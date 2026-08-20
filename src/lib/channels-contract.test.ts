@@ -1,3 +1,5 @@
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import {
   channelIncomingWebhookMessageSchema,
@@ -20,6 +22,14 @@ import {
 const projectId = "11111111-1111-4111-8111-111111111111";
 const agentId = "22222222-2222-4222-8222-222222222222";
 const clientMessageId = "33333333-3333-4333-8333-333333333333";
+const decode = <S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+  input: unknown,
+) => Schema.decodeUnknownSync(schema)(input);
+const accepts = <S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+  input: unknown,
+) => Option.isSome(Schema.decodeUnknownOption(schema)(input));
 
 describe("Agent input limits", () => {
   const skill = (index: number) => ({
@@ -33,43 +43,43 @@ describe("Agent input limits", () => {
   });
 
   it("accepts 20000-character responsibility and Skill instructions", () => {
-    expect(channelAgentSkillInputSchema.safeParse(skill(0)).success).toBe(true);
-    expect(organizationAgentInputSchema.safeParse({
+    expect(accepts(channelAgentSkillInputSchema, skill(0))).toBe(true);
+    expect(accepts(organizationAgentInputSchema, {
       name: "Builder",
       provider: "codex",
       responsibility: "x".repeat(agentResponsibilityMaxLength),
       skills: Array.from({ length: agentSkillsMaxCount }, (_, index) =>
         skill(index)
       ),
-    }).success).toBe(true);
+    })).toBe(true);
   });
 
   it("rejects responsibility, instructions, and rosters above their limits", () => {
-    expect(channelAgentSkillInputSchema.safeParse({
+    expect(accepts(channelAgentSkillInputSchema, {
       ...skill(0),
       instructions: "x".repeat(agentSkillInstructionsMaxLength + 1),
-    }).success).toBe(false);
-    expect(organizationAgentInputSchema.safeParse({
+    })).toBe(false);
+    expect(accepts(organizationAgentInputSchema, {
       name: "Builder",
       provider: "codex",
       responsibility: "x".repeat(agentResponsibilityMaxLength + 1),
       skills: [],
-    }).success).toBe(false);
-    expect(organizationAgentInputSchema.safeParse({
+    })).toBe(false);
+    expect(accepts(organizationAgentInputSchema, {
       name: "Builder",
       provider: "codex",
       responsibility: "Build the project.",
       skills: Array.from({ length: agentSkillsMaxCount + 1 }, (_, index) =>
         skill(index)
       ),
-    }).success).toBe(false);
+    })).toBe(false);
   });
 });
 
 describe("channel message contract", () => {
   it("canonicalizes UUID request fields before database comparisons", () => {
     expect(
-      channelMessageInputSchema.parse({
+      decode(channelMessageInputSchema, {
         body: "@Honey reply in the thread",
         clientMessageId: clientMessageId.toUpperCase(),
         parentMessageId: projectId.toUpperCase(),
@@ -86,15 +96,15 @@ describe("channel message contract", () => {
 
   it("canonicalizes channel proposal accept project IDs", () => {
     expect(
-      channelProposalAcceptInputSchema.parse({
+      decode(channelProposalAcceptInputSchema, {
         projectId: projectId.toUpperCase(),
       }),
     ).toEqual({ projectId, execution: null });
-    expect(channelProposalAcceptInputSchema.parse({})).toEqual({
+    expect(decode(channelProposalAcceptInputSchema, {})).toEqual({
       projectId: null,
       execution: null,
     });
-    expect(channelProposalAcceptInputSchema.parse({
+    expect(decode(channelProposalAcceptInputSchema, {
       projectId,
       execution: {
         provider: "codex",
@@ -180,20 +190,20 @@ describe("channel message contract", () => {
 
 describe("channel webhook contract", () => {
   it("trims bounded names and message fields without accepting extra input", () => {
-    expect(channelWebhookInputSchema.parse({ name: " Deploy notifier " }))
+    expect(decode(channelWebhookInputSchema, { name: " Deploy notifier " }))
       .toEqual({ name: "Deploy notifier" });
-    expect(channelIncomingWebhookMessageSchema.parse({
+    expect(decode(channelIncomingWebhookMessageSchema, {
       text: " Deployment complete ",
       eventId: " deploy-42 ",
     })).toEqual({ text: "Deployment complete", eventId: "deploy-42" });
-    expect(channelIncomingWebhookMessageSchema.safeParse({
+    expect(accepts(channelIncomingWebhookMessageSchema, {
       text: "Deployment complete",
       channelId: projectId,
-    }).success).toBe(false);
+    })).toBe(false);
   });
 
   it("accepts core Slack-compatible blocks and derives a readable fallback", () => {
-    const input = channelIncomingWebhookMessageSchema.parse({
+    const input = decode(channelIncomingWebhookMessageSchema, {
       blocks: [
         {
           type: "header",
@@ -224,18 +234,18 @@ describe("channel webhook contract", () => {
   });
 
   it("requires visible content and rejects unsupported interactive blocks", () => {
-    expect(channelIncomingWebhookMessageSchema.safeParse({
+    expect(accepts(channelIncomingWebhookMessageSchema, {
       blocks: [{ type: "divider" }],
-    }).success).toBe(false);
-    expect(channelIncomingWebhookMessageSchema.safeParse({
+    })).toBe(false);
+    expect(accepts(channelIncomingWebhookMessageSchema, {
       blocks: [{ type: "actions", elements: [] }],
-    }).success).toBe(false);
+    })).toBe(false);
   });
 });
 
 describe("channel reply completion contract", () => {
   it("keeps delegation null for rolling-compatible ordinary replies", () => {
-    expect(channelReplyCompletionSchema.parse({
+    expect(decode(channelReplyCompletionSchema, {
       body: "Answer",
       document: null,
       issueProposal: null,
@@ -250,7 +260,7 @@ describe("channel reply completion contract", () => {
   });
 
   it("accepts only an isolated saved Skill execution marker", () => {
-    expect(channelReplyCompletionSchema.parse({
+    expect(decode(channelReplyCompletionSchema, {
       body: "I matched the release Skill and prepared an approval.",
       document: null,
       issueProposal: null,
@@ -261,17 +271,17 @@ describe("channel reply completion contract", () => {
       delegation: null,
     });
 
-    expect(channelReplyCompletionSchema.safeParse({
+    expect(accepts(channelReplyCompletionSchema, {
       body: "Unsafe combined proposal",
       document: null,
       issueProposal: null,
       executionProposal: { projectId, runId: projectId },
       skillExecutionProposal: { type: "request_agent_skill_execute" },
-    }).success).toBe(false);
+    })).toBe(false);
   });
 
   it("accepts one bounded structured Project Agent delegation", () => {
-    expect(channelReplyCompletionSchema.parse({
+    expect(decode(channelReplyCompletionSchema, {
       body: "I asked the project Agent to inspect the repository.",
       document: null,
       issueProposal: null,
@@ -290,7 +300,7 @@ describe("channel reply completion contract", () => {
   });
 
   it("does not combine a delegation with an artifact or accept extra authority", () => {
-    const combined = channelReplyCompletionSchema.safeParse({
+    const combined = accepts(channelReplyCompletionSchema, {
       body: "Delegating and proposing.",
       document: {
         title: "Plan",
@@ -300,9 +310,9 @@ describe("channel reply completion contract", () => {
       issueProposal: null,
       delegation: { projectId, agentId, request: "Inspect it." },
     });
-    expect(combined.success).toBe(false);
+    expect(combined).toBe(false);
 
-    const expanded = channelReplyCompletionSchema.safeParse({
+    const expanded = accepts(channelReplyCompletionSchema, {
       body: "Delegating.",
       document: null,
       issueProposal: null,
@@ -313,7 +323,7 @@ describe("channel reply completion contract", () => {
         provider: "codex",
       },
     });
-    expect(expanded.success).toBe(false);
+    expect(expanded).toBe(false);
   });
 
   it("only lets new issue proposals request backlog creation", () => {
@@ -331,13 +341,13 @@ describe("channel reply completion contract", () => {
         },
       },
     };
-    expect(channelReplyCompletionSchema.safeParse(proposal).success).toBe(true);
-    expect(channelReplyCompletionSchema.safeParse({
+    expect(accepts(channelReplyCompletionSchema, proposal)).toBe(true);
+    expect(accepts(channelReplyCompletionSchema, {
       ...proposal,
       issueProposal: {
         ...proposal.issueProposal,
         issue: { ...proposal.issueProposal.issue, status: "queued" },
       },
-    }).success).toBe(false);
+    })).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-use std::{cell::Cell, ptr::NonNull, sync::OnceLock};
+use std::{cell::Cell, path::Path, ptr::NonNull, sync::OnceLock};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use block2::{DynBlock, RcBlock};
@@ -9,7 +9,7 @@ use objc2::{
     runtime::{Bool, ProtocolObject},
     AnyThread,
 };
-use objc2_foundation::{NSError, NSObject, NSObjectProtocol, NSString};
+use objc2_foundation::{NSBundle, NSError, NSObject, NSObjectProtocol, NSString};
 use objc2_user_notifications::{
     UNAuthorizationOptions, UNMutableNotificationContent, UNNotification,
     UNNotificationDefaultActionIdentifier, UNNotificationPresentationOptions,
@@ -25,6 +25,28 @@ use crate::{
 const NOTIFICATION_ID_PREFIX: &str = "briar-inbox:v1:";
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
+
+const NOTIFICATION_BUNDLE_ERROR: &str =
+    "Native macOS notifications require Briar to run from an application bundle";
+
+fn is_application_bundle(bundle_path: &str, has_bundle_identifier: bool) -> bool {
+    has_bundle_identifier
+        && Path::new(bundle_path)
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("app"))
+}
+
+fn notification_center() -> Result<Retained<UNUserNotificationCenter>, String> {
+    let bundle = NSBundle::mainBundle();
+    if !is_application_bundle(
+        &bundle.bundlePath().to_string(),
+        bundle.bundleIdentifier().is_some(),
+    ) {
+        return Err(NOTIFICATION_BUNDLE_ERROR.to_string());
+    }
+
+    Ok(UNUserNotificationCenter::currentNotificationCenter())
+}
 
 fn notification_id(target: &InboxNotificationTarget) -> Result<String, String> {
     let payload = serde_json::to_vec(target).map_err(|error| error.to_string())?;
@@ -99,33 +121,33 @@ impl InboxNotificationDelegate {
     }
 }
 
-pub(crate) fn install(app: &AppHandle) {
+pub(crate) fn install(app: &AppHandle) -> Result<(), String> {
+    let center = notification_center()?;
     let _ = APP_HANDLE.set(app.clone());
     static DELEGATE: OnceLock<Retained<InboxNotificationDelegate>> = OnceLock::new();
     DELEGATE.get_or_init(|| {
         let delegate = InboxNotificationDelegate::new();
-        UNUserNotificationCenter::currentNotificationCenter()
-            .setDelegate(Some(ProtocolObject::from_ref(&*delegate)));
+        center.setDelegate(Some(ProtocolObject::from_ref(&*delegate)));
         delegate
     });
+    Ok(())
 }
 
 pub(crate) async fn request_permission() -> Result<bool, String> {
     let (sender, receiver) = oneshot::channel::<Result<bool, String>>();
     let sender = Cell::new(Some(sender));
-    UNUserNotificationCenter::currentNotificationCenter()
-        .requestAuthorizationWithOptions_completionHandler(
-            UNAuthorizationOptions::Alert | UNAuthorizationOptions::Sound,
-            &RcBlock::new(move |granted: Bool, error: *mut NSError| {
-                let Some(sender) = sender.take() else {
-                    return;
-                };
-                let result = NonNull::new(error)
-                    .map(|error| unsafe { error.as_ref() }.localizedDescription().to_string())
-                    .map_or_else(|| Ok(granted.as_bool()), Err);
-                let _ = sender.send(result);
-            }),
-        );
+    notification_center()?.requestAuthorizationWithOptions_completionHandler(
+        UNAuthorizationOptions::Alert | UNAuthorizationOptions::Sound,
+        &RcBlock::new(move |granted: Bool, error: *mut NSError| {
+            let Some(sender) = sender.take() else {
+                return;
+            };
+            let result = NonNull::new(error)
+                .map(|error| unsafe { error.as_ref() }.localizedDescription().to_string())
+                .map_or_else(|| Ok(granted.as_bool()), Err);
+            let _ = sender.send(result);
+        }),
+    );
     receiver
         .await
         .map_err(|_| "Notification permission request was cancelled".to_string())?
@@ -136,6 +158,7 @@ pub(crate) fn show(
     body: String,
     target: InboxNotificationTarget,
 ) -> Result<(), String> {
+    let center = notification_center()?;
     let identifier = notification_id(&target)?;
     let content = UNMutableNotificationContent::new();
     content.setTitle(&NSString::from_str(&title));
@@ -147,18 +170,17 @@ pub(crate) fn show(
         None,
     );
 
-    UNUserNotificationCenter::currentNotificationCenter()
-        .addNotificationRequest_withCompletionHandler(
-            &request,
-            Some(&RcBlock::new(move |error: *mut NSError| {
-                if let Some(error) = NonNull::new(error) {
-                    eprintln!(
-                        "Inbox notification failed: {}",
-                        unsafe { error.as_ref() }.localizedDescription()
-                    );
-                }
-            })),
-        );
+    center.addNotificationRequest_withCompletionHandler(
+        &request,
+        Some(&RcBlock::new(move |error: *mut NSError| {
+            if let Some(error) = NonNull::new(error) {
+                eprintln!(
+                    "Inbox notification failed: {}",
+                    unsafe { error.as_ref() }.localizedDescription()
+                );
+            }
+        })),
+    );
     Ok(())
 }
 
@@ -209,5 +231,16 @@ mod tests {
             target_from_notification_id("briar-inbox:v1:not-base64"),
             None
         );
+    }
+
+    #[test]
+    fn only_initializes_native_notifications_for_application_bundles() {
+        assert!(!is_application_bundle("/tmp/briar/target/debug", false));
+        assert!(!is_application_bundle(
+            "/tmp/briar/target/debug/briar",
+            true
+        ));
+        assert!(!is_application_bundle("/Applications/Briar.app", false));
+        assert!(is_application_bundle("/Applications/Briar.app", true));
     }
 }

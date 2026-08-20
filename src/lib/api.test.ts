@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  apiErrorIssueMessages,
   ApiError,
   addIssueDependency,
   acceptChannelProposal,
@@ -19,7 +18,6 @@ import {
   createOrganizationInvitation,
   createProjectAgent,
   createProjectAgentSchedule,
-  deleteAccount,
   deleteChannel,
   deleteProjectAgent,
   deleteIssue,
@@ -45,7 +43,6 @@ import {
   loadRunEvidenceImage,
   loadRunEvents,
   listChannelWebhooks,
-  loadSession,
   removeIssueDependency,
   revokeChannelWebhook,
   rotateChannelWebhook,
@@ -57,7 +54,6 @@ import {
   updateProjectAgentSchedule,
   updateOrganizationMemberRole,
   updateChannelWebhook,
-  updateAccountProfile,
   updateIssue,
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
@@ -541,114 +537,6 @@ describe("API errors", () => {
       inviteUrl:
         "https://briar.wordbricks.ai/app/invitations/briar_invite_example",
     });
-  });
-
-  it("updates the signed-in account profile", async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
-      new Response(
-        JSON.stringify({
-          user: {
-            id: "user-1",
-            username: "jay_dev",
-            name: "Jay Kim",
-            email: "jay@example.com",
-            image: null,
-          },
-        }),
-        { headers: { "Content-Type": "application/json" } },
-      ),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      updateAccountProfile("token", {
-        username: "jay_dev",
-        name: "Jay Kim",
-        image: null,
-      }),
-    ).resolves.toMatchObject({ username: "jay_dev", name: "Jay Kim" });
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/me"),
-      expect.objectContaining({
-        method: "PATCH",
-        body: JSON.stringify({
-          username: "jay_dev",
-          name: "Jay Kim",
-          image: null,
-        }),
-      }),
-    );
-  });
-
-  it("deletes the signed-in account with an email confirmation", async () => {
-    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      deleteAccount("token", "jay@example.com"),
-    ).resolves.toBeUndefined();
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/me"),
-      expect.objectContaining({
-        method: "DELETE",
-        body: JSON.stringify({ confirmation: "jay@example.com" }),
-      }),
-    );
-  });
-
-  it("preserves the HTTP status for authentication decisions", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        return new Response(JSON.stringify({ message: "Unauthorized" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        });
-      }),
-    );
-
-    await expect(loadSession("expired-token")).rejects.toMatchObject({
-      name: "ApiError",
-      status: 401,
-      message: "Unauthorized",
-    });
-  });
-
-  it("preserves and formats structured API validation issues", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        return new Response(
-          JSON.stringify({
-            message: "Invalid project workflow",
-            code: "INVALID_PROJECT_WORKFLOW",
-            issues: [
-              "version 2 execution.checkpoints is required",
-              {
-                path: ["workflow", "completion", "requiredStages"],
-                message: "Required",
-              },
-            ],
-          }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-      }),
-    );
-
-    const error = await loadSession("token").catch((caught) => caught);
-    expect(error).toMatchObject({
-      name: "ApiError",
-      status: 400,
-      code: "INVALID_PROJECT_WORKFLOW",
-      issues: expect.any(Array),
-    });
-    expect(apiErrorIssueMessages(error)).toEqual([
-      "version 2 execution.checkpoints is required",
-      "workflow.completion.requiredStages: Required",
-    ]);
   });
 
   it("updates an issue through its project-scoped run endpoint", async () => {

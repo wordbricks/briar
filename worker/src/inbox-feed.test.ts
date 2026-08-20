@@ -3,7 +3,10 @@ import {
   buildInboxFeedMessages,
   type InboxFeedProjectData,
 } from "./inbox-feed";
-import { mobileInboxFeedResponseSchema } from "./mobile-contract";
+import {
+  mobileInboxFeedResponseSchema,
+} from "./mobile-contract";
+import { decodeMobileSchema } from "./mobile-contract-schema";
 
 const occurredAt = "2026-08-11T13:00:00.000Z";
 const currentUserId = "inbox-user-a";
@@ -70,7 +73,7 @@ describe("organization Inbox feed", () => {
       currentUserId,
     );
 
-    expect(() => mobileInboxFeedResponseSchema.parse({
+    expect(() => decodeMobileSchema(mobileInboxFeedResponseSchema, {
       messages,
       subscribedIssueIds: [],
       generatedAt: "2026-08-11T13:02:00.000Z",
@@ -117,7 +120,7 @@ describe("organization Inbox feed", () => {
       created_at: occurredAt,
     }], currentUserId);
 
-    expect(() => mobileInboxFeedResponseSchema.parse({
+    expect(() => decodeMobileSchema(mobileInboxFeedResponseSchema, {
       messages,
       subscribedIssueIds: [],
       generatedAt: "2026-08-11T13:02:00.000Z",
@@ -203,7 +206,7 @@ describe("organization Inbox feed", () => {
 
     const messages = buildInboxFeedMessages([second], [], currentUserId);
 
-    expect(() => mobileInboxFeedResponseSchema.parse({
+    expect(() => decodeMobileSchema(mobileInboxFeedResponseSchema, {
       messages,
       subscribedIssueIds: [],
       generatedAt: "2026-08-11T13:02:00.000Z",

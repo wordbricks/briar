@@ -41,8 +41,6 @@ import {
   listExecutionWorkers,
   listOrganizationExecutionProviders,
   listOrganizationExecutionWorkers,
-  latestExecutionWorkerUpdateHandoff,
-  pendingExecutionWorkerUpdate,
   MAX_CLAIM_ATTEMPTS,
   reapStalledHuntRuns,
   recordWorkerHeartbeat,
@@ -58,6 +56,10 @@ import {
   workerStateAt,
   WORKER_CREDENTIAL_TOUCH_INTERVAL_MS,
 } from "./workers";
+import {
+  latestExecutionWorkerUpdateHandoff,
+  pendingExecutionWorkerUpdate,
+} from "./worker-update-repository";
 import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
 
 const projectId = "11111111-1111-4111-8111-111111111111";

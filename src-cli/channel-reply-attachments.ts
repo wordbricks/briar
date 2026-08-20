@@ -1,6 +1,7 @@
 import { access, readFile, stat } from "node:fs/promises";
 import { basename, isAbsolute, resolve } from "node:path";
-import { z } from "zod";
+import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
 import { channelReplyCompletionSchema } from "../src/lib/channels-contract";
 import {
   issueAttachmentMimeTypeFromName,
@@ -10,35 +11,46 @@ import { isPathWithinRoot } from "./worktree";
 
 const maxChannelReplyAttachmentPathLength = 4096;
 
-export const channelReplyAgentAttachmentsSchema = z
-  .array(z.string().trim().min(1).max(maxChannelReplyAttachmentPathLength))
-  .max(5)
-  .default([]);
+const ChannelReplyAttachmentPaths = Schema.mutable(
+  Schema.Array(
+    Schema.Trim.check(
+      Schema.isLengthBetween(1, maxChannelReplyAttachmentPathLength),
+    ),
+  ),
+).check(Schema.isMaxLength(5));
+
+const decodeChannelReplyAttachmentPaths = Schema.decodeUnknownSync(
+  ChannelReplyAttachmentPaths,
+);
+const decodeChannelReplyCompletion = Schema.decodeUnknownSync(
+  channelReplyCompletionSchema,
+);
+
+type ChannelReplyCompletion = typeof channelReplyCompletionSchema.Type;
 
 export function parseChannelReplyAgentResult(parsed: unknown): {
-  result: z.infer<typeof channelReplyCompletionSchema>;
+  result: ChannelReplyCompletion;
   attachmentPaths: string[];
 } {
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+  if (!Predicate.isObject(parsed)) {
     return {
-      result: channelReplyCompletionSchema.parse(parsed),
+      result: decodeChannelReplyCompletion(parsed),
       attachmentPaths: [],
     };
   }
-  const record = parsed as Record<string, unknown>;
-  if (record.contextRequests !== null && record.contextRequests !== undefined) {
+  if (parsed.contextRequests !== null && parsed.contextRequests !== undefined) {
     throw new Error("A completed channel reply cannot request more context");
   }
-  const attachmentPaths = channelReplyAgentAttachmentsSchema.parse(
-    record.attachments ?? [],
+  const attachmentPaths = decodeChannelReplyAttachmentPaths(
+    parsed.attachments ?? [],
   );
   const {
     attachments: _ignored,
     contextRequests: _contextRequests,
     ...rest
-  } = record;
+  } = parsed;
   return {
-    result: channelReplyCompletionSchema.parse(rest),
+    result: decodeChannelReplyCompletion(rest),
     attachmentPaths,
   };
 }
@@ -47,7 +59,7 @@ export function channelReplyCompleteRequestBody(input: {
   organizationId: string;
   workerId: string;
   claimToken: string;
-  result: z.infer<typeof channelReplyCompletionSchema>;
+  result: ChannelReplyCompletion;
   attachments: readonly File[];
 }) {
   const payload = {

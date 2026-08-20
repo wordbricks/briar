@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CHANNEL_ACTIVITY_PUBLISH_MAX_TTL_MS,
   CHANNEL_ACTIVITY_SOCKET_AUTHORIZATION_TTL_MS,
   CHANNEL_ACTIVITY_SOCKET_TICKET_TTL_MS,
   createChannelActivityPublishToken,
@@ -45,6 +46,42 @@ describe("channel activity credentials", () => {
         issued.token,
         "11111111-1111-4111-8111-111111111111",
         now + 1,
+      ),
+    ).resolves.toBeNull();
+  });
+
+  it("rejects tampered, expired, and excessively long publish credentials", async () => {
+    const issued = await createChannelActivityPublishToken("secret", {
+      ...identity,
+      expiresAt: now + 60_000,
+    });
+    await expect(
+      verifyChannelActivityPublishToken(
+        "secret",
+        `${issued.token}x`,
+        identity.replyJobId,
+        now + 1,
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      verifyChannelActivityPublishToken(
+        "secret",
+        issued.token,
+        identity.replyJobId,
+        now + 60_000,
+      ),
+    ).resolves.toBeNull();
+
+    const excessive = await createChannelActivityPublishToken("secret", {
+      ...identity,
+      expiresAt: now + CHANNEL_ACTIVITY_PUBLISH_MAX_TTL_MS + 1,
+    });
+    await expect(
+      verifyChannelActivityPublishToken(
+        "secret",
+        excessive.token,
+        identity.replyJobId,
+        now,
       ),
     ).resolves.toBeNull();
   });

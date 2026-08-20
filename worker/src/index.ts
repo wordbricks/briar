@@ -1,4 +1,6 @@
-import { z } from "zod";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as SchemaIssue from "effect/SchemaIssue";
 import briarIconPng from "../../src/assets/app-icons/aubergine-riso.png";
 import {
   AutoHuntWorkflowValidationError,
@@ -18,22 +20,21 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import {
-  structuredAgentResultSchema,
+  decodeStructuredAgentResultOption,
   type StructuredAgentResult,
 } from "../../src/lib/agent-result";
-import { agentExecutionCostRecordSchema } from "../../src/lib/agent-execution-cost";
 import {
-  agentExecutionMetricsSchema,
-  agentExecutionUsageRecordSchema,
+  decodeAgentExecutionMetricsOption,
 } from "../../src/lib/agent-execution-metrics";
 import {
-  agentProviderLabels,
-  agentProviderCapabilityCatalogSchema,
+  decodeAgentProviderCapabilityCatalogOption,
   mergeAgentProviderCapabilityCatalogs,
-  agentProviders,
-  modelEffortSchema,
-  type AgentProvider,
 } from "../../src/lib/agent-provider-contract";
+import {
+  agentProviderLabels,
+  agentProviders,
+  type AgentProvider,
+} from "../../src/lib/agent-provider";
 import {
   agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
@@ -74,7 +75,7 @@ import {
 import {
   CHANNEL_AGENT_ACTIVITY_STALE_MS,
   CHANNEL_AGENT_ACTIVITY_VERSION,
-  channelAgentActivityPublishInputSchema,
+  ChannelAgentActivityPublishInput,
   type ChannelAgentActivityFrame,
   type IssueAgentActivityFrame,
 } from "../../src/lib/channel-agent-activity";
@@ -96,16 +97,16 @@ import {
   type ProjectUsagePeriod,
 } from "../../src/lib/project-usage-summary";
 import {
-  organizationAgentContextAgentsPageSchema,
-  organizationAgentContextDescriptorSchema,
-  organizationAgentContextIssuePullRequestsPageSchema,
-  organizationAgentContextIssuesPageSchema,
-  organizationAgentContextLookupInputSchema,
-  organizationAgentContextLookupResponseSchema,
-  organizationAgentContextManifestSchema,
-  organizationAgentContextProjectsPageSchema,
-  organizationAgentContextQuerySchema,
-  organizationAgentContextSessionsPageSchema,
+  decodeOrganizationAgentContextAgentsPage,
+  decodeOrganizationAgentContextDescriptor,
+  decodeOrganizationAgentContextIssuePullRequestsPage,
+  decodeOrganizationAgentContextIssuesPage,
+  decodeOrganizationAgentContextLookupInput,
+  decodeOrganizationAgentContextLookupResponse,
+  decodeOrganizationAgentContextManifest,
+  decodeOrganizationAgentContextProjectsPage,
+  decodeOrganizationAgentContextQuery,
+  decodeOrganizationAgentContextSessionsPage,
 } from "../../src/lib/organization-agent-context-contract";
 import {
   authEmailSenderFromEnv,
@@ -121,11 +122,36 @@ import {
   uploadStoredAttachments,
 } from "./attachment-storage";
 import {
-  mobileCurrentUserResponseSchema,
-  mobileHealthResponseSchema,
-  mobileProjectsResponseSchema,
+  decodeMobileCurrentUserResponse,
+  decodeMobileHealthResponse,
+  decodeMobileProjectsResponse,
 } from "./mobile-contract";
 import { buildInboxFeedMessages } from "./inbox-feed";
+import {
+  getDashboardSyncCursor,
+  listDashboardChanges,
+} from "./dashboard-change-repository";
+import {
+  listInboxReadStates,
+  upsertInboxReadStates,
+} from "./inbox-read-state-repository";
+import {
+  getOrganizationInvitationByTokenHash,
+  getOrganizationRole,
+  listOrganizationInvitations,
+  listOrganizationMembers,
+  listOrganizations,
+  type OrganizationInvitationRow,
+  type OrganizationMemberRow,
+  type OrganizationRole,
+  type OrganizationRow,
+} from "./organization-repository";
+import {
+  listOrganizationInboxProjects,
+  listOrganizationProjects,
+  listProjects,
+  type ProjectRow,
+} from "./project-repository";
 import {
   archiveCompletedLogs,
   backfillArchivedProjectAgentSessionSummaries,
@@ -208,9 +234,7 @@ import {
   getIssueAttachment,
   getIssueMessage,
   getRunEvidenceImage,
-  getOrganizationRole,
   getOrganizationInboxSyncVersion,
-  getOrganizationInvitationByTokenHash,
   getGithubConnectionByInstallation,
   getGithubConnectionForOrganization,
   getSlackInstallation,
@@ -223,7 +247,6 @@ import {
   projectAgentSessionIsApprovalOwned,
   getProjectAgentTaskJob,
   getProjectAgentTaskJobByRequest,
-  getDashboardSyncCursor,
   getHuntRunForProject,
   getRunExecutionAttempt,
   HuntClaimError,
@@ -247,19 +270,15 @@ import {
   listIssueThreadMessages,
   listIssueResultReviews,
   listIssueResultReviewsByRunIds,
-  listInboxReadStates,
   listEvidenceImagesForEvidence,
   listDashboardRuns,
   listDashboardRunsByIds,
-  listDashboardChanges,
   listHuntRunEvents,
   resolveHuntEventActorNames,
   listRunEvidence,
   listRunEvidenceImages,
   listRunStageRevisions,
-  listOrganizationMembers,
   listOrganizationStatusTrayRuns,
-  listOrganizationInvitations,
   listOrganizationUsageRuns,
   listOrganizationUsageExecutionAttempts,
   listOrganizationUsageCostRecords,
@@ -268,11 +287,7 @@ import {
   listProjectUsageTotals,
   listProjectUsageRuns,
   listGithubConnectionRepositories,
-  listOrganizationProjects,
-  listOrganizationInboxProjects,
   listOrganizationInboxRealtimeOutbox,
-  listOrganizations,
-  listProjects,
   listProjectAgents,
   listProjectAgentSessions,
   listProjectAgentSessionChanges,
@@ -333,7 +348,6 @@ import {
   deleteIssueMessage,
   updateSlackInstallationProject,
   acknowledgeOrganizationInboxRealtimeOutbox,
-  upsertInboxReadStates,
   upsertProjectAgentSession,
   upsertProjectAgentSessionSummary,
   upsertSlackInstallation,
@@ -352,22 +366,17 @@ import {
   type IssueReworkProposalRow,
   type IssueResultReviewRow,
   type IssueDependencyRow,
-  type ProjectRow,
   type ProjectAgentRow,
   type ProjectAgentSessionRow,
   type ProjectAgentScheduleRunRow,
   type ProjectAgentScheduleRow,
   type ProjectSettingsRow,
-  type OrganizationMemberRow,
   type OrganizationStatusTrayRunRow,
-  type OrganizationInvitationRow,
   type OrganizationUsageRunRow,
   type OrganizationCostRecordRow,
   type OrganizationUsageRecordRow,
   type ProjectUsageTotalRow,
   type RunExecutionAttemptRow,
-  type OrganizationRole,
-  type OrganizationRow,
   type RunEvidenceRow,
   type RunEvidenceImageInput,
   type RunEvidenceImageRow,
@@ -438,14 +447,9 @@ import {
   listExecutionWorkers,
   listOrganizationExecutionWorkers,
   listOrganizationExecutionProviders,
-  latestExecutionWorkerUpdateHandoff,
-  pendingExecutionWorkerUpdate,
   getProjectExecutionWorkerPolicy,
   hasExecutionWorkerReadinessChanged,
   isExecutionWorkerAllowedForProject,
-  MAX_WORKER_CONCURRENT_SESSIONS,
-  MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
-  MAX_TRANSCRIPT_HTTP_BODY_BYTES,
   WORKER_STALE_AFTER_MS,
   reapStalledHuntRuns,
   recordWorkerHeartbeat,
@@ -462,6 +466,114 @@ import {
   updateProjectExecutionWorkerPolicy,
   userOwnsExecutionWorkerDevice,
 } from "./workers";
+import {
+  latestExecutionWorkerUpdateHandoff,
+  pendingExecutionWorkerUpdate,
+} from "./worker-update-repository";
+import { MAX_WORKER_CONCURRENT_SESSIONS } from "./worker-limits";
+import { MAX_TRANSCRIPT_HTTP_BODY_BYTES } from "./transcript-limits";
+import {
+  decodeTranscriptRequestEffect,
+  TranscriptRequestDecodeError,
+} from "./transcript-request";
+import {
+  decodeRequestSync,
+  RequestDecodeError,
+} from "./request-schema";
+import {
+  decodeAccountDeletionInput,
+  decodeAccountProfileInput,
+  decodeInboxReadStatesInput,
+  decodeOrganizationHandle,
+  decodeOrganizationInput,
+  decodeOrganizationInvitationInput,
+  decodeOrganizationLogoInput,
+  decodeOrganizationMemberInput,
+  decodeOrganizationMemberRoleInput,
+  decodeOrganizationUpdateInput,
+  decodeProjectAgentScheduleBatchClaim,
+  decodeSlackOAuthInput,
+} from "./account-organization-request-contract";
+import {
+  decodeAgentSkillExecutionProposalAcceptInput,
+  decodeExecutionPreferences,
+  decodeIssueAgentReplyCompletion,
+  decodeIssueAgentReplyLease,
+  decodeIssueCreateProposalAction,
+  decodeIssueInput,
+  decodeIssueKeptAttachmentIds,
+  decodeIssueMessageEditInput,
+  decodeIssueMessageInput,
+  decodeIssueUpdateProposalAction,
+  decodeIssueUpdateInput,
+  decodeLinearApiKeyInput,
+  decodeLinearImportInput,
+  decodeLinearStatesInput,
+  type IssueInput,
+  type IssueUpdateInput,
+} from "./issue-request-contract";
+import {
+  decodeOrganizationAgentWrite,
+  decodeProjectAgentInput,
+  decodeProjectAgentScheduleInput,
+  decodeProjectAgentSessionInput,
+  decodeProjectAgentTaskClaimInput,
+  decodeProjectAgentTaskCompletion,
+  decodeProjectAgentTaskInput,
+  decodeProjectAgentTaskLease,
+  decodeProjectIconInput,
+  decodeProjectInput,
+  decodeProjectIssueKeyPrefixInput,
+  decodeProjectTabsInput,
+  decodeProjectTransferInput,
+} from "./project-request-contract";
+import {
+  decodeCheckpointPolicyInput,
+  decodeIssueCheckpointsInput,
+  decodeMoveRunInput,
+  decodePausedRunReworkInput,
+  decodeProjectUsagePeriod,
+  decodeRecoveryAgentInput,
+  decodeRecoveryUserInput,
+  decodeResumeAgentInput,
+  decodeResumeUserInput,
+  decodeRunEvent,
+  decodeRunEvidenceInput,
+  decodeRunReworkInput,
+  decodeRequestIdInput,
+  decodeUsageRangeDays,
+  decodeWorkflowStageLifecycleInput,
+  parseProjectSettingsInput,
+  ProjectWorkflowInputError,
+  type ResumeUserInput,
+} from "./run-request-contract";
+import {
+  decodeChannelMessageQuery,
+  decodeMessageLimit,
+  decodeProjectChannelMessageQuery,
+  decodeUuidOption,
+} from "./query-contract";
+import {
+  decodeClaimInput,
+  decodeDispatchRun,
+  decodeExecutionWorkerPolicy,
+  decodeIssueReplyClaimInput,
+  decodeLeaseRenew,
+  decodeProjectAgentScheduleRunCompletion,
+  decodeProjectAgentScheduleRunRenew,
+  decodeWorkerBind,
+  decodeWorkerClaimInput,
+  decodeWorkerConcurrency,
+  decodeWorkerHeartbeat,
+  decodeWorkerLabel,
+  decodeWorkerRegister,
+  decodeWorkerSettings,
+} from "./worker-request-contract";
+import {
+  decodeWorkerUpdateHandoff,
+  decodeWorkerUpdatePrepare,
+  decodeWorkerUpdateRequestId,
+} from "./worker-update-contract";
 import {
   ingestAgentTranscript,
   listAgentTranscriptSegments,
@@ -609,6 +721,7 @@ import {
   channelProposalAcceptInputSchema,
   channelReplyClaimTokenHeader,
   channelReplyClaimInputSchema,
+  type ChannelExecutionProposalAcceptInput,
   channelReplyCompleteInputSchema,
   channelReplyLeaseInputSchema,
   channelReplyNoAvailableWorkerError,
@@ -660,6 +773,41 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Expose-Headers": "ETag",
 };
+
+const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
+const decodeChannelAgentActivityPublishInput = decodeRequestSync(
+  ChannelAgentActivityPublishInput,
+);
+const decodeChannelReplyCompleteInput = decodeRequestSync(
+  channelReplyCompleteInputSchema,
+);
+const decodeChannelMessageInput = decodeRequestSync(channelMessageInputSchema);
+const decodeChannelInput = decodeRequestSync(channelInputSchema);
+const decodeChannelReadInput = decodeRequestSync(channelReadInputSchema);
+const decodeChannelUpdateInput = decodeRequestSync(channelUpdateInputSchema);
+const decodeChannelMemberInput = decodeRequestSync(channelMemberInputSchema);
+const decodeChannelWebhookInput = decodeRequestSync(channelWebhookInputSchema);
+const decodeChannelMessageReactionInput = decodeRequestSync(
+  channelMessageReactionInputSchema,
+);
+const decodeChannelProposalAcceptInput = decodeRequestSync(
+  channelProposalAcceptInputSchema,
+);
+const decodeChannelIssueProposalPayload = decodeRequestSync(
+  channelIssueProposalPayloadSchema,
+);
+const decodeChannelExecutionProposalAcceptInput = decodeRequestSync(
+  channelExecutionProposalAcceptInputSchema,
+);
+const decodeChannelReplyClaimInput = decodeRequestSync(
+  channelReplyClaimInputSchema,
+);
+const decodeChannelReplyLeaseInput = decodeRequestSync(
+  channelReplyLeaseInputSchema,
+);
+const decodeChannelIncomingWebhookMessage = decodeRequestSync(
+  channelIncomingWebhookMessageSchema,
+);
 
 export async function flushOrganizationInboxRealtimeOutbox(
   env: Env,
@@ -1087,16 +1235,6 @@ export function legacyAgentSkillInstructions(
   return activeSkill?.instructions ?? fallback;
 }
 
-export const usageRangeDaysSchema = z.preprocess(
-  (value) =>
-    typeof value === "string" && value.trim() !== ""
-      ? Number(value)
-      : value,
-  z.union([z.literal(7), z.literal(30), z.literal(90)]),
-);
-
-export const projectUsagePeriodSchema = z.enum(["day", "week", "month"]);
-
 export const organizationUsageQuerySince = (
   days: 7 | 30 | 90,
   now: number = Date.now(),
@@ -1484,9 +1622,9 @@ async function approveChannelExecutionProposalRequest(input: {
   project: Pick<ProjectRow, "id" | "organization_id">;
   proposal: LiveChannelExecutionProposal;
   userId: string;
-  selection: z.infer<typeof channelExecutionProposalAcceptInputSchema>;
+  selection: ChannelExecutionProposalAcceptInput;
 }) {
-  dispatchExecutionPreferencesSchema.parse({
+  decodeExecutionPreferences({
     provider: input.selection.provider,
     model: input.selection.model,
     effort: input.selection.effort,
@@ -1686,95 +1824,6 @@ function readMultipartJsonArray(
   }
 }
 
-class ProjectWorkflowInputError extends Error {
-  readonly code = "INVALID_PROJECT_WORKFLOW";
-
-  constructor(readonly issues: readonly unknown[]) {
-    super("Invalid project workflow");
-    this.name = "ProjectWorkflowInputError";
-  }
-}
-
-const runStatusSchema = z.enum(autoHuntPersistedRunStatuses);
-const workflowStageIdSchema = z
-  .string()
-  .trim()
-  .regex(/^[a-z][a-z0-9_-]{0,63}$/u);
-const workflowCheckpointSchema = z
-  .object({
-    key: workflowStageIdSchema,
-    stage: workflowStageIdSchema,
-    position: z.enum(["before", "after"]),
-  })
-  .strict();
-const evidenceTypeSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(autoHuntEvidenceTypeMaxLength)
-  .regex(autoHuntEvidenceTypePattern);
-const workflowSchema = z
-  .object({
-    version: z.literal(2),
-    requirements: z
-      .array(
-        z.object({
-          id: workflowStageIdSchema,
-          label: z.string().trim().min(1).max(80),
-          kind: z.enum(autoHuntRequirementKinds),
-          tool: z.string().trim().regex(/^[a-zA-Z0-9_.+-]+$/u).max(80),
-          reason: z.string().trim().min(1).max(200),
-        }).strict(),
-      )
-      .max(30)
-      .optional(),
-    stages: z
-      .array(
-        z
-          .object({
-            id: workflowStageIdSchema,
-            label: z.string().trim().min(1).max(80),
-            required: z.boolean(),
-            evidence: z
-              .array(evidenceTypeSchema)
-              .max(20)
-              .optional(),
-            checks: z
-              .array(z.string().trim().min(1).max(500))
-              .max(20)
-              .optional(),
-          })
-          .strict(),
-      )
-      .min(1)
-      .max(30),
-    completion: z
-      .object({
-        requiredStages: z.array(workflowStageIdSchema).max(30),
-      })
-      .strict()
-      .optional(),
-    execution: z
-      .object({
-        checkpoints: z
-          .array(
-            z
-              .object({
-                key: workflowStageIdSchema,
-                stage: workflowStageIdSchema,
-                position: z.enum(["before", "after"]),
-              })
-              .strict(),
-          )
-          .max(100)
-          .optional(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict()
-  .transform(normalizeAutoHuntWorkflow);
-
 const dashboardStageForProgress = (
   status: AutoHuntRunStatus,
   workflowStage: AutoHuntWorkflowStageId | null,
@@ -1804,175 +1853,6 @@ const dashboardStageForProgress = (
     ? (workflowStage as DashboardStage)
     : "implementing";
 };
-const nullableTrimmed = (max: number) =>
-  z.string().trim().min(1).max(max).nullable().optional();
-const httpsUrl = z
-  .string()
-  .url()
-  .max(1_000)
-  .refine(
-    (value) => new URL(value).protocol === "https:",
-    "HTTPS URL required",
-  );
-const trackerSchema = z
-  .object({
-    provider: z.string().trim().min(1).max(50),
-    issueId: nullableTrimmed(200),
-    identifier: nullableTrimmed(100),
-    url: httpsUrl.nullable().optional(),
-    state: nullableTrimmed(100),
-  })
-  .strict();
-
-export const eventSchema = z
-  .object({
-    runId: z.string().uuid().nullable().optional(),
-    source: z.enum(autoHuntSources).nullable().optional(),
-    sourceKey: z.string().trim().min(1).max(200).nullable().optional(),
-    title: z.string().trim().min(1).max(300).nullable().optional(),
-    status: runStatusSchema,
-    workflowStage: workflowStageIdSchema.nullable().optional(),
-    eventKey: z.string().trim().min(1).max(300),
-    occurredAt: z.string().datetime({ offset: true }),
-    actor: z.string().trim().min(1).max(128),
-    repository: z.string().trim().min(1).max(500),
-    detail: z.string().max(4_000).nullable().optional(),
-    priority: z.number().int().min(1).max(4).nullable().optional(),
-    branch: nullableTrimmed(500),
-    commitSha: z
-      .string()
-      .regex(/^[0-9a-f]{7,64}$/u)
-      .nullable()
-      .optional(),
-    tracker: trackerSchema.nullable().optional(),
-    issueDescription: z.string().max(100_000).nullable().optional(),
-    resultSummary: z.string().max(100_000).nullable().optional(),
-    structuredResult: structuredAgentResultSchema.nullable().optional(),
-    pullRequestUrls: z
-      .array(httpsUrl)
-      .max(20)
-      .default([])
-      .transform((urls) => [...new Set(urls)].sort()),
-    targetSha: z
-      .string()
-      .regex(/^[0-9a-f]{7,64}$/u)
-      .nullable()
-      .optional(),
-    sourceCreatedAt: z
-      .string()
-      .datetime({ offset: true })
-      .nullable()
-      .optional(),
-    context: z.record(z.string(), z.unknown()).nullable().optional(),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    if (!input.runId && (!input.source || !input.sourceKey || !input.title)) {
-      context.addIssue({
-        code: "custom",
-        message: "source, sourceKey, and title are required without runId",
-        path: ["runId"],
-      });
-    }
-    if (input.status === "running" && !input.workflowStage) {
-      context.addIssue({
-        code: "custom",
-        message: "running progress requires a workflow stage",
-        path: ["workflowStage"],
-      });
-    }
-    if (input.status === "blocked" && !input.detail?.trim()) {
-      context.addIssue({
-        code: "custom",
-        message: "blocked progress requires technical blocker details",
-        path: ["detail"],
-      });
-    }
-    if (input.status === "blocked" && !input.structuredResult) {
-      context.addIssue({
-        code: "custom",
-        message: "blocked progress requires a structured blocked result",
-        path: ["structuredResult"],
-      });
-    }
-    if (
-      input.status === "blocked" &&
-      input.structuredResult &&
-      input.structuredResult.outcome !== "blocked"
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "blocked progress requires a blocked structured outcome",
-        path: ["structuredResult", "outcome"],
-      });
-    }
-    if (
-      input.status === "blocked" &&
-      input.structuredResult &&
-      (!input.structuredResult.humanActionRequired ||
-        !input.structuredResult.nextAction)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "blocked progress requires an exact human next action",
-        path: ["structuredResult", "nextAction"],
-      });
-    }
-    if (input.status === "completed" && !input.structuredResult) {
-      context.addIssue({
-        code: "custom",
-        message: "completed runs require a structured result",
-        path: ["structuredResult"],
-      });
-    }
-    if (
-      input.status === "completed" &&
-      input.structuredResult &&
-      !["completed", "partial"].includes(input.structuredResult.outcome)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "completed runs require a completed or partial outcome",
-        path: ["structuredResult", "outcome"],
-      });
-    }
-    if (
-      input.resultSummary &&
-      input.structuredResult &&
-      input.resultSummary !== input.structuredResult.summary
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "resultSummary must match structuredResult.summary",
-        path: ["resultSummary"],
-      });
-    }
-    if (input.tracker?.provider === "linear" && input.tracker.url) {
-      if (new URL(input.tracker.url).hostname !== "linear.app") {
-        context.addIssue({
-          code: "custom",
-          message: "Linear tracker URLs must use linear.app",
-          path: ["tracker", "url"],
-        });
-      }
-    }
-  });
-
-export const runEvidenceInputSchema = z
-  .object({
-    evidenceKey: z.string().trim().min(1).max(300),
-    stage: workflowStageIdSchema,
-    type: evidenceTypeSchema,
-    status: z.enum(["pending", "passed", "failed", "skipped"]),
-    observedAt: z.string().datetime({ offset: true }),
-    actor: z.string().trim().min(1).max(128),
-    detail: z.string().max(100_000).nullable().optional(),
-    command: z.string().trim().min(1).max(2_000).nullable().optional(),
-    url: httpsUrl.nullable().optional(),
-    metadata: z.record(z.string(), z.unknown()).nullable().optional(),
-  })
-  .strict();
-
 export async function readRunEvidenceRequest(request: Request) {
   const form = await readBoundedMultipartForm(
     request,
@@ -1981,7 +1861,7 @@ export async function readRunEvidenceRequest(request: Request) {
   );
   if (!form) {
     return {
-      input: runEvidenceInputSchema.parse(await readJson(request)),
+      input: decodeRunEvidenceInput(await readJson(request)),
       images: [] as File[],
     };
   }
@@ -2001,7 +1881,7 @@ export async function readRunEvidenceRequest(request: Request) {
     "Evidence images must be files",
     validateEvidenceImages,
   );
-  return { input: runEvidenceInputSchema.parse(input), images };
+  return { input: decodeRunEvidenceInput(input), images };
 }
 
 export async function readChannelReplyCompleteRequest(request: Request) {
@@ -2012,7 +1892,7 @@ export async function readChannelReplyCompleteRequest(request: Request) {
   );
   if (!form) {
     return {
-      input: channelReplyCompleteInputSchema.parse(await readJson(request)),
+      input: decodeChannelReplyCompleteInput(await readJson(request)),
       attachments: [] as File[],
     };
   }
@@ -2035,550 +1915,15 @@ export async function readChannelReplyCompleteRequest(request: Request) {
   if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
     throw new HttpError(400, "Channel reply attachments must be images");
   }
-  const input = channelReplyCompleteInputSchema.parse(parsed);
+  const input = decodeChannelReplyCompleteInput(parsed);
   if (input.error && attachments.length > 0) {
     throw new HttpError(400, "A failed reply cannot include images");
   }
   return { input, attachments };
 }
 
-const projectInputSchema = z.object({
-  name: z.string().trim().min(1).max(100),
-  organizationId: z.string().uuid().optional(),
-});
 const maxProjectIconDataUrlLength = 400_000;
 const maxProjectIconRequestBytes = maxProjectIconDataUrlLength + 20;
-export const projectIconInputSchema = z
-  .object({
-    icon: z
-      .string()
-      .max(maxProjectIconDataUrlLength)
-      .regex(
-        /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/]+={0,2}$/iu,
-      )
-      .nullable(),
-  })
-  .strict();
-export const projectIssueKeyPrefixInputSchema = z
-  .object({
-    issueKeyPrefix: z
-      .string()
-      .trim()
-      .toUpperCase()
-      .regex(/^[A-Z0-9]{1,3}$/u),
-  })
-  .strict();
-export const projectTabsInputSchema = z
-  .object({
-    schedule: z.boolean(),
-  })
-  .strict();
-export const projectAgentInputSchema = z
-  .object({
-    name: z.string().trim().min(1).max(100).nullable().optional(),
-    description: z.string().trim().max(agentDescriptionMaxLength).optional(),
-    avatar: z
-      .string()
-      .max(400_000)
-      .regex(/^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/]+={0,2}$/iu)
-      .nullable()
-      .optional(),
-    codexPet: z
-      .object({
-        slug: z
-          .string()
-          .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*(?:--[a-z0-9]+(?:-[a-z0-9]+)*)?$/u),
-      })
-      .strict()
-      .nullable()
-      .optional(),
-    provider: z.enum(agentProviders),
-    model: z.string().trim().min(1).max(100).nullable().optional(),
-    effort: modelEffortSchema.nullable().optional(),
-    responsibility: z
-      .string()
-      .trim()
-      .min(1)
-      .max(agentResponsibilityMaxLength),
-    skills: z
-      .array(channelAgentSkillInputSchema)
-      .max(agentSkillsMaxCount)
-      .optional(),
-    calendarColor: z
-      .string()
-      .trim()
-      .regex(/^#[0-9a-f]{6}$/iu)
-      .default(defaultProjectAgentCalendarColor),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    if (!input.skills?.length) return;
-    const names = new Set<string>();
-    input.skills.forEach((skill, index) => {
-      const key = skill.name.toLocaleLowerCase("en-US");
-      if (names.has(key)) {
-        context.addIssue({
-          code: "custom",
-          path: ["skills", index, "name"],
-          message: "Agent Skill names must be unique",
-        });
-      }
-      names.add(key);
-    });
-  });
-const organizationAgentWriteSchema = organizationAgentInputSchema.superRefine(
-  (input, context) => {
-    if (!input.skills?.length) return;
-    const names = new Set<string>();
-    input.skills.forEach((skill, index) => {
-      const key = skill.name.toLocaleLowerCase("en-US");
-      if (names.has(key)) {
-        context.addIssue({
-          code: "custom",
-          path: ["skills", index, "name"],
-          message: "Agent Skill names must be unique",
-        });
-      }
-      names.add(key);
-    });
-  },
-);
-const projectAgentSessionEventSchema = z
-  .object({
-    id: z.string().min(1).max(128),
-    type: z.enum([
-      "started",
-      "completed",
-      "failed",
-      "skipped",
-      "interrupted",
-      "stopped",
-    ]),
-    occurredAt: z.string().datetime({ offset: true }),
-  })
-  .strict();
-const projectAgentSessionIssueSchema = z
-  .object({
-    runId: z.string().min(1).max(128),
-    runNumber: z.number().int().nonnegative(),
-    sourceKey: z.string().min(1).max(500),
-    title: z.string().min(1).max(500),
-    outcome: z.enum([
-      "pending",
-      "completed",
-      "blocked",
-      "failed",
-      "skipped",
-    ]),
-    summary: z.string().max(50_000).nullable(),
-  })
-  .strict();
-export const projectAgentSessionInputSchema = z
-  .object({
-    dispatchGroupId: z.string().max(128),
-    agentId: z.string().uuid().nullable(),
-    agentName: z.string().trim().min(1).max(200).nullable().optional(),
-    skillId: z.string().uuid().nullable().optional(),
-    sessionType: z.enum(["task", "dispatch"]),
-    trigger: z.enum(["manual", "scheduled"]).nullable(),
-    scheduleId: z.string().max(128).nullable(),
-    scheduleRunId: z.string().max(128).nullable(),
-    parentSessionId: z.string().max(128).nullable(),
-    request: z.string().max(50_000).nullable(),
-    followUps: z.array(z.object({
-      id: z.string().min(1).max(128),
-      message: z.string().trim().min(1).max(50_000),
-      sentAt: z.string().datetime({ offset: true }),
-    }).strict()).max(200).default([]),
-    status: z.enum(["running", "completed", "failed", "skipped", "interrupted"]),
-    issues: z.array(projectAgentSessionIssueSchema).max(100),
-    startedAt: z.string().datetime({ offset: true }),
-    completedAt: z.string().datetime({ offset: true }).nullable(),
-    conversationId: z.string().max(128).nullable(),
-    summary: z.string().max(50_000).nullable(),
-    error: z.string().max(20_000).nullable(),
-    requestedWorkerId: z.string().max(128).nullable().optional(),
-    workerId: z.string().max(128).nullable().optional(),
-    events: z.array(projectAgentSessionEventSchema).max(200),
-    updatedAt: z.string().datetime({ offset: true }),
-  })
-  .strict();
-
-const projectAgentTaskInputSchema = z
-  .object({
-    agentId: z.string().uuid(),
-    skillId: z.string().uuid().nullable().optional(),
-    request: z.string().trim().min(1).max(50_000),
-    workerId: z.string().trim().min(1).max(128),
-    requestId: z.string().uuid(),
-  })
-  .strict();
-
-const projectAgentTaskClaimInputSchema = z
-  .object({
-    projectId: z.string().uuid(),
-    workerId: z.string().trim().min(1).max(128),
-  })
-  .strict();
-
-const projectAgentTaskLeaseSchema = z
-  .object({
-    projectId: z.string().uuid(),
-    workerId: z.string().trim().min(1).max(128),
-    claimToken: z.string().startsWith("briar_agent_task_claim_"),
-  })
-  .strict();
-
-const projectAgentTaskCompletionSchema = z
-  .object({
-    projectId: z.string().uuid(),
-    workerId: z.string().trim().min(1).max(128),
-    claimToken: z.string().startsWith("briar_agent_task_claim_"),
-    summary: z.string().trim().min(1).max(50_000).optional(),
-    conversationId: z.string().trim().max(128).nullable().optional(),
-    error: z.string().trim().min(1).max(20_000).optional(),
-  })
-  .strict()
-  .refine((input) => Boolean(input.summary) !== Boolean(input.error), {
-    message: "Provide exactly one of summary or error",
-  });
-export const projectAgentScheduleInputSchema = z
-  .object({
-    agentId: z.string().uuid(),
-    name: z.string().trim().min(1).max(120),
-    recurrence: z.enum(projectAgentScheduleRecurrences),
-    timeOfDay: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u),
-    dayOfWeek: z.number().int().min(0).max(6).nullable().optional(),
-    intervalValue: z.number().int().min(1).max(999).optional(),
-    intervalUnit: z.enum(projectAgentScheduleIntervalUnits).optional(),
-    daysOfWeek: z
-      .array(z.number().int().min(0).max(6))
-      .max(7)
-      .optional(),
-    notificationLevel: z
-      .enum(projectAgentScheduleNotificationLevels)
-      .optional(),
-    timeZone: z
-      .string()
-      .trim()
-      .min(1)
-      .max(100)
-      .refine(isValidProjectAgentScheduleTimeZone, "Invalid IANA time zone"),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    const intervalUnit =
-      input.intervalUnit ??
-      (input.recurrence === "interval"
-        ? "hour"
-        : input.recurrence === "custom"
-          ? "week"
-          : "day");
-    if (
-      input.recurrence === "interval" &&
-      intervalUnit !== "minute" &&
-      intervalUnit !== "hour"
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "Interval schedules use minutes or hours",
-        path: ["intervalUnit"],
-      });
-    }
-    if (
-      input.recurrence === "custom" &&
-      intervalUnit !== "day" &&
-      intervalUnit !== "week"
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "Custom schedules repeat daily or weekly",
-        path: ["intervalUnit"],
-      });
-    }
-    if (
-      input.recurrence === "custom" &&
-      intervalUnit === "week" &&
-      normalizeProjectAgentScheduleDays(input.daysOfWeek).length === 0
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "Choose at least one weekday",
-        path: ["daysOfWeek"],
-      });
-    }
-  })
-  .transform((input) => ({
-    ...input,
-    dayOfWeek: normalizeProjectAgentScheduleDay(
-      input.recurrence,
-      input.dayOfWeek,
-    ),
-    intervalValue: normalizeProjectAgentScheduleInterval(input.intervalValue),
-    intervalUnit:
-      input.intervalUnit ??
-      (input.recurrence === "interval"
-        ? "hour"
-        : input.recurrence === "custom"
-          ? "week"
-          : "day"),
-    daysOfWeek: normalizeProjectAgentScheduleDays(input.daysOfWeek),
-    notificationLevel: input.notificationLevel ?? "important_updates",
-  }));
-const organizationInputSchema = z.object({
-  name: z.string().trim().min(1).max(100),
-  handle: z
-    .string()
-    .trim()
-    .min(1)
-    .max(63)
-    .regex(/^[a-z0-9-]+$/u),
-});
-
-export const accountProfileInputSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .min(3)
-    .max(30)
-    .regex(/^[a-z0-9_]+$/u),
-  name: z.string().trim().min(1).max(100),
-  image: z
-    .union([
-      z
-        .string()
-        .max(400_000)
-        .regex(/^data:image\/(?:jpeg|png|webp);base64,/u),
-      z
-        .string()
-        .max(400_000)
-        .url()
-        .refine(
-          (value) => new URL(value).protocol === "https:",
-          "HTTPS URL required",
-        ),
-    ])
-    .nullable(),
-});
-const inboxReadStateMaxEntries = 2_000;
-const inboxReadStateMessageIdSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(200)
-  .regex(/^(?:issue|session|conversation|channel):.+$/u);
-const inboxReadStateVersionSchema = z.string().trim().min(1).max(500);
-export const inboxReadStatesInputSchema = z
-  .object({
-    readVersions: z
-      .record(inboxReadStateMessageIdSchema, inboxReadStateVersionSchema)
-      .default({}),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    if (Object.keys(input.readVersions).length > inboxReadStateMaxEntries) {
-      context.addIssue({
-        code: "custom",
-        message: `At most ${inboxReadStateMaxEntries} inbox read states are allowed`,
-        path: ["readVersions"],
-      });
-    }
-  });
-
-export const projectAgentScheduleBatchClaimSchema = z.object({
-  projectIds: z.array(z.string().uuid()).min(1).max(100),
-}).strict();
-
-export const accountDeletionInputSchema = z
-  .object({
-    confirmation: z.string().trim().email().max(320),
-  })
-  .strict();
-export const organizationUpdateInputSchema = organizationInputSchema.pick({
-  name: true,
-});
-export const organizationLogoInputSchema = z
-  .object({
-    logo: z
-      .string()
-      .max(400_000)
-      .regex(/^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/]+={0,2}$/iu)
-      .nullable(),
-  })
-  .strict();
-const organizationHandleSchema = organizationInputSchema.shape.handle;
-const organizationMemberInputSchema = z.object({
-  email: z.string().trim().email().max(320),
-  role: z.enum(["admin", "member"]).default("member"),
-});
-export const organizationInvitationInputSchema = z
-  .object({
-    email: z.string().trim().toLowerCase().email().max(320),
-    role: z.enum(["admin", "member"]).default("member"),
-    initialProjectId: z.string().uuid(),
-  })
-  .strict();
-export const organizationMemberRoleInputSchema = z
-  .object({
-    role: z.enum(["admin", "member"]),
-  })
-  .strict();
-const slackOAuthInputSchema = z
-  .object({
-    defaultProjectId: z.string().uuid(),
-  })
-  .strict();
-const slackInstallationUpdateSchema = slackOAuthInputSchema;
-
-const issueTitleSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(issueTitleAbsoluteMaxLength)
-  .superRefine((title, context) => {
-    const message = issueTitleOverLimitMessage(title);
-    if (message) {
-      context.addIssue({ code: "custom", message });
-    }
-  });
-
-const issueInputBaseSchema = z
-  .object({
-    title: issueTitleSchema,
-    description: z.string().trim().max(100_000).nullable().optional(),
-    priority: z.number().int().min(1).max(4).nullable().optional(),
-    assigneeUserId: z.string().trim().min(1).max(200).nullable().optional(),
-    status: z.enum(["backlog", "queued"]).default("queued"),
-    preferredProvider: z.enum(agentProviders).nullable().optional(),
-    preferredModel: z.string().trim().min(1).max(100).nullable().optional(),
-    preferredEffort: modelEffortSchema.nullable().optional(),
-    fullAuto: z.boolean().default(false),
-    checkpoints: z.array(workflowCheckpointSchema).max(100).default([]),
-  })
-  .strict();
-
-const issueInputSchema = issueInputBaseSchema.superRefine((input, context) => {
-  if (!input.preferredProvider && input.preferredModel) {
-    context.addIssue({
-      code: "custom",
-      message: "A provider is required for a model preference",
-    });
-  }
-  if (!input.preferredProvider && input.preferredEffort) {
-    context.addIssue({
-      code: "custom",
-      message: "A provider is required for an effort preference",
-    });
-  }
-  if (!input.preferredModel && input.preferredEffort) {
-    context.addIssue({
-      code: "custom",
-      message: "A model is required for an effort preference",
-    });
-  }
-});
-
-export const issueUpdateInputSchema = issueInputBaseSchema
-  .pick({
-    title: true,
-    description: true,
-    priority: true,
-    assigneeUserId: true,
-  })
-  .required({
-    title: true,
-    description: true,
-    priority: true,
-  })
-  .strict();
-
-function executionPreferencesSchema({
-  allowProviderReportedModels = false,
-}: {
-  allowProviderReportedModels?: boolean;
-} = {}) {
-  return z
-    .object({
-      provider: z.enum(agentProviders).nullable(),
-      model: z.string().trim().min(1).max(100).nullable(),
-      effort: modelEffortSchema.nullable(),
-    })
-    .strict()
-    .superRefine((input, context) => {
-      if (!input.provider && (input.model || input.effort)) {
-        context.addIssue({
-          code: "custom",
-          message: "A provider is required for a model or effort preference",
-        });
-      }
-      if (!input.model && input.effort) {
-        context.addIssue({
-          code: "custom",
-          message: "A model is required for an effort preference",
-        });
-      }
-      void allowProviderReportedModels;
-    });
-}
-
-export const issueExecutionPreferencesSchema = executionPreferencesSchema();
-const dispatchExecutionPreferencesSchema = executionPreferencesSchema({
-  allowProviderReportedModels: true,
-});
-
-const linearApiKeySchema = z
-  .object({
-    apiKey: z.string().trim().min(10).max(500),
-  })
-  .strict();
-
-const linearStatesInputSchema = z
-  .object({
-    apiKey: z.string().trim().min(10).max(500),
-    teamIds: z.array(z.string().trim().min(1).max(100)).min(1).max(50),
-  })
-  .strict();
-
-const linearImportInputSchema = z
-  .object({
-    apiKey: z.string().trim().min(10).max(500),
-    teamIds: z.array(z.string().trim().min(1).max(100)).min(1).max(50),
-    statusMapping: z
-      .record(
-        z.string().trim().min(1).max(100),
-        z.string().trim().min(1).max(100),
-      )
-      .refine((value) => Object.keys(value).length > 0, {
-        message: "statusMapping is required",
-      }),
-  })
-  .strict();
-
-const issueMessageInputSchema = z
-  .object({
-    body: z.string().trim().min(1).max(10_000),
-    clientMessageId: z.string().uuid().transform((value) => value.toLowerCase()).optional(),
-    parentMessageId: z.string().uuid().nullable().optional(),
-    mentionedUserIds: z.array(z.string().min(1).max(200)).max(50).optional(),
-    mentionedAgentIds: z.array(z.string().uuid()).max(20).optional(),
-    agentConversationId: z
-      .string()
-      .trim()
-      .min(1)
-      .max(1_000)
-      .nullable()
-      .optional(),
-  })
-  .strict();
-
-const issueMessageEditInputSchema = z
-  .object({
-    body: z.string().trim().min(1).max(10_000),
-    mentionedUserIds: z.array(z.string().min(1).max(200)).max(50).optional(),
-  })
-  .strict();
-
 export async function readIssueMessageRequest(request: Request) {
   const form = await readBoundedMultipartForm(
     request,
@@ -2587,7 +1932,7 @@ export async function readIssueMessageRequest(request: Request) {
   );
   if (!form) {
     return {
-      input: issueMessageInputSchema.parse(await readJson(request, 16_384)),
+      input: decodeIssueMessageInput(await readJson(request, 16_384)),
       attachments: [] as File[],
       attachmentReferences: [] as string[],
     };
@@ -2624,7 +1969,7 @@ export async function readIssueMessageRequest(request: Request) {
   const parentMessageId = form.get("parentMessageId");
   const agentConversationId = form.get("agentConversationId");
   return {
-    input: issueMessageInputSchema.parse({
+    input: decodeIssueMessageInput({
       body: form.get("body"),
       clientMessageId:
         typeof clientMessageId === "string" && clientMessageId
@@ -2654,7 +1999,7 @@ export async function readChannelMessageRequest(request: Request) {
   );
   if (!form) {
     return {
-      input: channelMessageInputSchema.parse(await readJson(request, 32_768)),
+      input: decodeChannelMessageInput(await readJson(request, 32_768)),
       attachments: [] as File[],
       attachmentReferences: [] as string[],
     };
@@ -2689,7 +2034,7 @@ export async function readChannelMessageRequest(request: Request) {
   const clientMessageId = form.get("clientMessageId");
   const preferredDeviceId = form.get("preferredDeviceId");
   return {
-    input: channelMessageInputSchema.parse({
+    input: decodeChannelMessageInput({
       body: rawBody,
       clientMessageId:
         typeof clientMessageId === "string" && clientMessageId
@@ -2711,112 +2056,6 @@ export async function readChannelMessageRequest(request: Request) {
   };
 }
 
-const issueUpdateProposalActionSchema = z
-  .object({
-    type: z.literal("request_issue_update"),
-    changes: z
-      .object({
-        title: issueTitleSchema.optional(),
-        description: z.string().trim().max(100_000).nullable().optional(),
-        priority: z.number().int().min(1).max(4).nullable().optional(),
-      })
-      .strict()
-      .refine((changes) => Object.keys(changes).length > 0, {
-        message: "At least one issue change is required",
-      }),
-  })
-  .strict();
-
-const issueCreateProposalActionSchema = z
-  .object({
-    type: z.literal("request_issue_create"),
-    executeAfterCreate: z.boolean().default(false),
-    issue: z
-      .object({
-        title: issueTitleSchema,
-        description: z.string().trim().max(100_000).nullable(),
-        priority: z.number().int().min(1).max(4).nullable(),
-        status: z.enum(["backlog", "queued"]),
-      })
-      .strict(),
-  })
-  .strict();
-
-const issueAgentProposedActionSchema = z.discriminatedUnion("type", [
-  z
-    .object({
-      type: z.literal("request_issue_rework"),
-      workflowStage: workflowStageIdSchema,
-      reason: z.string().trim().min(1).max(4_000),
-    })
-    .strict(),
-  issueUpdateProposalActionSchema,
-  issueCreateProposalActionSchema,
-]);
-
-const issueAgentReplyCompletionSchema = z
-  .object({
-    projectId: z.string().uuid(),
-    workerId: z.string().trim().min(1).max(128),
-    claimToken: z.string().startsWith("briar_reply_claim_"),
-    body: z.string().trim().min(1).max(10_000).optional(),
-    proposedAction: issueAgentProposedActionSchema.nullable().optional(),
-    executionProposal: z
-      .object({ type: z.literal("request_issue_execute") })
-      .strict()
-      .nullable()
-      .optional(),
-    skillExecutionProposal: z
-      .object({ type: z.literal("request_agent_skill_execute") })
-      .strict()
-      .nullable()
-      .optional(),
-    error: z.string().trim().min(1).max(4_000).optional(),
-  })
-  .strict()
-  .refine((input) => Boolean(input.body) !== Boolean(input.error), {
-    message: "Provide exactly one of body or error",
-  })
-  .superRefine((input, context) => {
-    if (input.executionProposal && input.proposedAction) {
-      context.addIssue({
-        code: "custom",
-        message: "Use executeAfterCreate for a create-and-execute request",
-        path: ["executionProposal"],
-      });
-    }
-    if (
-      input.skillExecutionProposal &&
-      (input.executionProposal || input.proposedAction)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "Agent Skill execution cannot be combined with another proposal",
-        path: ["skillExecutionProposal"],
-      });
-    }
-  });
-
-const agentSkillExecutionProposalAcceptInputSchema = z
-  .object({
-    workerId: z
-      .string()
-      .min(1)
-      .max(128)
-      .refine((workerId) => workerId === workerId.trim(), {
-        message: "workerId cannot contain leading or trailing whitespace",
-      }),
-  })
-  .strict();
-
-const issueAgentReplyLeaseSchema = z
-  .object({
-    projectId: z.string().uuid(),
-    workerId: z.string().trim().min(1).max(128),
-    claimToken: z.string().startsWith("briar_reply_claim_"),
-  })
-  .strict();
-
 export async function readIssueRequest(request: Request) {
   const form = await readBoundedMultipartForm(
     request,
@@ -2825,7 +2064,7 @@ export async function readIssueRequest(request: Request) {
   );
   if (!form) {
     return {
-      input: issueInputSchema.parse(await readJson(request)),
+      input: decodeIssueInput(await readJson(request)),
       attachments: [] as File[],
       attachmentReferences: [] as string[],
     };
@@ -2872,7 +2111,7 @@ export async function readIssueRequest(request: Request) {
     }
   }
   return {
-    input: issueInputSchema.parse({
+    input: decodeIssueInput({
       title: form.get("title"),
       description:
         typeof description === "string" && description.trim()
@@ -2912,8 +2151,6 @@ export async function readIssueRequest(request: Request) {
   };
 }
 
-const issueKeptAttachmentIdsSchema = z.array(z.string().uuid()).max(50);
-
 export async function readIssueUpdateRequest(request: Request) {
   const form = await readBoundedMultipartForm(
     request,
@@ -2927,13 +2164,13 @@ export async function readIssueUpdateRequest(request: Request) {
       [key: string]: unknown;
     };
     return {
-      input: issueUpdateInputSchema.parse(fields),
+      input: decodeIssueUpdateInput(fields),
       attachments: [] as File[],
       attachmentReferences: [] as string[],
       keptAttachmentIds:
         keptAttachmentIds === undefined
           ? undefined
-          : issueKeptAttachmentIdsSchema.parse(keptAttachmentIds),
+          : decodeIssueKeptAttachmentIds(keptAttachmentIds),
     };
   }
   const attachments = readMultipartFiles(
@@ -2972,7 +2209,7 @@ export async function readIssueUpdateRequest(request: Request) {
       if (!parsed.every((id) => typeof id === "string")) {
         throw new Error("invalid kept attachment ids");
       }
-      keptAttachmentIds = issueKeptAttachmentIdsSchema.parse(parsed);
+      keptAttachmentIds = decodeIssueKeptAttachmentIds(parsed);
     } catch {
       throw new HttpError(400, "Kept attachment IDs are invalid");
     }
@@ -2982,7 +2219,7 @@ export async function readIssueUpdateRequest(request: Request) {
   const priority = form.get("priority");
   const assigneeUserId = form.get("assigneeUserId");
   return {
-    input: issueUpdateInputSchema.parse({
+    input: decodeIssueUpdateInput({
       title: form.get("title"),
       description:
         typeof description === "string" && description.trim()
@@ -3000,523 +2237,6 @@ export async function readIssueUpdateRequest(request: Request) {
     keptAttachmentIds,
   };
 }
-
-const claimInputSchema = z
-  .object({
-    claimedBy: z.string().trim().min(1).max(128),
-    workerId: z.string().trim().min(1).max(128).optional(),
-    projectId: z.string().uuid().optional(),
-    runId: z.string().uuid().optional(),
-  })
-  .strict();
-
-const workerClaimInputSchema = z
-  .object({
-    claimedBy: z.string().trim().min(1).max(128),
-    workerId: z.string().trim().min(1).max(128),
-    projectId: z.string().uuid(),
-  })
-  .strict();
-
-const providerHealthSchema = z.record(
-  z.enum(agentProviders),
-  z
-    .object({
-      installed: z.boolean(),
-      authenticated: z.boolean(),
-      healthy: z.boolean(),
-      reason: z.string().trim().max(64).nullable().optional(),
-      usageExhausted: z.boolean().optional(),
-      maxUsedPercent: z.number().min(0).max(100).nullable().optional(),
-    })
-    .strict(),
-);
-
-export const workerRegisterSchema = z
-  .object({
-    label: z.string().trim().min(1).max(100),
-    deviceIdentity: z.string().regex(/^briar_device_[0-9a-f]{64}$/u),
-    agentProvider: z.enum(agentProviders),
-    providers: z
-      .array(z.enum(agentProviders))
-      .max(agentProviders.length)
-      .optional(),
-    providerHealth: providerHealthSchema.optional(),
-    providerCapabilities: agentProviderCapabilityCatalogSchema.optional(),
-    maxConcurrentSessions: z
-      .number()
-      .int()
-      .min(1)
-      .max(MAX_WORKER_CONCURRENT_SESSIONS)
-      .optional(),
-    versions: z.record(z.string().max(64), z.string().max(64)).default({}),
-  })
-  .strict();
-
-const workerBindSchema = workerRegisterSchema.pick({
-  deviceIdentity: true,
-  agentProvider: true,
-  providers: true,
-  providerHealth: true,
-  providerCapabilities: true,
-  versions: true,
-});
-
-const workerConcurrencySchema = z
-  .object({
-    maxConcurrentSessions: z
-      .number()
-      .int()
-      .min(1)
-      .max(MAX_WORKER_CONCURRENT_SESSIONS),
-  })
-  .strict();
-
-const workerIconSchema = z.discriminatedUnion("type", [
-  z
-    .object({
-      type: z.literal("emoji"),
-      value: z
-        .string()
-        .trim()
-        .min(1)
-        .max(maxWorkerEmojiLength)
-        .refine(isWorkerEmoji, "Worker emoji must be one emoji"),
-    })
-    .strict(),
-  z
-    .object({
-      type: z.literal("image"),
-      value: z
-        .string()
-        .max(maxWorkerLogoDataUrlLength)
-        .refine(isWorkerLogoDataUrl, "Worker image must be a supported data URL"),
-    })
-    .strict(),
-]);
-
-export const workerSettingsSchema = z
-  .object({
-    maxConcurrentSessions: workerConcurrencySchema.shape.maxConcurrentSessions
-      .optional(),
-    icon: workerIconSchema.nullable().optional(),
-  })
-  .strict()
-  .refine(
-    (input) =>
-      input.maxConcurrentSessions !== undefined || input.icon !== undefined,
-    "At least one Worker setting is required",
-  );
-
-const executionWorkerPolicySchema = z
-  .object({
-    selectionMode: z.enum(["any", "allowlist"]),
-    defaultWorkerId: z.string().trim().min(1).max(128).nullable(),
-    allowedWorkerIds: z
-      .array(z.string().trim().min(1).max(128))
-      .max(100)
-      .default([]),
-  })
-  .strict();
-
-const workerHeartbeatSchema = z
-  .object({
-    versions: z.record(z.string().max(64), z.string().max(64)).optional(),
-    acceptingWork: z.boolean().optional(),
-    readinessState: z.enum(["ready", "busy", "needs_attention"]).optional(),
-    readinessDetail: z.string().trim().max(500).nullable().optional(),
-    capabilities: z
-      .object({
-        providerCapabilities: agentProviderCapabilityCatalogSchema.optional(),
-      })
-      .catchall(z.unknown())
-      .optional(),
-  })
-  .strict();
-
-const workerUpdateHandoffWorkTypeSchema = z.enum([
-  "issue",
-  "projectAgentTask",
-  "issueReply",
-  "channelReply",
-]);
-
-const workerUpdatePrepareSchema = z
-  .object({
-    targetVersion: z.string().trim().refine(isSemanticVersion, "Semantic version required"),
-  })
-  .strict();
-
-const workerUpdateHandoffSchema = z
-  .object({
-    requestId: z.string().uuid(),
-    projectId: z.string().uuid(),
-    workType: workerUpdateHandoffWorkTypeSchema,
-    workId: z.string().uuid(),
-    runId: z.string().uuid().nullable().optional(),
-    claimToken: z.string().trim().min(20).max(256),
-    checkpoint: z
-      .object({
-        conversationId: z.string().trim().max(512).nullable().optional(),
-        workspacePath: z.string().trim().max(2_000).nullable().optional(),
-      })
-      .strict()
-      .optional()
-      .default({}),
-  })
-  .strict();
-
-const workerLabelSchema = z
-  .object({
-    label: z.string().trim().min(1).max(100),
-  })
-  .strict();
-
-const dispatchRunSchema = z
-  .object({
-    agentId: z.string().uuid().nullable().optional(),
-    provider: z.enum(agentProviders).optional(),
-    model: z.string().trim().min(1).max(100).nullable().optional(),
-    effort: modelEffortSchema.nullable().optional(),
-    persistPreferences: z.boolean().optional(),
-    workerId: z.string().trim().min(1).max(128).nullable().optional(),
-    requestId: z.string().uuid(),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    const preferences = {
-      provider: input.provider ?? null,
-      model: input.model ?? null,
-      effort: input.effort ?? null,
-    };
-    const parsed = dispatchExecutionPreferencesSchema.safeParse(preferences);
-    if (!parsed.success) {
-      for (const issue of parsed.error.issues) {
-        context.addIssue({
-          code: "custom",
-          message: issue.message,
-          path: issue.path,
-        });
-      }
-    }
-  });
-
-const leaseRenewSchema = z
-  .object({
-    claimToken: z.string().trim().min(1).max(200),
-    projectId: z.string().uuid().optional(),
-  })
-  .strict();
-
-const projectAgentScheduleClaimTokenSchema = z
-  .string()
-  .trim()
-  .regex(/^briar_schedule_claim_[0-9a-f]{64}$/u);
-
-const projectAgentScheduleRunRenewSchema = z
-  .object({ claimToken: projectAgentScheduleClaimTokenSchema })
-  .strict();
-
-export const projectAgentScheduleRunCompletionSchema = z
-  .object({
-    claimToken: projectAgentScheduleClaimTokenSchema,
-    status: z.enum(["completed", "failed"]),
-    resultSummary: z.string().trim().min(1).max(100_000).nullable().optional(),
-    structuredResult: structuredAgentResultSchema,
-    error: z.string().trim().min(1).max(4_000).nullable().optional(),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    if (input.status === "completed" && !input.resultSummary) {
-      context.addIssue({
-        code: "custom",
-        message: "completed runs require a result summary",
-        path: ["resultSummary"],
-      });
-    }
-    if (
-      input.resultSummary &&
-      input.resultSummary !== input.structuredResult.summary
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "resultSummary must match structuredResult.summary",
-        path: ["resultSummary"],
-      });
-    }
-    if (input.status === "completed" && input.structuredResult.outcome === "failed") {
-      context.addIssue({
-        code: "custom",
-        message: "completed schedule runs cannot report a failed outcome",
-        path: ["structuredResult", "outcome"],
-      });
-    }
-    if (input.status === "failed" && input.structuredResult.outcome !== "failed") {
-      context.addIssue({
-        code: "custom",
-        message: "failed schedule runs require a failed structured outcome",
-        path: ["structuredResult", "outcome"],
-      });
-    }
-    if (input.status === "failed" && !input.error) {
-      context.addIssue({
-        code: "custom",
-        message: "failed runs require an error",
-        path: ["error"],
-      });
-    }
-  });
-
-export const transcriptSchema = z
-  .object({
-    sessionId: z
-      .string()
-      .trim()
-      .min(1)
-      .max(128)
-      .regex(/^[A-Za-z0-9_-]+$/u),
-    runId: z.string().uuid().nullable().optional(),
-    runAttempt: z.number().int().positive().optional(),
-    executionId: z.string().uuid().optional(),
-    projectId: z.string().uuid().optional(),
-    workerId: z.string().trim().min(1).max(128).nullable().optional(),
-    workType: workerUpdateHandoffWorkTypeSchema.optional(),
-    workId: z.string().uuid().optional(),
-    claimToken: z.string().trim().min(20).max(256).optional(),
-    agentProvider: z.enum(agentProviders),
-    executionMetrics: agentExecutionMetricsSchema.optional(),
-    usageRecords: z
-      .array(agentExecutionUsageRecordSchema)
-      .min(1)
-      .max(1_000)
-      .optional(),
-    costRecords: z
-      .array(agentExecutionCostRecordSchema)
-      .min(1)
-      .max(1_000)
-      .optional(),
-    events: z
-      .array(
-        z
-          .object({
-            sequence: z.number().int().positive(),
-            direction: z.enum(["client", "server"]),
-            payload: z.unknown(),
-          })
-          .strict(),
-      )
-      .min(1)
-      .max(MAX_TRANSCRIPT_EVENTS_PER_REQUEST),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    if (
-      input.executionMetrics !== undefined &&
-      (!input.runId || input.runAttempt === undefined)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "runId and runAttempt are required with executionMetrics",
-        path: ["executionMetrics"],
-      });
-    }
-    if (input.executionId && !input.runId) {
-      context.addIssue({
-        code: "custom",
-        message: "runId is required with executionId",
-        path: ["executionId"],
-      });
-    }
-    if (input.usageRecords && !input.executionId) {
-      context.addIssue({
-        code: "custom",
-        message: "executionId is required with usageRecords",
-        path: ["usageRecords"],
-      });
-    }
-    if (input.usageRecords && input.runAttempt === undefined) {
-      context.addIssue({
-        code: "custom",
-        message: "runAttempt is required with usageRecords",
-        path: ["usageRecords"],
-      });
-    }
-    if (input.costRecords && !input.executionId) {
-      context.addIssue({
-        code: "custom",
-        message: "executionId is required with costRecords",
-        path: ["costRecords"],
-      });
-    }
-    if (input.costRecords && input.runAttempt === undefined) {
-      context.addIssue({
-        code: "custom",
-        message: "runAttempt is required with costRecords",
-        path: ["costRecords"],
-      });
-    }
-    if (
-      input.usageRecords?.some(
-        (record) => record.agentProvider !== input.agentProvider,
-      )
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "usage record providers must match agentProvider",
-        path: ["usageRecords"],
-      });
-    }
-    if (
-      input.costRecords?.some(
-        (record) => record.agentProvider !== input.agentProvider,
-      )
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "cost record providers must match agentProvider",
-        path: ["costRecords"],
-      });
-    }
-  });
-
-const recoveryUserInputSchema = z
-  .object({
-    requestId: z.string().uuid(),
-    reason: z.string().trim().min(1).max(4_000).nullable().optional(),
-  })
-  .strict();
-
-const recoveryAgentInputSchema = recoveryUserInputSchema.extend({
-  actor: z.string().trim().min(1).max(128),
-});
-
-const resumeInputShape = z.object({
-  requestId: z.string().uuid(),
-  checkpointKey: workflowStageIdSchema,
-  attempt: z.number().int().positive(),
-  revision: z.number().int().positive(),
-}).strict();
-
-const resumeUserInputSchema = resumeInputShape;
-
-const resumeAgentInputSchema = resumeInputShape
-  .extend({ actor: z.string().trim().min(1).max(128) })
-  .strict();
-
-export const workflowStageLifecycleInputSchema = z
-  .object({
-    requestId: z.string().uuid(),
-    attempt: z.number().int().positive().optional(),
-    revision: z.number().int().positive().optional(),
-    actor: z.string().trim().min(1).max(128),
-  })
-  .strict();
-
-export const runReworkInputSchema = z
-  .object({
-    requestId: z.string().uuid(),
-    workflowStage: workflowStageIdSchema,
-    reason: z.string().trim().min(1).max(4_000),
-    actor: z.string().trim().min(1).max(128),
-  })
-  .strict();
-
-export const pausedRunReworkInputSchema = z
-  .object({
-    requestId: z.string().uuid(),
-    workflowStage: workflowStageIdSchema,
-    reason: z.string().trim().min(1).max(4_000),
-    checkpointKey: workflowStageIdSchema,
-    attempt: z.number().int().positive(),
-    revision: z.number().int().positive(),
-  })
-  .strict();
-
-const moveRunInputSchema = z
-  .object({
-    requestId: z.string().uuid(),
-    status: runStatusSchema,
-    workflowStage: workflowStageIdSchema.nullable(),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    if (input.status === "running" && !input.workflowStage) {
-      context.addIssue({
-        code: "custom",
-        message: "running status requires a workflow stage",
-        path: ["workflowStage"],
-      });
-    }
-    if (input.status !== "running" && input.workflowStage !== null) {
-      context.addIssue({
-        code: "custom",
-        message: "only running status can select a workflow stage",
-        path: ["workflowStage"],
-      });
-    }
-  });
-
-const projectSettingsSchema = z
-  .object({
-    velenOrg: nullableTrimmed(100),
-    dataSource: nullableTrimmed(300),
-    linear: z
-      .object({
-        enabled: z.boolean(),
-        source: z
-          .string()
-          .trim()
-          .regex(/^linear:\/\/.+/u)
-          .max(300)
-          .nullable(),
-        teamKey: z.string().trim().min(1).max(100).nullable(),
-      })
-      .strict(),
-    githubRepository: nullableTrimmed(300),
-    workflow: workflowSchema.default(cloneAutoHuntWorkflow()),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    if (input.dataSource && !input.velenOrg) {
-      context.addIssue({
-        code: "custom",
-        message: "Velen data source requires a Velen org",
-        path: ["dataSource"],
-      });
-    }
-    if (input.linear.enabled && (!input.velenOrg || !input.linear.source)) {
-      context.addIssue({
-        code: "custom",
-        message: "Linear integration requires a Velen org and Linear source",
-        path: ["linear"],
-      });
-    }
-  });
-
-export function parseProjectSettingsInput(value: unknown) {
-  try {
-    return projectSettingsSchema.parse(value);
-  } catch (error) {
-    if (
-      error instanceof z.ZodError &&
-      error.issues.some((issue) => issue.path[0] === "workflow")
-    ) {
-      throw new ProjectWorkflowInputError(error.issues);
-    }
-    if (error instanceof AutoHuntWorkflowValidationError) {
-      throw new ProjectWorkflowInputError(error.issues);
-    }
-    throw error;
-  }
-}
-
-const checkpointPolicyInputSchema = z
-  .object({
-    scope: z.enum(["project", "user"]),
-    checkpoints: z.array(workflowCheckpointSchema).max(100),
-    expectedRevision: z.number().int().nonnegative(),
-  })
-  .strict();
 
 async function readJson(
   request: Request,
@@ -3555,8 +2275,10 @@ async function readJson(
 }
 
 export async function readTranscriptRequest(request: Request) {
-  return transcriptSchema.parse(
-    await readJson(request, MAX_TRANSCRIPT_HTTP_BODY_BYTES),
+  return Effect.runPromise(
+    decodeTranscriptRequestEffect(
+      await readJson(request, MAX_TRANSCRIPT_HTTP_BODY_BYTES),
+    ),
   );
 }
 
@@ -3645,7 +2367,7 @@ async function createIssueWithAttachments(input: {
   db: D1Database;
   attachmentsBucket: R2Bucket;
   project: Pick<ProjectRow, "id" | "name">;
-  issue: Omit<z.infer<typeof issueInputSchema>, "fullAuto"> & {
+  issue: Omit<IssueInput, "fullAuto"> & {
     fullAuto?: boolean;
   };
   attachments: File[];
@@ -3805,7 +2527,7 @@ async function updateIssueWithAttachments(input: {
   attachmentsBucket: R2Bucket;
   project: Pick<ProjectRow, "id">;
   runId: string;
-  issue: z.infer<typeof issueUpdateInputSchema>;
+  issue: IssueUpdateInput;
   attachments: File[];
   attachmentReferences?: string[];
   keptAttachmentIds?: string[];
@@ -3834,6 +2556,7 @@ async function updateIssueWithAttachments(input: {
     },
   );
   const uploadedKeys: string[] = [];
+  let phase = "upload_attachments";
   const issueDescription = canonicalizeIssueAttachmentReferences(
     input.issue.description,
     input.attachmentReferences ?? [],
@@ -5936,13 +4659,13 @@ const parseStructuredResult = (
   value: string | null,
 ): StructuredAgentResult | null => {
   const parsed = parseJsonObject(value);
-  const result = structuredAgentResultSchema.safeParse(parsed);
-  return result.success ? result.data : null;
+  return Option.getOrNull(decodeStructuredAgentResultOption(parsed));
 };
 
 const parseExecutionMetrics = (value: string | null) => {
-  const result = agentExecutionMetricsSchema.safeParse(parseJsonObject(value));
-  return result.success ? result.data : null;
+  return Option.getOrNull(
+    decodeAgentExecutionMetricsOption(parseJsonObject(value)),
+  );
 };
 
 const parseUsageExecutionMetrics = (value: string | null) => {
@@ -6880,7 +5603,7 @@ async function resumeRunWithCheckpointIdentity(
   db: D1Database,
   projectId: string,
   runId: string,
-  input: z.infer<typeof resumeUserInputSchema>,
+  input: ResumeUserInput,
   actor: string,
 ) {
   const run = await getHuntRunForProject(db, projectId, runId);
@@ -6933,7 +5656,7 @@ async function route(
 
   if (pathname === "/me" && request.method === "GET") {
     const session = await requireSession(auth, request);
-    return json(mobileCurrentUserResponseSchema.parse({ user: session.user }));
+    return json(decodeMobileCurrentUserResponse({ user: session.user }));
   }
 
   if (pathname === "/inbox/read-states" && request.method === "GET") {
@@ -6948,13 +5671,10 @@ async function route(
 
   if (pathname === "/inbox/read-states" && request.method === "PUT") {
     const session = await requireSession(auth, request);
-    const input = inboxReadStatesInputSchema.parse(await readJson(request));
+    const input = decodeInboxReadStatesInput(await readJson(request));
     const entries = Object.entries(input.readVersions).map(
       ([messageId, version]) => ({ messageId, version }),
     );
-    if (entries.length > inboxReadStateMaxEntries) {
-      throw new HttpError(400, "Too many inbox read states");
-    }
     const rows = await upsertInboxReadStates(
       db,
       session.user.id,
@@ -7060,7 +5780,7 @@ async function route(
 
   if (pathname === "/me" && request.method === "PATCH") {
     const session = await requireSession(auth, request);
-    const input = accountProfileInputSchema.parse(
+    const input = decodeAccountProfileInput(
       await readJson(request, 450_000),
     );
     const updatedAt = new Date().toISOString();
@@ -7100,7 +5820,7 @@ async function route(
 
   if (pathname === "/me" && request.method === "DELETE") {
     const session = await requireSession(auth, request);
-    const input = accountDeletionInputSchema.parse(await readJson(request));
+    const input = decodeAccountDeletionInput(await readJson(request));
     if (input.confirmation.toLowerCase() !== session.user.email.toLowerCase()) {
       throw new HttpError(400, "Confirmation email does not match");
     }
@@ -7263,7 +5983,7 @@ async function route(
     const organizationId = organizationUsageRunsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
     if (!role) throw new HttpError(404, "Organization not found");
-    const days = usageRangeDaysSchema.parse(
+    const days = decodeUsageRangeDays(
       new URL(request.url).searchParams.get("days") ?? "90",
     );
     const generatedAt = Date.now();
@@ -7320,7 +6040,7 @@ async function route(
     request.method === "GET"
   ) {
     await requireSession(auth, request);
-    const handle = organizationHandleSchema.parse(
+    const handle = decodeOrganizationHandle(
       new URL(request.url).searchParams.get("handle"),
     );
     return json({
@@ -7330,7 +6050,7 @@ async function route(
 
   if (pathname === "/organizations" && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const input = organizationInputSchema.parse(await readJson(request));
+    const input = decodeOrganizationInput(await readJson(request));
     if (!(await isOrganizationHandleAvailable(db, input.handle))) {
       throw new HttpError(409, "Organization handle already exists");
     }
@@ -7362,7 +6082,7 @@ async function route(
     if (!canManageOrganization(role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = organizationUpdateInputSchema.parse(await readJson(request));
+    const input = decodeOrganizationUpdateInput(await readJson(request));
     const organization = await updateOrganization(
       db,
       organizationMatch[1],
@@ -7386,7 +6106,7 @@ async function route(
     if (!canManageOrganization(role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = organizationLogoInputSchema.parse(await readJson(request));
+    const input = decodeOrganizationLogoInput(await readJson(request));
     const organization = await updateOrganizationLogo(
       db,
       organizationLogoMatch[1],
@@ -7422,7 +6142,7 @@ async function route(
     if (!canManageOrganization(role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = organizationInvitationInputSchema.parse(
+    const input = decodeOrganizationInvitationInput(
       await readJson(request),
     );
     const token = `briar_invite_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
@@ -7505,7 +6225,7 @@ async function route(
     if (!canManageOrganization(role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = organizationMemberInputSchema.parse(await readJson(request));
+    const input = decodeOrganizationMemberInput(await readJson(request));
     const userId = await addOrganizationMember(
       db,
       organizationMembersMatch[1],
@@ -7545,7 +6265,7 @@ async function route(
     if (memberRole === "owner") {
       throw new HttpError(403, "Organization owner role cannot be changed");
     }
-    const input = organizationMemberRoleInputSchema.parse(
+    const input = decodeOrganizationMemberRoleInput(
       await readJson(request),
     );
     const updated = await updateOrganizationMemberRole(
@@ -7598,7 +6318,7 @@ async function route(
     if (!canManageOrganization(role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = organizationAgentWriteSchema.parse(await readJson(request));
+    const input = decodeOrganizationAgentWrite(await readJson(request));
     const agent = await createOrganizationAgent(db, {
       id: crypto.randomUUID(),
       organizationId,
@@ -7625,7 +6345,7 @@ async function route(
     if (!canManageOrganization(role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = organizationAgentWriteSchema.parse(await readJson(request));
+    const input = decodeOrganizationAgentWrite(await readJson(request));
     const agent = await updateOrganizationAgent(db, {
       organizationId,
       agentId: organizationAgentMatch[2],
@@ -7858,18 +6578,11 @@ async function route(
     }
 
     const searchParams = new URL(request.url).searchParams;
-    const query = z
-      .object({
-        limit: z.coerce.number().int().min(1).max(100).default(50),
-        cursor: z.string().uuid().nullable().default(null),
-        parentMessageId: z.string().uuid().nullable().default(null),
-      })
-      .strict()
-      .parse({
-        limit: searchParams.get("limit") ?? undefined,
-        cursor: searchParams.get("cursor"),
-        parentMessageId: searchParams.get("parentMessageId"),
-      });
+    const query = decodeChannelMessageQuery({
+      limit: searchParams.get("limit") ?? undefined,
+      cursor: searchParams.get("cursor"),
+      parentMessageId: searchParams.get("parentMessageId"),
+    });
     if (
       query.parentMessageId &&
       !(await isChannelRootMessage(db, channel.id, query.parentMessageId))
@@ -7910,7 +6623,7 @@ async function route(
     const organizationId = organizationChannelsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
     if (!role) throw new HttpError(404, "Organization not found");
-    const input = channelInputSchema.parse(await readJson(request));
+    const input = decodeChannelInput(await readJson(request));
     const channelId = crypto.randomUUID();
     const slug = input.slug ?? channelSlugFromName(input.name, channelId);
     if (input.defaultProjectId) {
@@ -7956,7 +6669,7 @@ async function route(
       organizationChannelReadMatch[2],
       session.user.id,
     );
-    const input = channelReadInputSchema.parse(await readJson(request));
+    const input = decodeChannelReadInput(await readJson(request));
     const lastReadAt = input.lastReadAt ?? new Date().toISOString();
     await markChannelRead(db, {
       userId: session.user.id,
@@ -7987,7 +6700,7 @@ async function route(
     const rawMessageLimit = new URL(request.url).searchParams.get("limit");
     const messageLimit = rawMessageLimit === null
       ? null
-      : z.coerce.number().int().min(1).max(100).parse(rawMessageLimit);
+      : decodeMessageLimit(rawMessageLimit);
     const [members, channelAgents, messagePage, activeReplies] = await Promise.all([
       listChannelMembers(db, channel.id),
       listChannelAgents(db, channel.id),
@@ -8022,7 +6735,7 @@ async function route(
       organizationChannelMatch[2],
       session.user.id,
     );
-    const input = channelUpdateInputSchema.parse(await readJson(request));
+    const input = decodeChannelUpdateInput(await readJson(request));
     if (input.defaultProjectId) {
       const project = await getProject(
         db,
@@ -8099,7 +6812,7 @@ async function route(
       channelMemberMatch[2],
       session.user.id,
     );
-    const input = channelMemberInputSchema.parse(await readJson(request));
+    const input = decodeChannelMemberInput(await readJson(request));
     const targetRole = await getOrganizationRole(
       db,
       channelMemberMatch[1],
@@ -8201,7 +6914,7 @@ async function route(
       db, channelWebhooksMatch[1], channelWebhooksMatch[2], session.user.id,
     );
     if (channel.archived_at) throw new HttpError(409, "Channel is archived");
-    const input = channelWebhookInputSchema.parse(await readJson(request));
+    const input = decodeChannelWebhookInput(await readJson(request));
     const secret = randomUrlSafeToken();
     const createdAt = new Date().toISOString();
     const webhook = await createChannelWebhook(db, {
@@ -8227,7 +6940,7 @@ async function route(
     const channel = await requireChannelWebhookManagement(
       db, channelWebhookMatch[1], channelWebhookMatch[2], session.user.id,
     );
-    const input = channelWebhookInputSchema.parse(await readJson(request));
+    const input = decodeChannelWebhookInput(await readJson(request));
     const webhook = await updateChannelWebhook(db, {
       channelId: channel.id,
       webhookId: channelWebhookMatch[3],
@@ -8349,18 +7062,11 @@ async function route(
     const parentMessageId = searchParams.get("parentMessageId");
     const paginated = searchParams.has("limit") || searchParams.has("cursor");
     if (paginated) {
-      const query = z
-        .object({
-          limit: z.coerce.number().int().min(1).max(100).default(20),
-          cursor: z.string().uuid().nullable().default(null),
-          parentMessageId: z.string().uuid().nullable().default(null),
-        })
-        .strict()
-        .parse({
-          limit: searchParams.get("limit") ?? undefined,
-          cursor: searchParams.get("cursor"),
-          parentMessageId,
-        });
+      const query = decodeProjectChannelMessageQuery({
+        limit: searchParams.get("limit") ?? undefined,
+        cursor: searchParams.get("cursor"),
+        parentMessageId,
+      });
       const page = await listChannelMessagePage(db, {
         channelId: channel.id,
         parentMessageId: query.parentMessageId,
@@ -8596,7 +7302,7 @@ async function route(
     if (channel.archived_at) {
       throw new HttpError(409, "Channel is archived");
     }
-    const input = channelMessageReactionInputSchema.parse(
+    const input = decodeChannelMessageReactionInput(
       await readJson(request, 1_024),
     );
     if (!isChannelReactionEmoji(input.emoji)) {
@@ -8668,7 +7374,7 @@ async function route(
         proposal.reply_author_agent_organization_id,
       replyAuthorAgentProjectId: proposal.reply_author_agent_project_id,
     });
-    const input = channelProposalAcceptInputSchema.parse(
+    const input = decodeChannelProposalAcceptInput(
       await readJson(request),
     );
     if (input.execution && proposal.execute_after_create !== 1) {
@@ -8754,12 +7460,12 @@ async function route(
     if (channel.archived_at) {
       throw new HttpError(409, "Channel is archived");
     }
-    const payload = channelIssueProposalPayloadSchema.parse(
+    const payload = decodeChannelIssueProposalPayload(
       JSON.parse(proposal.payload_json),
     );
     const approvedAt = new Date().toISOString();
     if (input.execution) {
-      dispatchExecutionPreferencesSchema.parse({
+      decodeExecutionPreferences({
         provider: input.execution.provider,
         model: input.execution.model,
         effort: input.execution.effort,
@@ -8947,7 +7653,7 @@ async function route(
     if (!proposal) {
       throw new HttpError(404, "Agent Skill execution proposal not found");
     }
-    const input = agentSkillExecutionProposalAcceptInputSchema.parse(
+    const input = decodeAgentSkillExecutionProposalAcceptInput(
       await readJson(request),
     );
     const project = await getProject(db, proposal.project_id, session.user.id);
@@ -8996,9 +7702,14 @@ async function route(
       userId: session.user.id,
     });
     if (!proposal) throw new HttpError(404, "Execution proposal not found");
-    const input = channelExecutionProposalAcceptInputSchema.parse(
+    const input = decodeChannelExecutionProposalAcceptInput(
       await readJson(request),
     );
+    decodeExecutionPreferences({
+      provider: input.provider,
+      model: input.model,
+      effort: input.effort,
+    });
     const project = await getProject(db, proposal.project_id, session.user.id);
     if (!project || project.organization_id !== channel.organization_id) {
       throw new HttpError(404, "Project not found");
@@ -9115,7 +7826,7 @@ async function route(
         "Worker owner or organization admin access required",
       );
     }
-    const input = workerSettingsSchema.parse(await readJson(request));
+    const input = decodeWorkerSettings(await readJson(request));
     const observedAt = new Date().toISOString();
     let updated =
       input.maxConcurrentSessions === undefined
@@ -9308,7 +8019,7 @@ async function route(
     if (!slackConfigAvailable(env)) {
       throw new HttpError(503, "Slack integration is not configured");
     }
-    const input = slackOAuthInputSchema.parse(await readJson(request));
+    const input = decodeSlackOAuthInput(await readJson(request));
     const project = await getProject(db, input.defaultProjectId, session.user.id);
     if (
       !project ||
@@ -9388,7 +8099,7 @@ async function route(
         },
       );
     }
-    const input = slackInstallationUpdateSchema.parse(await readJson(request));
+    const input = decodeSlackOAuthInput(await readJson(request));
     const updated = await updateSlackInstallationProject(
       db,
       organizationSlackInstallationMatch[1],
@@ -9412,14 +8123,14 @@ async function route(
   if (pathname === "/projects" && request.method === "GET") {
     const session = await requireSession(auth, request);
     const projects = await listProjects(db, session.user.id);
-    return json(mobileProjectsResponseSchema.parse({
+    return json(decodeMobileProjectsResponse({
       projects: projects.map(projectJson),
     }));
   }
 
   if (pathname === "/projects" && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const input = projectInputSchema.parse(await readJson(request));
+    const input = decodeProjectInput(await readJson(request));
     let organizations = await listOrganizations(db, session.user.id);
     if (organizations.length === 0) {
       const organization = await createOrganization(db, {
@@ -9528,7 +8239,7 @@ async function route(
     if (!canManageOrganization(project.member_role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = projectIconInputSchema.parse(
+    const input = decodeProjectIconInput(
       await readJson(request, maxProjectIconRequestBytes),
     );
     if (!(await updateProjectIcon(db, project.id, input.icon))) {
@@ -9551,7 +8262,7 @@ async function route(
     if (!canManageOrganization(project.member_role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = projectIssueKeyPrefixInputSchema.parse(
+    const input = decodeProjectIssueKeyPrefixInput(
       await readJson(request),
     );
     if (
@@ -9585,7 +8296,7 @@ async function route(
     if (!canManageOrganization(project.member_role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = projectTabsInputSchema.parse(await readJson(request));
+    const input = decodeProjectTabsInput(await readJson(request));
     if (
       !(await updateProjectScheduleTabEnabled(
         db,
@@ -9618,7 +8329,7 @@ async function route(
         ),
       });
     }
-    const input = checkpointPolicyInputSchema.parse(await readJson(request));
+    const input = decodeCheckpointPolicyInput(await readJson(request));
     if (input.scope === "project" && !canManageOrganization(project.member_role)) {
       throw new HttpError(403, "Organization admin access required");
     }
@@ -9745,7 +8456,7 @@ async function route(
     if (!canManageOrganization(project.member_role)) {
       throw new HttpError(403, "Organization admin access required");
     }
-    const input = executionWorkerPolicySchema.parse(await readJson(request));
+    const input = decodeExecutionWorkerPolicy(await readJson(request));
     const policy = await updateProjectExecutionWorkerPolicy(db, project.id, {
       ...input,
       updatedByUserId: session.user.id,
@@ -9774,7 +8485,7 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const input = projectAgentTaskInputSchema.parse(await readJson(request));
+    const input = decodeProjectAgentTaskInput(await readJson(request));
     const existingJob = await getProjectAgentTaskJobByRequest(
       db,
       project.id,
@@ -10089,7 +8800,7 @@ async function route(
         "AGENT_SKILL_EXECUTION_SESSION_SERVER_OWNED",
       );
     }
-    const input = projectAgentSessionInputSchema.parse(await readJson(request));
+    const input = decodeProjectAgentSessionInput(await readJson(request));
     const observedAt = new Date().toISOString();
     const existing = await getProjectAgentSession(
       db,
@@ -10167,7 +8878,7 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const input = projectAgentInputSchema.parse(await readJson(request));
+    const input = decodeProjectAgentInput(await readJson(request));
     if (input.codexPet !== undefined) {
       throw new HttpError(
         400,
@@ -10213,7 +8924,7 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const input = projectAgentScheduleInputSchema.parse(
+    const input = decodeProjectAgentScheduleInput(
       await readJson(request),
     );
     const schedule = await createProjectAgentSchedule(db, project.id, {
@@ -10235,7 +8946,7 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const input = projectAgentScheduleInputSchema.parse(
+    const input = decodeProjectAgentScheduleInput(
       await readJson(request),
     );
     const schedule = await updateProjectAgentSchedule(
@@ -10285,7 +8996,7 @@ async function route(
 
   if (pathname === "/agent-schedule-runs/claim" && request.method === "POST") {
     const session = await requireSession(auth, request);
-    const input = projectAgentScheduleBatchClaimSchema.parse(
+    const input = decodeProjectAgentScheduleBatchClaim(
       await readJson(request),
     );
     const observedAt = new Date().toISOString();
@@ -10354,7 +9065,7 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const input = projectAgentScheduleRunCompletionSchema.parse(
+    const input = decodeProjectAgentScheduleRunCompletion(
       await readJson(request),
     );
     const run = await completeProjectAgentScheduleRun(
@@ -10386,7 +9097,7 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const input = projectAgentScheduleRunRenewSchema.parse(
+    const input = decodeProjectAgentScheduleRunRenew(
       await readJson(request),
     );
     const run = await renewProjectAgentScheduleRunLease(
@@ -10410,7 +9121,7 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, projectAgentMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const input = projectAgentInputSchema.parse(await readJson(request));
+    const input = decodeProjectAgentInput(await readJson(request));
     const existing = await getProjectAgent(
       db,
       project.id,
@@ -10568,7 +9279,7 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const input = linearApiKeySchema.parse(await readJson(request));
+    const input = decodeLinearApiKeyInput(await readJson(request));
     try {
       const { viewer, teams } = await fetchLinearViewerAndTeams(input.apiKey);
       return json({ viewer, teams });
@@ -10590,7 +9301,7 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, linearStatesMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const input = linearStatesInputSchema.parse(await readJson(request));
+    const input = decodeLinearStatesInput(await readJson(request));
     try {
       const states = await fetchLinearWorkflowStates(
         input.apiKey,
@@ -10615,7 +9326,7 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, linearImportMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const input = linearImportInputSchema.parse(await readJson(request));
+    const input = decodeLinearImportInput(await readJson(request));
     const settings = await getProjectSettings(db, project.id);
     const workflow = settings?.workflow_json
       ? normalizeAutoHuntWorkflow(JSON.parse(settings.workflow_json))
@@ -10747,7 +9458,7 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const period = projectUsagePeriodSchema.parse(
+    const period = decodeProjectUsagePeriod(
       new URL(request.url).searchParams.get("period") ?? "day",
     );
     const generatedAt = Date.now();
@@ -11434,7 +10145,7 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const input = issueMessageEditInputSchema.parse(await readJson(request));
+    const input = decodeIssueMessageEditInput(await readJson(request));
     const message = await getIssueMessage(
       db,
       project.id,
@@ -11740,7 +10451,7 @@ async function route(
     const acceptedAt = new Date().toISOString();
     const rawPayload = JSON.parse(proposal.payload_json);
     if (proposal.action_type === "request_issue_update") {
-      const action = issueUpdateProposalActionSchema.parse({
+      const action = decodeIssueUpdateProposalAction({
         type: proposal.action_type,
         ...rawPayload,
       });
@@ -11786,7 +10497,7 @@ async function route(
       });
     }
 
-    const action = issueCreateProposalActionSchema.parse({
+    const action = decodeIssueCreateProposalAction({
       type: proposal.action_type,
       ...rawPayload,
     });
@@ -11946,7 +10657,7 @@ async function route(
     if (!proposal) {
       throw new HttpError(404, "Agent Skill execution proposal not found");
     }
-    const input = agentSkillExecutionProposalAcceptInputSchema.parse(
+    const input = decodeAgentSkillExecutionProposalAcceptInput(
       await readJson(request),
     );
     return json(await approveAgentSkillExecutionProposal(db, env.ARCHIVES, proposal, {
@@ -11984,10 +10695,10 @@ async function route(
       issueExecutionProposalAcceptMatch[3],
     );
     if (!proposal) throw new HttpError(404, "Execution proposal not found");
-    const input = channelExecutionProposalAcceptInputSchema.parse(
+    const input = decodeChannelExecutionProposalAcceptInput(
       await readJson(request),
     );
-    dispatchExecutionPreferencesSchema.parse({
+    decodeExecutionPreferences({
       provider: input.provider,
       model: input.model,
       effort: input.effort,
@@ -12399,7 +11110,7 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const input = issueExecutionPreferencesSchema.parse(await readJson(request));
+    const input = decodeExecutionPreferences(await readJson(request));
     const run = await updateIssueExecutionPreferences(
       db,
       project.id,
@@ -12425,10 +11136,7 @@ async function route(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    const input = z
-      .object({ checkpoints: z.array(workflowCheckpointSchema).max(100) })
-      .strict()
-      .parse(await readJson(request));
+    const input = decodeIssueCheckpointsInput(await readJson(request));
     const outcome = await updateIssueCheckpoints(
       db,
       project.id,
@@ -12555,11 +11263,7 @@ async function route(
       session.user.id,
     );
     if (!sourceProject) throw new HttpError(404, "Project not found");
-    const body = z
-      .object({
-        targetProjectId: z.string().uuid(),
-      })
-      .parse(await readJson(request));
+    const body = decodeProjectTransferInput(await readJson(request));
     if (body.targetProjectId === sourceProject.id) {
       throw new HttpError(400, "Target project must be different");
     }
@@ -12630,7 +11334,7 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, recoveryMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const input = recoveryUserInputSchema.parse(await readJson(request));
+    const input = decodeRecoveryUserInput(await readJson(request));
     const result = await recoverHuntRun(db, project.id, {
       runId: recoveryMatch[2],
       action: recoveryMatch[3] as "retry" | "cancel",
@@ -12676,7 +11380,7 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, resumeRunMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const input = resumeUserInputSchema.parse(await readJson(request));
+    const input = decodeResumeUserInput(await readJson(request));
     const result = await resumeRunWithCheckpointIdentity(
       db,
       project.id,
@@ -12709,7 +11413,7 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, pausedReworkMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const input = pausedRunReworkInputSchema.parse(await readJson(request));
+    const input = decodePausedRunReworkInput(await readJson(request));
     try {
       const result = await reworkHuntRun(db, project.id, {
         runId: pausedReworkMatch[2],
@@ -12743,7 +11447,7 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, moveRunMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const input = moveRunInputSchema.parse(await readJson(request));
+    const input = decodeMoveRunInput(await readJson(request));
     try {
       const result = await moveHuntRun(db, project.id, {
         runId: moveRunMatch[2],
@@ -12772,7 +11476,7 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, dispatchRunMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const input = dispatchRunSchema.parse(await readJson(request));
+    const input = decodeDispatchRun(await readJson(request));
     const dispatched = await dispatchHuntRun(
       db,
       project.organization_id,
@@ -12802,7 +11506,7 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, unassignRunMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const input = z.object({ requestId: z.string().uuid() }).strict().parse(await readJson(request));
+    const input = decodeRequestIdInput(await readJson(request));
     const result = await unassignHuntRun(db, project.organization_id, project.id, {
       runId: unassignRunMatch[2],
       requestedByUserId: session.user.id,
@@ -12866,7 +11570,7 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, projectId, session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const input = workerRegisterSchema.parse(await readJson(request));
+    const input = decodeWorkerRegister(await readJson(request));
     const observedAt = new Date().toISOString();
     const workerToken = `briar_worker_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
     const registration = await registerExecutionWorker(db, projectId, {
@@ -12906,7 +11610,7 @@ async function route(
     const session = await requireSession(auth, request);
     const project = await getProject(db, projectId, session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    const input = workerBindSchema.parse(await readJson(request));
+    const input = decodeWorkerBind(await readJson(request));
     const observedAt = new Date().toISOString();
     const binding = await bindExecutionWorkerProject(db, projectId, {
       id: crypto.randomUUID(),
@@ -12950,7 +11654,7 @@ async function route(
     ) {
       throw new HttpError(403, "Worker owner or organization admin access required");
     }
-    const input = workerConcurrencySchema.parse(await readJson(request));
+    const input = decodeWorkerConcurrency(await readJson(request));
     const observedAt = new Date().toISOString();
     const updated = await updateExecutionWorkerConcurrency(
       db,
@@ -13011,7 +11715,7 @@ async function route(
     if (!binding || binding.state === "disabled") {
       throw new HttpError(403, "Worker is not enabled for this project");
     }
-    const input = workerUpdatePrepareSchema.parse(await readJson(request));
+    const input = decodeWorkerUpdatePrepare(await readJson(request));
     const observedAt = new Date().toISOString();
     const updateRequest = await requestExecutionWorkerUpdate(db, {
       id: crypto.randomUUID(),
@@ -13049,7 +11753,7 @@ async function route(
       throw new HttpError(403, "Worker is not enabled for this project");
     }
     const requestId = new URL(request.url).searchParams.get("requestId") ?? undefined;
-    if (requestId) z.string().uuid().parse(requestId);
+    if (requestId) decodeWorkerUpdateRequestId(requestId);
     const status = await executionWorkerUpdateStatus(db, {
       deviceId: principal.deviceId,
       requestId,
@@ -13080,7 +11784,7 @@ async function route(
     if (!binding || binding.state === "disabled") {
       throw new HttpError(403, "Worker is not enabled for this project");
     }
-    const input = workerUpdateHandoffSchema.parse(await readJson(request));
+    const input = decodeWorkerUpdateHandoff(await readJson(request));
     if (input.projectId !== binding.project_id) {
       throw new HttpError(403, "Worker handoff project does not match its binding");
     }
@@ -13159,7 +11863,7 @@ async function route(
     if (!binding || binding.state === "disabled") {
       throw new HttpError(403, "Worker is not enabled for this project");
     }
-    const input = workerHeartbeatSchema.parse(await readJson(request));
+    const input = decodeWorkerHeartbeat(await readJson(request));
     const observedAt = new Date().toISOString();
     const pendingBeforeHeartbeat = await pendingExecutionWorkerUpdate(
       db,
@@ -13232,7 +11936,7 @@ async function route(
     if (!binding || binding.state === "disabled") {
       throw new HttpError(403, "Worker is not enabled for this project");
     }
-    const input = workerLabelSchema.parse(await readJson(request));
+    const input = decodeWorkerLabel(await readJson(request));
     const device = await updateExecutionWorkerLabel(
       db,
       principal.deviceId,
@@ -13245,7 +11949,7 @@ async function route(
 
   const leaseMatch = pathname.match(/^\/runs\/([0-9a-f-]+)\/lease$/u);
   if (leaseMatch && request.method === "POST") {
-    const input = leaseRenewSchema.parse(await readJson(request));
+    const input = decodeLeaseRenew(await readJson(request));
     let workerId: string | undefined;
     const projectId = bearerToken(request).startsWith("briar_worker_")
       ? (() => {
@@ -13536,8 +12240,8 @@ async function route(
         | Record<string, unknown>
         | null;
       const raw = capabilities?.providerCapabilities;
-      const parsed = agentProviderCapabilityCatalogSchema.safeParse(raw);
-      return parsed.success ? [parsed.data] : [];
+      const parsed = decodeAgentProviderCapabilityCatalogOption(raw);
+      return Option.isSome(parsed) ? [parsed.value] : [];
     });
     return json({
       capabilities: mergeAgentProviderCapabilityCatalogs(catalogs),
@@ -13568,19 +12272,19 @@ async function route(
     await requireProjectAccess(auth, db, request, projectId);
     const requestedSessionId = transcriptMatch[2];
     const detachedRunId = requestedSessionId.startsWith("detached-")
-      ? z.string().uuid().safeParse(requestedSessionId.slice("detached-".length))
-      : null;
-    const hotWorkLog = detachedRunId?.success
-      ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.data)
+      ? decodeUuidOption(requestedSessionId.slice("detached-".length))
+      : Option.none<string>();
+    const hotWorkLog = Option.isSome(detachedRunId)
+      ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.value)
       : await readAgentWorkLog(db, projectId, requestedSessionId);
     const workLog = hotWorkLog && hotWorkLog.entries.length > 0
       ? hotWorkLog
-      : detachedRunId?.success
+      : Option.isSome(detachedRunId)
         ? await readLatestArchivedWorkLogForRun(
             db,
             env.ARCHIVES,
             projectId,
-            detachedRunId.data,
+            detachedRunId.value,
           )
         : await readArchivedWorkLog(
             db,
@@ -13629,17 +12333,17 @@ async function route(
     await requireProjectAccess(auth, db, request, projectId);
     const requestedSessionId = rawTranscriptSegmentMatch[2];
     const detachedRunId = requestedSessionId.startsWith("detached-")
-      ? z.string().uuid().safeParse(requestedSessionId.slice("detached-".length))
-      : null;
-    const hotWorkLog = detachedRunId?.success
-      ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.data)
+      ? decodeUuidOption(requestedSessionId.slice("detached-".length))
+      : Option.none<string>();
+    const hotWorkLog = Option.isSome(detachedRunId)
+      ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.value)
       : await readAgentWorkLog(db, projectId, requestedSessionId);
-    const workLog = hotWorkLog ?? (detachedRunId?.success
+    const workLog = hotWorkLog ?? (Option.isSome(detachedRunId)
       ? await readLatestArchivedWorkLogForRun(
           db,
           env.ARCHIVES,
           projectId,
-          detachedRunId.data,
+          detachedRunId.value,
         )
       : await readArchivedWorkLog(
           db,
@@ -13680,17 +12384,17 @@ async function route(
     await requireProjectAccess(auth, db, request, projectId);
     const requestedSessionId = rawTranscriptMatch[2];
     const detachedRunId = requestedSessionId.startsWith("detached-")
-      ? z.string().uuid().safeParse(requestedSessionId.slice("detached-".length))
-      : null;
-    const hotWorkLog = detachedRunId?.success
-      ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.data)
+      ? decodeUuidOption(requestedSessionId.slice("detached-".length))
+      : Option.none<string>();
+    const hotWorkLog = Option.isSome(detachedRunId)
+      ? await readLatestAgentWorkLogForRun(db, projectId, detachedRunId.value)
       : await readAgentWorkLog(db, projectId, requestedSessionId);
-    const workLog = hotWorkLog ?? (detachedRunId?.success
+    const workLog = hotWorkLog ?? (Option.isSome(detachedRunId)
       ? await readLatestArchivedWorkLogForRun(
           db,
           env.ARCHIVES,
           projectId,
-          detachedRunId.data,
+          detachedRunId.value,
         )
       : await readArchivedWorkLog(
           db,
@@ -13741,7 +12445,7 @@ async function route(
   }
 
   if (pathname === "/worker-claims" && request.method === "POST") {
-    const input = workerClaimInputSchema.parse(await readJson(request));
+    const input = decodeWorkerClaimInput(await readJson(request));
     const authenticatedWorker = await requireWorkerProjectBinding(
       db,
       request,
@@ -13794,10 +12498,7 @@ async function route(
   }
 
   if (pathname === "/issue-reply-claims" && request.method === "POST") {
-    const input = claimInputSchema
-      .pick({ claimedBy: true, workerId: true, projectId: true })
-      .required({ workerId: true, projectId: true })
-      .parse(await readJson(request));
+    const input = decodeIssueReplyClaimInput(await readJson(request));
     const authenticatedWorker = await requireWorkerProjectBinding(
       db,
       request,
@@ -14048,7 +12749,7 @@ async function route(
   }
 
   if (pathname === "/channel-reply-claims" && request.method === "POST") {
-    const input = channelReplyClaimInputSchema.parse(await readJson(request));
+    const input = decodeChannelReplyClaimInput(await readJson(request));
     const principal = workerClaimContext?.principal ??
       await requireWorkerOrganization(db, request, input.organizationId);
     if (principal.organizationId !== input.organizationId) {
@@ -14314,7 +13015,7 @@ async function route(
           activity,
           handoffContext,
           organizationContext: agent.project_id === null
-            ? organizationAgentContextDescriptorSchema.parse({
+            ? decodeOrganizationAgentContextDescriptor({
                 schemaVersion: 1,
                 snapshotAt: job.claimed_at,
               })
@@ -14380,7 +13081,7 @@ async function route(
   if (organizationContextManifestMatch && request.method === "GET") {
     const organizationId = organizationContextManifestMatch[1];
     const workId = organizationContextManifestMatch[2];
-    const query = organizationAgentContextQuerySchema.parse(
+    const query = decodeOrganizationAgentContextQuery(
       Object.fromEntries(new URL(request.url).searchParams),
     );
     const principal = await requireWorkerOrganization(
@@ -14406,7 +13107,7 @@ async function route(
     if (!job?.claimed_at) {
       throw new HttpError(409, "Organization Agent claim is no longer active");
     }
-    const manifest = organizationAgentContextManifestSchema.parse(
+    const manifest = decodeOrganizationAgentContextManifest(
       await organizationAgentContextManifest(db, {
         organizationId,
         workId,
@@ -14431,7 +13132,7 @@ async function route(
   if (organizationContextLookupMatch && request.method === "POST") {
     const organizationId = organizationContextLookupMatch[1];
     const workId = organizationContextLookupMatch[2];
-    const input = organizationAgentContextLookupInputSchema.parse(
+    const input = decodeOrganizationAgentContextLookupInput(
       await readJson(request),
     );
     const principal = await requireWorkerOrganization(
@@ -14466,7 +13167,7 @@ async function route(
     if (projects.some((project) => !project)) {
       throw new HttpError(404, "Project not found");
     }
-    const response = organizationAgentContextLookupResponseSchema.parse(
+    const response = decodeOrganizationAgentContextLookupResponse(
       await lookupOrganizationAgentContext(db, env.ARCHIVES, {
         organizationId,
         workId,
@@ -14491,7 +13192,7 @@ async function route(
     const workId = organizationContextMatch[2];
     const projectId = organizationContextMatch[3] ?? null;
     const resource = organizationContextMatch[4] ?? "projects";
-    const query = organizationAgentContextQuerySchema.parse(
+    const query = decodeOrganizationAgentContextQuery(
       Object.fromEntries(new URL(request.url).searchParams),
     );
     const principal = await requireWorkerOrganization(
@@ -14527,7 +13228,7 @@ async function route(
         cursor: query.cursor,
       });
       return privateNoStoreJson(
-        organizationAgentContextProjectsPageSchema.parse(page),
+        decodeOrganizationAgentContextProjectsPage(page),
       );
     }
 
@@ -14546,7 +13247,7 @@ async function route(
         cursor: query.cursor,
       });
       return privateNoStoreJson(
-        organizationAgentContextAgentsPageSchema.parse(page),
+        decodeOrganizationAgentContextAgentsPage(page),
       );
     }
     if (resource === "issues") {
@@ -14559,7 +13260,7 @@ async function route(
         cursor: query.cursor,
       });
       return privateNoStoreJson(
-        organizationAgentContextIssuesPageSchema.parse(page),
+        decodeOrganizationAgentContextIssuesPage(page),
       );
     }
     if (resource === "issue-pull-requests") {
@@ -14572,7 +13273,7 @@ async function route(
         cursor: query.cursor,
       });
       return privateNoStoreJson(
-        organizationAgentContextIssuePullRequestsPageSchema.parse(page),
+        decodeOrganizationAgentContextIssuePullRequestsPage(page),
       );
     }
     const page = await listOrganizationAgentContextSessionsPage(
@@ -14588,7 +13289,7 @@ async function route(
       },
     );
     return privateNoStoreJson(
-      organizationAgentContextSessionsPageSchema.parse(page),
+      decodeOrganizationAgentContextSessionsPage(page),
     );
   }
 
@@ -14643,7 +13344,7 @@ async function route(
     if (!verified) {
       throw new HttpError(401, "Invalid or expired activity token");
     }
-    const input = channelAgentActivityPublishInputSchema.parse(
+    const input = decodeChannelAgentActivityPublishInput(
       await readJson(request),
     );
     const frame = channelActivityFrame(
@@ -14667,7 +13368,7 @@ async function route(
   );
   if (channelReplyClaimMatch && request.method === "POST") {
     if (channelReplyClaimMatch[2] === "lease") {
-      const input = channelReplyLeaseInputSchema.parse(await readJson(request));
+      const input = decodeChannelReplyLeaseInput(await readJson(request));
       const principal = await requireWorkerOrganization(
         db,
         request,
@@ -14952,7 +13653,7 @@ async function route(
     if (!verified) {
       throw new HttpError(401, "Invalid or expired activity token");
     }
-    const input = channelAgentActivityPublishInputSchema.parse(
+    const input = decodeChannelAgentActivityPublishInput(
       await readJson(request),
     );
     const frame = issueActivityFrame(
@@ -14975,7 +13676,7 @@ async function route(
   );
   if (issueReplyClaimMatch && request.method === "POST") {
     if (issueReplyClaimMatch[2] === "lease") {
-      const input = issueAgentReplyLeaseSchema.parse(await readJson(request));
+      const input = decodeIssueAgentReplyLease(await readJson(request));
       const worker = await requireWorkerProjectBinding(
         db,
         request,
@@ -15009,7 +13710,7 @@ async function route(
       return json({ leaseExpiresAt: renewed.lease_expires_at, activity });
     }
 
-    const input = issueAgentReplyCompletionSchema.parse(
+    const input = decodeIssueAgentReplyCompletion(
       await readJson(request),
     );
     if (
@@ -15161,7 +13862,7 @@ async function route(
   }
 
   if (pathname === "/agent-task-claims" && request.method === "POST") {
-    const input = projectAgentTaskClaimInputSchema.parse(await readJson(request));
+    const input = decodeProjectAgentTaskClaimInput(await readJson(request));
     const authenticatedWorker = await requireWorkerProjectBinding(
       db,
       request,
@@ -15288,7 +13989,7 @@ async function route(
   if (projectAgentTaskClaimMatch && request.method === "POST") {
     const body = await readJson(request);
     if (projectAgentTaskClaimMatch[2] === "lease") {
-      const input = projectAgentTaskLeaseSchema.parse(body);
+      const input = decodeProjectAgentTaskLease(body);
       const worker = await requireWorkerProjectBinding(
         db,
         request,
@@ -15309,7 +14010,7 @@ async function route(
       if (!renewed) throw new HttpError(409, "Agent task claim is no longer active");
       return json({ leaseExpiresAt: renewed.lease_expires_at });
     }
-    const input = projectAgentTaskCompletionSchema.parse(body);
+    const input = decodeProjectAgentTaskCompletion(body);
     const worker = await requireWorkerProjectBinding(
       db,
       request,
@@ -15389,7 +14090,7 @@ async function route(
 
   if (pathname === "/queue/claims" && request.method === "POST") {
     // Migration 0090 is applied by worker:deploy before this code can run.
-    const input = claimInputSchema.parse(await readJson(request));
+    const input = decodeClaimInput(await readJson(request));
     let authenticatedWorkerId: string | undefined;
     let authenticatedWorker:
       | Awaited<ReturnType<typeof requireWorkerProjectBinding>>
@@ -15589,7 +14290,7 @@ async function route(
       request,
       agentRecoveryMatch[1],
     );
-    const input = recoveryAgentInputSchema.parse(await readJson(request));
+    const input = decodeRecoveryAgentInput(await readJson(request));
     const result = await recoverHuntRun(db, projectId, {
       runId: agentRecoveryMatch[1],
       action: agentRecoveryMatch[2] as "retry" | "cancel",
@@ -15619,7 +14320,7 @@ async function route(
       request,
       agentStageLifecycleMatch[1],
     );
-    const input = workflowStageLifecycleInputSchema.parse(await readJson(request));
+    const input = decodeWorkflowStageLifecycleInput(await readJson(request));
     try {
       const common = {
         runId: agentStageLifecycleMatch[1],
@@ -15673,7 +14374,7 @@ async function route(
       request,
       agentResumeMatch[1],
     );
-    const input = resumeAgentInputSchema.parse(await readJson(request));
+    const input = decodeResumeAgentInput(await readJson(request));
     const result = await resumeRunWithCheckpointIdentity(
       db,
       projectId,
@@ -15706,7 +14407,7 @@ async function route(
       request,
       reworkMatch[1],
     );
-    const input = runReworkInputSchema.parse(await readJson(request));
+    const input = decodeRunReworkInput(await readJson(request));
     try {
       const result = await reworkHuntRun(db, projectId, {
         runId: reworkMatch[1],
@@ -15917,7 +14618,7 @@ async function route(
   }
 
   if (pathname === "/run-events" && request.method === "POST") {
-    const parsed = eventSchema.parse(await readJson(request));
+    const parsed = decodeRunEvent(await readJson(request));
     const projectId = parsed.runId
       ? (await requireActiveWorkerRunClaim(db, request, parsed.runId)).projectId
       : await requireAgentProject(db, request);
@@ -16181,7 +14882,7 @@ async function handleIncomingChannelWebhook(
     new Date(observedAt.getTime() - 60_000).toISOString(),
   );
   if (!allowed) throw new HttpError(429, "Webhook rate limit exceeded");
-  const input = channelIncomingWebhookMessageSchema.parse(
+  const input = decodeChannelIncomingWebhookMessage(
     await readJson(request, 65_536),
   );
   const rawHeaderEventId = request.headers.get("idempotency-key");
@@ -16237,7 +14938,7 @@ export default {
       return env.ASSETS.fetch(new Request(assetUrl, request));
     }
     if (url.pathname === "/health") {
-      return json(mobileHealthResponseSchema.parse({
+      return json(decodeMobileHealthResponse({
         ok: true,
         service: "briar-api",
         database: "cloudflare-d1",
@@ -16260,8 +14961,11 @@ export default {
         if (error instanceof HttpError) {
           return json({ message: error.message }, error.status);
         }
-        if (error instanceof z.ZodError) {
-          return json({ message: "Invalid request", issues: error.issues }, 400);
+        if (error instanceof RequestDecodeError) {
+          return json({
+            message: "Invalid request",
+            issues: formatSchemaIssue(error.cause.issue).issues,
+          }, 400);
         }
         console.error(JSON.stringify({
           message: "Incoming channel webhook failed",
@@ -16280,8 +14984,11 @@ export default {
         if (error instanceof HttpError) {
           return json({ message: error.message }, error.status);
         }
-        if (error instanceof z.ZodError) {
-          return json({ message: "Invalid GitHub webhook", issues: error.issues }, 400);
+        if (error instanceof RequestDecodeError) {
+          return json({
+            message: "Invalid GitHub webhook",
+            issues: formatSchemaIssue(error.cause.issue).issues,
+          }, 400);
         }
         console.error(
           JSON.stringify({
@@ -16493,8 +15200,17 @@ export default {
       if (error instanceof OrganizationAgentContextPageTooLargeError) {
         return json({ message: error.message }, 413);
       }
-      if (error instanceof z.ZodError) {
-        return json({ message: "Invalid request", issues: error.issues }, 400);
+      if (error instanceof TranscriptRequestDecodeError) {
+        return json({
+          message: "Invalid request",
+          issues: formatSchemaIssue(error.cause.issue).issues,
+        }, 400);
+      }
+      if (error instanceof RequestDecodeError) {
+        return json({
+          message: "Invalid request",
+          issues: formatSchemaIssue(error.cause.issue).issues,
+        }, 400);
       }
       if (error instanceof ProjectWorkflowInputError) {
         return json({

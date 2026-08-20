@@ -17,7 +17,7 @@ import {
   type OnboardingPrerequisites,
   type PrerequisiteId,
 } from "../lib/initial-onboarding";
-import { agentProviders } from "../lib/agent-provider-contract";
+import { agentProviders } from "../lib/agent-provider";
 import {
   AntigravityIcon,
   ClaudeIcon,

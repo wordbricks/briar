@@ -12,15 +12,8 @@ import { randomBytes } from "node:crypto";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { homedir, hostname, platform } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
-import type {
-  AgentProvider,
-  ModelEffort,
-} from "../src/lib/agent-provider-contract";
-
-export type {
-  AgentProvider,
-  ModelEffort,
-} from "../src/lib/agent-provider-contract";
+import type { ModelEffort } from "../src/lib/agent-provider-contract";
+import type { AgentProvider } from "../src/lib/agent-provider";
 
 export type ClaimedIssue = {
   workType?: "issue" | "issueReply" | "channelReply" | "projectAgentTask";

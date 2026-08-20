@@ -3,14 +3,18 @@ import type {
   PermissionRuleset,
   QuestionRequest,
 } from "@opencode-ai/sdk/v2";
+import * as Schema from "effect/Schema";
 import { pathToFileURL } from "node:url";
-import type { AgentAttachment } from "./runner-attachments";
 import {
   normalizedActivityText,
   normalizedActivityTitle,
   type AgentActivityKind,
   type NormalizedAgentEvent,
 } from "./normalized-agent-event";
+import {
+  commonRunnerRequestFields,
+  runnerRequestDecoderOptions,
+} from "./runner-request";
 
 export type {
   AgentActivityKind,
@@ -18,21 +22,18 @@ export type {
   NormalizedAgentEvent,
 } from "./normalized-agent-event";
 
-export type OpenCodeRunnerRequest = {
-  type: "run";
-  message: string;
-  workspaceRoot: string;
-  conversationId?: string | null;
-  instructions?: string | null;
-  outputSchema?: Record<string, unknown> | boolean | null;
-  model?: string | null;
-  effort?: string | null;
-  approvalPolicy: "untrusted" | "on-request" | "never";
-  sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
-  networkAccess: boolean;
-  attachments?: AgentAttachment[];
-  opencodeBinary: string;
-};
+export const OpenCodeRunnerRequest = Schema.Struct({
+  ...commonRunnerRequestFields,
+  effort: Schema.optional(Schema.NullOr(Schema.String)),
+  opencodeBinary: Schema.String,
+});
+
+export type OpenCodeRunnerRequest = typeof OpenCodeRunnerRequest.Type;
+
+export const decodeOpenCodeRunnerRequest = Schema.decodeUnknownResult(
+  OpenCodeRunnerRequest,
+  runnerRequestDecoderOptions,
+);
 
 export type OpenCodeRunnerOutput =
   | { type: "session"; sessionId: string }

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
 import type { JsonSchema } from "../src/lib/project-llm";
-import { agentProviderBinaryName } from "../src/lib/agent-provider-contract";
+import { agentProviderBinaryName } from "../src/lib/agent-provider";
 import {
   detachedConversationIdFromPayload,
   detachedProviderRequest,

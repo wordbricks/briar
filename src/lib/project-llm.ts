@@ -1,19 +1,18 @@
 import type { StructuredAgentResult } from "./agent-result";
 import {
   emptyAgentProviderCapabilityCatalog,
-  agentProviders,
-  type AgentProvider,
   type AgentProviderCapabilityCatalog,
   type AgentModelCapability,
   type ModelEffort,
 } from "./agent-provider-contract";
+import { agentProviders, type AgentProvider } from "./agent-provider";
 
 export {
   agentProviderLabels,
   agentProviders,
   type AgentProvider,
-  type ModelEffort,
-} from "./agent-provider-contract";
+} from "./agent-provider";
+export type { ModelEffort } from "./agent-provider-contract";
 
 export type JsonSchema = Record<string, unknown> | boolean;
 

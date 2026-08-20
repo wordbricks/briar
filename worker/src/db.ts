@@ -55,56 +55,17 @@ import {
   type AgentSkillRow,
 } from "./agent-skills";
 import { workflowSnapshotForRun } from "./workflow-policy";
+import {
+  getOrganizationInvitationById,
+  getOrganizationInvitationByTokenHash,
+  type OrganizationRole,
+  type OrganizationInvitationRow,
+  type OrganizationRow,
+} from "./organization-repository";
+import type { ProjectRow } from "./project-repository";
 
 type ProjectAgentProvider = AgentSkillProvider;
 type ModelEffort = AgentSkillEffort;
-
-export type ProjectRow = {
-  id: string;
-  name: string;
-  issue_key_prefix: string;
-  schedule_tab_enabled: number;
-  icon: string | null;
-  organization_id: string;
-  organization_name: string;
-  member_role: OrganizationRole;
-  created_at: string;
-};
-
-export type OrganizationRole = "owner" | "admin" | "member";
-export type OrganizationRow = {
-  id: string;
-  name: string;
-  handle: string;
-  logo: string | null;
-  role: OrganizationRole;
-  created_at: string;
-};
-export type OrganizationMemberRow = {
-  user_id: string;
-  name: string;
-  email: string;
-  image: string | null;
-  role: OrganizationRole;
-  created_at: string;
-};
-
-export type OrganizationInvitationRow = {
-  id: string;
-  organization_id: string;
-  organization_name: string;
-  initial_project_id: string;
-  initial_project_name: string;
-  email_normalized: string;
-  role: Exclude<OrganizationRole, "owner">;
-  invited_by_user_id: string | null;
-  expires_at: string;
-  accepted_at: string | null;
-  accepted_by_user_id: string | null;
-  revoked_at: string | null;
-  created_at: string;
-  updated_at: string;
-};
 
 export type AccountDeletionPlan = {
   blockedOrganizations: Array<{ id: string; name: string }>;
@@ -973,22 +934,6 @@ export type ChannelConversationNotificationRow = {
   notification_reason: "mention" | "thread_reply" | "subscription";
 };
 
-export type DashboardChangeRow = {
-  version: number;
-  entity_type: "run" | "worker" | "notifications" | "metadata";
-  entity_id: string | null;
-  operation: "upsert" | "delete" | "replace";
-};
-
-export type DashboardChangesPage = {
-  currentVersion: number;
-  oldestVersion: number | null;
-  changes: DashboardChangeRow[];
-  hasMore: boolean;
-  nextCursor: number;
-  expired: boolean;
-};
-
 export type IssueAttachmentRow = {
   id: string;
   run_id: string;
@@ -1069,7 +1014,6 @@ export class EventKeyConflictError extends Error {
 export class HuntTransitionError extends Error {}
 export class HuntClaimError extends Error {}
 
-const DASHBOARD_CHANGE_PAGE_SIZE = 500;
 const DASHBOARD_CHANGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1_000;
 const DEFAULT_DASHBOARD_CHANGE_PRUNE_BATCH_SIZE = 25_000;
 
@@ -1112,74 +1056,6 @@ export async function pruneExpiredDashboardChanges(
     cutoff,
     deleted,
     reachedBatchLimit: deleted === batchSize,
-  };
-}
-
-export async function getDashboardSyncCursor(
-  db: D1Database,
-  projectId: string,
-) {
-  const state = await db
-    .prepare(
-      `select current_version from briar_dashboard_sync_state
-       where project_id = ?`,
-    )
-    .bind(projectId)
-    .first<{ current_version: number }>();
-  return state?.current_version ?? 0;
-}
-
-export async function listDashboardChanges(
-  db: D1Database,
-  projectId: string,
-  cursor: number,
-): Promise<DashboardChangesPage> {
-  const currentVersion = await getDashboardSyncCursor(db, projectId);
-  const oldest = await db
-    .prepare(
-      `select min(version) as oldest_version
-       from briar_dashboard_changes where project_id = ?`,
-    )
-    .bind(projectId)
-    .first<{ oldest_version: number | null }>();
-  const oldestVersion = oldest?.oldest_version ?? null;
-  const expired =
-    cursor < 0 ||
-    cursor > currentVersion ||
-    (cursor < currentVersion &&
-      (oldestVersion === null || cursor < oldestVersion - 1));
-  if (expired) {
-    return {
-      currentVersion,
-      oldestVersion,
-      changes: [],
-      hasMore: false,
-      nextCursor: currentVersion,
-      expired: true,
-    };
-  }
-
-  const result = await db
-    .prepare(
-      `select version, entity_type, entity_id, operation
-       from briar_dashboard_changes
-       where project_id = ? and version > ? and version <= ?
-       order by version
-       limit ?`,
-    )
-    .bind(projectId, cursor, currentVersion, DASHBOARD_CHANGE_PAGE_SIZE + 1)
-    .all<DashboardChangeRow>();
-  const hasMore = result.results.length > DASHBOARD_CHANGE_PAGE_SIZE;
-  const changes = result.results.slice(0, DASHBOARD_CHANGE_PAGE_SIZE);
-  return {
-    currentVersion,
-    oldestVersion,
-    changes,
-    hasMore,
-    nextCursor: hasMore
-      ? (changes.at(-1)?.version ?? cursor)
-      : currentVersion,
-    expired: false,
   };
 }
 
@@ -2460,24 +2336,6 @@ export async function assertWorkflowRunCompletion(
   return progress;
 }
 
-export async function listOrganizations(db: D1Database, userId: string) {
-  const result = await db
-    .prepare(
-      `select organization.id, organization.name, organization.handle,
-              coalesce(organization.logo_data_url, organization.logo) as logo,
-              membership.role,
-              organization.created_at
-       from briar_organizations organization
-       join briar_organization_members membership
-         on membership.organization_id = organization.id
-       where membership.user_id = ?
-       order by organization.created_at, organization.id`,
-    )
-    .bind(userId)
-    .all<OrganizationRow>();
-  return result.results;
-}
-
 export async function planAccountDeletion(
   db: D1Database,
   userId: string,
@@ -3071,40 +2929,6 @@ export async function isOrganizationHandleAvailable(
   return organization === null;
 }
 
-export async function getOrganizationRole(
-  db: D1Database,
-  organizationId: string,
-  userId: string,
-) {
-  const row = await db
-    .prepare(
-      `select role from briar_organization_members
-     where organization_id = ? and user_id = ?`,
-    )
-    .bind(organizationId, userId)
-    .first<{ role: OrganizationRole }>();
-  return row?.role ?? null;
-}
-
-export async function listOrganizationMembers(
-  db: D1Database,
-  organizationId: string,
-) {
-  const result = await db
-    .prepare(
-      `select member.user_id, user.name, user.email, user.image,
-            member.role, member.created_at
-     from briar_organization_members member
-     join "user" on user.id = member.user_id
-     where member.organization_id = ?
-     order by case member.role when 'owner' then 0 when 'admin' then 1 else 2 end,
-              lower(user.name), lower(user.email)`,
-    )
-    .bind(organizationId)
-    .all<OrganizationMemberRow>();
-  return result.results;
-}
-
 export async function addOrganizationMember(
   db: D1Database,
   organizationId: string,
@@ -3130,22 +2954,6 @@ export async function addOrganizationMember(
     .run();
   return user.id;
 }
-
-const organizationInvitationSelect = `
-  select invitation.id, invitation.organization_id,
-         organization.name as organization_name,
-         invitation.initial_project_id,
-         project.name as initial_project_name,
-         invitation.email_normalized, invitation.role,
-         invitation.invited_by_user_id, invitation.expires_at,
-         invitation.accepted_at, invitation.accepted_by_user_id,
-         invitation.revoked_at, invitation.created_at, invitation.updated_at
-  from briar_organization_invitations invitation
-  join briar_organizations organization
-    on organization.id = invitation.organization_id
-  join briar_projects project
-    on project.id = invitation.initial_project_id
-   and project.organization_id = invitation.organization_id`;
 
 export async function createOrganizationInvitation(
   db: D1Database,
@@ -3221,49 +3029,6 @@ export async function createOrganizationInvitation(
   return invitation
     ? { outcome: "created" as const, invitation }
     : { outcome: "project_not_found" as const };
-}
-
-export async function listOrganizationInvitations(
-  db: D1Database,
-  organizationId: string,
-) {
-  const result = await db
-    .prepare(
-      `${organizationInvitationSelect}
-       where invitation.organization_id = ?
-         and invitation.accepted_at is null
-         and invitation.revoked_at is null
-       order by invitation.created_at desc, invitation.id`,
-    )
-    .bind(organizationId)
-    .all<OrganizationInvitationRow>();
-  return result.results;
-}
-
-export async function getOrganizationInvitationById(
-  db: D1Database,
-  invitationId: string,
-) {
-  return db
-    .prepare(
-      `${organizationInvitationSelect}
-       where invitation.id = ?`,
-    )
-    .bind(invitationId)
-    .first<OrganizationInvitationRow>();
-}
-
-export async function getOrganizationInvitationByTokenHash(
-  db: D1Database,
-  tokenHash: string,
-) {
-  return db
-    .prepare(
-      `${organizationInvitationSelect}
-       where invitation.token_hash = ?`,
-    )
-    .bind(tokenHash)
-    .first<OrganizationInvitationRow>();
 }
 
 export async function revokeOrganizationInvitation(
@@ -4258,68 +4023,6 @@ export async function releaseGithubDelivery(
     .bind(deliveryId, claimedAt)
     .run();
   return (result.meta.changes ?? 0) > 0;
-}
-
-export async function listProjects(db: D1Database, userId: string) {
-  const result = await db
-    .prepare(
-      `select project.id, project.name,
-              project.issue_key_prefix,
-              project.schedule_tab_enabled,
-              coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
-              project.organization_id,
-              organization.name as organization_name,
-              membership.role as member_role, project.created_at
-       from briar_projects project
-       join briar_organizations organization on organization.id = project.organization_id
-       join briar_organization_members membership
-         on membership.organization_id = project.organization_id
-        and membership.user_id = ?
-       order by organization.created_at, project.created_at`,
-    )
-    .bind(userId)
-    .all<ProjectRow>();
-  return result.results;
-}
-
-export async function listOrganizationProjects(
-  db: D1Database,
-  organizationId: string,
-) {
-  const result = await db
-    .prepare(
-      `select project.id, project.name,
-              project.issue_key_prefix,
-              project.schedule_tab_enabled,
-              coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
-              project.organization_id,
-              organization.name as organization_name,
-              'member' as member_role, project.created_at
-       from briar_projects project
-       join briar_organizations organization
-         on organization.id = project.organization_id
-       where project.organization_id = ?
-       order by project.created_at`,
-    )
-    .bind(organizationId)
-    .all<ProjectRow>();
-  return result.results;
-}
-
-export async function listOrganizationInboxProjects(
-  db: D1Database,
-  organizationId: string,
-) {
-  const result = await db
-    .prepare(
-      `select id, name, issue_key_prefix
-       from briar_projects
-       where organization_id = ?
-       order by created_at, id`,
-    )
-    .bind(organizationId)
-    .all<Pick<ProjectRow, "id" | "name" | "issue_key_prefix">>();
-  return result.results;
 }
 
 export async function getOrganizationInboxSyncVersion(
@@ -14473,52 +14176,4 @@ export async function transferIssue(
   }
 
   return "transferred";
-}
-
-export type InboxReadStateRow = {
-  message_id: string;
-  version: string;
-  updated_at: string;
-};
-
-export async function listInboxReadStates(
-  db: D1Database,
-  userId: string,
-): Promise<InboxReadStateRow[]> {
-  const result = await db
-    .prepare(
-      `select message_id, version, updated_at
-       from briar_inbox_read_states
-       where user_id = ?
-       order by updated_at desc, message_id`,
-    )
-    .bind(userId)
-    .all<InboxReadStateRow>();
-  return result.results ?? [];
-}
-
-export async function upsertInboxReadStates(
-  db: D1Database,
-  userId: string,
-  entries: ReadonlyArray<{ messageId: string; version: string }>,
-  updatedAt: string,
-): Promise<InboxReadStateRow[]> {
-  if (entries.length === 0) {
-    return listInboxReadStates(db, userId);
-  }
-
-  const statements = entries.map((entry) =>
-    db
-      .prepare(
-        `insert into briar_inbox_read_states (
-           user_id, message_id, version, updated_at
-         ) values (?, ?, ?, ?)
-         on conflict(user_id, message_id) do update set
-           version = excluded.version,
-           updated_at = excluded.updated_at`,
-      )
-      .bind(userId, entry.messageId, entry.version, updatedAt),
-  );
-  await db.batch(statements);
-  return listInboxReadStates(db, userId);
 }

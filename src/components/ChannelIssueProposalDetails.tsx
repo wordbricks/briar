@@ -1,7 +1,8 @@
+import * as Option from "effect/Option";
 import { useState } from "react";
 import { useI18n } from "../i18n";
 import {
-  channelIssueProposalPayloadSchema,
+  decodeChannelIssueProposalPayloadOption,
   type ChannelMessageProposal,
 } from "../lib/channels-contract";
 
@@ -9,16 +10,26 @@ export function channelIssueProposalDetails(
   proposal: ChannelMessageProposal | null | undefined,
 ) {
   if (proposal?.actionType !== "request_issue_create") return null;
-  const parsed = channelIssueProposalPayloadSchema.safeParse(proposal.payload);
-  return parsed.success ? parsed.data.issue : null;
+  return Option.match(
+    decodeChannelIssueProposalPayloadOption(proposal.payload),
+    {
+      onNone: () => null,
+      onSome: (payload) => payload.issue,
+    },
+  );
 }
 
 export function channelIssueProposalRequestsExecution(
   proposal: ChannelMessageProposal | null | undefined,
 ) {
   if (proposal?.actionType !== "request_issue_create") return false;
-  const parsed = channelIssueProposalPayloadSchema.safeParse(proposal.payload);
-  return parsed.success && parsed.data.executeAfterCreate === true;
+  return Option.match(
+    decodeChannelIssueProposalPayloadOption(proposal.payload),
+    {
+      onNone: () => false,
+      onSome: (payload) => payload.executeAfterCreate,
+    },
+  );
 }
 
 export function ChannelIssueProposalDetails({

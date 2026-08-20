@@ -102,8 +102,103 @@ describe("project workflow generator", () => {
       }),
     );
     expect(chatWithProjectLlm.mock.calls[0]?.[0].outputSchema).toMatchObject({
+      additionalProperties: false,
       properties: { version: { enum: [2] } },
     });
+    expect(chatWithProjectLlm.mock.calls[0]?.[0].outputSchema).toMatchObject({
+      properties: {
+        stages: { items: { additionalProperties: false } },
+        execution: { additionalProperties: false },
+      },
+    });
+  });
+
+  it("strips unsupported LLM fields at every decoded workflow boundary", async () => {
+    chatWithProjectLlm.mockResolvedValue({
+      conversationId: "briar:project-1:thread-extra-fields",
+      workspaceRoot: "/repo",
+      message: JSON.stringify({
+        version: 2,
+        requirements: [{
+          id: " bun ",
+          label: " Bun ",
+          kind: "executable",
+          tool: " bun ",
+          reason: " Runs repository tests. ",
+          unsupported: "drop-me",
+        }],
+        stages: [{
+          id: " implementing ",
+          label: " Implement ",
+          required: true,
+          evidence: [" diff "],
+          checks: [" bun run test "],
+          unsupported: "drop-me",
+        }],
+        execution: {
+          checkpoints: [{
+            key: " human_review ",
+            stage: " implementing ",
+            position: "after",
+            unsupported: "drop-me",
+          }],
+          unsupported: "drop-me",
+        },
+        completion: {
+          requiredStages: [" implementing "],
+          unsupported: "drop-me",
+        },
+        unsupported: "drop-me",
+      }),
+    });
+
+    await expect(generateProjectWorkflow("project-1")).resolves.toEqual({
+      version: 2,
+      requirements: [{
+        id: "bun",
+        label: "Bun",
+        kind: "executable",
+        tool: "bun",
+        reason: "Runs repository tests.",
+      }],
+      stages: [{
+        id: "implementing",
+        label: "Implement",
+        required: true,
+        evidence: ["diff"],
+        checks: ["bun run test"],
+      }],
+      execution: {
+        checkpoints: [{
+          key: "human_review",
+          stage: "implementing",
+          position: "after",
+        }],
+      },
+      completion: { requiredStages: ["implementing"] },
+    });
+  });
+
+  it("keeps malformed JSON and contract failures behind stable messages", async () => {
+    chatWithProjectLlm.mockResolvedValueOnce({
+      conversationId: "briar:project-1:thread-malformed",
+      workspaceRoot: "/repo",
+      message: "{not-json",
+    });
+
+    await expect(generateProjectWorkflow("project-1")).rejects.toThrow(
+      "LLM 프로바이더가 유효한 워크플로우 JSON을 반환하지 않았습니다.",
+    );
+
+    chatWithProjectLlm.mockResolvedValueOnce({
+      conversationId: "briar:project-1:thread-invalid",
+      workspaceRoot: "/repo",
+      message: JSON.stringify({ version: 2 }),
+    });
+
+    await expect(generateProjectWorkflow("project-1")).rejects.toThrow(
+      "LLM 프로바이더가 생성한 워크플로우가 실행 계약을 충족하지 않습니다.",
+    );
   });
 
   it("regenerates only tool requirements for an existing workflow", async () => {

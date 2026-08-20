@@ -40,7 +40,7 @@ import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import {
   agentProviderLabels,
   agentProviders,
-} from "../lib/agent-provider-contract";
+} from "../lib/agent-provider";
 import { AgentProviderIcon } from "./AgentIcons";
 import { NativeSelect } from "./NativeSelect";
 import { ProviderSelect } from "./ProviderSelect";

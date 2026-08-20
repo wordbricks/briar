@@ -56,6 +56,23 @@ describe("channel reply agent attachments", () => {
     });
   });
 
+  it("rejects invalid attachment path lists", () => {
+    const reply = {
+      body: "Answer",
+      document: null,
+      issueProposal: null,
+    };
+    for (const attachments of [
+      ["   "],
+      ["a".repeat(4097)],
+      Array.from({ length: 6 }, (_, index) => `screen-${index}.png`),
+    ]) {
+      expect(() =>
+        parseChannelReplyAgentResult({ ...reply, attachments })
+      ).toThrow();
+    }
+  });
+
   it("extracts channel issue proposals from pure, fenced, or mixed JSON", () => {
     const proposal = {
       body: "이슈 생성을 제안했습니다. 승인이 필요합니다.",
@@ -128,6 +145,13 @@ describe("channel reply agent attachments", () => {
     expect(() => parseDetachedJsonResult(`${valid}\n${valid}`)).toThrow(
       "exactly one JSON object",
     );
+
+    expect(() =>
+      parseChannelReplyAgentResult({
+        ...JSON.parse(valid),
+        unexpected: true,
+      })
+    ).toThrow();
   });
 
   it("keeps context lookup turns out of the durable reply contract", () => {

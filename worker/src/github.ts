@@ -1,122 +1,25 @@
-import { z } from "zod";
+import * as Option from "effect/Option";
+import {
+  decodeGitHubAppAuthorizationWebhookPayload,
+  decodeGitHubInstallationRepositoriesWebhookPayload,
+  decodeGitHubInstallationWebhookPayload,
+  decodeGitHubIssuesWebhookPayload,
+  decodeGitHubOAuthErrorResponseOption,
+  decodeGitHubOAuthTokenOption,
+  decodeGitHubPingWebhookPayload,
+  decodeGitHubPullRequestWebhookPayload,
+  decodeGitHubUser,
+  decodeGitHubUserInstallations,
+  decodeGitHubUserRepositories,
+  decodeGitHubWebhookHeaders,
+  isGitHubUuid,
+  type GitHubRepositoryAccess,
+  type GitHubUserInstallation,
+  type GitHubWebhookHeaders,
+  type GitHubWebhookRepositoryAccess,
+} from "./github-contract";
 
 const encoder = new TextEncoder();
-const supportedGitHubWebhookEventSchema = z.enum([
-  "pull_request",
-  "issues",
-  "ping",
-  "installation",
-  "installation_repositories",
-  "github_app_authorization",
-]);
-const githubTimestampSchema = z.iso.datetime({ offset: true });
-const githubIdSchema = z.number().int().positive();
-const githubShaSchema = z.string().trim().min(1).max(128);
-const nullableGithubTimestampSchema = githubTimestampSchema.nullable();
-
-const githubRepositorySchema = z.object({
-  id: githubIdSchema,
-  full_name: z.string().trim().min(3).max(300),
-});
-
-const githubSenderSchema = z.object({
-  login: z.string().trim().min(1).max(100),
-});
-
-const githubInstallationSchema = z.object({
-  id: githubIdSchema,
-});
-
-const githubInstallationWebhookPayloadSchema = z.object({
-  action: z.string().trim().min(1).max(100),
-  installation: githubInstallationSchema,
-});
-
-const githubWebhookRepositoryAccessSchema = z.object({
-  id: githubIdSchema,
-  name: z.string().trim().min(1).max(100),
-  full_name: z.string().trim().min(3).max(300),
-  owner: z.object({
-    login: z.string().trim().min(1).max(100),
-  }),
-});
-
-const githubInstallationRepositoriesWebhookPayloadSchema = z.object({
-  action: z.string().trim().min(1).max(100),
-  installation: githubInstallationSchema,
-  repositories_added: z.array(githubWebhookRepositoryAccessSchema),
-  repositories_removed: z.array(githubWebhookRepositoryAccessSchema),
-});
-
-const githubAppAuthorizationWebhookPayloadSchema = z.object({
-  action: z.string().trim().min(1).max(100),
-  sender: z.object({
-    id: githubIdSchema,
-    login: z.string().trim().min(1).max(100),
-  }),
-});
-
-export const githubPullRequestWebhookPayloadSchema = z.object({
-  action: z.string().trim().min(1).max(100),
-  installation: githubInstallationSchema,
-  repository: githubRepositorySchema,
-  sender: githubSenderSchema,
-  pull_request: z.object({
-    id: githubIdSchema,
-    node_id: z.string().trim().min(1).max(200),
-    number: z.number().int().positive(),
-    html_url: z.url(),
-    state: z.enum(["open", "closed"]),
-    draft: z.boolean(),
-    merged: z.boolean(),
-    merge_commit_sha: githubShaSchema.nullable(),
-    body: z.string().nullable(),
-    head: z.object({ sha: githubShaSchema }),
-    base: z.object({ sha: githubShaSchema }),
-    merged_at: nullableGithubTimestampSchema,
-    closed_at: nullableGithubTimestampSchema,
-    created_at: githubTimestampSchema,
-    updated_at: githubTimestampSchema,
-  }),
-});
-
-export const githubIssuesWebhookPayloadSchema = z.object({
-  action: z.string().trim().min(1).max(100),
-  installation: githubInstallationSchema,
-  repository: githubRepositorySchema,
-  sender: githubSenderSchema,
-  issue: z.object({
-    id: githubIdSchema,
-    node_id: z.string().trim().min(1).max(200),
-    number: z.number().int().positive(),
-    html_url: z.url(),
-    state: z.enum(["open", "closed"]),
-    title: z.string().min(1).max(1_000),
-    body: z.string().nullable(),
-    labels: z.array(z.object({
-      name: z.string().min(1).max(200),
-    })),
-    assignees: z.array(z.object({
-      login: z.string().trim().min(1).max(100),
-    })),
-    closed_at: nullableGithubTimestampSchema,
-    created_at: githubTimestampSchema,
-    updated_at: githubTimestampSchema,
-  }),
-});
-
-export const githubPingWebhookPayloadSchema = z.object({
-  zen: z.string().trim().min(1).max(1_000),
-  hook_id: githubIdSchema.optional(),
-});
-
-const githubWebhookHeadersSchema = z.object({
-  event: z.string().trim().pipe(supportedGitHubWebhookEventSchema),
-  deliveryId: z.string().trim().toLowerCase().pipe(z.uuid()),
-});
-
-export type GitHubWebhookHeaders = z.infer<typeof githubWebhookHeadersSchema>;
-
 export type BriarIssueLink = {
   projectId: string;
   runId: string;
@@ -153,54 +56,6 @@ export async function githubSha256Hex(value: string) {
   );
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-
-const githubOAuthTokenSchema = z.object({
-  access_token: z.string().trim().min(1).max(1_000),
-  token_type: z.string().trim().min(1).max(50),
-  expires_in: z.number().int().positive().optional(),
-  refresh_token: z.string().trim().min(1).max(1_000).optional(),
-  refresh_token_expires_in: z.number().int().positive().optional(),
-});
-
-const githubOAuthErrorSchema = z.object({
-  error: z.string().trim().min(1).max(200),
-  error_description: z.string().trim().min(1).max(1_000).optional(),
-});
-
-const githubUserSchema = z.object({
-  id: githubIdSchema,
-  login: z.string().trim().min(1).max(100),
-  avatar_url: z.url(),
-});
-
-const githubInstallationAccountSchema = z.object({
-  id: githubIdSchema,
-  login: z.string().trim().min(1).max(100),
-  avatar_url: z.url(),
-});
-
-const githubUserInstallationSchema = z.object({
-  id: githubIdSchema,
-  app_slug: z.string().trim().min(1).max(200),
-  account: githubInstallationAccountSchema,
-});
-
-const githubUserInstallationsSchema = z.object({
-  installations: z.array(githubUserInstallationSchema),
-});
-
-const githubRepositoryAccessSchema = z.object({
-  id: githubIdSchema,
-  name: z.string().trim().min(1).max(100),
-  full_name: z.string().trim().min(3).max(300),
-  owner: z.object({
-    login: z.string().trim().min(1).max(100),
-  }),
-});
-
-const githubUserRepositoriesSchema = z.object({
-  repositories: z.array(githubRepositoryAccessSchema),
-});
 
 export class GithubOAuthError extends Error {
   constructor(message: string) {
@@ -239,19 +94,19 @@ export async function exchangeGithubOAuthCode(input: {
     }),
   });
   const payload = await readGithubJson(response);
-  const oauthError = githubOAuthErrorSchema.safeParse(payload);
-  if (!response.ok || oauthError.success) {
+  const oauthError = decodeGitHubOAuthErrorResponseOption(payload);
+  if (!response.ok || Option.isSome(oauthError)) {
     throw new GithubOAuthError(
-      oauthError.success
-        ? `GitHub OAuth failed: ${oauthError.data.error}`
+      Option.isSome(oauthError)
+        ? `GitHub OAuth failed: ${oauthError.value.error}`
         : `GitHub OAuth failed with status ${response.status}`,
     );
   }
-  const token = githubOAuthTokenSchema.safeParse(payload);
-  if (!token.success) {
+  const token = decodeGitHubOAuthTokenOption(payload);
+  if (Option.isNone(token)) {
     throw new GithubOAuthError("GitHub returned an invalid OAuth token response");
   }
-  return token.data;
+  return token.value;
 }
 
 const githubApiHeaders = (accessToken: string) => ({
@@ -277,13 +132,13 @@ export async function verifyGithubOAuthInstallation(input: {
   installationId: number;
   appSlug: string;
 }) {
-  const user = githubUserSchema.parse(
+  const user = decodeGitHubUser(
     await fetchGithubApi("/user", input.accessToken),
   );
 
-  let installation: z.infer<typeof githubUserInstallationSchema> | undefined;
+  let installation: GitHubUserInstallation | undefined;
   for (let page = 1; page <= 10 && !installation; page += 1) {
-    const payload = githubUserInstallationsSchema.parse(
+    const payload = decodeGitHubUserInstallations(
       await fetchGithubApi(
         `/user/installations?per_page=100&page=${page}`,
         input.accessToken,
@@ -300,9 +155,9 @@ export async function verifyGithubOAuthInstallation(input: {
     );
   }
 
-  const repositories: Array<z.infer<typeof githubRepositoryAccessSchema>> = [];
+  const repositories: Array<GitHubRepositoryAccess> = [];
   for (let page = 1; page <= 10; page += 1) {
-    const payload = githubUserRepositoriesSchema.parse(
+    const payload = decodeGitHubUserRepositories(
       await fetchGithubApi(
         `/user/installations/${input.installationId}/repositories?per_page=100&page=${page}`,
         input.accessToken,
@@ -336,7 +191,7 @@ export async function verifyGithubOAuthInstallation(input: {
 export function parseGitHubWebhookHeaders(
   headers: Headers,
 ): GitHubWebhookHeaders {
-  return githubWebhookHeadersSchema.parse({
+  return decodeGitHubWebhookHeaders({
     event: headers.get("x-github-event"),
     deliveryId: headers.get("x-github-delivery"),
   });
@@ -399,18 +254,17 @@ export function extractBriarIssueLinks(
     `/open/issues/(${uuidSegment})/(${uuidSegment})(?![0-9a-z_-])`,
     "giu",
   );
-  const uuidSchema = z.uuid();
   const links: BriarIssueLink[] = [];
   const seen = new Set<string>();
 
   for (const match of body.matchAll(issuePathPattern)) {
-    const projectId = uuidSchema.safeParse(match[1]);
-    const runId = uuidSchema.safeParse(match[2]);
-    if (!projectId.success || !runId.success) continue;
+    const projectId = match[1];
+    const runId = match[2];
+    if (!isGitHubUuid(projectId) || !isGitHubUuid(runId)) continue;
 
     const link = {
-      projectId: projectId.data.toLowerCase(),
-      runId: runId.data.toLowerCase(),
+      projectId: projectId.toLowerCase(),
+      runId: runId.toLowerCase(),
     };
     const key = `${link.projectId}:${link.runId}`;
     if (seen.has(key)) continue;
@@ -453,7 +307,7 @@ export function parseGitHubWebhook(
   payload: unknown,
 ) {
   if (headers.event === "ping") {
-    const parsed = githubPingWebhookPayloadSchema.parse(payload);
+    const parsed = decodeGitHubPingWebhookPayload(payload);
     return {
       deliveryId: headers.deliveryId,
       event: "ping" as const,
@@ -463,7 +317,7 @@ export function parseGitHubWebhook(
   }
 
   if (headers.event === "installation") {
-    const parsed = githubInstallationWebhookPayloadSchema.parse(payload);
+    const parsed = decodeGitHubInstallationWebhookPayload(payload);
     return {
       deliveryId: headers.deliveryId,
       event: "installation" as const,
@@ -473,11 +327,11 @@ export function parseGitHubWebhook(
   }
 
   if (headers.event === "installation_repositories") {
-    const parsed = githubInstallationRepositoriesWebhookPayloadSchema.parse(
+    const parsed = decodeGitHubInstallationRepositoriesWebhookPayload(
       payload,
     );
     const repository = (
-      value: z.infer<typeof githubWebhookRepositoryAccessSchema>,
+      value: GitHubWebhookRepositoryAccess,
     ) => ({
       id: value.id,
       owner: value.owner.login,
@@ -495,7 +349,7 @@ export function parseGitHubWebhook(
   }
 
   if (headers.event === "github_app_authorization") {
-    const parsed = githubAppAuthorizationWebhookPayloadSchema.parse(payload);
+    const parsed = decodeGitHubAppAuthorizationWebhookPayload(payload);
     return {
       deliveryId: headers.deliveryId,
       event: "github_app_authorization" as const,
@@ -506,7 +360,7 @@ export function parseGitHubWebhook(
   }
 
   if (headers.event === "pull_request") {
-    const parsed = githubPullRequestWebhookPayloadSchema.parse(payload);
+    const parsed = decodeGitHubPullRequestWebhookPayload(payload);
     const pullRequest = parsed.pull_request;
     const isMerged = parsed.action === "closed" && pullRequest.merged;
     const state: GitHubPullRequestState = isMerged
@@ -536,7 +390,7 @@ export function parseGitHubWebhook(
     };
   }
 
-  const parsed = githubIssuesWebhookPayloadSchema.parse(payload);
+  const parsed = decodeGitHubIssuesWebhookPayload(payload);
   const issue = parsed.issue;
   return {
     ...commonWebhookFields(headers, parsed),

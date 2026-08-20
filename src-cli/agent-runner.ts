@@ -1,9 +1,7 @@
 import { Buffer } from "node:buffer";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
-import type {
-  AgentProvider,
-  ModelEffort,
-} from "../src/lib/agent-provider-contract";
+import type { ModelEffort } from "../src/lib/agent-provider-contract";
+import type { AgentProvider } from "../src/lib/agent-provider";
 import type { JsonSchema } from "../src/lib/project-llm";
 import { extractSingleJsonObject } from "../src/lib/single-json-object";
 
@@ -411,9 +409,9 @@ export function detachedTranscriptSequence(
   return (claimAttempt - 1) * detachedTranscriptClaimStride + localSequence;
 }
 
-export type DetachedAgentProvider = AgentProvider;
+type DetachedAgentProvider = AgentProvider;
 
-export type DetachedAgentEffort = ModelEffort;
+type DetachedAgentEffort = ModelEffort;
 
 export type DetachedAgentSkill = {
   id: string;

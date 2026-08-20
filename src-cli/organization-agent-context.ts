@@ -9,12 +9,12 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
-import { z } from "zod";
+import * as Schema from "effect/Schema";
 import { channelReplyClaimTokenHeader } from "../src/lib/channels-contract";
 import {
-  organizationAgentContextLookupResponseSchema,
-  organizationAgentContextManifestSchema,
-  organizationAgentContextResourcePageSchema,
+  decodeOrganizationAgentContextLookupResponse,
+  decodeOrganizationAgentContextManifest,
+  decodeOrganizationAgentContextResourcePage,
   type OrganizationAgentContextLookupRequest,
   type OrganizationAgentContextManifest as OrganizationAgentContextIndexManifest,
   type OrganizationAgentContextResource,
@@ -29,14 +29,35 @@ const unownedWorkspaceGraceMs = 60 * 60 * 1_000;
 
 type ContextResource = OrganizationAgentContextResource;
 
-const projectIdentitySchema = z.object({ id: z.string().uuid() }).passthrough();
-const contextItemIdentitySchema = z.object({
-  id: z.string().min(1).max(128),
-}).passthrough();
-const issuePullRequestIdentitySchema = z.object({
-  issueId: z.string().min(1).max(128),
-  position: z.number().int().nonnegative(),
-}).passthrough();
+const preserveExcessProperties = {
+  onExcessProperty: "preserve",
+} as const;
+
+const passthrough = <S extends Schema.Top>(schema: S) =>
+  schema.annotate({ parseOptions: preserveExcessProperties });
+
+const ContextItemId = Schema.String.check(Schema.isLengthBetween(1, 128));
+
+const ProjectIdentity = passthrough(Schema.Struct({
+  id: Schema.mutableKey(Schema.String.check(Schema.isUUID())),
+}));
+
+const ContextItemIdentity = passthrough(Schema.Struct({
+  id: Schema.mutableKey(ContextItemId),
+}));
+
+const IssuePullRequestIdentity = passthrough(Schema.Struct({
+  issueId: Schema.mutableKey(ContextItemId),
+  position: Schema.mutableKey(
+    Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  ),
+}));
+
+const decodeProjectIdentity = Schema.decodeUnknownSync(ProjectIdentity);
+const decodeContextItemIdentity = Schema.decodeUnknownSync(ContextItemIdentity);
+const decodeIssuePullRequestIdentity = Schema.decodeUnknownSync(
+  IssuePullRequestIdentity,
+);
 
 export type OrganizationAgentContextManifest = {
   schemaVersion: 1;
@@ -284,7 +305,7 @@ export async function downloadOrganizationAgentContext(input: {
         throw new Error(`Organization Agent ${resource} context page is too large`);
       }
       const text = await boundedResponseText(response, maxPageBytes, resource);
-      const page = organizationAgentContextResourcePageSchema.parse(
+      const page = decodeOrganizationAgentContextResourcePage(
         JSON.parse(text),
       );
       if (
@@ -312,7 +333,7 @@ export async function downloadOrganizationAgentContext(input: {
       }
       if (resource === "projects") {
         for (const rawItem of page.items) {
-          const project = projectIdentitySchema.parse(rawItem);
+          const project = decodeProjectIdentity(rawItem);
           if (seenProjectIds.has(project.id)) {
             throw new Error("Organization Agent project context contains duplicates");
           }
@@ -323,10 +344,10 @@ export async function downloadOrganizationAgentContext(input: {
         for (const rawItem of page.items) {
           const itemId = resource === "issue-pull-requests"
             ? (() => {
-                const item = issuePullRequestIdentitySchema.parse(rawItem);
+                const item = decodeIssuePullRequestIdentity(rawItem);
                 return `${item.issueId}:${item.position}`;
               })()
-            : contextItemIdentitySchema.parse(rawItem).id;
+            : decodeContextItemIdentity(rawItem).id;
           if (seenItemIds.has(itemId)) {
             throw new Error(
               `Organization Agent ${resource} context contains duplicates`,
@@ -524,7 +545,7 @@ export async function downloadOrganizationAgentContextManifest(input: {
       if (!cached) {
         throw new Error("Organization Agent manifest cache is missing");
       }
-      manifest = organizationAgentContextManifestSchema.parse({
+      manifest = decodeOrganizationAgentContextManifest({
         schemaVersion: 2,
         organizationId: input.organizationId,
         workId: input.workId,
@@ -544,7 +565,7 @@ export async function downloadOrganizationAgentContextManifest(input: {
         input.maxPageBytes ?? defaultMaxPageBytes,
         "manifest",
       );
-      manifest = organizationAgentContextManifestSchema.parse(JSON.parse(text));
+      manifest = decodeOrganizationAgentContextManifest(JSON.parse(text));
       if (
         manifest.organizationId !== input.organizationId ||
         manifest.workId !== input.workId ||
@@ -587,7 +608,7 @@ export async function hydrateOrganizationAgentContext(input: {
 }) {
   const directory = organizationAgentContextDirectory(input.workspacePath);
   const manifestPath = join(directory, "manifest.json");
-  const manifest = organizationAgentContextManifestSchema.parse(
+  const manifest = decodeOrganizationAgentContextManifest(
     JSON.parse(await readFile(manifestPath, "utf8")),
   );
   if (
@@ -630,7 +651,7 @@ export async function hydrateOrganizationAgentContext(input: {
     input.maxContextBytes ?? defaultMaxContextBytes,
     "lookup",
   );
-  const lookup = organizationAgentContextLookupResponseSchema.parse(
+  const lookup = decodeOrganizationAgentContextLookupResponse(
     JSON.parse(text),
   );
   if (
@@ -672,7 +693,7 @@ export async function hydrateOrganizationAgentContext(input: {
     await chmod(absolutePath, 0o600);
     nextLoadedQueries.push({ file: relativePath, request: result.request });
   }
-  const nextManifest = organizationAgentContextManifestSchema.parse({
+  const nextManifest = decodeOrganizationAgentContextManifest({
     ...manifest,
     loadedQueries: nextLoadedQueries,
   });

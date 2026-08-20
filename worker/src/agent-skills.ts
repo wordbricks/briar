@@ -1,7 +1,5 @@
-import type {
-  AgentProvider,
-  ModelEffort,
-} from "../../src/lib/agent-provider-contract";
+import type { ModelEffort } from "../../src/lib/agent-provider-contract";
+import type { AgentProvider } from "../../src/lib/agent-provider";
 import {
   agentSkillInstructionsMaxLength,
   agentSkillsMaxCount,

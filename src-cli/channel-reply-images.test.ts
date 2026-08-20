@@ -2,8 +2,8 @@ import { access, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { channelReplyClaimTokenHeader } from "../src/lib/channels-contract";
 import {
-  channelReplyClaimTokenHeader,
   channelReplyImageDirectory,
   channelReplyImagesForTrigger,
   cleanupChannelReplyImages,
@@ -15,7 +15,9 @@ const attachmentId = "22222222-2222-4222-8222-222222222222";
 const workId = "33333333-3333-4333-8333-333333333333";
 const organizationId = "44444444-4444-4444-8444-444444444444";
 const imageBytes = new Uint8Array([137, 80, 78, 71]);
+const maxChannelReplyImageBytes = 20 * 1024 * 1024;
 const snapshot = {
+  snapshotVersion: 2,
   messages: [
     {
       id: "55555555-5555-4555-8555-555555555555",
@@ -37,6 +39,7 @@ const snapshot = {
           filename: "private screen.png",
           contentType: "image/png",
           byteSize: imageBytes.byteLength,
+          private: true,
         },
       ],
     },
@@ -60,10 +63,56 @@ afterEach(async () => {
 });
 
 describe("channel reply image inputs", () => {
-  it("selects images only from the message that triggered the reply", () => {
-    expect(channelReplyImagesForTrigger(snapshot, triggerMessageId)).toEqual([
-      expect.objectContaining({ id: attachmentId }),
+  it("selects mutable normalized images from a passthrough snapshot", () => {
+    const images = channelReplyImagesForTrigger(snapshot, triggerMessageId);
+
+    expect(images).toEqual([
+      {
+        id: attachmentId,
+        filename: "private screen.png",
+        contentType: "image/png",
+        byteSize: imageBytes.byteLength,
+      },
     ]);
+    images[0]!.filename = "renamed.png";
+    images.push({
+      id: "77777777-7777-4777-8777-777777777777",
+      filename: "second.webp",
+      contentType: "image/webp",
+      byteSize: 1,
+    });
+    expect(images).toHaveLength(2);
+  });
+
+  it("rejects invalid image identities, sizes, and batch lengths", () => {
+    const trigger = snapshot.messages[1]!;
+    for (const attachment of [
+      { ...trigger.attachments[0], id: "not-a-uuid" },
+      { ...trigger.attachments[0], byteSize: 0 },
+      { ...trigger.attachments[0], byteSize: 1.5 },
+      { ...trigger.attachments[0], byteSize: maxChannelReplyImageBytes + 1 },
+    ]) {
+      expect(() =>
+        channelReplyImagesForTrigger({
+          messages: [{ ...trigger, attachments: [attachment] }],
+        }, triggerMessageId)
+      ).toThrow();
+    }
+
+    expect(() =>
+      channelReplyImagesForTrigger({
+        messages: [{
+          ...trigger,
+          attachments: Array.from(
+            { length: 6 },
+            (_, index) => ({
+              ...trigger.attachments[0],
+              id: `77777777-7777-4777-8777-${String(index).padStart(12, "0")}`,
+            }),
+          ),
+        }],
+      }, triggerMessageId)
+    ).toThrow();
   });
 
   it("downloads a claimed image with Worker and claim credentials", async () => {

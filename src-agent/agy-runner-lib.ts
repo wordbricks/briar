@@ -1,4 +1,4 @@
-import type { AgentAttachment } from "./runner-attachments";
+import * as Schema from "effect/Schema";
 import type {
   AgentActivityKind,
   NormalizedAgentEvent,
@@ -7,22 +7,23 @@ import {
   normalizedActivityText,
   normalizedActivityTitle,
 } from "./normalized-agent-event";
+import {
+  commonRunnerRequestFields,
+  runnerRequestDecoderOptions,
+} from "./runner-request";
 
-export type AgyRunnerRequest = {
-  type: "run";
-  message: string;
-  workspaceRoot: string;
-  conversationId?: string | null;
-  instructions?: string | null;
-  outputSchema?: Record<string, unknown> | boolean | null;
-  model?: string | null;
-  effort?: "low" | "medium" | "high" | "xhigh" | "max" | "ultra" | null;
-  approvalPolicy: "untrusted" | "on-request" | "never";
-  sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
-  networkAccess: boolean;
-  attachments?: AgentAttachment[];
-  agyBinary: string;
-};
+export const AgyRunnerRequest = Schema.Struct({
+  ...commonRunnerRequestFields,
+  effort: Schema.optional(Schema.NullOr(Schema.String)),
+  agyBinary: Schema.String,
+});
+
+export type AgyRunnerRequest = typeof AgyRunnerRequest.Type;
+
+export const decodeAgyRunnerRequest = Schema.decodeUnknownResult(
+  AgyRunnerRequest,
+  runnerRequestDecoderOptions,
+);
 
 export type AgyBlockedRetry =
   | {

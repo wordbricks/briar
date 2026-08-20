@@ -6,7 +6,7 @@ import { join } from "node:path";
 import {
   agentProviderBinaryName,
   type AgentProvider,
-} from "../src/lib/agent-provider-contract";
+} from "../src/lib/agent-provider";
 import {
   isProviderUsageExhausted,
   type AgentUsageProvider,

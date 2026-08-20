@@ -1,10 +1,13 @@
-import { z } from "zod";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import * as SchemaGetter from "effect/SchemaGetter";
+import * as SchemaTransformation from "effect/SchemaTransformation";
 import {
-  agentProviders,
-  modelEffortSchema,
-  type AgentProvider,
-  type ModelEffort,
+  ModelEffort,
+  type ModelEffort as ModelEffortType,
 } from "./agent-provider-contract";
+import { agentProviders, type AgentProvider } from "./agent-provider";
+import { IsoDateTimeWithOffset } from "./date-time-schema";
 import {
   agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
@@ -15,7 +18,7 @@ import {
 export const channelAgentProviders = agentProviders;
 export type ChannelAgentProvider = AgentProvider;
 
-export type ChannelAgentEffort = ModelEffort;
+export type ChannelAgentEffort = ModelEffortType;
 
 export const channelAgentSkillKinds = [
   "issue_processing",
@@ -47,177 +50,203 @@ export const channelReplyClaimTokenHeader =
 export const channelReplyNoAvailableWorkerError =
   "No available Worker can run this Agent.";
 
-export const channelSlugSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .min(1)
-  .max(63)
-  .regex(/^[a-z0-9-]+$/u);
-export const channelNameSchema = z.string().trim().min(1).max(100);
-export const channelTopicSchema = z.string().trim().max(500);
-export const channelMessageBodySchema = z.string().trim().min(1).max(10_000);
-export const channelWebhookNameSchema = z.string().trim().min(1).max(100);
+const strictSchemaOptions = {
+  errors: "all",
+  onExcessProperty: "error",
+} as const;
+const strict = <S extends Schema.Top>(schema: S) =>
+  schema.annotate({ parseOptions: strictSchemaOptions });
+const mutableArray = <S extends Schema.Top>(item: S) =>
+  Schema.mutable(Schema.Array(item));
+const defaulted = <S extends Schema.Constraint>(
+  schema: S,
+  value: S["Type"],
+): Schema.withDecodingDefaultType<S> =>
+  Schema.withDecodingDefaultType<S>(Effect.succeed(value))(schema);
+const defaultedWith = <S extends Schema.Constraint>(
+  schema: S,
+  value: () => S["Type"],
+): Schema.withDecodingDefaultType<S> =>
+  Schema.withDecodingDefaultType<S>(Effect.sync(value))(schema);
+const nullableDefault = <S extends Schema.Constraint>(schema: S) =>
+  defaulted(Schema.NullOr(schema), null);
+const between = (minimum: number, maximum: number) =>
+  Schema.Int.check(
+    Schema.isGreaterThanOrEqualTo(minimum),
+    Schema.isLessThanOrEqualTo(maximum),
+  );
 
-const channelBlockIdSchema = z.string().min(1).max(255).optional();
-const channelBlockTextValueSchema = z
-  .string()
-  .min(1)
-  .max(12_000)
-  .refine((value) => value.trim().length > 0, "Text must not be blank");
+const Lowercased = Schema.Trim.pipe(
+  Schema.decode({
+    decode: SchemaGetter.transform((value) => value.toLowerCase()),
+    encode: SchemaGetter.transform((value) => value.toLowerCase()),
+  }),
+);
 
-const channelPlainTextObjectSchema = z
-  .object({
-    type: z.literal("plain_text"),
-    text: channelBlockTextValueSchema,
-    emoji: z.boolean().optional(),
-  })
-  .strict();
+export const channelSlugSchema = Lowercased.check(
+  Schema.isLengthBetween(1, 63),
+  Schema.isPattern(/^[a-z0-9-]+$/u),
+);
+export const channelNameSchema = Schema.Trim.check(
+  Schema.isLengthBetween(1, 100),
+);
+export const channelTopicSchema = Schema.Trim.check(Schema.isMaxLength(500));
+export const channelMessageBodySchema = Schema.Trim.check(
+  Schema.isLengthBetween(1, 10_000),
+);
+export const channelWebhookNameSchema = Schema.Trim.check(
+  Schema.isLengthBetween(1, 100),
+);
 
-const channelMarkdownTextObjectSchema = z
-  .object({
-    type: z.literal("mrkdwn"),
-    text: channelBlockTextValueSchema,
-    verbatim: z.boolean().optional(),
-  })
-  .strict();
+const channelBlockIdSchema = Schema.optional(
+  Schema.String.check(Schema.isLengthBetween(1, 255)),
+);
+const channelBlockTextValueSchema = Schema.String.check(
+  Schema.isLengthBetween(1, 12_000),
+  Schema.makeFilter((value) =>
+    value.trim().length > 0 || "Text must not be blank"
+  ),
+);
 
-export const channelBlockTextObjectSchema = z.discriminatedUnion("type", [
+const channelPlainTextObjectSchema = strict(Schema.Struct({
+  type: Schema.Literal("plain_text"),
+  text: channelBlockTextValueSchema,
+  emoji: Schema.optional(Schema.Boolean),
+}));
+
+const channelMarkdownTextObjectSchema = strict(Schema.Struct({
+  type: Schema.Literal("mrkdwn"),
+  text: channelBlockTextValueSchema,
+  verbatim: Schema.optional(Schema.Boolean),
+}));
+
+export const channelBlockTextObjectSchema = Schema.Union([
   channelPlainTextObjectSchema,
   channelMarkdownTextObjectSchema,
 ]);
-export type ChannelBlockTextObject = z.infer<
-  typeof channelBlockTextObjectSchema
->;
+export type ChannelBlockTextObject =
+  typeof channelBlockTextObjectSchema.Type;
 
-const channelRichTextStyleSchema = z
-  .object({
-    bold: z.boolean().optional(),
-    italic: z.boolean().optional(),
-    strike: z.boolean().optional(),
-    code: z.boolean().optional(),
-  })
-  .strict();
+const channelRichTextStyleSchema = strict(Schema.Struct({
+  bold: Schema.optional(Schema.Boolean),
+  italic: Schema.optional(Schema.Boolean),
+  strike: Schema.optional(Schema.Boolean),
+  code: Schema.optional(Schema.Boolean),
+}));
 
-const channelRichTextInlineSchema = z.discriminatedUnion("type", [
-  z
-    .object({
-      type: z.literal("text"),
-      text: channelBlockTextValueSchema,
-      style: channelRichTextStyleSchema.optional(),
-    })
-    .strict(),
-  z
-    .object({
-      type: z.literal("link"),
-      url: z
-        .string()
-        .max(2_048)
-        .refine((value) => {
-          try {
-            return ["http:", "https:", "mailto:"].includes(new URL(value).protocol);
-          } catch {
-            return false;
-          }
-        }, "Link URL must use http, https, or mailto"),
-      text: z.string().min(1).max(3_000).optional(),
-      style: channelRichTextStyleSchema.optional(),
-    })
-    .strict(),
-  z
-    .object({
-      type: z.literal("emoji"),
-      name: z.string().trim().min(1).max(100),
-    })
-    .strict(),
+const channelRichTextInlineSchema = Schema.Union([
+  strict(Schema.Struct({
+    type: Schema.Literal("text"),
+    text: channelBlockTextValueSchema,
+    style: Schema.optional(channelRichTextStyleSchema),
+  })),
+  strict(Schema.Struct({
+    type: Schema.Literal("link"),
+    url: Schema.String.check(
+      Schema.isMaxLength(2_048),
+      Schema.makeFilter((value) => {
+        try {
+          return ["http:", "https:", "mailto:"].includes(
+            new URL(value).protocol,
+          ) || "Link URL must use http, https, or mailto";
+        } catch {
+          return "Link URL must use http, https, or mailto";
+        }
+      }),
+    ),
+    text: Schema.optional(
+      Schema.String.check(Schema.isLengthBetween(1, 3_000)),
+    ),
+    style: Schema.optional(channelRichTextStyleSchema),
+  })),
+  strict(Schema.Struct({
+    type: Schema.Literal("emoji"),
+    name: Schema.Trim.check(Schema.isLengthBetween(1, 100)),
+  })),
 ]);
 
-const channelRichTextSectionSchema = z
-  .object({
-    type: z.literal("rich_text_section"),
-    elements: z.array(channelRichTextInlineSchema).min(1).max(100),
-  })
-  .strict();
+const channelRichTextSectionSchema = strict(Schema.Struct({
+  type: Schema.Literal("rich_text_section"),
+  elements: mutableArray(channelRichTextInlineSchema).check(
+    Schema.isLengthBetween(1, 100),
+  ),
+}));
 
-const channelRichTextElementSchema = z.discriminatedUnion("type", [
+const channelRichTextElementSchema = Schema.Union([
   channelRichTextSectionSchema,
-  z
-    .object({
-      type: z.literal("rich_text_list"),
-      style: z.enum(["bullet", "ordered"]),
-      indent: z.number().int().min(0).max(8).optional(),
-      offset: z.number().int().min(0).max(10_000).optional(),
-      elements: z.array(channelRichTextSectionSchema).min(1).max(50),
-    })
-    .strict(),
-  z
-    .object({
-      type: z.literal("rich_text_quote"),
-      elements: z.array(channelRichTextInlineSchema).min(1).max(100),
-    })
-    .strict(),
-  z
-    .object({
-      type: z.literal("rich_text_preformatted"),
-      elements: z.array(channelRichTextInlineSchema).min(1).max(100),
-    })
-    .strict(),
+  strict(Schema.Struct({
+    type: Schema.Literal("rich_text_list"),
+    style: Schema.Literals(["bullet", "ordered"]),
+    indent: Schema.optional(between(0, 8)),
+    offset: Schema.optional(between(0, 10_000)),
+    elements: mutableArray(channelRichTextSectionSchema).check(
+      Schema.isLengthBetween(1, 50),
+    ),
+  })),
+  strict(Schema.Struct({
+    type: Schema.Literal("rich_text_quote"),
+    elements: mutableArray(channelRichTextInlineSchema).check(
+      Schema.isLengthBetween(1, 100),
+    ),
+  })),
+  strict(Schema.Struct({
+    type: Schema.Literal("rich_text_preformatted"),
+    elements: mutableArray(channelRichTextInlineSchema).check(
+      Schema.isLengthBetween(1, 100),
+    ),
+  })),
 ]);
 
-export const channelMessageBlockSchema = z.discriminatedUnion("type", [
-  z
-    .object({
-      type: z.literal("header"),
-      text: channelPlainTextObjectSchema.refine(
-        ({ text }) => text.length <= 150,
-        "Header text must contain at most 150 characters",
+export const channelMessageBlockSchema = Schema.Union([
+  strict(Schema.Struct({
+    type: Schema.Literal("header"),
+    text: strict(channelPlainTextObjectSchema.check(
+      Schema.makeFilter(({ text }) =>
+        text.length <= 150 ||
+        "Header text must contain at most 150 characters"
       ),
-      block_id: channelBlockIdSchema,
-    })
-    .strict(),
-  z
-    .object({
-      type: z.literal("section"),
-      text: channelBlockTextObjectSchema.refine(
-        ({ text }) => text.length <= 3_000,
-        "Section text must contain at most 3000 characters",
+    )),
+    block_id: channelBlockIdSchema,
+  })),
+  strict(Schema.Struct({
+    type: Schema.Literal("section"),
+    text: strict(channelBlockTextObjectSchema.check(
+      Schema.makeFilter(({ text }) =>
+        text.length <= 3_000 ||
+        "Section text must contain at most 3000 characters"
       ),
-      block_id: channelBlockIdSchema,
-      expand: z.boolean().optional(),
-    })
-    .strict(),
-  z
-    .object({
-      type: z.literal("markdown"),
-      text: channelBlockTextValueSchema,
-      block_id: channelBlockIdSchema,
-    })
-    .strict(),
-  z
-    .object({
-      type: z.literal("divider"),
-      block_id: channelBlockIdSchema,
-    })
-    .strict(),
-  z
-    .object({
-      type: z.literal("context"),
-      elements: z.array(channelBlockTextObjectSchema).min(1).max(10),
-      block_id: channelBlockIdSchema,
-    })
-    .strict(),
-  z
-    .object({
-      type: z.literal("rich_text"),
-      elements: z.array(channelRichTextElementSchema).min(1).max(50),
-      block_id: channelBlockIdSchema,
-    })
-    .strict(),
+    )),
+    block_id: channelBlockIdSchema,
+    expand: Schema.optional(Schema.Boolean),
+  })),
+  strict(Schema.Struct({
+    type: Schema.Literal("markdown"),
+    text: channelBlockTextValueSchema,
+    block_id: channelBlockIdSchema,
+  })),
+  strict(Schema.Struct({
+    type: Schema.Literal("divider"),
+    block_id: channelBlockIdSchema,
+  })),
+  strict(Schema.Struct({
+    type: Schema.Literal("context"),
+    elements: mutableArray(channelBlockTextObjectSchema).check(
+      Schema.isLengthBetween(1, 10),
+    ),
+    block_id: channelBlockIdSchema,
+  })),
+  strict(Schema.Struct({
+    type: Schema.Literal("rich_text"),
+    elements: mutableArray(channelRichTextElementSchema).check(
+      Schema.isLengthBetween(1, 50),
+    ),
+    block_id: channelBlockIdSchema,
+  })),
 ]);
-export type ChannelMessageBlock = z.infer<typeof channelMessageBlockSchema>;
+export type ChannelMessageBlock = typeof channelMessageBlockSchema.Type;
 
 const richTextInlineFallback = (
-  elements: Array<z.infer<typeof channelRichTextInlineSchema>>,
+  elements: Array<typeof channelRichTextInlineSchema.Type>,
 ) => elements.map((element) => {
   if (element.type === "text") return element.text;
   if (element.type === "link") return element.text ?? element.url;
@@ -256,30 +285,53 @@ export function channelMessageBlocksFallback(blocks: ChannelMessageBlock[]) {
   }).filter(Boolean).join("\n").trim().slice(0, 10_000);
 }
 
-export const channelAgentSkillInputSchema = z
-  .object({
-    id: z.string().uuid().optional(),
-    name: z.string().trim().min(1).max(100),
-    instructions: z
-      .string()
-      .trim()
-      .max(agentSkillInstructionsMaxLength)
-      .default(""),
-    provider: z.enum(channelAgentProviders),
-    model: z.string().trim().min(1).max(100).nullable().default(null),
-    effort: modelEffortSchema.nullable().default(null),
-    kind: z.enum(channelAgentSkillKinds).default("custom"),
-    // Accepted only so clients from before Skill selection was explicit can
-    // roll forward without a hard API failure. It has no runtime meaning.
-    isDefault: z.boolean().optional(),
-    position: z.number().int().min(0).max(999).default(0),
-  })
-  .strict()
-  .transform(({ isDefault: _legacyDefault, ...skill }) => skill);
+const Uuid = Schema.String.check(Schema.isUUID());
+const AgentProviderSchema = Schema.Literals(channelAgentProviders);
+const ChannelAgentSkillKindSchema = Schema.Literals(channelAgentSkillKinds);
 
-export type ChannelAgentSkillInput = z.output<
-  typeof channelAgentSkillInputSchema
->;
+const channelAgentSkillInputSourceSchema = strict(Schema.Struct({
+  id: Schema.optional(Uuid),
+  name: Schema.Trim.check(Schema.isLengthBetween(1, 100)),
+  instructions: defaulted(
+    Schema.Trim.check(Schema.isMaxLength(agentSkillInstructionsMaxLength)),
+    "",
+  ),
+  provider: AgentProviderSchema,
+  model: nullableDefault(
+    Schema.Trim.check(Schema.isLengthBetween(1, 100)),
+  ),
+  effort: nullableDefault(ModelEffort),
+  kind: defaulted(ChannelAgentSkillKindSchema, "custom"),
+  // Accepted only so clients from before Skill selection was explicit can
+  // roll forward without a hard API failure. It has no runtime meaning.
+  isDefault: Schema.optional(Schema.Boolean),
+  position: defaulted(between(0, 999), 0),
+}));
+
+const channelAgentSkillInputTypeSchema = strict(Schema.Struct({
+  id: Schema.optional(Uuid),
+  name: Schema.String,
+  instructions: Schema.String,
+  provider: AgentProviderSchema,
+  model: Schema.NullOr(Schema.String),
+  effort: Schema.NullOr(Schema.String),
+  kind: ChannelAgentSkillKindSchema,
+  position: Schema.Int,
+}));
+
+export const channelAgentSkillInputSchema =
+  channelAgentSkillInputSourceSchema.pipe(
+    Schema.decodeTo(
+      channelAgentSkillInputTypeSchema,
+      SchemaTransformation.transform({
+        decode: ({ isDefault: _legacyDefault, ...skill }) => skill,
+        encode: (skill) => skill,
+      }),
+    ),
+  );
+
+export type ChannelAgentSkillInput =
+  typeof channelAgentSkillInputSchema.Type;
 
 /** Converts a channel name into the restricted alphabet used by URL slugs. */
 function handleFromName(name: string) {
@@ -299,67 +351,74 @@ export function channelSlugFromName(name: string, channelId: string) {
   );
 }
 
-export const channelInputSchema = z
-  .object({
-    name: channelNameSchema,
-    slug: channelSlugSchema.optional(),
-    topic: channelTopicSchema.nullable().default(null),
-    visibility: z.enum(channelVisibilities).default("public"),
-    defaultProjectId: z.string().uuid().nullable().default(null),
-  })
-  .strict();
+export const channelInputSchema = strict(Schema.Struct({
+  name: channelNameSchema,
+  slug: Schema.optional(channelSlugSchema),
+  topic: nullableDefault(channelTopicSchema),
+  visibility: defaulted(Schema.Literals(channelVisibilities), "public"),
+  defaultProjectId: nullableDefault(Uuid),
+}));
 
-export const channelUpdateInputSchema = z
-  .object({
-    name: channelNameSchema.optional(),
-    topic: channelTopicSchema.nullable().optional(),
-    visibility: z.enum(channelVisibilities).optional(),
-    defaultProjectId: z.string().uuid().nullable().optional(),
-    archived: z.boolean().optional(),
-  })
-  .strict();
+export const channelUpdateInputSchema = strict(Schema.Struct({
+  name: Schema.optional(channelNameSchema),
+  topic: Schema.optional(Schema.NullOr(channelTopicSchema)),
+  visibility: Schema.optional(Schema.Literals(channelVisibilities)),
+  defaultProjectId: Schema.optional(Schema.NullOr(Uuid)),
+  archived: Schema.optional(Schema.Boolean),
+}));
 
-const canonicalUuidSchema = z
-  .string()
-  .uuid()
-  .transform((value) => value.toLowerCase());
+const canonicalUuidSchema = Uuid.pipe(
+  Schema.decode({
+    decode: SchemaGetter.transform((value) => value.toLowerCase()),
+    encode: SchemaGetter.transform((value) => value.toLowerCase()),
+  }),
+);
 
-export const channelMessageInputSchema = z
-  .object({
-    body: channelMessageBodySchema,
-    clientMessageId: canonicalUuidSchema.optional(),
-    parentMessageId: canonicalUuidSchema.nullable().default(null),
-    mentionedUserIds: z.array(z.string().min(1).max(64)).max(20).default([]),
-    mentionedAgentIds: z.array(canonicalUuidSchema).max(8).default([]),
-    preferredDeviceId: canonicalUuidSchema.nullable().default(null),
-  })
-  .strict();
+export const channelMessageInputSchema = strict(Schema.Struct({
+  body: channelMessageBodySchema,
+  clientMessageId: Schema.optional(canonicalUuidSchema),
+  parentMessageId: nullableDefault(canonicalUuidSchema),
+  mentionedUserIds: defaultedWith(
+    mutableArray(
+      Schema.String.check(Schema.isLengthBetween(1, 64)),
+    ).check(Schema.isMaxLength(20)),
+    () => [],
+  ),
+  mentionedAgentIds: defaultedWith(
+    mutableArray(canonicalUuidSchema).check(Schema.isMaxLength(8)),
+    () => [],
+  ),
+  preferredDeviceId: nullableDefault(canonicalUuidSchema),
+}));
 
-export const channelWebhookInputSchema = z
-  .object({ name: channelWebhookNameSchema })
-  .strict();
+export const channelWebhookInputSchema = strict(Schema.Struct({
+  name: channelWebhookNameSchema,
+}));
 
-export const channelIncomingWebhookMessageSchema = z
-  .object({
-    text: channelMessageBodySchema.optional(),
-    blocks: z.array(channelMessageBlockSchema).min(1).max(50).optional(),
-    eventId: z.string().trim().min(1).max(200).optional(),
-  })
-  .strict()
-  .superRefine((input, context) => {
+export const channelIncomingWebhookMessageSchema = strict(Schema.Struct({
+  text: Schema.optional(channelMessageBodySchema),
+  blocks: Schema.optional(
+    mutableArray(channelMessageBlockSchema).check(
+      Schema.isLengthBetween(1, 50),
+    ),
+  ),
+  eventId: Schema.optional(
+    Schema.Trim.check(Schema.isLengthBetween(1, 200)),
+  ),
+}).check(
+  Schema.makeFilter((input) => {
+    const issues: Array<Schema.FilterIssue> = [];
     if (!input.text && !input.blocks) {
-      context.addIssue({
-        code: "custom",
-        message: "Either text or blocks is required",
+      issues.push({
         path: ["text"],
+        issue: "Either text or blocks is required",
       });
-      return;
+      return issues;
     }
     if (!input.text && input.blocks && !channelMessageBlocksFallback(input.blocks)) {
-      context.addIssue({
-        code: "custom",
-        message: "Blocks must contain visible text when text is omitted",
+      issues.push({
         path: ["blocks"],
+        issue: "Blocks must contain visible text when text is omitted",
       });
     }
     if (input.blocks) {
@@ -368,56 +427,57 @@ export const channelIncomingWebhookMessageSchema = z
         0,
       );
       if (markdownLength > 12_000) {
-        context.addIssue({
-          code: "custom",
-          message: "Markdown blocks may contain at most 12000 characters in total",
+        issues.push({
           path: ["blocks"],
+          issue: "Markdown blocks may contain at most 12000 characters in total",
         });
       }
     }
-  });
+    return issues;
+  }),
+));
 
-export const organizationAgentInputSchema = z
-  .object({
-    name: z.string().trim().min(1).max(100),
-    description: z.string().trim().max(agentDescriptionMaxLength).optional(),
-    provider: z.enum(channelAgentProviders),
-    model: z.string().trim().min(1).max(100).nullable().default(null),
-    responsibility: z
-      .string()
-      .trim()
-      .min(1)
-      .max(agentResponsibilityMaxLength),
-    effort: modelEffortSchema.nullable().default(null),
-    skills: z
-      .array(channelAgentSkillInputSchema)
-      .max(agentSkillsMaxCount)
-      .optional(),
-  })
-  .strict();
+export const organizationAgentInputSchema = strict(Schema.Struct({
+  name: Schema.Trim.check(Schema.isLengthBetween(1, 100)),
+  description: Schema.optional(
+    Schema.Trim.check(Schema.isMaxLength(agentDescriptionMaxLength)),
+  ),
+  provider: AgentProviderSchema,
+  model: nullableDefault(
+    Schema.Trim.check(Schema.isLengthBetween(1, 100)),
+  ),
+  responsibility: Schema.Trim.check(
+    Schema.isLengthBetween(1, agentResponsibilityMaxLength),
+  ),
+  effort: nullableDefault(ModelEffort),
+  skills: Schema.optional(
+    mutableArray(channelAgentSkillInputSchema).check(
+      Schema.isMaxLength(agentSkillsMaxCount),
+    ),
+  ),
+}));
 
-export const channelMemberInputSchema = z
-  .object({ role: z.enum(["owner", "member"]).default("member") })
-  .strict();
+export const channelMemberInputSchema = strict(Schema.Struct({
+  role: defaulted(Schema.Literals(["owner", "member"]), "member"),
+}));
 
-export const channelExecutionProposalAcceptInputSchema = z
-  .object({
-    provider: z.enum(channelAgentProviders),
-    model: z.string().trim().min(1).max(100).nullable(),
-    effort: modelEffortSchema.nullable(),
-    workerId: z.string().trim().min(1).max(128).nullable(),
-  })
-  .strict();
+export const channelExecutionProposalAcceptInputSchema = strict(Schema.Struct({
+  provider: AgentProviderSchema,
+  model: Schema.NullOr(
+    Schema.Trim.check(Schema.isLengthBetween(1, 100)),
+  ),
+  effort: Schema.NullOr(ModelEffort),
+  workerId: Schema.NullOr(
+    Schema.Trim.check(Schema.isLengthBetween(1, 128)),
+  ),
+}));
+export type ChannelExecutionProposalAcceptInput =
+  typeof channelExecutionProposalAcceptInputSchema.Type;
 
-export const channelProposalAcceptInputSchema = z
-  .object({
-    projectId: canonicalUuidSchema.nullable().default(null),
-    // New clients submit the execution selection with the create approval.
-    // Keeping this nullable preserves rolling compatibility for create-only
-    // proposals and older clients that still render the follow-up card.
-    execution: channelExecutionProposalAcceptInputSchema.nullable().default(null),
-  })
-  .strict();
+export const channelProposalAcceptInputSchema = strict(Schema.Struct({
+  projectId: nullableDefault(canonicalUuidSchema),
+  execution: nullableDefault(channelExecutionProposalAcceptInputSchema),
+}));
 
 export type ChannelSummary = {
   id: string;
@@ -438,11 +498,9 @@ export type ChannelSummary = {
   hasUnread?: boolean;
 };
 
-export const channelReadInputSchema = z
-  .object({
-    lastReadAt: z.string().datetime({ offset: true }).optional(),
-  })
-  .strict();
+export const channelReadInputSchema = strict(Schema.Struct({
+  lastReadAt: Schema.optional(IsoDateTimeWithOffset),
+}));
 
 export type ChannelMember = {
   userId: string;
@@ -727,11 +785,9 @@ export const channelQuickReactionEmojis = [
   "🎉",
 ] as const;
 
-export const channelMessageReactionInputSchema = z
-  .object({
-    emoji: z.string().trim().min(1).max(32),
-  })
-  .strict();
+export const channelMessageReactionInputSchema = strict(Schema.Struct({
+  emoji: Schema.Trim.check(Schema.isLengthBetween(1, 32)),
+}));
 
 export type ChannelAgentReply = {
   id: string;
@@ -762,140 +818,121 @@ export type ChannelDelta = {
  * state. Creating an issue does, so it lands as a proposal that a member has to
  * accept, matching the issue conversation rules in migration 0068.
  */
-export const channelReplyCompletionSchema = z
-  .object({
-    body: channelMessageBodySchema,
-    document: z
-      .object({
-        title: z.string().trim().min(1).max(300),
-        markdown: z.string().min(1).max(200_000),
-        projectId: z.string().uuid().nullable().default(null),
-      })
-      .strict()
-      .nullable()
-      .default(null),
-    issueProposal: z
-      .object({
-        projectId: z.string().uuid().nullable().default(null),
-        executeAfterCreate: z.boolean().default(false),
-        issue: z
-          .object({
-            title: z.string().trim().min(1).max(300),
-            description: z.string().trim().max(100_000).nullable(),
-            priority: z.number().int().min(1).max(4).nullable(),
-            status: z.literal("backlog"),
-          })
-          .strict(),
-      })
-      .strict()
-      .nullable()
-      .default(null),
-    executionProposal: z
-      .object({
-        projectId: z.string().uuid(),
-        runId: z.string().uuid(),
-      })
-      .strict()
-      .nullable()
-      .default(null),
-    skillExecutionProposal: z
-      .object({
-        type: z.literal("request_agent_skill_execute"),
-      })
-      .strict()
-      .nullable()
-      .default(null),
+const channelReplyDocumentSchema = strict(Schema.Struct({
+  title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
+  markdown: Schema.String.check(Schema.isLengthBetween(1, 200_000)),
+  projectId: nullableDefault(Uuid),
+}));
+
+const channelReplyIssueProposalSchema = strict(Schema.Struct({
+  projectId: nullableDefault(Uuid),
+  executeAfterCreate: defaulted(Schema.Boolean, false),
+  issue: strict(Schema.Struct({
+    title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
+    description: Schema.NullOr(
+      Schema.Trim.check(Schema.isMaxLength(100_000)),
+    ),
+    priority: Schema.NullOr(between(1, 4)),
+    status: Schema.Literal("backlog"),
+  })),
+}));
+
+const channelReplyExecutionProposalSchema = strict(Schema.Struct({
+  projectId: Uuid,
+  runId: Uuid,
+}));
+
+const channelReplySkillExecutionProposalSchema = strict(Schema.Struct({
+  type: Schema.Literal("request_agent_skill_execute"),
+}));
+
+const channelReplyDelegationSchema = strict(Schema.Struct({
+  projectId: Uuid,
+  agentId: Uuid,
+  request: channelMessageBodySchema,
+}));
+
+export const channelReplyCompletionSchema = strict(Schema.Struct({
+  body: channelMessageBodySchema,
+  document: nullableDefault(channelReplyDocumentSchema),
+  issueProposal: nullableDefault(channelReplyIssueProposalSchema),
+  executionProposal: nullableDefault(channelReplyExecutionProposalSchema),
+  skillExecutionProposal: nullableDefault(
+    channelReplySkillExecutionProposalSchema,
+  ),
     /**
      * Organization Agents can hand one repository-specific question to an
      * eligible Project Agent. The server remains authoritative for the target
      * organization, project, channel roster, and recursion boundary.
      */
-    delegation: z
-      .object({
-        projectId: z.string().uuid(),
-        agentId: z.string().uuid(),
-        request: channelMessageBodySchema,
-      })
-      .strict()
-      .nullable()
-      .default(null),
-  })
-  .strict()
-  .superRefine((reply, context) => {
+  delegation: nullableDefault(channelReplyDelegationSchema),
+}).check(
+  Schema.makeFilter((reply) => {
+    const issues: Array<Schema.FilterIssue> = [];
     if (
       reply.delegation &&
       (reply.document || reply.issueProposal || reply.executionProposal ||
         reply.skillExecutionProposal)
     ) {
-      context.addIssue({
-        code: "custom",
-        message: "A delegated reply cannot also attach an artifact proposal",
+      issues.push({
         path: ["delegation"],
+        issue: "A delegated reply cannot also attach an artifact proposal",
       });
     }
     if (reply.issueProposal && reply.executionProposal) {
-      context.addIssue({
-        code: "custom",
-        message: "Use executeAfterCreate for a create-and-execute request",
+      issues.push({
         path: ["executionProposal"],
+        issue: "Use executeAfterCreate for a create-and-execute request",
       });
     }
     if (
       reply.skillExecutionProposal &&
       (reply.document || reply.issueProposal || reply.executionProposal)
     ) {
-      context.addIssue({
-        code: "custom",
-        message: "A Skill execution cannot be combined with another artifact proposal",
+      issues.push({
         path: ["skillExecutionProposal"],
+        issue: "A Skill execution cannot be combined with another artifact proposal",
       });
     }
-  });
+    return issues;
+  }),
+));
 
-export const channelReplyClaimInputSchema = z
-  .object({
-    organizationId: z.string().uuid(),
-    workerId: z.string().trim().min(1).max(64),
-  })
-  .strict();
+export const channelReplyClaimInputSchema = strict(Schema.Struct({
+  organizationId: Uuid,
+  workerId: Schema.Trim.check(Schema.isLengthBetween(1, 64)),
+}));
 
-export const channelReplyLeaseInputSchema = channelReplyClaimInputSchema.extend(
-  { claimToken: z.string().trim().min(1).max(200) },
-);
+export const channelReplyLeaseInputSchema = strict(Schema.Struct({
+  ...channelReplyClaimInputSchema.fields,
+  claimToken: Schema.Trim.check(Schema.isLengthBetween(1, 200)),
+}));
 
-export const channelReplyCompleteInputSchema = channelReplyLeaseInputSchema
-  .extend({
-    error: z.string().trim().min(1).max(4000).nullable().default(null),
-    result: channelReplyCompletionSchema.nullable().default(null),
-  })
-  .refine((input) => Boolean(input.error) !== Boolean(input.result), {
-    message: "Provide either an error or a reply result",
-  });
+export const channelReplyCompleteInputSchema = strict(Schema.Struct({
+  ...channelReplyLeaseInputSchema.fields,
+  error: nullableDefault(
+    Schema.Trim.check(Schema.isLengthBetween(1, 4_000)),
+  ),
+  result: nullableDefault(channelReplyCompletionSchema),
+}).check(
+  Schema.makeFilter((input) =>
+    Boolean(input.error) !== Boolean(input.result) ||
+    "Provide either an error or a reply result"
+  ),
+));
 
-export const channelIssueProposalPayloadSchema = z.object({
-  issue: z
-    .object({
-      title: z.string().trim().min(1).max(300),
-      description: z.string().trim().max(100_000).nullable(),
-      priority: z.number().int().min(1).max(4).nullable(),
+export const channelIssueProposalPayloadSchema = Schema.Struct({
+  issue: strict(Schema.Struct({
+    title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
+    description: Schema.NullOr(
+      Schema.Trim.check(Schema.isMaxLength(100_000)),
+    ),
+    priority: Schema.NullOr(between(1, 4)),
       // Read compatibility for proposals persisted by pre-approval-boundary
       // Workers. Acceptance always normalizes either value to backlog.
-      status: z.enum(["backlog", "queued"]),
-    })
-    .strict(),
-  executeAfterCreate: z.boolean().default(false),
+    status: Schema.Literals(["backlog", "queued"]),
+  })),
+  executeAfterCreate: defaulted(Schema.Boolean, false),
 });
-
-export const channelExecutionProposalPayloadSchema = z
-  .object({
-    runId: z.string().uuid(),
-    title: z.string().trim().min(1).max(300),
-    delegation: z
-      .object({
-        delegatedByAgentId: z.string().uuid(),
-        delegatedByAgentName: z.string().trim().min(1).max(100),
-      })
-      .strict()
-      .nullable(),
-  })
-  .strict();
+export const decodeChannelIssueProposalPayloadOption =
+  Schema.decodeUnknownOption(channelIssueProposalPayloadSchema);

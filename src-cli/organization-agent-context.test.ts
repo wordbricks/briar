@@ -594,6 +594,76 @@ describe("Organization Agent context downloader", () => {
     ).rejects.toThrow();
   });
 
+  it.each([
+    {
+      resource: "issues" as const,
+      items: [
+        issueItem("duplicate-issue", projectA),
+        issueItem("duplicate-issue", projectA),
+      ],
+    },
+    {
+      resource: "issue-pull-requests" as const,
+      items: [
+        issuePullRequestItem(projectA),
+        issuePullRequestItem(projectA),
+      ],
+    },
+  ])("rejects duplicate $resource identities", async ({ resource, items }) => {
+    const workspacePath = await workspace();
+    const projectResources = [
+      "agents",
+      "issues",
+      "issue-pull-requests",
+      "agent-sessions",
+    ] as const;
+    const fetcher = vi.fn(async (rawUrl: string | URL | Request) => {
+      const pathname = new URL(String(rawUrl)).pathname;
+      if (pathname.endsWith("/organization-context/projects")) {
+        return Response.json(
+          page({
+            resource: "projects",
+            projectId: null,
+            total: 1,
+            items: [projectItem(projectA, "Project")],
+          }),
+        );
+      }
+      const requestedResource = projectResources.find((candidate) =>
+        pathname.endsWith(`/${projectA}/${candidate}`)
+      );
+      if (!requestedResource) throw new Error(`Unexpected URL: ${pathname}`);
+      const isDuplicateResource = requestedResource === resource;
+      return Response.json(
+        page({
+          resource: requestedResource,
+          projectId: projectA,
+          total: isDuplicateResource ? 2 : 0,
+          items: isDuplicateResource ? items : [],
+        }),
+      );
+    });
+
+    await expect(
+      downloadOrganizationAgentContext({
+        apiUrl: "https://api.example.test",
+        workerToken: "worker-token",
+        organizationId,
+        workId,
+        workerId,
+        claimToken,
+        snapshotAt,
+        workspacePath,
+        fetcher,
+      }),
+    ).rejects.toThrow(
+      `Organization Agent ${resource} context contains duplicates`,
+    );
+    await expect(
+      access(organizationAgentContextDirectory(workspacePath)),
+    ).rejects.toThrow();
+  });
+
   it("fails closed when collection totals change between pages", async () => {
     const workspacePath = await workspace();
     let requestCount = 0;

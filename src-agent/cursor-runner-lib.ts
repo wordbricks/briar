@@ -14,24 +14,25 @@ import {
   type GrokEventState,
   type GrokRunnerRequest,
 } from "./grok-runner-lib";
-import type { AgentAttachment } from "./runner-attachments";
+import * as Schema from "effect/Schema";
 import type { NormalizedAgentEvent } from "./normalized-agent-event";
+import {
+  commonRunnerRequestFields,
+  runnerRequestDecoderOptions,
+} from "./runner-request";
 
-export type CursorRunnerRequest = {
-  type: "run";
-  message: string;
-  workspaceRoot: string;
-  conversationId?: string | null;
-  instructions?: string | null;
-  outputSchema?: Record<string, unknown> | boolean | null;
-  model?: string | null;
-  effort?: string | null;
-  approvalPolicy: "untrusted" | "on-request" | "never";
-  sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
-  networkAccess: boolean;
-  attachments?: AgentAttachment[];
-  cursorBinary: string;
-};
+export const CursorRunnerRequest = Schema.Struct({
+  ...commonRunnerRequestFields,
+  effort: Schema.optional(Schema.NullOr(Schema.String)),
+  cursorBinary: Schema.String,
+});
+
+export type CursorRunnerRequest = typeof CursorRunnerRequest.Type;
+
+export const decodeCursorRunnerRequest = Schema.decodeUnknownResult(
+  CursorRunnerRequest,
+  runnerRequestDecoderOptions,
+);
 
 export type CursorRunnerOutput =
   | { type: "session"; sessionId: string }

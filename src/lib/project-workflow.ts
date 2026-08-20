@@ -1,4 +1,5 @@
-import { z } from "zod";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import {
   autoHuntEvidenceTypeMaxLength,
   autoHuntEvidenceTypePattern,
@@ -12,93 +13,101 @@ import {
   type ProjectLlmProgress,
 } from "./project-llm";
 
-const evidenceTypeSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(autoHuntEvidenceTypeMaxLength)
-  .regex(autoHuntEvidenceTypePattern);
+const trimmedText = (minimum: number, maximum: number) =>
+  Schema.Trim.check(Schema.isLengthBetween(minimum, maximum));
 
-const workflowStageSchema = z.object({
-  id: z
-    .string()
-    .trim()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z][a-z0-9_]*$/u),
-  label: z.string().trim().min(1).max(80),
-  required: z.boolean(),
-  evidence: z.array(evidenceTypeSchema).max(20),
-  checks: z.array(z.string().trim().min(1).max(300)).max(20),
+const trimmedTextMatching = (
+  minimum: number,
+  maximum: number,
+  pattern: RegExp,
+) =>
+  Schema.Trim.check(
+    Schema.isLengthBetween(minimum, maximum),
+    Schema.isPattern(pattern),
+  );
+
+const mutableArrayAtMost = <S extends Schema.Top>(item: S, maximum: number) =>
+  Schema.mutable(Schema.Array(item)).check(Schema.isMaxLength(maximum));
+
+const mutableArrayBetween = <S extends Schema.Top>(
+  item: S,
+  minimum: number,
+  maximum: number,
+) =>
+  Schema.mutable(Schema.Array(item)).check(
+    Schema.isLengthBetween(minimum, maximum),
+  );
+
+const workflowIdPattern = /^[a-z][a-z0-9_]*$/u;
+
+const EvidenceType = trimmedTextMatching(
+  1,
+  autoHuntEvidenceTypeMaxLength,
+  autoHuntEvidenceTypePattern,
+);
+
+const WorkflowStage = Schema.Struct({
+  id: trimmedTextMatching(1, 64, workflowIdPattern),
+  label: trimmedText(1, 80),
+  required: Schema.Boolean,
+  evidence: mutableArrayAtMost(EvidenceType, 20),
+  checks: mutableArrayAtMost(trimmedText(1, 300), 20),
 });
 
-const workflowRequirementSchema = z.object({
-  id: z.string().trim().min(1).max(64).regex(/^[a-z][a-z0-9_]*$/u),
-  label: z.string().trim().min(1).max(80),
-  kind: z.enum(autoHuntRequirementKinds),
-  tool: z.string().trim().min(1).max(80).regex(/^[a-zA-Z0-9_.+-]+$/u),
-  reason: z.string().trim().min(1).max(200),
+const WorkflowRequirement = Schema.Struct({
+  id: trimmedTextMatching(1, 64, workflowIdPattern),
+  label: trimmedText(1, 80),
+  kind: Schema.Literals(autoHuntRequirementKinds),
+  tool: trimmedTextMatching(1, 80, /^[a-zA-Z0-9_.+-]+$/u),
+  reason: trimmedText(1, 200),
 });
 
-const workflowCheckpointSchema = z.object({
-  key: z
-    .string()
-    .trim()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z][a-z0-9_-]*$/u),
-  stage: z
-    .string()
-    .trim()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z][a-z0-9_]*$/u),
-  position: z.enum(["before", "after"]),
+const WorkflowCheckpoint = Schema.Struct({
+  key: trimmedTextMatching(1, 64, /^[a-z][a-z0-9_-]*$/u),
+  stage: trimmedTextMatching(1, 64, workflowIdPattern),
+  position: Schema.Literals(["before", "after"]),
 });
 
-const generatedRequirementsSchema = z
-  .object({
-    requirements: z.array(workflowRequirementSchema).max(30),
-  })
-  .superRefine((result, context) => {
+const GeneratedRequirements = Schema.Struct({
+  requirements: mutableArrayAtMost(WorkflowRequirement, 30),
+}).check(
+  Schema.makeFilter((result) => {
     const ids = result.requirements.map((requirement) => requirement.id);
-    if (new Set(ids).size !== ids.length) {
-      context.addIssue({
-        code: "custom",
-        message: "Workflow requirement ids must be unique.",
-        path: ["requirements"],
-      });
-    }
-  });
+    return new Set(ids).size === ids.length
+      ? undefined
+      : {
+          path: ["requirements"],
+          issue: "Workflow requirement ids must be unique.",
+        };
+  }),
+);
 
-const generatedWorkflowSchema = z
-  .object({
-    version: z.literal(2),
-    requirements: z.array(workflowRequirementSchema).max(30),
-    stages: z.array(workflowStageSchema).min(1).max(30),
-    execution: z.object({
-      checkpoints: z.array(workflowCheckpointSchema).max(100),
-    }),
-    completion: z.object({
-      requiredStages: z.array(z.string().trim().min(1).max(64)).max(30),
-    }),
-  })
-  .superRefine((workflow, context) => {
+const GeneratedWorkflow = Schema.Struct({
+  version: Schema.Literal(2),
+  requirements: mutableArrayAtMost(WorkflowRequirement, 30),
+  stages: mutableArrayBetween(WorkflowStage, 1, 30),
+  execution: Schema.Struct({
+    checkpoints: mutableArrayAtMost(WorkflowCheckpoint, 100),
+  }),
+  completion: Schema.Struct({
+    requiredStages: mutableArrayAtMost(trimmedText(1, 64), 30),
+  }),
+}).check(
+  Schema.makeFilter((workflow) => {
+    const issues: Array<Schema.FilterIssue> = [];
     const stageIds = workflow.stages.map((stage) => stage.id);
     const uniqueIds = new Set(stageIds);
     if (uniqueIds.size !== stageIds.length) {
-      context.addIssue({
-        code: "custom",
-        message: "Workflow stage ids must be unique.",
+      issues.push({
         path: ["stages"],
+        issue: "Workflow stage ids must be unique.",
       });
     }
     const requirementIds = workflow.requirements.map((requirement) => requirement.id);
     if (new Set(requirementIds).size !== requirementIds.length) {
-      context.addIssue({
-        code: "custom",
-        message: "Workflow requirement ids must be unique.",
+      issues.push({
         path: ["requirements"],
+        issue: "Workflow requirement ids must be unique.",
       });
     }
     const expectedRequired = workflow.stages
@@ -110,41 +119,44 @@ const generatedWorkflowSchema = z
         (id) => !expectedRequired.includes(id),
       )
     ) {
-      context.addIssue({
-        code: "custom",
-        message: "Completion stages must match stages marked as required.",
+      issues.push({
         path: ["completion", "requiredStages"],
+        issue: "Completion stages must match stages marked as required.",
       });
     }
     const checkpointKeys = new Set<string>();
     const checkpointBoundaries = new Set<string>();
     for (const [index, checkpoint] of workflow.execution.checkpoints.entries()) {
       if (!uniqueIds.has(checkpoint.stage)) {
-        context.addIssue({
-          code: "custom",
-          message: "Workflow checkpoint must reference a configured stage.",
+        issues.push({
           path: ["execution", "checkpoints", index, "stage"],
+          issue: "Workflow checkpoint must reference a configured stage.",
         });
       }
       if (checkpointKeys.has(checkpoint.key)) {
-        context.addIssue({
-          code: "custom",
-          message: "Workflow checkpoint keys must be unique.",
+        issues.push({
           path: ["execution", "checkpoints", index, "key"],
+          issue: "Workflow checkpoint keys must be unique.",
         });
       }
       checkpointKeys.add(checkpoint.key);
       const boundary = `${checkpoint.stage}:${checkpoint.position}`;
       if (checkpointBoundaries.has(boundary)) {
-        context.addIssue({
-          code: "custom",
-          message: "Workflow checkpoint boundaries must be unique.",
+        issues.push({
           path: ["execution", "checkpoints", index],
+          issue: "Workflow checkpoint boundaries must be unique.",
         });
       }
       checkpointBoundaries.add(boundary);
     }
-  });
+    return issues;
+  }),
+);
+
+const decodeGeneratedRequirements = Schema.decodeUnknownOption(
+  GeneratedRequirements,
+);
+const decodeGeneratedWorkflow = Schema.decodeUnknownOption(GeneratedWorkflow);
 
 const workflowOutputSchema: JsonSchema = {
   type: "object",
@@ -326,14 +338,15 @@ const parseGeneratedWorkflow = (message: string): AutoHuntWorkflow => {
   } catch {
     throw new Error("LLM 프로바이더가 유효한 워크플로우 JSON을 반환하지 않았습니다.");
   }
-  const generated = generatedWorkflowSchema.safeParse(parsed);
-  if (!generated.success) {
-    throw new Error(
-      "LLM 프로바이더가 생성한 워크플로우가 실행 계약을 충족하지 않습니다.",
-    );
-  }
+  const generated = Option.getOrThrowWith(
+    decodeGeneratedWorkflow(parsed),
+    () =>
+      new Error(
+        "LLM 프로바이더가 생성한 워크플로우가 실행 계약을 충족하지 않습니다.",
+      ),
+  );
   try {
-    return normalizeAutoHuntWorkflow(generated.data);
+    return normalizeAutoHuntWorkflow(generated);
   } catch {
     throw new Error(
       "LLM 프로바이더가 생성한 워크플로우가 실행 계약을 충족하지 않습니다.",
@@ -397,13 +410,16 @@ ${JSON.stringify(currentWorkflow, null, 2)}
   } catch {
     throw new Error("LLM 프로바이더가 유효한 필요 도구 JSON을 반환하지 않았습니다.");
   }
-  const generated = generatedRequirementsSchema.safeParse(parsed);
-  if (!generated.success) {
-    throw new Error("LLM 프로바이더가 생성한 필요 도구 목록이 계약을 충족하지 않습니다.");
-  }
+  const generated = Option.getOrThrowWith(
+    decodeGeneratedRequirements(parsed),
+    () =>
+      new Error(
+        "LLM 프로바이더가 생성한 필요 도구 목록이 계약을 충족하지 않습니다.",
+      ),
+  );
   return {
     ...currentWorkflow,
-    requirements: generated.data.requirements,
+    requirements: generated.requirements,
   };
 }
 

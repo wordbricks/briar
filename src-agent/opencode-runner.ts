@@ -5,6 +5,7 @@ import {
   type OpencodeClient,
   type QuestionRequest,
 } from "@opencode-ai/sdk/v2";
+import * as Effect from "effect/Effect";
 
 import {
   approvedOpenCodeQuestionAnswers,
@@ -12,6 +13,7 @@ import {
   buildOpenCodeParts,
   completeOpenCodeMessages,
   createOpenCodeEventState,
+  decodeOpenCodeRunnerRequest,
   isOpenCodeWritePermission,
   mapEffortToOpenCode,
   normalizeOpenCodeEvent,
@@ -22,7 +24,6 @@ import {
   openCodeResponseText,
   openCodeSystemPrompt,
   parseOpenCodeModel,
-  parseOpenCodeServerUrl,
   shouldAutoApproveOpenCodePermission,
   type OpenCodeBlockedRetry,
   type OpenCodeEventState,
@@ -30,6 +31,7 @@ import {
   type OpenCodeRunnerRequest,
 } from "./opencode-runner-lib";
 import { createRunnerIo } from "./runner-io";
+import { waitForOpenCodeServerUrl } from "./opencode-server-startup";
 import {
   providerInstructionSeatbeltPattern,
   readOnlySeatbeltProfile,
@@ -165,42 +167,9 @@ class OpenCodeServer {
         stdio: ["pipe", "pipe", "pipe"],
       },
     );
-    let output = "";
-    let settled = false;
     let url: string;
     try {
-      url = await new Promise<string>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error(`Timed out waiting for OpenCode server startup.\n${output}`));
-        }, 30_000);
-        const succeed = (value: string) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeout);
-          resolve(value);
-        };
-        const fail = (error: Error) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeout);
-          reject(error);
-        };
-        child.once("error", fail);
-        child.once("close", (code) => {
-          fail(
-            new Error(
-              `OpenCode server exited before startup${code === null ? "" : ` (code ${code})`}.\n${output}`,
-            ),
-          );
-        });
-        const inspect = (chunk: Buffer | string) => {
-          output += chunk.toString();
-          const parsed = parseOpenCodeServerUrl(output);
-          if (parsed) succeed(parsed);
-        };
-        child.stdout.on("data", inspect);
-        child.stderr.on("data", inspect);
-      });
+      url = await Effect.runPromise(waitForOpenCodeServerUrl(child));
     } catch (caught) {
       stopOpenCodeProcess(child);
       throw caught;
@@ -428,6 +397,7 @@ async function main(runnerIo: OpenCodeRunnerIo) {
 export async function runOpenCodeRunner() {
   const runnerIo = createRunnerIo<OpenCodeRunnerRequest, OpenCodeRunnerOutput>({
     closeError: "Briar closed the OpenCode runner input.",
+    decodeRequest: decodeOpenCodeRunnerRequest,
   });
   const { emit } = runnerIo;
   try {

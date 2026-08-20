@@ -1,755 +1,840 @@
-import { z } from "zod";
+import * as Schema from "effect/Schema";
 import {
-  agentProviderCapabilityCatalogSchema,
-  agentProviders,
-  modelEffortSchema,
+  AgentProviderCapabilityCatalog,
+  ModelEffort as mobileEffortSchema,
 } from "../../src/lib/agent-provider-contract";
+import { agentProviders } from "../../src/lib/agent-provider";
+import {
+  IsoDateTimeUtc as isoDateTime,
+} from "../../src/lib/date-time-schema";
 import {
   issueTitleAbsoluteMaxLength,
   issueTitleOverLimitMessage,
 } from "../../src/lib/issue-title";
 import { channelMessageBlockSchema } from "../../src/lib/channels-contract";
+import {
+  defaulted,
+  defaultedWith,
+  emailString,
+  integerBetween,
+  mobileSchemaDecodeOptions,
+  mutableArray,
+  mutableStruct,
+  nonEmptyString,
+  nonNegativeInteger,
+  numberBetween,
+  passthrough,
+  positiveInteger,
+  strict,
+  urlString,
+  uuidString,
+} from "./mobile-contract-schema";
+
+const optionalNullable = <S extends Schema.Constraint>(schema: S) =>
+  Schema.optional(Schema.NullOr(schema));
+const nullable = <S extends Schema.Constraint>(schema: S) =>
+  Schema.NullOr(schema);
+const optional = <S extends Schema.Constraint>(schema: S) =>
+  Schema.optional(schema);
 
 export const mobileClientIds = ["briar-mobile", "briar-android"] as const;
-export const mobileClientIdSchema = z.enum(mobileClientIds);
-const mobileProviderSchema = z.enum(agentProviders);
-const mobileEffortSchema = modelEffortSchema;
+export const mobileClientIdSchema = Schema.Literals(mobileClientIds);
+const mobileProviderSchema = Schema.Literals(agentProviders);
 
-export const mobileHealthResponseSchema = z.object({
-  ok: z.literal(true),
-  service: z.literal("briar-api"),
-  database: z.string(),
-  updates: z.string(),
+const mobileRoleSchema = Schema.Literals(["owner", "admin", "member"]);
+const mobileRunStatusSchema = Schema.Literals([
+  "backlog",
+  "queued",
+  "running",
+  "paused",
+  "blocked",
+  "failed",
+  "completed",
+  "cancelled",
+]);
+
+export const mobileHealthResponseSchema = mutableStruct({
+  ok: Schema.Literal(true),
+  service: Schema.Literal("briar-api"),
+  database: Schema.String,
+  updates: Schema.String,
 });
 
-export const mobileDeviceCodeRequestSchema = z.object({
+export const mobileDeviceCodeRequestSchema = strict(mutableStruct({
   client_id: mobileClientIdSchema,
-  scope: z.literal("openid profile email"),
-}).strict();
+  scope: Schema.Literal("openid profile email"),
+}));
 
-export const mobileDeviceCodeResponseSchema = z.object({
-  device_code: z.string().min(1),
-  user_code: z.string().min(1),
-  verification_uri: z.url(),
-  verification_uri_complete: z.url().optional(),
-  expires_in: z.number().int().positive().optional(),
-  interval: z.number().int().positive().optional(),
+export const mobileDeviceCodeResponseSchema = mutableStruct({
+  device_code: nonEmptyString,
+  user_code: nonEmptyString,
+  verification_uri: urlString,
+  verification_uri_complete: optional(urlString),
+  expires_in: optional(positiveInteger),
+  interval: optional(positiveInteger),
 });
 
-export const mobileDeviceTokenRequestSchema = z.object({
-  grant_type: z.literal("urn:ietf:params:oauth:grant-type:device_code"),
-  device_code: z.string().min(1),
+export const mobileDeviceTokenRequestSchema = strict(mutableStruct({
+  grant_type: Schema.Literal(
+    "urn:ietf:params:oauth:grant-type:device_code",
+  ),
+  device_code: nonEmptyString,
   client_id: mobileClientIdSchema,
-}).strict();
+}));
 
-export const mobileDeviceTokenResponseSchema = z.object({
-  access_token: z.string().min(1),
-  token_type: z.string().optional(),
-  expires_in: z.number().int().positive().optional(),
+export const mobileDeviceTokenResponseSchema = mutableStruct({
+  access_token: nonEmptyString,
+  token_type: optional(Schema.String),
+  expires_in: optional(positiveInteger),
 });
 
-export const mobileDeviceTokenErrorSchema = z.object({
-  error: z.enum([
+export const mobileDeviceTokenErrorSchema = mutableStruct({
+  error: Schema.Literals([
     "authorization_pending",
     "slow_down",
     "access_denied",
     "expired_token",
   ]),
-  error_description: z.string().optional(),
+  error_description: optional(Schema.String),
 });
 
-export const mobileCurrentUserResponseSchema = z.object({
-  user: z.object({
-    id: z.string(),
-    username: z.string().nullable().optional(),
-    name: z.string(),
-    email: z.email(),
-    image: z.string().nullable().optional(),
+export const mobileCurrentUserResponseSchema = mutableStruct({
+  user: mutableStruct({
+    id: Schema.String,
+    username: optionalNullable(Schema.String),
+    name: Schema.String,
+    email: emailString,
+    image: optionalNullable(Schema.String),
   }),
 });
 
-export const mobileProjectsResponseSchema = z.object({
-  projects: z.array(z.object({
-    id: z.uuid(),
-    name: z.string(),
-    issueKeyPrefix: z.string().regex(/^[A-Z0-9]{1,3}$/u).default("AH"),
-    scheduleTabEnabled: z.boolean().default(true),
-    icon: z.string().nullable(),
-    organizationId: z.uuid(),
-    organizationName: z.string(),
-    role: z.enum(["owner", "admin", "member"]),
-    createdAt: z.iso.datetime(),
-  })),
+const mobileDashboardProjectSchema = mutableStruct({
+  id: uuidString,
+  name: Schema.String,
+  issueKeyPrefix: defaulted(
+    Schema.String.check(Schema.isPattern(/^[A-Z0-9]{1,3}$/u)),
+    "AH",
+  ),
+  scheduleTabEnabled: defaulted(Schema.Boolean, true),
+  icon: nullable(Schema.String),
+  organizationId: uuidString,
+  organizationName: Schema.String,
+  role: mobileRoleSchema,
+  createdAt: isoDateTime,
 });
 
-export const mobileIssueAttachmentSchema = z.object({
-  id: z.uuid(),
-  filename: z.string(),
-  contentType: z.string(),
-  byteSize: z.number().int().nonnegative(),
-  url: z.string(),
+export const mobileProjectsResponseSchema = mutableStruct({
+  projects: mutableArray(mobileDashboardProjectSchema),
 });
 
-export const mobileMessageAuthorSchema = z.object({
-  id: z.string().nullable(),
-  agentId: z.uuid().nullable().optional(),
-  name: z.string(),
-  image: z.string().nullable(),
-  provider: z.string().nullable(),
+export const mobileIssueAttachmentSchema = mutableStruct({
+  id: uuidString,
+  filename: Schema.String,
+  contentType: Schema.String,
+  byteSize: nonNegativeInteger,
+  url: Schema.String,
 });
 
-export const mobileOrganizationMemberSchema = z.object({
-  userId: z.string(),
-  name: z.string(),
-  email: z.email(),
-  image: z.string().nullable(),
-  role: z.enum(["owner", "admin", "member"]),
-  createdAt: z.iso.datetime(),
+export const mobileMessageAuthorSchema = mutableStruct({
+  id: nullable(Schema.String),
+  agentId: optionalNullable(uuidString),
+  name: Schema.String,
+  image: nullable(Schema.String),
+  provider: nullable(Schema.String),
 });
 
-export const mobileIssueSubscriberSchema = z.object({
-  userId: z.string().min(1),
-  subscribedAt: z.iso.datetime(),
+export const mobileOrganizationMemberSchema = mutableStruct({
+  userId: Schema.String,
+  name: Schema.String,
+  email: emailString,
+  image: nullable(Schema.String),
+  role: mobileRoleSchema,
+  createdAt: isoDateTime,
 });
 
-export const mobileDashboardRunSchema = z.object({
-  id: z.uuid(),
-  runNumber: z.number().int().positive().optional(),
-  currentAttempt: z.number().int().positive().optional(),
-  currentRevision: z.number().int().positive().optional(),
-  title: z.string(),
-  status: z.enum([
-    "backlog",
-    "queued",
-    "running",
-    "paused",
-    "blocked",
-    "failed",
-    "completed",
-    "cancelled",
-  ]),
-  workflowStage: z.string().nullable().optional(),
-  pausedAt: z.iso.datetime().nullable().optional(),
-  resumeRequestedAt: z.iso.datetime().nullable().optional(),
-  checkpoint: z.object({
-    key: z.string().min(1),
-    stage: z.string().min(1),
-    stageLabel: z.string().min(1),
-    position: z.enum(["before", "after"]),
-    attempt: z.number().int().positive(),
-    revision: z.number().int().positive(),
-    reachedAt: z.iso.datetime().nullable(),
-    nextStage: z.string().nullable(),
-    nextStageLabel: z.string().nullable(),
-    terminalReviewOnly: z.boolean(),
-  }).nullable().optional(),
-  workflow: z.object({
-    version: z.union([z.literal(1), z.literal(2)]),
-    stages: z.array(z.object({
-      id: z.string().min(1),
-      label: z.string().min(1),
-      required: z.boolean(),
-    }).passthrough()),
-  }).passthrough().optional(),
-  progress: z.number().min(0).max(100).optional(),
-  detail: z.string().nullable().optional(),
-  priority: z.number().int().min(1).max(4).nullable().optional(),
-  assigneeUserId: z.string().nullable().optional(),
-  createdByUserId: z.string().nullable().optional(),
-  subscribers: z.array(mobileIssueSubscriberSchema).optional(),
-  issueDescription: z.string().nullable().optional(),
-  attachments: z.array(mobileIssueAttachmentSchema).optional(),
-  prerequisites: z.array(z.object({
-    id: z.uuid(),
-    runNumber: z.number().int().positive(),
-    title: z.string(),
-    status: z.enum(["backlog", "queued", "running", "paused", "blocked", "failed", "completed", "cancelled"]),
-  })).optional(),
-  dependents: z.array(z.object({
-    id: z.uuid(),
-    runNumber: z.number().int().positive(),
-    title: z.string(),
-    status: z.enum(["backlog", "queued", "running", "paused", "blocked", "failed", "completed", "cancelled"]),
-  })).optional(),
-  executionReadiness: z.enum(["ready", "waiting"]).optional(),
-  waitingOnPrerequisiteCount: z.number().int().nonnegative().optional(),
-  resultSummary: z.string().nullable().optional(),
-  structuredResult: z.object({
-    summary: z.string(),
-    outcome: z.enum(["completed", "partial", "blocked", "failed"]),
-    importance: z.string().optional(),
-    urgency: z.string().optional(),
-    impact: z.string().optional(),
-    humanActionRequired: z.boolean().optional(),
-    nextAction: z.string().nullable().optional(),
-    dueAt: z.iso.datetime().nullable().optional(),
-  }).nullable().optional(),
-  resultReviews: z.array(z.object({
-    userId: z.string(),
-    name: z.string(),
-    username: z.string().nullable(),
-    image: z.string().nullable(),
-    completedAt: z.iso.datetime(),
-  })).optional(),
-  pullRequestUrls: z.array(z.url()).optional(),
-  branch: z.string().nullable().optional(),
-  commitSha: z.string().nullable().optional(),
-  preferredProvider: mobileProviderSchema.nullable().optional(),
-  preferredModel: z.string().nullable().optional(),
-  preferredEffort: mobileEffortSchema.nullable().optional(),
-  fullAuto: z.boolean().optional(),
-  requestedProvider: mobileProviderSchema.nullable().optional(),
-  requestedModel: z.string().nullable().optional(),
-  requestedEffort: mobileEffortSchema.nullable().optional(),
-  requestedWorkerId: z.string().nullable().optional(),
-  requestedByUserId: z.string().nullable().optional(),
-  dispatchMode: z.enum(["any", "specific"]).nullable().optional(),
-  claimedBy: z.string().nullable().optional(),
-  claimedAt: z.iso.datetime().nullable().optional(),
-  workerId: z.string().nullable().optional(),
-  updatedAt: z.iso.datetime(),
-  completedAt: z.iso.datetime().nullable().optional(),
-  lastEventAt: z.iso.datetime().optional(),
-  eventCount: z.number().int().nonnegative().optional(),
+export const mobileIssueSubscriberSchema = mutableStruct({
+  userId: nonEmptyString,
+  subscribedAt: isoDateTime,
 });
 
-export const mobileInboxReadStatesSchema = z.object({
-  readVersions: z.record(z.string().min(1), z.string().min(1)),
+const mobileCheckpointSchema = mutableStruct({
+  key: nonEmptyString,
+  stage: nonEmptyString,
+  stageLabel: nonEmptyString,
+  position: Schema.Literals(["before", "after"]),
+  attempt: positiveInteger,
+  revision: positiveInteger,
+  reachedAt: nullable(isoDateTime),
+  nextStage: nullable(Schema.String),
+  nextStageLabel: nullable(Schema.String),
+  terminalReviewOnly: Schema.Boolean,
 });
 
-const mobileInboxMessageBaseSchema = z.object({
-  id: z.string().min(1),
-  projectId: z.uuid(),
-  projectName: z.string(),
-  targetId: z.string().min(1),
-  title: z.string(),
-  occurredAt: z.iso.datetime(),
-  version: z.string().min(1),
+const mobileWorkflowStageSchema = passthrough(mutableStruct({
+  id: nonEmptyString,
+  label: nonEmptyString,
+  required: Schema.Boolean,
+}));
+
+const mobileWorkflowSchema = passthrough(mutableStruct({
+  version: Schema.Literals([1, 2]),
+  stages: mutableArray(mobileWorkflowStageSchema),
+}));
+
+const mobileRunDependencySchema = mutableStruct({
+  id: uuidString,
+  runNumber: positiveInteger,
+  title: Schema.String,
+  status: mobileRunStatusSchema,
 });
 
-const mobileInboxIssueMessageSchema = mobileInboxMessageBaseSchema.extend({
-  kind: z.literal("issue"),
-  runNumber: z.number().int().positive(),
-  status: z.enum(["paused", "completed", "failed", "blocked"]),
-  workflowStage: z.string().nullable(),
-  workflowStageLabel: z.string().nullable().optional(),
-  priority: z.number().int().min(1).max(4).nullable(),
-  structuredResult: mobileDashboardRunSchema.shape.structuredResult,
+const mobileStructuredResultSchema = mutableStruct({
+  summary: Schema.String,
+  outcome: Schema.Literals(["completed", "partial", "blocked", "failed"]),
+  importance: optional(Schema.String),
+  urgency: optional(Schema.String),
+  impact: optional(Schema.String),
+  humanActionRequired: optional(Schema.Boolean),
+  nextAction: optionalNullable(Schema.String),
+  dueAt: optionalNullable(isoDateTime),
 });
 
-const mobileInboxConversationMessageSchema = mobileInboxMessageBaseSchema.extend({
-  kind: z.literal("conversation"),
-  messageId: z.uuid(),
-  rootMessageId: z.uuid(),
-  body: z.string(),
-  blocks: z.array(channelMessageBlockSchema).nullable().optional(),
-  authorName: z.string(),
-  authorImage: z.string().nullable().optional(),
-  issueKey: z.string().optional(),
-  reason: z.enum(["mention", "thread_reply", "subscription"]),
+export const mobileResultReviewSchema = mutableStruct({
+  userId: Schema.String,
+  name: Schema.String,
+  username: nullable(Schema.String),
+  image: nullable(Schema.String),
+  completedAt: isoDateTime,
 });
 
-const mobileInboxChannelMessageSchema = mobileInboxMessageBaseSchema.extend({
-  kind: z.literal("channel"),
-  channelId: z.uuid(),
-  channelName: z.string(),
-  messageId: z.uuid(),
-  rootMessageId: z.uuid(),
-  body: z.string(),
-  authorName: z.string(),
-  authorImage: z.string().nullable().optional(),
-  reason: z.enum(["mention", "thread_reply", "subscription"]),
+export const mobileDashboardRunSchema = mutableStruct({
+  id: uuidString,
+  runNumber: optional(positiveInteger),
+  currentAttempt: optional(positiveInteger),
+  currentRevision: optional(positiveInteger),
+  title: Schema.String,
+  status: mobileRunStatusSchema,
+  workflowStage: optionalNullable(Schema.String),
+  pausedAt: optionalNullable(isoDateTime),
+  resumeRequestedAt: optionalNullable(isoDateTime),
+  checkpoint: optionalNullable(mobileCheckpointSchema),
+  workflow: optional(mobileWorkflowSchema),
+  progress: optional(numberBetween(0, 100)),
+  detail: optionalNullable(Schema.String),
+  priority: optionalNullable(integerBetween(1, 4)),
+  assigneeUserId: optionalNullable(Schema.String),
+  createdByUserId: optionalNullable(Schema.String),
+  subscribers: optional(mutableArray(mobileIssueSubscriberSchema)),
+  issueDescription: optionalNullable(Schema.String),
+  attachments: optional(mutableArray(mobileIssueAttachmentSchema)),
+  prerequisites: optional(mutableArray(mobileRunDependencySchema)),
+  dependents: optional(mutableArray(mobileRunDependencySchema)),
+  executionReadiness: optional(Schema.Literals(["ready", "waiting"])),
+  waitingOnPrerequisiteCount: optional(nonNegativeInteger),
+  resultSummary: optionalNullable(Schema.String),
+  structuredResult: optionalNullable(mobileStructuredResultSchema),
+  resultReviews: optional(mutableArray(mobileResultReviewSchema)),
+  pullRequestUrls: optional(mutableArray(urlString)),
+  branch: optionalNullable(Schema.String),
+  commitSha: optionalNullable(Schema.String),
+  preferredProvider: optionalNullable(mobileProviderSchema),
+  preferredModel: optionalNullable(Schema.String),
+  preferredEffort: optionalNullable(mobileEffortSchema),
+  fullAuto: optional(Schema.Boolean),
+  requestedProvider: optionalNullable(mobileProviderSchema),
+  requestedModel: optionalNullable(Schema.String),
+  requestedEffort: optionalNullable(mobileEffortSchema),
+  requestedWorkerId: optionalNullable(Schema.String),
+  requestedByUserId: optionalNullable(Schema.String),
+  dispatchMode: optionalNullable(Schema.Literals(["any", "specific"])),
+  claimedBy: optionalNullable(Schema.String),
+  claimedAt: optionalNullable(isoDateTime),
+  workerId: optionalNullable(Schema.String),
+  updatedAt: isoDateTime,
+  completedAt: optionalNullable(isoDateTime),
+  lastEventAt: optional(isoDateTime),
+  eventCount: optional(nonNegativeInteger),
 });
 
-const mobileInboxSessionMessageSchema = mobileInboxMessageBaseSchema.extend({
-  kind: z.literal("session"),
-  status: z.enum(["completed", "failed"]),
-  agentName: z.string().nullable(),
-  issueCount: z.number().int().nonnegative(),
-  error: z.string().nullable(),
-  summary: z.string().nullable(),
-  requiresAttention: z.boolean(),
+export const mobileInboxReadStatesSchema = mutableStruct({
+  readVersions: Schema.Record(
+    Schema.String,
+    Schema.mutableKey(nonEmptyString),
+  ).check(Schema.makeFilter((readVersions) =>
+    Object.keys(readVersions).every((key) => key.length > 0) ||
+    "Inbox read state keys must not be empty"
+  )),
 });
 
-export const mobileIssueSubscriptionResponseSchema = z.object({
-  runId: z.uuid(),
-  subscribers: z.array(mobileIssueSubscriberSchema),
+const mobileInboxMessageBaseFields = {
+  id: nonEmptyString,
+  projectId: uuidString,
+  projectName: Schema.String,
+  targetId: nonEmptyString,
+  title: Schema.String,
+  occurredAt: isoDateTime,
+  version: nonEmptyString,
+} as const;
+
+const mobileInboxIssueMessageSchema = mutableStruct({
+  ...mobileInboxMessageBaseFields,
+  kind: Schema.Literal("issue"),
+  runNumber: positiveInteger,
+  status: Schema.Literals(["paused", "completed", "failed", "blocked"]),
+  workflowStage: nullable(Schema.String),
+  workflowStageLabel: optionalNullable(Schema.String),
+  priority: nullable(integerBetween(1, 4)),
+  structuredResult: optionalNullable(mobileStructuredResultSchema),
 });
 
-export const mobileInboxFeedResponseSchema = z.object({
-  messages: z.array(z.discriminatedUnion("kind", [
+const mobileInboxConversationMessageSchema = mutableStruct({
+  ...mobileInboxMessageBaseFields,
+  kind: Schema.Literal("conversation"),
+  messageId: uuidString,
+  rootMessageId: uuidString,
+  body: Schema.String,
+  blocks: optionalNullable(mutableArray(channelMessageBlockSchema)),
+  authorName: Schema.String,
+  authorImage: optionalNullable(Schema.String),
+  issueKey: optional(Schema.String),
+  reason: Schema.Literals(["mention", "thread_reply", "subscription"]),
+});
+
+const mobileInboxChannelMessageSchema = mutableStruct({
+  ...mobileInboxMessageBaseFields,
+  kind: Schema.Literal("channel"),
+  channelId: uuidString,
+  channelName: Schema.String,
+  messageId: uuidString,
+  rootMessageId: uuidString,
+  body: Schema.String,
+  authorName: Schema.String,
+  authorImage: optionalNullable(Schema.String),
+  reason: Schema.Literals(["mention", "thread_reply", "subscription"]),
+});
+
+const mobileInboxSessionMessageSchema = mutableStruct({
+  ...mobileInboxMessageBaseFields,
+  kind: Schema.Literal("session"),
+  status: Schema.Literals(["completed", "failed"]),
+  agentName: nullable(Schema.String),
+  issueCount: nonNegativeInteger,
+  error: nullable(Schema.String),
+  summary: nullable(Schema.String),
+  requiresAttention: Schema.Boolean,
+});
+
+export const mobileIssueSubscriptionResponseSchema = mutableStruct({
+  runId: uuidString,
+  subscribers: mutableArray(mobileIssueSubscriberSchema),
+});
+
+export const mobileInboxFeedResponseSchema = mutableStruct({
+  messages: mutableArray(Schema.Union([
     mobileInboxIssueMessageSchema,
     mobileInboxConversationMessageSchema,
     mobileInboxChannelMessageSchema,
     mobileInboxSessionMessageSchema,
   ])),
-  subscribedIssueIds: z.array(z.uuid()),
-  generatedAt: z.iso.datetime(),
+  subscribedIssueIds: mutableArray(uuidString),
+  generatedAt: isoDateTime,
 });
 
-export const mobileDashboardWorkerSchema = z.object({
-  id: z.string(),
-  label: z.string(),
-  icon: z.discriminatedUnion("type", [
-    z.object({ type: z.literal("emoji"), value: z.string() }),
-    z.object({ type: z.literal("image"), value: z.string() }),
-  ]).nullable().optional(),
-  agentProvider: mobileProviderSchema.optional(),
-  providers: z.array(mobileProviderSchema).optional(),
-  capabilities: z
-    .object({
-      providerCapabilities: agentProviderCapabilityCatalogSchema.optional(),
-    })
-    .catchall(z.unknown())
-    .optional(),
-  readiness: z.string(),
-  acceptingWork: z.boolean(),
-  readinessDetail: z.string().nullable(),
-  activeSessions: z.number().int().nonnegative(),
-  availableSessions: z.number().int().nonnegative(),
+const mobileWorkerIconSchema = Schema.Union([
+  mutableStruct({ type: Schema.Literal("emoji"), value: Schema.String }),
+  mutableStruct({ type: Schema.Literal("image"), value: Schema.String }),
+]);
+
+const mobileWorkerCapabilitiesSchema = passthrough(mutableStruct({
+  providerCapabilities: optional(AgentProviderCapabilityCatalog),
+}));
+
+export const mobileDashboardWorkerSchema = mutableStruct({
+  id: Schema.String,
+  label: Schema.String,
+  icon: optionalNullable(mobileWorkerIconSchema),
+  agentProvider: optional(mobileProviderSchema),
+  providers: optional(mutableArray(mobileProviderSchema)),
+  capabilities: optional(mobileWorkerCapabilitiesSchema),
+  readiness: Schema.String,
+  acceptingWork: Schema.Boolean,
+  readinessDetail: nullable(Schema.String),
+  activeSessions: nonNegativeInteger,
+  availableSessions: nonNegativeInteger,
 });
 
-export const mobileProjectExecutionWorkerPolicySchema = z.object({
-  selectionMode: z.enum(["any", "allowlist"]),
-  defaultWorkerId: z.string().nullable(),
-  allowedWorkerIds: z.array(z.string()),
-  updatedAt: z.iso.datetime().nullable(),
+export const mobileProjectExecutionWorkerPolicySchema = mutableStruct({
+  selectionMode: Schema.Literals(["any", "allowlist"]),
+  defaultWorkerId: nullable(Schema.String),
+  allowedWorkerIds: mutableArray(Schema.String),
+  updatedAt: nullable(isoDateTime),
 });
 
-export const mobileConversationNotificationSchema = z.object({
-  id: z.uuid(),
-  runId: z.uuid(),
-  runTitle: z.string(),
-  rootMessageId: z.uuid(),
-  body: z.string(),
+export const mobileConversationNotificationSchema = mutableStruct({
+  id: uuidString,
+  runId: uuidString,
+  runTitle: Schema.String,
+  rootMessageId: uuidString,
+  body: Schema.String,
   author: mobileMessageAuthorSchema,
-  reason: z.enum(["mention", "thread_reply", "subscription"]),
-  createdAt: z.iso.datetime(),
+  reason: Schema.Literals(["mention", "thread_reply", "subscription"]),
+  createdAt: isoDateTime,
 });
 
-export const mobileChannelNotificationSchema = z.object({
-  id: z.uuid(),
-  channelId: z.uuid(),
-  channelName: z.string(),
-  rootMessageId: z.uuid(),
-  body: z.string(),
+export const mobileChannelNotificationSchema = mutableStruct({
+  id: uuidString,
+  channelId: uuidString,
+  channelName: Schema.String,
+  rootMessageId: uuidString,
+  body: Schema.String,
   author: mobileMessageAuthorSchema,
-  reason: z.enum(["mention", "thread_reply", "subscription"]),
-  createdAt: z.iso.datetime(),
+  reason: Schema.Literals(["mention", "thread_reply", "subscription"]),
+  createdAt: isoDateTime,
 });
 
-const mobileDashboardProjectSchema = mobileProjectsResponseSchema.shape.projects.element;
-
-export const mobileDashboardSnapshotSchema = z.object({
+export const mobileDashboardSnapshotSchema = mutableStruct({
   project: mobileDashboardProjectSchema,
-  runs: z.array(mobileDashboardRunSchema),
-  workers: z.array(mobileDashboardWorkerSchema).optional(),
-  organizationProviders: z.array(mobileProviderSchema).optional(),
-  executionPolicy: mobileProjectExecutionWorkerPolicySchema.optional(),
-  members: z.array(mobileOrganizationMemberSchema).optional(),
-  conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
-  channelNotifications: z.array(mobileChannelNotificationSchema).optional(),
-  cursor: z.number().int().nonnegative().optional(),
-  generatedAt: z.iso.datetime(),
+  runs: mutableArray(mobileDashboardRunSchema),
+  workers: optional(mutableArray(mobileDashboardWorkerSchema)),
+  organizationProviders: optional(mutableArray(mobileProviderSchema)),
+  executionPolicy: optional(mobileProjectExecutionWorkerPolicySchema),
+  members: optional(mutableArray(mobileOrganizationMemberSchema)),
+  conversationNotifications: optional(
+    mutableArray(mobileConversationNotificationSchema),
+  ),
+  channelNotifications: optional(mutableArray(mobileChannelNotificationSchema)),
+  cursor: optional(nonNegativeInteger),
+  generatedAt: isoDateTime,
 });
 
-export const mobileDashboardDeltaSchema = z.object({
-  cursor: z.number().int().nonnegative(),
-  hasMore: z.boolean(),
-  runs: z.array(mobileDashboardRunSchema),
-  deletedRunIds: z.array(z.uuid()),
-  project: mobileDashboardProjectSchema.optional(),
-  workers: z.array(mobileDashboardWorkerSchema).optional(),
-  organizationProviders: z.array(mobileProviderSchema).optional(),
-  executionPolicy: mobileProjectExecutionWorkerPolicySchema.optional(),
-  members: z.array(mobileOrganizationMemberSchema).optional(),
-  conversationNotifications: z.array(mobileConversationNotificationSchema).optional(),
-  channelNotifications: z.array(mobileChannelNotificationSchema).optional(),
-  generatedAt: z.iso.datetime(),
+export const mobileDashboardDeltaSchema = mutableStruct({
+  cursor: nonNegativeInteger,
+  hasMore: Schema.Boolean,
+  runs: mutableArray(mobileDashboardRunSchema),
+  deletedRunIds: mutableArray(uuidString),
+  project: optional(mobileDashboardProjectSchema),
+  workers: optional(mutableArray(mobileDashboardWorkerSchema)),
+  organizationProviders: optional(mutableArray(mobileProviderSchema)),
+  executionPolicy: optional(mobileProjectExecutionWorkerPolicySchema),
+  members: optional(mutableArray(mobileOrganizationMemberSchema)),
+  conversationNotifications: optional(
+    mutableArray(mobileConversationNotificationSchema),
+  ),
+  channelNotifications: optional(mutableArray(mobileChannelNotificationSchema)),
+  generatedAt: isoDateTime,
 });
 
-export const mobileRunEventsResponseSchema = z.object({
-  events: z.array(z.object({
-    id: z.uuid(),
-    status: mobileDashboardRunSchema.shape.status,
-    workflowStage: z.string().nullable(),
-    detail: z.string().nullable(),
-    actor: z.string(),
-    actorName: z.string().nullable().optional(),
-    occurredAt: z.iso.datetime(),
+export const mobileRunEventsResponseSchema = mutableStruct({
+  events: mutableArray(mutableStruct({
+    id: uuidString,
+    status: mobileRunStatusSchema,
+    workflowStage: nullable(Schema.String),
+    detail: nullable(Schema.String),
+    actor: Schema.String,
+    actorName: optionalNullable(Schema.String),
+    occurredAt: isoDateTime,
   })),
 });
 
-export const mobileIssueReworkProposalSchema = z.object({
-  id: z.uuid(),
-  type: z.literal("request_issue_rework"),
-  workflowStage: z.string().min(1),
-  reason: z.string().min(1),
-  status: z.enum(["pending", "accepted"]),
-  acceptedAt: z.iso.datetime().nullable(),
-  appliedRevision: z.number().int().positive().nullable(),
+export const mobileIssueReworkProposalSchema = mutableStruct({
+  id: uuidString,
+  type: Schema.Literal("request_issue_rework"),
+  workflowStage: nonEmptyString,
+  reason: nonEmptyString,
+  status: Schema.Literals(["pending", "accepted"]),
+  acceptedAt: nullable(isoDateTime),
+  appliedRevision: nullable(positiveInteger),
 });
 
-export const mobileIssueUpdateProposalSchema = z.object({
-  id: z.uuid(),
-  type: z.literal("request_issue_update"),
-  changes: z.object({
-    title: z.string().optional(),
-    description: z.string().nullable().optional(),
-    priority: z.number().int().min(1).max(4).nullable().optional(),
+export const mobileIssueUpdateProposalSchema = mutableStruct({
+  id: uuidString,
+  type: Schema.Literal("request_issue_update"),
+  changes: mutableStruct({
+    title: optional(Schema.String),
+    description: optionalNullable(Schema.String),
+    priority: optionalNullable(integerBetween(1, 4)),
   }),
-  changedFields: z.array(z.enum(["title", "description", "priority"])),
-  status: z.enum(["pending", "accepted"]),
-  acceptedAt: z.iso.datetime().nullable(),
-  resultRunId: z.uuid().nullable(),
+  changedFields: mutableArray(
+    Schema.Literals(["title", "description", "priority"]),
+  ),
+  status: Schema.Literals(["pending", "accepted"]),
+  acceptedAt: nullable(isoDateTime),
+  resultRunId: nullable(uuidString),
 });
 
-export const mobileIssueCreateProposalSchema = z.object({
-  id: z.uuid(),
-  type: z.literal("request_issue_create"),
-  issue: z.object({
-    title: z.string(),
-    description: z.string().nullable(),
-    priority: z.number().int().min(1).max(4).nullable(),
-    status: z.enum(["backlog", "queued"]),
+export const mobileIssueCreateProposalSchema = mutableStruct({
+  id: uuidString,
+  type: Schema.Literal("request_issue_create"),
+  issue: mutableStruct({
+    title: Schema.String,
+    description: nullable(Schema.String),
+    priority: nullable(integerBetween(1, 4)),
+    status: Schema.Literals(["backlog", "queued"]),
   }),
-  executeAfterCreate: z.boolean().optional(),
-  status: z.enum(["pending", "accepted"]),
-  acceptedAt: z.iso.datetime().nullable(),
-  resultRunId: z.uuid().nullable(),
+  executeAfterCreate: optional(Schema.Boolean),
+  status: Schema.Literals(["pending", "accepted"]),
+  acceptedAt: nullable(isoDateTime),
+  resultRunId: nullable(uuidString),
 });
 
-export const mobileIssueExecutionProposalSchema = z.object({
-  id: z.uuid(),
-  type: z.literal("request_issue_execute"),
-  status: z.enum(["pending", "accepted"]),
-  projectId: z.uuid(),
-  runId: z.uuid(),
-  title: z.string().trim().min(1).max(300),
-  createdAt: z.iso.datetime(),
-  acceptedAt: z.iso.datetime().nullable(),
-  requestedProvider: mobileProviderSchema.nullable(),
-  requestedModel: z.string().nullable(),
-  requestedEffort: mobileEffortSchema.nullable(),
-  requestedWorkerId: z.string().nullable(),
-  delegatedByAgentId: z.uuid().nullable(),
-  delegatedByAgentName: z.string().nullable(),
-}).strict();
+export const mobileIssueExecutionProposalSchema = strict(mutableStruct({
+  id: uuidString,
+  type: Schema.Literal("request_issue_execute"),
+  status: Schema.Literals(["pending", "accepted"]),
+  projectId: uuidString,
+  runId: uuidString,
+  title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
+  createdAt: isoDateTime,
+  acceptedAt: nullable(isoDateTime),
+  requestedProvider: nullable(mobileProviderSchema),
+  requestedModel: nullable(Schema.String),
+  requestedEffort: nullable(mobileEffortSchema),
+  requestedWorkerId: nullable(Schema.String),
+  delegatedByAgentId: nullable(uuidString),
+  delegatedByAgentName: nullable(Schema.String),
+}));
 
-export const mobileAgentSkillExecutionProposalSchema = z.object({
-  id: z.uuid(),
-  type: z.literal("request_agent_skill_execute"),
-  status: z.enum(["pending", "accepted"]),
-  projectId: z.uuid(),
-  agentId: z.uuid(),
-  agentName: z.string().trim().min(1).max(100),
-  skillId: z.uuid(),
-  skillName: z.string().trim().min(1).max(100),
+export const mobileAgentSkillExecutionProposalSchema = strict(mutableStruct({
+  id: uuidString,
+  type: Schema.Literal("request_agent_skill_execute"),
+  status: Schema.Literals(["pending", "accepted"]),
+  projectId: uuidString,
+  agentId: uuidString,
+  agentName: Schema.Trim.check(Schema.isLengthBetween(1, 100)),
+  skillId: uuidString,
+  skillName: Schema.Trim.check(Schema.isLengthBetween(1, 100)),
   provider: mobileProviderSchema,
-  model: z.string().nullable(),
-  effort: mobileEffortSchema.nullable(),
-  request: z.string().trim().min(1).max(10_000),
-  delegatedByAgentId: z.uuid().nullable(),
-  delegatedByAgentName: z.string().nullable(),
-  requestedWorkerId: z.string().nullable(),
-  requestedWorkerLabel: z.string().nullable(),
-  resultSessionId: z.string().nullable(),
-  createdAt: z.iso.datetime(),
-  acceptedAt: z.iso.datetime().nullable(),
-}).strict().superRefine((proposal, context) => {
+  model: nullable(Schema.String),
+  effort: nullable(mobileEffortSchema),
+  request: Schema.Trim.check(Schema.isLengthBetween(1, 10_000)),
+  delegatedByAgentId: nullable(uuidString),
+  delegatedByAgentName: nullable(Schema.String),
+  requestedWorkerId: nullable(Schema.String),
+  requestedWorkerLabel: nullable(Schema.String),
+  resultSessionId: nullable(Schema.String),
+  createdAt: isoDateTime,
+  acceptedAt: nullable(isoDateTime),
+})).check(Schema.makeFilter((proposal) => {
   const hasAcceptedFields = proposal.requestedWorkerId !== null &&
     proposal.requestedWorkerLabel !== null &&
     proposal.resultSessionId !== null && proposal.acceptedAt !== null;
-  if (
-    (proposal.status === "accepted") !== hasAcceptedFields ||
-    (proposal.status === "pending" && (
-      proposal.requestedWorkerId !== null ||
-      proposal.requestedWorkerLabel !== null ||
-      proposal.resultSessionId !== null || proposal.acceptedAt !== null
-    ))
-  ) {
-    context.addIssue({
-      code: "custom",
-      message: "Agent Skill execution approval fields do not match status",
-    });
-  }
-});
+  return (proposal.status === "accepted") === hasAcceptedFields &&
+      !(proposal.status === "pending" && (
+        proposal.requestedWorkerId !== null ||
+        proposal.requestedWorkerLabel !== null ||
+        proposal.resultSessionId !== null || proposal.acceptedAt !== null
+      ))
+    ? undefined
+    : "Agent Skill execution approval fields do not match status";
+}));
 
-export const mobileIssueProposedActionSchema = z.discriminatedUnion("type", [
+export const mobileIssueProposedActionSchema = Schema.Union([
   mobileIssueReworkProposalSchema,
   mobileIssueUpdateProposalSchema,
   mobileIssueCreateProposalSchema,
 ]);
 
-export const mobileIssueMessagesResponseSchema = z.object({
-  messages: z.array(z.object({
-    id: z.uuid(),
-    runId: z.uuid(),
-    parentMessageId: z.uuid().nullable(),
-    body: z.string(),
-    attachments: z.array(mobileIssueAttachmentSchema).default([]),
-    author: mobileMessageAuthorSchema,
-    replyCount: z.number().int().nonnegative(),
-    proposedAction: mobileIssueProposedActionSchema.nullable().optional(),
-    executionProposal: mobileIssueExecutionProposalSchema.nullable().optional(),
-    skillExecutionProposal:
-      mobileAgentSkillExecutionProposalSchema.nullable().optional(),
-    createdAt: z.iso.datetime(),
-    updatedAt: z.iso.datetime(),
-  })),
-  agentReplies: z.array(z.lazy(() => mobileAgentReplySchema)).default([]),
+const mobileAgentReplySchema = mutableStruct({
+  id: uuidString,
+  triggerMessageId: uuidString,
+  parentMessageId: uuidString,
+  agentId: optionalNullable(uuidString),
+  agentName: optionalNullable(Schema.String),
+  status: Schema.Literals(["queued", "running", "completed", "failed"]),
+  attempts: nonNegativeInteger,
+  error: nullable(Schema.String),
+});
+
+export const mobileIssueMessageSchema = mutableStruct({
+  id: uuidString,
+  runId: uuidString,
+  parentMessageId: nullable(uuidString),
+  body: Schema.String,
+  attachments: defaultedWith(
+    mutableArray(mobileIssueAttachmentSchema),
+    () => [],
+  ),
+  author: mobileMessageAuthorSchema,
+  replyCount: nonNegativeInteger,
+  proposedAction: optionalNullable(mobileIssueProposedActionSchema),
+  executionProposal: optionalNullable(mobileIssueExecutionProposalSchema),
+  skillExecutionProposal: optionalNullable(
+    mobileAgentSkillExecutionProposalSchema,
+  ),
+  createdAt: isoDateTime,
+  updatedAt: isoDateTime,
+});
+
+export const mobileIssueMessagesResponseSchema = mutableStruct({
+  messages: mutableArray(mobileIssueMessageSchema),
+  agentReplies: defaultedWith(
+    mutableArray(Schema.suspend(() => mobileAgentReplySchema)),
+    () => [],
+  ),
 });
 
 /**
  * A channel's `defaultProjectId` is also how Home groups it: null means the
  * channel belongs to the whole organization rather than to one project.
  */
-export const mobileChannelSummarySchema = z.object({
-  id: z.uuid(),
-  organizationId: z.uuid(),
-  slug: z.string(),
-  name: z.string(),
-  topic: z.string().nullable(),
-  visibility: z.enum(["public", "private"]),
-  defaultProjectId: z.uuid().nullable(),
-  archivedAt: z.iso.datetime().nullable(),
-  memberCount: z.number().int().nonnegative(),
-  agentCount: z.number().int().nonnegative(),
-  createdByUserId: z.string().nullable().optional(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-  lastMessageAt: z.iso.datetime().nullable().optional(),
-  lastReadAt: z.iso.datetime().nullable().optional(),
-  hasUnread: z.boolean().optional(),
+export const mobileChannelSummarySchema = mutableStruct({
+  id: uuidString,
+  organizationId: uuidString,
+  slug: Schema.String,
+  name: Schema.String,
+  topic: nullable(Schema.String),
+  visibility: Schema.Literals(["public", "private"]),
+  defaultProjectId: nullable(uuidString),
+  archivedAt: nullable(isoDateTime),
+  memberCount: nonNegativeInteger,
+  agentCount: nonNegativeInteger,
+  createdByUserId: optionalNullable(Schema.String),
+  createdAt: isoDateTime,
+  updatedAt: isoDateTime,
+  lastMessageAt: optionalNullable(isoDateTime),
+  lastReadAt: optionalNullable(isoDateTime),
+  hasUnread: optional(Schema.Boolean),
 });
 
-export const mobileChannelIssueProposalPayloadSchema = z.object({
-  issue: z.object({
-    title: z.string().trim().min(1).max(300),
-    description: z.string().trim().max(100_000).nullable(),
-    priority: z.number().int().min(1).max(4).nullable(),
-    status: z.enum(["backlog", "queued"]),
-  }).strict(),
-  executeAfterCreate: z.boolean().default(false),
-}).strict();
-
-const mobileChannelProposalBaseShape = {
-  id: z.uuid(),
-  status: z.enum(["pending", "accepted"]),
-  projectId: z.uuid().nullable(),
-  resultRunId: z.uuid().nullable(),
-};
-
-export const mobileChannelMessageSchema = z.object({
-  id: z.uuid(),
-  channelId: z.uuid(),
-  parentMessageId: z.uuid().nullable(),
-  body: z.string(),
-  author: z.discriminatedUnion("type", [
-    z.object({
-      type: z.literal("user"),
-      id: z.string(),
-      name: z.string(),
-      email: z.string(),
-      image: z.string().nullable(),
-    }),
-    z.object({
-      type: z.literal("agent"),
-      id: z.uuid().nullable(),
-      name: z.string(),
-      provider: z.string().nullable(),
-      image: z.string().nullable(),
-    }),
-    z.object({
-      type: z.literal("webhook"),
-      id: z.uuid().nullable(),
-      name: z.string(),
-    }),
-  ]),
-  mentionedUserIds: z.array(z.string()).default([]),
-  mentionedAgentIds: z.array(z.uuid()).default([]),
-  attachments: z.array(mobileIssueAttachmentSchema).default([]),
-  reactions: z
-    .array(
-      z.object({
-        emoji: z.string().min(1).max(32),
-        count: z.number().int().positive(),
-        userIds: z.array(z.string()).min(1),
-      }),
-    )
-    .default([]),
-  replyCount: z.number().int().nonnegative(),
-  lastReplyAt: z.iso.datetime().nullable(),
-  document: z
-    .object({
-      messageId: z.uuid(),
-      title: z.string(),
-      projectId: z.uuid().nullable(),
-    })
-    .nullable(),
-  proposal: z
-    .union([
-      z.object({
-        ...mobileChannelProposalBaseShape,
-        actionType: z.literal("request_issue_create"),
-        payload: mobileChannelIssueProposalPayloadSchema,
-      }),
-      // Retain decode compatibility for the never-produced legacy DB action.
-      z.object({
-        ...mobileChannelProposalBaseShape,
-        actionType: z.literal("request_plan_document"),
-        payload: z.unknown(),
-      }),
-    ])
-    .nullable(),
-  executionProposal: mobileIssueExecutionProposalSchema.nullable().optional(),
-  skillExecutionProposal:
-    mobileAgentSkillExecutionProposalSchema.nullable().optional(),
-  subscribers: z.array(mobileIssueSubscriberSchema).optional(),
-  createdAt: z.iso.datetime(),
-});
-
-export const mobileChannelsResponseSchema = z.object({
-  channels: z.array(mobileChannelSummarySchema),
-  cursor: z.number().int().nonnegative(),
-});
-
-export const mobileChannelDetailResponseSchema = z.object({
-  channel: mobileChannelSummarySchema,
-  members: z.array(z.object({
-    userId: z.string(),
-    name: z.string(),
-    email: z.string(),
-    image: z.string().nullable(),
-    role: z.enum(["owner", "member"]),
-    createdAt: z.iso.datetime(),
+export const mobileChannelIssueProposalPayloadSchema = strict(mutableStruct({
+  issue: strict(mutableStruct({
+    title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
+    description: nullable(
+      Schema.Trim.check(Schema.isMaxLength(100_000)),
+    ),
+    priority: nullable(integerBetween(1, 4)),
+    status: Schema.Literals(["backlog", "queued"]),
   })),
-  agents: z.array(z.object({
-    agentId: z.uuid(),
-    name: z.string(),
-    avatar: z.string().nullable(),
-    provider: mobileProviderSchema,
-    model: z.string().nullable(),
-    projectId: z.uuid().nullable(),
-    description: z.string().default(""),
-    responsibility: z.string(),
-    createdAt: z.iso.datetime(),
-  })),
-  messages: z.array(mobileChannelMessageSchema),
-  agentReplies: z.array(z.lazy(() => mobileChannelAgentReplySchema)).default([]),
-  nextCursor: z.uuid().nullable(),
-});
+  executeAfterCreate: defaulted(Schema.Boolean, false),
+}));
 
-export const mobileChannelMessagesResponseSchema = z.object({
-  messages: z.array(mobileChannelMessageSchema),
-  nextCursor: z.uuid().nullable(),
-});
+const mobileChannelProposalBaseFields = {
+  id: uuidString,
+  status: Schema.Literals(["pending", "accepted"]),
+  projectId: nullable(uuidString),
+  resultRunId: nullable(uuidString),
+} as const;
 
-export const mobileCreateChannelMessageRequestSchema = z.object({
-  body: z.string().min(1),
-  clientMessageId: z.uuid().optional(),
-  parentMessageId: z.uuid().nullable().default(null),
-  mentionedUserIds: z.array(z.string()).default([]),
-  mentionedAgentIds: z.array(z.uuid()).default([]),
-});
+const mobileChannelMessageAuthorSchema = Schema.Union([
+  mutableStruct({
+    type: Schema.Literal("user"),
+    id: Schema.String,
+    name: Schema.String,
+    email: Schema.String,
+    image: nullable(Schema.String),
+  }),
+  mutableStruct({
+    type: Schema.Literal("agent"),
+    id: nullable(uuidString),
+    name: Schema.String,
+    provider: nullable(Schema.String),
+    image: nullable(Schema.String),
+  }),
+  mutableStruct({
+    type: Schema.Literal("webhook"),
+    id: nullable(uuidString),
+    name: Schema.String,
+  }),
+]);
 
-export const mobileToggleChannelMessageReactionRequestSchema = z.object({
-  emoji: z.string().trim().min(1).max(32),
-});
+const mobileChannelProposalSchema = Schema.Union([
+  mutableStruct({
+    ...mobileChannelProposalBaseFields,
+    actionType: Schema.Literal("request_issue_create"),
+    payload: mobileChannelIssueProposalPayloadSchema,
+  }),
+  // Retain decode compatibility for the never-produced legacy DB action.
+  mutableStruct({
+    ...mobileChannelProposalBaseFields,
+    actionType: Schema.Literal("request_plan_document"),
+    payload: Schema.Unknown,
+  }),
+]);
 
-export const mobileToggleChannelMessageReactionResponseSchema = z.object({
-  message: mobileChannelMessageSchema,
-});
-
-export const mobileChannelThreadSubscriptionResponseSchema = z.object({
-  rootMessageId: z.uuid(),
-  subscribers: z.array(mobileIssueSubscriberSchema),
-});
-
-export const mobileChannelAgentReplySchema = z.object({
-  id: z.uuid(),
-  agentId: z.uuid(),
-  channelId: z.uuid(),
-  triggerMessageId: z.uuid(),
-  parentMessageId: z.uuid(),
-  replyMessageId: z.uuid(),
-  status: z.enum(["queued", "running", "completed", "failed"]),
-  attempts: z.number().int().nonnegative(),
-  error: z.string().nullable(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-});
-
-export const mobileCreateChannelMessageResponseSchema = z.object({
-  message: mobileChannelMessageSchema,
-  agentReplies: z.array(mobileChannelAgentReplySchema),
-});
-
-export const mobileChannelDeltaResponseSchema = z.object({
-  cursor: z.number().int().nonnegative(),
-  hasMore: z.boolean(),
-  channels: z.array(mobileChannelSummarySchema),
-  removedChannelIds: z.array(z.uuid()),
-  messages: z.array(mobileChannelMessageSchema),
-  removedMessageIds: z.array(z.uuid()),
-  agentReplies: z.array(mobileChannelAgentReplySchema),
-});
-
-export const mobileAcceptChannelProposalRequestSchema = z.object({
-  projectId: z.uuid().nullable(),
-}).strict();
-
-export const mobileAcceptChannelProposalResponseSchema = z.object({
-  outcome: z.enum(["accepted", "already_accepted"]),
-  projectId: z.uuid(),
-  resultRunId: z.uuid(),
-  executionProposal: mobileIssueExecutionProposalSchema.nullable().optional(),
-});
-
-export const mobileIssueExecutionApprovalRequestSchema = z.object({
-  provider: mobileProviderSchema,
-  model: z.string().nullable(),
-  effort: mobileEffortSchema.nullable(),
-  workerId: z.string().nullable(),
-}).strict();
-
-export const mobileAgentSkillExecutionApprovalRequestSchema = z.object({
-  workerId: z.string().min(1).max(128).refine(
-    (workerId) => workerId === workerId.trim(),
-    { message: "workerId cannot contain leading or trailing whitespace" },
+export const mobileChannelMessageSchema = mutableStruct({
+  id: uuidString,
+  channelId: uuidString,
+  parentMessageId: nullable(uuidString),
+  body: Schema.String,
+  author: mobileChannelMessageAuthorSchema,
+  mentionedUserIds: defaultedWith(mutableArray(Schema.String), () => []),
+  mentionedAgentIds: defaultedWith(mutableArray(uuidString), () => []),
+  attachments: defaultedWith(
+    mutableArray(mobileIssueAttachmentSchema),
+    () => [],
   ),
-}).strict();
+  reactions: defaultedWith(
+    mutableArray(mutableStruct({
+      emoji: Schema.String.check(Schema.isLengthBetween(1, 32)),
+      count: positiveInteger,
+      userIds: mutableArray(Schema.String).check(Schema.isMinLength(1)),
+    })),
+    () => [],
+  ),
+  replyCount: nonNegativeInteger,
+  lastReplyAt: nullable(isoDateTime),
+  document: nullable(mutableStruct({
+    messageId: uuidString,
+    title: Schema.String,
+    projectId: nullable(uuidString),
+  })),
+  proposal: nullable(mobileChannelProposalSchema),
+  executionProposal: optionalNullable(mobileIssueExecutionProposalSchema),
+  skillExecutionProposal: optionalNullable(
+    mobileAgentSkillExecutionProposalSchema,
+  ),
+  subscribers: optional(mutableArray(mobileIssueSubscriberSchema)),
+  createdAt: isoDateTime,
+});
 
-export const mobileRunEvidenceResponseSchema = z.object({
-  evidence: z.array(z.object({
-    key: z.string(),
-    attempt: z.number().int().positive(),
-    revision: z.number().int().positive(),
-    stage: z.string(),
-    type: z.string(),
-    status: z.enum(["pending", "passed", "failed", "skipped"]),
-    detail: z.string().nullable(),
-    url: z.url().nullable(),
-    actor: z.string(),
-    observedAt: z.iso.datetime(),
-    images: z.array(z.object({
-      id: z.uuid(),
-      filename: z.string(),
-      contentType: z.string(),
-      byteSize: z.number().int().nonnegative(),
-      url: z.string(),
-    })).optional(),
-    canonical: z.boolean(),
+export const mobileChannelsResponseSchema = mutableStruct({
+  channels: mutableArray(mobileChannelSummarySchema),
+  cursor: nonNegativeInteger,
+});
+
+export const mobileChannelAgentReplySchema = mutableStruct({
+  id: uuidString,
+  agentId: uuidString,
+  channelId: uuidString,
+  triggerMessageId: uuidString,
+  parentMessageId: uuidString,
+  replyMessageId: uuidString,
+  status: Schema.Literals(["queued", "running", "completed", "failed"]),
+  attempts: nonNegativeInteger,
+  error: nullable(Schema.String),
+  createdAt: isoDateTime,
+  updatedAt: isoDateTime,
+});
+
+export const mobileChannelDetailResponseSchema = mutableStruct({
+  channel: mobileChannelSummarySchema,
+  members: mutableArray(mutableStruct({
+    userId: Schema.String,
+    name: Schema.String,
+    email: Schema.String,
+    image: nullable(Schema.String),
+    role: Schema.Literals(["owner", "member"]),
+    createdAt: isoDateTime,
+  })),
+  agents: mutableArray(mutableStruct({
+    agentId: uuidString,
+    name: Schema.String,
+    avatar: nullable(Schema.String),
+    provider: mobileProviderSchema,
+    model: nullable(Schema.String),
+    projectId: nullable(uuidString),
+    description: defaulted(Schema.String, ""),
+    responsibility: Schema.String,
+    createdAt: isoDateTime,
+  })),
+  messages: mutableArray(mobileChannelMessageSchema),
+  agentReplies: defaultedWith(
+    mutableArray(Schema.suspend(() => mobileChannelAgentReplySchema)),
+    () => [],
+  ),
+  nextCursor: nullable(uuidString),
+});
+
+export const mobileChannelMessagesResponseSchema = mutableStruct({
+  messages: mutableArray(mobileChannelMessageSchema),
+  nextCursor: nullable(uuidString),
+});
+
+export const mobileCreateChannelMessageRequestSchema = mutableStruct({
+  body: nonEmptyString,
+  clientMessageId: optional(uuidString),
+  parentMessageId: defaulted(nullable(uuidString), null),
+  mentionedUserIds: defaultedWith(mutableArray(Schema.String), () => []),
+  mentionedAgentIds: defaultedWith(mutableArray(uuidString), () => []),
+});
+
+export const mobileToggleChannelMessageReactionRequestSchema = mutableStruct({
+  emoji: Schema.Trim.check(Schema.isLengthBetween(1, 32)),
+});
+
+export const mobileToggleChannelMessageReactionResponseSchema = mutableStruct({
+  message: mobileChannelMessageSchema,
+});
+
+export const mobileChannelThreadSubscriptionResponseSchema = mutableStruct({
+  rootMessageId: uuidString,
+  subscribers: mutableArray(mobileIssueSubscriberSchema),
+});
+
+export const mobileCreateChannelMessageResponseSchema = mutableStruct({
+  message: mobileChannelMessageSchema,
+  agentReplies: mutableArray(mobileChannelAgentReplySchema),
+});
+
+export const mobileChannelDeltaResponseSchema = mutableStruct({
+  cursor: nonNegativeInteger,
+  hasMore: Schema.Boolean,
+  channels: mutableArray(mobileChannelSummarySchema),
+  removedChannelIds: mutableArray(uuidString),
+  messages: mutableArray(mobileChannelMessageSchema),
+  removedMessageIds: mutableArray(uuidString),
+  agentReplies: mutableArray(mobileChannelAgentReplySchema),
+});
+
+export const mobileAcceptChannelProposalRequestSchema = strict(mutableStruct({
+  projectId: nullable(uuidString),
+}));
+
+export const mobileAcceptChannelProposalResponseSchema = mutableStruct({
+  outcome: Schema.Literals(["accepted", "already_accepted"]),
+  projectId: uuidString,
+  resultRunId: uuidString,
+  executionProposal: optionalNullable(mobileIssueExecutionProposalSchema),
+});
+
+export const mobileIssueExecutionApprovalRequestSchema = strict(mutableStruct({
+  provider: mobileProviderSchema,
+  model: nullable(Schema.String),
+  effort: nullable(mobileEffortSchema),
+  workerId: nullable(Schema.String),
+}));
+
+export const mobileAgentSkillExecutionApprovalRequestSchema = strict(
+  mutableStruct({
+    workerId: Schema.String.check(
+      Schema.isLengthBetween(1, 128),
+      Schema.makeFilter((workerId) =>
+        workerId === workerId.trim() ||
+        "workerId cannot contain leading or trailing whitespace"
+      ),
+    ),
+  }),
+);
+
+export const mobileRunEvidenceResponseSchema = mutableStruct({
+  evidence: mutableArray(mutableStruct({
+    key: Schema.String,
+    attempt: positiveInteger,
+    revision: positiveInteger,
+    stage: Schema.String,
+    type: Schema.String,
+    status: Schema.Literals(["pending", "passed", "failed", "skipped"]),
+    detail: nullable(Schema.String),
+    url: nullable(urlString),
+    actor: Schema.String,
+    observedAt: isoDateTime,
+    images: optional(mutableArray(mutableStruct({
+      id: uuidString,
+      filename: Schema.String,
+      contentType: Schema.String,
+      byteSize: nonNegativeInteger,
+      url: Schema.String,
+    }))),
+    canonical: Schema.Boolean,
   })),
 });
 
-export const mobileDashboardCursorExpiredSchema = z.object({
-  code: z.literal("dashboard_cursor_expired"),
-  message: z.string(),
+export const mobileDashboardCursorExpiredSchema = mutableStruct({
+  code: Schema.Literal("dashboard_cursor_expired"),
+  message: Schema.String,
 });
 
-const mobileRunStatusSchema = mobileDashboardRunSchema.shape.status;
-const mobilePlacementStatusSchema = z.enum([
+const mobilePlacementStatusSchema = Schema.Literals([
   "backlog",
   "queued",
   "running",
@@ -758,334 +843,361 @@ const mobilePlacementStatusSchema = z.enum([
   "completed",
   "cancelled",
 ]);
-const requestIdSchema = z.object({ requestId: z.uuid() });
 
-const mobileIssueTitleSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(issueTitleAbsoluteMaxLength)
-  .superRefine((title, context) => {
-    const message = issueTitleOverLimitMessage(title);
-    if (message) {
-      context.addIssue({ code: "custom", message });
-    }
-  });
+const requestIdFields = { requestId: uuidString } as const;
 
-const mobileIssueWriteBaseSchema = z
-  .object({
-    title: mobileIssueTitleSchema,
-    description: z.string().max(100_000).nullable(),
-    priority: z.number().int().min(1).max(4).nullable(),
-    assigneeUserId: z.string().nullable(),
-    status: z.enum(["backlog", "queued"]),
-    preferredProvider: mobileProviderSchema.nullable().optional(),
-    preferredModel: z.string().nullable().optional(),
-    preferredEffort: mobileEffortSchema.nullable().optional(),
-    fullAuto: z.boolean().default(false),
-  })
-  .strict();
+const mobileIssueTitleSchema = Schema.Trim.check(
+  Schema.isLengthBetween(1, issueTitleAbsoluteMaxLength),
+  Schema.makeFilter((title) => issueTitleOverLimitMessage(title) ?? undefined),
+);
 
-export const mobileCreateIssueRequestSchema = mobileIssueWriteBaseSchema
-  .superRefine((input, context) => {
-    if (input.preferredModel && !input.preferredProvider) {
-      context.addIssue({
-        code: "custom",
-        message: "A provider is required for a model preference",
-      });
-    }
-    if (input.preferredEffort && !input.preferredProvider) {
-      context.addIssue({
-        code: "custom",
-        message: "A provider is required for an effort preference",
-      });
-    }
-    if (input.preferredEffort && !input.preferredModel) {
-      context.addIssue({
-        code: "custom",
-        message: "A model is required for an effort preference",
-      });
-    }
-  });
-export const mobileCreateIssueResponseSchema = z.object({
-  runId: z.uuid(),
-  sourceKey: z.string(),
-  stage: z.literal("queued"),
-  status: z.enum(["backlog", "queued"]),
-  assigneeUserId: z.string().nullable(),
-  createdByUserId: z.string(),
-  attachments: z.array(mobileIssueAttachmentSchema),
+const mobileIssueWriteFields = {
+  title: mobileIssueTitleSchema,
+  description: nullable(
+    Schema.String.check(Schema.isMaxLength(100_000)),
+  ),
+  priority: nullable(integerBetween(1, 4)),
+  assigneeUserId: nullable(Schema.String),
+  status: Schema.Literals(["backlog", "queued"]),
+  preferredProvider: optionalNullable(mobileProviderSchema),
+  preferredModel: optionalNullable(Schema.String),
+  preferredEffort: optionalNullable(mobileEffortSchema),
+  fullAuto: defaulted(Schema.Boolean, false),
+} as const;
+
+export const mobileCreateIssueRequestSchema = strict(
+  mutableStruct(mobileIssueWriteFields),
+).check(Schema.makeFilter((input) => {
+  const issues: Array<string> = [];
+  if (input.preferredModel && !input.preferredProvider) {
+    issues.push("A provider is required for a model preference");
+  }
+  if (input.preferredEffort && !input.preferredProvider) {
+    issues.push("A provider is required for an effort preference");
+  }
+  if (input.preferredEffort && !input.preferredModel) {
+    issues.push("A model is required for an effort preference");
+  }
+  return issues;
+}));
+
+export const mobileCreateIssueResponseSchema = mutableStruct({
+  runId: uuidString,
+  sourceKey: Schema.String,
+  stage: Schema.Literal("queued"),
+  status: Schema.Literals(["backlog", "queued"]),
+  assigneeUserId: nullable(Schema.String),
+  createdByUserId: Schema.String,
+  attachments: mutableArray(mobileIssueAttachmentSchema),
 });
-export const mobileUpdateIssueRequestSchema = z
-  .object({
-    title: mobileIssueTitleSchema,
-    description: z.string().max(100_000).nullable(),
-    priority: z.number().int().min(1).max(4).nullable(),
-    assigneeUserId: z.string().nullable(),
-  })
-  .strict();
-export const mobileUpdateIssueResponseSchema = z.object({
-  runId: z.uuid(),
-  title: z.string(),
-  description: z.string().nullable(),
-  priority: z.number().int().min(1).max(4).nullable(),
-  assigneeUserId: z.string().nullable(),
+
+export const mobileUpdateIssueRequestSchema = strict(mutableStruct({
+  title: mobileIssueTitleSchema,
+  description: nullable(
+    Schema.String.check(Schema.isMaxLength(100_000)),
+  ),
+  priority: nullable(integerBetween(1, 4)),
+  assigneeUserId: nullable(Schema.String),
+}));
+
+export const mobileUpdateIssueResponseSchema = mutableStruct({
+  runId: uuidString,
+  title: Schema.String,
+  description: nullable(Schema.String),
+  priority: nullable(integerBetween(1, 4)),
+  assigneeUserId: nullable(Schema.String),
 });
-export const mobilePreferencesSchema = z.object({
-  provider: mobileProviderSchema.nullable(),
-  model: z.string().nullable(),
-  effort: mobileEffortSchema.nullable(),
-}).strict();
-export const mobilePreferencesResponseSchema = mobilePreferencesSchema.extend({ runId: z.uuid() });
-export const mobileDependencyResponseSchema = z.object({
-  prerequisiteRunId: z.uuid(),
-  dependentRunId: z.uuid(),
-  outcome: z.enum(["created", "already_exists"]),
+
+const mobilePreferencesFields = {
+  provider: nullable(mobileProviderSchema),
+  model: nullable(Schema.String),
+  effort: nullable(mobileEffortSchema),
+} as const;
+
+export const mobilePreferencesSchema = strict(
+  mutableStruct(mobilePreferencesFields),
+);
+
+export const mobilePreferencesResponseSchema = strict(mutableStruct({
+  ...mobilePreferencesFields,
+  runId: uuidString,
+}));
+
+export const mobileDependencyResponseSchema = mutableStruct({
+  prerequisiteRunId: uuidString,
+  dependentRunId: uuidString,
+  outcome: Schema.Literals(["created", "already_exists"]),
 });
-export const mobileMoveRunRequestSchema = requestIdSchema.extend({
+
+export const mobileMoveRunRequestSchema = mutableStruct({
+  ...requestIdFields,
   status: mobilePlacementStatusSchema,
-  workflowStage: z.string().nullable(),
+  workflowStage: nullable(Schema.String),
 });
-export const mobileMoveRunResponseSchema = z.object({
-  runId: z.uuid(),
-  outcome: z.enum(["moved", "unchanged", "already_moved"]),
+
+export const mobileMoveRunResponseSchema = mutableStruct({
+  runId: uuidString,
+  outcome: Schema.Literals(["moved", "unchanged", "already_moved"]),
   status: mobilePlacementStatusSchema,
-  workflowStage: z.string().nullable(),
+  workflowStage: nullable(Schema.String),
 });
-export const mobileRecoveryRequestSchema = requestIdSchema.extend({ reason: z.string().nullable() });
-export const mobileRecoveryResponseSchema = z.object({
-  runId: z.uuid(),
-  outcome: z.string(),
-  attempt: z.number().int().positive(),
-  stage: z.enum(["queued", "cancelled"]),
+
+export const mobileRecoveryRequestSchema = mutableStruct({
+  ...requestIdFields,
+  reason: nullable(Schema.String),
 });
-export const mobileResumeRequestSchema = requestIdSchema.extend({
-  checkpointKey: z.string().min(1),
-  attempt: z.number().int().positive(),
-  revision: z.number().int().positive(),
+
+export const mobileRecoveryResponseSchema = mutableStruct({
+  runId: uuidString,
+  outcome: Schema.String,
+  attempt: positiveInteger,
+  stage: Schema.Literals(["queued", "cancelled"]),
 });
-export const mobileResumeResponseSchema = z.object({
-  runId: z.uuid(),
-  outcome: z.enum(["approved", "already_approved", "resumed", "already_resumed"]),
-  workflowStage: z.string().nullable(),
-  startStage: z.string().nullable(),
-  checkpointKey: z.string().nullable(),
-  attempt: z.number().int().positive().nullable(),
-  revision: z.number().int().positive().nullable(),
-  terminalReviewOnly: z.boolean(),
+
+export const mobileResumeRequestSchema = mutableStruct({
+  ...requestIdFields,
+  checkpointKey: nonEmptyString,
+  attempt: positiveInteger,
+  revision: positiveInteger,
 });
-export const mobileDispatchRequestSchema = requestIdSchema.extend({
+
+export const mobileResumeResponseSchema = mutableStruct({
+  runId: uuidString,
+  outcome: Schema.Literals([
+    "approved",
+    "already_approved",
+    "resumed",
+    "already_resumed",
+  ]),
+  workflowStage: nullable(Schema.String),
+  startStage: nullable(Schema.String),
+  checkpointKey: nullable(Schema.String),
+  attempt: nullable(positiveInteger),
+  revision: nullable(positiveInteger),
+  terminalReviewOnly: Schema.Boolean,
+});
+
+export const mobileDispatchRequestSchema = mutableStruct({
+  ...requestIdFields,
   provider: mobileProviderSchema,
-  model: z.string().nullable(),
-  effort: mobileEffortSchema.nullable(),
-  persistPreferences: z.boolean(),
-  workerId: z.string().nullable(),
+  model: nullable(Schema.String),
+  effort: nullable(mobileEffortSchema),
+  persistPreferences: Schema.Boolean,
+  workerId: nullable(Schema.String),
 });
-export const mobileDispatchResponseSchema = z.object({
-  runId: z.uuid(),
-  agentId: z.uuid().nullable(),
+
+export const mobileDispatchResponseSchema = mutableStruct({
+  runId: uuidString,
+  agentId: nullable(uuidString),
   provider: mobileProviderSchema,
-  model: z.string().nullable(),
-  effort: mobileEffortSchema.nullable(),
-  requestedWorkerId: z.string().nullable(),
-  requestedByUserId: z.string(),
-  dispatchMode: z.enum(["any", "specific"]),
-  dispatchedAt: z.iso.datetime(),
-  outcome: z.enum(["dispatched", "already_dispatched"]),
+  model: nullable(Schema.String),
+  effort: nullable(mobileEffortSchema),
+  requestedWorkerId: nullable(Schema.String),
+  requestedByUserId: Schema.String,
+  dispatchMode: Schema.Literals(["any", "specific"]),
+  dispatchedAt: isoDateTime,
+  outcome: Schema.Literals(["dispatched", "already_dispatched"]),
 });
-export const mobileIssueExecutionApprovalResponseSchema = z.object({
+
+export const mobileIssueExecutionApprovalResponseSchema = strict(mutableStruct({
   proposal: mobileIssueExecutionProposalSchema,
-  outcome: z.enum(["accepted", "already_accepted"]),
-  projectId: z.uuid(),
-  runId: z.uuid(),
+  outcome: Schema.Literals(["accepted", "already_accepted"]),
+  projectId: uuidString,
+  runId: uuidString,
   dispatch: mobileDispatchResponseSchema,
-}).strict();
-export const mobileIssueMessageSchema = mobileIssueMessagesResponseSchema.shape.messages.element;
-export const mobileCreateMessageRequestSchema = z.object({
-  body: z.string().trim().min(1).max(10_000),
-  clientMessageId: z.uuid().optional(),
-  parentMessageId: z.uuid().nullable(),
-  mentionedUserIds: z.array(z.string()),
-  mentionedAgentIds: z.array(z.uuid()).default([]),
-  agentConversationId: z.string().nullable(),
-}).strict();
-const mobileAgentReplySchema = z.object({
-  id: z.uuid(),
-  triggerMessageId: z.uuid(),
-  parentMessageId: z.uuid(),
-  agentId: z.uuid().nullable().optional(),
-  agentName: z.string().nullable().optional(),
-  status: z.enum(["queued", "running", "completed", "failed"]),
-  attempts: z.number().int().nonnegative(),
-  error: z.string().nullable(),
-});
-export const mobileCreateMessageResponseSchema = z.object({
+}));
+
+export const mobileCreateMessageRequestSchema = strict(mutableStruct({
+  body: Schema.Trim.check(Schema.isLengthBetween(1, 10_000)),
+  clientMessageId: optional(uuidString),
+  parentMessageId: nullable(uuidString),
+  mentionedUserIds: mutableArray(Schema.String),
+  mentionedAgentIds: defaultedWith(mutableArray(uuidString), () => []),
+  agentConversationId: nullable(Schema.String),
+}));
+
+export const mobileCreateMessageResponseSchema = mutableStruct({
   message: mobileIssueMessageSchema,
-  agentReply: mobileAgentReplySchema.nullable(),
-  agentReplies: z.array(mobileAgentReplySchema).default([]),
+  agentReply: nullable(mobileAgentReplySchema),
+  agentReplies: defaultedWith(mutableArray(mobileAgentReplySchema), () => []),
 });
-export const mobileAgentReplyResponseSchema = z.object({
+
+export const mobileAgentReplyResponseSchema = mutableStruct({
   agentReply: mobileAgentReplySchema,
-  message: mobileIssueMessageSchema.nullable(),
-  agentReplies: z.array(mobileAgentReplySchema).default([]),
-  messages: z.array(mobileIssueMessageSchema).default([]),
+  message: nullable(mobileIssueMessageSchema),
+  agentReplies: defaultedWith(mutableArray(mobileAgentReplySchema), () => []),
+  messages: defaultedWith(mutableArray(mobileIssueMessageSchema), () => []),
 });
-export const mobileAcceptIssueReworkProposalResponseSchema = z.object({
+
+export const mobileAcceptIssueReworkProposalResponseSchema = mutableStruct({
   proposal: mobileIssueReworkProposalSchema,
-  outcome: z.enum(["accepted", "already_accepted"]),
-  attempt: z.number().int().positive(),
-  revision: z.number().int().positive(),
-  workflowStage: z.string().min(1),
+  outcome: Schema.Literals(["accepted", "already_accepted"]),
+  attempt: positiveInteger,
+  revision: positiveInteger,
+  workflowStage: nonEmptyString,
 });
-export const mobileAcceptIssueActionProposalResponseSchema = z.object({
-  proposal: z.union([
+
+export const mobileAcceptIssueActionProposalResponseSchema = mutableStruct({
+  proposal: Schema.Union([
     mobileIssueUpdateProposalSchema,
     mobileIssueCreateProposalSchema,
   ]),
-  outcome: z.enum(["accepted", "already_accepted"]),
-  resultRunId: z.uuid().nullable(),
-  executionProposal: mobileIssueExecutionProposalSchema.nullable().optional(),
+  outcome: Schema.Literals(["accepted", "already_accepted"]),
+  resultRunId: nullable(uuidString),
+  executionProposal: optionalNullable(mobileIssueExecutionProposalSchema),
 });
-export const mobileResultReviewSchema = mobileDashboardRunSchema.shape.resultReviews.unwrap().element;
 
-export const mobileProjectAgentSkillSchema = z.object({
-  id: z.uuid(),
-  agentId: z.uuid(),
-  name: z.string(),
-  instructions: z.string(),
+export const mobileProjectAgentSkillSchema = mutableStruct({
+  id: uuidString,
+  agentId: uuidString,
+  name: Schema.String,
+  instructions: Schema.String,
   provider: mobileProviderSchema,
-  model: z.string().nullable(),
-  effort: mobileEffortSchema.nullable(),
-  kind: z.enum(["issue_processing", "custom"]),
-  position: z.number().int().nonnegative(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
+  model: nullable(Schema.String),
+  effort: nullable(mobileEffortSchema),
+  kind: Schema.Literals(["issue_processing", "custom"]),
+  position: nonNegativeInteger,
+  createdAt: isoDateTime,
+  updatedAt: isoDateTime,
 });
 
-export const mobileProjectAgentSchema = z.object({
-  id: z.uuid(),
-  projectId: z.uuid(),
-  name: z.string(),
-  avatar: z.string().nullable(),
-  codexPet: z.object({
-    slug: z.string(),
-    name: z.string(),
-    author: z.string(),
-    license: z.string(),
-    spriteVersion: z.number().int(),
-    spriteSheetUrl: z.string().nullable().optional(),
-  }).nullable().optional(),
-  provider: mobileProviderSchema,
-  model: z.string().nullable(),
-  description: z.string().default(""),
-  responsibility: z.string(),
-  skill: z.string(),
-  skills: z.array(mobileProjectAgentSkillSchema),
-  calendarColor: z.string(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-});
-
-export const mobileProjectAgentsResponseSchema = z.object({
-  agents: z.array(mobileProjectAgentSchema),
-});
-
-export const mobileProjectAgentSessionSchema = z.object({
-  id: z.string(),
-  projectId: z.uuid(),
-  dispatchGroupId: z.string().optional(),
-  agentId: z.uuid().nullable().optional(),
-  agentName: z.string().nullable().optional(),
-  skillId: z.uuid().nullable().optional(),
-  sessionType: z.enum(["task", "dispatch"]).optional(),
-  trigger: z.enum(["manual", "scheduled"]).nullable().optional(),
-  scheduleId: z.string().nullable().optional(),
-  scheduleRunId: z.string().nullable().optional(),
-  parentSessionId: z.string().nullable().optional(),
-  request: z.string().nullable().optional(),
-  status: z.enum(["running", "completed", "failed", "skipped", "interrupted"]),
-  issues: z.array(z.object({
-    runId: z.string(),
-    runNumber: z.number().int(),
-    sourceKey: z.string(),
-    title: z.string(),
-    outcome: z.enum(["pending", "completed", "blocked", "failed", "skipped"]),
-    summary: z.string().nullable(),
+export const mobileProjectAgentSchema = mutableStruct({
+  id: uuidString,
+  projectId: uuidString,
+  name: Schema.String,
+  avatar: nullable(Schema.String),
+  codexPet: optionalNullable(mutableStruct({
+    slug: Schema.String,
+    name: Schema.String,
+    author: Schema.String,
+    license: Schema.String,
+    spriteVersion: Schema.Int,
+    spriteSheetUrl: optionalNullable(Schema.String),
   })),
-  startedAt: z.string(),
-  completedAt: z.string().nullable(),
-  conversationId: z.string().nullable().optional(),
-  workspaceRoot: z.null().optional(),
-  requestedWorkerId: z.string().nullable().optional(),
-  workerId: z.string().nullable().optional(),
-  requestedByUserId: z.string().nullable().optional(),
-  summary: z.string().nullable().optional(),
-  error: z.string().nullable().optional(),
-  events: z.array(z.object({
-    id: z.string(),
-    type: z.enum([
-      "started",
-      "completed",
-      "failed",
-      "skipped",
-      "interrupted",
-      "stopped",
-    ]),
-    occurredAt: z.string(),
-  })).optional(),
-  dispatchEvents: z.array(z.unknown()).optional(),
-  workers: z.array(z.unknown()).optional(),
-  updatedAt: z.string().optional(),
+  provider: mobileProviderSchema,
+  model: nullable(Schema.String),
+  description: defaulted(Schema.String, ""),
+  responsibility: Schema.String,
+  skill: Schema.String,
+  skills: mutableArray(mobileProjectAgentSkillSchema),
+  calendarColor: Schema.String,
+  createdAt: isoDateTime,
+  updatedAt: isoDateTime,
 });
 
-export const mobileProjectAgentSessionsResponseSchema = z.object({
-  sessions: z.array(mobileProjectAgentSessionSchema),
+export const mobileProjectAgentsResponseSchema = mutableStruct({
+  agents: mutableArray(mobileProjectAgentSchema),
 });
 
-export const mobileProjectAgentTaskRequestSchema = z.object({
-  agentId: z.uuid(),
-  skillId: z.uuid(),
-  request: z.string().trim().min(1).max(50_000),
-  workerId: z.string().trim().min(1).max(128),
-  requestId: z.uuid(),
+const mobileProjectAgentSessionIssueSchema = mutableStruct({
+  runId: Schema.String,
+  runNumber: Schema.Int,
+  sourceKey: Schema.String,
+  title: Schema.String,
+  outcome: Schema.Literals([
+    "pending",
+    "completed",
+    "blocked",
+    "failed",
+    "skipped",
+  ]),
+  summary: nullable(Schema.String),
 });
 
-export const mobileProjectAgentTaskResponseSchema = z.object({
+const mobileProjectAgentSessionEventSchema = mutableStruct({
+  id: Schema.String,
+  type: Schema.Literals([
+    "started",
+    "completed",
+    "failed",
+    "skipped",
+    "interrupted",
+    "stopped",
+  ]),
+  occurredAt: Schema.String,
+});
+
+export const mobileProjectAgentSessionSchema = mutableStruct({
+  id: Schema.String,
+  projectId: uuidString,
+  dispatchGroupId: optional(Schema.String),
+  agentId: optionalNullable(uuidString),
+  agentName: optionalNullable(Schema.String),
+  skillId: optionalNullable(uuidString),
+  sessionType: optional(Schema.Literals(["task", "dispatch"])),
+  trigger: optionalNullable(Schema.Literals(["manual", "scheduled"])),
+  scheduleId: optionalNullable(Schema.String),
+  scheduleRunId: optionalNullable(Schema.String),
+  parentSessionId: optionalNullable(Schema.String),
+  request: optionalNullable(Schema.String),
+  status: Schema.Literals([
+    "running",
+    "completed",
+    "failed",
+    "skipped",
+    "interrupted",
+  ]),
+  issues: mutableArray(mobileProjectAgentSessionIssueSchema),
+  startedAt: Schema.String,
+  completedAt: nullable(Schema.String),
+  conversationId: optionalNullable(Schema.String),
+  workspaceRoot: optional(Schema.Null),
+  requestedWorkerId: optionalNullable(Schema.String),
+  workerId: optionalNullable(Schema.String),
+  requestedByUserId: optionalNullable(Schema.String),
+  summary: optionalNullable(Schema.String),
+  error: optionalNullable(Schema.String),
+  events: optional(mutableArray(mobileProjectAgentSessionEventSchema)),
+  dispatchEvents: optional(mutableArray(Schema.Unknown)),
+  workers: optional(mutableArray(Schema.Unknown)),
+  updatedAt: optional(Schema.String),
+});
+
+export const mobileProjectAgentSessionsResponseSchema = mutableStruct({
+  sessions: mutableArray(mobileProjectAgentSessionSchema),
+});
+
+export const mobileProjectAgentTaskRequestSchema = mutableStruct({
+  agentId: uuidString,
+  skillId: uuidString,
+  request: Schema.Trim.check(Schema.isLengthBetween(1, 50_000)),
+  workerId: Schema.Trim.check(Schema.isLengthBetween(1, 128)),
+  requestId: uuidString,
+});
+
+export const mobileProjectAgentTaskResponseSchema = mutableStruct({
   session: mobileProjectAgentSessionSchema,
 });
 
-export const mobileAgentSkillExecutionApprovalResponseSchema = z.object({
-  outcome: z.enum(["accepted", "already_accepted"]),
-  proposal: mobileAgentSkillExecutionProposalSchema,
-  projectId: z.uuid(),
-  session: mobileProjectAgentSessionSchema,
-}).strict().superRefine((response, context) => {
+export const mobileAgentSkillExecutionApprovalResponseSchema = strict(
+  mutableStruct({
+    outcome: Schema.Literals(["accepted", "already_accepted"]),
+    proposal: mobileAgentSkillExecutionProposalSchema,
+    projectId: uuidString,
+    session: mobileProjectAgentSessionSchema,
+  }),
+).check(Schema.makeFilter((response) => {
   const proposal = response.proposal;
   const session = response.session;
-  if (
-    proposal.status !== "accepted" ||
-    proposal.resultSessionId === null ||
-    proposal.requestedWorkerId === null ||
-    proposal.requestedWorkerLabel === null ||
-    proposal.acceptedAt === null ||
-    response.projectId !== proposal.projectId ||
-    session.id !== proposal.resultSessionId ||
-    session.projectId !== proposal.projectId ||
-    session.agentId !== proposal.agentId ||
-    session.agentName !== proposal.agentName ||
-    session.skillId !== proposal.skillId ||
-    session.sessionType !== "task" ||
-    session.trigger !== "manual" ||
-    session.request !== proposal.request ||
-    session.requestedWorkerId !== proposal.requestedWorkerId ||
-    session.workerId !== proposal.requestedWorkerId
-  ) {
-    context.addIssue({
-      code: "custom",
-      message: "Approved Agent Skill execution response is not canonical",
-    });
-  }
-});
+  return proposal.status === "accepted" &&
+      proposal.resultSessionId !== null &&
+      proposal.requestedWorkerId !== null &&
+      proposal.requestedWorkerLabel !== null &&
+      proposal.acceptedAt !== null &&
+      response.projectId === proposal.projectId &&
+      session.id === proposal.resultSessionId &&
+      session.projectId === proposal.projectId &&
+      session.agentId === proposal.agentId &&
+      session.agentName === proposal.agentName &&
+      session.skillId === proposal.skillId &&
+      session.sessionType === "task" &&
+      session.trigger === "manual" &&
+      session.request === proposal.request &&
+      session.requestedWorkerId === proposal.requestedWorkerId &&
+      session.workerId === proposal.requestedWorkerId
+    ? undefined
+    : "Approved Agent Skill execution response is not canonical";
+}));
 
 export const mobileOperationSchemas = {
   getHealth: { response: mobileHealthResponseSchema },
@@ -1114,22 +1226,52 @@ export const mobileOperationSchemas = {
   listRunEvents: { response: mobileRunEventsResponseSchema },
   listIssueMessages: { response: mobileIssueMessagesResponseSchema },
   listRunEvidence: { response: mobileRunEvidenceResponseSchema },
-  createIssue: { request: mobileCreateIssueRequestSchema, response: mobileCreateIssueResponseSchema },
-  updateIssue: { request: mobileUpdateIssueRequestSchema, response: mobileUpdateIssueResponseSchema },
+  createIssue: {
+    request: mobileCreateIssueRequestSchema,
+    response: mobileCreateIssueResponseSchema,
+  },
+  updateIssue: {
+    request: mobileUpdateIssueRequestSchema,
+    response: mobileUpdateIssueResponseSchema,
+  },
   putIssueSubscription: { response: mobileIssueSubscriptionResponseSchema },
   deleteIssueSubscription: { response: mobileIssueSubscriptionResponseSchema },
-  deleteIssue: { response: z.null() },
-  updateIssuePreferences: { request: mobilePreferencesSchema, response: mobilePreferencesResponseSchema },
+  deleteIssue: { response: Schema.Null },
+  updateIssuePreferences: {
+    request: mobilePreferencesSchema,
+    response: mobilePreferencesResponseSchema,
+  },
   addIssueDependency: { response: mobileDependencyResponseSchema },
-  removeIssueDependency: { response: z.null() },
-  moveRun: { request: mobileMoveRunRequestSchema, response: mobileMoveRunResponseSchema },
-  retryRun: { request: mobileRecoveryRequestSchema, response: mobileRecoveryResponseSchema },
-  cancelRun: { request: mobileRecoveryRequestSchema, response: mobileRecoveryResponseSchema },
-  resumeRun: { request: mobileResumeRequestSchema, response: mobileResumeResponseSchema },
-  dispatchRun: { request: mobileDispatchRequestSchema, response: mobileDispatchResponseSchema },
-  reassignRun: { request: mobileDispatchRequestSchema, response: mobileDispatchResponseSchema },
+  removeIssueDependency: { response: Schema.Null },
+  moveRun: {
+    request: mobileMoveRunRequestSchema,
+    response: mobileMoveRunResponseSchema,
+  },
+  retryRun: {
+    request: mobileRecoveryRequestSchema,
+    response: mobileRecoveryResponseSchema,
+  },
+  cancelRun: {
+    request: mobileRecoveryRequestSchema,
+    response: mobileRecoveryResponseSchema,
+  },
+  resumeRun: {
+    request: mobileResumeRequestSchema,
+    response: mobileResumeResponseSchema,
+  },
+  dispatchRun: {
+    request: mobileDispatchRequestSchema,
+    response: mobileDispatchResponseSchema,
+  },
+  reassignRun: {
+    request: mobileDispatchRequestSchema,
+    response: mobileDispatchResponseSchema,
+  },
   completeResultReview: { response: mobileResultReviewSchema },
-  createIssueMessage: { request: mobileCreateMessageRequestSchema, response: mobileCreateMessageResponseSchema },
+  createIssueMessage: {
+    request: mobileCreateMessageRequestSchema,
+    response: mobileCreateMessageResponseSchema,
+  },
   getIssueAgentReply: { response: mobileAgentReplyResponseSchema },
   acceptIssueReworkProposal: {
     response: mobileAcceptIssueReworkProposalResponseSchema,
@@ -1146,7 +1288,9 @@ export const mobileOperationSchemas = {
     response: mobileAgentSkillExecutionApprovalResponseSchema,
   },
   listProjectAgents: { response: mobileProjectAgentsResponseSchema },
-  listProjectAgentSessions: { response: mobileProjectAgentSessionsResponseSchema },
+  listProjectAgentSessions: {
+    response: mobileProjectAgentSessionsResponseSchema,
+  },
   runProjectAgentTask: {
     request: mobileProjectAgentTaskRequestSchema,
     response: mobileProjectAgentTaskResponseSchema,
@@ -1183,6 +1327,17 @@ export const mobileOperationSchemas = {
   },
 } as const;
 
-export function isMobileClientId(value: string) {
-  return mobileClientIdSchema.safeParse(value).success;
-}
+export const decodeMobileHealthResponse = Schema.decodeUnknownSync(
+  mobileHealthResponseSchema,
+  mobileSchemaDecodeOptions,
+);
+export const decodeMobileCurrentUserResponse = Schema.decodeUnknownSync(
+  mobileCurrentUserResponseSchema,
+  mobileSchemaDecodeOptions,
+);
+export const decodeMobileProjectsResponse = Schema.decodeUnknownSync(
+  mobileProjectsResponseSchema,
+  mobileSchemaDecodeOptions,
+);
+
+export const isMobileClientId = Schema.is(mobileClientIdSchema);

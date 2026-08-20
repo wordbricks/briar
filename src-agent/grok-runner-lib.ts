@@ -7,7 +7,7 @@ import {
   sep,
   win32,
 } from "node:path";
-import type { AgentAttachment } from "./runner-attachments";
+import * as Schema from "effect/Schema";
 import {
   normalizedActivityText,
   normalizedActivityTitle,
@@ -17,6 +17,10 @@ import {
 import { readAgentImage } from "./runner-attachments";
 import { extractSingleJsonObject } from "../src/lib/single-json-object";
 import type { AcpJsonRpcMessage } from "./acp-json-rpc";
+import {
+  commonRunnerRequestFields,
+  runnerRequestDecoderOptions,
+} from "./runner-request";
 
 export type {
   AgentActivityKind,
@@ -32,21 +36,18 @@ export type {
  * while mapping stream updates into Briar's provider-neutral agent events.
  */
 
-export type GrokRunnerRequest = {
-  type: "run";
-  message: string;
-  workspaceRoot: string;
-  conversationId?: string | null;
-  instructions?: string | null;
-  outputSchema?: Record<string, unknown> | boolean | null;
-  model?: string | null;
-  effort?: string | null;
-  approvalPolicy: "untrusted" | "on-request" | "never";
-  sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
-  networkAccess: boolean;
-  attachments?: AgentAttachment[];
-  grokBinary: string;
-};
+export const GrokRunnerRequest = Schema.Struct({
+  ...commonRunnerRequestFields,
+  effort: Schema.optional(Schema.NullOr(Schema.String)),
+  grokBinary: Schema.String,
+});
+
+export type GrokRunnerRequest = typeof GrokRunnerRequest.Type;
+
+export const decodeGrokRunnerRequest = Schema.decodeUnknownResult(
+  GrokRunnerRequest,
+  runnerRequestDecoderOptions,
+);
 
 export type GrokEventState = {
   activeMessageId: string | null;

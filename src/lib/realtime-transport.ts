@@ -1,25 +1,13 @@
-export type RealtimeNotification =
-  | {
-      topic: "ready";
-    }
-  | {
-      topic: "channels";
-      cursor: number;
-    }
-  | {
-      topic: "inbox";
-      version: number;
-    }
-  | {
-      topic: "project";
-      projectId: string;
-      cursor: number;
-    }
-  | {
-      topic: "project-session";
-      projectId: string;
-      version: number;
-    };
+import * as Option from "effect/Option";
+import {
+  decodeRealtimeNotificationJson,
+  decodeWebSocketTicket,
+  type RealtimeNotification,
+} from "./realtime-protocol";
+import { SseEventDecoder } from "./sse-event-decoder";
+
+export type { RealtimeNotification } from "./realtime-protocol";
+export { SseEventDecoder } from "./sse-event-decoder";
 
 export interface RealtimeTransport {
   start(): void;
@@ -48,99 +36,6 @@ type FetchLike = (
   input: RequestInfo | URL,
   init?: RequestInit,
 ) => Promise<Response>;
-
-type ParsedSseEvent = { event: string; data: string };
-
-/** Incremental SSE decoder kept transport-agnostic for fragmented fetch streams. */
-export class SseEventDecoder {
-  private buffer = "";
-  private event = "message";
-  private data: string[] = [];
-
-  push(chunk: string): ParsedSseEvent[] {
-    this.buffer += chunk;
-    const events: ParsedSseEvent[] = [];
-    let newline = this.buffer.indexOf("\n");
-    while (newline >= 0) {
-      let line = this.buffer.slice(0, newline);
-      this.buffer = this.buffer.slice(newline + 1);
-      if (line.endsWith("\r")) line = line.slice(0, -1);
-      const parsed = this.consumeLine(line);
-      if (parsed) events.push(parsed);
-      newline = this.buffer.indexOf("\n");
-    }
-    return events;
-  }
-
-  private consumeLine(line: string): ParsedSseEvent | null {
-    if (line === "") {
-      if (this.data.length === 0) {
-        this.event = "message";
-        return null;
-      }
-      const parsed = { event: this.event, data: this.data.join("\n") };
-      this.event = "message";
-      this.data = [];
-      return parsed;
-    }
-    if (line.startsWith(":")) return null;
-    const separator = line.indexOf(":");
-    const field = separator < 0 ? line : line.slice(0, separator);
-    let value = separator < 0 ? "" : line.slice(separator + 1);
-    if (value.startsWith(" ")) value = value.slice(1);
-    if (field === "event") this.event = value || "message";
-    else if (field === "data") this.data.push(value);
-    return null;
-  }
-}
-
-const realtimeNotification = (value: unknown): RealtimeNotification | null => {
-  if (!value || typeof value !== "object") return null;
-  const candidate = value as Partial<RealtimeNotification>;
-  if (candidate.topic === "ready") return { topic: "ready" };
-  if (candidate.topic === "channels") {
-    const cursor = (value as { cursor?: unknown }).cursor;
-    return Number.isSafeInteger(cursor) && (cursor as number) >= 0
-      ? { topic: "channels", cursor: cursor as number }
-      : null;
-  }
-  if (candidate.topic === "inbox") {
-    const version = (value as { version?: unknown }).version;
-    return Number.isSafeInteger(version) && (version as number) >= 0
-      ? { topic: "inbox", version: version as number }
-      : null;
-  }
-  const project = value as {
-    topic?: unknown;
-    projectId?: unknown;
-    cursor?: unknown;
-    version?: unknown;
-  };
-  if (
-    project.topic === "project-session" &&
-    typeof project.projectId === "string" &&
-    /^[0-9a-f-]+$/iu.test(project.projectId) &&
-    Number.isSafeInteger(project.version) &&
-    (project.version as number) >= 0
-  ) {
-    return {
-      topic: "project-session",
-      projectId: project.projectId,
-      version: project.version as number,
-    };
-  }
-  return project.topic === "project" &&
-      typeof project.projectId === "string" &&
-      /^[0-9a-f-]+$/iu.test(project.projectId) &&
-      Number.isSafeInteger(project.cursor) &&
-      (project.cursor as number) >= 0
-    ? {
-        topic: "project",
-        projectId: project.projectId,
-        cursor: project.cursor as number,
-      }
-    : null;
-};
 
 /**
  * Authenticated fetch-stream SSE adapter.
@@ -236,15 +131,9 @@ export class SseRealtimeTransport implements RealtimeTransport {
         if (done) break;
         for (const event of sse.push(decoder.decode(value, { stream: true }))) {
           if (event.event !== "ready" && event.event !== "change") continue;
-          let parsed: unknown;
-          try {
-            parsed = JSON.parse(event.data);
-          } catch {
-            continue;
-          }
-          const notification = realtimeNotification(parsed);
-          if (!notification) continue;
-          for (const listener of this.listeners) listener(notification);
+          const notification = decodeRealtimeNotificationJson(event.data);
+          if (Option.isNone(notification)) continue;
+          for (const listener of this.listeners) listener(notification.value);
         }
       }
     } finally {
@@ -335,12 +224,12 @@ export class WebSocketRealtimeTransport implements RealtimeTransport {
       if (!response.ok) {
         throw new Error(`Realtime ticket failed (${response.status})`);
       }
-      const body = await response.json() as { url?: unknown };
-      if (typeof body.url !== "string" || !/^wss?:\/\//u.test(body.url)) {
+      const ticket = decodeWebSocketTicket(await response.json());
+      if (Option.isNone(ticket)) {
         throw new Error("Realtime ticket returned an invalid WebSocket URL");
       }
       if (!this.active || generation !== this.generation) return;
-      const socket = this.createSocket(body.url);
+      const socket = this.createSocket(ticket.value.url);
       this.socket = socket;
       let finished = false;
       const finish = () => {
@@ -356,17 +245,11 @@ export class WebSocketRealtimeTransport implements RealtimeTransport {
       });
       socket.addEventListener("message", (event) => {
         if (!this.active || generation !== this.generation) return;
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(
-            typeof event.data === "string" ? event.data : "",
-          );
-        } catch {
-          return;
-        }
-        const notification = realtimeNotification(parsed);
-        if (!notification) return;
-        for (const listener of this.listeners) listener(notification);
+        const notification = decodeRealtimeNotificationJson(
+          typeof event.data === "string" ? event.data : "",
+        );
+        if (Option.isNone(notification)) return;
+        for (const listener of this.listeners) listener(notification.value);
       });
       socket.addEventListener("close", finish);
       socket.addEventListener("error", () => {

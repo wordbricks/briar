@@ -1,8 +1,9 @@
-import { z } from "zod";
-import {
-  agentProviders,
-  modelEffortSchema,
-} from "./agent-provider-contract";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import * as SchemaTransformation from "effect/SchemaTransformation";
+import { ModelEffort } from "./agent-provider-contract";
+import { agentProviders } from "./agent-provider";
+import { IsoDateTimeWithOffset } from "./date-time-schema";
 import {
   agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
@@ -25,518 +26,668 @@ export const organizationAgentContextResources = [
 
 export const organizationAgentContextCapability = { protocol: 1 } as const;
 
-/**
- * Protocol 1 originally exposed only eager, paginated collections. These
- * request types are additive so older Workers can keep using those pages while
- * newer Workers fetch a small manifest and hydrate only the context selected by
- * an Organization Agent.
- */
-export const organizationAgentContextLookupResources = [
-  "project-settings",
-  "agents",
-  "skills",
-  "issues",
-  "issue-pull-requests",
-  "agent-sessions",
-] as const;
-
 export type OrganizationAgentContextResource =
   (typeof organizationAgentContextResources)[number];
 
-const organizationAgentContextIdSchema = z.string().min(1).max(128);
-const organizationAgentContextTimestampSchema = z
-  .string()
-  .datetime({ offset: true });
+const strictSchemaOptions = {
+  errors: "all",
+  onExcessProperty: "error",
+} as const;
+
+const strict = <S extends Schema.Top>(schema: S) =>
+  schema.annotate({ parseOptions: strictSchemaOptions });
+
+const mutableArrayAtMost = <S extends Schema.Top>(
+  item: S,
+  maximum: number,
+) => Schema.mutable(Schema.Array(item)).check(Schema.isMaxLength(maximum));
+
+const mutableArrayBetween = <S extends Schema.Top>(
+  item: S,
+  minimum: number,
+  maximum: number,
+) =>
+  Schema.mutable(Schema.Array(item)).check(
+    Schema.isLengthBetween(minimum, maximum),
+  );
+
+const stringBetween = (minimum: number, maximum: number) =>
+  Schema.String.check(Schema.isLengthBetween(minimum, maximum));
+
+const integerBetween = (minimum: number, maximum: number) =>
+  Schema.Int.check(
+    Schema.isGreaterThanOrEqualTo(minimum),
+    Schema.isLessThanOrEqualTo(maximum),
+  );
+
+const nonNegativeInteger = Schema.Int.check(
+  Schema.isGreaterThanOrEqualTo(0),
+);
+
+const positiveInteger = Schema.Int.check(Schema.isGreaterThan(0));
+
+const defaulted = <S extends Schema.Constraint>(
+  schema: S,
+  value: S["Type"],
+): Schema.withDecodingDefaultType<S> =>
+  Schema.withDecodingDefaultType<S>(Effect.succeed(value))(schema);
+
+const defaultedWith = <S extends Schema.Constraint>(
+  schema: S,
+  value: () => S["Type"],
+): Schema.withDecodingDefaultType<S> =>
+  Schema.withDecodingDefaultType<S>(Effect.sync(value))(schema);
+
+const UrlString = Schema.String.check(
+  Schema.makeFilter((value) => {
+    try {
+      new URL(value);
+      return undefined;
+    } catch {
+      return "Expected a valid URL";
+    }
+  }),
+);
+
+const OrganizationAgentContextId = stringBetween(1, 128);
 
 /**
  * Attached to an Organization Agent claim to advertise the private, paginated
  * context protocol supported by the claiming Worker.
  */
-export const organizationAgentContextDescriptorSchema = z
-  .object({
-    schemaVersion: z.literal(1),
-    snapshotAt: organizationAgentContextTimestampSchema,
-  })
-  .strict();
+export const OrganizationAgentContextDescriptor = strict(Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  snapshotAt: IsoDateTimeWithOffset,
+}));
+export type OrganizationAgentContextDescriptor =
+  typeof OrganizationAgentContextDescriptor.Type;
 
-const organizationAgentContextLimitSchema = z.preprocess((value) => {
-  if (value === undefined || value === null || value === "") return undefined;
-  if (typeof value !== "string") return value;
-  const normalized = value.trim();
-  return /^\d+$/u.test(normalized) ? Number(normalized) : Number.NaN;
-}, z.number().int().min(1).max(50).default(25));
+const OrganizationAgentContextLimit = Schema.Unknown.pipe(
+  Schema.decodeTo(
+    defaulted(integerBetween(1, 50), 25),
+    SchemaTransformation.transform<number | undefined, unknown>({
+      decode: (value) => {
+        if (value === undefined || value === null || value === "") {
+          return undefined;
+        }
+        if (typeof value !== "string") {
+          return typeof value === "number" ? value : Number.NaN;
+        }
+        const normalized = value.trim();
+        return /^[0-9]+$/u.test(normalized)
+          ? Number(normalized)
+          : Number.NaN;
+      },
+      encode: (value) => value,
+    }),
+  ),
+);
 
 /** Query shared by all claim-scoped organization-context resources. */
-export const organizationAgentContextQuerySchema = z
-  .object({
-    workerId: z.string().trim().min(1).max(64),
-    limit: organizationAgentContextLimitSchema,
-    cursor: z.string().min(1).max(4096).optional(),
-  })
-  .strict();
+export const OrganizationAgentContextQuery = strict(Schema.Struct({
+  workerId: Schema.Trim.check(Schema.isLengthBetween(1, 64)),
+  limit: OrganizationAgentContextLimit,
+  cursor: Schema.optional(stringBetween(1, 4_096)),
+}));
+export type OrganizationAgentContextQuery =
+  typeof OrganizationAgentContextQuery.Type;
 
-const organizationAgentContextLookupIdsSchema = z
-  .array(organizationAgentContextIdSchema)
-  .min(1)
-  .max(50);
+const OrganizationAgentContextLookupIds = mutableArrayBetween(
+  OrganizationAgentContextId,
+  1,
+  50,
+);
 
-const organizationAgentContextSummaryLookupSchema = z
-  .object({
-    resource: z.enum(["agents", "issues", "agent-sessions"]),
-    projectId: organizationAgentContextIdSchema,
-    detail: z.literal("summary"),
-    limit: z.number().int().min(1).max(50).default(25),
-    cursor: z.string().min(1).max(4096).nullable().default(null),
-  })
-  .strict();
+const OrganizationAgentContextSummaryLookup = strict(Schema.Struct({
+  resource: Schema.Literals(["agents", "issues", "agent-sessions"]),
+  projectId: OrganizationAgentContextId,
+  detail: Schema.Literal("summary"),
+  limit: defaulted(integerBetween(1, 50), 25),
+  cursor: defaulted(Schema.NullOr(stringBetween(1, 4_096)), null),
+}));
 
-const organizationAgentContextDetailLookupSchema = z
-  .object({
-    resource: z.enum(["agents", "issues", "agent-sessions"]),
-    projectId: organizationAgentContextIdSchema,
-    detail: z.literal("full"),
-    ids: organizationAgentContextLookupIdsSchema,
-  })
-  .strict();
+const OrganizationAgentContextDetailLookup = strict(Schema.Struct({
+  resource: Schema.Literals(["agents", "issues", "agent-sessions"]),
+  projectId: OrganizationAgentContextId,
+  detail: Schema.Literal("full"),
+  ids: OrganizationAgentContextLookupIds,
+}));
 
-export const organizationAgentContextLookupRequestSchema = z.union([
-  z.object({
-    resource: z.literal("project-settings"),
-    projectId: organizationAgentContextIdSchema,
-  }).strict(),
-  organizationAgentContextSummaryLookupSchema,
-  organizationAgentContextDetailLookupSchema,
-  z.object({
-    resource: z.literal("skills"),
-    projectId: organizationAgentContextIdSchema,
-    ids: organizationAgentContextLookupIdsSchema,
-  }).strict(),
-  z.object({
-    resource: z.literal("issue-pull-requests"),
-    projectId: organizationAgentContextIdSchema,
-    issueIds: organizationAgentContextLookupIdsSchema,
-  }).strict(),
+export const OrganizationAgentContextLookupRequest = Schema.Union([
+  strict(Schema.Struct({
+    resource: Schema.Literal("project-settings"),
+    projectId: OrganizationAgentContextId,
+  })),
+  OrganizationAgentContextSummaryLookup,
+  OrganizationAgentContextDetailLookup,
+  strict(Schema.Struct({
+    resource: Schema.Literal("skills"),
+    projectId: OrganizationAgentContextId,
+    ids: OrganizationAgentContextLookupIds,
+  })),
+  strict(Schema.Struct({
+    resource: Schema.Literal("issue-pull-requests"),
+    projectId: OrganizationAgentContextId,
+    issueIds: OrganizationAgentContextLookupIds,
+  })),
 ]);
+export type OrganizationAgentContextLookupRequest =
+  typeof OrganizationAgentContextLookupRequest.Type;
 
-export const organizationAgentContextLookupInputSchema = z
-  .object({
-    workerId: z.string().trim().min(1).max(64),
-    requests: z.array(organizationAgentContextLookupRequestSchema).min(1).max(12),
-  })
-  .strict();
+export const OrganizationAgentContextLookupInput = strict(Schema.Struct({
+  workerId: Schema.Trim.check(Schema.isLengthBetween(1, 64)),
+  requests: mutableArrayBetween(OrganizationAgentContextLookupRequest, 1, 12),
+}));
+export type OrganizationAgentContextLookupInput =
+  typeof OrganizationAgentContextLookupInput.Type;
 
-export const organizationAgentContextLookupResultSchema = z
-  .object({
-    request: organizationAgentContextLookupRequestSchema,
-    data: z.unknown(),
-  })
-  .strict();
+export const OrganizationAgentContextLookupResult = strict(Schema.Struct({
+  request: OrganizationAgentContextLookupRequest,
+  // This opaque extension point accepts omission as well as explicit undefined.
+  data: Schema.optional(Schema.Unknown),
+}));
+export type OrganizationAgentContextLookupResult =
+  typeof OrganizationAgentContextLookupResult.Type;
 
-export const organizationAgentContextLookupResponseSchema = z
-  .object({
-    schemaVersion: z.literal(2),
-    organizationId: organizationAgentContextIdSchema,
-    workId: organizationAgentContextIdSchema,
-    snapshotAt: organizationAgentContextTimestampSchema,
-    results: z.array(organizationAgentContextLookupResultSchema).max(12),
-  })
-  .strict();
+export const OrganizationAgentContextLookupResponse = strict(Schema.Struct({
+  schemaVersion: Schema.Literal(2),
+  organizationId: OrganizationAgentContextId,
+  workId: OrganizationAgentContextId,
+  snapshotAt: IsoDateTimeWithOffset,
+  results: mutableArrayAtMost(OrganizationAgentContextLookupResult, 12),
+}));
+export type OrganizationAgentContextLookupResponse =
+  typeof OrganizationAgentContextLookupResponse.Type;
 
-const organizationAgentContextResourceRevisionSchema = z
-  .object({
-    count: z.number().int().nonnegative(),
-    revision: organizationAgentContextTimestampSchema.nullable(),
-  })
-  .strict();
+const OrganizationAgentContextResourceRevision = strict(Schema.Struct({
+  count: nonNegativeInteger,
+  revision: Schema.NullOr(IsoDateTimeWithOffset),
+}));
 
-export const organizationAgentContextManifestProjectSchema = z
-  .object({
-    id: organizationAgentContextIdSchema,
-    name: z.string().min(1).max(100),
-    issueKeyPrefix: z.string().regex(/^[A-Z0-9]{1,3}$/u),
-    createdAt: organizationAgentContextTimestampSchema,
-    updatedAt: organizationAgentContextTimestampSchema,
-    resources: z.object({
-      settings: z.object({
-        revision: organizationAgentContextTimestampSchema.nullable(),
-      }).strict(),
-      agents: organizationAgentContextResourceRevisionSchema,
-      issues: organizationAgentContextResourceRevisionSchema.extend({
-        openCount: z.number().int().nonnegative(),
-        pullRequestCount: z.number().int().nonnegative(),
-      }).strict(),
-      sessions: organizationAgentContextResourceRevisionSchema.extend({
-        archivedCount: z.number().int().nonnegative(),
-      }).strict(),
-    }).strict(),
-  })
-  .strict();
+export const OrganizationAgentContextManifestProject = strict(Schema.Struct({
+  id: OrganizationAgentContextId,
+  name: stringBetween(1, 100),
+  issueKeyPrefix: Schema.String.check(
+    Schema.isPattern(/^[A-Z0-9]{1,3}$/u),
+  ),
+  createdAt: IsoDateTimeWithOffset,
+  updatedAt: IsoDateTimeWithOffset,
+  resources: strict(Schema.Struct({
+    settings: strict(Schema.Struct({
+      revision: Schema.NullOr(IsoDateTimeWithOffset),
+    })),
+    agents: OrganizationAgentContextResourceRevision,
+    issues: strict(Schema.Struct({
+      ...OrganizationAgentContextResourceRevision.fields,
+      openCount: nonNegativeInteger,
+      pullRequestCount: nonNegativeInteger,
+    })),
+    sessions: strict(Schema.Struct({
+      ...OrganizationAgentContextResourceRevision.fields,
+      archivedCount: nonNegativeInteger,
+    })),
+  })),
+}));
+export type OrganizationAgentContextManifestProject =
+  typeof OrganizationAgentContextManifestProject.Type;
 
-export const organizationAgentContextManifestSchema = z
-  .object({
-    schemaVersion: z.literal(2),
-    organizationId: organizationAgentContextIdSchema,
-    workId: organizationAgentContextIdSchema,
-    snapshotAt: organizationAgentContextTimestampSchema,
-    revision: z.string().regex(/^[0-9a-f]{64}$/u),
-    projects: z.array(organizationAgentContextManifestProjectSchema).max(5_000),
-    loadedQueries: z.array(z.object({
-      file: z.string().min(1).max(1_024),
-      request: organizationAgentContextLookupRequestSchema,
-    }).strict()).max(36).default([]),
-  })
-  .strict();
+const OrganizationAgentContextLoadedQuery = strict(Schema.Struct({
+  file: stringBetween(1, 1_024),
+  request: OrganizationAgentContextLookupRequest,
+}));
 
-export const organizationAgentContextRequestTurnSchema = z
-  .object({
-    contextRequests: z.array(organizationAgentContextLookupRequestSchema)
-      .min(1)
-      .max(12),
-  })
-  .strict();
+export const OrganizationAgentContextManifest = strict(Schema.Struct({
+  schemaVersion: Schema.Literal(2),
+  organizationId: OrganizationAgentContextId,
+  workId: OrganizationAgentContextId,
+  snapshotAt: IsoDateTimeWithOffset,
+  revision: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/u)),
+  projects: mutableArrayAtMost(OrganizationAgentContextManifestProject, 5_000),
+  loadedQueries: defaultedWith(
+    mutableArrayAtMost(OrganizationAgentContextLoadedQuery, 36),
+    () => [],
+  ),
+}));
+export type OrganizationAgentContextManifest =
+  typeof OrganizationAgentContextManifest.Type;
 
-export const organizationAgentContextAgentSkillSchema = z
-  .object({
-    id: organizationAgentContextIdSchema,
-    name: z.string().min(1).max(100),
-    instructions: z.string().max(agentSkillInstructionsMaxLength),
-    provider: z.enum(agentProviders),
-    model: z.string().min(1).max(100).nullable(),
-    effort: modelEffortSchema.nullable(),
-    kind: z.enum(["issue_processing", "custom"]),
-    position: z.number().int().min(0).max(999),
-  })
-  .strict();
+export const OrganizationAgentContextRequestTurn = strict(Schema.Struct({
+  contextRequests: mutableArrayBetween(
+    OrganizationAgentContextLookupRequest,
+    1,
+    12,
+  ),
+}));
+export type OrganizationAgentContextRequestTurn =
+  typeof OrganizationAgentContextRequestTurn.Type;
 
-export const organizationAgentContextProjectAgentSchema = z
-  .object({
-    id: organizationAgentContextIdSchema,
-    name: z.string().min(1).max(100),
-    provider: z.enum(agentProviders),
-    model: z.string().min(1).max(100).nullable(),
-    effort: modelEffortSchema.nullable(),
-    description: z.string().max(agentDescriptionMaxLength),
-    responsibility: z.string().max(agentResponsibilityMaxLength),
-    skills: z
-      .array(organizationAgentContextAgentSkillSchema)
-      .max(agentSkillsMaxCount),
-    createdAt: organizationAgentContextTimestampSchema,
-    updatedAt: organizationAgentContextTimestampSchema,
-  })
-  .strict();
+export const OrganizationAgentContextAgentSkill = strict(Schema.Struct({
+  id: OrganizationAgentContextId,
+  name: stringBetween(1, 100),
+  instructions: Schema.String.check(
+    Schema.isMaxLength(agentSkillInstructionsMaxLength),
+  ),
+  provider: Schema.Literals(agentProviders),
+  model: Schema.NullOr(stringBetween(1, 100)),
+  effort: Schema.NullOr(ModelEffort),
+  kind: Schema.Literals(["issue_processing", "custom"]),
+  position: integerBetween(0, 999),
+}));
+export type OrganizationAgentContextAgentSkill =
+  typeof OrganizationAgentContextAgentSkill.Type;
 
-export const organizationAgentContextProjectSchema = z
-  .object({
-    id: organizationAgentContextIdSchema,
-    name: z.string().min(1).max(100),
-    issueKeyPrefix: z.string().regex(/^[A-Z0-9]{1,3}$/u),
-    createdAt: organizationAgentContextTimestampSchema,
-    settings: z
-      .object({
-        velenOrg: z.string().max(500).nullable(),
-        dataSource: z.string().max(500).nullable(),
-        linear: z
-          .object({
-            enabled: z.boolean(),
-            source: z.string().max(500).nullable(),
-            teamKey: z.string().max(100).nullable(),
-          })
-          .strict(),
-        githubRepository: z.string().max(500).nullable(),
-        workflow: z.unknown(),
-      })
-      .strict(),
-  })
-  .strict();
+export const OrganizationAgentContextProjectAgent = strict(Schema.Struct({
+  id: OrganizationAgentContextId,
+  name: stringBetween(1, 100),
+  provider: Schema.Literals(agentProviders),
+  model: Schema.NullOr(stringBetween(1, 100)),
+  effort: Schema.NullOr(ModelEffort),
+  description: Schema.String.check(
+    Schema.isMaxLength(agentDescriptionMaxLength),
+  ),
+  responsibility: Schema.String.check(
+    Schema.isMaxLength(agentResponsibilityMaxLength),
+  ),
+  skills: mutableArrayAtMost(
+    OrganizationAgentContextAgentSkill,
+    agentSkillsMaxCount,
+  ),
+  createdAt: IsoDateTimeWithOffset,
+  updatedAt: IsoDateTimeWithOffset,
+}));
+export type OrganizationAgentContextProjectAgent =
+  typeof OrganizationAgentContextProjectAgent.Type;
 
-export const organizationAgentContextIssueSchema = z
-  .object({
-    id: organizationAgentContextIdSchema,
-    projectId: organizationAgentContextIdSchema,
-    runNumber: z.number().int().positive(),
-    source: z.enum(autoHuntSources),
-    sourceKey: z.string().min(1).max(200),
-    title: z.string().min(1).max(300),
-    status: z.enum(autoHuntRunStatuses),
-    workflowStage: z.string().min(1).max(64).nullable(),
-    detail: z.string().max(4_000).nullable(),
-    priority: z.number().int().min(1).max(4).nullable(),
-    assigneeUserId: organizationAgentContextIdSchema.nullable(),
-    agentId: organizationAgentContextIdSchema.nullable(),
-    issueDescription: z.string().max(100_000).nullable(),
-    resultSummary: z.string().max(100_000).nullable(),
-    structuredResult: z.unknown().nullable(),
-    repository: z.string().min(1).max(500),
-    branch: z.string().min(1).max(500).nullable(),
-    commitSha: z.string().min(7).max(64).nullable(),
-    targetSha: z.string().min(7).max(64).nullable(),
-    tracker: z
-      .object({
-        provider: z.string().min(1).max(100),
-        issueId: z.string().min(1).max(500).nullable(),
-        identifier: z.string().min(1).max(500).nullable(),
-        url: z.string().url().max(2_000).nullable(),
-        state: z.string().max(200).nullable(),
-      })
-      .strict()
-      .nullable(),
-    preferredProvider: z.enum(agentProviders).nullable(),
-    preferredModel: z.string().min(1).max(100).nullable(),
-    preferredEffort: modelEffortSchema.nullable(),
-    requestedProvider: z.enum(agentProviders).nullable(),
-    requestedModel: z.string().min(1).max(100).nullable(),
-    requestedEffort: modelEffortSchema.nullable(),
-    stagingQaStatus: z.enum(autoHuntQaStatuses).nullable(),
-    productionQaStatus: z.enum(autoHuntQaStatuses).nullable(),
-    stagingQaDetail: z.string().max(100_000).nullable(),
-    productionQaDetail: z.string().max(100_000).nullable(),
-    sourceCreatedAt: organizationAgentContextTimestampSchema.nullable(),
-    startedAt: organizationAgentContextTimestampSchema,
-    createdAt: organizationAgentContextTimestampSchema,
-    updatedAt: organizationAgentContextTimestampSchema,
-    completedAt: organizationAgentContextTimestampSchema.nullable(),
-    lastEventAt: organizationAgentContextTimestampSchema,
-    eventCount: z.number().int().nonnegative(),
-    eventCountStable: z.boolean(),
-  })
-  .strict();
+export const OrganizationAgentContextProject = strict(Schema.Struct({
+  id: OrganizationAgentContextId,
+  name: stringBetween(1, 100),
+  issueKeyPrefix: Schema.String.check(
+    Schema.isPattern(/^[A-Z0-9]{1,3}$/u),
+  ),
+  createdAt: IsoDateTimeWithOffset,
+  settings: strict(Schema.Struct({
+    velenOrg: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
+    dataSource: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
+    linear: strict(Schema.Struct({
+      enabled: Schema.Boolean,
+      source: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
+      teamKey: Schema.NullOr(Schema.String.check(Schema.isMaxLength(100))),
+    })),
+    githubRepository: Schema.NullOr(
+      Schema.String.check(Schema.isMaxLength(500)),
+    ),
+    // Persisted workflows may be omitted or explicitly undefined.
+    workflow: Schema.optional(Schema.Unknown),
+  })),
+}));
+export type OrganizationAgentContextProject =
+  typeof OrganizationAgentContextProject.Type;
 
-export const organizationAgentContextIssuePullRequestSchema = z
-  .object({
-    issueId: organizationAgentContextIdSchema,
-    projectId: organizationAgentContextIdSchema,
-    runNumber: z.number().int().positive(),
-    position: z.number().int().nonnegative(),
-    url: z.string().url().max(2_000),
-  })
-  .strict();
+const OrganizationAgentContextTracker = strict(Schema.Struct({
+  provider: stringBetween(1, 100),
+  issueId: Schema.NullOr(stringBetween(1, 500)),
+  identifier: Schema.NullOr(stringBetween(1, 500)),
+  url: Schema.NullOr(UrlString.check(Schema.isMaxLength(2_000))),
+  state: Schema.NullOr(Schema.String.check(Schema.isMaxLength(200))),
+}));
 
-export const organizationAgentContextSessionPayloadSchema = z
-  .object({
-    dispatchGroupId: z.string().max(128),
-    agentId: organizationAgentContextIdSchema.nullable(),
-    agentName: z.string().min(1).max(200).nullable(),
-    skillId: organizationAgentContextIdSchema.nullable(),
-    sessionType: z.enum(["task", "dispatch"]),
-    trigger: z.enum(["manual", "scheduled"]).nullable(),
-    scheduleId: z.string().max(128).nullable(),
-    scheduleRunId: z.string().max(128).nullable(),
-    parentSessionId: z.string().max(128).nullable(),
-    request: z.string().max(50_000).nullable(),
-    followUps: z.array(z.object({
-      id: z.string().min(1).max(128),
-      message: z.string().min(1).max(50_000),
-      sentAt: organizationAgentContextTimestampSchema,
-    }).strict()).max(200),
-    status: z.enum([
-      "running",
-      "completed",
-      "failed",
-      "skipped",
-      "interrupted",
-    ]),
-    issues: z.array(z.object({
-      runId: z.string().min(1).max(128),
-      runNumber: z.number().int().nonnegative(),
-      sourceKey: z.string().min(1).max(500),
-      title: z.string().min(1).max(500),
-      outcome: z.enum([
-        "pending",
-        "completed",
-        "blocked",
-        "failed",
-        "skipped",
-      ]),
-      summary: z.string().max(50_000).nullable(),
-    }).strict()).max(100),
-    startedAt: organizationAgentContextTimestampSchema,
-    completedAt: organizationAgentContextTimestampSchema.nullable(),
-    conversationId: z.string().max(128).nullable(),
-    summary: z.string().max(50_000).nullable(),
-    error: z.string().max(20_000).nullable(),
-    requestedWorkerId: z.string().max(128).nullable(),
-    workerId: z.string().max(128).nullable(),
-    events: z.array(z.object({
-      id: z.string().min(1).max(128),
-      type: z.enum([
-        "started",
-        "completed",
-        "failed",
-        "skipped",
-        "interrupted",
-        "stopped",
-      ]),
-      occurredAt: organizationAgentContextTimestampSchema,
-    }).strict()).max(200),
-    updatedAt: organizationAgentContextTimestampSchema,
-  })
-  .partial()
-  .strict();
+export const OrganizationAgentContextIssue = strict(Schema.Struct({
+  id: OrganizationAgentContextId,
+  projectId: OrganizationAgentContextId,
+  runNumber: positiveInteger,
+  source: Schema.Literals(autoHuntSources),
+  sourceKey: stringBetween(1, 200),
+  title: stringBetween(1, 300),
+  status: Schema.Literals(autoHuntRunStatuses),
+  workflowStage: Schema.NullOr(stringBetween(1, 64)),
+  detail: Schema.NullOr(Schema.String.check(Schema.isMaxLength(4_000))),
+  priority: Schema.NullOr(integerBetween(1, 4)),
+  assigneeUserId: Schema.NullOr(OrganizationAgentContextId),
+  agentId: Schema.NullOr(OrganizationAgentContextId),
+  issueDescription: Schema.NullOr(
+    Schema.String.check(Schema.isMaxLength(100_000)),
+  ),
+  resultSummary: Schema.NullOr(
+    Schema.String.check(Schema.isMaxLength(100_000)),
+  ),
+  // Persisted results may be omitted, null, or explicitly undefined.
+  structuredResult: Schema.optional(Schema.NullOr(Schema.Unknown)),
+  repository: stringBetween(1, 500),
+  branch: Schema.NullOr(stringBetween(1, 500)),
+  commitSha: Schema.NullOr(stringBetween(7, 64)),
+  targetSha: Schema.NullOr(stringBetween(7, 64)),
+  tracker: Schema.NullOr(OrganizationAgentContextTracker),
+  preferredProvider: Schema.NullOr(Schema.Literals(agentProviders)),
+  preferredModel: Schema.NullOr(stringBetween(1, 100)),
+  preferredEffort: Schema.NullOr(ModelEffort),
+  requestedProvider: Schema.NullOr(Schema.Literals(agentProviders)),
+  requestedModel: Schema.NullOr(stringBetween(1, 100)),
+  requestedEffort: Schema.NullOr(ModelEffort),
+  stagingQaStatus: Schema.NullOr(Schema.Literals(autoHuntQaStatuses)),
+  productionQaStatus: Schema.NullOr(Schema.Literals(autoHuntQaStatuses)),
+  stagingQaDetail: Schema.NullOr(
+    Schema.String.check(Schema.isMaxLength(100_000)),
+  ),
+  productionQaDetail: Schema.NullOr(
+    Schema.String.check(Schema.isMaxLength(100_000)),
+  ),
+  sourceCreatedAt: Schema.NullOr(IsoDateTimeWithOffset),
+  startedAt: IsoDateTimeWithOffset,
+  createdAt: IsoDateTimeWithOffset,
+  updatedAt: IsoDateTimeWithOffset,
+  completedAt: Schema.NullOr(IsoDateTimeWithOffset),
+  lastEventAt: IsoDateTimeWithOffset,
+  eventCount: nonNegativeInteger,
+  eventCountStable: Schema.Boolean,
+}));
+export type OrganizationAgentContextIssue =
+  typeof OrganizationAgentContextIssue.Type;
 
-export const organizationAgentContextSessionSchema = z
-  .object({
-    id: organizationAgentContextIdSchema,
-    projectId: organizationAgentContextIdSchema,
-    agentId: organizationAgentContextIdSchema.nullable(),
-    status: z.enum([
-      "running",
-      "completed",
-      "failed",
-      "skipped",
-      "interrupted",
-    ]),
-    sessionType: z.enum(["task", "dispatch"]),
-    payload: organizationAgentContextSessionPayloadSchema,
-    startedAt: organizationAgentContextTimestampSchema,
-    completedAt: organizationAgentContextTimestampSchema.nullable(),
-    updatedAt: organizationAgentContextTimestampSchema,
-  })
-  .strict();
+export const OrganizationAgentContextIssuePullRequest = strict(Schema.Struct({
+  issueId: OrganizationAgentContextId,
+  projectId: OrganizationAgentContextId,
+  runNumber: positiveInteger,
+  position: nonNegativeInteger,
+  url: UrlString.check(Schema.isMaxLength(2_000)),
+}));
+export type OrganizationAgentContextIssuePullRequest =
+  typeof OrganizationAgentContextIssuePullRequest.Type;
+
+const OrganizationAgentContextFollowUp = strict(Schema.Struct({
+  id: stringBetween(1, 128),
+  message: stringBetween(1, 50_000),
+  sentAt: IsoDateTimeWithOffset,
+}));
+
+const OrganizationAgentContextSessionIssue = strict(Schema.Struct({
+  runId: stringBetween(1, 128),
+  runNumber: nonNegativeInteger,
+  sourceKey: stringBetween(1, 500),
+  title: stringBetween(1, 500),
+  outcome: Schema.Literals([
+    "pending",
+    "completed",
+    "blocked",
+    "failed",
+    "skipped",
+  ]),
+  summary: Schema.NullOr(Schema.String.check(Schema.isMaxLength(50_000))),
+}));
+
+const OrganizationAgentContextSessionEvent = strict(Schema.Struct({
+  id: stringBetween(1, 128),
+  type: Schema.Literals([
+    "started",
+    "completed",
+    "failed",
+    "skipped",
+    "interrupted",
+    "stopped",
+  ]),
+  occurredAt: IsoDateTimeWithOffset,
+}));
+
+export const OrganizationAgentContextSessionPayload = strict(Schema.Struct({
+  dispatchGroupId: Schema.optional(
+    Schema.String.check(Schema.isMaxLength(128)),
+  ),
+  agentId: Schema.optional(Schema.NullOr(OrganizationAgentContextId)),
+  agentName: Schema.optional(Schema.NullOr(stringBetween(1, 200))),
+  skillId: Schema.optional(Schema.NullOr(OrganizationAgentContextId)),
+  sessionType: Schema.optional(Schema.Literals(["task", "dispatch"])),
+  trigger: Schema.optional(
+    Schema.NullOr(Schema.Literals(["manual", "scheduled"])),
+  ),
+  scheduleId: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  ),
+  scheduleRunId: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  ),
+  parentSessionId: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  ),
+  request: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isMaxLength(50_000))),
+  ),
+  followUps: Schema.optional(
+    mutableArrayAtMost(OrganizationAgentContextFollowUp, 200),
+  ),
+  status: Schema.optional(Schema.Literals([
+    "running",
+    "completed",
+    "failed",
+    "skipped",
+    "interrupted",
+  ])),
+  issues: Schema.optional(
+    mutableArrayAtMost(OrganizationAgentContextSessionIssue, 100),
+  ),
+  startedAt: Schema.optional(IsoDateTimeWithOffset),
+  completedAt: Schema.optional(Schema.NullOr(IsoDateTimeWithOffset)),
+  conversationId: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  ),
+  summary: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isMaxLength(50_000))),
+  ),
+  error: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isMaxLength(20_000))),
+  ),
+  requestedWorkerId: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  ),
+  workerId: Schema.optional(
+    Schema.NullOr(Schema.String.check(Schema.isMaxLength(128))),
+  ),
+  events: Schema.optional(
+    mutableArrayAtMost(OrganizationAgentContextSessionEvent, 200),
+  ),
+  updatedAt: Schema.optional(IsoDateTimeWithOffset),
+}));
+export type OrganizationAgentContextSessionPayload =
+  typeof OrganizationAgentContextSessionPayload.Type;
+
+export const OrganizationAgentContextSession = strict(Schema.Struct({
+  id: OrganizationAgentContextId,
+  projectId: OrganizationAgentContextId,
+  agentId: Schema.NullOr(OrganizationAgentContextId),
+  status: Schema.Literals([
+    "running",
+    "completed",
+    "failed",
+    "skipped",
+    "interrupted",
+  ]),
+  sessionType: Schema.Literals(["task", "dispatch"]),
+  payload: OrganizationAgentContextSessionPayload,
+  startedAt: IsoDateTimeWithOffset,
+  completedAt: Schema.NullOr(IsoDateTimeWithOffset),
+  updatedAt: IsoDateTimeWithOffset,
+}));
+export type OrganizationAgentContextSession =
+  typeof OrganizationAgentContextSession.Type;
 
 const organizationAgentContextPageShape = {
-  schemaVersion: z.literal(1),
-  organizationId: organizationAgentContextIdSchema,
-  workId: organizationAgentContextIdSchema,
-  snapshotAt: organizationAgentContextTimestampSchema,
-  total: z.number().int().nonnegative(),
-  nextCursor: z.string().min(1).max(4096).nullable(),
-  complete: z.boolean(),
+  schemaVersion: Schema.Literal(1),
+  organizationId: OrganizationAgentContextId,
+  workId: OrganizationAgentContextId,
+  snapshotAt: IsoDateTimeWithOffset,
+  total: nonNegativeInteger,
+  nextCursor: Schema.NullOr(stringBetween(1, 4_096)),
+  complete: Schema.Boolean,
 } as const;
 
-function validateOrganizationAgentContextPage(
-  page: { complete: boolean; nextCursor: string | null },
-  context: z.RefinementCtx,
-) {
-  if (page.complete !== (page.nextCursor === null)) {
-    context.addIssue({
-      code: "custom",
-      message: "complete must be true exactly when nextCursor is null",
-      path: ["complete"],
-    });
-  }
-}
+const validateOrganizationAgentContextPage = (
+  page: { readonly complete: boolean; readonly nextCursor: string | null },
+): Schema.FilterIssue | undefined =>
+  page.complete === (page.nextCursor === null)
+    ? undefined
+    : {
+        path: ["complete"],
+        issue: "complete must be true exactly when nextCursor is null",
+      };
 
-function validateOrganizationAgentContextProjectPage(
+const validateOrganizationAgentContextProjectPage = (
   page: {
-    complete: boolean;
-    nextCursor: string | null;
-    projectId: string;
-    items: Array<{ projectId: string }>;
+    readonly complete: boolean;
+    readonly nextCursor: string | null;
+    readonly projectId: string;
+    readonly items: ReadonlyArray<{ readonly projectId: string }>;
   },
-  context: z.RefinementCtx,
-) {
-  validateOrganizationAgentContextPage(page, context);
+): Schema.FilterOutput => {
+  const issues: Array<Schema.FilterIssue> = [];
+  const pageIssue = validateOrganizationAgentContextPage(page);
+  if (pageIssue !== undefined) issues.push(pageIssue);
   page.items.forEach((item, index) => {
     if (item.projectId !== page.projectId) {
-      context.addIssue({
-        code: "custom",
-        message: "item projectId must match the page projectId",
+      issues.push({
         path: ["items", index, "projectId"],
+        issue: "item projectId must match the page projectId",
       });
     }
   });
-}
+  return issues;
+};
 
-export const organizationAgentContextProjectsPageSchema = z
-  .object({
+export const OrganizationAgentContextProjectsPage = strict(Schema.Struct({
+  ...organizationAgentContextPageShape,
+  resource: Schema.Literal("projects"),
+  projectId: Schema.Null,
+  items: mutableArrayAtMost(OrganizationAgentContextProject, 50),
+}).check(
+  Schema.makeFilter((page) => validateOrganizationAgentContextPage(page)),
+));
+export type OrganizationAgentContextProjectsPage =
+  typeof OrganizationAgentContextProjectsPage.Type;
+
+export const OrganizationAgentContextIssuesPage = strict(Schema.Struct({
+  ...organizationAgentContextPageShape,
+  resource: Schema.Literal("issues"),
+  projectId: OrganizationAgentContextId,
+  items: mutableArrayAtMost(OrganizationAgentContextIssue, 50),
+}).check(
+  Schema.makeFilter((page) =>
+    validateOrganizationAgentContextProjectPage(page)
+  ),
+));
+export type OrganizationAgentContextIssuesPage =
+  typeof OrganizationAgentContextIssuesPage.Type;
+
+export const OrganizationAgentContextAgentsPage = strict(Schema.Struct({
+  ...organizationAgentContextPageShape,
+  resource: Schema.Literal("agents"),
+  projectId: OrganizationAgentContextId,
+  items: mutableArrayAtMost(OrganizationAgentContextProjectAgent, 50),
+}).check(
+  Schema.makeFilter((page) => validateOrganizationAgentContextPage(page)),
+));
+export type OrganizationAgentContextAgentsPage =
+  typeof OrganizationAgentContextAgentsPage.Type;
+
+export const OrganizationAgentContextIssuePullRequestsPage = strict(
+  Schema.Struct({
     ...organizationAgentContextPageShape,
-    resource: z.literal("projects"),
-    projectId: z.null(),
-    items: z.array(organizationAgentContextProjectSchema).max(50),
-  })
-  .strict()
-  .superRefine(validateOrganizationAgentContextPage);
+    resource: Schema.Literal("issue-pull-requests"),
+    projectId: OrganizationAgentContextId,
+    items: mutableArrayAtMost(OrganizationAgentContextIssuePullRequest, 50),
+  }).check(
+    Schema.makeFilter((page) =>
+      validateOrganizationAgentContextProjectPage(page)
+    ),
+  ),
+);
+export type OrganizationAgentContextIssuePullRequestsPage =
+  typeof OrganizationAgentContextIssuePullRequestsPage.Type;
 
-export const organizationAgentContextIssuesPageSchema = z
-  .object({
-    ...organizationAgentContextPageShape,
-    resource: z.literal("issues"),
-    projectId: organizationAgentContextIdSchema,
-    items: z.array(organizationAgentContextIssueSchema).max(50),
-  })
-  .strict()
-  .superRefine(validateOrganizationAgentContextProjectPage);
+export const OrganizationAgentContextSessionsPage = strict(Schema.Struct({
+  ...organizationAgentContextPageShape,
+  resource: Schema.Literal("agent-sessions"),
+  projectId: OrganizationAgentContextId,
+  items: mutableArrayAtMost(OrganizationAgentContextSession, 50),
+}).check(
+  Schema.makeFilter((page) =>
+    validateOrganizationAgentContextProjectPage(page)
+  ),
+));
+export type OrganizationAgentContextSessionsPage =
+  typeof OrganizationAgentContextSessionsPage.Type;
 
-export const organizationAgentContextAgentsPageSchema = z
-  .object({
-    ...organizationAgentContextPageShape,
-    resource: z.literal("agents"),
-    projectId: organizationAgentContextIdSchema,
-    items: z.array(organizationAgentContextProjectAgentSchema).max(50),
-  })
-  .strict()
-  .superRefine(validateOrganizationAgentContextPage);
-
-export const organizationAgentContextIssuePullRequestsPageSchema = z
-  .object({
-    ...organizationAgentContextPageShape,
-    resource: z.literal("issue-pull-requests"),
-    projectId: organizationAgentContextIdSchema,
-    items: z.array(organizationAgentContextIssuePullRequestSchema).max(50),
-  })
-  .strict()
-  .superRefine(validateOrganizationAgentContextProjectPage);
-
-export const organizationAgentContextSessionsPageSchema = z
-  .object({
-    ...organizationAgentContextPageShape,
-    resource: z.literal("agent-sessions"),
-    projectId: organizationAgentContextIdSchema,
-    items: z.array(organizationAgentContextSessionSchema).max(50),
-  })
-  .strict()
-  .superRefine(validateOrganizationAgentContextProjectPage);
-
-export const organizationAgentContextResourcePageSchema = z.union([
-  organizationAgentContextProjectsPageSchema,
-  organizationAgentContextAgentsPageSchema,
-  organizationAgentContextIssuesPageSchema,
-  organizationAgentContextIssuePullRequestsPageSchema,
-  organizationAgentContextSessionsPageSchema,
+export const OrganizationAgentContextResourcePage = Schema.Union([
+  OrganizationAgentContextProjectsPage,
+  OrganizationAgentContextAgentsPage,
+  OrganizationAgentContextIssuesPage,
+  OrganizationAgentContextIssuePullRequestsPage,
+  OrganizationAgentContextSessionsPage,
 ]);
+export type OrganizationAgentContextResourcePage =
+  typeof OrganizationAgentContextResourcePage.Type;
 
-export type OrganizationAgentContextDescriptor = z.infer<
-  typeof organizationAgentContextDescriptorSchema
->;
-export type OrganizationAgentContextQuery = z.output<
-  typeof organizationAgentContextQuerySchema
->;
-export type OrganizationAgentContextProject = z.infer<
-  typeof organizationAgentContextProjectSchema
->;
-export type OrganizationAgentContextIssue = z.infer<
-  typeof organizationAgentContextIssueSchema
->;
-export type OrganizationAgentContextIssuePullRequest = z.infer<
-  typeof organizationAgentContextIssuePullRequestSchema
->;
-export type OrganizationAgentContextSession = z.infer<
-  typeof organizationAgentContextSessionSchema
->;
-export type OrganizationAgentContextProjectsPage = z.infer<
-  typeof organizationAgentContextProjectsPageSchema
->;
-export type OrganizationAgentContextIssuesPage = z.infer<
-  typeof organizationAgentContextIssuesPageSchema
->;
-export type OrganizationAgentContextAgentsPage = z.infer<
-  typeof organizationAgentContextAgentsPageSchema
->;
-export type OrganizationAgentContextIssuePullRequestsPage = z.infer<
-  typeof organizationAgentContextIssuePullRequestsPageSchema
->;
-export type OrganizationAgentContextSessionsPage = z.infer<
-  typeof organizationAgentContextSessionsPageSchema
->;
-export type OrganizationAgentContextResourcePage = z.infer<
-  typeof organizationAgentContextResourcePageSchema
->;
-export type OrganizationAgentContextLookupRequest = z.output<
-  typeof organizationAgentContextLookupRequestSchema
->;
-export type OrganizationAgentContextLookupInput = z.output<
-  typeof organizationAgentContextLookupInputSchema
->;
-export type OrganizationAgentContextManifest = z.infer<
-  typeof organizationAgentContextManifestSchema
->;
+export const decodeOrganizationAgentContextDescriptor =
+  Schema.decodeUnknownSync(
+    OrganizationAgentContextDescriptor,
+    strictSchemaOptions,
+  );
+export const decodeOrganizationAgentContextQuery = Schema.decodeUnknownSync(
+  OrganizationAgentContextQuery,
+  strictSchemaOptions,
+);
+export const decodeOrganizationAgentContextLookupRequest =
+  Schema.decodeUnknownSync(
+    OrganizationAgentContextLookupRequest,
+    strictSchemaOptions,
+  );
+export const decodeOrganizationAgentContextLookupInput =
+  Schema.decodeUnknownSync(
+    OrganizationAgentContextLookupInput,
+    strictSchemaOptions,
+  );
+export const decodeOrganizationAgentContextLookupResult =
+  Schema.decodeUnknownSync(
+    OrganizationAgentContextLookupResult,
+    strictSchemaOptions,
+  );
+export const decodeOrganizationAgentContextLookupResponse =
+  Schema.decodeUnknownSync(
+    OrganizationAgentContextLookupResponse,
+    strictSchemaOptions,
+  );
+export const decodeOrganizationAgentContextManifest = Schema.decodeUnknownSync(
+  OrganizationAgentContextManifest,
+  strictSchemaOptions,
+);
+export const decodeOrganizationAgentContextRequestTurn =
+  Schema.decodeUnknownSync(
+    OrganizationAgentContextRequestTurn,
+    strictSchemaOptions,
+  );
+export const decodeOrganizationAgentContextProjectsPage =
+  Schema.decodeUnknownSync(
+    OrganizationAgentContextProjectsPage,
+    strictSchemaOptions,
+  );
+export const decodeOrganizationAgentContextIssuesPage =
+  Schema.decodeUnknownSync(
+    OrganizationAgentContextIssuesPage,
+    strictSchemaOptions,
+  );
+export const decodeOrganizationAgentContextAgentsPage =
+  Schema.decodeUnknownSync(
+    OrganizationAgentContextAgentsPage,
+    strictSchemaOptions,
+  );
+export const decodeOrganizationAgentContextIssuePullRequestsPage =
+  Schema.decodeUnknownSync(
+    OrganizationAgentContextIssuePullRequestsPage,
+    strictSchemaOptions,
+  );
+export const decodeOrganizationAgentContextSessionsPage =
+  Schema.decodeUnknownSync(
+    OrganizationAgentContextSessionsPage,
+    strictSchemaOptions,
+  );
+export const decodeOrganizationAgentContextResourcePage =
+  Schema.decodeUnknownSync(
+    OrganizationAgentContextResourcePage,
+    strictSchemaOptions,
+  );

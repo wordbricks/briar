@@ -23,3 +23,13 @@ Deploy all production web changes to Cloudflare. The landing site under
 hosting provider for production web deployments. Build and test the landing
 site from the merged `main` branch, then deploy the generated vinext Worker
 with Wrangler while preserving its `ASSETS` and `IMAGES` bindings.
+
+## Learning more about Effect
+
+This repository uses the Effect TypeScript library.
+
+Before writing any Effect code, first read `node_modules/effect/AGENTS.md`
+**completely**, and follow the links in the file when required.
+
+If you need to learn more about particular Effect APIs and concepts that the
+guide doesn't cover, search through the source code in `node_modules/effect/src`.

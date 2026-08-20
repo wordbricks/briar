@@ -1,12 +1,14 @@
 import { createInterface } from "node:readline";
+import * as Option from "effect/Option";
+import * as Result from "effect/Result";
+import type { SchemaError } from "effect/Schema";
+import {
+  decodeApprovalResponse,
+  decodeApprovalResponseEnvelope,
+  isRunRequestEnvelope,
+} from "./runner-control-message";
 
 type RunRequest = { type: "run" };
-
-type ApprovalResponse = {
-  type: "approvalResponse";
-  id: string;
-  approved: boolean;
-};
 
 type PendingApproval = {
   abort?: () => void;
@@ -14,8 +16,9 @@ type PendingApproval = {
   resolve: (approved: boolean) => void;
 };
 
-export type RunnerIoOptions = {
+export type RunnerIoOptions<Request> = {
   closeError: string;
+  decodeRequest: (input: unknown) => Result.Result<Request, SchemaError>;
   input?: NodeJS.ReadableStream;
   onClose?: () => void;
   output?: Pick<NodeJS.WritableStream, "write">;
@@ -28,10 +31,11 @@ export type RunnerIoOptions = {
  */
 export function createRunnerIo<Request extends RunRequest, Output>({
   closeError,
+  decodeRequest,
   input = process.stdin,
   onClose,
   output = process.stdout,
-}: RunnerIoOptions) {
+}: RunnerIoOptions<Request>) {
   const lines = createInterface({ input, crlfDelay: Infinity });
   let resolveRequest: ((request: Request) => void) | undefined;
   let rejectRequest: ((error: Error) => void) | undefined;
@@ -40,6 +44,7 @@ export function createRunnerIo<Request extends RunRequest, Output>({
     rejectRequest = reject;
   });
   const approvals = new Map<string, PendingApproval>();
+  let closed = false;
 
   function settleApproval(id: string, approved: boolean) {
     const pending = approvals.get(id);
@@ -52,25 +57,43 @@ export function createRunnerIo<Request extends RunRequest, Output>({
   }
 
   lines.on("line", (line) => {
+    let message: unknown;
     try {
-      const message = JSON.parse(line) as Request | ApprovalResponse;
-      if (message.type === "run") {
-        resolveRequest?.(message);
-        resolveRequest = undefined;
-        rejectRequest = undefined;
-        return;
-      }
-      if (message.type === "approvalResponse") {
-        settleApproval(message.id, message.approved);
-      }
+      message = JSON.parse(line);
     } catch (caught) {
       rejectRequest?.(
         caught instanceof Error ? caught : new Error(String(caught)),
       );
+      return;
     }
+
+    const approval = decodeApprovalResponse(message);
+    if (Option.isSome(approval)) {
+      settleApproval(approval.value.id, approval.value.approved);
+      return;
+    }
+
+    const approvalEnvelope = decodeApprovalResponseEnvelope(message);
+    if (Option.isSome(approvalEnvelope)) {
+      // A parent sends exactly one response for each approval. Deny a matching
+      // malformed response so the runner cannot approve it or wait forever.
+      settleApproval(approvalEnvelope.value.id, false);
+      return;
+    }
+    if (!isRunRequestEnvelope(message)) return;
+
+    const decoded = decodeRequest(message);
+    if (Result.isFailure(decoded)) {
+      rejectRequest?.(decoded.failure);
+    } else {
+      resolveRequest?.(decoded.success);
+    }
+    resolveRequest = undefined;
+    rejectRequest = undefined;
   });
 
   lines.on("close", () => {
+    closed = true;
     rejectRequest?.(new Error(closeError));
     rejectRequest = undefined;
     resolveRequest = undefined;
@@ -83,6 +106,8 @@ export function createRunnerIo<Request extends RunRequest, Output>({
   }
 
   function waitForApproval(id: string, signal?: AbortSignal) {
+    if (closed) return Promise.resolve(false);
+
     return new Promise<boolean>((resolve) => {
       const pending: PendingApproval = { resolve };
       if (signal) {
@@ -99,7 +124,10 @@ export function createRunnerIo<Request extends RunRequest, Output>({
   }
 
   return {
-    close: () => lines.close(),
+    close: () => {
+      closed = true;
+      lines.close();
+    },
     emit,
     request,
     waitForApproval,

@@ -3,14 +3,16 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
-  agentProviderBinaryName,
-  agentProviders,
   emptyAgentProviderCapabilityCatalog,
   type AgentEffortCapability,
   type AgentModelCapability,
-  type AgentProvider,
   type AgentProviderCapabilityCatalog,
 } from "../src/lib/agent-provider-contract";
+import {
+  agentProviderBinaryName,
+  agentProviders,
+  type AgentProvider,
+} from "../src/lib/agent-provider";
 import { cursorAuthenticated } from "./provider-health";
 
 const MAX_MODELS = 500;

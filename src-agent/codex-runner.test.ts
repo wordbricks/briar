@@ -78,9 +78,20 @@ describe("Codex runner MCP isolation", () => {
       false,
     );
   });
+
+  it("fails fast when the App Server emits a schema-invalid message", async () => {
+    const result = await runScenario("invalid");
+
+    expect(result.exitCode).toBe(1);
+    expect(result.payloads).toContainEqual({
+      type: "error",
+      message:
+        'Codex App Server emitted invalid JSON: {"id":1,"method":42}',
+    });
+  });
 });
 
-async function runScenario(scenario: "optional" | "required") {
+async function runScenario(scenario: "invalid" | "optional" | "required") {
   const directory = await mkdtemp(join(tmpdir(), "briar-codex-runner-test-"));
   const fakeCodex = join(directory, "fake-codex.mjs");
   await writeFile(fakeCodex, fakeCodexSource, "utf8");
@@ -136,6 +147,10 @@ for await (const line of lines) {
   if (!line.trim()) continue;
   const message = JSON.parse(line);
   if (message.method === "initialize") {
+    if (scenario === "invalid") {
+      process.stdout.write('{"id":1,"method":42}\\n');
+      continue;
+    }
     send({ id: message.id, result: {} });
     continue;
   }

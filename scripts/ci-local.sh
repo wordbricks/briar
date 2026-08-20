@@ -71,13 +71,7 @@ run_app_worker() {
   fi
   bun run check
   bun run test:d1:prepare
-  if includes_context d1-migrations; then
-    bun run test -- \
-      --exclude worker/src/migrations.test.ts \
-      --exclude worker/src/db.test.ts
-  else
-    bun run test
-  fi
+  bun run test
   bash -n \
     scripts/import-apple-signing-assets.sh \
     scripts/release-ios.sh \

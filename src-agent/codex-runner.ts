@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
+import * as Result from "effect/Result";
 import {
   codexAppServerArgs,
   codexApprovalRequest,
@@ -9,6 +10,7 @@ import {
   codexServerRequestResponse,
   consumeCodexAppServerMessage,
   createCodexAppServerState,
+  decodeCodexRunnerRequest,
   normalizeCodexAppServerMessage,
   type CodexMcpIsolation,
   type CodexMcpTurnFailure,
@@ -16,11 +18,13 @@ import {
   type CodexRunnerRequest,
   type CodexRpcMessage,
 } from "./codex-runner-lib";
+import { decodeJsonRpcMessageJsonResult } from "./json-rpc-message";
 import { createRunnerIo } from "./runner-io";
 
 let activeChild: ChildProcessWithoutNullStreams | null = null;
 const runnerIo = createRunnerIo<CodexRunnerRequest, CodexRunnerOutput>({
   closeError: "Briar closed the Codex runner input.",
+  decodeRequest: decodeCodexRunnerRequest,
   onClose: () => {
     if (activeChild && activeChild.exitCode === null) {
       activeChild.kill("SIGTERM");
@@ -99,14 +103,13 @@ async function runCodexAttempt(
     });
     for await (const line of serverLines) {
       if (!line.trim()) continue;
-      let message: CodexRpcMessage;
-      try {
-        message = JSON.parse(line) as CodexRpcMessage;
-      } catch {
+      const decoded = decodeJsonRpcMessageJsonResult(line);
+      if (Result.isFailure(decoded)) {
         throw new Error(
           `Codex App Server emitted invalid JSON: ${line.slice(0, 500)}`,
         );
       }
+      const message: CodexRpcMessage = decoded.success;
 
       const normalized = normalizeCodexAppServerMessage(message);
       emit({

@@ -1,7 +1,7 @@
 import {
   agentProviderLabels,
   type AgentProvider,
-} from "./agent-provider-contract";
+} from "./agent-provider";
 
 export type AgentUsageStatus = "ok" | "error" | "unavailable";
 

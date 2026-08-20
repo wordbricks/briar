@@ -1,5 +1,6 @@
+import * as Option from "effect/Option";
 import {
-  agentReplyActivityFrameSchema,
+  decodeAgentReplyActivityFrameOption,
   type AgentReplyActivityFrame,
   type ChannelAgentActivityFrame,
   type IssueAgentActivityFrame,
@@ -53,13 +54,13 @@ export class ChannelActivityHub {
       return this.subscribe({ userId, authorizationExpiresAt });
     }
     if (url.pathname === "/publish" && request.method === "POST") {
-      const parsed = agentReplyActivityFrameSchema.safeParse(
-        await request.json<unknown>(),
+      const parsed = Option.getOrNull(
+        decodeAgentReplyActivityFrameOption(await request.json<unknown>()),
       );
-      if (!parsed.success) {
+      if (parsed === null) {
         return new Response("Invalid activity frame", { status: 400 });
       }
-      this.publish(parsed.data);
+      this.publish(parsed);
       return new Response(null, { status: 204 });
     }
     if (url.pathname === "/disconnect" && request.method === "POST") {

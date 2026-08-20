@@ -124,7 +124,7 @@ export function issueTitleTooLongMessageEn(title: string): string {
   return `The title is too long. Please shorten it to ${max} characters or fewer. (currently ${length})`;
 }
 
-/** Shared Zod-friendly refine for issue title fields after trim/min checks. */
+/** Shared issue-title refinement after trim and minimum-length checks. */
 export function issueTitleOverLimitMessage(title: string): string | null {
   const trimmed = title.trim();
   if (!trimmed) return null;

@@ -1,0 +1,86 @@
+import * as Data from "effect/Data";
+import * as Predicate from "effect/Predicate";
+import type { SchemaError } from "effect/Schema";
+
+export class ApiError extends Data.TaggedError("ApiError")<{
+  readonly status: number;
+  readonly message: string;
+  readonly code?: string;
+  readonly issues?: readonly unknown[];
+}> {
+  constructor(
+    status: number,
+    message: string,
+    code?: string,
+    issues?: readonly unknown[],
+  ) {
+    super({ status, message, code, issues });
+  }
+}
+
+export class ApiRequestError extends Data.TaggedError("ApiRequestError")<{
+  readonly method: string;
+  readonly path: string;
+  readonly cause: unknown;
+  readonly message: string;
+}> {
+  constructor(method: string, path: string, cause: unknown) {
+    const detail = Predicate.isError(cause) ? cause.message : String(cause);
+    super({
+      method,
+      path,
+      cause,
+      message: `Briar API ${method} ${path} 요청 실패: ${detail}`,
+    });
+  }
+}
+
+export class ApiResponseDecodeError extends Data.TaggedError(
+  "ApiResponseDecodeError",
+)<{
+  readonly path: string;
+  readonly cause: SchemaError;
+  readonly message: string;
+}> {
+  constructor(path: string, cause: SchemaError) {
+    super({
+      path,
+      cause,
+      message: `Briar API ${path} 응답 형식이 올바르지 않습니다: ${cause.message}`,
+    });
+  }
+}
+
+export function isApiErrorStatus(error: unknown, status: number) {
+  return error instanceof ApiError && error.status === status;
+}
+
+export function errorWithMessage(error: unknown, message: string) {
+  if (error instanceof ApiError) {
+    return new ApiError(error.status, message, error.code, error.issues);
+  }
+  if (error instanceof Error && error.message === message) return error;
+  return new Error(message);
+}
+
+export function apiErrorIssueMessages(error: unknown) {
+  if (!(error instanceof ApiError) || !error.issues) return [];
+  return error.issues.flatMap((issue) => {
+    if (Predicate.isString(issue)) return [issue];
+    if (
+      !Predicate.hasProperty(issue, "message") ||
+      !Predicate.isString(issue.message)
+    ) return [];
+    const candidatePath = Predicate.hasProperty(issue, "path")
+      ? issue.path
+      : undefined;
+    const path = Array.isArray(candidatePath)
+      ? candidatePath
+          .filter((part) =>
+            Predicate.isString(part) || Predicate.isNumber(part)
+          )
+          .join(".")
+      : "";
+    return [path ? `${path}: ${issue.message}` : issue.message];
+  });
+}

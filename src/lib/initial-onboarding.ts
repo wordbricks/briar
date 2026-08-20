@@ -1,4 +1,4 @@
-import type { AgentProvider } from "./agent-provider-contract";
+import type { AgentProvider } from "./agent-provider";
 
 export type PrerequisiteId = "git" | AgentProvider;
 
