@@ -19,7 +19,6 @@ import {
   defaulted,
   integerBetween,
   mutableArray,
-  PositiveSafeInteger,
   strictSchema,
   trimmedText,
   UuidString,
@@ -43,54 +42,6 @@ export const IssueReplyClaimInput = strictSchema(Schema.Struct({
   claimedBy: trimmedText(1, 128),
   workerId: trimmedText(1, 128),
   projectId: UuidString,
-}));
-
-const MergeBatchClaimToken = Schema.String.check(
-  Schema.isStartsWith("briar_merge_batch_claim_"),
-);
-const GitObjectSha = Schema.String.check(
-  Schema.isPattern(/^[0-9a-f]{7,64}$/u),
-);
-const MergeBatchFence = {
-  projectId: UuidString,
-  workerId: trimmedText(1, 128),
-  claimToken: MergeBatchClaimToken,
-};
-
-export const MergeBatchLeaseInput = strictSchema(Schema.Struct({
-  ...MergeBatchFence,
-}));
-export const MergeBatchEnqueueInput = strictSchema(Schema.Struct({
-  ...MergeBatchFence,
-  candidateId: UuidString,
-  expectedHeadSha: GitObjectSha,
-  queueEntryId: trimmedText(1, 200),
-}));
-export const MergeBatchGroupInput = strictSchema(Schema.Struct({
-  ...MergeBatchFence,
-  mergeGroupRef: trimmedText(1, 500),
-  mergeGroupSha: GitObjectSha,
-}));
-export const MergeBatchValidationInput = strictSchema(Schema.Struct({
-  ...MergeBatchFence,
-  mergeGroupSha: GitObjectSha,
-}));
-export const MergeBatchFailureInput = strictSchema(Schema.Struct({
-  ...MergeBatchFence,
-  outcome: Schema.Literals(["failed", "blocked"]),
-  code: trimmedText(1, 100),
-  detail: trimmedText(1, 4_000),
-}));
-export const RepositoryMergePolicyInput = strictSchema(Schema.Struct({
-  repositoryId: PositiveSafeInteger,
-  repository: trimmedText(3, 300),
-  baseBranch: trimmedText(1, 255),
-  enabled: Schema.Boolean,
-  quietWindowMs: integerBetween(1_000, 300_000),
-  validationCommand: trimmedText(1, 500),
-  statusContexts: mutableArray(trimmedText(1, 200)).check(
-    Schema.isLengthBetween(1, 20),
-  ),
 }));
 
 const ProviderHealth = strictSchema(Schema.Struct({
@@ -337,24 +288,6 @@ export const decodeClaimInput = decodeRequestSync(ClaimInput);
 export const decodeWorkerClaimInput = decodeRequestSync(WorkerClaimInput);
 export const decodeIssueReplyClaimInput = decodeRequestSync(
   IssueReplyClaimInput,
-);
-export const decodeMergeBatchLeaseInput = decodeRequestSync(
-  MergeBatchLeaseInput,
-);
-export const decodeMergeBatchEnqueueInput = decodeRequestSync(
-  MergeBatchEnqueueInput,
-);
-export const decodeMergeBatchGroupInput = decodeRequestSync(
-  MergeBatchGroupInput,
-);
-export const decodeMergeBatchValidationInput = decodeRequestSync(
-  MergeBatchValidationInput,
-);
-export const decodeMergeBatchFailureInput = decodeRequestSync(
-  MergeBatchFailureInput,
-);
-export const decodeRepositoryMergePolicyInput = decodeRequestSync(
-  RepositoryMergePolicyInput,
 );
 export const decodeWorkerRegister = decodeRequestSync(WorkerRegister);
 export const decodeWorkerBind = decodeRequestSync(WorkerBind);
