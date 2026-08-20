@@ -199,6 +199,16 @@ button:focus-visible {
   transition: top 150ms ease;
 }
 
+.inline-arrow {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
 .skip-link:focus-visible {
   top: 12px;
   outline: 2px solid #fff;
@@ -308,6 +318,23 @@ button:focus-visible {
   font-weight: 600;
   cursor: pointer;
   transition: color 180ms ease;
+}
+
+.language-switcher-mark {
+  display: grid;
+  width: 13px;
+  height: 13px;
+  margin-right: 6px;
+  place-items: center;
+}
+
+.language-switcher-mark svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.15;
 }
 
 .language-switcher button.is-active {
@@ -4492,6 +4519,37 @@ footer {
 
 .docs-pager-next {
   text-align: right;
+}
+
+/* Home refinements: keep the conversion path visible while the long-form
+ * story scrolls, and make the first mobile decision intentionally obvious. */
+.home-header {
+  position: sticky;
+  top: 0;
+  box-shadow: 0 10px 28px rgb(75 54 58 / 0.035);
+}
+
+.home-page #product,
+.home-page #workflow,
+.home-page #agents,
+.home-page #security {
+  scroll-margin-top: 88px;
+}
+
+.home-page .principle-grid article,
+.home-page .agent-row {
+  transition: background-color 180ms ease;
+}
+
+.home-page .principle-grid article:hover,
+.home-page .agent-row:hover {
+  background-color: rgb(255 255 255 / 0.58);
+}
+
+@media (max-width: 560px) {
+  .home-page .download-bar-actions .download-bar-button:first-child {
+    flex-basis: 100%;
+  }
 }
 
 :lang(ko) .docs-hero h1,

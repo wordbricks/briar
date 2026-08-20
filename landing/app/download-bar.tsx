@@ -111,6 +111,7 @@ export function DownloadBar({
           aria-label={copy.aria.iosDownload}
           className="button button-secondary download-bar-icon"
           href={`${downloadPage}#mobile`}
+          title={copy.aria.iosDownload}
         >
           <AppleMark />
         </a>
@@ -120,6 +121,7 @@ export function DownloadBar({
           href={GITHUB_LATEST_RELEASE_URL}
           rel="noreferrer"
           target="_blank"
+          title={copy.aria.androidDownload}
         >
           <PlayMark />
         </a>
@@ -127,6 +129,7 @@ export function DownloadBar({
           aria-label={copy.aria.cliDownload}
           className="button button-secondary download-bar-icon"
           href={`${downloadPage}#cli`}
+          title={copy.aria.cliDownload}
         >
           <TerminalMark />
         </a>

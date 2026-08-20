@@ -12,7 +12,20 @@ export function Arrow({
 }: {
   direction?: "down" | "out";
 }) {
-  return <span aria-hidden="true">{direction === "down" ? "↓" : "↗"}</span>;
+  return (
+    <svg
+      aria-hidden="true"
+      className="inline-arrow"
+      fill="none"
+      viewBox="0 0 16 16"
+    >
+      {direction === "down" ? (
+        <path d="m3.5 6 4.5 4.5L12.5 6" />
+      ) : (
+        <path d="M4 12 12 4M6 4h6v6" />
+      )}
+    </svg>
+  );
 }
 
 export function Brand({
