@@ -621,6 +621,30 @@ describe("channel issue proposal approval route", () => {
     });
   });
 
+  it("adds a backlink to the channel proposal message for new issues", async () => {
+    const proposalId = await seedProposal(23);
+    const accepted = await worker.fetch(
+      request(proposalId, projectAId),
+      env(),
+    );
+    expect(accepted.status).toBe(200);
+    const acceptedBody = await accepted.json<{ resultRunId: string }>();
+    const suffix = (23).toString(16).padStart(12, "0");
+    const triggerMessageId = `50000000-0000-4000-8000-${suffix}`;
+    const replyMessageId = `60000000-0000-4000-8000-${suffix}`;
+    const created = await db.prepare(
+      `select issue_description from briar_hunt_runs where id = ?`,
+    ).bind(acceptedBody.resultRunId).first<{
+      issue_description: string | null;
+    }>();
+
+    expect(created?.issue_description).toBe(
+      `Create it, but do not execute it.\n\n` +
+      `[채널 메시지로 돌아가기](https://briar.example/open/channels/` +
+      `${organizationId}/${channelId}/${replyMessageId}?root=${triggerMessageId})`,
+    );
+  });
+
   it("serializes executeAfterCreate only for create proposals and keeps update retries exact", async () => {
     const { conversationRunId } = await seedConversationProposal(120);
     const updateProposalId = "71000000-0000-4000-8000-000000000102";
