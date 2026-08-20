@@ -6,6 +6,9 @@
 
 .dark .provider-artwork-white { filter:none; }
 .dark .provider-artwork-dark { filter:invert(1); }
+.dark .provider-artwork-codex { color:#fff; }
+.dark .provider-artwork-theme-switcher > .provider-artwork-light { display:none; }
+.dark .provider-artwork-theme-switcher > .provider-artwork-dark { display:block; }
 
 .dark .sidebar,
 .dark .sidebar-bottom,
