@@ -135,6 +135,17 @@ import {
   upsertInboxReadStates,
 } from "./inbox-read-state-repository";
 import {
+  listOrganizations,
+  type OrganizationRole,
+  type OrganizationRow,
+} from "./organization-repository";
+import {
+  listOrganizationInboxProjects,
+  listOrganizationProjects,
+  listProjects,
+  type ProjectRow,
+} from "./project-repository";
+import {
   archiveCompletedLogs,
   backfillArchivedProjectAgentSessionSummaries,
   collectStorageMetrics,
@@ -272,11 +283,7 @@ import {
   listProjectUsageTotals,
   listProjectUsageRuns,
   listGithubConnectionRepositories,
-  listOrganizationProjects,
-  listOrganizationInboxProjects,
   listOrganizationInboxRealtimeOutbox,
-  listOrganizations,
-  listProjects,
   listProjectAgents,
   listProjectAgentSessions,
   listProjectAgentSessionChanges,
@@ -355,7 +362,6 @@ import {
   type IssueReworkProposalRow,
   type IssueResultReviewRow,
   type IssueDependencyRow,
-  type ProjectRow,
   type ProjectAgentRow,
   type ProjectAgentSessionRow,
   type ProjectAgentScheduleRunRow,
@@ -369,8 +375,6 @@ import {
   type OrganizationUsageRecordRow,
   type ProjectUsageTotalRow,
   type RunExecutionAttemptRow,
-  type OrganizationRole,
-  type OrganizationRow,
   type RunEvidenceRow,
   type RunEvidenceImageInput,
   type RunEvidenceImageRow,

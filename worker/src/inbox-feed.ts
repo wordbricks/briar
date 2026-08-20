@@ -13,8 +13,8 @@ import type {
   HuntRunRow,
   IssueConversationNotificationRow,
   ProjectAgentSessionSummaryRow,
-  ProjectRow,
 } from "./db";
+import type { ProjectRow } from "./project-repository";
 
 const notifyingRunStatuses = new Set([
   "paused",

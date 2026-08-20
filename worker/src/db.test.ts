@@ -13,6 +13,8 @@ import {
   getDashboardSyncCursor,
   listDashboardChanges,
 } from "./dashboard-change-repository";
+import { listOrganizations } from "./organization-repository";
+import { listProjects } from "./project-repository";
 import {
   acceptOrganizationInvitation,
   acceptIssueCreateProposal,
@@ -77,7 +79,6 @@ import {
   listDashboardRunsByIds,
   listHuntRunEvents,
   resolveHuntEventActorNames,
-  listOrganizations,
   listOrganizationInvitations,
   listOrganizationIssueSubscriptionRunIds,
   listOrganizationMembers,
@@ -85,7 +86,6 @@ import {
   listOrganizationUsageRuns,
   isOrganizationHandleAvailable,
   issueProjectAgentToken,
-  listProjects,
   listProjectAgents,
   listProjectAgentSessionSummaries,
   listProjectAgentSessions,

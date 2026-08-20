@@ -55,31 +55,15 @@ import {
   type AgentSkillRow,
 } from "./agent-skills";
 import { workflowSnapshotForRun } from "./workflow-policy";
+import type {
+  OrganizationRole,
+  OrganizationRow,
+} from "./organization-repository";
+import type { ProjectRow } from "./project-repository";
 
 type ProjectAgentProvider = AgentSkillProvider;
 type ModelEffort = AgentSkillEffort;
 
-export type ProjectRow = {
-  id: string;
-  name: string;
-  issue_key_prefix: string;
-  schedule_tab_enabled: number;
-  icon: string | null;
-  organization_id: string;
-  organization_name: string;
-  member_role: OrganizationRole;
-  created_at: string;
-};
-
-export type OrganizationRole = "owner" | "admin" | "member";
-export type OrganizationRow = {
-  id: string;
-  name: string;
-  handle: string;
-  logo: string | null;
-  role: OrganizationRole;
-  created_at: string;
-};
 export type OrganizationMemberRow = {
   user_id: string;
   name: string;
@@ -2369,24 +2353,6 @@ export async function assertWorkflowRunCompletion(
   return progress;
 }
 
-export async function listOrganizations(db: D1Database, userId: string) {
-  const result = await db
-    .prepare(
-      `select organization.id, organization.name, organization.handle,
-              coalesce(organization.logo_data_url, organization.logo) as logo,
-              membership.role,
-              organization.created_at
-       from briar_organizations organization
-       join briar_organization_members membership
-         on membership.organization_id = organization.id
-       where membership.user_id = ?
-       order by organization.created_at, organization.id`,
-    )
-    .bind(userId)
-    .all<OrganizationRow>();
-  return result.results;
-}
-
 export async function planAccountDeletion(
   db: D1Database,
   userId: string,
@@ -4167,68 +4133,6 @@ export async function releaseGithubDelivery(
     .bind(deliveryId, claimedAt)
     .run();
   return (result.meta.changes ?? 0) > 0;
-}
-
-export async function listProjects(db: D1Database, userId: string) {
-  const result = await db
-    .prepare(
-      `select project.id, project.name,
-              project.issue_key_prefix,
-              project.schedule_tab_enabled,
-              coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
-              project.organization_id,
-              organization.name as organization_name,
-              membership.role as member_role, project.created_at
-       from briar_projects project
-       join briar_organizations organization on organization.id = project.organization_id
-       join briar_organization_members membership
-         on membership.organization_id = project.organization_id
-        and membership.user_id = ?
-       order by organization.created_at, project.created_at`,
-    )
-    .bind(userId)
-    .all<ProjectRow>();
-  return result.results;
-}
-
-export async function listOrganizationProjects(
-  db: D1Database,
-  organizationId: string,
-) {
-  const result = await db
-    .prepare(
-      `select project.id, project.name,
-              project.issue_key_prefix,
-              project.schedule_tab_enabled,
-              coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
-              project.organization_id,
-              organization.name as organization_name,
-              'member' as member_role, project.created_at
-       from briar_projects project
-       join briar_organizations organization
-         on organization.id = project.organization_id
-       where project.organization_id = ?
-       order by project.created_at`,
-    )
-    .bind(organizationId)
-    .all<ProjectRow>();
-  return result.results;
-}
-
-export async function listOrganizationInboxProjects(
-  db: D1Database,
-  organizationId: string,
-) {
-  const result = await db
-    .prepare(
-      `select id, name, issue_key_prefix
-       from briar_projects
-       where organization_id = ?
-       order by created_at, id`,
-    )
-    .bind(organizationId)
-    .all<Pick<ProjectRow, "id" | "name" | "issue_key_prefix">>();
-  return result.results;
 }
 
 export async function getOrganizationInboxSyncVersion(
