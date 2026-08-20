@@ -127,6 +127,10 @@ import {
 } from "./mobile-contract";
 import { buildInboxFeedMessages } from "./inbox-feed";
 import {
+  listInboxReadStates,
+  upsertInboxReadStates,
+} from "./inbox-read-state-repository";
+import {
   archiveCompletedLogs,
   backfillArchivedProjectAgentSessionSummaries,
   collectStorageMetrics,
@@ -246,7 +250,6 @@ import {
   listIssueThreadMessages,
   listIssueResultReviews,
   listIssueResultReviewsByRunIds,
-  listInboxReadStates,
   listEvidenceImagesForEvidence,
   listDashboardRuns,
   listDashboardRunsByIds,
@@ -333,7 +336,6 @@ import {
   deleteIssueMessage,
   updateSlackInstallationProject,
   acknowledgeOrganizationInboxRealtimeOutbox,
-  upsertInboxReadStates,
   upsertProjectAgentSession,
   upsertSlackInstallation,
   syncGithubPullRequest,

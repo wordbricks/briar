@@ -69,7 +69,6 @@ import {
   listIssueReworkProposals,
   updateIssueMessage,
   deleteIssueMessage,
-  listInboxReadStates,
   listDashboardChanges,
   pruneExpiredDashboardChanges,
   listDashboardRuns,
@@ -119,7 +118,6 @@ import {
   updateProjectScheduleTabEnabled,
   updateIssue,
   unsubscribeIssue,
-  upsertInboxReadStates,
   upsertProjectAgentSession,
 } from "./db";
 import { registerExecutionWorker } from "./workers";
@@ -4811,56 +4809,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         },
       ],
     });
-  });
-
-  it("stores account-scoped inbox read versions for multi-device sync", async () => {
-    const first = await upsertInboxReadStates(
-      db,
-      "owner",
-      [
-        {
-          messageId: "issue:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-          version: "1:1:completed:merged:2026-08-02T01:00:00.000Z:3",
-        },
-      ],
-      atMinute(40),
-    );
-    expect(first).toEqual([
-      expect.objectContaining({
-        message_id: "issue:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        version: "1:1:completed:merged:2026-08-02T01:00:00.000Z:3",
-      }),
-    ]);
-
-    const updated = await upsertInboxReadStates(
-      db,
-      "owner",
-      [
-        {
-          messageId: "issue:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-          version: "2:1:blocked:reviewing:2026-08-02T02:00:00.000Z:5",
-        },
-        {
-          messageId: "conversation:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-          version: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-        },
-      ],
-      atMinute(41),
-    );
-    expect(updated).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          message_id: "issue:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-          version: "2:1:blocked:reviewing:2026-08-02T02:00:00.000Z:5",
-        }),
-        expect.objectContaining({
-          message_id: "conversation:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-          version: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-        }),
-      ]),
-    );
-    expect(await listInboxReadStates(db, "owner")).toHaveLength(2);
-    expect(await listInboxReadStates(db, "member")).toEqual([]);
   });
 
   it("stores issue attachment metadata scoped to its project and run", async () => {
