@@ -4598,7 +4598,9 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain('<div class="issue-description-markdown">');
+    expect(markup).toContain(
+      '<div class="issue-description-markdown markdown-content">',
+    );
     expect(markup).toContain("<h1>목표</h1>");
     expect(markup).toContain("<li>상세 내용을 표시합니다.</li>");
     expect(markup).toContain("<del>일반 텍스트</del>");
@@ -5831,6 +5833,9 @@ describe("HuntDashboard", () => {
     expect(messageList.querySelector(".issue-message-body h2")?.textContent).toBe(
       "기존 메시지",
     );
+    expect(
+      messageList.querySelector(".issue-message-body")?.classList,
+    ).toContain("markdown-content");
     expect(messageList.querySelector(".issue-message-body li")?.textContent).toBe(
       "마크다운 항목",
     );
@@ -7151,7 +7156,9 @@ describe("HuntDashboard", () => {
     expect(workHistoryIndex).toBeGreaterThan(workResultIndex);
     expect(ctaIndex).toBeGreaterThan(workResultIndex);
     expect(workHistoryIndex).toBeGreaterThan(ctaIndex);
-    expect(markup).toContain('<div class="completed-issue-summary paused-result-summary"><h2>구현</h2>');
+    expect(markup).toContain(
+      '<div class="completed-issue-summary paused-result-summary markdown-content"><h2>구현</h2>',
+    );
     expect(markup.match(/<li>/g)).toHaveLength(3);
     expect(markup).toContain("승인하고 계속");
     expect(markup).toContain("증빙 자세히 보기");
@@ -7842,7 +7849,9 @@ describe("HuntDashboard", () => {
 
     expect(markup).toContain('class="completed-issue-card"');
     expect(markup).toContain("작업 결과");
-    expect(markup).toContain('class="completed-issue-summary"');
+    expect(markup).toContain(
+      'class="completed-issue-summary markdown-content"',
+    );
     expect(markup).toContain("<h2>변경 결과</h2>");
     expect(markup).toContain("<ul>");
     expect(markup).toContain("<strong>결과 요약</strong>");
