@@ -36,6 +36,13 @@ describe("OrganizationCreate", () => {
       );
     });
 
+    const surface = container.querySelector(".organization-create");
+    expect(surface?.hasAttribute("data-tauri-drag-region")).toBe(true);
+    const header = surface?.querySelector(".organization-create-header");
+    expect(header?.hasAttribute("data-tauri-drag-region")).toBe(true);
+    expect(
+      header?.querySelector("button")?.hasAttribute("data-tauri-drag-region"),
+    ).toBe(false);
     const [name, handle] = Array.from(
       container.querySelectorAll<HTMLInputElement>("input"),
     );

@@ -81,7 +81,11 @@ export function InvitationOnboarding({
   const error = acceptError ?? invitationError ?? loginError;
 
   return (
-    <main aria-label={t("invitation.label")} className="login-shell">
+    <main
+      aria-label={t("invitation.label")}
+      className="login-shell"
+      data-tauri-drag-region
+    >
       <div className="login-glow" />
       <section className="login-card w-full max-w-[520px] rounded-3xl border border-border bg-card shadow-lg">
         <Logo />

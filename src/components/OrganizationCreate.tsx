@@ -117,8 +117,12 @@ export function OrganizationCreate({
           ? "organization-create-embedded"
           : "flex-1 overflow-auto bg-background px-[clamp(28px,4.5vw,72px)] py-14",
       )}
+      data-tauri-drag-region
     >
-      <header className="organization-create-header mx-auto mb-7 flex max-w-[620px] items-start gap-3">
+      <header
+        className="organization-create-header mx-auto mb-7 flex max-w-[620px] items-start gap-3"
+        data-tauri-drag-region
+      >
         {!embedded ? (
           <Button
             aria-label={t("organization.create.back")}

@@ -16,7 +16,7 @@ export function FirstOrganizationSetup({
 }) {
   return (
     <div className="onboarding-shell project-onboarding-shell">
-      <header className="onboarding-topbar">
+      <header className="onboarding-topbar" data-tauri-drag-region>
         <Logo />
         <div className="onboarding-topbar-actions">
           <button onClick={onLogout} type="button">

@@ -2106,7 +2106,7 @@ export function Channels({
         <section className="channel-main">
         {activeChannel ? (
           <>
-            <header className="channel-header">
+            <header className="channel-header" data-tauri-drag-region>
               <div className="channel-header-title">
                 {activeChannel.visibility === "private" ? (
                   <Lock size={16} aria-hidden="true" />
