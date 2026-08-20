@@ -8705,7 +8705,9 @@ pub fn run() {
     let app = builder
         .setup(|_app| {
             #[cfg(target_os = "macos")]
-            macos_inbox_notifications::install(_app.handle());
+            if let Err(error) = macos_inbox_notifications::install(_app.handle()) {
+                eprintln!("Inbox notification install skipped: {error}");
+            }
             #[cfg(target_os = "macos")]
             if let Err(error) = status_tray::install(_app.handle()) {
                 eprintln!("Status tray install failed: {error}");
