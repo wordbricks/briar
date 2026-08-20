@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 
 import antigravityIconUrl from "../assets/antigravity.png";
 import grokIconUrl from "../assets/grok.png";
-import openaiIconUrl from "../assets/openai.png";
 import opencodeIconUrl from "../assets/opencode.png";
 import openrouterIconUrl from "../assets/openrouter.png";
 import { AgentProviderIcon } from "./AgentIcons";
@@ -58,27 +57,29 @@ describe("AgentProviderIcon", () => {
     act(() => root.unmount());
   });
 
-  it("uses the provided OpenAI artwork for the codex provider", () => {
+  it("restores the existing SVG artwork for the codex provider", () => {
     const container = document.createElement("div");
     const root = createRoot(container);
     act(() => root.render(<AgentProviderIcon provider="codex" size={20} />));
 
-    const image = container.querySelector("img");
-    expect(image?.getAttribute("src")).toBe(openaiIconUrl);
-    expect(image?.classList.contains("provider-artwork-white")).toBe(true);
-    expect(image?.getAttribute("width")).toBe("20");
-    expect(image?.getAttribute("height")).toBe("20");
-    expect(image?.getAttribute("aria-hidden")).toBe("true");
+    const icon = container.querySelector("svg");
+    expect(icon?.classList.contains("provider-artwork-codex")).toBe(true);
+    expect(icon?.getAttribute("fill")).toBe("currentColor");
+    expect(icon?.getAttribute("width")).toBe("20");
+    expect(icon?.getAttribute("height")).toBe("20");
+    expect(icon?.getAttribute("aria-hidden")).toBe("true");
 
     act(() => root.unmount());
   });
 
-  it("uses the provided OpenCode artwork for the opencode provider", () => {
+  it("keeps the OpenCode SVG in light mode and provides dark artwork", () => {
     const container = document.createElement("div");
     const root = createRoot(container);
     act(() => root.render(<AgentProviderIcon provider="opencode" size={19} />));
 
+    const lightIcon = container.querySelector("svg");
     const image = container.querySelector("img");
+    expect(lightIcon?.classList.contains("provider-artwork-light")).toBe(true);
     expect(image?.getAttribute("src")).toBe(opencodeIconUrl);
     expect(image?.classList.contains("provider-artwork-dark")).toBe(true);
     expect(image?.getAttribute("width")).toBe("19");
