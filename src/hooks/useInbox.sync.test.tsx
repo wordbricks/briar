@@ -284,6 +284,7 @@ describe("useInbox read-state synchronization", () => {
     mockedLoadInboxReadStates.mockResolvedValue({
       [messageId]: legacyVersion,
     });
+    mockedLoadInboxFeed.mockRejectedValueOnce(new Error("offline"));
 
     await renderHarness({
       dashboard: dashboardAt(1),
@@ -337,6 +338,49 @@ describe("useInbox read-state synchronization", () => {
     await flushPromises();
 
     expect(inbox.messages).toEqual([]);
+    expect(inbox.unreadCount).toBe(0);
+  });
+
+  it("removes cached session messages absent from the authoritative feed", async () => {
+    const occurredAt = "2026-08-01T12:22:38.913Z";
+    window.localStorage.setItem(
+      "briar.inbox.v1:user-a",
+      JSON.stringify({
+        messages: [{
+          id: "session:another-members-session",
+          kind: "session",
+          projectId: demoDashboard.project.id,
+          projectName: demoDashboard.project.name,
+          targetId: "another-members-session",
+          title: "Private execution result",
+          occurredAt,
+          version: `session:v1:failed:${occurredAt}`,
+          status: "failed",
+          agentName: "Inbox Agent",
+          issueCount: 1,
+          error: "Runner stopped",
+          summary: null,
+          requiresAttention: true,
+        }],
+        readVersions: {},
+      }),
+    );
+    mockedLoadInboxFeed.mockResolvedValueOnce({
+      state: { etag: 'W/"organization-inbox:org:3"' },
+      notModified: false,
+      messages: [],
+      subscribedIssueIds: [],
+    });
+
+    await renderHarness({
+      dashboard: dashboardAt(1),
+      token: "token-a",
+      userId: "user-a",
+    });
+    await flushPromises();
+
+    expect(inbox.messages).toEqual([]);
+    expect(inbox.unreadCount).toBe(0);
   });
 
   it("reuses the organization Inbox ETag after reconnecting", async () => {

@@ -196,6 +196,7 @@ import {
   failSlackRevocation,
   findProjectIdByAgentTokenHash,
   getProjectAgent,
+  getProjectAgentScheduleCreatorId,
   getClaimedIssueAgentReply,
   getIssueActionProposal,
   getIssueExecutionProposal,
@@ -333,6 +334,7 @@ import {
   acknowledgeOrganizationInboxRealtimeOutbox,
   upsertInboxReadStates,
   upsertProjectAgentSession,
+  upsertProjectAgentSessionSummary,
   upsertSlackInstallation,
   syncGithubPullRequest,
   syncGithubConnectionRepositories,
@@ -4095,11 +4097,13 @@ const projectAgentJson = (row: ProjectAgentRow) => {
 const projectAgentSessionJson = (row: {
   project_id: string;
   id: string;
+  requested_by_user_id: string | null;
   payload_json: string;
 }) => ({
   id: row.id,
   projectId: row.project_id,
   ...(JSON.parse(row.payload_json) as Record<string, unknown>),
+  requestedByUserId: row.requested_by_user_id,
   workspaceRoot: null,
   dispatchEvents: [],
   workers: [],
@@ -4240,6 +4244,7 @@ async function syncProjectAgentTaskSession(
     project_id: current.project_id,
     id: current.id,
     agent_id: current.agent_id,
+    requested_by_user_id: current.requested_by_user_id,
     status: nextPayload.status as ProjectAgentSessionRow["status"],
     session_type: current.session_type,
     payload_json: JSON.stringify(nextPayload),
@@ -6085,6 +6090,7 @@ async function approveAgentSkillExecutionProposal(
       session.id !== current.result_session_id ||
       session.project_id !== current.project_id ||
       session.agent_id !== current.agent_id ||
+      session.requested_by_user_id !== current.accepted_by_user_id ||
       session.session_type !== "task" ||
       sessionPayload.dispatchGroupId !== current.result_session_id ||
       sessionPayload.agentId !== current.agent_id ||
@@ -6094,10 +6100,12 @@ async function approveAgentSkillExecutionProposal(
       sessionPayload.trigger !== "manual" ||
       sessionPayload.request !== current.request ||
       sessionPayload.requestedWorkerId !== current.requested_worker_id ||
-      sessionPayload.workerId !== current.requested_worker_id
+      sessionPayload.workerId !== current.requested_worker_id ||
+      sessionPayload.requestedByUserId !== current.accepted_by_user_id
     ) {
       throw stale("The approved Agent Skill execution session lost its Worker binding");
     }
+    await upsertProjectAgentSessionSummary(db, session, false);
     return {
       outcome,
       proposal: agentSkillExecutionProposalJson(current),
@@ -6770,7 +6778,12 @@ async function route(
                     project.id,
                     session.user.id,
                   ),
-                  listProjectAgentSessionSummaries(db, project.id),
+                  listProjectAgentSessionSummaries(
+                    db,
+                    project.id,
+                    undefined,
+                    session.user.id,
+                  ),
                 ]);
               return {
                 project,
@@ -6802,7 +6815,11 @@ async function route(
           ),
         ]);
         return {
-          messages: buildInboxFeedMessages(projectData, channelNotifications),
+          messages: buildInboxFeedMessages(
+            projectData,
+            channelNotifications,
+            session.user.id,
+          ),
           subscribedIssueIds,
           generatedAt: new Date().toISOString(),
         };
@@ -9688,6 +9705,7 @@ async function route(
       project_id: project.id,
       id: taskId,
       agent_id: agent.id,
+      requested_by_user_id: session.user.id,
       status: "running",
       session_type: "task",
       payload_json: JSON.stringify(payload),
@@ -9862,10 +9880,45 @@ async function route(
     }
     const input = projectAgentSessionInputSchema.parse(await readJson(request));
     const observedAt = new Date().toISOString();
+    const existing = await getProjectAgentSession(
+      db,
+      project.id,
+      projectAgentSessionMatch[2],
+    ) ?? await getArchivedProjectAgentSession(
+      db,
+      env.ARCHIVES,
+      project.id,
+      projectAgentSessionMatch[2],
+    );
+    let requestedByUserId: string | null;
+    if (existing) {
+      requestedByUserId = existing.requested_by_user_id;
+    } else if (input.parentSessionId) {
+      const parent = await getProjectAgentSession(
+        db,
+        project.id,
+        input.parentSessionId,
+      ) ?? await getArchivedProjectAgentSession(
+        db,
+        env.ARCHIVES,
+        project.id,
+        input.parentSessionId,
+      );
+      requestedByUserId = parent?.requested_by_user_id ?? null;
+    } else if (input.trigger === "scheduled" && input.scheduleId) {
+      requestedByUserId = await getProjectAgentScheduleCreatorId(
+        db,
+        project.id,
+        input.scheduleId,
+      );
+    } else {
+      requestedByUserId = session.user.id;
+    }
     const row = await upsertProjectAgentSession(db, {
       project_id: project.id,
       id: projectAgentSessionMatch[2],
       agent_id: input.agentId,
+      requested_by_user_id: requestedByUserId,
       status: input.status,
       session_type: input.sessionType,
       payload_json: JSON.stringify(input),
@@ -9952,7 +10005,10 @@ async function route(
     const input = projectAgentScheduleInputSchema.parse(
       await readJson(request),
     );
-    const schedule = await createProjectAgentSchedule(db, project.id, input);
+    const schedule = await createProjectAgentSchedule(db, project.id, {
+      ...input,
+      createdByUserId: session.user.id,
+    });
     if (!schedule) throw new HttpError(404, "Project agent not found");
     return json({ schedule: projectAgentScheduleJson(schedule) }, 201);
   }
@@ -14665,7 +14721,23 @@ async function route(
       error: "Worker lease expired after repeated attempts.",
     });
     await Promise.all(
-      reaped.filter((job) => !job.skill_execution_proposal_id).map(async (job) => {
+      reaped.map(async (job) => {
+        if (job.skill_execution_proposal_id) {
+          const session = await getProjectAgentSession(
+            db,
+            job.project_id,
+            job.id,
+          );
+          if (!session) return;
+          await upsertProjectAgentSessionSummary(db, session, false);
+          scheduleProjectAgentSessionRealtimePublish(
+            env,
+            db,
+            job.project_id,
+            context,
+          );
+          return;
+        }
         const session = await syncProjectAgentTaskSession(
           db,
           job,
@@ -14798,6 +14870,14 @@ async function route(
         error: completed.error ?? input.error ?? null,
       });
       sessionChanged = session !== null;
+    }
+    if (completed?.skill_execution_proposal_id && hotSession) {
+      const summaryResult = await upsertProjectAgentSessionSummary(
+        db,
+        hotSession,
+        false,
+      );
+      sessionChanged ||= (summaryResult.meta.changes ?? 0) > 0;
     }
     if (sessionChanged) {
       scheduleProjectAgentSessionRealtimePublish(

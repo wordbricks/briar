@@ -85,6 +85,7 @@ export type AutoHuntSession = {
   workspaceRoot: string | null;
   requestedWorkerId?: string | null;
   workerId?: string | null;
+  requestedByUserId?: string | null;
   summary: string | null;
   error: string | null;
   events: AutoHuntSessionEvent[];
@@ -730,7 +731,10 @@ export function useAutoHuntSessions(
       agentName: agent.name,
       sessionType: "dispatch",
       trigger: parent?.trigger ?? "manual",
+      scheduleId: parent?.scheduleId,
+      scheduleRunId: parent?.scheduleRunId,
       parentSessionId: parent?.id,
+      requestedByUserId: parent?.requestedByUserId ?? null,
       request: parent?.request,
       status: "running",
       issues: selectedRuns.map((run) => ({

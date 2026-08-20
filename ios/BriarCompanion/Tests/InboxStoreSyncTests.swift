@@ -290,6 +290,60 @@ final class InboxStoreSyncTests: XCTestCase {
         store.applicationDidEnterBackground()
     }
 
+    func testAuthoritativeFeedRemovesCachedSessionForAnotherMember() async throws {
+        let response = InboxFeedResponse(
+            messages: [],
+            subscribedIssueIds: [],
+            generatedAt: Date(timeIntervalSince1970: 1_775_260_951)
+        )
+        let api = SelectionIndependentInboxAPI(response: response)
+        let (defaults, suiteName) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = InboxStore(
+            defaults: defaults,
+            api: api,
+            pollInterval: .seconds(3_600)
+        )
+        let completedAt = Date(timeIntervalSince1970: 1_775_260_900)
+        let cachedSession = ProjectAgentSession(
+            id: "cached-private-session",
+            projectId: project.id,
+            dispatchGroupId: "cached-private-session",
+            agentId: nil,
+            sessionType: .task,
+            trigger: .manual,
+            scheduleId: nil,
+            scheduleRunId: nil,
+            parentSessionId: nil,
+            request: "Private execution result",
+            status: .failed,
+            issues: [],
+            startedAt: completedAt.addingTimeInterval(-60),
+            completedAt: completedAt,
+            conversationId: nil,
+            workspaceRoot: nil,
+            summary: nil,
+            error: "Runner stopped",
+            events: [.init(id: "failed-event", type: .failed, occurredAt: completedAt)],
+            updatedAt: completedAt,
+            requestedByUserId: "user-a"
+        )
+
+        store.configure(
+            token: "token-a",
+            userID: "user-a",
+            organizationID: project.organizationId
+        )
+        store.update(snapshot: nil, sessions: [cachedSession], project: project)
+        XCTAssertEqual(store.messages.map(\.id), ["session:cached-private-session"])
+
+        await store.refreshFeed()
+
+        XCTAssertFalse(store.messages.contains { $0.kind == .session })
+        XCTAssertEqual(store.unreadCount, 0)
+        store.applicationDidEnterBackground()
+    }
+
     private func snapshot(
         revision: Int,
         subscribers: [IssueSubscriber]? = nil
