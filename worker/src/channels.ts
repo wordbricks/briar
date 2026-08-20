@@ -3413,6 +3413,7 @@ export async function getChannelActionProposal(
   return db
     .prepare(
       `select proposal.*,
+              reply.parent_message_id as reply_parent_message_id,
               reply.author_agent_id as reply_author_agent_id,
               agent.organization_id as reply_author_agent_organization_id,
               agent.project_id as reply_author_agent_project_id
@@ -3431,6 +3432,7 @@ export async function getChannelActionProposal(
       project_id: string | null;
       trigger_message_id: string;
       reply_message_id: string;
+      reply_parent_message_id: string | null;
       action_type: ChannelActionType;
       payload_json: string;
       status: "pending" | "accepted";
