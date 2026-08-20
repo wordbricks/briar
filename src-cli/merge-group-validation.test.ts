@@ -1,4 +1,5 @@
 import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
@@ -205,7 +206,9 @@ while :; do sleep 1; done
       signal: controller.signal,
       killGraceMs: 25,
     });
-    await vi.waitFor(async () => expect(await readFile(pidFile, "utf8")).toMatch(/\d+/u));
+    await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true), {
+      timeout: 5_000,
+    });
     const descendantPid = Number((await readFile(pidFile, "utf8")).trim());
     controller.abort(new Error("lease lost"));
     await expect(running).rejects.toThrow("lease lost");

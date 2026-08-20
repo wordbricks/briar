@@ -23,8 +23,9 @@ describe("merge-group security regression", () => {
     expect(executor).not.toContain("env: process.env");
     expect(executor).toContain('"--network=none"');
     expect(executor).toContain('"--user=65532:65532"');
-    expect(executor).toContain("dst=/candidate,ro");
     expect(executor).toContain("repository.bundle");
+    expect(executor).not.toContain("dst=/candidate");
+    expect(executor).not.toContain("BRIAR_CI_CANDIDATE_ROOT");
     expect(executor).not.toContain("dst=/repo/.git");
     expect(executor).not.toContain("BRIAR_WORKER_TOKEN");
     expect(executor).not.toContain("GH_TOKEN");
