@@ -1144,6 +1144,7 @@ export const mobileProjectAgentSessionSchema = mutableStruct({
   workspaceRoot: optional(Schema.Null),
   requestedWorkerId: optionalNullable(Schema.String),
   workerId: optionalNullable(Schema.String),
+  requestedByUserId: optionalNullable(Schema.String),
   summary: optionalNullable(Schema.String),
   error: optionalNullable(Schema.String),
   events: optional(mutableArray(mobileProjectAgentSessionEventSchema)),

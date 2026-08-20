@@ -843,6 +843,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(
+        resolve("migrations/0076_execution_worker_updates.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
         resolve("migrations/0077_project_agent_task_jobs.sql"),
         "utf8",
       ),
@@ -950,7 +957,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          agent_id text not null,
          skill_id text not null,
          request text not null,
-         worker_id text not null
+         worker_id text not null,
+         approved_by_user_id text
        );`,
     );
     await executeSql(
@@ -1002,6 +1010,20 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0117_email_otp_auth.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0119_execution_worker_update_handoffs.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      `alter table briar_project_agent_sessions
+         add column requested_by_user_id text references "user" (id);
+       alter table briar_project_agent_schedules
+         add column created_by_user_id text references "user" (id);`,
     );
     // The lifecycle suite intentionally uses a compact migration history, so
     // add the issue-reply job columns that production migration 0116 supplies
@@ -1846,6 +1868,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       project_id: projectId,
       id: sessionId,
       agent_id: null,
+      requested_by_user_id: "owner",
       status: "running",
       session_type: "task",
       payload_json: JSON.stringify(payload),
@@ -1857,6 +1880,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       project_id: projectId,
       id: sessionId,
       agent_id: null,
+      requested_by_user_id: "owner",
       status: "failed",
       session_type: "task",
       payload_json: JSON.stringify({ ...payload, status: "failed" }),
@@ -1881,6 +1905,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       project_id: projectId,
       id: sessionId,
       agent_id: null,
+      requested_by_user_id: "owner",
       status: "skipped",
       session_type: "task",
       payload_json: JSON.stringify({ status: "skipped" }),
@@ -1903,6 +1928,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       project_id: projectId,
       id: sessionId,
       agent_id: null,
+      requested_by_user_id: "owner",
       status: "completed",
       session_type: "task",
       payload_json: JSON.stringify({
@@ -1925,10 +1951,74 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       projectId,
       [sessionId],
+      "owner",
     );
     expect(JSON.parse(summaries[0]!.summary_json)).toMatchObject({
       status: "completed",
       inboxVersion: `session:v1:completed:${completedAt}`,
+      requestedByUserId: "owner",
+    });
+    await expect(
+      listProjectAgentSessionSummaries(
+        db,
+        projectId,
+        [sessionId],
+        "another-member",
+      ),
+    ).resolves.toEqual([]);
+  });
+
+  it("preserves the trusted Agent Session requester across later updates", async () => {
+    const sessionId = "44444444-4444-4444-8444-444444444444";
+    const row = {
+      project_id: projectId,
+      id: sessionId,
+      agent_id: null,
+      requested_by_user_id: "owner",
+      status: "running" as const,
+      session_type: "task" as const,
+      payload_json: JSON.stringify({
+        status: "running",
+        issues: [],
+        startedAt: atMinute(5),
+        completedAt: null,
+      }),
+      started_at: atMinute(5),
+      completed_at: null,
+      updated_at: atMinute(5),
+    };
+    await upsertProjectAgentSession(db, row, atMinute(5));
+    await upsertProjectAgentSession(db, {
+      ...row,
+      requested_by_user_id: null,
+      status: "completed",
+      payload_json: JSON.stringify({
+        status: "completed",
+        issues: [],
+        startedAt: atMinute(5),
+        completedAt: atMinute(6),
+      }),
+      completed_at: atMinute(6),
+      updated_at: atMinute(6),
+    }, atMinute(6));
+
+    const stored = (await listProjectAgentSessions(db, projectId)).find(
+      (session) => session.id === sessionId,
+    );
+    expect(stored).toMatchObject({
+      id: sessionId,
+      requested_by_user_id: "owner",
+      status: "completed",
+    });
+    const [summary] = await listProjectAgentSessionSummaries(
+      db,
+      projectId,
+      [sessionId],
+      "owner",
+    );
+    expect(JSON.parse(summary!.summary_json)).toMatchObject({
+      requestedByUserId: "owner",
+      status: "completed",
     });
   });
 

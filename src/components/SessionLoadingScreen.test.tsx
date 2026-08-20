@@ -13,6 +13,7 @@ describe("SessionLoadingScreen", () => {
 
     const status = container.querySelector<HTMLElement>('[role="status"]');
     expect(status?.dataset.testid).toBe("session-loading-screen");
+    expect(status?.hasAttribute("data-tauri-drag-region")).toBe(true);
     expect(status?.getAttribute("aria-busy")).toBe("true");
     expect(status?.getAttribute("aria-live")).toBe("polite");
     expect(status?.textContent).toContain("로그인 정보를 확인하는 중입니다");

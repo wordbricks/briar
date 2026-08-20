@@ -530,7 +530,8 @@ const projectSessionCandidate = async (
 ): Promise<ArchiveCandidate | null> => {
   const session = await db
     .prepare(
-      `select project_id, id, agent_id, status, session_type, payload_json,
+      `select project_id, id, agent_id, requested_by_user_id, status,
+              session_type, payload_json,
               started_at, completed_at, updated_at
        from briar_project_agent_sessions
        where status in ('completed', 'failed', 'interrupted') and updated_at <= ?
@@ -887,6 +888,38 @@ export async function readArchivedProjectAgentSession(
     );
   }
   return session;
+}
+
+async function restoreArchivedProjectAgentSessionRequester(
+  db: D1Database,
+  session: ProjectAgentSessionRow,
+) {
+  if (session.requested_by_user_id !== null) return session;
+  const approval = await db
+    .prepare(
+      `select approved_by_user_id
+       from briar_agent_skill_execution_approval_audit
+       where project_id = ? and result_session_id = ?
+         and approved_by_user_id is not null
+       limit 1`,
+    )
+    .bind(session.project_id, session.id)
+    .first<{ approved_by_user_id: string }>();
+  if (!approval) return session;
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(session.payload_json) as Record<string, unknown>;
+  } catch {
+    return session;
+  }
+  return {
+    ...session,
+    requested_by_user_id: approval.approved_by_user_id,
+    payload_json: JSON.stringify({
+      ...payload,
+      requestedByUserId: approval.approved_by_user_id,
+    }),
+  };
 }
 
 const completeVerifiedArchive = async (
@@ -1268,9 +1301,12 @@ export async function listArchivedProjectAgentSessions(
   const records = await archivedRecords(db, bucket, projectId, {
     kind: "project_agent_sessions",
   });
-  return records.map((record) =>
-    decodeArchivedProjectAgentSession(record.data)
-  );
+  return Promise.all(records.map((record) =>
+    restoreArchivedProjectAgentSessionRequester(
+      db,
+      decodeArchivedProjectAgentSession(record.data),
+    )
+  ));
 }
 
 export async function getArchivedProjectAgentSession(
@@ -1290,9 +1326,11 @@ export async function getArchivedProjectAgentSession(
     )
     .bind(projectId, sessionId)
     .first<ArchiveMetadataRow>();
-  return metadata
-    ? readArchivedProjectAgentSession(bucket, metadata)
-    : null;
+  if (!metadata) return null;
+  return restoreArchivedProjectAgentSessionRequester(
+    db,
+    await readArchivedProjectAgentSession(bucket, metadata),
+  );
 }
 
 /**
@@ -1326,7 +1364,12 @@ export async function backfillArchivedProjectAgentSessionSummaries(
     const archived = await Promise.all(
       result.results
         .slice(offset, offset + 8)
-        .map((metadata) => readArchivedProjectAgentSession(bucket, metadata)),
+        .map(async (metadata) =>
+          restoreArchivedProjectAgentSessionRequester(
+            db,
+            await readArchivedProjectAgentSession(bucket, metadata),
+          )
+        ),
     );
     for (const session of archived) {
       await upsertProjectAgentSessionSummary(db, session, true);

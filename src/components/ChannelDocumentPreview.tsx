@@ -1,7 +1,5 @@
 import { FileText, LoaderCircle, RefreshCw } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
-import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
-import remarkGfm from "remark-gfm";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +13,7 @@ import type {
   ChannelMessageDocument,
   ChannelMessageDocumentContent,
 } from "../lib/channels-contract";
+import { MarkdownContent } from "./MarkdownContent";
 
 export function ChannelDocumentPreview({
   channelId,
@@ -105,15 +104,9 @@ export function ChannelDocumentPreview({
                 </button>
               </div>
             ) : content ? (
-              <div className="issue-description-markdown channel-document-markdown">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  skipHtml
-                  urlTransform={defaultUrlTransform}
-                >
-                  {content.markdown}
-                </ReactMarkdown>
-              </div>
+              <MarkdownContent className="issue-description-markdown channel-document-markdown">
+                {content.markdown}
+              </MarkdownContent>
             ) : null}
           </div>
         </DialogContent>

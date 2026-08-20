@@ -461,10 +461,6 @@ export const channelMemberInputSchema = strict(Schema.Struct({
   role: defaulted(Schema.Literals(["owner", "member"]), "member"),
 }));
 
-export const channelProposalAcceptInputSchema = strict(Schema.Struct({
-  projectId: nullableDefault(canonicalUuidSchema),
-}));
-
 export const channelExecutionProposalAcceptInputSchema = strict(Schema.Struct({
   provider: AgentProviderSchema,
   model: Schema.NullOr(
@@ -474,6 +470,13 @@ export const channelExecutionProposalAcceptInputSchema = strict(Schema.Struct({
   workerId: Schema.NullOr(
     Schema.Trim.check(Schema.isLengthBetween(1, 128)),
   ),
+}));
+export type ChannelExecutionProposalAcceptInput =
+  typeof channelExecutionProposalAcceptInputSchema.Type;
+
+export const channelProposalAcceptInputSchema = strict(Schema.Struct({
+  projectId: nullableDefault(canonicalUuidSchema),
+  execution: nullableDefault(channelExecutionProposalAcceptInputSchema),
 }));
 
 export type ChannelSummary = {

@@ -35,7 +35,12 @@ export function LanguageSwitcher({
 
   return (
     <div className="language-switcher" aria-label={label} role="group">
-      <span aria-hidden="true">◎</span>
+      <span aria-hidden="true" className="language-switcher-mark">
+        <svg fill="none" viewBox="0 0 16 16">
+          <circle cx="8" cy="8" r="5.8" />
+          <path d="M2.5 8h11M8 2.2c1.45 1.55 2.2 3.48 2.2 5.8S9.45 12.25 8 13.8C6.55 12.25 5.8 10.32 5.8 8S6.55 3.75 8 2.2Z" />
+        </svg>
+      </span>
       <button
         type="button"
         className={locale === "en" ? "is-active" : undefined}

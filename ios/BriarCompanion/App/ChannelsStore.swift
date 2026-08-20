@@ -959,7 +959,8 @@ final class ChannelsStore: ObservableObject {
     func acceptProposal(
         channelID: UUID,
         proposalID: UUID,
-        projectID: UUID
+        projectID: UUID,
+        execution: AcceptIssueExecutionProposalRequest? = nil
     ) async -> AcceptChannelProposalResponse? {
         guard let organizationID, let token else { return nil }
         guard focusedChannelID == channelID else { return nil }
@@ -978,6 +979,7 @@ final class ChannelsStore: ObservableObject {
         let expectedProposalRevision = proposalRevisions[proposalID, default: 0]
         let requestsExecutionFollowUp = latestProposals[proposalID]?
             .payload?.executeAfterCreate == true
+        guard execution == nil || requestsExecutionFollowUp else { return nil }
         acceptanceRevision &+= 1
         let expectedAcceptanceRevision = acceptanceRevision
         acceptingProposalID = proposalID
@@ -989,6 +991,27 @@ final class ChannelsStore: ObservableObject {
             }
         }
         do {
+            if let execution {
+                let preflight: DashboardSnapshot = try await api.get(
+                    MobileAPIContract.Endpoint.dashboard(projectID: projectID),
+                    token: token,
+                    as: DashboardSnapshot.self
+                )
+                guard
+                    expectedGeneration == generation,
+                    expectedAcceptanceRevision == acceptanceRevision,
+                    expectedFocusRevision == authoritativeLoadRevision,
+                    expectedFocusedChannelID == focusedChannelID,
+                    expectedFocusedThreadParentID == focusedThreadParentID,
+                    proposalRevisions[proposalID, default: 0] == expectedProposalRevision,
+                    latestProposals[proposalID]?.payload?.executeAfterCreate == true
+                else { return nil }
+                try validateIssueExecutionSelection(
+                    snapshot: preflight,
+                    projectID: projectID,
+                    request: execution
+                )
+            }
             let response: AcceptChannelProposalResponse = try await api.send(
                 MobileAPIContract.Endpoint.acceptChannelProposal(
                     organizationID: organizationID,
@@ -997,7 +1020,10 @@ final class ChannelsStore: ObservableObject {
                 ),
                 method: "POST",
                 token: token,
-                body: AcceptChannelProposalRequest(projectId: projectID),
+                body: AcceptChannelProposalRequest(
+                    projectId: projectID,
+                    execution: execution
+                ),
                 as: AcceptChannelProposalResponse.self
             )
             guard
@@ -1015,11 +1041,25 @@ final class ChannelsStore: ObservableObject {
                     runID: response.resultRunId
                 ) ? candidate : nil
             }
+            if let execution {
+                guard let proposal = normalizedExecutionProposal,
+                      let dispatch = response.dispatch,
+                      issueExecutionApprovalResponseMatches(
+                          proposal: proposal,
+                          projectID: response.projectId,
+                          runID: response.resultRunId,
+                          dispatch: dispatch,
+                          expectedProposalID: proposal.id,
+                          request: execution
+                      )
+                else { throw MobileAPIError.invalidResponse }
+            }
             let normalizedResponse = AcceptChannelProposalResponse(
                 outcome: response.outcome,
                 projectId: response.projectId,
                 resultRunId: response.resultRunId,
-                executionProposal: normalizedExecutionProposal
+                executionProposal: normalizedExecutionProposal,
+                dispatch: response.dispatch
             )
             if proposalRevisions[proposalID, default: 0] != expectedProposalRevision {
                 var latest = latestProposals[proposalID]
@@ -1046,7 +1086,8 @@ final class ChannelsStore: ObservableObject {
                         resultRunId: runID,
                         executionProposal: executionProposal(
                             forCreateProposalID: proposalID
-                        )
+                        ),
+                        dispatch: response.dispatch
                     )
                 }
                 // A pending proposal on the accepted target is the reservation
@@ -1308,6 +1349,75 @@ final class ChannelsStore: ObservableObject {
             _ = try validateIssueExecutionApproval(
                 snapshot: snapshot,
                 proposal: proposal
+            )
+            errorMessage = nil
+            return ExecutionApprovalContext(proposalID: proposalID, snapshot: snapshot)
+        } catch {
+            guard
+                expectedGeneration == generation,
+                expectedAcceptanceRevision == acceptanceRevision,
+                expectedFocusRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == expectedFocusedThreadParentID
+            else { return nil }
+            errorMessage = CompanionStore.message(for: error)
+            return nil
+        }
+    }
+
+    func prepareCreateExecutionProposal(
+        channelID: UUID,
+        proposalID: UUID,
+        projectID: UUID
+    ) async -> ExecutionApprovalContext? {
+        guard let token else { return nil }
+        guard focusedChannelID == channelID else { return nil }
+        guard channels.first(where: { $0.id == channelID })?.archivedAt == nil else {
+            return nil
+        }
+        guard acceptingProposalID == nil,
+              approvingExecutionProposalID == nil,
+              preparingExecutionProposalID == nil,
+              approvingSkillExecutionProposalID == nil,
+              preparingSkillExecutionProposalID == nil,
+              let proposal = latestProposals[proposalID],
+              proposal.payload?.executeAfterCreate == true,
+              proposal.projectId == nil || proposal.projectId == projectID
+        else { return nil }
+
+        let expectedGeneration = generation
+        let expectedFocusRevision = authoritativeLoadRevision
+        let expectedFocusedThreadParentID = focusedThreadParentID
+        let expectedProposalRevision = proposalRevisions[proposalID, default: 0]
+        acceptanceRevision &+= 1
+        let expectedAcceptanceRevision = acceptanceRevision
+        preparingExecutionProposalID = proposalID
+        defer {
+            if expectedGeneration == generation,
+               expectedAcceptanceRevision == acceptanceRevision,
+               preparingExecutionProposalID == proposalID {
+                preparingExecutionProposalID = nil
+            }
+        }
+
+        do {
+            let snapshot: DashboardSnapshot = try await api.get(
+                MobileAPIContract.Endpoint.dashboard(projectID: projectID),
+                token: token,
+                as: DashboardSnapshot.self
+            )
+            guard
+                expectedGeneration == generation,
+                expectedAcceptanceRevision == acceptanceRevision,
+                expectedFocusRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == expectedFocusedThreadParentID,
+                proposalRevisions[proposalID, default: 0] == expectedProposalRevision,
+                latestProposals[proposalID] == proposal
+            else { return nil }
+            try validateIssueExecutionSelection(
+                snapshot: snapshot,
+                projectID: projectID
             )
             errorMessage = nil
             return ExecutionApprovalContext(proposalID: proposalID, snapshot: snapshot)

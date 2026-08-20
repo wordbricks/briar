@@ -141,6 +141,7 @@ export const ProjectAgentSessionResponse = Schema.Struct({
   error: Schema.NullOr(Schema.String),
   requestedWorkerId: Schema.optional(Schema.NullOr(Schema.String)),
   workerId: Schema.optional(Schema.NullOr(Schema.String)),
+  requestedByUserId: Schema.optional(Schema.NullOr(Schema.String)),
   events: mutableArray(ProjectAgentSessionEventResponse),
   dispatchEvents: mutableArray(Schema.Never),
   workers: mutableArray(Schema.Never),

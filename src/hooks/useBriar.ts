@@ -77,6 +77,7 @@ import {
   createProjectWorkspace,
   disconnectLocalProject,
   discoverRepositoryIcon,
+  inspectLovableRepositoryCompatibility,
   inspectVelen,
   inspectRepositoryReadiness,
   installProjectGithubCli,
@@ -1622,6 +1623,10 @@ export function useBriar(options: UseBriarOptions = {}) {
     }
   }, []);
 
+  const inspectLovableProject = useCallback(async (repositoryPath: string) => {
+    return inspectLovableRepositoryCompatibility(repositoryPath);
+  }, []);
+
   const connectProject = useCallback(async (
     autoHunt: LocalAutoHuntConfig,
     repositoryPath: string,
@@ -1666,6 +1671,9 @@ export function useBriar(options: UseBriarOptions = {}) {
           undefined,
           onWorkflowProgress,
         ),
+        !isRepositoryWorkflowPending(autoHunt.workflow)
+          ? autoHunt.workflow
+          : undefined,
       );
       await updateLocalProjectWorkflow(
         connection.project.id,
@@ -3806,6 +3814,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     selectProjectRepository,
     createProjectRepository,
     inspectProjectRepository: inspectRepositoryReadiness,
+    inspectLovableProject,
     installGithubForProject,
     loginGithubForProject,
     repairHealth,

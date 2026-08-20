@@ -35,6 +35,7 @@ export async function runDetachedProviderTurn(input: {
   environment: NodeJS.ProcessEnv;
   signal: AbortSignal;
   onPayload?: (payload: unknown, rawLine: string) => void | Promise<void>;
+  onConversationId?: (conversationId: string) => void | Promise<void>;
 }): Promise<DetachedProviderTurnResult> {
   if (input.signal.aborted) {
     throw input.signal.reason instanceof Error
@@ -113,8 +114,11 @@ export async function runDetachedProviderTurn(input: {
       } catch {
         // Preserve plain provider output for caller diagnostics.
       }
-      conversationId =
-        detachedConversationIdFromPayload(payload) ?? conversationId;
+      const nextConversationId = detachedConversationIdFromPayload(payload);
+      if (nextConversationId && nextConversationId !== conversationId) {
+        conversationId = nextConversationId;
+        await input.onConversationId?.(nextConversationId);
+      }
       const candidate = issueReplyTextFromPayload(payload);
       if (candidate) resultText = candidate;
       if (

@@ -40,6 +40,21 @@ const NonNegativeInteger = Schema.Int.check(
 const StringRecord = Schema.Record(Schema.String, Schema.Unknown);
 const AgentProviderSchema = Schema.Literals(agentProviders);
 
+const ClaimedHandoffContext = strict(Schema.Struct({
+  requestId: Uuid,
+  workType: Schema.Literals([
+    "issue",
+    "projectAgentTask",
+    "issueReply",
+    "channelReply",
+  ]),
+  workId: Uuid,
+  runId: Schema.NullOr(Uuid),
+  conversationId: Schema.NullOr(Schema.String),
+  workspacePath: Schema.NullOr(Schema.String),
+  createdAt: IsoDateTimeWithOffset,
+}));
+
 export const QueuedAttachment = Schema.Struct({
   id: Uuid,
   filename: Schema.String.check(Schema.isLengthBetween(1, 255)),
@@ -117,6 +132,7 @@ export const QueuedIssue = Schema.Struct({
   claimedAt: IsoDateTimeWithOffset,
   leaseExpiresAt: IsoDateTimeWithOffset,
   claimAttempts: PositiveInteger,
+  handoffContext: defaulted(Schema.NullOr(ClaimedHandoffContext), null),
 });
 export type QueuedIssue = typeof QueuedIssue.Type;
 export const decodeQueuedIssue = Schema.decodeUnknownSync(QueuedIssue);
@@ -198,6 +214,7 @@ export const ClaimedRun = Schema.Struct({
   execution: Schema.optional(Schema.NullOr(DetachedExecution)),
   agent: Schema.NullOr(DetachedAgentClaim),
   activeSkill: Schema.optional(Schema.NullOr(DetachedAgentSkill)),
+  handoffContext: defaulted(Schema.NullOr(ClaimedHandoffContext), null),
 });
 export type ClaimedRun = typeof ClaimedRun.Type;
 export const decodeClaimedRun = Schema.decodeUnknownSync(ClaimedRun);
@@ -217,6 +234,7 @@ export const ClaimedProjectAgentTask = Schema.Struct({
   request: Schema.NonEmptyString,
   agent: DetachedAgentClaim,
   activeSkill: Schema.optional(Schema.NullOr(DetachedAgentSkill)),
+  handoffContext: defaulted(Schema.NullOr(ClaimedHandoffContext), null),
 });
 export type ClaimedProjectAgentTask = typeof ClaimedProjectAgentTask.Type;
 export const decodeClaimedProjectAgentTask = Schema.decodeUnknownSync(
@@ -253,6 +271,7 @@ export const ClaimedIssueReply = Schema.Struct({
   claimedAt: IsoDateTimeWithOffset,
   leaseExpiresAt: IsoDateTimeWithOffset,
   activity: defaulted(Schema.NullOr(ChannelActivityCredential), null),
+  handoffContext: defaulted(Schema.NullOr(ClaimedHandoffContext), null),
   snapshot: Schema.Struct({
     run: StringRecord,
     messages: mutableArray(QueuedIssueMessage),
@@ -333,6 +352,7 @@ const ClaimedChannelReplyInput = Schema.Struct({
     mutableArray(ChannelDelegationTarget),
     () => [],
   ),
+  handoffContext: defaulted(Schema.NullOr(ClaimedHandoffContext), null),
   snapshot: StringRecord,
 }).check(
   Schema.makeFilter((reply) => {

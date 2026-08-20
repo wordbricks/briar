@@ -37,6 +37,11 @@ describe("InitialOnboarding", () => {
       root.render(<InitialOnboarding {...createProps()} />),
     );
 
+    expect(
+      container
+        .querySelector(".initial-onboarding-drag-region")
+        ?.hasAttribute("data-tauri-drag-region"),
+    ).toBe(true);
     expect(container.textContent).toContain("Briar에 오신 것을 환영해요.");
     expect(container.textContent).toContain(
       "에이전트의 진행 상황과 결과, 팀의 피드백",

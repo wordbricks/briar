@@ -93,6 +93,7 @@ import {
   workerExecutionPath,
   writeServiceDefinition,
   type ClaimedIssue,
+  type WorkerExecutionCheckpoint,
 } from "./worker";
 import {
   supportsRemoteWorkerUpdates,
@@ -215,13 +216,18 @@ function providerExecutionEnvironment(
   provider: AgentProvider,
   environment: NodeJS.ProcessEnv,
 ): NodeJS.ProcessEnv {
-  if (provider !== "openrouter") return environment;
+  const browserEnvironment = {
+    ...environment,
+    BRIAR_BROWSER_AUTOMATION_PROVIDER:
+      config.appSettings.browserAutomationProvider,
+  };
+  if (provider !== "openrouter") return browserEnvironment;
   const apiKey = config.openrouterApiKey?.trim();
   if (!apiKey) {
     throw new Error("앱 설정에서 OpenRouter API 키를 먼저 저장하세요.");
   }
   return {
-    ...environment,
+    ...browserEnvironment,
     OPENROUTER_API_KEY: apiKey,
     OPENCODE_CONFIG_CONTENT: openRouterOpenCodeConfig,
   };
@@ -1803,6 +1809,7 @@ async function runClaimedIssue(
   issue: ClaimedRun,
   workerToken: string,
   signal: AbortSignal,
+  reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
 ) {
   const runtimeDirectory = issueWorkerSessionDirectory(configDirectory, issue);
   const runtimeConfig = structuredClone(config);
@@ -1828,6 +1835,7 @@ async function runClaimedIssue(
       workerToken,
       signal,
       runtimeDirectory,
+      reportCheckpoint,
     );
   } finally {
     await rm(runtimeDirectory, { recursive: true, force: true });
@@ -1841,6 +1849,7 @@ async function runClaimedIssueInRuntime(
   workerToken: string,
   signal: AbortSignal,
   runtimeDirectory: string,
+  reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
 ) {
   const execution = issue.execution ??
     (issue.agent
@@ -1866,6 +1875,7 @@ async function runClaimedIssueInRuntime(
       `Worker workspace allocation failed: ${workspaceError ?? "no workspace"}`,
     );
   }
+  reportCheckpoint?.({ workspacePath: workspace.path });
 
   const provider = execution.provider;
   const attachments = await Promise.all(
@@ -1964,6 +1974,9 @@ async function runClaimedIssueInRuntime(
     projectId: project.id,
     sessionId,
     runId: issue.runId,
+    workType: "issue" as const,
+    workId: issue.runId,
+    claimToken: issue.claimToken,
     ...(issue.executionId ? { executionId: issue.executionId } : {}),
     workerId: activeProject.executionWorker?.workerId,
     agentProvider: provider,
@@ -1989,7 +2002,8 @@ async function runClaimedIssueInRuntime(
       );
     },
   });
-  let conversationId: string | null = null;
+  let conversationId: string | null = issue.handoffContext?.conversationId ?? null;
+  if (conversationId) reportCheckpoint?.({ conversationId });
   let nextPrompt = prompt;
   let turnNumber = 0;
   let consecutiveProviderTurnFailures = 0;
@@ -2009,6 +2023,10 @@ async function runClaimedIssueInRuntime(
             : undefined,
         environment,
         signal,
+        onConversationId: (nextConversationId) => {
+          conversationId = nextConversationId;
+          reportCheckpoint?.({ conversationId: nextConversationId });
+        },
         onPayload: async (rawPayload, line) => {
           usageCollector.observe(rawPayload, new Date().toISOString());
           runnerBlock ??= detachedProviderBlockFromPayload(rawPayload);
@@ -2132,6 +2150,9 @@ async function runClaimedIssueInRuntime(
         sessionId,
         runId: issue.runId,
         runAttempt: issue.currentAttempt,
+        workType: "issue" as const,
+        workId: issue.runId,
+        claimToken: issue.claimToken,
         ...(issue.executionId ? { executionId: issue.executionId } : {}),
         workerId: activeProject.executionWorker?.workerId,
         agentProvider: provider,
@@ -2223,8 +2244,10 @@ async function runClaimedProjectAgentTask(
   workerToken: string,
   workerId: string,
   signal: AbortSignal,
+  reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
 ) {
   const workspacePath = project.repositoryPath;
+  reportCheckpoint?.({ workspacePath });
   const organizationId = project.executionWorker?.organizationId;
   if (!organizationId) throw new Error("Worker registration is missing");
   const agent: DetachedAgent = {
@@ -2245,6 +2268,10 @@ async function runClaimedProjectAgentTask(
   const transcriptEnvelope = {
     projectId: project.id,
     sessionId: task.workId,
+    runId: task.runId,
+    workType: "projectAgentTask" as const,
+    workId: task.workId,
+    claimToken: task.claimToken,
     workerId,
     agentProvider: agent.provider,
   };
@@ -2269,6 +2296,8 @@ async function runClaimedProjectAgentTask(
       );
     },
   });
+  let conversationId: string | null = task.handoffContext?.conversationId ?? null;
+  if (conversationId) reportCheckpoint?.({ conversationId });
   const turn = await (async () => {
     try {
       return await runDetachedProviderTurn({
@@ -2276,6 +2305,7 @@ async function runClaimedProjectAgentTask(
         prompt,
         workspacePath,
         fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
+        conversationId,
         environment: providerExecutionEnvironment(config, agent.provider, {
           ...process.env,
           PATH: workerExecutionPath(),
@@ -2284,6 +2314,10 @@ async function runClaimedProjectAgentTask(
           BRIAR_PROJECT_ID: project.id,
         }),
         signal,
+        onConversationId: (nextConversationId) => {
+          conversationId = nextConversationId;
+          reportCheckpoint?.({ conversationId: nextConversationId });
+        },
         onPayload: async (rawPayload, line) => {
           const payload = detachedTranscriptPayload(rawPayload, line);
           const sequence = transcriptSequencer.nextForPayload(payload);
@@ -2308,7 +2342,7 @@ async function runClaimedProjectAgentTask(
     workerId,
     claimToken: task.claimToken,
     summary: turn.resultText.slice(0, 50_000),
-    conversationId: turn.conversationId ?? null,
+    conversationId: turn.conversationId ?? conversationId,
   };
 }
 
@@ -2368,6 +2402,7 @@ async function runClaimedIssueReply(
   issue: ClaimedIssueReply,
   workerToken: string,
   signal: AbortSignal,
+  reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
 ) {
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
@@ -2432,6 +2467,7 @@ async function runClaimedIssueReply(
     configuredWorktree?.path ??
     cachedAnalysisWorktree?.path ??
     project.repositoryPath;
+  reportCheckpoint?.({ workspacePath });
   const imageDirectory = await mkdtemp(join(tmpdir(), "briar-issue-reply-images-"));
   let imagesCleaned = false;
   let lastActivityErrorAt = Number.NEGATIVE_INFINITY;
@@ -2535,6 +2571,9 @@ async function runClaimedIssueReply(
       projectId: project.id,
       sessionId: `reply-${issue.workId}`,
       runId: issue.runId,
+      workType: "issueReply" as const,
+      workId: issue.workId,
+      claimToken: issue.claimToken,
       workerId: registered.workerId,
       agentProvider: provider,
     };
@@ -2559,6 +2598,8 @@ async function runClaimedIssueReply(
         );
       },
     });
+    let conversationId: string | null = issue.handoffContext?.conversationId ?? null;
+    if (conversationId) reportCheckpoint?.({ conversationId });
     const turn = await (async () => {
       try {
         return await runDetachedProviderTurn({
@@ -2568,6 +2609,7 @@ async function runClaimedIssueReply(
           fullAccess: false,
           readOnly: true,
           attachments,
+          conversationId,
           outputSchema: detachedIssueReplyOutputSchema,
           environment: providerExecutionEnvironment(config, agent.provider, {
             ...process.env,
@@ -2577,6 +2619,10 @@ async function runClaimedIssueReply(
             BRIAR_PROJECT_ID: project.id,
           }),
           signal,
+          onConversationId: (nextConversationId) => {
+            conversationId = nextConversationId;
+            reportCheckpoint?.({ conversationId: nextConversationId });
+          },
           onPayload: async (payload, line) => {
             activityPublisher.observePayload(payload);
             sequence += 1;
@@ -2683,6 +2729,7 @@ async function runClaimedChannelReply(
   reply: ClaimedChannelReply,
   workerToken: string,
   signal: AbortSignal,
+  reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
 ) {
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
@@ -2699,6 +2746,7 @@ async function runClaimedChannelReply(
   const workspacePath =
     analysisWorktree?.path ??
     join(configDirectory, "worker-sessions", `channel-${reply.workId}`);
+  reportCheckpoint?.({ workspacePath });
   if (!analysisWorktree) {
     // A prior hard-killed attempt may have left a path behind. Recreate the
     // exact claim workspace so stale files or a planted symlink cannot become
@@ -2822,7 +2870,8 @@ async function runClaimedChannelReply(
       delegation: reply.delegation,
       skillExecutionTarget: reply.skillExecutionTarget,
     });
-    let conversationId: string | null = null;
+    let conversationId: string | null = reply.handoffContext?.conversationId ?? null;
+    if (conversationId) reportCheckpoint?.({ conversationId });
     let lookupRounds = 0;
     let turnPrompt = prompt;
     let result: ReturnType<typeof parseChannelReplyAgentResult>["result"] | null =
@@ -2852,6 +2901,10 @@ async function runClaimedChannelReply(
           BRIAR_PROJECT_ID: project.id,
         }),
         signal,
+        onConversationId: (nextConversationId) => {
+          conversationId = nextConversationId;
+          reportCheckpoint?.({ conversationId: nextConversationId });
+        },
         onPayload: (payload) => {
           activityPublisher.observePayload(payload);
         },
@@ -3527,7 +3580,6 @@ async function workerCommand() {
         if (heartbeat.updateDirective) {
           effectiveAcceptingWork = false;
           if (
-            readinessState === "ready" &&
             supportsRemoteWorkerUpdates(platform()) &&
             lastTriggeredUpdateId !== heartbeat.updateDirective.id
           ) {
@@ -3614,7 +3666,31 @@ async function workerCommand() {
             registered.maxConcurrentSessions,
         };
       },
-      runIssue: async (issue, signal) => {
+      handoff: async (issue, requestId, checkpoint) => {
+        const workType = issue.workType ?? "issue";
+        const workId = issue.workId ?? issue.runId;
+        await request(
+          config.apiUrl,
+          `/workers/${workerId}/update-handoff/claim`,
+          workerToken,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              requestId,
+              projectId: project.id,
+              workType,
+              workId,
+              runId: issue.runId,
+              claimToken: issue.claimToken,
+              checkpoint: {
+                conversationId: checkpoint.conversationId ?? null,
+                workspacePath: checkpoint.workspacePath ?? null,
+              },
+            }),
+          },
+        );
+      },
+      runIssue: async (issue, signal, reportCheckpoint) => {
         if (issue.workType === "projectAgentTask") {
           const task = decodeClaimedProjectAgentTask(issue);
           await runProjectAgentTaskCompletionFlow({
@@ -3625,6 +3701,7 @@ async function workerCommand() {
               workerToken,
               workerId,
               signal,
+              reportCheckpoint,
             ),
             completeSuccess: (completion) => completeClaimedProjectAgentTask(
               config,
@@ -3633,13 +3710,16 @@ async function workerCommand() {
               completion,
               signal,
             ),
-            completeFailure: (error) => failClaimedProjectAgentTask(
-              config,
-              project,
-              task,
-              workerToken,
-              error,
-            ),
+            completeFailure: async (error) => {
+              if (signal.aborted) throw error;
+              return failClaimedProjectAgentTask(
+                config,
+                project,
+                task,
+                workerToken,
+                error,
+              );
+            },
             isRetryableCompletionError: (error) =>
               !(error instanceof HttpRequestError) ||
               error.status === 408 || error.status === 429 ||
@@ -3658,8 +3738,10 @@ async function workerCommand() {
               reply,
               workerToken,
               signal,
+              reportCheckpoint,
             );
           } catch (error) {
+            if (signal.aborted) throw error;
             await failClaimedChannelReply(
               config,
               project,
@@ -3679,8 +3761,10 @@ async function workerCommand() {
               reply,
               workerToken,
               signal,
+              reportCheckpoint,
             );
           } catch (error) {
+            if (signal.aborted) throw error;
             await failClaimedIssueReply(
               config,
               project,
@@ -3697,6 +3781,7 @@ async function workerCommand() {
           decodeClaimedRun(issue),
           workerToken,
           signal,
+          reportCheckpoint,
         );
       },
       sleep: interruptibleSleep,
@@ -3706,6 +3791,10 @@ async function workerCommand() {
     {
       once: has("--once"),
       maxConcurrentSessions: registered.maxConcurrentSessions,
+      // Planned update drains are delivered through heartbeat. Keep the
+      // active Worker below the 30-second handoff budget even while a
+      // provider turn is occupying every execution slot.
+      heartbeatIntervalMs: 10_000,
       ...(Number.isInteger(maxIssues) && maxIssues > 0 ? { maxIssues } : {}),
     },
   );
@@ -3747,6 +3836,74 @@ async function workerStatus() {
 
 async function workerRestartServices() {
   const config = await loadConfig();
+  const projects = config.projects.filter((project) => {
+    if (!project.executionWorker) return false;
+    const definition = serviceDefinition({
+      projectId: project.id,
+      briarBinary: process.execPath,
+      workingDirectory: project.repositoryPath,
+    });
+    return existsSync(definition.path);
+  });
+  const handoffs = new Map<
+    string,
+    { workerId: string; token: string; requestId: string }
+  >();
+  for (const project of projects) {
+    const registered = project.executionWorker;
+    if (!registered || handoffs.has(registered.workerId)) continue;
+    const prepared = await request<{
+      requestId: string;
+      targetVersion: string;
+      handoffState: string;
+      activeWorkCount: number;
+      ready: boolean;
+    }>(
+      config.apiUrl,
+      `/workers/${registered.workerId}/update-handoff/prepare`,
+      registered.token,
+      {
+        method: "POST",
+        body: JSON.stringify({ targetVersion: cliVersion }),
+      },
+    );
+    handoffs.set(registered.workerId, {
+      workerId: registered.workerId,
+      token: registered.token,
+      requestId: prepared.requestId,
+    });
+  }
+
+  const deadline = Date.now() + 30_000;
+  while (true) {
+    let ready = true;
+    for (const handoff of handoffs.values()) {
+      const status = await request<{
+        handoffState: string;
+        activeWorkCount: number;
+        ready: boolean;
+        handoffError?: string | null;
+      }>(
+        config.apiUrl,
+        `/workers/${handoff.workerId}/update-handoff/status?requestId=${encodeURIComponent(handoff.requestId)}`,
+        handoff.token,
+      );
+      if (status.handoffState === "failed") {
+        throw new Error(
+          `Worker update handoff failed: ${status.handoffError ?? "unknown reason"}`,
+        );
+      }
+      if (!status.ready || status.activeWorkCount > 0) ready = false;
+    }
+    if (ready) break;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        "Worker update handoff timed out after 30 seconds; services were not restarted so the old lease remains the safe fallback.",
+      );
+    }
+    await Bun.sleep(500);
+  }
+
   const definitions = config.projects
     .filter((project) => Boolean(project.executionWorker))
     .map((project) =>

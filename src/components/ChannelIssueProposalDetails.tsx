@@ -43,6 +43,7 @@ export function ChannelIssueProposalDetails({
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const issue = channelIssueProposalDetails(proposal);
   if (!issue) return null;
+  const requestsExecution = channelIssueProposalRequestsExecution(proposal);
   const descriptionNeedsExpansion = Boolean(
     issue.description &&
     (issue.description.length > 240 || issue.description.split("\n").length > 3),
@@ -89,9 +90,15 @@ export function ChannelIssueProposalDetails({
             {t("channel.issueProposalProject", { project: projectName })}
           </span>
         ) : null}
-        <span>{t("channel.issueProposalBacklogOnly")}</span>
+        <span>
+          {t(
+            requestsExecution
+              ? "channel.issueProposalCreateAndExecute"
+              : "channel.issueProposalBacklogOnly",
+          )}
+        </span>
       </div>
-      {channelIssueProposalRequestsExecution(proposal) ? (
+      {requestsExecution ? (
         <p className="channel-proposal-execution-intent">
           {t("channel.issueProposalExecutionRequested")}
         </p>

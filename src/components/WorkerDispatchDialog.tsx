@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ChoiceCard } from "@/components/ui/choice-card";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
@@ -29,6 +30,7 @@ import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import type {
   ExecutionWorker,
   HuntRun,
+  IssueExecutionApprovalInput,
   ProjectExecutionWorkerPolicy,
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
@@ -38,6 +40,7 @@ import { WorkerIcon } from "./WorkerIcon";
 export function WorkerDispatchDialog({
   didDispatchSuccessfully = false,
   error,
+  initialSelection = null,
   intent = "dispatch",
   isDispatching,
   onOpenChange,
@@ -45,12 +48,15 @@ export function WorkerDispatchDialog({
   open,
   policy,
   run,
+  selectionKey,
   submissionDisabled = false,
+  targetTitle,
   workers,
 }: {
   didDispatchSuccessfully?: boolean;
   error: string | null;
-  intent?: "dispatch" | "approve_execution";
+  initialSelection?: IssueExecutionApprovalInput | null;
+  intent?: "dispatch" | "approve_execution" | "create_and_execute";
   isDispatching: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: {
@@ -62,7 +68,9 @@ export function WorkerDispatchDialog({
   open: boolean;
   policy?: ProjectExecutionWorkerPolicy;
   run: HuntRun | null;
+  selectionKey?: string;
   submissionDisabled?: boolean;
+  targetTitle?: string;
   workers: ExecutionWorker[];
 }) {
   const { t } = useI18n();
@@ -119,7 +127,7 @@ export function WorkerDispatchDialog({
     (option) => option.value === model,
   );
   const normalizedModel = model.trim();
-  const selectionSessionKey = run?.id ?? "__without-run__";
+  const selectionSessionKey = run?.id ?? selectionKey ?? "__without-run__";
 
   useEffect(() => {
     if (!open) {
@@ -134,9 +142,16 @@ export function WorkerDispatchDialog({
     selectionSessionRef.current = selectionSessionKey;
     const preferredWorker = policyWorkers.find(
       (worker) =>
-        worker.id === (run?.requestedWorkerId ?? policy?.defaultWorkerId),
+        worker.id === (
+          initialSelection?.workerId ??
+          run?.requestedWorkerId ??
+          policy?.defaultWorkerId
+        ),
     );
     const initialProvider =
+      (initialSelection && healthyProviders.includes(initialSelection.provider)
+        ? initialSelection.provider
+        : null) ??
       run?.preferredProvider ??
       run?.requestedProvider ??
       preferredWorker?.agentProvider ??
@@ -145,20 +160,30 @@ export function WorkerDispatchDialog({
     initializingProviderRef.current = initialProvider;
     setProvider(initialProvider);
     setModel(
-      run?.preferredProvider
-        ? (run.preferredModel ?? "")
-        : run?.requestedProvider
-          ? (run.requestedModel ?? "")
-          : "",
+      initialSelection
+        ? (initialSelection.model ?? "")
+        : run?.preferredProvider
+          ? (run.preferredModel ?? "")
+          : run?.requestedProvider
+            ? (run.requestedModel ?? "")
+            : "",
     );
     setEffort(
-      run?.preferredProvider
-        ? (run.preferredEffort ?? "")
-        : (run?.requestedEffort ?? ""),
+      initialSelection
+        ? (initialSelection.effort ?? "")
+        : run?.preferredProvider
+          ? (run.preferredEffort ?? "")
+          : (run?.requestedEffort ?? ""),
     );
-    setWorkerId(run?.requestedWorkerId ?? policy?.defaultWorkerId ?? "");
+    setWorkerId(
+      initialSelection?.workerId ??
+      run?.requestedWorkerId ??
+      policy?.defaultWorkerId ??
+      "",
+    );
   }, [
     healthyProviders,
+    initialSelection,
     open,
     policy?.defaultWorkerId,
     policyWorkers,
@@ -209,22 +234,29 @@ export function WorkerDispatchDialog({
       ));
   const isReassign = Boolean(run?.dispatchedAt || run?.workerId);
   const isApproval = intent === "approve_execution";
+  const isCreateAndExecute = intent === "create_and_execute";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {t(isApproval
-              ? "worker.executionApprovalTitle"
-              : "worker.dispatchTitle")}
+            {t(
+              isCreateAndExecute
+                ? "worker.createExecutionApprovalTitle"
+                : isApproval
+                  ? "worker.executionApprovalTitle"
+                  : "worker.dispatchTitle",
+            )}
           </DialogTitle>
           <DialogDescription>
             {t(
-              isApproval
-                ? "worker.executionApprovalDescription"
-                : "worker.dispatchDescription",
-              { title: run?.title ?? "" },
+              isCreateAndExecute
+                ? "worker.createExecutionApprovalDescription"
+                : isApproval
+                  ? "worker.executionApprovalDescription"
+                  : "worker.dispatchDescription",
+              { title: targetTitle ?? run?.title ?? "" },
             )}
           </DialogDescription>
         </DialogHeader>
@@ -317,58 +349,50 @@ export function WorkerDispatchDialog({
               <p><CircleAlert size={15} />{t("worker.noneForProvider")}</p>
             ) : (
               <>
-                <button
-                  aria-pressed={workerId === ""}
+                <ChoiceCard
                   className="worker-readiness-row"
+                  description={t("worker.anyAvailableDetail")}
+                  icon={<Waypoints />}
+                  iconClassName="[&_svg]:size-[26px]"
+                  layout="horizontal"
+                  leading={<span className="worker-readiness-dot any" />}
                   onClick={() => {
                     selectionDirtyRef.current = true;
                     setWorkerId("");
                   }}
-                  type="button"
-                >
-                  <span className="worker-readiness-dot any" />
-                  <span className="worker-readiness-any-icon">
-                    <Waypoints size={30} />
-                  </span>
-                  <span>
-                    <strong>{t("worker.anyAvailable")}</strong>
-                    <small>{t("worker.anyAvailableDetail")}</small>
-                  </span>
-                  <Check
-                    aria-hidden="true"
-                    className="worker-readiness-check"
-                    size={16}
-                  />
-                </button>
+                  selected={workerId === ""}
+                  title={t("worker.anyAvailable")}
+                  trailing={workerId === "" ? <Check aria-hidden="true" /> : null}
+                />
                 {eligibleWorkers.map((worker) => (
-                  <button
-                    aria-pressed={workerId === worker.id}
+                  <ChoiceCard
                     className="worker-readiness-row"
-                    disabled={worker.readiness !== "available"}
-                    key={worker.id}
-                    onClick={() => {
-                      selectionDirtyRef.current = true;
-                      setWorkerId(worker.id);
-                    }}
-                    type="button"
-                  >
-                    <span className={`worker-readiness-dot ${worker.readiness}`} />
-                    <WorkerIcon icon={worker.icon} size={30} />
-                    <span>
-                      <strong>{worker.label}</strong>
-                      <small>
+                    description={
+                      <>
                         {t(`worker.readiness.${worker.readiness}` as MessageKey)}
                         {worker.readinessDetail
                           ? ` · ${worker.readinessDetail}`
                           : ""}
-                      </small>
-                    </span>
-                    <Check
-                      aria-hidden="true"
-                      className="worker-readiness-check"
-                      size={16}
-                    />
-                  </button>
+                      </>
+                    }
+                    disabled={worker.readiness !== "available"}
+                    icon={<WorkerIcon icon={worker.icon} size={30} />}
+                    iconClassName="bg-transparent"
+                    key={worker.id}
+                    layout="horizontal"
+                    leading={
+                      <span className={`worker-readiness-dot ${worker.readiness}`} />
+                    }
+                    onClick={() => {
+                      selectionDirtyRef.current = true;
+                      setWorkerId(worker.id);
+                    }}
+                    selected={workerId === worker.id}
+                    title={worker.label}
+                    trailing={
+                      workerId === worker.id ? <Check aria-hidden="true" /> : null
+                    }
+                  />
                 ))}
               </>
             )}
@@ -419,11 +443,13 @@ export function WorkerDispatchDialog({
               ? t(isApproval
                 ? "worker.executionApprovalComplete"
                 : "worker.dispatchComplete")
-              : t(isApproval
-                ? "worker.approveExecution"
-                : isReassign
-                  ? "worker.reassign"
-                  : "worker.dispatch")}
+              : t(isCreateAndExecute
+                ? "worker.approveCreateExecution"
+                : isApproval
+                  ? "worker.approveExecution"
+                  : isReassign
+                    ? "worker.reassign"
+                    : "worker.dispatch")}
           </Button>
         </DialogFooter>
       </DialogContent>

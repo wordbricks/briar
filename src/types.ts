@@ -567,6 +567,8 @@ export type OrganizationExecutionWorker = {
     targetVersion: string;
     status: "requested" | "completed" | "cancelled";
     requestedAt: string;
+    handoffState?: "idle" | "draining" | "ready" | "failed";
+    handoffError?: string | null;
   } | null;
   bindings: Array<{
     id: string;

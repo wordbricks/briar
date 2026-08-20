@@ -12,7 +12,6 @@ import {
   FolderOpen,
   GitBranch,
   Github,
-  HeartHandshake,
   Info,
   LoaderCircle,
   PlayCircle,
@@ -25,6 +24,7 @@ import type { ProjectConnection } from "../hooks/useBriar";
 import { ApiError, apiErrorIssueMessages } from "../lib/api";
 import type {
   LocalAutoHuntConfig,
+  LovableRepositoryCompatibility,
   RepositoryReadiness,
   WorkflowRequirementHealth,
 } from "../lib/project-connection";
@@ -37,12 +37,14 @@ import {
   githubSshRepositoryName,
   repositoryProjectName,
 } from "../lib/project-workspace";
+import { lovableWorkflowPreset } from "../lib/lovable-workflow";
 import {
   agentProviderLabels,
   type ProjectLlmProgress,
 } from "../lib/project-llm";
 import { formatExecutionDuration } from "../lib/agent-execution-metrics";
 import { useI18n } from "../i18n";
+import lovableLogo from "../assets/lovable-color.png";
 import { DeveloperToolsSetup } from "./DeveloperToolsSetup";
 import { ChoiceCard } from "./ui/choice-card";
 import {
@@ -90,6 +92,9 @@ type Props = {
   ) => Promise<PreparedProjectConnection>;
   onCreate: (input: { name: string }) => Promise<unknown>;
   onFinish: () => void;
+  onInspectLovableRepository: (
+    repositoryPath: string,
+  ) => Promise<LovableRepositoryCompatibility>;
   onReviseWorkflow: (
     projectId: string,
     requestedChange: string,
@@ -289,6 +294,7 @@ export function ProjectOnboarding({
   onConnect,
   onCreate,
   onFinish,
+  onInspectLovableRepository,
   onRepositoryInspect,
   onRepositorySelect,
   onReviseWorkflow,
@@ -324,6 +330,8 @@ export function ProjectOnboarding({
   const [lovableRepositoryUrl, setLovableRepositoryUrl] = useState("");
   const [lovableImporting, setLovableImporting] = useState(false);
   const [lovableError, setLovableError] = useState<string | null>(null);
+  const [lovablePreset, setLovablePreset] =
+    useState<AutoHuntWorkflow | null>(null);
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -350,14 +358,17 @@ export function ProjectOnboarding({
     ) {
       return;
     }
-    const key = `${connection.project.id}:${generationAttempt}`;
+    const key = `${connection.project.id}:${generationAttempt}:${
+      lovablePreset ? "lovable" : "generated"
+    }`;
     const settings: LocalAutoHuntConfig = {
       velenOrg: null,
       linearEnabled: false,
       linearSource: null,
       linearTeam: null,
       githubRepository: repositoryReadiness?.githubRepository ?? null,
-      workflow: connection.workflow ?? repositoryWorkflowBootstrap,
+      workflow:
+        lovablePreset ?? connection.workflow ?? repositoryWorkflowBootstrap,
     };
     if (generationRequest.current?.key !== key) {
       generationProgressKey.current = key;
@@ -379,6 +390,10 @@ export function ProjectOnboarding({
         setRepositoryPath(result.repositoryPath);
         setWorkflow(result.workflow);
         generationProgressKey.current = null;
+        if (lovablePreset) {
+          onFinish();
+          return;
+        }
         setPhase("workflow-review");
       })
       .catch((caught) => {
@@ -400,7 +415,9 @@ export function ProjectOnboarding({
   }, [
     connection,
     generationAttempt,
+    lovablePreset,
     onConnect,
+    onFinish,
     phase,
     repositoryPath,
     repositoryReadiness?.githubRepository,
@@ -460,6 +477,12 @@ export function ProjectOnboarding({
       setRepositoryPath(readiness.repositoryPath);
       setRepositoryReadiness(readiness);
       setName(cloned.repositoryName || repositoryName);
+      const compatibility = await onInspectLovableRepository(
+        readiness.repositoryPath,
+      ).catch(() => null);
+      setLovablePreset(
+        compatibility ? lovableWorkflowPreset(compatibility) : null,
+      );
       await onCreate({ name: cloned.repositoryName || repositoryName });
       setWorkflowError(null);
       setPhase("workflow-loading");
@@ -674,8 +697,8 @@ export function ProjectOnboarding({
                   <ChoiceCard
                     className="max-[680px]:min-h-[150px] min-[681px]:min-h-[218px]"
                     description={t("onboarding.migrateLovableDescription")}
-                    icon={<HeartHandshake />}
-                    iconClassName="bg-destructive/10 text-destructive"
+                    icon={<img alt="" aria-hidden="true" src={lovableLogo} />}
+                    iconClassName="bg-transparent [&_img]:size-10 [&_img]:object-contain"
                     onClick={() => setPhase("lovable-tutorial")}
                     title={t("onboarding.migrateLovableTitle")}
                     trailing={<ArrowRight />}
@@ -899,12 +922,22 @@ export function ProjectOnboarding({
                 ) : (
                   <>
                     <span className="onboarding-process-icon"><LoaderCircle className="spin" size={27} /></span>
-                    <h1>{t("onboarding.generatingWorkflowTitle")}</h1>
-                    <p>{t("onboarding.generatingWorkflowDescription")}</p>
-                    <OnboardingProviderProgress
-                      progress={workflowProgress}
-                      progressMessageRef={workflowProgressMessage}
-                    />
+                    <h1>
+                      {lovablePreset
+                        ? t("onboarding.lovablePresetTitle")
+                        : t("onboarding.generatingWorkflowTitle")}
+                    </h1>
+                    <p>
+                      {lovablePreset
+                        ? t("onboarding.lovablePresetDescription")
+                        : t("onboarding.generatingWorkflowDescription")}
+                    </p>
+                    {!lovablePreset ? (
+                      <OnboardingProviderProgress
+                        progress={workflowProgress}
+                        progressMessageRef={workflowProgressMessage}
+                      />
+                    ) : null}
                   </>
                 )}
               </section>

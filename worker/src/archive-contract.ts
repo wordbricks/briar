@@ -161,6 +161,7 @@ export const ArchivedProjectAgentSession = Schema.Struct({
   project_id: Schema.String,
   id: Schema.String,
   agent_id: NullableString,
+  requested_by_user_id: LegacyNullableString,
   status: Schema.Literals([
     "running",
     "completed",

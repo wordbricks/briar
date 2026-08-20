@@ -168,6 +168,7 @@ export function createCodexAppServerState(
 
 export function codexAppServerArgs(
   request: Pick<CodexRunnerRequest, "networkAccess" | "externalTools">,
+  browserAutomationProvider?: string,
 ): string[] {
   const argumentsList = ["app-server", "--listen", "stdio://"];
   if (request.externalTools === false) {
@@ -191,6 +192,17 @@ export function codexAppServerArgs(
       'default_permissions="briar_read_only"',
       "--config",
       'permissions.briar_read_only={filesystem={":minimal"="read",":workspace_roots"={"."="read"}},network={enabled=false}}',
+    );
+  }
+  if (
+    request.externalTools !== false &&
+    browserAutomationProvider === "aside"
+  ) {
+    argumentsList.push(
+      "--config",
+      'mcp_servers.aside.command="aside"',
+      "--config",
+      'mcp_servers.aside.args=["mcp"]',
     );
   }
   if (request.networkAccess) {

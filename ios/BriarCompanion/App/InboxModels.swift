@@ -305,6 +305,9 @@ enum InboxMessageBuilder {
         }
 
         for session in sessions where session.status == .completed || session.status == .failed {
+            guard let currentUserID, session.requestedByUserId == currentUserID else {
+                continue
+            }
             let finalEvent = (session.events ?? []).reversed().first {
                 $0.type.rawValue == session.status.rawValue
             }

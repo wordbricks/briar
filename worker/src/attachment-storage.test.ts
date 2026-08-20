@@ -81,6 +81,7 @@ describe("attachment storage", () => {
       "issues/run/attachment-1",
       "issues/run/attachment-2",
     ]);
+    expect(put.mock.calls[0]?.[1]).toBe(attachments[0]!.file);
     expect(put.mock.calls[0]?.[2]).toEqual({
       httpMetadata: {
         contentType: "image/png",

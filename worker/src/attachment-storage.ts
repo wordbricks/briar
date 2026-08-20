@@ -35,7 +35,9 @@ export async function uploadStoredAttachments(
   customMetadata: (attachment: StoredAttachmentFile) => Record<string, string>,
 ) {
   for (const attachment of attachments) {
-    await bucket.put(attachment.object_key, attachment.file.stream(), {
+    // Passing the Blob preserves its known byte length. A derived stream can
+    // lose that length marker and R2 rejects unknown-length request bodies.
+    await bucket.put(attachment.object_key, attachment.file, {
       httpMetadata: {
         contentType: attachment.content_type,
         contentDisposition: contentDisposition(attachment.filename),

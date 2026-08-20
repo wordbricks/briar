@@ -241,6 +241,7 @@ export type ProjectAgentSessionRow = {
   project_id: string;
   id: string;
   agent_id: string | null;
+  requested_by_user_id: string | null;
   status: "running" | "completed" | "failed" | "skipped" | "interrupted";
   session_type: "task" | "dispatch";
   payload_json: string;
@@ -285,6 +286,7 @@ export type ProjectAgentTaskJobRow = {
   claimed_at: string | null;
   lease_expires_at: string | null;
   attempts: number;
+  planned_update_resume: number;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -347,6 +349,7 @@ export type ProjectAgentScheduleRow = {
   time_zone: string;
   enabled: number;
   next_run_at: string | null;
+  created_by_user_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -423,6 +426,7 @@ export type HuntRunRow = {
   claimed_at: string | null;
   lease_expires_at: string | null;
   claim_attempts: number;
+  planned_update_resume: number;
   last_execution_id: string | null;
   paused_at: string | null;
   resume_requested_at: string | null;
@@ -746,6 +750,7 @@ export type IssueAgentReplyJobRow = {
   claimed_at: string | null;
   lease_expires_at: string | null;
   attempts: number;
+  planned_update_resume: number;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -982,6 +987,7 @@ export type HuntEventInput = {
   stagingQaDetail: string | null;
   productionQaDetail: string | null;
   context: Record<string, unknown> | null;
+  postInsertIssueDescription?: string | null;
   createdByUserId?: string | null;
   preferredAgentProvider?: ProjectAgentProvider | null;
   preferredAgentModel?: string | null;
@@ -4507,6 +4513,7 @@ const projectAgentSessionSummaryJson = (row: ProjectAgentSessionRow) => {
     scheduleId: payload.scheduleId ?? null,
     scheduleRunId: payload.scheduleRunId ?? null,
     parentSessionId: payload.parentSessionId ?? null,
+    requestedByUserId: row.requested_by_user_id,
     request: typeof payload.request === "string"
       ? payload.request.slice(0, 500)
       : null,
@@ -4528,11 +4535,17 @@ const upsertProjectAgentSessionSummaryStatement = (
   db: D1Database,
   row: ProjectAgentSessionRow,
   archived: boolean,
-) =>
-  db.prepare(
+  requesterFromHotSession = false,
+) => {
+  const requesterExpression = requesterFromHotSession
+    ? `(select session.requested_by_user_id
+        from briar_project_agent_sessions session
+        where session.project_id = ? and session.id = ?)`
+    : "?";
+  return db.prepare(
     `insert into briar_project_agent_session_summaries (
        project_id, session_id, summary_json, updated_at, archived
-     ) values (?, ?, ?, ?, ?)
+     ) values (?, ?, json_set(?, '$.requestedByUserId', ${requesterExpression}), ?, ?)
      on conflict (project_id, session_id) do update set
        summary_json = excluded.summary_json,
        updated_at = excluded.updated_at,
@@ -4543,9 +4556,13 @@ const upsertProjectAgentSessionSummaryStatement = (
     row.project_id,
     row.id,
     projectAgentSessionSummaryJson(row),
+    ...(requesterFromHotSession
+      ? [row.project_id, row.id]
+      : [row.requested_by_user_id]),
     row.updated_at,
     archived ? 1 : 0,
   );
+};
 
 export async function upsertProjectAgentSessionSummary(
   db: D1Database,
@@ -4559,21 +4576,30 @@ export async function listProjectAgentSessionSummaries(
   db: D1Database,
   projectId: string,
   sessionIds?: readonly string[],
+  requestedByUserId?: string,
 ) {
   if (sessionIds?.length === 0) return [];
   const idFilter = sessionIds
     ? `and session_id in (${sessionIds.map(() => "?").join(",")})`
     : "";
+  const requesterFilter = requestedByUserId === undefined
+    ? ""
+    : "and json_extract(summary_json, '$.requestedByUserId') = ?";
   const rowLimit = sessionIds ? projectAgentSessionChangePageSize : 200;
   const result = await db
     .prepare(
       `select project_id, session_id, summary_json, updated_at, archived
        from briar_project_agent_session_summaries
-       where project_id = ? ${idFilter}
+       where project_id = ? ${idFilter} ${requesterFilter}
        order by updated_at desc, session_id
        limit ?`,
     )
-    .bind(projectId, ...(sessionIds ?? []), rowLimit)
+    .bind(
+      projectId,
+      ...(sessionIds ?? []),
+      ...(requestedByUserId === undefined ? [] : [requestedByUserId]),
+      rowLimit,
+    )
     .all<ProjectAgentSessionSummaryRow>();
   return result.results;
 }
@@ -4654,7 +4680,8 @@ export async function listProjectAgentSessions(
 ) {
   const result = await db
     .prepare(
-      `select project_id, id, agent_id, status, session_type, payload_json,
+      `select project_id, id, agent_id, requested_by_user_id, status,
+              session_type, payload_json,
               started_at, completed_at, updated_at
        from briar_project_agent_sessions
        where project_id = ?
@@ -4673,7 +4700,8 @@ export async function getProjectAgentSession(
 ) {
   return db
     .prepare(
-      `select project_id, id, agent_id, status, session_type, payload_json,
+      `select project_id, id, agent_id, requested_by_user_id, status,
+              session_type, payload_json,
               started_at, completed_at, updated_at
        from briar_project_agent_sessions
        where project_id = ? and id = ?`,
@@ -4726,8 +4754,8 @@ export async function upsertProjectAgentSession(
     db.prepare(
       `insert into briar_project_agent_sessions (
          project_id, id, agent_id, status, session_type, payload_json,
-         started_at, completed_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         started_at, completed_at, updated_at, requested_by_user_id
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        on conflict (project_id, id) do update set
          agent_id = excluded.agent_id,
          status = excluded.status,
@@ -4748,12 +4776,14 @@ export async function upsertProjectAgentSession(
       input.started_at,
       input.completed_at,
       input.updated_at,
+      input.requested_by_user_id,
     ),
-    upsertProjectAgentSessionSummaryStatement(db, input, false),
+    upsertProjectAgentSessionSummaryStatement(db, input, false, true),
   ]);
   return db
     .prepare(
-      `select project_id, id, agent_id, status, session_type, payload_json,
+      `select project_id, id, agent_id, requested_by_user_id, status,
+              session_type, payload_json,
               started_at, completed_at, updated_at
        from briar_project_agent_sessions
        where project_id = ? and id = ?`,
@@ -4902,7 +4932,8 @@ export async function claimNextProjectAgentTask(
       `update briar_project_agent_task_jobs
        set status = 'running', claimed_worker_id = ?,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
-           attempts = attempts + 1, error = null, updated_at = ?
+           attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
+           planned_update_resume = 0, error = null, updated_at = ?
        where id = (
          select job.id
          from briar_project_agent_task_jobs job
@@ -5400,6 +5431,7 @@ type ProjectAgentScheduleInput = {
   daysOfWeek?: number[];
   notificationLevel?: ProjectAgentScheduleNotificationLevel;
   timeZone: string;
+  createdByUserId?: string | null;
 };
 
 function persistedProjectAgentScheduleRecurrence(
@@ -5423,7 +5455,7 @@ export async function listProjectAgentSchedules(
               schedule.interval_value, schedule.interval_unit,
               schedule.days_of_week, schedule.notification_level,
               schedule.time_zone, schedule.enabled,
-              schedule.next_run_at,
+              schedule.next_run_at, schedule.created_by_user_id,
               schedule.created_at, schedule.updated_at
        from briar_project_agent_schedules schedule
        join briar_project_agents agent on agent.id = schedule.agent_id
@@ -5433,6 +5465,22 @@ export async function listProjectAgentSchedules(
     .bind(projectId)
     .all<ProjectAgentScheduleRow>();
   return result.results;
+}
+
+export async function getProjectAgentScheduleCreatorId(
+  db: D1Database,
+  projectId: string,
+  scheduleId: string,
+) {
+  const schedule = await db
+    .prepare(
+      `select created_by_user_id
+       from briar_project_agent_schedules
+       where project_id = ? and id = ?`,
+    )
+    .bind(projectId, scheduleId)
+    .first<{ created_by_user_id: string | null }>();
+  return schedule?.created_by_user_id ?? null;
 }
 
 export async function createProjectAgentSchedule(
@@ -5475,8 +5523,8 @@ export async function createProjectAgentSchedule(
          id, project_id, agent_id, name, recurrence, frequency, time_of_day,
          day_of_week, interval_value, interval_unit, days_of_week,
          notification_level, time_zone, enabled, next_run_at, created_at,
-         updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+         updated_at, created_by_user_id
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -5496,6 +5544,7 @@ export async function createProjectAgentSchedule(
       nextRunAt,
       createdAt,
       createdAt,
+      input.createdByUserId ?? null,
     )
     .run();
 
@@ -5508,7 +5557,7 @@ export async function createProjectAgentSchedule(
               schedule.interval_value, schedule.interval_unit,
               schedule.days_of_week, schedule.notification_level,
               schedule.time_zone, schedule.enabled,
-              schedule.next_run_at,
+              schedule.next_run_at, schedule.created_by_user_id,
               schedule.created_at, schedule.updated_at
        from briar_project_agent_schedules schedule
        join briar_project_agents agent on agent.id = schedule.agent_id
@@ -5595,7 +5644,7 @@ export async function updateProjectAgentSchedule(
               schedule.interval_value, schedule.interval_unit,
               schedule.days_of_week, schedule.notification_level,
               schedule.time_zone, schedule.enabled,
-              schedule.next_run_at,
+              schedule.next_run_at, schedule.created_by_user_id,
               schedule.created_at, schedule.updated_at
        from briar_project_agent_schedules schedule
        join briar_project_agents agent on agent.id = schedule.agent_id
@@ -7808,7 +7857,8 @@ export async function claimNextIssueAgentReply(
              else ?
            end,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
-           attempts = attempts + 1, error = null, updated_at = ?
+           attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
+           planned_update_resume = 0, error = null, updated_at = ?
        where id = (
          select job.id
          from briar_issue_agent_reply_jobs job
@@ -9802,7 +9852,10 @@ export async function claimNextQueuedHuntRun(
     .prepare(
       `update briar_hunt_runs
        set claim_token_hash = ?, claimed_by = ?, claimed_at = ?,
-           lease_expires_at = ?, claim_attempts = claim_attempts + 1,
+           lease_expires_at = ?,
+           claim_attempts = claim_attempts +
+             case when planned_update_resume = 1 then 0 else 1 end,
+           planned_update_resume = 0,
            last_execution_id = ?,
            worker_id = ?,
            status = case
@@ -10844,7 +10897,31 @@ export async function recordHuntEvent(
         eventAttempt,
         eventId,
       ),
+    ...(normalizedInput.postInsertIssueDescription === undefined
+      ? []
+      : [
+          db
+            .prepare(
+              `update briar_hunt_runs
+               set issue_description = ?, updated_at = ?
+               where id = ? and project_id = ?
+               returning id, issue_description`,
+            )
+            .bind(
+              normalizedInput.postInsertIssueDescription,
+              recordedAt,
+              runId,
+              projectId,
+            ),
+        ]),
   ]);
+
+  if (
+    normalizedInput.postInsertIssueDescription !== undefined &&
+    (results[3]?.results?.length ?? 0) !== 1
+  ) {
+    throw new Error("Post-insert issue description could not be persisted");
+  }
 
   if ((results[1]?.meta.changes ?? 0) === 0) {
     const existingEvent = await db

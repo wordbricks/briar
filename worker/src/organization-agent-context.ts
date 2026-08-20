@@ -791,7 +791,8 @@ const getContextSession = async (
 ) => {
   const hot = await db.prepare(
     `select session.project_id, session.id, session.agent_id, session.status,
-            session.session_type, session.payload_json, session.started_at,
+            session.requested_by_user_id, session.session_type,
+            session.payload_json, session.started_at,
             session.completed_at, session.updated_at
      from briar_project_agent_sessions session
      join briar_project_agent_session_context_membership membership

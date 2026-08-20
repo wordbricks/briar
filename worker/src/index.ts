@@ -60,6 +60,7 @@ import {
 } from "../../src/lib/evidence-images";
 import {
   maxIssueMultipartBytes,
+  normalizeIssueAttachmentFile,
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
 import {
@@ -222,6 +223,7 @@ import {
   failSlackRevocation,
   findProjectIdByAgentTokenHash,
   getProjectAgent,
+  getProjectAgentScheduleCreatorId,
   getClaimedIssueAgentReply,
   getIssueActionProposal,
   getIssueExecutionProposal,
@@ -337,7 +339,6 @@ import {
   updateProjectIcon,
   updateProjectIssueKeyPrefix,
   updateProjectScheduleTabEnabled,
-  updateIssue,
   updateIssueWithAttachmentMetadata,
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
@@ -348,6 +349,7 @@ import {
   updateSlackInstallationProject,
   acknowledgeOrganizationInboxRealtimeOutbox,
   upsertProjectAgentSession,
+  upsertProjectAgentSessionSummary,
   upsertSlackInstallation,
   syncGithubPullRequest,
   syncGithubConnectionRepositories,
@@ -420,6 +422,7 @@ import {
   parsePlacementKey,
 } from "../../src/lib/linear-import";
 import {
+  assertExecutionSelectionAvailable,
   availableExecutionWorkerForAgentSkill,
   auditExecutionEvent,
   authenticateExecutionWorker,
@@ -435,12 +438,16 @@ import {
   executionWorkerDeviceForBinding,
   executionWorkerProviders,
   executionWorkerSupportsOrganizationAgentContext,
+  executionWorkerUpdateStatus,
+  failExecutionWorkerUpdateHandoff,
+  handoffExecutionWorkerClaim,
   hasAvailableChannelReplyWorker,
   leaseExpiryFrom,
   listExecutionAuditEvents,
   listExecutionWorkers,
   listOrganizationExecutionWorkers,
   listOrganizationExecutionProviders,
+  latestExecutionWorkerUpdateHandoff,
   pendingExecutionWorkerUpdate,
   getProjectExecutionWorkerPolicy,
   hasExecutionWorkerReadinessChanged,
@@ -561,6 +568,11 @@ import {
   decodeWorkerSettings,
 } from "./worker-request-contract";
 import {
+  decodeWorkerUpdateHandoff,
+  decodeWorkerUpdatePrepare,
+  decodeWorkerUpdateRequestId,
+} from "./worker-update-contract";
+import {
   ingestAgentTranscript,
   listAgentTranscriptSegments,
   readAgentWorkLog,
@@ -639,6 +651,7 @@ import {
   updateChannel,
   updateChannelWebhook,
   consumeChannelWebhookRateLimit,
+  type ChannelRow,
   type ChannelReplyJobRow,
 } from "./channels";
 import {
@@ -706,6 +719,7 @@ import {
   channelProposalAcceptInputSchema,
   channelReplyClaimTokenHeader,
   channelReplyClaimInputSchema,
+  type ChannelExecutionProposalAcceptInput,
   channelReplyCompleteInputSchema,
   channelReplyLeaseInputSchema,
   channelReplyNoAvailableWorkerError,
@@ -1320,6 +1334,36 @@ export function approvedIssueCreation<T extends Record<string, unknown>>(
   };
 }
 
+export function channelMessageShareUrl(input: {
+  origin: string;
+  organizationId: string;
+  channelId: string;
+  messageId: string;
+  rootMessageId?: string | null;
+}) {
+  const url = new URL(input.origin);
+  url.pathname =
+    `/open/channels/${encodeURIComponent(input.organizationId)}` +
+    `/${encodeURIComponent(input.channelId)}` +
+    `/${encodeURIComponent(input.messageId)}`;
+  url.search = "";
+  url.hash = "";
+  const rootMessageId = input.rootMessageId?.trim();
+  if (rootMessageId && rootMessageId !== input.messageId) {
+    url.searchParams.set("root", rootMessageId);
+  }
+  return url.toString();
+}
+
+function appendChannelMessageBacklink(
+  description: string | null,
+  channelMessageUrl: string,
+) {
+  const backlink = `[채널 메시지로 돌아가기](${channelMessageUrl})`;
+  const body = description?.trimEnd() ?? "";
+  return body ? `${body}\n\n${backlink}` : backlink;
+}
+
 /**
  * Read the change cursor before the channel catalog. If a channel mutation
  * lands between the two reads, the catalog already contains it and the older
@@ -1486,8 +1530,12 @@ export function assertRunEventIdentityNotOverridden(input: {
 async function createApprovedChannelProposalIssue(input: {
   db: D1Database;
   project: Pick<ProjectRow, "id" | "name">;
+  organizationId: string;
   proposalId: string;
   channelId: string;
+  messageId: string;
+  rootMessageId: string | null;
+  shareOrigin: string;
   sourceKey: string;
   title: string;
   description: string | null;
@@ -1496,7 +1544,22 @@ async function createApprovedChannelProposalIssue(input: {
   occurredAt: string;
 }) {
   const settings = await getProjectSettings(input.db, input.project.id);
-  return recordHuntEvent(input.db, input.project.id, {
+  const channelMessageUrl = channelMessageShareUrl({
+    origin: input.shareOrigin,
+    organizationId: input.organizationId,
+    channelId: input.channelId,
+    messageId: input.messageId,
+    rootMessageId: input.rootMessageId,
+  });
+  const issueDescription = appendChannelMessageBacklink(
+    input.description,
+    channelMessageUrl,
+  );
+  // The approval reservation trigger intentionally requires the insert to
+  // match the immutable proposal payload exactly. recordHuntEvent inserts
+  // that protected row first and applies this derived link in the same D1
+  // batch, so a successful creation cannot expose an intermediate description.
+  const runId = await recordHuntEvent(input.db, input.project.id, {
     source: "issue",
     sourceKey: input.sourceKey,
     title: input.title,
@@ -1532,11 +1595,174 @@ async function createApprovedChannelProposalIssue(input: {
       attachmentCount: 0,
       fullAuto: false,
     },
+    postInsertIssueDescription: issueDescription,
     createdByUserId: input.createdByUserId,
     preferredAgentProvider: null,
     preferredAgentModel: null,
     preferredAgentEffort: null,
   });
+  return runId;
+}
+
+type LiveChannelExecutionProposal = NonNullable<
+  Awaited<ReturnType<typeof getChannelExecutionProposal>>
+>;
+
+/**
+ * Applies the existing execution reservation and dispatch transition for both
+ * standalone execution cards and create-and-execute's single authenticated
+ * approval. The opaque proposal/dispatch IDs make retries converge on the
+ * same run even if the first HTTP response is lost after dispatch commits.
+ */
+async function approveChannelExecutionProposalRequest(input: {
+  db: D1Database;
+  channel: Pick<ChannelRow, "id" | "organization_id" | "archived_at">;
+  project: Pick<ProjectRow, "id" | "organization_id">;
+  proposal: LiveChannelExecutionProposal;
+  userId: string;
+  selection: ChannelExecutionProposalAcceptInput;
+}) {
+  decodeExecutionPreferences({
+    provider: input.selection.provider,
+    model: input.selection.model,
+    effort: input.selection.effort,
+  });
+  const run = await getHuntRunForProject(
+    input.db,
+    input.project.id,
+    input.proposal.target_run_id,
+  );
+  if (input.proposal.status === "accepted") {
+    if (
+      input.proposal.accepted_by_user_id !== input.userId ||
+      input.proposal.requested_provider !== input.selection.provider ||
+      input.proposal.requested_model !== input.selection.model ||
+      input.proposal.requested_effort !== input.selection.effort ||
+      input.proposal.requested_worker_id !== input.selection.workerId
+    ) {
+      throw new HttpError(
+        409,
+        "Execution was approved with different settings or by another member",
+        "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
+      );
+    }
+    if (
+      !run || !input.proposal.dispatch_request_id ||
+      run.dispatch_request_id !== input.proposal.dispatch_request_id
+    ) {
+      throw new HttpError(
+        409,
+        "This execution approval is stale; request a new approval",
+        "CHANNEL_EXECUTION_PROPOSAL_STALE",
+      );
+    }
+    return {
+      proposal: issueExecutionProposalJson(input.proposal),
+      outcome: "already_accepted" as const,
+      projectId: input.proposal.project_id,
+      runId: input.proposal.target_run_id,
+      dispatch: {
+        runId: input.proposal.target_run_id,
+        agentId: input.proposal.proposed_by_agent_id,
+        provider: input.proposal.requested_provider!,
+        model: input.proposal.requested_model,
+        effort: input.proposal.requested_effort,
+        requestedWorkerId: input.proposal.requested_worker_id,
+        requestedByUserId: input.proposal.accepted_by_user_id!,
+        dispatchMode: input.proposal.requested_worker_id ? "specific" : "any",
+        dispatchedAt: input.proposal.accepted_at!,
+        outcome: "already_dispatched" as const,
+      },
+    };
+  }
+  if (input.proposal.status !== "pending" || input.channel.archived_at) {
+    throw new HttpError(
+      409,
+      input.channel.archived_at
+        ? "Channel is archived"
+        : "This execution proposal is no longer valid",
+      "CHANNEL_EXECUTION_PROPOSAL_STALE",
+    );
+  }
+  const acceptedAt = new Date().toISOString();
+  const reservation = await reserveChannelExecutionProposalApproval(input.db, {
+    organizationId: input.channel.organization_id,
+    channelId: input.channel.id,
+    proposalId: input.proposal.id,
+    userId: input.userId,
+    provider: input.selection.provider,
+    model: input.selection.model,
+    effort: input.selection.effort,
+    workerId: input.selection.workerId,
+    dispatchRequestId: crypto.randomUUID(),
+    reservedAt: acceptedAt,
+  });
+  if (
+    !reservation?.dispatch_request_id ||
+    !reservation.approval_reserved_by_user_id ||
+    !reservation.approval_reserved_at
+  ) {
+    throw new HttpError(
+      409,
+      "The issue or execution approval changed before dispatch",
+      "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
+    );
+  }
+  try {
+    const dispatched = await dispatchHuntRun(
+      input.db,
+      input.project.organization_id,
+      input.project.id,
+      {
+        runId: reservation.target_run_id,
+        agentId: reservation.proposed_by_agent_id,
+        provider: reservation.requested_provider!,
+        model: reservation.requested_model,
+        effort: reservation.requested_effort,
+        persistPreferences: false,
+        workerId: reservation.requested_worker_id,
+        requestedByUserId: reservation.approval_reserved_by_user_id,
+        requestId: reservation.dispatch_request_id,
+        occurredAt: reservation.approval_reserved_at,
+      },
+    );
+    if (!dispatched) throw new HttpError(404, "Run not found");
+    const accepted = await getChannelExecutionProposal(input.db, {
+      organizationId: reservation.organization_id,
+      channelId: reservation.channel_id!,
+      proposalId: reservation.id,
+      userId: reservation.approval_reserved_by_user_id,
+    });
+    if (
+      !accepted || accepted.status !== "accepted" ||
+      accepted.dispatch_request_id !== reservation.dispatch_request_id
+    ) {
+      throw new HttpError(
+        409,
+        "Execution approval was not finalized",
+        "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
+      );
+    }
+    return {
+      proposal: issueExecutionProposalJson(accepted),
+      outcome: "accepted" as const,
+      projectId: accepted.project_id,
+      runId: accepted.target_run_id,
+      dispatch: dispatched,
+    };
+  } catch (error) {
+    if (
+      error instanceof WorkerConflictError ||
+      (error instanceof Error && error.message.includes("execution proposal"))
+    ) {
+      throw new HttpError(
+        409,
+        error.message,
+        "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
+      );
+    }
+    throw error;
+  }
 }
 
 async function readBoundedMultipartForm(
@@ -1574,7 +1800,7 @@ function readMultipartFiles(
   if (values.some((value) => !(value instanceof File))) {
     throw new HttpError(400, invalidFilesMessage);
   }
-  const files = values as File[];
+  const files = (values as File[]).map(normalizeIssueAttachmentFile);
   const validationError = validate(files);
   if (validationError) throw new HttpError(400, validationError);
   return files;
@@ -2166,6 +2392,7 @@ async function createIssueWithAttachments(input: {
     },
   );
   const uploadedKeys: string[] = [];
+  let phase = "upload_attachments";
   const issueDescription = canonicalizeIssueAttachmentReferences(
     input.issue.description,
     input.attachmentReferences ?? [],
@@ -2182,6 +2409,7 @@ async function createIssueWithAttachments(input: {
         projectId: input.project.id,
       }),
     );
+    phase = "record_issue";
     runId = await recordHuntEvent(input.db, input.project.id, {
       source: "issue",
       sourceKey: input.sourceKey,
@@ -2221,6 +2449,7 @@ async function createIssueWithAttachments(input: {
       preferredAgentModel: input.issue.preferredModel ?? null,
       preferredAgentEffort: input.issue.preferredEffort ?? null,
     });
+    phase = "store_attachment_metadata";
     await createIssueAttachments(
       input.db,
       input.project.id,
@@ -2237,6 +2466,20 @@ async function createIssueWithAttachments(input: {
       ),
     };
   } catch (error) {
+    console.error(JSON.stringify({
+      message: "issue creation failed",
+      phase,
+      errorType: error instanceof Error ? error.name : "UnknownError",
+      error: error instanceof Error ? error.message : String(error),
+      projectId: input.project.id,
+      issueStorageId,
+      runId,
+      attachmentCount: storedAttachments.length,
+      uploadedAttachmentCount: uploadedKeys.length,
+      attachmentContentTypes: [
+        ...new Set(storedAttachments.map((attachment) => attachment.content_type)),
+      ],
+    }));
     if (runId) {
       try {
         await rollbackNewAppIssue(input.db, input.project.id, runId);
@@ -2311,6 +2554,7 @@ async function updateIssueWithAttachments(input: {
     },
   );
   const uploadedKeys: string[] = [];
+  let phase = "upload_attachments";
   const issueDescription = canonicalizeIssueAttachmentReferences(
     input.issue.description,
     input.attachmentReferences ?? [],
@@ -2794,11 +3038,13 @@ const projectAgentJson = (row: ProjectAgentRow) => {
 const projectAgentSessionJson = (row: {
   project_id: string;
   id: string;
+  requested_by_user_id: string | null;
   payload_json: string;
 }) => ({
   id: row.id,
   projectId: row.project_id,
   ...(JSON.parse(row.payload_json) as Record<string, unknown>),
+  requestedByUserId: row.requested_by_user_id,
   workspaceRoot: null,
   dispatchEvents: [],
   workers: [],
@@ -2939,6 +3185,7 @@ async function syncProjectAgentTaskSession(
     project_id: current.project_id,
     id: current.id,
     agent_id: current.agent_id,
+    requested_by_user_id: current.requested_by_user_id,
     status: nextPayload.status as ProjectAgentSessionRow["status"],
     session_type: current.session_type,
     payload_json: JSON.stringify(nextPayload),
@@ -4784,6 +5031,7 @@ async function approveAgentSkillExecutionProposal(
       session.id !== current.result_session_id ||
       session.project_id !== current.project_id ||
       session.agent_id !== current.agent_id ||
+      session.requested_by_user_id !== current.accepted_by_user_id ||
       session.session_type !== "task" ||
       sessionPayload.dispatchGroupId !== current.result_session_id ||
       sessionPayload.agentId !== current.agent_id ||
@@ -4793,10 +5041,12 @@ async function approveAgentSkillExecutionProposal(
       sessionPayload.trigger !== "manual" ||
       sessionPayload.request !== current.request ||
       sessionPayload.requestedWorkerId !== current.requested_worker_id ||
-      sessionPayload.workerId !== current.requested_worker_id
+      sessionPayload.workerId !== current.requested_worker_id ||
+      sessionPayload.requestedByUserId !== current.accepted_by_user_id
     ) {
       throw stale("The approved Agent Skill execution session lost its Worker binding");
     }
+    await upsertProjectAgentSessionSummary(db, session, false);
     return {
       outcome,
       proposal: agentSkillExecutionProposalJson(current),
@@ -5466,7 +5716,12 @@ async function route(
                     project.id,
                     session.user.id,
                   ),
-                  listProjectAgentSessionSummaries(db, project.id),
+                  listProjectAgentSessionSummaries(
+                    db,
+                    project.id,
+                    undefined,
+                    session.user.id,
+                  ),
                 ]);
               return {
                 project,
@@ -5498,7 +5753,11 @@ async function route(
           ),
         ]);
         return {
-          messages: buildInboxFeedMessages(projectData, channelNotifications),
+          messages: buildInboxFeedMessages(
+            projectData,
+            channelNotifications,
+            session.user.id,
+          ),
           subscribedIssueIds,
           generatedAt: new Date().toISOString(),
         };
@@ -7102,28 +7361,6 @@ async function route(
       channelProposalAcceptMatch[3],
     );
     if (!proposal) throw new HttpError(404, "Proposal not found");
-    if (proposal.status === "accepted") {
-      if (!proposal.project_id || !proposal.result_run_id) {
-        throw new HttpError(409, "Accepted proposal is missing its result");
-      }
-      const executionProposal = proposal.execution_proposal_id
-        ? await getChannelExecutionProposal(db, {
-            organizationId: channel.organization_id,
-            channelId: channel.id,
-            proposalId: proposal.execution_proposal_id,
-            userId: session.user.id,
-          })
-        : null;
-      return json({
-        outcome: "already_accepted",
-        projectId: proposal.project_id,
-        resultRunId: proposal.result_run_id,
-        executionProposal: liveIssueExecutionProposalJson(executionProposal),
-      });
-    }
-    if (channel.archived_at) {
-      throw new HttpError(409, "Channel is archived");
-    }
     if (proposal.action_type !== "request_issue_create") {
       throw new HttpError(409, "This proposal cannot create an issue");
     }
@@ -7138,6 +7375,22 @@ async function route(
     const input = decodeChannelProposalAcceptInput(
       await readJson(request),
     );
+    if (input.execution && proposal.execute_after_create !== 1) {
+      throw new HttpError(
+        400,
+        "Execution settings require a create-and-execute proposal",
+      );
+    }
+    if (
+      input.execution &&
+      !(await channelExecutionProposalTablesAvailable(db))
+    ) {
+      throw new HttpError(
+        503,
+        "Issue execution approval is not available during this upgrade",
+        "ISSUE_EXECUTION_APPROVAL_UNAVAILABLE",
+      );
+    }
     // A Project Agent's proposal is already bound to its authoritative
     // project. Only an organization-scoped proposal may be assigned at
     // approval time, and every target must stay inside this channel's org.
@@ -7156,11 +7409,86 @@ async function route(
     );
     if (!organizationProject) throw new HttpError(404, "Project not found");
     const project = await getProject(db, targetProjectId, session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
+    if (!project || project.organization_id !== channel.organization_id) {
+      throw new HttpError(404, "Project not found");
+    }
+    if (proposal.status === "accepted") {
+      if (!proposal.project_id || !proposal.result_run_id) {
+        throw new HttpError(409, "Accepted proposal is missing its result");
+      }
+      const executionProposal = proposal.execution_proposal_id
+        ? await getChannelExecutionProposal(db, {
+            organizationId: channel.organization_id,
+            channelId: channel.id,
+            proposalId: proposal.execution_proposal_id,
+            userId: session.user.id,
+          })
+        : null;
+      if (input.execution) {
+        if (!executionProposal) {
+          throw new HttpError(
+            409,
+            "The created issue has no retryable execution proposal",
+            "CHANNEL_EXECUTION_PROPOSAL_STALE",
+          );
+        }
+        const execution = await approveChannelExecutionProposalRequest({
+          db,
+          channel,
+          project,
+          proposal: executionProposal,
+          userId: session.user.id,
+          selection: input.execution,
+        });
+        return json({
+          outcome: "already_accepted",
+          projectId: proposal.project_id,
+          resultRunId: proposal.result_run_id,
+          executionProposal: execution.proposal,
+          dispatch: execution.dispatch,
+        });
+      }
+      return json({
+        outcome: "already_accepted",
+        projectId: proposal.project_id,
+        resultRunId: proposal.result_run_id,
+        executionProposal: liveIssueExecutionProposalJson(executionProposal),
+      });
+    }
+    if (channel.archived_at) {
+      throw new HttpError(409, "Channel is archived");
+    }
     const payload = decodeChannelIssueProposalPayload(
       JSON.parse(proposal.payload_json),
     );
     const approvedAt = new Date().toISOString();
+    if (input.execution) {
+      decodeExecutionPreferences({
+        provider: input.execution.provider,
+        model: input.execution.model,
+        effort: input.execution.effort,
+      });
+      try {
+        await assertExecutionSelectionAvailable(
+          db,
+          channel.organization_id,
+          project.id,
+          {
+            ...input.execution,
+            observedAt: approvedAt,
+          },
+        );
+      } catch (error) {
+        if (error instanceof WorkerConflictError) {
+          throw new HttpError(
+            409,
+            error.message,
+            "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
+          );
+        }
+        throw error;
+      }
+    }
     const reservation = await reserveChannelActionProposalApproval(db, {
       organizationId: channel.organization_id,
       channelId: channel.id,
@@ -7185,6 +7513,30 @@ async function route(
               userId: session.user.id,
             })
           : null;
+        if (input.execution) {
+          if (!executionProposal) {
+            throw new HttpError(
+              409,
+              "The created issue has no retryable execution proposal",
+              "CHANNEL_EXECUTION_PROPOSAL_STALE",
+            );
+          }
+          const execution = await approveChannelExecutionProposalRequest({
+            db,
+            channel,
+            project,
+            proposal: executionProposal,
+            userId: session.user.id,
+            selection: input.execution,
+          });
+          return json({
+            outcome: "already_accepted",
+            projectId: current.project_id,
+            resultRunId: current.result_run_id,
+            executionProposal: execution.proposal,
+            dispatch: execution.dispatch,
+          });
+        }
         return json({
           outcome: "already_accepted",
           projectId: current.project_id,
@@ -7208,9 +7560,13 @@ async function route(
     const resultRunId = await createApprovedChannelProposalIssue({
       db,
       project,
+      organizationId: channel.organization_id,
       sourceKey: reservation.issue_source_key,
       proposalId: proposal.id,
       channelId: channel.id,
+      messageId: proposal.reply_message_id,
+      rootMessageId: proposal.reply_parent_message_id,
+      shareOrigin: new URL(request.url).origin,
       title: approvedIssue.title,
       description: approvedIssue.description,
       priority: approvedIssue.priority,
@@ -7234,6 +7590,30 @@ async function route(
           userId: session.user.id,
         })
       : null;
+    if (input.execution) {
+      if (!executionProposal) {
+        throw new HttpError(
+          409,
+          "The created issue has no execution proposal",
+          "CHANNEL_EXECUTION_PROPOSAL_STALE",
+        );
+      }
+      const execution = await approveChannelExecutionProposalRequest({
+        db,
+        channel,
+        project,
+        proposal: executionProposal,
+        userId: session.user.id,
+        selection: input.execution,
+      });
+      return json({
+        outcome: "accepted",
+        projectId: project.id,
+        resultRunId,
+        executionProposal: execution.proposal,
+        dispatch: execution.dispatch,
+      });
+    }
     return json({
       outcome: "accepted",
       projectId: project.id,
@@ -7332,135 +7712,14 @@ async function route(
     if (!project || project.organization_id !== channel.organization_id) {
       throw new HttpError(404, "Project not found");
     }
-    const run = await getHuntRunForProject(db, project.id, proposal.target_run_id);
-    if (proposal.status === "accepted") {
-      if (
-        proposal.accepted_by_user_id !== session.user.id ||
-        proposal.requested_provider !== input.provider ||
-        proposal.requested_model !== input.model ||
-        proposal.requested_effort !== input.effort ||
-        proposal.requested_worker_id !== input.workerId
-      ) {
-        throw new HttpError(
-          409,
-          "Execution was approved with different settings or by another member",
-          "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
-        );
-      }
-      if (
-        !run || !proposal.dispatch_request_id ||
-        run.dispatch_request_id !== proposal.dispatch_request_id
-      ) {
-        throw new HttpError(
-          409,
-          "This execution approval is stale; request a new approval",
-          "CHANNEL_EXECUTION_PROPOSAL_STALE",
-        );
-      }
-      return json({
-        proposal: issueExecutionProposalJson(proposal),
-        outcome: "already_accepted",
-        projectId: proposal.project_id,
-        runId: proposal.target_run_id,
-        dispatch: {
-          runId: proposal.target_run_id,
-          agentId: proposal.proposed_by_agent_id,
-          provider: proposal.requested_provider,
-          model: proposal.requested_model,
-          effort: proposal.requested_effort,
-          requestedWorkerId: proposal.requested_worker_id,
-          requestedByUserId: proposal.accepted_by_user_id,
-          dispatchMode: proposal.requested_worker_id ? "specific" : "any",
-          dispatchedAt: proposal.accepted_at,
-          outcome: "already_dispatched",
-        },
-      });
-    }
-    if (proposal.status !== "pending" || channel.archived_at) {
-      throw new HttpError(
-        409,
-        channel.archived_at
-          ? "Channel is archived"
-          : "This execution proposal is no longer valid",
-        "CHANNEL_EXECUTION_PROPOSAL_STALE",
-      );
-    }
-    const acceptedAt = new Date().toISOString();
-    const reservation = await reserveChannelExecutionProposalApproval(db, {
-      organizationId: channel.organization_id,
-      channelId: channel.id,
-      proposalId: proposal.id,
+    return json(await approveChannelExecutionProposalRequest({
+      db,
+      channel,
+      project,
+      proposal,
       userId: session.user.id,
-      provider: input.provider,
-      model: input.model,
-      effort: input.effort,
-      workerId: input.workerId,
-      dispatchRequestId: crypto.randomUUID(),
-      reservedAt: acceptedAt,
-    });
-    if (!reservation?.dispatch_request_id ||
-        !reservation.approval_reserved_by_user_id ||
-        !reservation.approval_reserved_at) {
-      throw new HttpError(
-        409,
-        "The issue or execution approval changed before dispatch",
-        "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
-      );
-    }
-    try {
-      const dispatched = await dispatchHuntRun(
-        db,
-        project.organization_id,
-        project.id,
-        {
-          runId: reservation.target_run_id,
-          agentId: reservation.proposed_by_agent_id,
-          provider: reservation.requested_provider!,
-          model: reservation.requested_model,
-          effort: reservation.requested_effort,
-          persistPreferences: false,
-          workerId: reservation.requested_worker_id,
-          requestedByUserId: reservation.approval_reserved_by_user_id,
-          requestId: reservation.dispatch_request_id,
-          occurredAt: reservation.approval_reserved_at,
-        },
-      );
-      if (!dispatched) throw new HttpError(404, "Run not found");
-      const accepted = await getChannelExecutionProposal(db, {
-        organizationId: reservation.organization_id,
-        channelId: reservation.channel_id!,
-        proposalId: reservation.id,
-        userId: reservation.approval_reserved_by_user_id,
-      });
-      if (
-        !accepted || accepted.status !== "accepted" ||
-        accepted.dispatch_request_id !== reservation.dispatch_request_id
-      ) {
-        throw new HttpError(
-          409,
-          "Execution approval was not finalized",
-          "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
-        );
-      }
-      return json({
-        proposal: issueExecutionProposalJson(accepted),
-        outcome: "accepted",
-        projectId: accepted.project_id,
-        runId: accepted.target_run_id,
-        dispatch: dispatched,
-      });
-    } catch (error) {
-      if (error instanceof WorkerConflictError || (
-        error instanceof Error && error.message.includes("execution proposal")
-      )) {
-        throw new HttpError(
-          409,
-          error.message,
-          "CHANNEL_EXECUTION_PROPOSAL_CONFLICT",
-        );
-      }
-      throw error;
-    }
+      selection: input,
+    }));
   }
 
   const organizationWorkersMatch = pathname.match(
@@ -8366,6 +8625,7 @@ async function route(
       project_id: project.id,
       id: taskId,
       agent_id: agent.id,
+      requested_by_user_id: session.user.id,
       status: "running",
       session_type: "task",
       payload_json: JSON.stringify(payload),
@@ -8540,10 +8800,45 @@ async function route(
     }
     const input = decodeProjectAgentSessionInput(await readJson(request));
     const observedAt = new Date().toISOString();
+    const existing = await getProjectAgentSession(
+      db,
+      project.id,
+      projectAgentSessionMatch[2],
+    ) ?? await getArchivedProjectAgentSession(
+      db,
+      env.ARCHIVES,
+      project.id,
+      projectAgentSessionMatch[2],
+    );
+    let requestedByUserId: string | null;
+    if (existing) {
+      requestedByUserId = existing.requested_by_user_id;
+    } else if (input.parentSessionId) {
+      const parent = await getProjectAgentSession(
+        db,
+        project.id,
+        input.parentSessionId,
+      ) ?? await getArchivedProjectAgentSession(
+        db,
+        env.ARCHIVES,
+        project.id,
+        input.parentSessionId,
+      );
+      requestedByUserId = parent?.requested_by_user_id ?? null;
+    } else if (input.trigger === "scheduled" && input.scheduleId) {
+      requestedByUserId = await getProjectAgentScheduleCreatorId(
+        db,
+        project.id,
+        input.scheduleId,
+      );
+    } else {
+      requestedByUserId = session.user.id;
+    }
     const row = await upsertProjectAgentSession(db, {
       project_id: project.id,
       id: projectAgentSessionMatch[2],
       agent_id: input.agentId,
+      requested_by_user_id: requestedByUserId,
       status: input.status,
       session_type: input.sessionType,
       payload_json: JSON.stringify(input),
@@ -8630,7 +8925,10 @@ async function route(
     const input = decodeProjectAgentScheduleInput(
       await readJson(request),
     );
-    const schedule = await createProjectAgentSchedule(db, project.id, input);
+    const schedule = await createProjectAgentSchedule(db, project.id, {
+      ...input,
+      createdByUserId: session.user.id,
+    });
     if (!schedule) throw new HttpError(404, "Project agent not found");
     return json({ schedule: projectAgentScheduleJson(schedule) }, 201);
   }
@@ -11402,6 +11700,154 @@ async function route(
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  const workerUpdatePrepareMatch = pathname.match(
+    /^\/workers\/([0-9a-zA-Z-]+)\/update-handoff\/prepare$/u,
+  );
+  if (workerUpdatePrepareMatch && request.method === "POST") {
+    const principal = await requireWorkerCredential(db, request);
+    const binding = await executionWorkerBindingById(
+      db,
+      principal.deviceId,
+      workerUpdatePrepareMatch[1],
+    );
+    if (!binding || binding.state === "disabled") {
+      throw new HttpError(403, "Worker is not enabled for this project");
+    }
+    const input = decodeWorkerUpdatePrepare(await readJson(request));
+    const observedAt = new Date().toISOString();
+    const updateRequest = await requestExecutionWorkerUpdate(db, {
+      id: crypto.randomUUID(),
+      organizationId: principal.organizationId,
+      deviceId: principal.deviceId,
+      requestedByUserId: principal.ownerUserId,
+      targetVersion: input.targetVersion,
+      requestedAt: observedAt,
+    });
+    const status = await executionWorkerUpdateStatus(db, {
+      deviceId: principal.deviceId,
+      requestId: updateRequest.id,
+      observedAt,
+    });
+    return json({
+      requestId: updateRequest.id,
+      targetVersion: updateRequest.targetVersion,
+      handoffState: status?.request.handoffState ?? updateRequest.handoffState,
+      activeWorkCount: status?.activeWorkCount ?? 0,
+      ready: status?.ready ?? false,
+    }, 202);
+  }
+
+  const workerUpdateStatusMatch = pathname.match(
+    /^\/workers\/([0-9a-zA-Z-]+)\/update-handoff\/status$/u,
+  );
+  if (workerUpdateStatusMatch && request.method === "GET") {
+    const principal = await requireWorkerCredential(db, request);
+    const binding = await executionWorkerBindingById(
+      db,
+      principal.deviceId,
+      workerUpdateStatusMatch[1],
+    );
+    if (!binding || binding.state === "disabled") {
+      throw new HttpError(403, "Worker is not enabled for this project");
+    }
+    const requestId = new URL(request.url).searchParams.get("requestId") ?? undefined;
+    if (requestId) decodeWorkerUpdateRequestId(requestId);
+    const status = await executionWorkerUpdateStatus(db, {
+      deviceId: principal.deviceId,
+      requestId,
+      observedAt: new Date().toISOString(),
+    });
+    if (!status) return json({ request: null, activeWorkCount: 0, ready: true });
+    return json({
+      requestId: status.request.id,
+      targetVersion: status.request.targetVersion,
+      status: status.request.status,
+      handoffState: status.request.handoffState,
+      handoffError: status.request.handoffError,
+      activeWorkCount: status.activeWorkCount,
+      ready: status.ready,
+    });
+  }
+
+  const workerUpdateClaimMatch = pathname.match(
+    /^\/workers\/([0-9a-zA-Z-]+)\/update-handoff\/claim$/u,
+  );
+  if (workerUpdateClaimMatch && request.method === "POST") {
+    const principal = await requireWorkerCredential(db, request);
+    const binding = await executionWorkerBindingById(
+      db,
+      principal.deviceId,
+      workerUpdateClaimMatch[1],
+    );
+    if (!binding || binding.state === "disabled") {
+      throw new HttpError(403, "Worker is not enabled for this project");
+    }
+    const input = decodeWorkerUpdateHandoff(await readJson(request));
+    if (input.projectId !== binding.project_id) {
+      throw new HttpError(403, "Worker handoff project does not match its binding");
+    }
+    const observedAt = new Date().toISOString();
+    const claimTokenHash = await sha256(input.claimToken);
+    let outcome;
+    try {
+      outcome = await handoffExecutionWorkerClaim(db, {
+        requestId: input.requestId,
+        organizationId: principal.organizationId,
+        deviceId: principal.deviceId,
+        projectId: input.projectId,
+        workerId: binding.id,
+        workType: input.workType,
+        workId: input.workId,
+        runId: input.runId ?? null,
+        claimTokenHash,
+        metadata: input.checkpoint,
+        observedAt,
+      });
+    } catch (error) {
+      try {
+        await failExecutionWorkerUpdateHandoff(db, {
+          requestId: input.requestId,
+          organizationId: principal.organizationId,
+          deviceId: principal.deviceId,
+          projectId: input.projectId,
+          workerId: binding.id,
+          workType: input.workType,
+          workId: input.workId,
+          runId: input.runId ?? null,
+          claimTokenHash,
+          metadata: input.checkpoint,
+          error: error instanceof Error ? error.message : String(error),
+          observedAt,
+        });
+      } catch (failureError) {
+        console.error(
+          `worker update handoff failure could not be recorded: ${
+            failureError instanceof Error ? failureError.message : String(failureError)
+          }`,
+        );
+      }
+      throw error;
+    }
+    if (outcome.outcome === "not_ready") {
+      throw new HttpError(409, "Worker update handoff is not draining");
+    }
+    if (outcome.outcome === "not_active") {
+      throw new HttpError(409, "Worker claim is no longer active");
+    }
+    const status = await executionWorkerUpdateStatus(db, {
+      deviceId: principal.deviceId,
+      requestId: input.requestId,
+      observedAt: new Date().toISOString(),
+    });
+    return json({
+      outcome: outcome.outcome,
+      requestId: input.requestId,
+      handoffState: status?.request.handoffState ?? "draining",
+      activeWorkCount: outcome.activeWorkCount,
+      ready: status?.ready ?? false,
+    });
+  }
+
   const workerHeartbeatMatch = pathname.match(
     /^\/workers\/([0-9a-zA-Z-]+)\/heartbeat$/u,
   );
@@ -11417,12 +11863,19 @@ async function route(
     }
     const input = decodeWorkerHeartbeat(await readJson(request));
     const observedAt = new Date().toISOString();
+    const pendingBeforeHeartbeat = await pendingExecutionWorkerUpdate(
+      db,
+      principal.deviceId,
+    );
+    const updateIsDraining = pendingBeforeHeartbeat?.handoffState === "draining";
     const worker = await recordWorkerHeartbeat(db, binding.project_id, {
       workerId: workerHeartbeatMatch[1],
       versions: input.versions,
-      acceptingWork: input.acceptingWork,
-      readinessState: input.readinessState,
-      readinessDetail: input.readinessDetail,
+      acceptingWork: updateIsDraining ? false : input.acceptingWork,
+      readinessState: updateIsDraining ? "busy" : input.readinessState,
+      readinessDetail: updateIsDraining
+        ? "계획된 업데이트 handoff를 진행 중입니다."
+        : input.readinessDetail,
       capabilities: input.capabilities,
       observedAt,
     });
@@ -11551,6 +12004,8 @@ async function route(
     const input = await readTranscriptRequest(request);
     const recordedAt = new Date().toISOString();
     let authenticatedWorkerId: string | null = null;
+    let authenticatedWorkerDeviceId: string | null = null;
+    let authenticatedWorkerOrganizationId: string | null = null;
     let authenticatedExecutionAttempt: RunExecutionAttemptRow | null = null;
     const projectId = bearerToken(request).startsWith("briar_worker_")
       ? (() => {
@@ -11568,6 +12023,8 @@ async function route(
         input.workerId ?? undefined,
       );
       authenticatedWorkerId = worker.binding.id;
+      authenticatedWorkerDeviceId = worker.principal.deviceId;
+      authenticatedWorkerOrganizationId = worker.principal.organizationId;
       if (input.executionId) {
         authenticatedExecutionAttempt = await getRunExecutionAttempt(
           db,
@@ -11596,6 +12053,105 @@ async function route(
     }
     if (input.executionId && !authenticatedExecutionAttempt) {
       throw new HttpError(403, "Only execution workers can report an execution");
+    }
+    const hasWorkerClaimIdentity = Boolean(
+      input.claimToken || input.workType || input.workId,
+    );
+    if (authenticatedWorkerDeviceId && !hasWorkerClaimIdentity) {
+      const pendingUpdate = await pendingExecutionWorkerUpdate(
+        db,
+        authenticatedWorkerDeviceId,
+      );
+      if (pendingUpdate && pendingUpdate.handoffState !== "idle") {
+        throw new HttpError(
+          409,
+          "Worker transcript claim identity is required during a planned update",
+        );
+      }
+    }
+    if (input.claimToken || input.workType || input.workId) {
+      if (
+        !authenticatedWorkerId ||
+        !authenticatedWorkerDeviceId ||
+        !input.claimToken ||
+        !input.workType ||
+        !input.workId
+      ) {
+        throw new HttpError(400, "Worker transcript claim identity is incomplete");
+      }
+      const claimTokenHash = await sha256(input.claimToken);
+      const active = input.workType === "issue"
+        ? await db
+            .prepare(
+              `select 1 as active
+               from briar_hunt_runs
+               where id = ? and project_id = ? and worker_id = ?
+                 and claim_token_hash = ? and lease_expires_at > ?
+                 and status not in
+                   ('backlog', 'completed', 'cancelled', 'blocked', 'failed')`,
+            )
+            .bind(
+              input.workId,
+              projectId,
+              authenticatedWorkerId,
+              claimTokenHash,
+              recordedAt,
+            )
+            .first<{ active: number }>()
+        : input.workType === "projectAgentTask"
+          ? await db
+              .prepare(
+                `select 1 as active
+                 from briar_project_agent_task_jobs
+                 where id = ? and project_id = ? and status = 'running'
+                   and claimed_worker_id = ? and claim_token_hash = ?
+                   and lease_expires_at > ?`,
+              )
+              .bind(
+                input.workId,
+                projectId,
+                authenticatedWorkerId,
+                claimTokenHash,
+                recordedAt,
+              )
+              .first<{ active: number }>()
+          : input.workType === "issueReply"
+            ? await db
+                .prepare(
+                  `select 1 as active
+                   from briar_issue_agent_reply_jobs
+                   where id = ? and project_id = ? and status = 'running'
+                     and claimed_worker_id = ? and claim_token_hash = ?
+                     and lease_expires_at > ?`,
+                )
+                .bind(
+                  input.workId,
+                  projectId,
+                  authenticatedWorkerId,
+                  claimTokenHash,
+                  recordedAt,
+                )
+                .first<{ active: number }>()
+            : await db
+                .prepare(
+                  `select 1 as active
+                   from briar_channel_agent_reply_jobs
+                   where id = ? and organization_id = ? and status = 'running'
+                     and claimed_device_id = ? and claimed_worker_id = ?
+                     and claim_token_hash = ? and lease_expires_at > ?`,
+                )
+                .bind(
+                  input.workId,
+                  authenticatedWorkerOrganizationId,
+                  authenticatedWorkerDeviceId,
+                  authenticatedWorkerId,
+                  claimTokenHash,
+                  recordedAt,
+                )
+                .first<{ active: number }>();
+      if (!active) {
+        throw new HttpError(409, "Worker claim is no longer active");
+      }
     }
     if (
       input.executionMetrics &&
@@ -12080,6 +12636,11 @@ async function route(
       agent,
       prioritizeAgent: job.agent_id !== null,
     });
+    const handoffContext = await latestExecutionWorkerUpdateHandoff(db, {
+      deviceId: authenticatedWorker.principal.deviceId,
+      workType: "issueReply",
+      workId: job.id,
+    });
     return json({
       work: {
         workType: "issueReply",
@@ -12093,6 +12654,7 @@ async function route(
         model: replyExecution.model,
         effort: replyExecution.effort,
         activeSkill: activeSkill ? agentSkillJson(activeSkill) : null,
+        handoffContext,
         skillExecutionTarget: selectedSkill && agent && triggerMessage
           ? {
               projectId: input.projectId,
@@ -12388,6 +12950,11 @@ async function route(
             deviceId: principal.deviceId,
           })
         : null;
+      const handoffContext = await latestExecutionWorkerUpdateHandoff(db, {
+        deviceId: principal.deviceId,
+        workType: "channelReply",
+        workId: job.id,
+      });
       return json({
         work: {
           workType: "channelReply",
@@ -12444,6 +13011,7 @@ async function route(
           claimedAt: job.claimed_at,
           leaseExpiresAt: job.lease_expires_at,
           activity,
+          handoffContext,
           organizationContext: agent.project_id === null
             ? decodeOrganizationAgentContextDescriptor({
                 schemaVersion: 1,
@@ -13333,7 +13901,23 @@ async function route(
       error: "Worker lease expired after repeated attempts.",
     });
     await Promise.all(
-      reaped.filter((job) => !job.skill_execution_proposal_id).map(async (job) => {
+      reaped.map(async (job) => {
+        if (job.skill_execution_proposal_id) {
+          const session = await getProjectAgentSession(
+            db,
+            job.project_id,
+            job.id,
+          );
+          if (!session) return;
+          await upsertProjectAgentSessionSummary(db, session, false);
+          scheduleProjectAgentSessionRealtimePublish(
+            env,
+            db,
+            job.project_id,
+            context,
+          );
+          return;
+        }
         const session = await syncProjectAgentTaskSession(
           db,
           job,
@@ -13364,6 +13948,11 @@ async function route(
     if (!activeSkill) {
       throw new HttpError(409, "Agent task lost its selected Skill");
     }
+    const handoffContext = await latestExecutionWorkerUpdateHandoff(db, {
+      deviceId: authenticatedWorker.principal.deviceId,
+      workType: "projectAgentTask",
+      workId: job.id,
+    });
     return json({
       work: {
         workType: "projectAgentTask",
@@ -13377,6 +13966,7 @@ async function route(
         leaseExpiresAt: job.lease_expires_at,
         request: job.request,
         activeSkill: agentSkillJson(activeSkill),
+        handoffContext,
         agent: {
           id: job.agent_id,
           name: job.agent_name,
@@ -13466,6 +14056,14 @@ async function route(
         error: completed.error ?? input.error ?? null,
       });
       sessionChanged = session !== null;
+    }
+    if (completed?.skill_execution_proposal_id && hotSession) {
+      const summaryResult = await upsertProjectAgentSessionSummary(
+        db,
+        hotSession,
+        false,
+      );
+      sessionChanged ||= (summaryResult.meta.changes ?? 0) > 0;
     }
     if (sessionChanged) {
       scheduleProjectAgentSessionRealtimePublish(
@@ -13618,6 +14216,13 @@ async function route(
     const workflowContext = run
       ? await claimWorkflowContext(db, projectId, run)
       : { startStage: null, resumeContext: null };
+    const handoffContext = run && authenticatedWorker
+      ? await latestExecutionWorkerUpdateHandoff(db, {
+          deviceId: authenticatedWorker.principal.deviceId,
+          workType: "issue",
+          workId: run.id,
+        })
+      : null;
     return json({
       work: run
         ? {
@@ -13649,6 +14254,7 @@ async function route(
             claimedAt: run.claimed_at,
             leaseExpiresAt: run.lease_expires_at,
             claimAttempts: run.claim_attempts,
+            handoffContext,
             execution: execution?.provider
               ? execution
               : null,

@@ -22,6 +22,7 @@ import {
   CreateIssueDialog,
   EditIssueDialog,
   HuntDashboard,
+  IssueAgentActivityPanel,
   RunPage,
 } from "./HuntDashboard";
 import { ToastProvider } from "./ui/toast";
@@ -4275,7 +4276,7 @@ describe("HuntDashboard", () => {
       ".issue-agent-activity-panel .auto-hunt-agent-message > header",
     );
     expect(messageHeader?.querySelector("strong")?.textContent).toBe("Codex");
-    expect(messageHeader?.querySelector("img")).not.toBeNull();
+    expect(messageHeader?.querySelector("svg")).not.toBeNull();
     expect(messageHeader?.textContent).not.toContain("최종 메시지");
 
     await act(async () => root.unmount());
@@ -4375,6 +4376,96 @@ describe("HuntDashboard", () => {
 
     await act(async () => root.unmount());
     loadTranscript.mockRestore();
+    container.remove();
+  });
+
+  it("preserves the issue work log position when new activity arrives above the bottom", async () => {
+    const firstMessage = {
+      id: "message-1",
+      phase: "commentary",
+      text: "첫 번째 작업 메시지",
+      startedAtMs: Date.now(),
+      updatedAtMs: Date.now(),
+      isComplete: true,
+    };
+    const secondMessage = {
+      ...firstMessage,
+      id: "message-2",
+      text: "두 번째 작업 메시지",
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <IssueAgentActivityPanel
+          activity={[]}
+          error={null}
+          id="work-log-panel"
+          isLive
+          labelledBy="work-log-tab"
+          loading
+          provider="codex"
+        />,
+      );
+    });
+
+    const panel = container.querySelector<HTMLElement>(
+      ".issue-agent-activity-panel",
+    );
+    expect(panel).not.toBeNull();
+    if (!panel) throw new Error("work log panel was not rendered");
+    Object.defineProperty(panel, "clientHeight", {
+      configurable: true,
+      value: 200,
+    });
+    Object.defineProperty(panel, "scrollHeight", {
+      configurable: true,
+      value: 640,
+    });
+
+    await act(async () => {
+      root.render(
+        <IssueAgentActivityPanel
+          activity={[firstMessage]}
+          error={null}
+          id="work-log-panel"
+          isLive
+          labelledBy="work-log-tab"
+          loading={false}
+          provider="codex"
+        />,
+      );
+    });
+    expect(panel.scrollTop).toBe(640);
+
+    panel.scrollTop = 100;
+    await act(async () => {
+      panel.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+    Object.defineProperty(panel, "scrollHeight", {
+      configurable: true,
+      value: 800,
+    });
+    await act(async () => {
+      root.render(
+        <IssueAgentActivityPanel
+          activity={[firstMessage, secondMessage]}
+          error={null}
+          id="work-log-panel"
+          isLive
+          labelledBy="work-log-tab"
+          loading={false}
+          provider="codex"
+        />,
+      );
+    });
+
+    expect(panel.textContent).toContain("두 번째 작업 메시지");
+    expect(panel.scrollTop).toBe(100);
+
+    await act(async () => root.unmount());
     container.remove();
   });
 
@@ -4507,7 +4598,9 @@ describe("HuntDashboard", () => {
       />,
     );
 
-    expect(markup).toContain('<div class="issue-description-markdown">');
+    expect(markup).toContain(
+      '<div class="issue-description-markdown markdown-content">',
+    );
     expect(markup).toContain("<h1>목표</h1>");
     expect(markup).toContain("<li>상세 내용을 표시합니다.</li>");
     expect(markup).toContain("<del>일반 텍스트</del>");
@@ -5740,6 +5833,9 @@ describe("HuntDashboard", () => {
     expect(messageList.querySelector(".issue-message-body h2")?.textContent).toBe(
       "기존 메시지",
     );
+    expect(
+      messageList.querySelector(".issue-message-body")?.classList,
+    ).toContain("markdown-content");
     expect(messageList.querySelector(".issue-message-body li")?.textContent).toBe(
       "마크다운 항목",
     );
@@ -7060,7 +7156,9 @@ describe("HuntDashboard", () => {
     expect(workHistoryIndex).toBeGreaterThan(workResultIndex);
     expect(ctaIndex).toBeGreaterThan(workResultIndex);
     expect(workHistoryIndex).toBeGreaterThan(ctaIndex);
-    expect(markup).toContain('<div class="completed-issue-summary paused-result-summary"><h2>구현</h2>');
+    expect(markup).toContain(
+      '<div class="completed-issue-summary paused-result-summary markdown-content"><h2>구현</h2>',
+    );
     expect(markup.match(/<li>/g)).toHaveLength(3);
     expect(markup).toContain("승인하고 계속");
     expect(markup).toContain("증빙 자세히 보기");
@@ -7751,7 +7849,9 @@ describe("HuntDashboard", () => {
 
     expect(markup).toContain('class="completed-issue-card"');
     expect(markup).toContain("작업 결과");
-    expect(markup).toContain('class="completed-issue-summary"');
+    expect(markup).toContain(
+      'class="completed-issue-summary markdown-content"',
+    );
     expect(markup).toContain("<h2>변경 결과</h2>");
     expect(markup).toContain("<ul>");
     expect(markup).toContain("<strong>결과 요약</strong>");

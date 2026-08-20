@@ -9,6 +9,7 @@ import {
 import { decodeMobileSchema } from "./mobile-contract-schema";
 
 const occurredAt = "2026-08-11T13:00:00.000Z";
+const currentUserId = "inbox-user-a";
 
 function projectData(
   id: string,
@@ -56,6 +57,7 @@ describe("organization Inbox feed", () => {
       session_id: "second-project-session",
       summary_json: JSON.stringify({
         agentName: "Second Agent",
+        requestedByUserId: currentUserId,
         status: "failed",
         issues: [{ title: "Second project issue", outcome: "failed" }],
         startedAt: occurredAt,
@@ -65,7 +67,11 @@ describe("organization Inbox feed", () => {
       updated_at: "2026-08-11T13:01:00.000Z",
     }];
 
-    const messages = buildInboxFeedMessages([first, second], []);
+    const messages = buildInboxFeedMessages(
+      [first, second],
+      [],
+      currentUserId,
+    );
 
     expect(() => decodeMobileSchema(mobileInboxFeedResponseSchema, {
       messages,
@@ -112,7 +118,7 @@ describe("organization Inbox feed", () => {
       author_agent_image: null,
       notification_reason: "mention",
       created_at: occurredAt,
-    }]);
+    }], currentUserId);
 
     expect(() => decodeMobileSchema(mobileInboxFeedResponseSchema, {
       messages,
@@ -163,7 +169,7 @@ describe("organization Inbox feed", () => {
         notification_reason: "thread_reply",
         created_at: occurredAt,
       },
-    ]);
+    ], currentUserId);
 
     expect(messages).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -198,7 +204,7 @@ describe("organization Inbox feed", () => {
       created_at: occurredAt,
     }];
 
-    const messages = buildInboxFeedMessages([second], []);
+    const messages = buildInboxFeedMessages([second], [], currentUserId);
 
     expect(() => decodeMobileSchema(mobileInboxFeedResponseSchema, {
       messages,
@@ -236,11 +242,79 @@ describe("organization Inbox feed", () => {
       created_at: occurredAt,
     }];
 
-    const messages = buildInboxFeedMessages([project], []);
+    const messages = buildInboxFeedMessages([project], [], currentUserId);
 
     expect(messages).toContainEqual(expect.objectContaining({
       id: "conversation:dddddddd-dddd-4ddd-8ddd-dddddddddddd",
       authorImage: "https://example.com/codex.png",
     }));
+  });
+
+  it("returns terminal sessions only to their trusted requester", () => {
+    const project = projectData(
+      "11111111-1111-4111-8111-111111111111",
+      "Private results",
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "completed",
+    );
+    project.sessionSummaries = [
+      {
+        session_id: "owned-failed-session",
+        summary_json: JSON.stringify({
+          requestedByUserId: currentUserId,
+          status: "completed",
+          issues: [{ title: "Blocked result", outcome: "blocked" }],
+          startedAt: occurredAt,
+          completedAt: "2026-08-11T13:01:00.000Z",
+        }),
+        updated_at: "2026-08-11T13:01:00.000Z",
+      },
+      {
+        session_id: "other-member-session",
+        summary_json: JSON.stringify({
+          requestedByUserId: "inbox-user-b",
+          status: "failed",
+          issues: [],
+          startedAt: occurredAt,
+          completedAt: "2026-08-11T13:02:00.000Z",
+        }),
+        updated_at: "2026-08-11T13:02:00.000Z",
+      },
+      {
+        session_id: "unknown-legacy-session",
+        summary_json: JSON.stringify({
+          status: "completed",
+          issues: [],
+          startedAt: occurredAt,
+          completedAt: "2026-08-11T13:03:00.000Z",
+        }),
+        updated_at: "2026-08-11T13:03:00.000Z",
+      },
+    ];
+
+    const requesterMessages = buildInboxFeedMessages(
+      [project],
+      [],
+      currentUserId,
+    );
+    const otherMemberMessages = buildInboxFeedMessages(
+      [project],
+      [],
+      "inbox-user-b",
+    );
+
+    expect(
+      requesterMessages.filter((message) => message.kind === "session"),
+    ).toEqual([
+      expect.objectContaining({
+        id: "session:owned-failed-session",
+        requiresAttention: true,
+      }),
+    ]);
+    expect(
+      otherMemberMessages.filter((message) => message.kind === "session"),
+    ).toEqual([
+      expect.objectContaining({ id: "session:other-member-session" }),
+    ]);
   });
 });

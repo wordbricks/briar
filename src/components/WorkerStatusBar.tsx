@@ -302,6 +302,7 @@ export function WorkerStatusBar({
                 deviceState?.remoteUpdateSupported ??
                 workerRemoteUpdateSupported(worker);
               const updateRequest = deviceState?.updateRequest ?? null;
+              const updateFailed = updateRequest?.handoffState === "failed";
               const updateAvailable = workerUpdateAvailable({
                 currentVersion,
                 latestVersion,
@@ -315,16 +316,17 @@ export function WorkerStatusBar({
               const isUpdating = Boolean(
                 worker.deviceId && updatingDeviceIds[worker.deviceId],
               );
-              const isPending = Boolean(updateRequest);
+              const isPending = Boolean(updateRequest) && !updateFailed;
               const showUpdateControl =
                 mayRequestUpdate &&
                 remoteUpdateSupported &&
-                (updateAvailable || isPending || isUpdating);
+                (updateAvailable || isPending || updateFailed || isUpdating);
               const titleParts = [
                 worker.label,
                 status,
                 slotUsage,
                 versionLabel,
+                updateFailed ? updateRequest?.handoffError : null,
               ].filter(Boolean);
 
               return (
@@ -377,7 +379,14 @@ export function WorkerStatusBar({
                       <button
                         aria-busy={isUpdating || isPending}
                         aria-label={
-                          isPending
+                          updateFailed
+                            ? t("organization.workerUpdateDelayed", {
+                                version:
+                                  updateRequest?.targetVersion ??
+                                  latestVersion ??
+                                  "",
+                              })
+                            : isPending
                             ? t("organization.workerUpdatePending", {
                                 version:
                                   updateRequest?.targetVersion ??
@@ -400,7 +409,17 @@ export function WorkerStatusBar({
                           void requestUpdate(worker);
                         }}
                         title={
-                          isPending
+                          updateFailed
+                            ? t("organization.workerUpdateDelayedWithReason", {
+                                version:
+                                  updateRequest?.targetVersion ??
+                                  latestVersion ??
+                                  "",
+                                reason:
+                                  updateRequest?.handoffError ??
+                                  t("organization.workerUpdateDelayed"),
+                              })
+                            : isPending
                             ? t("organization.workerUpdatePending", {
                                 version:
                                   updateRequest?.targetVersion ??

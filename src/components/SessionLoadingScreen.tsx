@@ -14,6 +14,7 @@ export function SessionLoadingScreen() {
       aria-busy="true"
       aria-live="polite"
       className="session-loading-screen"
+      data-tauri-drag-region
       data-testid="session-loading-screen"
       role="status"
     >

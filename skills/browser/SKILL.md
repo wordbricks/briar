@@ -1,6 +1,6 @@
 ---
 name: browser
-description: Use ego-browser or agent-browser to verify user-visible interfaces and capture screenshots for Briar result evidence. Use when a Briar task changes a UI or requires browser-based validation.
+description: Use ego-browser, agent-browser, or Aside to verify user-visible interfaces and capture screenshots for Briar result evidence. Use when a Briar task changes a UI or requires browser-based validation.
 ---
 
 # Browser Automation

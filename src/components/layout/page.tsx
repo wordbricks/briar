@@ -51,6 +51,7 @@ export function PageHeader({
         "page-header flex items-center justify-between gap-3 border-b border-border bg-card",
         className,
       )}
+      data-tauri-drag-region
       {...props}
     >
       <div className="page-header-copy min-w-0 flex-1">
@@ -119,4 +120,3 @@ export function EmptyState({
     </div>
   );
 }
-

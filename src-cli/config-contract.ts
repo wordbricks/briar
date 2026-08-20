@@ -272,7 +272,7 @@ const AppSettings = passthrough(Schema.Struct({
   ),
   browserAutomationProvider: Schema.mutableKey(
     defaulted(
-      Schema.Literals(["ego-browser", "agent-browser"]),
+      Schema.Literals(["ego-browser", "agent-browser", "aside"]),
       "ego-browser",
     ),
   ),

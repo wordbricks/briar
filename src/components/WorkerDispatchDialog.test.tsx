@@ -609,6 +609,7 @@ describe("WorkerDispatchDialog", () => {
         ".worker-readiness-row",
       ),
     ).find((button) => button.textContent?.includes("Second Mac"));
+    expect(secondCard?.dataset.slot).toBe("choice-card");
     await act(async () => secondCard?.click());
 
     expect(secondCard?.getAttribute("aria-pressed")).toBe("true");

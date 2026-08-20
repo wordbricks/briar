@@ -294,6 +294,7 @@ export function buildCurrentInboxMessages(
 
   for (const session of collapseLinkedAutoHuntSessions(sessions)) {
     if (session.status !== "completed" && session.status !== "failed") continue;
+    if (!currentUserId || session.requestedByUserId !== currentUserId) continue;
     const finalEvent = [...session.events].reverse().find(
       (event) => event.type === session.status,
     );
@@ -985,13 +986,23 @@ export function useInbox(
             const subscribedIssueIds = result.subscribedIssueIds
               ? new Set(result.subscribedIssueIds)
               : null;
-            const retainedMessages = subscribedIssueIds
-              ? current.messages.filter(
-                  (message) =>
-                    (message.kind !== "issue" && message.kind !== "conversation") ||
-                    subscribedIssueIds.has(message.targetId),
-                )
-              : current.messages;
+            const authorizedSessionMessageIds = new Set(
+              result.messages.flatMap((message) =>
+                message.kind === "session" ? [message.id] : []
+              ),
+            );
+            const retainedMessages = current.messages.filter((message) => {
+              if (message.kind === "session") {
+                return authorizedSessionMessageIds.has(message.id);
+              }
+              if (
+                subscribedIssueIds &&
+                (message.kind === "issue" || message.kind === "conversation")
+              ) {
+                return subscribedIssueIds.has(message.targetId);
+              }
+              return true;
+            });
             const storedById = new Map(
               retainedMessages.map((message) => [message.id, message]),
             );

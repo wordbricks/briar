@@ -511,6 +511,18 @@ struct EgoBrowserStatus {
     version: Option<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AsideBrowserStatus {
+    supported: bool,
+    installed: bool,
+    cli_ready: bool,
+    mcp_ready: bool,
+    skill_ready: bool,
+    browser_ready: bool,
+    version: Option<String>,
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RepositoryReadiness {
@@ -530,6 +542,16 @@ struct RepositoryReadiness {
     github_write_access: bool,
     git_ready: bool,
     pr_ready: bool,
+    issues: Vec<String>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LovableRepositoryCompatibility {
+    compatible: bool,
+    stack: Option<String>,
+    package_manager: Option<String>,
+    scripts: Vec<String>,
     issues: Vec<String>,
 }
 
@@ -626,6 +648,7 @@ enum BrowserAutomationProvider {
     #[default]
     EgoBrowser,
     AgentBrowser,
+    Aside,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -2386,6 +2409,176 @@ async fn inspect_ego_browser(app: tauri::AppHandle) -> Result<EgoBrowserStatus, 
         .map_err(|error| error.to_string())
 }
 
+#[cfg(target_os = "macos")]
+fn aside_supported() -> bool {
+    Command::new("/usr/bin/sw_vers")
+        .arg("-productVersion")
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| {
+            String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .split('.')
+                .next()?
+                .parse::<u32>()
+                .ok()
+        })
+        .is_some_and(|major| major >= 15)
+}
+
+#[cfg(target_os = "macos")]
+fn aside_installed(home: &Path) -> bool {
+    [
+        PathBuf::from("/Applications/Aside.app"),
+        PathBuf::from("/Applications/Aside Browser.app"),
+        home.join("Applications/Aside.app"),
+        home.join("Applications/Aside Browser.app"),
+    ]
+    .iter()
+    .any(|path| path.is_dir())
+}
+
+fn aside_browser_skill_ready(home: &Path) -> bool {
+    [
+        home.join(".codex/skills/browser/SKILL.md"),
+        home.join(".claude/skills/browser/SKILL.md"),
+        home.join(".cursor/skills/browser/SKILL.md"),
+        home.join(".grok/skills/browser/SKILL.md"),
+        home.join(".gemini/config/skills/browser/SKILL.md"),
+        home.join(".config/opencode/skills/browser/SKILL.md"),
+    ]
+    .iter()
+    .all(|path| path.is_file())
+}
+
+fn aside_output(home: &Path, binary: &Path, arguments: &[&str]) -> Option<std::process::Output> {
+    Command::new(binary)
+        .args(arguments)
+        .env("PATH", cli_execution_path(home).ok()?)
+        .env("HOME", home)
+        .output()
+        .ok()
+}
+
+fn inspect_aside_browser_sync(home: &Path) -> AsideBrowserStatus {
+    #[cfg(target_os = "macos")]
+    {
+        let supported = aside_supported();
+        let installed = aside_installed(home);
+        let binary = cli_execution_path(home)
+            .ok()
+            .and_then(|execution_path| which::which_in("aside", Some(execution_path), home).ok());
+        let version = binary.as_deref().and_then(|binary| {
+            aside_output(home, binary, &["--version"])
+                .filter(|output| output.status.success())
+                .and_then(|output| {
+                    parse_cli_version(&output.stdout).or_else(|| parse_cli_version(&output.stderr))
+                })
+        });
+        let cli_ready = version.is_some();
+        let mcp_ready = binary.as_deref().is_some_and(|binary| {
+            aside_output(home, binary, &["mcp", "--help"])
+                .is_some_and(|output| output.status.success())
+        });
+        let skill_ready = aside_browser_skill_ready(home);
+        AsideBrowserStatus {
+            supported,
+            installed,
+            cli_ready,
+            mcp_ready,
+            skill_ready,
+            browser_ready: supported && installed && cli_ready && mcp_ready && skill_ready,
+            version,
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = home;
+        AsideBrowserStatus {
+            supported: false,
+            installed: false,
+            cli_ready: false,
+            mcp_ready: false,
+            skill_ready: false,
+            browser_ready: false,
+            version: None,
+        }
+    }
+}
+
+#[tauri::command]
+async fn inspect_aside_browser(app: tauri::AppHandle) -> Result<AsideBrowserStatus, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || inspect_aside_browser_sync(&home))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn install_aside_cli(home: &Path) -> Result<(), String> {
+    let execution_path = cli_execution_path(home)?;
+    let shell = which::which_in("bash", Some(&execution_path), home)
+        .or_else(|_| which::which_in("sh", Some(&execution_path), home))
+        .map_err(|_| "Aside CLI 설치에 필요한 shell을 찾지 못했습니다.".to_string())?;
+    let output = Command::new(shell)
+        .env("PATH", &execution_path)
+        .env("HOME", home)
+        .args([
+            "-c",
+            "curl -fsSL https://releases.aside.com/install.sh | bash",
+        ])
+        .output()
+        .map_err(|error| format!("Aside CLI 설치 명령을 실행하지 못했습니다: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let detail = [output.stderr.as_slice(), output.stdout.as_slice()]
+        .into_iter()
+        .map(String::from_utf8_lossy)
+        .map(|value| value.trim().to_string())
+        .find(|value| !value.is_empty())
+        .unwrap_or_else(|| "unknown error".to_string());
+    Err(format!("Aside CLI를 설치하지 못했습니다: {detail}"))
+}
+
+#[tauri::command]
+async fn setup_aside_browser(app: tauri::AppHandle) -> Result<AsideBrowserStatus, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(target_os = "macos")]
+        {
+            if !aside_supported() {
+                return Err("Aside는 macOS 15 이상에서만 사용할 수 있습니다.".to_string());
+            }
+            if !aside_installed(&home) {
+                return Err("Aside를 먼저 설치하고 로그인과 온보딩을 완료해 주세요.".to_string());
+            }
+            install_aside_cli(&home)?;
+            sync_auto_hunt_assets(&resource_directory, &home)?;
+            let status = inspect_aside_browser_sync(&home);
+            if !status.browser_ready {
+                return Err(format!(
+                    "Aside 설정 후 재확인에 실패했습니다. CLI: {}, MCP: {}, Skill: {}",
+                    status.cli_ready, status.mcp_ready, status.skill_ready
+                ));
+            }
+            Ok(status)
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (home, resource_directory);
+            Err("Aside는 macOS 15 이상에서만 사용할 수 있습니다.".to_string())
+        }
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[tauri::command]
 async fn install_agent_browser(app: tauri::AppHandle) -> Result<AgentBrowserStatus, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
@@ -2722,6 +2915,266 @@ async fn discover_repository_icon(repository_path: String) -> Result<Option<Stri
     tauri::async_runtime::spawn_blocking(move || {
         let root = git_repository_root(Path::new(&repository_path))?;
         repository_icon_data_url(&root)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+const MAX_LOVABLE_PACKAGE_JSON_BYTES: u64 = 1024 * 1024;
+
+fn package_script_is_preset_compatible(name: &str, command: &str) -> bool {
+    let command = command.trim();
+    if command.is_empty()
+        || command.contains([';', '|', '`', '\n', '\r', '>', '<'])
+        || command.contains("$(")
+        || command.replace("&&", "").contains('&')
+    {
+        return false;
+    }
+    let allowed_prefixes: &[&str] = match name {
+        "build" => &["vite build", "vinxi build", "react-router build", "tsc"],
+        "lint" => &["eslint", "biome check", "oxlint"],
+        "typecheck" => &["tsc"],
+        "test" => &["vitest", "jest"],
+        _ => return false,
+    };
+    command.split("&&").all(|segment| {
+        let segment = segment.trim();
+        allowed_prefixes.iter().any(|prefix| {
+            segment == *prefix
+                || segment
+                    .strip_prefix(prefix)
+                    .is_some_and(|suffix| suffix.starts_with(char::is_whitespace))
+        })
+    })
+}
+
+fn inspect_lovable_repository_compatibility_in(
+    repository_root: &Path,
+) -> LovableRepositoryCompatibility {
+    let mut issues = Vec::new();
+    let Ok(repository_root) = fs::canonicalize(repository_root) else {
+        return LovableRepositoryCompatibility {
+            compatible: false,
+            stack: None,
+            package_manager: None,
+            scripts: Vec::new(),
+            issues: vec!["The repository root could not be resolved.".to_string()],
+        };
+    };
+    let package_path = repository_root.join("package.json");
+    let Ok(resolved_package_path) = fs::canonicalize(&package_path) else {
+        return LovableRepositoryCompatibility {
+            compatible: false,
+            stack: None,
+            package_manager: None,
+            scripts: Vec::new(),
+            issues: vec!["package.json is missing.".to_string()],
+        };
+    };
+    if !resolved_package_path.starts_with(&repository_root) {
+        return LovableRepositoryCompatibility {
+            compatible: false,
+            stack: None,
+            package_manager: None,
+            scripts: Vec::new(),
+            issues: vec!["package.json resolves outside the repository.".to_string()],
+        };
+    }
+    let package_size = fs::metadata(&resolved_package_path)
+        .map(|metadata| metadata.len())
+        .unwrap_or(MAX_LOVABLE_PACKAGE_JSON_BYTES + 1);
+    if package_size > MAX_LOVABLE_PACKAGE_JSON_BYTES {
+        return LovableRepositoryCompatibility {
+            compatible: false,
+            stack: None,
+            package_manager: None,
+            scripts: Vec::new(),
+            issues: vec!["package.json is too large to inspect safely.".to_string()],
+        };
+    }
+    let package = fs::read_to_string(&resolved_package_path)
+        .ok()
+        .and_then(|contents| serde_json::from_str::<serde_json::Value>(&contents).ok());
+    let Some(package) = package.and_then(|value| value.as_object().cloned()) else {
+        return LovableRepositoryCompatibility {
+            compatible: false,
+            stack: None,
+            package_manager: None,
+            scripts: Vec::new(),
+            issues: vec!["package.json is not valid JSON.".to_string()],
+        };
+    };
+
+    let dependencies = ["dependencies", "devDependencies", "peerDependencies"]
+        .into_iter()
+        .filter_map(|key| package.get(key).and_then(serde_json::Value::as_object))
+        .flat_map(|dependencies| dependencies.keys().cloned())
+        .collect::<BTreeSet<_>>();
+    let has_react = dependencies.contains("react");
+    if !has_react {
+        issues.push("The React dependency was not found.".to_string());
+    }
+    let stack = if dependencies.contains("@tanstack/react-start") {
+        Some("tanstack-start".to_string())
+    } else if dependencies.contains("vite") && has_react {
+        Some("vite-react".to_string())
+    } else {
+        issues.push("Neither TanStack Start nor React + Vite was detected.".to_string());
+        None
+    };
+    if ![
+        "vite.config.ts",
+        "vite.config.js",
+        "vite.config.mts",
+        "vite.config.mjs",
+    ]
+    .iter()
+    .any(|config| repository_root.join(config).is_file())
+    {
+        issues.push("A Vite configuration file was not found.".to_string());
+    }
+    let supabase_directory = repository_root.join("supabase");
+    if supabase_directory.is_dir() {
+        if !supabase_directory.join("config.toml").is_file() {
+            issues.push("The Supabase directory has no config.toml file.".to_string());
+        }
+        if supabase_directory.join("functions").is_dir() {
+            issues.push(
+                "Supabase Edge Functions require repository-specific workflow analysis."
+                    .to_string(),
+            );
+        }
+    }
+
+    let script_entries = package
+        .get("scripts")
+        .and_then(serde_json::Value::as_object);
+    let scripts = script_entries
+        .into_iter()
+        .flat_map(|scripts| scripts.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    if !scripts.contains("build") {
+        issues.push("A package build script is required.".to_string());
+    }
+    for script_name in ["lint", "typecheck", "test", "build"] {
+        let Some(command) = script_entries
+            .and_then(|scripts| scripts.get(script_name))
+            .and_then(serde_json::Value::as_str)
+        else {
+            continue;
+        };
+        if !package_script_is_preset_compatible(script_name, command) {
+            issues.push(format!(
+                "The '{script_name}' script requires repository-specific analysis."
+            ));
+        }
+    }
+    let custom_lifecycle_scripts = scripts
+        .iter()
+        .filter(|script| {
+            let script = script.to_ascii_lowercase();
+            ["deploy", "release", "publish"]
+                .iter()
+                .any(|prefix| script == *prefix || script.starts_with(&format!("{prefix}:")))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if !custom_lifecycle_scripts.is_empty() {
+        issues.push(format!(
+            "Custom deployment scripts were detected: {}.",
+            custom_lifecycle_scripts.join(", ")
+        ));
+    }
+    if package.get("workspaces").is_some() {
+        issues.push("A workspace or monorepo configuration was detected.".to_string());
+    }
+
+    let custom_configuration = [
+        ".github/workflows",
+        ".gitlab-ci.yml",
+        ".circleci",
+        "Dockerfile",
+        "docker-compose.yml",
+        "docker-compose.yaml",
+        "wrangler.toml",
+        "wrangler.json",
+        "wrangler.jsonc",
+        "vercel.json",
+        "netlify.toml",
+        "firebase.json",
+        "fly.toml",
+        "render.yaml",
+        "render.yml",
+        "railway.json",
+        "serverless.yml",
+        "serverless.yaml",
+    ]
+    .into_iter()
+    .filter(|relative| repository_root.join(relative).exists())
+    .collect::<Vec<_>>();
+    if !custom_configuration.is_empty() {
+        issues.push(format!(
+            "Custom CI or deployment configuration was detected: {}.",
+            custom_configuration.join(", ")
+        ));
+    }
+
+    let mut package_manager_signals = BTreeSet::new();
+    let declared_package_manager = package
+        .get("packageManager")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|value| value.split('@').next())
+        .filter(|manager| matches!(*manager, "bun" | "npm" | "pnpm" | "yarn"))
+        .map(str::to_string);
+    if package.get("packageManager").is_some() && declared_package_manager.is_none() {
+        issues.push("The declared package manager is not supported by the preset.".to_string());
+    }
+    if let Some(manager) = declared_package_manager.as_ref() {
+        package_manager_signals.insert(manager.clone());
+    }
+    for (lockfile, manager) in [
+        ("bun.lock", "bun"),
+        ("bun.lockb", "bun"),
+        ("package-lock.json", "npm"),
+        ("pnpm-lock.yaml", "pnpm"),
+        ("yarn.lock", "yarn"),
+    ] {
+        if repository_root.join(lockfile).is_file() {
+            package_manager_signals.insert(manager.to_string());
+        }
+    }
+    if package_manager_signals.len() > 1 {
+        issues.push(format!(
+            "Conflicting package manager signals were detected: {}.",
+            package_manager_signals
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+    let package_manager = declared_package_manager
+        .or_else(|| package_manager_signals.iter().next().cloned())
+        .or_else(|| Some("npm".to_string()));
+
+    LovableRepositoryCompatibility {
+        compatible: issues.is_empty(),
+        stack,
+        package_manager,
+        scripts: scripts.into_iter().collect(),
+        issues,
+    }
+}
+
+#[tauri::command]
+async fn inspect_lovable_repository_compatibility(
+    repository_path: String,
+) -> Result<LovableRepositoryCompatibility, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = git_repository_root(Path::new(&repository_path))?;
+        Ok(inspect_lovable_repository_compatibility_in(&root))
     })
     .await
     .map_err(|error| error.to_string())?
@@ -8334,10 +8787,12 @@ pub fn run() {
             inspect_open_code_terminal_path,
             configure_open_code_terminal_path,
             inspect_agent_browser,
+            inspect_aside_browser,
             inspect_ego_browser,
             open_agent_provider_login,
             install_onboarding_prerequisite,
             install_agent_browser,
+            setup_aside_browser,
             read_session_token,
             write_session_token,
             clear_session_token,
@@ -8347,6 +8802,7 @@ pub fn run() {
             validate_repository_path,
             clone_github_ssh_repository,
             create_project_workspace,
+            inspect_lovable_repository_compatibility,
             inspect_repository_readiness,
             discover_repository_icon,
             connected_project_ids,
@@ -8711,6 +9167,131 @@ mod tests {
         .expect("project metadata");
 
         assert_eq!(repository_icon_path(&repository), None);
+    }
+
+    #[test]
+    fn recognizes_standard_tanstack_start_lovable_repositories() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        fs::write(
+            repository.path().join("package.json"),
+            r#"{
+              "packageManager": "npm@11.0.0",
+              "scripts": {
+                "dev": "vite dev",
+                "lint": "eslint .",
+                "test": "vitest run",
+                "build": "vite build"
+              },
+              "dependencies": {
+                "@tanstack/react-start": "^1.0.0",
+                "react": "^19.0.0"
+              },
+              "devDependencies": { "vite": "^7.0.0" }
+            }"#,
+        )
+        .expect("package manifest");
+        fs::write(repository.path().join("package-lock.json"), "{}\n").expect("package lock");
+        fs::write(
+            repository.path().join("vite.config.ts"),
+            "export default {};\n",
+        )
+        .expect("Vite configuration");
+
+        let compatibility = inspect_lovable_repository_compatibility_in(repository.path());
+
+        assert!(compatibility.compatible, "{:?}", compatibility.issues);
+        assert_eq!(compatibility.stack.as_deref(), Some("tanstack-start"));
+        assert_eq!(compatibility.package_manager.as_deref(), Some("npm"));
+        assert_eq!(compatibility.scripts, vec!["build", "dev", "lint", "test"]);
+    }
+
+    #[test]
+    fn recognizes_legacy_vite_lovable_repositories() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        fs::write(
+            repository.path().join("package.json"),
+            r#"{
+              "scripts": { "dev": "vite", "build": "vite build" },
+              "dependencies": { "react": "^18.0.0" },
+              "devDependencies": { "vite": "^5.0.0" }
+            }"#,
+        )
+        .expect("package manifest");
+        fs::write(repository.path().join("bun.lock"), "").expect("bun lockfile");
+        fs::write(
+            repository.path().join("vite.config.ts"),
+            "export default {};\n",
+        )
+        .expect("Vite configuration");
+
+        let compatibility = inspect_lovable_repository_compatibility_in(repository.path());
+
+        assert!(compatibility.compatible, "{:?}", compatibility.issues);
+        assert_eq!(compatibility.stack.as_deref(), Some("vite-react"));
+        assert_eq!(compatibility.package_manager.as_deref(), Some("bun"));
+    }
+
+    #[test]
+    fn sends_custom_lovable_delivery_workflows_to_repository_analysis() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        fs::write(
+            repository.path().join("package.json"),
+            r#"{
+              "scripts": {
+                "build": "vite build",
+                "deploy": "wrangler deploy"
+              },
+              "dependencies": { "react": "^18.0.0" },
+              "devDependencies": { "vite": "^5.0.0" }
+            }"#,
+        )
+        .expect("package manifest");
+        fs::create_dir_all(repository.path().join(".github/workflows"))
+            .expect("workflow directory");
+        fs::create_dir_all(repository.path().join("supabase/functions"))
+            .expect("Supabase functions directory");
+        fs::write(
+            repository.path().join("supabase/config.toml"),
+            "project_id = 'app'\n",
+        )
+        .expect("Supabase configuration");
+        fs::write(
+            repository.path().join("vite.config.ts"),
+            "export default {};\n",
+        )
+        .expect("Vite configuration");
+
+        let compatibility = inspect_lovable_repository_compatibility_in(repository.path());
+
+        assert!(!compatibility.compatible);
+        assert!(compatibility
+            .issues
+            .iter()
+            .any(|issue| issue.contains("Custom deployment scripts")));
+        assert!(compatibility
+            .issues
+            .iter()
+            .any(|issue| issue.contains("Custom CI or deployment")));
+        assert!(compatibility
+            .issues
+            .iter()
+            .any(|issue| issue.contains("Supabase Edge Functions")));
+    }
+
+    #[test]
+    fn rejects_shell_composition_in_preset_validation_scripts() {
+        assert!(package_script_is_preset_compatible(
+            "build",
+            "tsc -b && vite build"
+        ));
+        assert!(!package_script_is_preset_compatible(
+            "build",
+            "vite build && curl https://example.com"
+        ));
+        assert!(!package_script_is_preset_compatible(
+            "build",
+            "vite build & curl https://example.com"
+        ));
     }
 
     #[cfg(desktop)]
@@ -9079,6 +9660,49 @@ mod tests {
             String::from_utf8_lossy(&output.stdout).trim(),
             "agent-browser fixture"
         );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn detects_aside_cli_mcp_and_browser_skill_readiness() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        fs::create_dir_all(home.path().join("Applications/Aside.app"))
+            .expect("Aside app fixture should exist");
+        let binary = home.path().join(".local/bin/aside");
+        fs::create_dir_all(binary.parent().expect("binary should have a parent"))
+            .expect("local binary directory should exist");
+        fs::write(
+            &binary,
+            "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 1.26.810.1915; exit 0; fi\nif [ \"$1\" = \"mcp\" ] && [ \"$2\" = \"--help\" ]; then exit 0; fi\nexit 1\n",
+        )
+        .expect("Aside CLI fixture should be written");
+        fs::set_permissions(&binary, fs::Permissions::from_mode(0o700))
+            .expect("Aside CLI fixture should be executable");
+        for skill in [
+            ".codex/skills/browser/SKILL.md",
+            ".claude/skills/browser/SKILL.md",
+            ".cursor/skills/browser/SKILL.md",
+            ".grok/skills/browser/SKILL.md",
+            ".gemini/config/skills/browser/SKILL.md",
+            ".config/opencode/skills/browser/SKILL.md",
+        ] {
+            let skill = home.path().join(skill);
+            fs::create_dir_all(skill.parent().expect("skill should have a parent"))
+                .expect("skill directory should exist");
+            fs::write(skill, "# Browser\n").expect("skill fixture should be written");
+        }
+
+        let status = inspect_aside_browser_sync(home.path());
+
+        assert!(status.supported);
+        assert!(status.installed);
+        assert!(status.cli_ready);
+        assert!(status.mcp_ready);
+        assert!(status.skill_ready);
+        assert!(status.browser_ready);
+        assert_eq!(status.version.as_deref(), Some("1.26.810.1915"));
     }
 
     #[test]
@@ -9852,7 +10476,7 @@ branch refs/heads/briar/second-11111111
         update_browser_automation_settings_at(
             &config_path,
             BrowserAutomationSettings {
-                provider: BrowserAutomationProvider::AgentBrowser,
+                provider: BrowserAutomationProvider::Aside,
             },
         )
         .expect("browser automation settings should save");
@@ -9883,10 +10507,7 @@ branch refs/heads/briar/second-11111111
         assert_eq!(saved["agentProviders"]["codex"], false);
         assert_eq!(saved["agentProviders"]["claude"], true);
         assert_eq!(saved["appSettings"]["preventSleepWhileRunning"], true);
-        assert_eq!(
-            saved["appSettings"]["browserAutomationProvider"],
-            "agent-browser"
-        );
+        assert_eq!(saved["appSettings"]["browserAutomationProvider"], "aside");
         assert_eq!(saved["projects"][0]["llm"]["provider"], "claude");
         assert_eq!(saved["projects"][0]["llm"]["model"], "sonnet");
         assert_eq!(saved["projects"][0]["llm"]["effort"], "high");

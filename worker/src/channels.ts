@@ -184,6 +184,7 @@ export type ChannelReplyJobRow = {
   claimed_at: string | null;
   lease_expires_at: string | null;
   attempts: number;
+  planned_update_resume: number;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -2339,7 +2340,8 @@ export async function claimNextChannelAgentReply(
       `update briar_channel_agent_reply_jobs
        set status = 'running', claimed_device_id = ?, claimed_worker_id = ?,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
-           attempts = attempts + 1, error = null, updated_at = ?
+           attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
+           planned_update_resume = 0, error = null, updated_at = ?
        where id = ? and organization_id = ? and attempts < ?
          and (status = 'queued'
            or (status = 'running' and lease_expires_at <= ?))
@@ -3413,6 +3415,7 @@ export async function getChannelActionProposal(
   return db
     .prepare(
       `select proposal.*,
+              reply.parent_message_id as reply_parent_message_id,
               reply.author_agent_id as reply_author_agent_id,
               agent.organization_id as reply_author_agent_organization_id,
               agent.project_id as reply_author_agent_project_id
@@ -3431,6 +3434,7 @@ export async function getChannelActionProposal(
       project_id: string | null;
       trigger_message_id: string;
       reply_message_id: string;
+      reply_parent_message_id: string | null;
       action_type: ChannelActionType;
       payload_json: string;
       status: "pending" | "accepted";

@@ -52,9 +52,9 @@ describe("issue conversation message overflow containment", () => {
     expect(pre).toContain("max-width:100%");
     expect(pre).toContain("overflow-x:auto");
 
-    const table = ruleBody(".issue-message-body table");
-    expect(table).toContain("max-width:100%");
-    expect(table).toContain("overflow-x:auto");
+    const tableWrap = ruleBody(".markdown-table-wrap");
+    expect(tableWrap).toContain("max-width:100%");
+    expect(tableWrap).toContain("overflow-x:auto");
 
     const paragraph = ruleBody(".issue-message-body p");
     expect(paragraph).toContain("overflow-wrap:anywhere");

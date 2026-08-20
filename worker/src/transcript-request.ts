@@ -8,6 +8,7 @@ import {
 } from "../../src/lib/agent-execution-metrics";
 import { agentProviders } from "../../src/lib/agent-provider";
 import { MAX_TRANSCRIPT_EVENTS_PER_REQUEST } from "./transcript-limits";
+import { WorkerUpdateHandoffWorkType } from "./worker-update-contract";
 
 const strictSchemaOptions = {
   errors: "all",
@@ -46,6 +47,11 @@ export const TranscriptRequest = Schema.Struct({
   executionId: Schema.optional(Uuid),
   projectId: Schema.optional(Uuid),
   workerId: Schema.optional(WorkerId),
+  workType: Schema.optional(WorkerUpdateHandoffWorkType),
+  workId: Schema.optional(Uuid),
+  claimToken: Schema.optional(
+    Schema.Trim.check(Schema.isLengthBetween(20, 256)),
+  ),
   agentProvider: Schema.Literals(agentProviders),
   executionMetrics: Schema.optional(AgentExecutionMetrics),
   usageRecords: Schema.optional(

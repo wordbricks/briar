@@ -6,6 +6,9 @@
 
 .dark .provider-artwork-white { filter:none; }
 .dark .provider-artwork-dark { filter:invert(1); }
+.dark .provider-artwork-codex { color:#fff; }
+.dark .provider-artwork-theme-switcher > .provider-artwork-light { display:none; }
+.dark .provider-artwork-theme-switcher > .provider-artwork-dark { display:block; }
 
 .dark .sidebar,
 .dark .sidebar-bottom,
@@ -346,17 +349,6 @@
 
 .dark .health-item {
   border-color: var(--border);
-}
-
-.dark .project-workflow-requirements,
-.dark .project-workflow-requirements > ul > li {
-  border-color: var(--border);
-  background: var(--card);
-}
-
-.dark .project-workflow-requirements li strong,
-.dark .project-workflow-requirements header strong {
-  color: var(--foreground);
 }
 
 .dark .health-item strong {

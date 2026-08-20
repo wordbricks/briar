@@ -30,6 +30,61 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.144",
+        date: "2026년 8월 20일",
+        title: "Lovable 프로젝트를 검토와 병합까지 연결합니다",
+        summary:
+          "Lovable 프로젝트 온보딩을 더 쉽게 알아보고, 기본 워크플로가 PR 생성과 main 병합까지 이어지도록 확장했습니다.",
+        items: [
+          "저장소 가져오기 카드에 Lovable 로고를 표시해 Lovable 프로젝트 경로를 더 쉽게 구분합니다.",
+          "Lovable 호환 저장소의 기본 워크플로에 PR 생성과 main 병합 단계를 추가해 검토와 반영 과정을 명시합니다.",
+          "프로젝트 온보딩과 Lovable 워크플로 프리셋 회귀 테스트를 보강합니다.",
+        ],
+      },
+      {
+        version: "1.2.143",
+        date: "2026년 8월 20일",
+        title: "앱 업데이트 중 실행 중인 Worker 작업을 안전하게 이어받습니다",
+        summary:
+          "앱 업데이트로 Worker가 재시작되어도 실행 중인 작업을 중복 없이 즉시 이어가고, 오래된 Worker의 늦은 기록은 안전하게 차단합니다.",
+        items: [
+          "Worker 자산이 바뀌기 전에 새 claim을 막고 provider를 중단하며 transcript·진행 상태·대화 ID·작업 공간 checkpoint를 저장합니다.",
+          "이슈·Project Agent task·이슈 답글·채널 답글을 현재 claim token으로 원자적으로 handoff해 lease 만료를 기다리지 않고 새 Worker가 이어받습니다.",
+          "계획된 인계는 재시도 횟수를 소모하지 않고, 이전 Worker의 늦은 lease 갱신·transcript·완료 요청은 fence해 중복 결과를 막습니다.",
+          "인계 실패 시 동시 실행을 허용하지 않고 lease 만료 복구로 안전하게 전환하며, Worker 상태 화면에 지연 사유와 재시도 동작을 표시합니다.",
+          "Worker 자산이 바뀌지 않은 일반 앱 재시작에서는 실행 중 Worker를 불필요하게 다시 시작하지 않습니다.",
+        ],
+      },
+      {
+        version: "1.2.142",
+        date: "2026년 8월 20일",
+        title: "채널에서 이슈 생성과 실행 승인을 한 번에 연결합니다",
+        summary:
+          "채널 제안에서 이슈 생성과 Agent 실행 설정을 하나의 승인 흐름으로 묶고, landing의 다음 행동을 더 분명하게 다듬었습니다.",
+        items: [
+          "채널에서 이슈를 만들고 실행할 때 프로젝트·Worker·제공자·모델·effort를 검토한 뒤 한 번의 승인으로 함께 처리합니다.",
+          "데스크탑과 iOS Companion에서 같은 채널 제안·실행 승인 상태를 보여주고, 재시도와 중복 요청에도 동일한 실행 결과를 유지합니다.",
+          "서버가 프로젝트·멤버십·정책·제공자·Worker 가능 여부를 승인 시점에 다시 확인해 실행 요청을 안전하게 예약합니다.",
+          "랜딩 홈페이지의 고정 헤더·언어 전환·다운로드 버튼·모바일 선택 흐름을 정리해 다음 행동을 더 쉽게 찾도록 합니다.",
+          "채널 이슈 생성·실행 승인과 관련된 UI·API·Worker·Companion 회귀 테스트를 보강합니다.",
+        ],
+      },
+      {
+        version: "1.2.141",
+        date: "2026년 8월 20일",
+        title: "프로젝트 창과 상태 표현을 더 선명하게 정리합니다",
+        summary:
+          "프로젝트를 별도 데스크탑 창에서 열고, 온보딩·설정·사용량 상태를 공통 패널로 정리하며 제공자 활동과 아이콘을 테마에 맞게 정확히 보여줍니다.",
+        items: [
+          "데스크탑에서 프로젝트를 별도 창으로 열어 프로젝트별 Inbox·채널·설정을 독립적으로 확인하고, 창을 연 프로젝트와 조직을 고정합니다.",
+          "사용자별 조직 선택을 기억하고, 프로젝트 창에서는 해당 프로젝트의 Inbox·채널·알림만 표시합니다.",
+          "온보딩·프로젝트 설정·사용량·검토 상태를 공통 ChoiceCard·StatusPanel 구성요소와 의미 있는 상태 색상으로 통일합니다.",
+          "사용량 상태 바에는 활성화한 제공자만 표시하고, 사용량이 없어도 제공자 아이콘과 상태를 명확히 보여줍니다.",
+          "제공자 로고가 라이트 테마에서 올바르게 보이고 다크 테마에서 OpenCode·Codex 색상을 읽기 쉽게 전환합니다.",
+          "프로젝트 창·상태 패널·제공자 표시 회귀 테스트를 추가합니다.",
+        ],
+      },
+      {
         version: "1.2.140",
         date: "2026년 8월 20일",
         title: "다크 모드와 로컬 Worker 시작을 더 안정적으로 다듬습니다",
@@ -851,6 +906,61 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.144",
+        date: "August 20, 2026",
+        title: "Carry Lovable projects through review and merge",
+        summary:
+          "Make Lovable project onboarding easier to recognize and extend its default workflow through pull-request creation and merging to main.",
+        items: [
+          "Show the Lovable logo on the repository import card so the Lovable project path is easier to recognize.",
+          "Add pull-request creation and merge-to-main stages to the default workflow for compatible Lovable repositories.",
+          "Expand onboarding and Lovable workflow preset regression coverage.",
+        ],
+      },
+      {
+        version: "1.2.143",
+        date: "August 20, 2026",
+        title: "Safely hand off active Worker jobs during app updates",
+        summary:
+          "Continue active work immediately without duplicate side effects when an app update restarts a Worker, while fencing late writes from the old Worker.",
+        items: [
+          "Drain new claims before changed Worker assets are restarted, stop the provider, and save transcript, progress, conversation ID, and workspace checkpoints.",
+          "Atomically hand off issue, Project Agent task, issue reply, and channel reply claims so a new Worker resumes without waiting for lease expiry.",
+          "Keep planned handoffs out of retry accounting and fence late lease renewals, transcript writes, and completion requests from the old Worker.",
+          "If handoff fails, prevent concurrent execution and fall back to lease-expiry recovery while showing the delay reason and retry action in Worker status UI.",
+          "Avoid restarting active Workers during ordinary app reopen when Worker assets have not changed.",
+        ],
+      },
+      {
+        version: "1.2.142",
+        date: "August 20, 2026",
+        title: "Connect channel issue creation and execution approval in one step",
+        summary:
+          "Combine issue creation and Agent execution settings into one channel approval flow, and make the landing page's next action easier to find.",
+        items: [
+          "Review the project, Worker, provider, model, and effort before creating and executing an issue from a channel, then approve both together once.",
+          "Show the same channel proposal and execution-approval state on desktop and iOS Companion, with retries and duplicate requests converging on the same result.",
+          "Recheck project, membership, policy, provider, and Worker availability at approval time before safely reserving the execution request.",
+          "Refine the landing homepage's sticky header, language switcher, download buttons, and mobile choice flow so the next action is easier to discover.",
+          "Expand UI, API, Worker, and Companion regression coverage for channel issue creation and execution approval.",
+        ],
+      },
+      {
+        version: "1.2.141",
+        date: "August 20, 2026",
+        title: "Make project windows and status surfaces clearer",
+        summary:
+          "Open projects in dedicated desktop windows, consolidate onboarding, settings, and usage states, and keep provider activity and logos accurate across themes.",
+        items: [
+          "Open projects in dedicated desktop windows so each project keeps its own Inbox, channels, and settings context.",
+          "Remember the selected organization per user and lock project windows to the project and organization they opened.",
+          "Unify onboarding, project settings, usage, and review states with shared ChoiceCard and StatusPanel components and semantic tones.",
+          "Show only enabled providers in the usage status bar, with clear provider icons even when usage data is unavailable.",
+          "Restore provider logos in the light theme and switch OpenCode and Codex artwork for readable dark-theme contrast.",
+          "Add regression coverage for project windows, status panels, active-provider usage, and themed provider artwork.",
+        ],
+      },
       {
         version: "1.2.140",
         date: "August 20, 2026",
@@ -1764,7 +1874,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-140">
+          <a href="#v1-2-144">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1786,6 +1896,10 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
+                      entry.version === "1.2.144" ||
+                      entry.version === "1.2.143" ||
+                      entry.version === "1.2.142" ||
+                      entry.version === "1.2.141" ||
                       entry.version === "1.2.140"
                         ? "2026-08-20"
                         : entry.version === "1.2.139" ||
