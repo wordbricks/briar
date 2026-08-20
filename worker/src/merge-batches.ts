@@ -103,7 +103,8 @@ export async function registerReadyMergeCandidate(
          frozen_head_sha, priority, ready_at, state, created_at, updated_at
        )
        select ?, run.project_id, null, run.id, run.current_attempt,
-              run.current_revision, link.repository_id, link.repository, ?,
+              run.current_revision, link.repository_id, link.repository,
+              policy.base_branch,
               link.pull_request_id, link.pull_request_node_id,
               link.pull_request_number, link.url, link.head_sha, run.priority,
               ?, 'ready', ?, ?
@@ -112,6 +113,11 @@ export async function registerReadyMergeCandidate(
          on link.project_id = run.project_id and link.run_id = run.id
         and link.attempt = run.current_attempt
         and link.revision = run.current_revision
+       join briar_repository_merge_policies policy
+         on policy.project_id = run.project_id
+        and policy.repository_id = link.repository_id
+        and policy.base_branch = coalesce(link.base_branch, ?)
+        and policy.enabled = 1
        where run.project_id = ? and run.id = ? and run.status = 'running'
          and link.state = 'open' and link.draft = 0 and link.head_sha is not null
          and not exists (
@@ -176,19 +182,42 @@ export async function registerReadyMergeCandidate(
        returning *`,
     ).bind(input.readyAt, candidateId, input.readyAt),
   ]);
-  return (results[2]?.results?.[0] ?? results[0]?.results?.[0] ?? null) as
+  const stored = (results[2]?.results?.[0] ?? results[0]?.results?.[0] ?? null) as
     | MergeBatchCandidateRow
     | null;
+  if (stored) return stored;
+  return db.prepare(
+    `select * from briar_merge_batch_candidates
+     where project_id = ? and run_id = ?
+       and attempt = (
+         select current_attempt from briar_hunt_runs where id = ? and project_id = ?
+       )
+       and revision = (
+         select current_revision from briar_hunt_runs where id = ? and project_id = ?
+       )`,
+  ).bind(
+    input.projectId,
+    input.runId,
+    input.runId,
+    input.projectId,
+    input.runId,
+    input.projectId,
+  ).first<MergeBatchCandidateRow>();
 }
 
 async function ensureNextCollectingBatch(
   db: D1Database,
   projectId: string,
   now: string,
-  quietWindowMs: number,
 ) {
   const candidate = await db.prepare(
-    `select * from briar_merge_batch_candidates candidate
+    `select candidate.*, policy.quiet_window_ms
+     from briar_merge_batch_candidates candidate
+     join briar_repository_merge_policies policy
+       on policy.project_id = candidate.project_id
+      and policy.repository_id = candidate.repository_id
+      and policy.base_branch = candidate.base_branch
+      and policy.enabled = 1
      where candidate.project_id = ? and candidate.batch_id is null
        and candidate.state = 'ready'
        and not exists (
@@ -201,9 +230,13 @@ async function ensureNextCollectingBatch(
      order by case when priority is null then 1 else 0 end,
               priority, ready_at, run_id
      limit 1`,
-  ).bind(projectId, ...activeBatchStates).first<MergeBatchCandidateRow>();
+  ).bind(projectId, ...activeBatchStates).first<
+    MergeBatchCandidateRow & { quiet_window_ms: number }
+  >();
   if (!candidate) return;
-  const quietUntil = new Date(Date.parse(now) + quietWindowMs).toISOString();
+  const quietUntil = new Date(
+    Date.parse(now) + candidate.quiet_window_ms,
+  ).toISOString();
   const batchId = crypto.randomUUID();
   try {
     await db.batch([
@@ -265,14 +298,7 @@ export async function claimNextMergeBatch(
     ...activeBatchStates,
   ).run();
 
-  await ensureNextCollectingBatch(
-    db,
-    projectId,
-    input.claimedAt,
-    Math.max(1, Math.trunc(
-      input.quietWindowMs ?? DEFAULT_MERGE_BATCH_QUIET_WINDOW_MS,
-    )),
-  );
+  await ensureNextCollectingBatch(db, projectId, input.claimedAt);
 
   const collecting = await db.prepare(
     `select id from briar_merge_batches
@@ -381,6 +407,14 @@ export async function recordMergeBatchMemberEnqueued(
        and state in ('frozen', 'enqueued')
        and (queue_entry_id is null or queue_entry_id = ?)
        and exists (
+         select 1 from briar_hunt_runs run
+         where run.id = briar_merge_batch_candidates.run_id
+           and run.project_id = briar_merge_batch_candidates.project_id
+           and run.current_attempt = briar_merge_batch_candidates.attempt
+           and run.current_revision = briar_merge_batch_candidates.revision
+           and run.status = 'running'
+       )
+       and exists (
          select 1 from briar_merge_batches batch
          where batch.id = briar_merge_batch_candidates.batch_id
            and batch.project_id = ? and batch.claimed_worker_id = ?
@@ -424,7 +458,17 @@ export async function recordMergeGroup(
        and not exists (
          select 1 from briar_merge_batch_candidates candidate
          where candidate.batch_id = briar_merge_batches.id
-           and candidate.state <> 'enqueued'
+           and (
+             candidate.state <> 'enqueued'
+             or not exists (
+               select 1 from briar_hunt_runs run
+               where run.id = candidate.run_id
+                 and run.project_id = candidate.project_id
+                 and run.current_attempt = candidate.attempt
+                 and run.current_revision = candidate.revision
+                 and run.status = 'running'
+             )
+           )
        )
        and (merge_group_sha is null or merge_group_sha = ?)
      returning *`,
@@ -457,6 +501,18 @@ export async function completeMergeBatchValidation(
      set state = 'awaiting_merge', updated_at = ?
      where ${batchLeaseFence} and state in ('validating', 'awaiting_merge')
        and merge_group_sha = ?
+       and not exists (
+         select 1 from briar_merge_batch_candidates candidate
+         where candidate.batch_id = briar_merge_batches.id
+           and not exists (
+             select 1 from briar_hunt_runs run
+             where run.id = candidate.run_id
+               and run.project_id = candidate.project_id
+               and run.current_attempt = candidate.attempt
+               and run.current_revision = candidate.revision
+               and run.status = 'running'
+           )
+       )
      returning *`,
   ).bind(
     input.observedAt,
@@ -501,6 +557,33 @@ export async function failMergeBatch(
     input.claimTokenHash,
     input.observedAt,
   ).first<MergeBatchRow>();
+}
+
+export async function retryMergeBatch(
+  db: D1Database,
+  input: { projectId: string; batchId: string; observedAt: string },
+) {
+  return db.prepare(
+    `update briar_merge_batches
+     set state = 'frozen', merge_group_ref = null, merge_group_sha = null,
+         claim_token_hash = null, claimed_worker_id = null, claimed_by = null,
+         claimed_at = null, lease_expires_at = null,
+         failure_code = null, failure_detail = null, updated_at = ?
+     where id = ? and project_id = ? and state in ('failed', 'blocked')
+       and not exists (
+         select 1 from briar_merge_batch_candidates candidate
+         where candidate.batch_id = briar_merge_batches.id
+           and not exists (
+             select 1 from briar_hunt_runs run
+             where run.id = candidate.run_id
+               and run.project_id = candidate.project_id
+               and run.current_attempt = candidate.attempt
+               and run.current_revision = candidate.revision
+               and run.status = 'running'
+           )
+       )
+     returning *`,
+  ).bind(input.observedAt, input.batchId, input.projectId).first<MergeBatchRow>();
 }
 
 export async function observeMergedBatchPullRequest(

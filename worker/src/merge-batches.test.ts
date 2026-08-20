@@ -77,6 +77,12 @@ describe("repository merge batch coordinator", () => {
         at(0),
         at(0),
       )),
+      db.prepare(
+        `insert into briar_repository_merge_policies (
+           project_id, repository_id, repository, base_branch, enabled,
+           quiet_window_ms, created_at, updated_at
+         ) values (?, ?, 'wordbricks/briar', 'main', 1, 10000, ?, ?)`,
+      ).bind(projectId, repositoryId, at(0), at(0)),
     ]);
   });
 
@@ -211,6 +217,7 @@ describe("repository merge batch coordinator", () => {
        order by priority, ready_at`,
     ).bind(claimed!.id).all<{
       id: string;
+      run_id: string;
       frozen_head_sha: string;
     }>();
 
@@ -262,6 +269,20 @@ describe("repository merge batch coordinator", () => {
       mergeGroupSha: hash("d"),
       observedAt: at(23),
     })).resolves.toBeNull();
+    await db.prepare(
+      `update briar_hunt_runs set current_revision = 2 where id = ?`,
+    ).bind(members.results[0]!.run_id).run();
+    await expect(completeMergeBatchValidation(db, {
+      batchId: claimed!.id,
+      projectId,
+      workerId: claimed!.claimed_worker_id,
+      claimTokenHash: claimed!.claim_token_hash,
+      mergeGroupSha: mergeSha,
+      observedAt: at(23),
+    })).resolves.toBeNull();
+    await db.prepare(
+      `update briar_hunt_runs set current_revision = 1 where id = ?`,
+    ).bind(members.results[0]!.run_id).run();
     await expect(completeMergeBatchValidation(db, {
       batchId: claimed!.id,
       projectId,
@@ -306,5 +327,22 @@ describe("repository merge batch coordinator", () => {
     expect((await db.prepare(
       `select state from briar_merge_batches where id = ?`,
     ).bind(batch!.id).first<{ state: string }>())?.state).toBe("completed");
+
+    await db.prepare(
+      `update briar_repository_merge_policies set enabled = 0
+       where project_id = ? and repository_id = ? and base_branch = 'main'`,
+    ).bind(projectId, repositoryId).run();
+    await expect(claimNextMergeBatch(db, projectId, {
+      workerId: workerA,
+      claimedBy: "worker-a",
+      claimTokenHash: tokenHash("8"),
+      claimedAt: at(60),
+      leaseExpiresAt: at(120),
+    })).resolves.toBeNull();
+    const nextBatch = await db.prepare(
+      `select count(*) as count from briar_merge_batches
+       where project_id = ? and state = 'collecting'`,
+    ).bind(projectId).first<{ count: number }>();
+    expect(nextBatch?.count).toBe(0);
   });
 });

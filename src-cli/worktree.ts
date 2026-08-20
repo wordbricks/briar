@@ -309,6 +309,18 @@ export function analysisWorktreePath(
   return assertPathWithinRoot(join(analysisRoot, `analysis-${runId}`), analysisRoot);
 }
 
+export function mergeGroupWorktreePath(
+  root: string,
+  projectId: string,
+  batchId: string,
+): string {
+  if (!/^[0-9a-f-]{36}$/iu.test(batchId)) {
+    throw new Error("merge batch ID가 올바르지 않습니다.");
+  }
+  const mergeRoot = join(projectWorktreeRoot(root, projectId), "merge-groups");
+  return assertPathWithinRoot(join(mergeRoot, `merge-${batchId}`), mergeRoot);
+}
+
 export type IssueReplyWorkspaceMode =
   | "project"
   | "shared"
@@ -872,6 +884,84 @@ export async function allocateAnalysisWorktree(input: {
       message: "분석 워크트리의 HEAD를 읽지 못했습니다.",
     }),
     ...(warning ? { warning } : {}),
+  };
+}
+
+/** A synthetic merge group is always checked out detached at its exact SHA. */
+export async function allocateMergeGroupWorktree(input: {
+  repositoryPath: string;
+  projectId: string;
+  batchId: string;
+  mergeGroupSha: string;
+  settings: WorktreeSettings;
+  git: GitRunner;
+}): Promise<AnalysisWorktree & { reused: boolean }> {
+  if (!/^[0-9a-f]{7,64}$/u.test(input.mergeGroupSha)) {
+    throw new Error("merge-group SHA가 올바르지 않습니다.");
+  }
+  const path = mergeGroupWorktreePath(
+    input.settings.root,
+    input.projectId,
+    input.batchId,
+  );
+  const attached = parseWorktreeList(
+    gitOrThrow(input.git, ["worktree", "list", "--porcelain"], {
+      cwd: input.repositoryPath,
+      message: "merge-group 워크트리 목록을 읽지 못했습니다.",
+    }),
+  ).find((candidate) => samePath(candidate.path, path));
+  if (attached && attached.branch !== null) {
+    throw new Error("merge-group 워크트리는 detached checkout이어야 합니다.");
+  }
+  if (attached && await pathExists(path)) {
+    const head = gitOrThrow(input.git, ["rev-parse", "HEAD"], {
+      cwd: path,
+      message: "merge-group 워크트리 SHA를 읽지 못했습니다.",
+    });
+    if (head !== input.mergeGroupSha) {
+      throw new Error("기존 merge-group 워크트리 SHA가 frozen SHA와 다릅니다.");
+    }
+    return {
+      path,
+      baseRef: input.mergeGroupSha,
+      baseSha: head,
+      includedPaths: await copyWorktreeIncludes(input.repositoryPath, path),
+      reused: true,
+    };
+  }
+  if (attached) {
+    const removed = input.git(["worktree", "remove", "--force", path], {
+      cwd: input.repositoryPath,
+      timeoutMs: WORKTREE_ADD_TIMEOUT_MS,
+    });
+    if (removed.exitCode !== 0) {
+      throw new Error(`손상된 merge-group 워크트리를 정리하지 못했습니다: ${removed.stderr.trim()}`);
+    }
+  }
+  if (await pathExists(path)) await rm(path, { recursive: true, force: true });
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  gitOrThrow(
+    input.git,
+    ["worktree", "add", "--detach", path, input.mergeGroupSha],
+    {
+      cwd: input.repositoryPath,
+      timeoutMs: WORKTREE_ADD_TIMEOUT_MS,
+      message: "exact merge-group SHA 워크트리를 만들지 못했습니다.",
+    },
+  );
+  const head = gitOrThrow(input.git, ["rev-parse", "HEAD"], {
+    cwd: path,
+    message: "merge-group 워크트리 SHA를 검증하지 못했습니다.",
+  });
+  if (head !== input.mergeGroupSha) {
+    throw new Error("merge-group 워크트리가 요청한 exact SHA를 checkout하지 않았습니다.");
+  }
+  return {
+    path,
+    baseRef: input.mergeGroupSha,
+    baseSha: head,
+    includedPaths: await copyWorktreeIncludes(input.repositoryPath, path),
+    reused: false,
   };
 }
 

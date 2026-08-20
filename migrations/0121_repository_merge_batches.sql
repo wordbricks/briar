@@ -4,6 +4,34 @@
 alter table briar_github_pull_requests add column base_branch text;
 alter table briar_run_pull_requests add column base_branch text;
 
+create table briar_repository_merge_policies (
+  project_id text not null references briar_projects (id) on delete cascade,
+  repository_id integer not null check (repository_id > 0),
+  repository text not null check (
+    repository = lower(trim(repository)) and length(repository) between 3 and 300
+  ),
+  base_branch text not null check (
+    base_branch = trim(base_branch) and length(base_branch) between 1 and 255
+  ),
+  enabled integer not null default 0 check (enabled in (0, 1)),
+  quiet_window_ms integer not null default 30000 check (
+    quiet_window_ms between 1000 and 300000
+  ),
+  validation_command text not null default 'bun run ci:local' check (
+    validation_command = trim(validation_command)
+    and length(validation_command) between 1 and 500
+  ),
+  status_contexts_json text not null default
+    '["signoff/app-worker","signoff/d1-migrations","signoff/rust","signoff/security"]'
+    check (
+      json_valid(status_contexts_json)
+      and json_type(status_contexts_json) = 'array'
+    ),
+  created_at text not null,
+  updated_at text not null,
+  primary key (project_id, repository_id, base_branch)
+);
+
 create table briar_merge_batches (
   id text primary key not null,
   project_id text not null references briar_projects (id) on delete cascade,
