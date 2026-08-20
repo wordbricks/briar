@@ -218,6 +218,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
     let workspaceRoot: String?
     let requestedWorkerId: String?
     let workerId: String?
+    let requestedByUserId: String?
     let summary: String?
     let error: String?
     let events: [Event]?
@@ -247,7 +248,8 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         summary: String?,
         error: String?,
         events: [Event]?,
-        updatedAt: Date?
+        updatedAt: Date?,
+        requestedByUserId: String? = nil
     ) {
         self.id = id
         self.projectId = projectId
@@ -269,6 +271,7 @@ struct ProjectAgentSession: Codable, Equatable, Identifiable, Sendable {
         self.workspaceRoot = workspaceRoot
         self.requestedWorkerId = requestedWorkerId
         self.workerId = workerId
+        self.requestedByUserId = requestedByUserId
         self.summary = summary
         self.error = error
         self.events = events

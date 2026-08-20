@@ -180,6 +180,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // 0116 rebuilds issue reply jobs from the explicit-skill schema that
         // this historical workflow fixture deliberately leaves out.
         "0116_issue_project_agent_replies.sql",
+        // 0118 backfills trusted requesters from the Agent Skill approval
+        // audit that this historical workflow fixture deliberately excludes.
+        "0118_agent_session_inbox_requesters.sql",
       ],
     });
 

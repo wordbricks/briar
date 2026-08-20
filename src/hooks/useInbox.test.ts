@@ -26,6 +26,7 @@ function session(
     dispatchEvents: [],
     projectId: project.id,
     agentName: "Inbox Agent",
+    requestedByUserId: "owner",
     status,
     issues: [
       {
@@ -177,6 +178,7 @@ describe("Inbox messages", () => {
       null,
       [session("running"), session("completed"), session("failed")],
       [project],
+      "owner",
     );
 
     expect(messages.map((message) => message.id)).toEqual([
@@ -403,6 +405,7 @@ describe("Inbox messages", () => {
       null,
       [dispatchSession, taskSession],
       [project],
+      "owner",
     );
 
     expect(messages).toHaveLength(1);
@@ -430,6 +433,7 @@ describe("Inbox messages", () => {
         },
       ],
       [project, otherProject],
+      "owner",
     );
 
     expect(
@@ -453,6 +457,7 @@ describe("Inbox messages", () => {
       null,
       [session("completed")],
       [project],
+      "owner",
     );
 
     expect(isInboxMessageUnread(message, {})).toBe(true);
@@ -462,6 +467,35 @@ describe("Inbox messages", () => {
     expect(
       isInboxMessageUnread(message, { [message.id]: "previous-version" }),
     ).toBe(true);
+  });
+
+  it("builds terminal session messages only for the current requester", () => {
+    const owned = session("completed", "owned-session");
+    const other = {
+      ...session("failed", "other-session"),
+      requestedByUserId: "member-b",
+    };
+    const legacy = {
+      ...session("completed", "legacy-session"),
+      requestedByUserId: null,
+    };
+
+    expect(
+      buildCurrentInboxMessages(
+        null,
+        [owned, other, legacy],
+        [project],
+        "owner",
+      ).map((message) => message.id),
+    ).toEqual(["session:owned-session"]);
+    expect(
+      buildCurrentInboxMessages(
+        null,
+        [owned, other, legacy],
+        [project],
+        "member-b",
+      ).map((message) => message.id),
+    ).toEqual(["session:other-session"]);
   });
 
   it("merges account-synced read versions with local-only entries", () => {

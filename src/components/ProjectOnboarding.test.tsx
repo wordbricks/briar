@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../lib/api";
 import { repositoryWorkflowBootstrap } from "../lib/auto-hunt-contract";
+import type { LocalAutoHuntConfig } from "../lib/project-connection";
 import type { ProjectLlmProgress } from "../lib/project-llm";
 import { ProjectOnboarding } from "./ProjectOnboarding";
 
@@ -91,6 +92,14 @@ const readiness = {
   issues: [],
 };
 
+const lovableCompatibility = {
+  compatible: true,
+  stack: "tanstack-start" as const,
+  packageManager: "npm" as const,
+  scripts: ["dev", "lint", "test", "build"],
+  issues: [],
+};
+
 const connection = {
   project: {
     id: "project-1",
@@ -125,6 +134,7 @@ const baseProps = {
   }),
   onCreate: async () => undefined,
   onFinish: () => undefined,
+  onInspectLovableRepository: async () => lovableCompatibility,
   onLogout: () => undefined,
   onReviseWorkflow: async () => generatedWorkflow,
   onRepositorySelect: async () => readiness.repositoryPath,
@@ -234,12 +244,16 @@ describe("ProjectOnboarding", () => {
       repositoryName: "lovable-store",
     });
     const onCreate = vi.fn().mockResolvedValue(undefined);
+    const onInspectLovableRepository = vi.fn().mockResolvedValue(
+      lovableCompatibility,
+    );
 
     await act(async () => root.render(
       <ProjectOnboarding
         {...baseProps}
         onCloneRepository={onCloneRepository}
         onCreate={onCreate}
+        onInspectLovableRepository={onInspectLovableRepository}
       />,
     ));
     await act(async () => buttonWithText(container, "Migrate from Lovable")?.click());
@@ -251,6 +265,7 @@ describe("ProjectOnboarding", () => {
     await act(async () => buttonWithText(container, "영상대로 연결했어요")?.click());
 
     expect(container.textContent).toContain("Project settings → Git → GitHub");
+    expect(container.textContent).toContain("커스텀 구성일 때만 워크플로우를 분석");
     const sshInput = container.querySelector<HTMLInputElement>(
       "#lovable-github-ssh-url",
     );
@@ -262,6 +277,105 @@ describe("ProjectOnboarding", () => {
       "git@github.com:jay/lovable-store.git",
     );
     expect(onCreate).toHaveBeenCalledWith({ name: "lovable-store" });
+    expect(onInspectLovableRepository).toHaveBeenCalledWith(
+      readiness.repositoryPath,
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("saves a compatible Lovable preset and finishes without workflow review", async () => {
+    const { container, root } = mountOnboarding();
+    const onFinish = vi.fn();
+    const onAnalyzeRequirements = vi.fn();
+    const onConnect = vi.fn(async (settings: LocalAutoHuntConfig) => ({
+      repositoryPath: readiness.repositoryPath,
+      workflow: settings.workflow,
+    }));
+    const props = {
+      ...baseProps,
+      onAnalyzeRequirements,
+      onConnect,
+      onFinish,
+    };
+
+    await act(async () => root.render(<ProjectOnboarding {...props} />));
+    await act(async () => buttonWithText(container, "Migrate from Lovable")?.click());
+    await act(async () => buttonWithText(container, "영상대로 연결했어요")?.click());
+    const sshInput = container.querySelector<HTMLInputElement>(
+      "#lovable-github-ssh-url",
+    );
+    await act(async () => typeInto(sshInput!, "git@github.com:jay/lovable-store.git"));
+    await act(async () => buttonWithText(container, "확인")?.click());
+    await act(async () => root.render(
+      <ProjectOnboarding {...props} connection={connection} />,
+    ));
+    await act(async () => Promise.resolve());
+
+    expect(onConnect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflow: expect.objectContaining({
+          requirements: [expect.objectContaining({ tool: "npm" })],
+          stages: expect.arrayContaining([
+            expect.objectContaining({
+              id: "local_qa",
+              checks: ["npm run lint", "npm run test", "npm run build"],
+            }),
+            expect.objectContaining({ id: "pr_open" }),
+          ]),
+        }),
+      }),
+      readiness.repositoryPath,
+      expect.any(Function),
+    );
+    expect(container.textContent).toContain("Lovable 워크플로우를 확인하고 있어요");
+    expect(container.textContent).not.toContain("워크플로우를 확인해 주세요");
+    expect(onAnalyzeRequirements).not.toHaveBeenCalled();
+    expect(onFinish).toHaveBeenCalledOnce();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("falls back to repository workflow generation for a custom Lovable setup", async () => {
+    const { container, root } = mountOnboarding();
+    const onFinish = vi.fn();
+    const onConnect = vi.fn().mockResolvedValue({
+      repositoryPath: readiness.repositoryPath,
+      workflow: generatedWorkflow,
+    });
+    const props = {
+      ...baseProps,
+      onConnect,
+      onFinish,
+      onInspectLovableRepository: vi.fn().mockResolvedValue({
+        ...lovableCompatibility,
+        compatible: false,
+        issues: ["Custom CI or deployment configuration was detected."],
+      }),
+    };
+
+    await act(async () => root.render(<ProjectOnboarding {...props} />));
+    await act(async () => buttonWithText(container, "Migrate from Lovable")?.click());
+    await act(async () => buttonWithText(container, "영상대로 연결했어요")?.click());
+    const sshInput = container.querySelector<HTMLInputElement>(
+      "#lovable-github-ssh-url",
+    );
+    await act(async () => typeInto(sshInput!, "git@github.com:jay/custom-store.git"));
+    await act(async () => buttonWithText(container, "확인")?.click());
+    await act(async () => root.render(
+      <ProjectOnboarding {...props} connection={connection} />,
+    ));
+    await act(async () => Promise.resolve());
+
+    expect(onConnect).toHaveBeenCalledWith(
+      expect.objectContaining({ workflow: repositoryWorkflowBootstrap }),
+      readiness.repositoryPath,
+      expect.any(Function),
+    );
+    expect(container.textContent).toContain("워크플로우를 확인해 주세요");
+    expect(onFinish).not.toHaveBeenCalled();
 
     await act(async () => root.unmount());
     container.remove();

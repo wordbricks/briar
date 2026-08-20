@@ -237,6 +237,7 @@ const projectAgentSessionSchema = z.object({
   error: z.string().nullable(),
   requestedWorkerId: z.string().nullable().optional(),
   workerId: z.string().nullable().optional(),
+  requestedByUserId: z.string().nullable().optional(),
   events: z.array(z.object({
     id: z.string(),
     type: z.enum([

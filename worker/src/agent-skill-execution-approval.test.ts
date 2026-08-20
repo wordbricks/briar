@@ -565,6 +565,7 @@ describe("conversational Agent Skill execution approval", () => {
         trigger: "manual",
         requestedWorkerId: workerId,
         workerId,
+        requestedByUserId: ownerId,
       },
     });
     expect(await tableCount("briar_project_agent_task_jobs")).toBe(1);
@@ -635,12 +636,16 @@ describe("conversational Agent Skill execution approval", () => {
     expect(completedResponse.status).toBe(200);
     const completedBody = await completedResponse.json();
     const session = await getProjectAgentSession(db, projectId, claimed!.id);
-    expect(session?.status).toBe("completed");
+    expect(session).toMatchObject({
+      status: "completed",
+      requested_by_user_id: ownerId,
+    });
     expect(JSON.parse(session!.payload_json)).toMatchObject({
       status: "completed",
       summary: "Release workflow completed.",
       conversationId: "conversation-approved-task",
       workerId,
+      requestedByUserId: ownerId,
     });
     expect(completedBody).toMatchObject({
       session: {
@@ -649,6 +654,7 @@ describe("conversational Agent Skill execution approval", () => {
         summary: completionPayload.summary,
         conversationId: completionPayload.conversationId,
         workerId,
+        requestedByUserId: ownerId,
       },
     });
     const hotReplay = await completeTask(
@@ -713,7 +719,12 @@ describe("conversational Agent Skill execution approval", () => {
     expect(archivedRetry.status).toBe(200);
     expect(await archivedRetry.json()).toMatchObject({
       outcome: "already_accepted",
-      session: { id: claimed!.id, status: "completed", workerId },
+      session: {
+        id: claimed!.id,
+        status: "completed",
+        workerId,
+        requestedByUserId: ownerId,
+      },
     });
   }, 60_000);
 
