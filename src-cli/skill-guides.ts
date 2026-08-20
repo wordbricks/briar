@@ -6,7 +6,10 @@ export type SkillGuide = {
   markdown: string;
 };
 
-export type BrowserAutomationProvider = "ego-browser" | "agent-browser";
+export type BrowserAutomationProvider =
+  | "ego-browser"
+  | "agent-browser"
+  | "aside";
 
 const browserAutomationProviderToken = "{{BROWSER_AUTOMATION_PROVIDER}}";
 

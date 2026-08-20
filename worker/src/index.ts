@@ -322,7 +322,6 @@ import {
   updateProjectIcon,
   updateProjectIssueKeyPrefix,
   updateProjectScheduleTabEnabled,
-  updateIssue,
   updateIssueWithAttachmentMetadata,
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
@@ -1190,6 +1189,36 @@ export function approvedIssueCreation<T extends Record<string, unknown>>(
   };
 }
 
+export function channelMessageShareUrl(input: {
+  origin: string;
+  organizationId: string;
+  channelId: string;
+  messageId: string;
+  rootMessageId?: string | null;
+}) {
+  const url = new URL(input.origin);
+  url.pathname =
+    `/open/channels/${encodeURIComponent(input.organizationId)}` +
+    `/${encodeURIComponent(input.channelId)}` +
+    `/${encodeURIComponent(input.messageId)}`;
+  url.search = "";
+  url.hash = "";
+  const rootMessageId = input.rootMessageId?.trim();
+  if (rootMessageId && rootMessageId !== input.messageId) {
+    url.searchParams.set("root", rootMessageId);
+  }
+  return url.toString();
+}
+
+function appendChannelMessageBacklink(
+  description: string | null,
+  channelMessageUrl: string,
+) {
+  const backlink = `[채널 메시지로 돌아가기](${channelMessageUrl})`;
+  const body = description?.trimEnd() ?? "";
+  return body ? `${body}\n\n${backlink}` : backlink;
+}
+
 /**
  * Read the change cursor before the channel catalog. If a channel mutation
  * lands between the two reads, the catalog already contains it and the older
@@ -1356,8 +1385,12 @@ export function assertRunEventIdentityNotOverridden(input: {
 async function createApprovedChannelProposalIssue(input: {
   db: D1Database;
   project: Pick<ProjectRow, "id" | "name">;
+  organizationId: string;
   proposalId: string;
   channelId: string;
+  messageId: string;
+  rootMessageId: string | null;
+  shareOrigin: string;
   sourceKey: string;
   title: string;
   description: string | null;
@@ -1366,7 +1399,22 @@ async function createApprovedChannelProposalIssue(input: {
   occurredAt: string;
 }) {
   const settings = await getProjectSettings(input.db, input.project.id);
-  return recordHuntEvent(input.db, input.project.id, {
+  const channelMessageUrl = channelMessageShareUrl({
+    origin: input.shareOrigin,
+    organizationId: input.organizationId,
+    channelId: input.channelId,
+    messageId: input.messageId,
+    rootMessageId: input.rootMessageId,
+  });
+  const issueDescription = appendChannelMessageBacklink(
+    input.description,
+    channelMessageUrl,
+  );
+  // The approval reservation trigger intentionally requires the insert to
+  // match the immutable proposal payload exactly. recordHuntEvent inserts
+  // that protected row first and applies this derived link in the same D1
+  // batch, so a successful creation cannot expose an intermediate description.
+  const runId = await recordHuntEvent(input.db, input.project.id, {
     source: "issue",
     sourceKey: input.sourceKey,
     title: input.title,
@@ -1402,11 +1450,13 @@ async function createApprovedChannelProposalIssue(input: {
       attachmentCount: 0,
       fullAuto: false,
     },
+    postInsertIssueDescription: issueDescription,
     createdByUserId: input.createdByUserId,
     preferredAgentProvider: null,
     preferredAgentModel: null,
     preferredAgentEffort: null,
   });
+  return runId;
 }
 
 async function readBoundedMultipartForm(
@@ -8476,9 +8526,13 @@ async function route(
     const resultRunId = await createApprovedChannelProposalIssue({
       db,
       project,
+      organizationId: channel.organization_id,
       sourceKey: reservation.issue_source_key,
       proposalId: proposal.id,
       channelId: channel.id,
+      messageId: proposal.reply_message_id,
+      rootMessageId: proposal.reply_parent_message_id,
+      shareOrigin: new URL(request.url).origin,
       title: approvedIssue.title,
       description: approvedIssue.description,
       priority: approvedIssue.priority,

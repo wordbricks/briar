@@ -47,8 +47,40 @@ describe("browser skill selection", () => {
       "selected **`agent-browser`** in **Briar Settings → Browser**",
     );
     expect(result.stdout).toContain(
-      "Never switch to the other browser tool automatically",
+      "Never switch to another browser tool automatically",
     );
+    expect(result.stdout).not.toContain("{{BROWSER_AUTOMATION_PROVIDER}}");
+  });
+
+  it("binds Aside and its MCP-only workflow", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-aside-skill-"));
+    temporaryDirectories.push(directory);
+    await writeFile(
+      join(directory, "config.json"),
+      `${JSON.stringify({
+        apiUrl: "https://briar.example.com",
+        appSettings: {
+          browserAutomationProvider: "aside",
+        },
+        projects: [],
+      })}\n`,
+    );
+
+    const result = spawnSync(
+      bunExecutable,
+      ["run", "src-cli/index.ts", "skills", "get", "browser"],
+      {
+        cwd: process.cwd(),
+        env: { ...process.env, BRIAR_CONFIG_HOME: directory },
+        encoding: "utf8",
+      },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(
+      "selected **`aside`** in **Briar Settings → Browser**",
+    );
+    expect(result.stdout).toContain("Aside MCP tools exposed");
     expect(result.stdout).not.toContain("{{BROWSER_AUTOMATION_PROVIDER}}");
   });
 });

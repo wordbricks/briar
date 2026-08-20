@@ -22,6 +22,7 @@ import {
   CreateIssueDialog,
   EditIssueDialog,
   HuntDashboard,
+  IssueAgentActivityPanel,
   RunPage,
 } from "./HuntDashboard";
 import { ToastProvider } from "./ui/toast";
@@ -4375,6 +4376,96 @@ describe("HuntDashboard", () => {
 
     await act(async () => root.unmount());
     loadTranscript.mockRestore();
+    container.remove();
+  });
+
+  it("preserves the issue work log position when new activity arrives above the bottom", async () => {
+    const firstMessage = {
+      id: "message-1",
+      phase: "commentary",
+      text: "첫 번째 작업 메시지",
+      startedAtMs: Date.now(),
+      updatedAtMs: Date.now(),
+      isComplete: true,
+    };
+    const secondMessage = {
+      ...firstMessage,
+      id: "message-2",
+      text: "두 번째 작업 메시지",
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <IssueAgentActivityPanel
+          activity={[]}
+          error={null}
+          id="work-log-panel"
+          isLive
+          labelledBy="work-log-tab"
+          loading
+          provider="codex"
+        />,
+      );
+    });
+
+    const panel = container.querySelector<HTMLElement>(
+      ".issue-agent-activity-panel",
+    );
+    expect(panel).not.toBeNull();
+    if (!panel) throw new Error("work log panel was not rendered");
+    Object.defineProperty(panel, "clientHeight", {
+      configurable: true,
+      value: 200,
+    });
+    Object.defineProperty(panel, "scrollHeight", {
+      configurable: true,
+      value: 640,
+    });
+
+    await act(async () => {
+      root.render(
+        <IssueAgentActivityPanel
+          activity={[firstMessage]}
+          error={null}
+          id="work-log-panel"
+          isLive
+          labelledBy="work-log-tab"
+          loading={false}
+          provider="codex"
+        />,
+      );
+    });
+    expect(panel.scrollTop).toBe(640);
+
+    panel.scrollTop = 100;
+    await act(async () => {
+      panel.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+    Object.defineProperty(panel, "scrollHeight", {
+      configurable: true,
+      value: 800,
+    });
+    await act(async () => {
+      root.render(
+        <IssueAgentActivityPanel
+          activity={[firstMessage, secondMessage]}
+          error={null}
+          id="work-log-panel"
+          isLive
+          labelledBy="work-log-tab"
+          loading={false}
+          provider="codex"
+        />,
+      );
+    });
+
+    expect(panel.textContent).toContain("두 번째 작업 메시지");
+    expect(panel.scrollTop).toBe(100);
+
+    await act(async () => root.unmount());
     container.remove();
   });
 

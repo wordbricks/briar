@@ -1037,6 +1037,7 @@ export type HuntEventInput = {
   stagingQaDetail: string | null;
   productionQaDetail: string | null;
   context: Record<string, unknown> | null;
+  postInsertIssueDescription?: string | null;
   createdByUserId?: string | null;
   preferredAgentProvider?: ProjectAgentProvider | null;
   preferredAgentModel?: string | null;
@@ -11141,7 +11142,31 @@ export async function recordHuntEvent(
         eventAttempt,
         eventId,
       ),
+    ...(normalizedInput.postInsertIssueDescription === undefined
+      ? []
+      : [
+          db
+            .prepare(
+              `update briar_hunt_runs
+               set issue_description = ?, updated_at = ?
+               where id = ? and project_id = ?
+               returning id, issue_description`,
+            )
+            .bind(
+              normalizedInput.postInsertIssueDescription,
+              recordedAt,
+              runId,
+              projectId,
+            ),
+        ]),
   ]);
+
+  if (
+    normalizedInput.postInsertIssueDescription !== undefined &&
+    (results[3]?.results?.length ?? 0) !== 1
+  ) {
+    throw new Error("Post-insert issue description could not be persisted");
+  }
 
   if ((results[1]?.meta.changes ?? 0) === 0) {
     const existingEvent = await db

@@ -1,11 +1,12 @@
 # Browser Automation
 
-Use a supported standalone browser CLI to inspect and operate a real browser, verify user-visible
+Use a supported standalone browser interface to inspect and operate a real browser, verify user-visible
 behavior, and capture screenshots that can be attached to Briar result evidence. Briar supports
-`ego-browser` from [ego (lite)](https://lite.ego.app/) and Vercel's `agent-browser`.
+`ego-browser` from [ego (lite)](https://lite.ego.app/), Vercel's `agent-browser`, and
+[Aside](https://aside.com/) through its local MCP server.
 
 The operator selected **`{{BROWSER_AUTOMATION_PROVIDER}}`** in **Briar Settings → Browser**. Use
-only that configured tool. Never switch to the other browser tool automatically, even when the
+only that configured tool. Never switch to another browser tool automatically, even when the
 configured tool is unavailable.
 
 Do not treat an unavailable in-app browser integration as proof that browser automation is
@@ -22,6 +23,9 @@ command -v "$configured_browser"
 if [ "$configured_browser" = 'agent-browser' ]; then
   agent-browser doctor --offline --quick
 fi
+if [ "$configured_browser" = 'aside' ]; then
+  aside mcp --help
+fi
 ```
 
 If the configured tool is not ready, report that browser verification is unavailable and direct
@@ -35,6 +39,9 @@ Before operating a selected tool, read its complete, version-matched guide:
   **Briar Settings → Browser**.
 - For `agent-browser`, run `agent-browser skills get core --full` and read the complete output. Use
   `agent-browser --help` only as a fallback for versions that do not provide `skills get`.
+- For `aside`, the Briar runner connects `aside mcp` as a local stdio MCP server. Use only the
+  Aside MCP tools exposed in the current tool inventory. If they are absent, return to **Briar
+  Settings → Browser**, run **Setup**, and retry after all CLI, MCP, and Skill checks are ready.
 
 ## Verification with ego-browser
 
@@ -92,8 +99,19 @@ agent-browser --session "$session" close
 ```
 
 Never copy an element reference from an old snapshot after the page has materially changed. With
-either tool, use a deterministic local fixture only when necessary, disclose it in the evidence
+any tool, use a deterministic local fixture only when necessary, disclose it in the evidence
 detail, and remove any temporary product data after capture.
+
+## Verification with Aside
+
+Use the Aside MCP tools already connected to the agent. Start or reuse a run-specific browser
+session when the server exposes session controls, inspect fresh page state before each interaction,
+and save the final screenshot to an absolute path that can be attached to Briar evidence. Do not
+start a second `aside mcp` process or switch to `aside repl` as a silent fallback: a missing Aside
+MCP connection is a setup failure that should be reported precisely.
+
+Aside operates the user's signed-in browser. Keep browser actions within the task's authorized
+scope, preserve any requested approval boundary, and avoid unrelated profiles, tabs, or accounts.
 
 ## Briar result evidence
 
@@ -121,5 +139,7 @@ and the checks that still ran in the evidence detail. Never fabricate an image.
 - Do not expose secrets in commands, snapshots, screenshots, logs, or evidence.
 - ego (lite) can inherit the user's browser state. Use authenticated state only when the task
   requires it and the operator has authorized that context.
+- Aside uses the user's browser profiles and signed-in accounts. Treat that state as sensitive and
+  use only the account and pages required by the task.
 - Do not perform destructive or externally visible actions merely to obtain a screenshot.
 - Keep each Auto Hunt run isolated and always close its task space or session.

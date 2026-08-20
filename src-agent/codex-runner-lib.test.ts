@@ -44,6 +44,17 @@ describe("Codex App Server runner", () => {
       "--listen",
       "stdio://",
     ]);
+    expect(codexAppServerArgs({ networkAccess: true }, "aside")).toEqual([
+      "app-server",
+      "--listen",
+      "stdio://",
+      "--config",
+      'mcp_servers.aside.command="aside"',
+      "--config",
+      'mcp_servers.aside.args=["mcp"]',
+      "--config",
+      "sandbox_workspace_write.network_access=true",
+    ]);
     expect(
       codexAppServerArgs({ networkAccess: false, externalTools: false }),
     ).toEqual([
@@ -70,6 +81,12 @@ describe("Codex App Server runner", () => {
       "--config",
       'permissions.briar_read_only={filesystem={":minimal"="read",":workspace_roots"={"."="read"}},network={enabled=false}}',
     ]);
+    expect(
+      codexAppServerArgs(
+        { networkAccess: false, externalTools: false },
+        "aside",
+      ),
+    ).not.toContain('mcp_servers.aside.command="aside"');
     expect(codexInitializeRequest()).toMatchObject({
       method: "initialize",
       id: 1,

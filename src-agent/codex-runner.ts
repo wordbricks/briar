@@ -70,11 +70,15 @@ async function runCodexAttempt(
   isolation: CodexMcpIsolation,
   emittedSessions: Set<string>,
 ): Promise<CodexAttemptResult> {
-  const child = spawn(request.codexBinary, codexAppServerArgs(request), {
-    cwd: request.workspaceRoot,
-    env: process.env,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  const child = spawn(
+    request.codexBinary,
+    codexAppServerArgs(request, process.env.BRIAR_BROWSER_AUTOMATION_PROVIDER),
+    {
+      cwd: request.workspaceRoot,
+      env: process.env,
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
   activeChild = child;
   child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");

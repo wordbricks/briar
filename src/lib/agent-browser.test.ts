@@ -24,4 +24,12 @@ describe("browser automation settings", () => {
       provider: "agent-browser",
     });
   });
+
+  it("persists an explicit Aside selection", async () => {
+    await updateBrowserAutomationSettings({ provider: "aside" });
+
+    await expect(loadBrowserAutomationSettings()).resolves.toEqual({
+      provider: "aside",
+    });
+  });
 });

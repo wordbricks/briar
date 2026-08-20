@@ -27,9 +27,11 @@ import { ThemeProvider, themeStorageKey } from "../theme";
 import { AppSettings } from "./AppSettings";
 import {
   inspectAgentBrowser,
+  inspectAsideBrowser,
   inspectEgoBrowser,
   installAgentBrowser,
   loadBrowserAutomationSettings,
+  setupAsideBrowser,
   updateBrowserAutomationSettings,
 } from "../lib/agent-browser";
 
@@ -59,9 +61,11 @@ vi.mock("../lib/app-runtime-settings", () => ({
 
 vi.mock("../lib/agent-browser", () => ({
   inspectAgentBrowser: vi.fn(),
+  inspectAsideBrowser: vi.fn(),
   inspectEgoBrowser: vi.fn(),
   installAgentBrowser: vi.fn(),
   loadBrowserAutomationSettings: vi.fn(),
+  setupAsideBrowser: vi.fn(),
   updateBrowserAutomationSettings: vi.fn(),
 }));
 
@@ -206,9 +210,11 @@ describe("AppSettings", () => {
     vi.mocked(loadAppRuntimeSettings).mockReset();
     vi.mocked(updateAppRuntimeSettings).mockReset();
     vi.mocked(inspectAgentBrowser).mockReset();
+    vi.mocked(inspectAsideBrowser).mockReset();
     vi.mocked(inspectEgoBrowser).mockReset();
     vi.mocked(installAgentBrowser).mockReset();
     vi.mocked(loadBrowserAutomationSettings).mockReset();
+    vi.mocked(setupAsideBrowser).mockReset();
     vi.mocked(updateBrowserAutomationSettings).mockReset();
     window.localStorage.clear();
     window.localStorage.setItem("briar.locale.v1", "en");
@@ -302,6 +308,15 @@ describe("AppSettings", () => {
       browserReady: false,
       version: null,
     });
+    vi.mocked(inspectAsideBrowser).mockResolvedValue({
+      supported: true,
+      installed: false,
+      cliReady: false,
+      mcpReady: false,
+      skillReady: false,
+      browserReady: false,
+      version: null,
+    });
     vi.mocked(installAgentBrowser).mockResolvedValue({
       supported: true,
       installed: true,
@@ -331,6 +346,7 @@ describe("AppSettings", () => {
     });
 
     expect(inspectAgentBrowser).toHaveBeenCalledOnce();
+    expect(inspectAsideBrowser).toHaveBeenCalledOnce();
     expect(inspectEgoBrowser).toHaveBeenCalledOnce();
     expect(
       container
@@ -338,6 +354,13 @@ describe("AppSettings", () => {
         ?.getAttribute("href"),
     ).toBe("https://lite.ego.app/download?auto=1");
     expect(container.textContent).toContain("Not installed or not available on PATH.");
+    expect(
+      container
+        .querySelector<HTMLAnchorElement>(
+          '[aria-label="Install and onboard Aside"]',
+        )
+        ?.getAttribute("href"),
+    ).toBe("https://docs.aside.com/help/get-started");
 
     const agentBrowserChoice = container.querySelector<HTMLButtonElement>(
       '[aria-label="Select agent-browser for browser automation"]',
@@ -360,6 +383,96 @@ describe("AppSettings", () => {
     expect(installAgentBrowser).toHaveBeenCalledOnce();
     expect(container.textContent).toContain("agent-browser 0.32.3");
     expect(container.textContent).toContain("Agents can verify interfaces");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows Aside readiness and prepares its CLI, MCP, and skill", async () => {
+    vi.mocked(loadBrowserAutomationSettings).mockResolvedValue({
+      provider: "ego-browser",
+    });
+    vi.mocked(updateBrowserAutomationSettings).mockResolvedValue({
+      provider: "aside",
+    });
+    vi.mocked(inspectEgoBrowser).mockResolvedValue({
+      supported: true,
+      installed: true,
+      browserReady: true,
+      version: "ego-browser 1.0.0",
+    });
+    vi.mocked(inspectAgentBrowser).mockResolvedValue({
+      supported: true,
+      installed: true,
+      browserReady: true,
+      version: "agent-browser 0.32.3",
+    });
+    vi.mocked(inspectAsideBrowser).mockResolvedValue({
+      supported: true,
+      installed: true,
+      cliReady: false,
+      mcpReady: false,
+      skillReady: true,
+      browserReady: false,
+      version: null,
+    });
+    vi.mocked(setupAsideBrowser).mockResolvedValue({
+      supported: true,
+      installed: true,
+      cliReady: true,
+      mcpReady: true,
+      skillReady: true,
+      browserReady: true,
+      version: "1.26.810.1915",
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <AppSettings
+            error={null}
+            initialSection="browser"
+            isSidebarOpen
+            loading={false}
+            onBack={() => undefined}
+            onRefresh={() => Promise.resolve(readiness)}
+            projectId="project-1"
+            projectName="Briar"
+            readiness={readiness}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    expect(container.textContent).toContain("CLI");
+    expect(container.textContent).toContain("MCP");
+    expect(container.textContent).toContain("Skill");
+    const asideChoice = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Select Aside for browser automation"]',
+    );
+    expect(asideChoice?.disabled).toBe(true);
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="Set up Aside developer tools"]',
+        )
+        ?.click();
+    });
+
+    expect(setupAsideBrowser).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain("1.26.810.1915");
+    expect(container.textContent).toContain(
+      "Agents can control the Aside browser through MCP.",
+    );
+    expect(asideChoice?.disabled).toBe(false);
+    await act(async () => asideChoice?.click());
+    expect(updateBrowserAutomationSettings).toHaveBeenCalledWith({
+      provider: "aside",
+    });
 
     await act(async () => root.unmount());
     container.remove();
