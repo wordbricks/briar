@@ -142,12 +142,6 @@
   border-color: var(--background);
 }
 
-.dark .kanban-card-review-banner {
-  color: #e8c37a;
-  background: rgba(215, 154, 65, 0.16);
-  border-top-color: rgba(215, 154, 65, 0.32);
-}
-
 .dark .kanban-card,
 .dark .issue-list-body,
 .dark .issue-list-row,
@@ -285,44 +279,6 @@
   color: var(--foreground);
 }
 
-.dark .project-settings-danger {
-  border-color: color-mix(in srgb, var(--destructive) 28%, var(--border));
-  background: color-mix(in srgb, var(--destructive) 7%, var(--card));
-}
-
-.dark .project-settings-danger strong,
-.dark .project-settings-danger > button {
-  color: var(--destructive);
-}
-
-.dark .project-settings-danger small {
-  color: color-mix(
-    in srgb,
-    var(--destructive) 38%,
-    var(--muted-foreground)
-  );
-}
-
-.dark .project-settings-danger .danger-icon {
-  color: var(--destructive);
-  background: color-mix(in srgb, var(--destructive) 12%, var(--card));
-}
-
-.dark .project-settings-danger > button {
-  border-color: color-mix(in srgb, var(--destructive) 68%, var(--border));
-  background: var(--card);
-}
-
-.dark .project-settings-danger > button:hover {
-  border-color: var(--destructive);
-  color: var(--destructive-foreground);
-  background: var(--destructive);
-}
-
-.dark .project-settings-danger > button:focus-visible {
-  outline-color: color-mix(in srgb, var(--destructive) 42%, transparent);
-}
-
 .dark .health-item strong {
   color: var(--foreground);
 }
@@ -336,13 +292,6 @@
   color: var(--accent-foreground);
   border-color: var(--input);
   background: var(--accent);
-}
-
-.dark .health-error,
-.dark .health-issues {
-  color: var(--foreground);
-  border-color: color-mix(in srgb, var(--destructive) 36%, var(--border));
-  background: color-mix(in srgb, var(--destructive) 10%, var(--card));
 }
 
 .dark .channel-message-avatar .channel-agent-badge {
