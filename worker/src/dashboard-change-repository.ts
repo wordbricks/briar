@@ -5,6 +5,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import { runD1 } from "./d1-runtime";
+import { makeSqlQueryCache } from "./sql-query-cache";
 
 const DASHBOARD_CHANGE_PAGE_SIZE = 500;
 
@@ -81,12 +82,13 @@ const makeDashboardChangeQueries = (sql: SqlClient.SqlClient) => {
     findOldestDashboardChange,
   };
 };
+const dashboardChangeQueries = makeSqlQueryCache(makeDashboardChangeQueries);
 
 const getDashboardSyncCursorEffect = Effect.fn(
   "getDashboardSyncCursorEffect",
 )(function*(projectId: string) {
   const sql = yield* SqlClient.SqlClient;
-  const queries = makeDashboardChangeQueries(sql);
+  const queries = dashboardChangeQueries(sql);
   const state = yield* queries.findDashboardSyncState({ projectId });
   return Option.match(state, {
     onNone: () => 0,
@@ -97,7 +99,7 @@ const getDashboardSyncCursorEffect = Effect.fn(
 const listDashboardChangesEffect = Effect.fn("listDashboardChangesEffect")(
   function*(projectId: string, cursor: number) {
     const sql = yield* SqlClient.SqlClient;
-    const queries = makeDashboardChangeQueries(sql);
+    const queries = dashboardChangeQueries(sql);
     const state = yield* queries.findDashboardSyncState({ projectId });
     const currentVersion = Option.match(state, {
       onNone: () => 0,

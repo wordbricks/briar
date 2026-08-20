@@ -55,40 +55,17 @@ import {
   type AgentSkillRow,
 } from "./agent-skills";
 import { workflowSnapshotForRun } from "./workflow-policy";
-import type {
-  OrganizationRole,
-  OrganizationRow,
+import {
+  getOrganizationInvitationById,
+  getOrganizationInvitationByTokenHash,
+  type OrganizationRole,
+  type OrganizationInvitationRow,
+  type OrganizationRow,
 } from "./organization-repository";
 import type { ProjectRow } from "./project-repository";
 
 type ProjectAgentProvider = AgentSkillProvider;
 type ModelEffort = AgentSkillEffort;
-
-export type OrganizationMemberRow = {
-  user_id: string;
-  name: string;
-  email: string;
-  image: string | null;
-  role: OrganizationRole;
-  created_at: string;
-};
-
-export type OrganizationInvitationRow = {
-  id: string;
-  organization_id: string;
-  organization_name: string;
-  initial_project_id: string;
-  initial_project_name: string;
-  email_normalized: string;
-  role: Exclude<OrganizationRole, "owner">;
-  invited_by_user_id: string | null;
-  expires_at: string;
-  accepted_at: string | null;
-  accepted_by_user_id: string | null;
-  revoked_at: string | null;
-  created_at: string;
-  updated_at: string;
-};
 
 export type AccountDeletionPlan = {
   blockedOrganizations: Array<{ id: string; name: string }>;
@@ -2946,40 +2923,6 @@ export async function isOrganizationHandleAvailable(
   return organization === null;
 }
 
-export async function getOrganizationRole(
-  db: D1Database,
-  organizationId: string,
-  userId: string,
-) {
-  const row = await db
-    .prepare(
-      `select role from briar_organization_members
-     where organization_id = ? and user_id = ?`,
-    )
-    .bind(organizationId, userId)
-    .first<{ role: OrganizationRole }>();
-  return row?.role ?? null;
-}
-
-export async function listOrganizationMembers(
-  db: D1Database,
-  organizationId: string,
-) {
-  const result = await db
-    .prepare(
-      `select member.user_id, user.name, user.email, user.image,
-            member.role, member.created_at
-     from briar_organization_members member
-     join "user" on user.id = member.user_id
-     where member.organization_id = ?
-     order by case member.role when 'owner' then 0 when 'admin' then 1 else 2 end,
-              lower(user.name), lower(user.email)`,
-    )
-    .bind(organizationId)
-    .all<OrganizationMemberRow>();
-  return result.results;
-}
-
 export async function addOrganizationMember(
   db: D1Database,
   organizationId: string,
@@ -3005,22 +2948,6 @@ export async function addOrganizationMember(
     .run();
   return user.id;
 }
-
-const organizationInvitationSelect = `
-  select invitation.id, invitation.organization_id,
-         organization.name as organization_name,
-         invitation.initial_project_id,
-         project.name as initial_project_name,
-         invitation.email_normalized, invitation.role,
-         invitation.invited_by_user_id, invitation.expires_at,
-         invitation.accepted_at, invitation.accepted_by_user_id,
-         invitation.revoked_at, invitation.created_at, invitation.updated_at
-  from briar_organization_invitations invitation
-  join briar_organizations organization
-    on organization.id = invitation.organization_id
-  join briar_projects project
-    on project.id = invitation.initial_project_id
-   and project.organization_id = invitation.organization_id`;
 
 export async function createOrganizationInvitation(
   db: D1Database,
@@ -3096,49 +3023,6 @@ export async function createOrganizationInvitation(
   return invitation
     ? { outcome: "created" as const, invitation }
     : { outcome: "project_not_found" as const };
-}
-
-export async function listOrganizationInvitations(
-  db: D1Database,
-  organizationId: string,
-) {
-  const result = await db
-    .prepare(
-      `${organizationInvitationSelect}
-       where invitation.organization_id = ?
-         and invitation.accepted_at is null
-         and invitation.revoked_at is null
-       order by invitation.created_at desc, invitation.id`,
-    )
-    .bind(organizationId)
-    .all<OrganizationInvitationRow>();
-  return result.results;
-}
-
-export async function getOrganizationInvitationById(
-  db: D1Database,
-  invitationId: string,
-) {
-  return db
-    .prepare(
-      `${organizationInvitationSelect}
-       where invitation.id = ?`,
-    )
-    .bind(invitationId)
-    .first<OrganizationInvitationRow>();
-}
-
-export async function getOrganizationInvitationByTokenHash(
-  db: D1Database,
-  tokenHash: string,
-) {
-  return db
-    .prepare(
-      `${organizationInvitationSelect}
-       where invitation.token_hash = ?`,
-    )
-    .bind(tokenHash)
-    .first<OrganizationInvitationRow>();
 }
 
 export async function revokeOrganizationInvitation(

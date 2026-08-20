@@ -4,6 +4,7 @@ import * as Schema from "effect/Schema";
 import type * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import { runD1 } from "./d1-runtime";
+import { makeSqlQueryCache } from "./sql-query-cache";
 
 const InboxReadStateRow = Schema.Struct({
   message_id: Schema.String,
@@ -30,11 +31,12 @@ const makeInboxReadStateQueries = (sql: SqlClient.SqlClient) => {
 
   return { findInboxReadStates };
 };
+const inboxReadStateQueries = makeSqlQueryCache(makeInboxReadStateQueries);
 
 const listInboxReadStatesEffect = Effect.fn("listInboxReadStatesEffect")(
   function*(userId: string) {
     const sql = yield* D1Client.D1Client;
-    const queries = makeInboxReadStateQueries(sql);
+    const queries = inboxReadStateQueries(sql);
     return yield* queries.findInboxReadStates({ userId });
   },
 );
@@ -61,7 +63,7 @@ const upsertInboxReadStatesEffect = Effect.fn("upsertInboxReadStatesEffect")(
       );
     }
     const sql = yield* D1Client.D1Client;
-    const queries = makeInboxReadStateQueries(sql);
+    const queries = inboxReadStateQueries(sql);
     return yield* queries.findInboxReadStates({ userId });
   },
 );

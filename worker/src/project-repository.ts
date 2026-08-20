@@ -4,6 +4,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import { runD1 } from "./d1-runtime";
 import { OrganizationRole } from "./organization-repository";
+import { makeSqlQueryCache } from "./sql-query-cache";
 
 const ProjectRow = Schema.Struct({
   id: Schema.mutableKey(Schema.String),
@@ -84,11 +85,12 @@ const InboxProjectRow = Schema.Struct({
     findProjects,
   };
 };
+const projectQueries = makeSqlQueryCache(makeProjectQueries);
 
 const listProjectsEffect = Effect.fn("listProjectsEffect")(
   function*(userId: string) {
     const sql = yield* SqlClient.SqlClient;
-    const queries = makeProjectQueries(sql);
+    const queries = projectQueries(sql);
     return yield* queries.findProjects({ scopeId: userId });
   },
 );
@@ -97,7 +99,7 @@ const listOrganizationProjectsEffect = Effect.fn(
   "listOrganizationProjectsEffect",
 )(function*(organizationId: string) {
   const sql = yield* SqlClient.SqlClient;
-  const queries = makeProjectQueries(sql);
+  const queries = projectQueries(sql);
   return yield* queries.findOrganizationProjects({ scopeId: organizationId });
 });
 
@@ -105,7 +107,7 @@ const listOrganizationInboxProjectsEffect = Effect.fn(
   "listOrganizationInboxProjectsEffect",
 )(function*(organizationId: string) {
   const sql = yield* SqlClient.SqlClient;
-  const queries = makeProjectQueries(sql);
+  const queries = projectQueries(sql);
   return yield* queries.findOrganizationInboxProjects({
     scopeId: organizationId,
   });
