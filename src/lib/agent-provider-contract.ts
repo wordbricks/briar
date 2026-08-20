@@ -4,13 +4,6 @@ import {
   type AgentProvider,
 } from "./agent-provider";
 
-export {
-  agentProviderBinaryName,
-  agentProviderLabels,
-  agentProviders,
-  type AgentProvider,
-} from "./agent-provider";
-
 /**
  * Model and effort identifiers are provider-owned capability values. Keep the
  * API validation structural so a provider can add a value without requiring a

@@ -1,9 +1,7 @@
 import { Buffer } from "node:buffer";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
-import type {
-  AgentProvider,
-  ModelEffort,
-} from "../src/lib/agent-provider-contract";
+import type { ModelEffort } from "../src/lib/agent-provider-contract";
+import type { AgentProvider } from "../src/lib/agent-provider";
 import type { JsonSchema } from "../src/lib/project-llm";
 import { extractSingleJsonObject } from "../src/lib/single-json-object";
 

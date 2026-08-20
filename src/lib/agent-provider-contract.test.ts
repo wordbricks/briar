@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   agentProviderCapabilityCatalogSchema,
-  agentProviderLabels,
   agentProviderSupportsSelection,
-  agentProviders,
   emptyAgentProviderCapabilityCatalog,
   mergeAgentProviderCapabilityCatalogs,
   modelEffortSchema,
 } from "./agent-provider-contract";
+import { agentProviderLabels, agentProviders } from "./agent-provider";
 
 describe("agent provider contract", () => {
   it("keeps only the provider roster and labels static", () => {

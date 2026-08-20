@@ -1,8 +1,6 @@
 import { z } from "zod";
-import {
-  agentProviders,
-  modelEffortSchema,
-} from "./agent-provider-contract";
+import { modelEffortSchema } from "./agent-provider-contract";
+import { agentProviders } from "./agent-provider";
 import {
   agentDescriptionMaxLength,
   agentResponsibilityMaxLength,

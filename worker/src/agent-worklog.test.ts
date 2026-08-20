@@ -1,6 +1,6 @@
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { agentProviders } from "../../src/lib/agent-provider-contract";
+import { agentProviders } from "../../src/lib/agent-provider";
 import {
   ingestAgentTranscript,
   listAgentTranscriptSegments,

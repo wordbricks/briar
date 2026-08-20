@@ -23,7 +23,6 @@ export const AgentExecutionMetrics = Schema.Struct({
 }).annotate({ parseOptions: strictAgentExecutionSchemaOptions });
 
 export type AgentExecutionMetrics = typeof AgentExecutionMetrics.Type;
-export const agentExecutionMetricsSchema = AgentExecutionMetrics;
 export type AgentExecutionTokenUsage = Omit<
   AgentExecutionMetrics,
   "durationMs"
@@ -170,7 +169,6 @@ export const AgentExecutionUsageRecord = Schema.Struct({
 
 export type AgentExecutionUsageRecord =
   typeof AgentExecutionUsageRecord.Type;
-export const agentExecutionUsageRecordSchema = AgentExecutionUsageRecord;
 
 export type AgentExecutionCollectedTokenObservation =
   AgentExecutionTokenObservation & {

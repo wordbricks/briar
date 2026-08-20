@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   decodeTranscriptRequest,
   decodeTranscriptRequestEffect,
-  transcriptSchema,
+  TranscriptRequest,
   TranscriptRequestDecodeError,
 } from "./transcript-request";
 
@@ -74,7 +74,7 @@ describe("transcript request schema", () => {
       })
     ).toThrow();
     expect(() =>
-      Schema.decodeUnknownSync(transcriptSchema)({
+      Schema.decodeUnknownSync(TranscriptRequest)({
         ...transcript,
         requestTraceId: "trace-1",
       })

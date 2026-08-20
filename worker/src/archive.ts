@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { agentProviders } from "../../src/lib/agent-provider-contract";
+import { agentProviders } from "../../src/lib/agent-provider";
 import type {
   HuntEventRow,
   IssueMessageRow,

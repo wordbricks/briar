@@ -11,7 +11,7 @@ import {
 } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentProvider } from "../src/lib/agent-provider-contract";
+import type { AgentProvider } from "../src/lib/agent-provider";
 
 const commonEnvironmentKeys = new Set([
   "HOME",

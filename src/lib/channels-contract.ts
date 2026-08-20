@@ -1,10 +1,9 @@
 import { z } from "zod";
 import {
-  agentProviders,
   modelEffortSchema,
-  type AgentProvider,
   type ModelEffort,
 } from "./agent-provider-contract";
+import { agentProviders, type AgentProvider } from "./agent-provider";
 import {
   agentDescriptionMaxLength,
   agentResponsibilityMaxLength,

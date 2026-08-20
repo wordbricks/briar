@@ -1,4 +1,4 @@
-import type { AgentProvider } from "../../src/lib/agent-provider-contract";
+import type { AgentProvider } from "../../src/lib/agent-provider";
 import {
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
   MAX_TRANSCRIPT_PAYLOAD_BYTES,

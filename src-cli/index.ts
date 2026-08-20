@@ -33,10 +33,12 @@ import {
   createAgentExecutionUsageCollector,
 } from "../src/lib/agent-execution-metrics";
 import {
-  agentProviders,
   modelEffortSchema,
-  type AgentProvider,
 } from "../src/lib/agent-provider-contract";
+import {
+  agentProviders,
+  type AgentProvider,
+} from "../src/lib/agent-provider";
 import {
   agentResponsibilityMaxLength,
   agentSkillsMaxCount,

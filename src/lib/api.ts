@@ -28,11 +28,10 @@ import {
   type ProjectAgentLocale,
 } from "./project-agent";
 import {
-  agentProviders,
   modelEffortSchema,
-  type AgentProvider,
   type ModelEffort,
 } from "./agent-provider-contract";
+import { agentProviders, type AgentProvider } from "./agent-provider";
 import type { UsageRangeDays } from "./agent-usage-overview";
 import type { ProjectUsagePeriod } from "./project-usage-summary";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./agent-usage-pricing";

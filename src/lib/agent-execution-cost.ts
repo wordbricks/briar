@@ -34,7 +34,6 @@ export const AgentExecutionCostRecord = Schema.Struct({
 
 export type AgentExecutionCostRecord =
   typeof AgentExecutionCostRecord.Type;
-export const agentExecutionCostRecordSchema = AgentExecutionCostRecord;
 
 export const decodeAgentExecutionCostRecord = Schema.decodeUnknownSync(
   AgentExecutionCostRecord,

@@ -35,7 +35,6 @@ import worker, {
   projectAgentScheduleRunCompletionSchema,
   projectMutationProject,
   projectScheduleClaimMutation,
-  decodeTranscriptRequest,
   readChannelReplyCompleteRequest,
   readIssueRequest,
   readRunEvidenceRequest,
@@ -50,6 +49,7 @@ import worker, {
   workerSettingsSchema,
   type ScheduledTaskDependencies,
 } from "./index";
+import { decodeTranscriptRequest } from "./transcript-request";
 import { slackCreateIssueShortcutCallbackId } from "./slack";
 import {
   agentResponsibilityMaxLength,

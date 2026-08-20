@@ -90,7 +90,7 @@ import {
   markChannelCatalogRead,
 } from "../lib/channel-unread";
 import type { MentionTarget } from "../lib/channel-mentions";
-import { agentProviderLabels } from "../lib/agent-provider-contract";
+import { agentProviderLabels } from "../lib/agent-provider";
 import {
   mergeChannelMessages,
   mergeChannelMessageSnapshot,

@@ -28,13 +28,15 @@ import {
   decodeAgentExecutionMetricsOption,
 } from "../../src/lib/agent-execution-metrics";
 import {
-  agentProviderLabels,
   agentProviderCapabilityCatalogSchema,
   mergeAgentProviderCapabilityCatalogs,
-  agentProviders,
   modelEffortSchema,
-  type AgentProvider,
 } from "../../src/lib/agent-provider-contract";
+import {
+  agentProviderLabels,
+  agentProviders,
+  type AgentProvider,
+} from "../../src/lib/agent-provider";
 import {
   agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
@@ -458,11 +460,6 @@ import { MAX_TRANSCRIPT_HTTP_BODY_BYTES } from "./transcript-limits";
 import {
   decodeTranscriptRequestEffect,
   TranscriptRequestDecodeError,
-} from "./transcript-request";
-
-export {
-  decodeTranscriptRequest,
-  transcriptSchema,
 } from "./transcript-request";
 import {
   ingestAgentTranscript,

@@ -39,7 +39,7 @@ const mutableArrayBetween = <S extends Schema.Top>(
     Schema.isLengthBetween(minimum, maximum),
   );
 
-export const transcriptSchema = Schema.Struct({
+export const TranscriptRequest = Schema.Struct({
   sessionId: SessionId,
   runId: Schema.optional(Schema.NullOr(Uuid)),
   runAttempt: Schema.optional(PositiveInteger),
@@ -125,7 +125,7 @@ export const transcriptSchema = Schema.Struct({
   }),
 ).annotate({ parseOptions: strictSchemaOptions });
 
-export type TranscriptRequest = typeof transcriptSchema.Type;
+export type TranscriptRequest = typeof TranscriptRequest.Type;
 
 export class TranscriptRequestDecodeError extends Data.TaggedError(
   "TranscriptRequestDecodeError",
@@ -134,7 +134,7 @@ export class TranscriptRequestDecodeError extends Data.TaggedError(
 }> {}
 
 export const decodeTranscriptRequest = Schema.decodeUnknownSync(
-  transcriptSchema,
+  TranscriptRequest,
   strictSchemaOptions,
 );
 
@@ -142,7 +142,7 @@ export const decodeTranscriptRequestEffect = Effect.fn(
   "decodeTranscriptRequestEffect",
 )(function*(input: unknown) {
   return yield* Schema.decodeUnknownEffect(
-    transcriptSchema,
+    TranscriptRequest,
     strictSchemaOptions,
   )(input).pipe(
     Effect.mapError((cause) => new TranscriptRequestDecodeError({ cause })),

@@ -2,7 +2,7 @@ import type {
   AgentExecutionMetrics,
   AgentExecutionUsageRecord,
 } from "./agent-execution-metrics";
-import type { AgentProvider } from "./agent-provider-contract";
+import type { AgentProvider } from "./agent-provider";
 import type { AutoHuntRunStatus } from "./auto-hunt-contract";
 
 export type ProjectUsagePeriod = "day" | "week" | "month";

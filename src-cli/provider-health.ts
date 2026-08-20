@@ -6,7 +6,7 @@ import {
   agentProviderBinaryName,
   agentProviders,
   type AgentProvider,
-} from "../src/lib/agent-provider-contract";
+} from "../src/lib/agent-provider";
 import {
   probeWorkerProviderUsage,
   type ProviderUsageProbe,

@@ -1,9 +1,9 @@
 import { z } from "zod";
 import {
   agentProviderCapabilityCatalogSchema,
-  agentProviders,
   modelEffortSchema,
 } from "../../src/lib/agent-provider-contract";
+import { agentProviders } from "../../src/lib/agent-provider";
 import {
   issueTitleAbsoluteMaxLength,
   issueTitleOverLimitMessage,

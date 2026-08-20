@@ -18,20 +18,22 @@ import {
 import {
   agentProviderCapabilityCatalogSchema,
   agentProviderSupportsSelection,
-  agentProviders,
-  type AgentProvider,
   type AgentProviderCapabilityCatalog,
   type ModelEffort,
 } from "../../src/lib/agent-provider-contract";
+import {
+  agentProviders,
+  type AgentProvider,
+} from "../../src/lib/agent-provider";
 import {
   organizationAgentContextCapability,
 } from "../../src/lib/organization-agent-context-contract";
 import { isChannelApprovedIssue } from "./db";
 
 export type {
-  AgentProvider,
   ModelEffort,
 } from "../../src/lib/agent-provider-contract";
+export type { AgentProvider } from "../../src/lib/agent-provider";
 
 export type ExecutionWorkerState = "online" | "stale" | "disabled";
 export type ExecutionWorkerReadiness = "ready" | "busy" | "needs_attention";
