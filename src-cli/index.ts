@@ -104,7 +104,6 @@ import {
   allocateAnalysisWorktree,
   allocateCachedAnalysisWorktree,
   allocateIssueWorktree,
-  allocateMergeGroupWorktree,
   analysisWorktreePath,
   defaultWorktreeRoot,
   findExistingIssueWorktree,
@@ -125,15 +124,6 @@ import {
   type IssueWorktree,
   type WorktreeSettings,
 } from "./worktree";
-import {
-  assertLiveMergeGroupSha,
-  inspectAndEnqueueMember,
-  mergeGroupContainingAllMembers,
-  parseMergeGroupRefs,
-  publishCommitStatus,
-  verifyNativeMergeQueue,
-  type CommandRunner as MergeQueueCommandRunner,
-} from "./merge-queue";
 import {
   sameApiEnvironment,
   selectProjectForApi,
@@ -198,7 +188,6 @@ import {
 import {
   decodeClaimedChannelReply,
   decodeClaimedIssueReply,
-  decodeClaimedMergeBatch,
   decodeClaimedProjectAgentTask,
   decodeClaimedRun,
   decodeDetachedAgentEffortOption,
@@ -208,7 +197,6 @@ import {
   decodeWorkerRegistration,
   type ClaimedChannelReply,
   type ClaimedIssueReply,
-  type ClaimedMergeBatch,
   type ClaimedProjectAgentTask,
   type ClaimedRun,
   type DetachedAgentClaim,
@@ -788,38 +776,10 @@ async function projectDoctor() {
   const project = await currentProject(config);
   let velen: ReturnType<typeof ensureConfiguredVelen> = null;
   let velenError: string | null = null;
-  type DoctorMergeQueuePolicy = {
-    repositoryId: number;
-    repository: string;
-    baseBranch: string;
-    enabled: boolean;
-  };
-  let mergeQueuePolicy: DoctorMergeQueuePolicy | null = null;
-  let mergeQueueHealthy: boolean | null = null;
-  let mergeQueueError: string | null = null;
   try {
     velen = ensureConfiguredVelen(project);
   } catch (error) {
     velenError = error instanceof Error ? error.message : String(error);
-  }
-  try {
-    const result = await request<{ policy: DoctorMergeQueuePolicy | null }>(
-      config.apiUrl,
-      `/projects/${project.id}/merge-policy`,
-      executionToken(project),
-    );
-    mergeQueuePolicy = result.policy;
-    if (mergeQueuePolicy?.enabled) {
-      verifyNativeMergeQueue(
-        runMergeQueueCommand,
-        mergeQueuePolicy.repository,
-        mergeQueuePolicy.baseBranch,
-      );
-      mergeQueueHealthy = true;
-    }
-  } catch (error) {
-    mergeQueueHealthy = false;
-    mergeQueueError = error instanceof Error ? error.message : String(error);
   }
   console.log(
     JSON.stringify({
@@ -842,11 +802,6 @@ async function projectDoctor() {
         // true is the default; false opts into checkout/worktree-confined writes.
         fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
       },
-      mergeQueue: {
-        policy: mergeQueuePolicy,
-        healthy: mergeQueueHealthy,
-        error: mergeQueueError,
-      },
       velenHealthy: velenError === null,
       velenError,
       requestIds: [velen?.auth.requestId, velen?.org.requestId, velen?.linear?.requestId].filter(
@@ -854,78 +809,6 @@ async function projectDoctor() {
       ),
     }),
   );
-}
-
-async function configureMergeQueue() {
-  const config = await loadConfig();
-  const project = await currentProject(config);
-  const repository = (
-    value("--repository") ?? project.autoHunt?.githubRepository ?? ""
-  ).trim().toLowerCase();
-  if (!repository) {
-    throw new Error("--repository or the project GitHub repository is required");
-  }
-  const baseBranch = (value("--base-branch") ?? "main").trim();
-  const enabled = !has("--disable");
-  const repositoryResponse = runMergeQueueCommand([
-    "gh", "api", `repos/${repository}`, "--jq", ".id",
-  ]);
-  const repositoryId = Number(repositoryResponse.stdout.trim());
-  if (
-    repositoryResponse.exitCode !== 0 ||
-    !Number.isSafeInteger(repositoryId) ||
-    repositoryId <= 0
-  ) {
-    throw new Error(
-      `GitHub repository identity could not be read: ${repositoryResponse.stderr.trim()}`,
-    );
-  }
-  if (enabled) {
-    // Activation is intentionally after the authoritative GitHub rule check.
-    // This command never creates or edits a GitHub ruleset.
-    verifyNativeMergeQueue(runMergeQueueCommand, repository, baseBranch);
-  }
-  const quietWindowMs = Number(value("--quiet-window-ms") ?? "30000");
-  if (!Number.isInteger(quietWindowMs) || quietWindowMs < 1_000 || quietWindowMs > 300_000) {
-    throw new Error("--quiet-window-ms must be between 1000 and 300000");
-  }
-  const result = await request(
-    config.apiUrl,
-    `/projects/${project.id}/merge-policy`,
-    executionToken(project),
-    {
-      method: "PUT",
-      body: JSON.stringify({
-        repositoryId,
-        repository,
-        baseBranch,
-        enabled,
-        quietWindowMs,
-        validationCommand: value("--validation-command") ?? "bun run ci:local",
-        statusContexts: [
-          "signoff/app-worker",
-          "signoff/d1-migrations",
-          "signoff/rust",
-          "signoff/security",
-        ],
-      }),
-    },
-  );
-  console.log(JSON.stringify(result));
-}
-
-async function retryMergeQueueBatch() {
-  const config = await loadConfig();
-  const project = await currentProject(config);
-  const batchId = required("--batch");
-  decodeUuid(batchId);
-  const result = await request(
-    config.apiUrl,
-    `/projects/${project.id}/merge-batches/${batchId}/retry`,
-    executionToken(project),
-    { method: "POST", body: "{}" },
-  );
-  console.log(JSON.stringify(result));
 }
 
 async function showWorkflow() {
@@ -1805,13 +1688,7 @@ async function transitionWorkflowStage(action: "start" | "complete") {
   const result = await request<{
     runId: string;
     requestId: string;
-    outcome:
-      | "started"
-      | "completed"
-      | "already_started"
-      | "already_completed"
-      | "paused"
-      | "delegated";
+    outcome: "started" | "completed" | "already_started" | "already_completed" | "paused";
     attempt: number;
     revision: number;
     stage: string;
@@ -1835,14 +1712,6 @@ async function transitionWorkflowStage(action: "start" | "complete") {
     },
   );
   if (result.outcome === "paused" && project.activeClaim?.runId === runId) {
-    config.projects = config.projects.map((candidate) =>
-      candidate.id === project.id
-        ? { ...candidate, activeClaim: undefined }
-        : candidate,
-    );
-    await saveConfig(config);
-  }
-  if (result.outcome === "delegated" && project.activeClaim?.runId === runId) {
     config.projects = config.projects.map((candidate) =>
       candidate.id === project.id
         ? { ...candidate, activeClaim: undefined }
@@ -3390,227 +3259,6 @@ async function workerSyncLabelCommand() {
   );
 }
 
-const runMergeQueueCommand: MergeQueueCommandRunner = (command, options = {}) => {
-  const result = Bun.spawnSync(command, {
-    cwd: options.cwd,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: { ...process.env, GH_PROMPT_DISABLED: "1", GIT_TERMINAL_PROMPT: "0" },
-    ...(options.timeoutMs ? { timeout: options.timeoutMs } : {}),
-  });
-  return {
-    exitCode: result.exitCode ?? 1,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  };
-};
-
-async function runClaimedMergeBatch(
-  config: Config,
-  project: ProjectConfig,
-  batch: ClaimedMergeBatch,
-  workerToken: string,
-  workerId: string,
-  signal: AbortSignal,
-  reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
-) {
-  const operation = <T>(name: string, body: Record<string, unknown>) =>
-    request<T>(
-      config.apiUrl,
-      `/merge-batch-claims/${batch.workId}/${name}`,
-      workerToken,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          projectId: project.id,
-          workerId,
-          claimToken: batch.claimToken,
-          ...body,
-        }),
-      },
-    );
-  let worktreePath: string | null = null;
-  let syntheticSha = batch.mergeGroupSha;
-  try {
-    verifyNativeMergeQueue(
-      runMergeQueueCommand,
-      batch.repository,
-      batch.baseBranch,
-    );
-    if (batch.state === "awaiting_merge") {
-      if (!batch.mergeGroupRef || !batch.mergeGroupSha) {
-        throw new Error("Awaiting merge batch lost its exact merge-group identity");
-      }
-      const liveGroup = runMergeQueueCommand([
-        "gh",
-        "api",
-        `repos/${batch.repository}/git/ref/${batch.mergeGroupRef.replace(/^refs\//u, "")}`,
-      ]);
-      if (liveGroup.exitCode !== 0) {
-        throw new Error("GitHub merge-group ref disappeared before status recovery");
-      }
-      assertLiveMergeGroupSha(liveGroup.stdout, batch.mergeGroupSha);
-      // The server transition durably proves validation passed. Rechecking its
-      // fences makes status publication idempotently recoverable after a crash.
-      await operation("validation", { mergeGroupSha: batch.mergeGroupSha });
-      for (const context of batch.statusContexts) {
-        publishCommitStatus(runMergeQueueCommand, {
-          repository: batch.repository,
-          sha: batch.mergeGroupSha,
-          context,
-          state: "success",
-          description: "Briar merge-group validation passed",
-        });
-      }
-      return;
-    }
-
-    for (const member of batch.members) {
-      if (signal.aborted) throw signal.reason ?? new Error("Merge batch aborted");
-      if (member.state === "merged") continue;
-      const queueEntryId = inspectAndEnqueueMember(
-        runMergeQueueCommand,
-        batch,
-        member,
-      );
-      await operation("enqueue", {
-        candidateId: member.id,
-        expectedHeadSha: member.frozenHeadSha,
-        queueEntryId,
-      });
-    }
-
-    let mergeGroup = batch.mergeGroupRef && batch.mergeGroupSha
-      ? { ref: batch.mergeGroupRef, sha: batch.mergeGroupSha }
-      : null;
-    for (let attempt = 0; !mergeGroup && attempt < 120; attempt += 1) {
-      if (signal.aborted) throw signal.reason ?? new Error("Merge batch aborted");
-      const refs = runMergeQueueCommand([
-        "gh",
-        "api",
-        `repos/${batch.repository}/git/matching-refs/heads/gh-readonly-queue/${encodeURIComponent(batch.baseBranch)}/`,
-      ]);
-      if (refs.exitCode !== 0) {
-        throw new Error(
-          `GitHub merge-group refs could not be read: ${refs.stderr.trim()}`,
-        );
-      }
-      mergeGroup = mergeGroupContainingAllMembers(
-        runGit,
-        project.repositoryPath,
-        batch,
-        parseMergeGroupRefs(refs.stdout),
-      );
-      if (!mergeGroup) await interruptibleSleep(5_000, signal);
-    }
-    if (!mergeGroup) {
-      throw new Error(
-        "GitHub did not create one merge group containing every frozen batch member",
-      );
-    }
-    syntheticSha = mergeGroup.sha;
-    await operation("merge-group", {
-      mergeGroupRef: mergeGroup.ref,
-      mergeGroupSha: mergeGroup.sha,
-    });
-
-    const worktree = await allocateMergeGroupWorktree({
-      repositoryPath: project.repositoryPath,
-      projectId: project.id,
-      batchId: batch.workId,
-      mergeGroupSha: mergeGroup.sha,
-      settings: worktreeSettings(project),
-      git: runGit,
-    });
-    worktreePath = worktree.path;
-    reportCheckpoint?.({ workspacePath: worktree.path });
-    const validation = Bun.spawn(
-      ["/bin/bash", "-lc", batch.validationCommand],
-      {
-        cwd: worktree.path,
-        stdout: "inherit",
-        stderr: "inherit",
-        env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GH_PROMPT_DISABLED: "1" },
-        signal,
-      },
-    );
-    const exitCode = await validation.exited;
-    const checkedHead = runGit(["rev-parse", "HEAD"], { cwd: worktree.path });
-    if (checkedHead.exitCode !== 0 || checkedHead.stdout.trim() !== mergeGroup.sha) {
-      throw new Error("Synthetic merge-group SHA changed during validation");
-    }
-    const liveGroup = runMergeQueueCommand([
-      "gh",
-      "api",
-      `repos/${batch.repository}/git/ref/${mergeGroup.ref.replace(/^refs\//u, "")}`,
-    ]);
-    if (liveGroup.exitCode !== 0) {
-      throw new Error("GitHub merge-group ref disappeared during validation");
-    }
-    assertLiveMergeGroupSha(liveGroup.stdout, mergeGroup.sha);
-    // The server-side renewal rechecks the lease immediately before statuses
-    // are published, so a superseded coordinator cannot bless stale output.
-    await operation("lease", {});
-    if (exitCode !== 0) {
-      for (const context of batch.statusContexts) {
-        publishCommitStatus(runMergeQueueCommand, {
-          repository: batch.repository,
-          sha: mergeGroup.sha,
-          context,
-          state: "failure",
-          description: "Briar merge-group validation failed",
-        });
-      }
-      throw new Error(`Merge-group validation failed with exit code ${exitCode}`);
-    }
-    // The durable service approves the exact SHA, current revisions, and live
-    // lease before any success context can become authoritative on GitHub.
-    await operation("validation", { mergeGroupSha: mergeGroup.sha });
-    for (const context of batch.statusContexts) {
-      publishCommitStatus(runMergeQueueCommand, {
-        repository: batch.repository,
-        sha: mergeGroup.sha,
-        context,
-        state: "success",
-        description: "Briar merge-group validation passed",
-      });
-    }
-  } catch (error) {
-    if (!signal.aborted) {
-      const detail = error instanceof Error ? error.message : String(error);
-      const blocked = /Require merge queue|branch rules|could not be read|authenticated/iu
-        .test(detail);
-      try {
-        await operation("failure", {
-          outcome: blocked ? "blocked" : "failed",
-          code: blocked ? "merge_queue_unavailable" : "merge_batch_failed",
-          detail,
-        });
-      } catch {
-        // A lost lease is expected to reject this late failure write. The
-        // durable frozen batch remains recoverable by the next coordinator.
-      }
-    }
-    throw error;
-  } finally {
-    if (worktreePath) {
-      try {
-        await removeAnalysisWorktree({
-          repositoryPath: project.repositoryPath,
-          path: worktreePath,
-          git: runGit,
-        });
-      } catch (error) {
-        console.error(
-          `merge-group worktree cleanup failed: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
-    }
-  }
-}
-
 async function workerCommand() {
   const config = await loadConfig();
   await cleanupOrphanedOrganizationAgentWorkspaces({
@@ -3734,8 +3382,6 @@ async function workerCommand() {
           : undefined;
         const work = workType === "issueReply"
           ? decodeClaimedIssueReply(claim.work)
-          : workType === "mergeBatch"
-            ? decodeClaimedMergeBatch(claim.work)
           : workType === "projectAgentTask"
             ? decodeClaimedProjectAgentTask(claim.work)
             : workType === "channelReply"
@@ -3744,23 +3390,6 @@ async function workerCommand() {
         return { work };
       },
       renewLease: async (issue) => {
-        if (issue.workType === "mergeBatch") {
-          const batch = decodeClaimedMergeBatch(issue);
-          await request(
-            config.apiUrl,
-            `/merge-batch-claims/${batch.workId}/lease`,
-            workerToken,
-            {
-              method: "POST",
-              body: JSON.stringify({
-                projectId: project.id,
-                workerId,
-                claimToken: batch.claimToken,
-              }),
-            },
-          );
-          return;
-        }
         if (issue.workType === "projectAgentTask") {
           const task = decodeClaimedProjectAgentTask(issue);
           await request(
@@ -4039,10 +3668,6 @@ async function workerCommand() {
       },
       handoff: async (issue, requestId, checkpoint) => {
         const workType = issue.workType ?? "issue";
-        // A merge batch has no provider conversation to transfer. Stopping
-        // renewal lets its durable lease expire and the next Worker resumes
-        // the same frozen batch without touching any issue worktree/evidence.
-        if (workType === "mergeBatch") return;
         const workId = issue.workId ?? issue.runId;
         await request(
           config.apiUrl,
@@ -4066,18 +3691,6 @@ async function workerCommand() {
         );
       },
       runIssue: async (issue, signal, reportCheckpoint) => {
-        if (issue.workType === "mergeBatch") {
-          await runClaimedMergeBatch(
-            config,
-            project,
-            decodeClaimedMergeBatch(issue),
-            workerToken,
-            workerId,
-            signal,
-            reportCheckpoint,
-          );
-          return;
-        }
         if (issue.workType === "projectAgentTask") {
           const task = decodeClaimedProjectAgentTask(issue);
           await runProjectAgentTaskCompletionFlow({
@@ -4429,9 +4042,6 @@ const usage = `Briar CLI
   briar project create [--name <name>]
   briar connect --project-id <uuid> --agent-token <token>
   briar project doctor
-  briar merge-queue configure [--repository <owner/name>] [--base-branch <branch>]
-    [--quiet-window-ms <milliseconds>] [--validation-command <command>] [--disable]
-  briar merge-queue retry --batch <uuid>
   briar project configure [--velen-org <slug> | --disable-velen]
     [--data-source <provider://source>]
     [--enable-linear --linear-source <linear://source> --linear-team <key>]
@@ -4522,12 +4132,6 @@ async function main() {
   if (args[0] === "project" && args[1] === "create") return createProject();
   if (args[0] === "connect") return connectProject();
   if (args[0] === "project" && args[1] === "doctor") return projectDoctor();
-  if (args[0] === "merge-queue" && args[1] === "configure") {
-    return configureMergeQueue();
-  }
-  if (args[0] === "merge-queue" && args[1] === "retry") {
-    return retryMergeQueueBatch();
-  }
   if (args[0] === "project" && args[1] === "configure") return configureProject();
   if (args[0] === "issue" && args[1] === "create") return createIssueCommand();
   if (args[0] === "channel" && args[1] === "messages") {

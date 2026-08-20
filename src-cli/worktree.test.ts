@@ -7,7 +7,6 @@ import {
   allocateAnalysisWorktree,
   allocateCachedAnalysisWorktree,
   allocateIssueWorktree,
-  allocateMergeGroupWorktree,
   assertPathWithinRoot,
   compactWorktreeArtifacts,
   COMPLETED_WORKTREE_RETENTION_MS,
@@ -619,33 +618,6 @@ describe("conversation worktree allocation", () => {
     expect(await readFile(join(worktree.path, ".env.keys"), "utf8")).toBe(
       "DOTENV_PRIVATE_KEY=abc",
     );
-  });
-
-  it("checks out an exact synthetic SHA in a dedicated detached worktree", async () => {
-    const root = await temporaryDirectory("briar-merge-group-root-");
-    const sha = "a".repeat(40);
-    const { git, calls } = fakeGit((gitArgs) => {
-      if (gitArgs[0] === "worktree" && gitArgs[1] === "list") {
-        return ok("worktree /repo\nbranch refs/heads/main\n");
-      }
-      if (gitArgs[0] === "rev-parse") return ok(`${sha}\n`);
-      return ok();
-    });
-    const worktree = await allocateMergeGroupWorktree({
-      repositoryPath: "/repo",
-      projectId: "project-1",
-      batchId: "11111111-1111-4111-8111-111111111111",
-      mergeGroupSha: sha,
-      settings: { root, branchPrefix: "unused" },
-      git,
-    });
-
-    expect(worktree.path).toContain("/merge-groups/merge-11111111-");
-    expect(worktree).toMatchObject({ baseSha: sha, reused: false });
-    expect(calls).toContainEqual([
-      "worktree", "add", "--detach", worktree.path, sha,
-    ]);
-    expect(calls.some((args) => args.includes("-b"))).toBe(false);
   });
 
   it("reuses one cached checkout for successive replies to the same issue", async () => {

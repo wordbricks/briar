@@ -13,12 +13,6 @@ Branch protection requires these commit statuses:
 - `signoff/rust`
 - `signoff/security`
 
-Repositories that enable batched delivery use GitHub's native merge queue as
-the authoritative `main` gate. Individual pull requests still complete their
-admission signoff, while Briar validates a frozen cohort on the queue's exact
-synthetic SHA. Configuration, rollout order, and recovery are documented in
-[`repository-merge-queue.md`](repository-merge-queue.md).
-
 Run all checks locally:
 
 ```sh

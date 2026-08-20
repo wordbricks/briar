@@ -16,12 +16,7 @@ import type { ModelEffort } from "../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
 
 export type ClaimedIssue = {
-  workType?:
-    | "issue"
-    | "issueReply"
-    | "channelReply"
-    | "projectAgentTask"
-    | "mergeBatch";
+  workType?: "issue" | "issueReply" | "channelReply" | "projectAgentTask";
   workId?: string;
   /** Immutable identity of one run claim/execution attempt. */
   executionId?: string;

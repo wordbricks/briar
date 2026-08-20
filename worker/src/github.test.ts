@@ -47,7 +47,7 @@ function pullRequestPayload(input: {
       merge_commit_sha: input.merged ? "c".repeat(40) : null,
       body: input.body ?? "No Briar link yet",
       head: { sha: "a".repeat(40) },
-      base: { sha: "b".repeat(40), ref: "main" },
+      base: { sha: "b".repeat(40) },
       merged_at: input.merged ? "2026-08-04T09:40:00Z" : null,
       closed_at: input.state === "closed"
         ? "2026-08-04T09:40:00Z"
