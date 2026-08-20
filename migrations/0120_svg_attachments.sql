@@ -1,0 +1,129 @@
+-- SVG was added to the application allowlists before the persisted metadata
+-- constraints were updated. Rebuild every attachment table that accepts the
+-- shared image policy so valid SVG uploads are not rejected after R2 storage.
+pragma defer_foreign_keys = on;
+pragma legacy_alter_table = on;
+
+-- Keep views and triggers owned by other tables pointing at the canonical
+-- name while each legacy table is swapped out.
+alter table briar_issue_attachments rename to briar_issue_attachments_legacy;
+
+create table briar_issue_attachments (
+  id text primary key not null,
+  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  project_id text not null references briar_projects (id) on delete cascade,
+  object_key text not null unique check (
+    object_key = trim(object_key)
+    and length(object_key) between 1 and 500
+  ),
+  filename text not null check (length(trim(filename)) between 1 and 255),
+  content_type text not null check (content_type in (
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+    'image/svg+xml', 'video/mp4', 'video/webm', 'video/quicktime'
+  )),
+  byte_size integer not null check (byte_size between 1 and 20971520),
+  created_at text not null
+);
+
+insert into briar_issue_attachments
+select * from briar_issue_attachments_legacy;
+
+drop table briar_issue_attachments_legacy;
+
+create index briar_issue_attachments_run_idx
+  on briar_issue_attachments (run_id, created_at, id);
+create index briar_issue_attachments_project_idx
+  on briar_issue_attachments (project_id, run_id);
+
+-- Recreate the dashboard delta triggers dropped with the old table.
+create trigger briar_dashboard_attachments_insert_sync
+after insert on briar_issue_attachments BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (new.project_id, 'run', new.run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+
+create trigger briar_dashboard_attachments_delete_sync
+after delete on briar_issue_attachments BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (old.project_id, 'run', old.run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (old.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+
+alter table briar_channel_message_attachments
+  rename to briar_channel_message_attachments_legacy;
+
+create table briar_channel_message_attachments (
+  id text primary key not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  channel_id text not null references briar_channels (id) on delete cascade,
+  message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  object_key text not null unique check (
+    object_key = trim(object_key)
+    and length(object_key) between 1 and 500
+  ),
+  filename text not null check (length(trim(filename)) between 1 and 255),
+  content_type text not null check (content_type in (
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+    'image/svg+xml'
+  )),
+  byte_size integer not null check (byte_size between 1 and 20971520),
+  created_at text not null
+);
+
+insert into briar_channel_message_attachments
+select * from briar_channel_message_attachments_legacy;
+
+drop table briar_channel_message_attachments_legacy;
+
+create index briar_channel_message_attachments_message_idx
+  on briar_channel_message_attachments (message_id, created_at, id);
+create index briar_channel_message_attachments_channel_idx
+  on briar_channel_message_attachments (organization_id, channel_id, message_id);
+
+alter table briar_run_evidence_images rename to briar_run_evidence_images_legacy;
+
+create table briar_run_evidence_images (
+  id text primary key not null,
+  project_id text not null references briar_projects (id) on delete cascade,
+  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  evidence_id text not null references briar_run_evidence (id) on delete cascade,
+  object_key text not null unique check (
+    object_key = trim(object_key)
+    and length(object_key) between 1 and 500
+  ),
+  filename text not null check (length(trim(filename)) between 1 and 255),
+  content_type text not null check (content_type in (
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+    'image/svg+xml'
+  )),
+  byte_size integer not null check (byte_size between 1 and 20971520),
+  sha256 text not null check (
+    length(sha256) = 64 and sha256 not glob '*[^0-9a-f]*'
+  ),
+  position integer not null check (position between 0 and 4),
+  created_at text not null,
+  unique (evidence_id, position),
+  unique (evidence_id, sha256)
+);
+
+insert into briar_run_evidence_images
+select * from briar_run_evidence_images_legacy;
+
+drop table briar_run_evidence_images_legacy;
+
+create index briar_run_evidence_images_evidence_idx
+  on briar_run_evidence_images (evidence_id, position, id);
+create index briar_run_evidence_images_project_run_idx
+  on briar_run_evidence_images (project_id, run_id);
+
+pragma legacy_alter_table = off;
+pragma defer_foreign_keys = off;

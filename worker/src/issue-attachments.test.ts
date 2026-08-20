@@ -346,6 +346,32 @@ describe("issue multipart input", () => {
     ).rejects.toThrow("25MB");
   });
 
+  it.each([
+    { name: "diagram.SVG", type: "" },
+    { name: "diagram.svg", type: "application/octet-stream" },
+    { name: "diagram.svg", type: "image/svg+xml; charset=utf-8" },
+  ])("normalizes SVG MIME metadata from $type", async ({ name, type }) => {
+    const result = await readIssueRequest(
+      issueRequest(new File(["<svg />"], name, { type })),
+    );
+
+    expect(result.attachments).toEqual([
+      expect.objectContaining({ name, type: "image/svg+xml" }),
+    ]);
+  });
+
+  it("keeps existing PNG attachment behavior while normalizing generic MIME metadata", async () => {
+    const result = await readIssueRequest(
+      issueRequest(
+        new File(["png"], "screen.PNG", { type: "application/octet-stream" }),
+      ),
+    );
+
+    expect(result.attachments).toEqual([
+      expect.objectContaining({ name: "screen.PNG", type: "image/png" }),
+    ]);
+  });
+
   it("rejects malformed inline attachment references", async () => {
     await expect(
       readIssueRequest(

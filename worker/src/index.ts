@@ -59,6 +59,7 @@ import {
 } from "../../src/lib/evidence-images";
 import {
   maxIssueMultipartBytes,
+  normalizeIssueAttachmentFile,
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
 import {
@@ -1663,7 +1664,7 @@ function readMultipartFiles(
   if (values.some((value) => !(value instanceof File))) {
     throw new HttpError(400, invalidFilesMessage);
   }
-  const files = values as File[];
+  const files = (values as File[]).map(normalizeIssueAttachmentFile);
   const validationError = validate(files);
   if (validationError) throw new HttpError(400, validationError);
   return files;
@@ -3671,6 +3672,7 @@ async function createIssueWithAttachments(input: {
     },
   );
   const uploadedKeys: string[] = [];
+  let phase = "upload_attachments";
   const issueDescription = canonicalizeIssueAttachmentReferences(
     input.issue.description,
     input.attachmentReferences ?? [],
@@ -3687,6 +3689,7 @@ async function createIssueWithAttachments(input: {
         projectId: input.project.id,
       }),
     );
+    phase = "record_issue";
     runId = await recordHuntEvent(input.db, input.project.id, {
       source: "issue",
       sourceKey: input.sourceKey,
@@ -3726,6 +3729,7 @@ async function createIssueWithAttachments(input: {
       preferredAgentModel: input.issue.preferredModel ?? null,
       preferredAgentEffort: input.issue.preferredEffort ?? null,
     });
+    phase = "store_attachment_metadata";
     await createIssueAttachments(
       input.db,
       input.project.id,
@@ -3742,6 +3746,20 @@ async function createIssueWithAttachments(input: {
       ),
     };
   } catch (error) {
+    console.error(JSON.stringify({
+      message: "issue creation failed",
+      phase,
+      errorType: error instanceof Error ? error.name : "UnknownError",
+      error: error instanceof Error ? error.message : String(error),
+      projectId: input.project.id,
+      issueStorageId,
+      runId,
+      attachmentCount: storedAttachments.length,
+      uploadedAttachmentCount: uploadedKeys.length,
+      attachmentContentTypes: [
+        ...new Set(storedAttachments.map((attachment) => attachment.content_type)),
+      ],
+    }));
     if (runId) {
       try {
         await rollbackNewAppIssue(input.db, input.project.id, runId);
