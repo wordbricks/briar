@@ -187,6 +187,7 @@ describe("detached execution workers", () => {
         "0103_agent_worklog_projection.sql",
         "0113_project_schedule_tab.sql",
         "0119_execution_worker_update_handoffs.sql",
+        "0121_merge_group_validation_jobs.sql",
       ],
     });
     await executeD1Sql(

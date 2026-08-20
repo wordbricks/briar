@@ -12515,6 +12515,11 @@ async function route(
       input.projectId,
       input.workerId,
     );
+    const legacyClaimInput = {
+      claimedBy: input.claimedBy,
+      workerId: input.workerId,
+      projectId: input.projectId,
+    };
     const claimRoutes = [
       ...(input.repliesOnly ? [] : [{
         pathname: "/merge-group-validation-claims",
@@ -12522,7 +12527,7 @@ async function route(
       }]),
       {
         pathname: "/issue-reply-claims",
-        body: input,
+        body: legacyClaimInput,
       },
       {
         pathname: "/channel-reply-claims",
@@ -12536,7 +12541,7 @@ async function route(
         body: { workerId: input.workerId, projectId: input.projectId },
       }, {
         pathname: "/queue/claims",
-        body: input,
+        body: legacyClaimInput,
       }]),
     ];
     for (const candidate of claimRoutes) {
