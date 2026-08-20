@@ -1020,6 +1020,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
+      await readFile(
+        resolve("migrations/0121_repository_merge_batches.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
       `alter table briar_project_agent_sessions
          add column requested_by_user_id text references "user" (id);
        alter table briar_project_agent_schedules

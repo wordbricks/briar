@@ -47,6 +47,7 @@ const ClaimedHandoffContext = strict(Schema.Struct({
     "projectAgentTask",
     "issueReply",
     "channelReply",
+    "mergeBatch",
   ]),
   workId: Uuid,
   runId: Schema.NullOr(Uuid),
@@ -218,6 +219,54 @@ export const ClaimedRun = Schema.Struct({
 });
 export type ClaimedRun = typeof ClaimedRun.Type;
 export const decodeClaimedRun = Schema.decodeUnknownSync(ClaimedRun);
+
+const GitObjectSha = Schema.String.check(
+  Schema.isPattern(/^[0-9a-f]{7,64}$/u),
+);
+const MergeBatchMember = strict(Schema.Struct({
+  id: Uuid,
+  runId: Uuid,
+  attempt: PositiveInteger,
+  revision: PositiveInteger,
+  pullRequestId: PositiveInteger,
+  pullRequestNodeId: Schema.NonEmptyString,
+  pullRequestNumber: PositiveInteger,
+  pullRequestUrl: Schema.String,
+  frozenHeadSha: GitObjectSha,
+  state: Schema.Literals(["frozen", "enqueued", "merged"]),
+  queueEntryId: Schema.NullOr(Schema.String),
+}));
+
+export const ClaimedMergeBatch = strict(Schema.Struct({
+  workType: Schema.Literal("mergeBatch"),
+  workId: Uuid,
+  runId: Uuid,
+  sourceKey: Schema.NonEmptyString,
+  title: Schema.NonEmptyString,
+  claimToken: Schema.String.check(
+    Schema.isStartsWith("briar_merge_batch_claim_"),
+  ),
+  claimAttempts: PositiveInteger,
+  claimedAt: IsoDateTimeWithOffset,
+  leaseExpiresAt: IsoDateTimeWithOffset,
+  state: Schema.Literals([
+    "enqueueing",
+    "validating",
+    "awaiting_merge",
+  ]),
+  repository: Schema.NonEmptyString,
+  repositoryId: PositiveInteger,
+  baseBranch: Schema.NonEmptyString,
+  mergeGroupRef: Schema.NullOr(Schema.String),
+  mergeGroupSha: Schema.NullOr(GitObjectSha),
+  validationCommand: Schema.NonEmptyString,
+  statusContexts: mutableArray(Schema.NonEmptyString),
+  members: mutableArray(MergeBatchMember).check(Schema.isMinLength(1)),
+}));
+export type ClaimedMergeBatch = typeof ClaimedMergeBatch.Type;
+export const decodeClaimedMergeBatch = Schema.decodeUnknownSync(
+  ClaimedMergeBatch,
+);
 
 export const ClaimedProjectAgentTask = Schema.Struct({
   workType: Schema.Literal("projectAgentTask"),
