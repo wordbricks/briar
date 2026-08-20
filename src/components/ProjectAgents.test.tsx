@@ -137,7 +137,7 @@ describe("ProjectAgents", () => {
     expect(createCard?.textContent).toContain("책임과 스킬");
 
     const providerIcons = [
-      { provider: "codex", label: "Codex", element: "svg" },
+      { provider: "codex", label: "Codex", element: "img" },
       { provider: "claude", label: "Claude", element: "svg" },
       { provider: "grok", label: "Grok", element: "img" },
     ];

@@ -4,6 +4,9 @@
   product surfaces that still contain fixed light colors in styles.css.
 */
 
+.dark .provider-artwork-white { filter:none; }
+.dark .provider-artwork-dark { filter:invert(1); }
+
 .dark .sidebar,
 .dark .sidebar-bottom,
 .dark .app-settings-sidebar,

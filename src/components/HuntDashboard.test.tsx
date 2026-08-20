@@ -4275,7 +4275,7 @@ describe("HuntDashboard", () => {
       ".issue-agent-activity-panel .auto-hunt-agent-message > header",
     );
     expect(messageHeader?.querySelector("strong")?.textContent).toBe("Codex");
-    expect(messageHeader?.querySelector("svg")).not.toBeNull();
+    expect(messageHeader?.querySelector("img")).not.toBeNull();
     expect(messageHeader?.textContent).not.toContain("최종 메시지");
 
     await act(async () => root.unmount());

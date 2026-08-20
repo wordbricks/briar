@@ -1,6 +1,9 @@
 /* Design tokens live in styles/tokens.css (imported via styles/globals.css). */
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; margin: 0; }
+.provider-artwork { display:block; }
+.provider-artwork-white { filter:brightness(0); }
+.provider-artwork-dark { filter:none; }
 html.launch-intro-document,
 html.launch-intro-document body,
 html.launch-intro-document #root { background:transparent !important; }
