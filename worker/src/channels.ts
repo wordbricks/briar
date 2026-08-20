@@ -184,6 +184,7 @@ export type ChannelReplyJobRow = {
   claimed_at: string | null;
   lease_expires_at: string | null;
   attempts: number;
+  planned_update_resume: number;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -2339,7 +2340,8 @@ export async function claimNextChannelAgentReply(
       `update briar_channel_agent_reply_jobs
        set status = 'running', claimed_device_id = ?, claimed_worker_id = ?,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
-           attempts = attempts + 1, error = null, updated_at = ?
+           attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
+           planned_update_resume = 0, error = null, updated_at = ?
        where id = ? and organization_id = ? and attempts < ?
          and (status = 'queued'
            or (status = 'running' and lease_expires_at <= ?))

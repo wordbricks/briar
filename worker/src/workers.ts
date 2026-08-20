@@ -142,6 +142,26 @@ export type ExecutionWorkerUpdateRequest = {
   targetVersion: string;
   status: "requested" | "completed" | "cancelled";
   requestedAt: string;
+  handoffState: "idle" | "draining" | "ready" | "failed";
+  handoffStartedAt: string | null;
+  handoffCompletedAt: string | null;
+  handoffError: string | null;
+};
+
+export type ExecutionWorkerUpdateHandoffWorkType =
+  | "issue"
+  | "projectAgentTask"
+  | "issueReply"
+  | "channelReply";
+
+export type ExecutionWorkerUpdateHandoffContext = {
+  requestId: string;
+  workType: ExecutionWorkerUpdateHandoffWorkType;
+  workId: string;
+  runId: string | null;
+  conversationId: string | null;
+  workspacePath: string | null;
+  createdAt: string;
 };
 
 type ExecutionWorkerUpdateRequestRow = {
@@ -154,18 +174,33 @@ type ExecutionWorkerUpdateRequestRow = {
   requested_at: string;
   updated_at: string;
   completed_at: string | null;
+  handoff_state: "idle" | "draining" | "ready" | "failed";
+  handoff_started_at: string | null;
+  handoff_completed_at: string | null;
+  handoff_error: string | null;
 };
 
 const updateRequestJson = (
   row: Pick<
     ExecutionWorkerUpdateRequestRow,
-    "id" | "target_version" | "status" | "requested_at"
+    | "id"
+    | "target_version"
+    | "status"
+    | "requested_at"
+    | "handoff_state"
+    | "handoff_started_at"
+    | "handoff_completed_at"
+    | "handoff_error"
   >,
 ): ExecutionWorkerUpdateRequest => ({
   id: row.id,
   targetVersion: row.target_version,
   status: row.status,
   requestedAt: row.requested_at,
+  handoffState: row.handoff_state,
+  handoffStartedAt: row.handoff_started_at,
+  handoffCompletedAt: row.handoff_completed_at,
+  handoffError: row.handoff_error,
 });
 
 export async function pendingExecutionWorkerUpdate(
@@ -174,7 +209,9 @@ export async function pendingExecutionWorkerUpdate(
 ): Promise<ExecutionWorkerUpdateRequest | null> {
   const row = await db
     .prepare(
-      `select id, target_version, status, requested_at
+      `select id, target_version, status, requested_at,
+              handoff_state, handoff_started_at, handoff_completed_at,
+              handoff_error
        from briar_execution_worker_update_requests
        where device_id = ? and status = 'requested'
        order by requested_at desc limit 1`,
@@ -182,9 +219,47 @@ export async function pendingExecutionWorkerUpdate(
     .bind(deviceId)
     .first<Pick<
       ExecutionWorkerUpdateRequestRow,
-      "id" | "target_version" | "status" | "requested_at"
+      | "id"
+      | "target_version"
+      | "status"
+      | "requested_at"
+      | "handoff_state"
+      | "handoff_started_at"
+      | "handoff_completed_at"
+      | "handoff_error"
     >>();
   return row ? updateRequestJson(row) : null;
+}
+
+async function beginExecutionWorkerUpdate(
+  db: D1Database,
+  input: { requestId: string; deviceId: string; observedAt: string },
+) {
+  await db.batch([
+    db
+      .prepare(
+        `update briar_execution_worker_update_requests
+         set handoff_state = case
+               when handoff_state = 'ready' then 'ready'
+               else 'draining'
+             end,
+             handoff_started_at = coalesce(handoff_started_at, ?),
+             handoff_error = null,
+             updated_at = ?
+         where id = ? and device_id = ? and status = 'requested'`,
+      )
+      .bind(input.observedAt, input.observedAt, input.requestId, input.deviceId),
+    db
+      .prepare(
+        `update briar_execution_workers
+         set accepting_work = 0,
+             readiness_state = 'busy',
+             readiness_detail = '계획된 업데이트 handoff를 준비하고 있습니다.',
+             updated_at = ?
+         where device_id = ? and state <> 'disabled'`,
+      )
+      .bind(input.observedAt, input.deviceId),
+  ]);
 }
 
 export async function requestExecutionWorkerUpdate(
@@ -199,13 +274,21 @@ export async function requestExecutionWorkerUpdate(
   },
 ): Promise<ExecutionWorkerUpdateRequest> {
   const pending = await pendingExecutionWorkerUpdate(db, input.deviceId);
-  if (pending) return pending;
+  if (pending) {
+    await beginExecutionWorkerUpdate(db, {
+      requestId: pending.id,
+      deviceId: input.deviceId,
+      observedAt: input.requestedAt,
+    });
+    return (await pendingExecutionWorkerUpdate(db, input.deviceId)) ?? pending;
+  }
   const inserted = await db
     .prepare(
       `insert into briar_execution_worker_update_requests (
          id, organization_id, device_id, requested_by_user_id,
-         target_version, status, requested_at, updated_at
-       ) values (?, ?, ?, ?, ?, 'requested', ?, ?)
+         target_version, status, requested_at, updated_at,
+         handoff_state, handoff_started_at
+       ) values (?, ?, ?, ?, ?, 'requested', ?, ?, 'draining', ?)
        on conflict do nothing`,
     )
     .bind(
@@ -216,18 +299,97 @@ export async function requestExecutionWorkerUpdate(
       input.targetVersion,
       input.requestedAt,
       input.requestedAt,
+      input.requestedAt,
     )
     .run();
   if (inserted.meta.changes < 1) {
     const concurrent = await pendingExecutionWorkerUpdate(db, input.deviceId);
-    if (concurrent) return concurrent;
+    if (concurrent) {
+      await beginExecutionWorkerUpdate(db, {
+        requestId: concurrent.id,
+        deviceId: input.deviceId,
+        observedAt: input.requestedAt,
+      });
+      return (await pendingExecutionWorkerUpdate(db, input.deviceId)) ?? concurrent;
+    }
     throw new WorkerConflictError("Worker update request changed");
   }
+  await beginExecutionWorkerUpdate(db, {
+    requestId: input.id,
+    deviceId: input.deviceId,
+    observedAt: input.requestedAt,
+  });
+  const requested = await pendingExecutionWorkerUpdate(db, input.deviceId);
+  if (!requested) throw new WorkerConflictError("Worker update request disappeared");
+  return requested;
+}
+
+async function updateExecutionWorkerHandoffStateIfIdle(
+  db: D1Database,
+  deviceId: string,
+  requestId: string,
+  observedAt: string,
+) {
+  const activeWorkCount = await countExecutionWorkerDeviceSessions(
+    db,
+    deviceId,
+    observedAt,
+  );
+  if (activeWorkCount === 0) {
+    await db
+      .prepare(
+        `update briar_execution_worker_update_requests
+         set handoff_state = 'ready',
+             handoff_completed_at = coalesce(handoff_completed_at, ?),
+             updated_at = ?
+         where id = ? and device_id = ? and status = 'requested'
+           and handoff_state = 'draining'`,
+      )
+      .bind(observedAt, observedAt, requestId, deviceId)
+      .run();
+  }
+  return activeWorkCount;
+}
+
+export async function executionWorkerUpdateStatus(
+  db: D1Database,
+  input: { deviceId: string; requestId?: string; observedAt: string },
+) {
+  const row = await db
+    .prepare(
+      `select id, target_version, status, requested_at,
+              handoff_state, handoff_started_at, handoff_completed_at,
+              handoff_error
+       from briar_execution_worker_update_requests
+       where device_id = ? and (? is null or id = ?)
+       order by requested_at desc limit 1`,
+    )
+    .bind(input.deviceId, input.requestId ?? null, input.requestId ?? null)
+    .first<ExecutionWorkerUpdateRequestRow>();
+  if (!row) return null;
+  const activeWorkCount = row.status === "requested"
+    ? await updateExecutionWorkerHandoffStateIfIdle(
+        db,
+        input.deviceId,
+        row.id,
+        input.observedAt,
+      )
+    : 0;
+  const current = await db
+    .prepare(
+      `select id, target_version, status, requested_at,
+              handoff_state, handoff_started_at, handoff_completed_at,
+              handoff_error
+       from briar_execution_worker_update_requests
+       where id = ?`,
+    )
+    .bind(row.id)
+    .first<ExecutionWorkerUpdateRequestRow>();
+  const request = current ? updateRequestJson(current) : updateRequestJson(row);
   return {
-    id: input.id,
-    targetVersion: input.targetVersion,
-    status: "requested",
-    requestedAt: input.requestedAt,
+    request,
+    activeWorkCount,
+    ready: request.handoffState === "ready",
   };
 }
 
@@ -245,6 +407,12 @@ export async function completeExecutionWorkerUpdates(
   ) {
     return;
   }
+  const status = await executionWorkerUpdateStatus(db, {
+    deviceId,
+    requestId: pending.id,
+    observedAt,
+  });
+  if (!status?.ready || status.activeWorkCount > 0) return;
   await db
     .prepare(
       `update briar_execution_worker_update_requests
@@ -253,6 +421,326 @@ export async function completeExecutionWorkerUpdates(
     )
     .bind(observedAt, observedAt, pending.id)
     .run();
+}
+
+export async function handoffExecutionWorkerClaim(
+  db: D1Database,
+  input: {
+    requestId: string;
+    organizationId: string;
+    deviceId: string;
+    projectId: string;
+    workerId: string;
+    workType: ExecutionWorkerUpdateHandoffWorkType;
+    workId: string;
+    runId: string | null;
+    claimTokenHash: string;
+    metadata: Record<string, unknown>;
+    observedAt: string;
+  },
+) {
+  const request = await db
+    .prepare(
+      `select id, handoff_state
+       from briar_execution_worker_update_requests
+       where id = ? and device_id = ? and organization_id = ?
+         and status = 'requested'`,
+    )
+    .bind(input.requestId, input.deviceId, input.organizationId)
+    .first<{ id: string; handoff_state: string }>();
+  if (!request || !["draining", "ready"].includes(request.handoff_state)) {
+    return { outcome: "not_ready" as const, activeWorkCount: 0 };
+  }
+
+  const update = (() => {
+    switch (input.workType) {
+      case "issue":
+        return db.prepare(
+          `update briar_hunt_runs
+           set status = 'queued',
+               claim_token_hash = null, claimed_by = null, claimed_at = null,
+               lease_expires_at = null, worker_id = null,
+               planned_update_resume = 1,
+               detail = '계획된 Worker 업데이트 후 작업을 이어받도록 인계했습니다.',
+               updated_at = ?
+           where id = ? and project_id = ? and status not in
+             ('backlog', 'completed', 'cancelled', 'blocked', 'failed')
+             and worker_id = ? and claim_token_hash = ?
+             and lease_expires_at > ?
+           returning id`,
+        ).bind(
+          input.observedAt,
+          input.workId,
+          input.projectId,
+          input.workerId,
+          input.claimTokenHash,
+          input.observedAt,
+        );
+      case "projectAgentTask":
+        return db.prepare(
+          `update briar_project_agent_task_jobs
+           set status = 'queued', claimed_worker_id = null,
+               claim_token_hash = null, claimed_at = null,
+               lease_expires_at = null, planned_update_resume = 1,
+               error = null, updated_at = ?
+           where id = ? and project_id = ? and status = 'running'
+             and claimed_worker_id = ? and claim_token_hash = ?
+             and lease_expires_at > ?
+           returning id`,
+        ).bind(
+          input.observedAt,
+          input.workId,
+          input.projectId,
+          input.workerId,
+          input.claimTokenHash,
+          input.observedAt,
+        );
+      case "issueReply":
+        return db.prepare(
+          `update briar_issue_agent_reply_jobs
+           set status = 'queued', claimed_worker_id = null,
+               claim_token_hash = null, claimed_at = null,
+               lease_expires_at = null, planned_update_resume = 1,
+               error = null, updated_at = ?
+           where id = ? and project_id = ? and status = 'running'
+             and claimed_worker_id = ? and claim_token_hash = ?
+             and lease_expires_at > ?
+           returning id`,
+        ).bind(
+          input.observedAt,
+          input.workId,
+          input.projectId,
+          input.workerId,
+          input.claimTokenHash,
+          input.observedAt,
+        );
+      case "channelReply":
+        return db.prepare(
+          `update briar_channel_agent_reply_jobs
+           set status = 'queued', claimed_device_id = null,
+               claimed_worker_id = null, claim_token_hash = null,
+               claimed_at = null, lease_expires_at = null,
+               planned_update_resume = 1, error = null, updated_at = ?
+           where id = ? and organization_id = ? and status = 'running'
+             and (project_id is null or project_id = ?) and claimed_device_id = ?
+             and claimed_worker_id = ? and claim_token_hash = ?
+             and lease_expires_at > ?
+           returning id`,
+        ).bind(
+          input.observedAt,
+          input.workId,
+          input.organizationId,
+          input.projectId,
+          input.deviceId,
+          input.workerId,
+          input.claimTokenHash,
+          input.observedAt,
+        );
+    }
+  })();
+
+  const table = input.workType === "issue"
+    ? "briar_hunt_runs"
+    : input.workType === "projectAgentTask"
+      ? "briar_project_agent_task_jobs"
+      : input.workType === "issueReply"
+        ? "briar_issue_agent_reply_jobs"
+        : "briar_channel_agent_reply_jobs";
+  const audit = db
+    .prepare(
+      `insert into briar_execution_worker_update_handoffs (
+         id, update_request_id, organization_id, device_id, project_id,
+         worker_id, work_type, work_id, run_id, claim_token_hash,
+         metadata_json, status, created_at, updated_at
+       )
+       select ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'handed_off', ?, ?
+       where exists (
+         select 1 from ${table}
+         where id = ? and status = 'queued' and planned_update_resume = 1
+           and updated_at = ?
+       )
+       on conflict (update_request_id, work_type, work_id) do nothing`,
+    )
+    .bind(
+      crypto.randomUUID(),
+      input.requestId,
+      input.organizationId,
+      input.deviceId,
+      input.projectId,
+      input.workerId,
+      input.workType,
+      input.workId,
+      input.runId,
+      input.claimTokenHash,
+      JSON.stringify(input.metadata),
+      input.observedAt,
+      input.observedAt,
+      input.workId,
+      input.observedAt,
+    );
+  const [updated, inserted] = await db.batch([update, audit]);
+  if ((updated.results?.length ?? 0) < 1) {
+    const existing = await db
+      .prepare(
+        `select 1 as handed_off
+         from briar_execution_worker_update_handoffs
+         where update_request_id = ? and work_type = ? and work_id = ?
+           and claim_token_hash = ?
+         limit 1`,
+      )
+      .bind(input.requestId, input.workType, input.workId, input.claimTokenHash)
+      .first<{ handed_off: number }>();
+    if (!existing) return { outcome: "not_active" as const, activeWorkCount: 0 };
+    const status = await executionWorkerUpdateStatus(db, {
+      deviceId: input.deviceId,
+      requestId: input.requestId,
+      observedAt: input.observedAt,
+    });
+    return {
+      outcome: "already_handed_off" as const,
+      activeWorkCount: status?.activeWorkCount ?? 0,
+    };
+  }
+  if ((inserted.meta?.changes ?? 0) < 1) {
+    throw new WorkerConflictError("Worker handoff audit was not recorded");
+  }
+  const status = await executionWorkerUpdateStatus(db, {
+    deviceId: input.deviceId,
+    requestId: input.requestId,
+    observedAt: input.observedAt,
+  });
+  return {
+    outcome: "handed_off" as const,
+    activeWorkCount: status?.activeWorkCount ?? 0,
+  };
+}
+
+/** Persist a failed handoff without releasing the old lease. */
+export async function failExecutionWorkerUpdateHandoff(
+  db: D1Database,
+  input: {
+    requestId: string;
+    organizationId: string;
+    deviceId: string;
+    projectId: string;
+    workerId: string;
+    workType: ExecutionWorkerUpdateHandoffWorkType;
+    workId: string;
+    runId: string | null;
+    claimTokenHash: string;
+    metadata: Record<string, unknown>;
+    error: string;
+    observedAt: string;
+  },
+) {
+  const error = input.error.trim().slice(0, 4_000) || "Unknown handoff failure";
+  await db.batch([
+    db
+      .prepare(
+        `update briar_execution_worker_update_requests
+         set handoff_state = 'failed', handoff_error = ?, updated_at = ?
+         where id = ? and device_id = ? and organization_id = ?
+           and status = 'requested' and handoff_state in ('draining', 'ready')`,
+      )
+      .bind(
+        error,
+        input.observedAt,
+        input.requestId,
+        input.deviceId,
+        input.organizationId,
+      ),
+    db
+      .prepare(
+        `update briar_execution_workers
+         set accepting_work = 0,
+             readiness_state = 'busy',
+             readiness_detail = ?,
+             updated_at = ?
+         where device_id = ? and state <> 'disabled'`,
+      )
+      .bind(
+        `계획된 업데이트 handoff 실패: ${error.slice(0, 420)}`,
+        input.observedAt,
+        input.deviceId,
+      ),
+    db
+      .prepare(
+        `insert into briar_execution_worker_update_handoffs (
+           id, update_request_id, organization_id, device_id, project_id,
+           worker_id, work_type, work_id, run_id, claim_token_hash,
+           metadata_json, status, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'failed', ?, ?)
+         on conflict (update_request_id, work_type, work_id) do nothing`,
+      )
+      .bind(
+        crypto.randomUUID(),
+        input.requestId,
+        input.organizationId,
+        input.deviceId,
+        input.projectId,
+        input.workerId,
+        input.workType,
+        input.workId,
+        input.runId,
+        input.claimTokenHash,
+        JSON.stringify({ ...input.metadata, error }),
+        input.observedAt,
+        input.observedAt,
+      ),
+  ]);
+}
+
+export async function latestExecutionWorkerUpdateHandoff(
+  db: D1Database,
+  input: {
+    deviceId: string;
+    workType: ExecutionWorkerUpdateHandoffWorkType;
+    workId: string;
+  },
+): Promise<ExecutionWorkerUpdateHandoffContext | null> {
+  const row = await db
+    .prepare(
+      `select update_request_id, work_type, work_id, run_id,
+              metadata_json, created_at
+       from briar_execution_worker_update_handoffs
+       where device_id = ? and work_type = ? and work_id = ?
+         and status = 'handed_off'
+       order by updated_at desc, id desc limit 1`,
+    )
+    .bind(input.deviceId, input.workType, input.workId)
+    .first<{
+      update_request_id: string;
+      work_type: ExecutionWorkerUpdateHandoffWorkType;
+      work_id: string;
+      run_id: string | null;
+      metadata_json: string;
+      created_at: string;
+    }>();
+  if (!row) return null;
+  let metadata: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(row.metadata_json);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      metadata = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Optional checkpoint data must not make the new claim unusable.
+  }
+  return {
+    requestId: row.update_request_id,
+    workType: row.work_type,
+    workId: row.work_id,
+    runId: row.run_id,
+    conversationId:
+      typeof metadata.conversationId === "string"
+        ? metadata.conversationId
+        : null,
+    workspacePath:
+      typeof metadata.workspacePath === "string"
+        ? metadata.workspacePath
+        : null,
+    createdAt: row.created_at,
+  };
 }
 
 export type ExecutionWorkerCredentialPrincipal = {
@@ -2341,7 +2829,7 @@ export async function listExecutionAuditEvents(
   return result.results ?? [];
 }
 
-/** Return all live Hunt and Project Agent task leases on one device. */
+/** Return all live Worker leases on one device, including reply work. */
 export async function countExecutionWorkerDeviceSessions(
   db: D1Database,
   deviceId: string,
@@ -2367,9 +2855,32 @@ export async function countExecutionWorkerDeviceSessions(
            on worker.id = task.claimed_worker_id
          where worker.device_id = ? and task.status = 'running'
            and task.lease_expires_at > ?
+         union all
+         select reply.id
+         from briar_issue_agent_reply_jobs reply
+         join briar_execution_workers worker
+           on worker.id = reply.claimed_worker_id
+         where worker.device_id = ? and reply.status = 'running'
+           and reply.lease_expires_at > ?
+         union all
+         select reply.id
+         from briar_channel_agent_reply_jobs reply
+         join briar_execution_workers worker
+           on worker.id = reply.claimed_worker_id
+         where worker.device_id = ? and reply.status = 'running'
+           and reply.lease_expires_at > ?
        ) active_work`,
     )
-    .bind(deviceId, observedAt, deviceId, observedAt)
+    .bind(
+      deviceId,
+      observedAt,
+      deviceId,
+      observedAt,
+      deviceId,
+      observedAt,
+      deviceId,
+      observedAt,
+    )
     .first<{ active_sessions: number }>();
   return row?.active_sessions ?? 0;
 }

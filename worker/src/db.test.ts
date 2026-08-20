@@ -841,6 +841,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(
+        resolve("migrations/0076_execution_worker_updates.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
+      await readFile(
         resolve("migrations/0077_project_agent_task_jobs.sql"),
         "utf8",
       ),
@@ -1001,6 +1008,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0117_email_otp_auth.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0119_execution_worker_update_handoffs.sql"),
+        "utf8",
+      ),
     );
     await executeSql(
       db,

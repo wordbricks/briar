@@ -32,13 +32,16 @@ import {
   executionWorkerBindingForProject,
   executionWorkerProviders,
   executionWorkerSupportsOrganizationAgentContext,
+  failExecutionWorkerUpdateHandoff,
   getProjectExecutionWorkerPolicy,
+  handoffExecutionWorkerClaim,
   hasAvailableChannelReplyWorker,
   hasExecutionWorkerReadinessChanged,
   leaseExpiryFrom,
   listExecutionWorkers,
   listOrganizationExecutionProviders,
   listOrganizationExecutionWorkers,
+  latestExecutionWorkerUpdateHandoff,
   pendingExecutionWorkerUpdate,
   MAX_CLAIM_ATTEMPTS,
   reapStalledHuntRuns,
@@ -171,14 +174,17 @@ describe("detached execution workers", () => {
         "0068_issue_action_proposals.sql",
         "0069_project_agent_effort.sql",
         "0070_project_issue_key_prefix.sql",
+        "0073_organization_channels.sql",
         "0076_execution_worker_updates.sql",
         "0077_project_agent_task_jobs.sql",
         "0079_agent_skills.sql",
         "0084_run_usage_ledger.sql",
         "0085_run_cost_ledger.sql",
+        "0087_channel_reply_worker_scope.sql",
         "0099_project_usage_analytics.sql",
         "0103_agent_worklog_projection.sql",
         "0113_project_schedule_tab.sql",
+        "0119_execution_worker_update_handoffs.sql",
       ],
     });
     await executeD1Sql(
@@ -285,9 +291,11 @@ describe("detached execution workers", () => {
        delete from briar_agent_transcript_sessions;
        delete from briar_hunt_events;
        delete from briar_hunt_runs;
+       delete from briar_channel_agent_reply_jobs;
        delete from briar_project_execution_worker_allowlist;
        delete from briar_project_execution_worker_policies;
        delete from briar_execution_worker_update_requests;
+       delete from briar_execution_worker_update_handoffs;
        delete from briar_execution_worker_credentials;
        delete from briar_execution_audit_events;
        delete from briar_project_agent_task_jobs;
@@ -581,6 +589,186 @@ describe("detached execution workers", () => {
       atMinute(4),
     );
     expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toBeNull();
+  });
+
+  it("atomically fences multiple active runs and resumes them without retry attempts", async () => {
+    const worker = await register("handoff", 1);
+    await updateExecutionWorkerConcurrency(
+      db,
+      worker.device.id,
+      2,
+      atMinute(1),
+    );
+    const runIds = await Promise.all([
+      recordHuntEvent(db, projectId, queuedEvent("handoff-one", 1)),
+      recordHuntEvent(db, projectId, queuedEvent("handoff-two", 1)),
+    ]);
+    const oldTokens = [fingerprint("handoff-old-one"), fingerprint("handoff-old-two")];
+    const claims = await Promise.all(
+      runIds.map((runId, index) =>
+        claimNextQueuedHuntRun(db, projectId, {
+          runId,
+          claimTokenHash: oldTokens[index],
+          claimedBy: worker.worker.label,
+          claimedAt: atMinute(2),
+          leaseExpiresAt: leaseExpiryFrom(atMinute(2)),
+          workerId: worker.worker.id,
+          workerDeviceId: worker.device.id,
+        }),
+      ),
+    );
+    expect(claims.every(Boolean)).toBe(true);
+    expect(await countExecutionWorkerDeviceSessions(db, worker.device.id, atMinute(3))).toBe(2);
+
+    const request = await requestExecutionWorkerUpdate(db, {
+      id: "77777777-7777-4777-8777-777777777778",
+      organizationId: projectId,
+      deviceId: worker.device.id,
+      requestedByUserId: "owner",
+      targetVersion: "2.0.0",
+      requestedAt: atMinute(3),
+    });
+    const handoffs = await Promise.all(
+      runIds.map((runId, index) =>
+        handoffExecutionWorkerClaim(db, {
+          requestId: request.id,
+          organizationId: projectId,
+          deviceId: worker.device.id,
+          projectId,
+          workerId: worker.worker.id,
+          workType: "issue",
+          workId: runId,
+          runId,
+          claimTokenHash: oldTokens[index],
+          metadata: {
+            conversationId: `conversation-${index}`,
+            workspacePath: `/tmp/handoff-${index}`,
+          },
+          observedAt: atMinute(4),
+        }),
+      ),
+    );
+    expect(handoffs.map((handoff) => handoff.outcome)).toEqual([
+      "handed_off",
+      "handed_off",
+    ]);
+    expect(await countExecutionWorkerDeviceSessions(db, worker.device.id, atMinute(4))).toBe(0);
+
+    const rows = await db
+      .prepare(
+        `select id, status, claim_token_hash, worker_id, claim_attempts,
+                planned_update_resume
+         from briar_hunt_runs where id in (?, ?)
+         order by id`,
+      )
+      .bind(...runIds)
+      .all<{
+        id: string;
+        status: string;
+        claim_token_hash: string | null;
+        worker_id: string | null;
+        claim_attempts: number;
+        planned_update_resume: number;
+      }>();
+    expect(rows.results).toEqual(
+      expect.arrayContaining(
+        runIds.map((id) => ({
+          id,
+          status: "queued",
+          claim_token_hash: null,
+          worker_id: null,
+          claim_attempts: 1,
+          planned_update_resume: 1,
+        })),
+      ),
+    );
+    expect(await latestExecutionWorkerUpdateHandoff(db, {
+      deviceId: worker.device.id,
+      workType: "issue",
+      workId: runIds[0],
+    })).toMatchObject({
+      requestId: request.id,
+      conversationId: "conversation-0",
+      workspacePath: "/tmp/handoff-0",
+    });
+    for (const [index, runId] of runIds.entries()) {
+      await expect(
+        renewHuntRunLease(db, projectId, {
+          runId,
+          claimTokenHash: oldTokens[index],
+          workerId: worker.worker.id,
+          observedAt: atMinute(5),
+        }),
+      ).rejects.toBeInstanceOf(WorkerConflictError);
+    }
+
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: worker.worker.id,
+      versions: { briar: "2.0.0" },
+      acceptingWork: true,
+      readinessState: "ready",
+      capabilities: {
+        providers: ["codex"],
+        remoteUpdates: { supported: true, protocol: 1 },
+      },
+      observedAt: atMinute(5),
+    });
+    await completeExecutionWorkerUpdates(db, worker.device.id, "2.0.0", atMinute(5));
+    expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toBeNull();
+
+    const resumed = await Promise.all(
+      runIds.map((runId, index) =>
+        claimNextQueuedHuntRun(db, projectId, {
+          runId,
+          claimTokenHash: fingerprint(`handoff-new-${index}`),
+          claimedBy: worker.worker.label,
+          claimedAt: atMinute(6),
+          leaseExpiresAt: leaseExpiryFrom(atMinute(6)),
+          workerId: worker.worker.id,
+          workerDeviceId: worker.device.id,
+        }),
+      ),
+    );
+    expect(resumed.map((run) => run?.claim_attempts)).toEqual([1, 1]);
+  });
+
+  it("records a handoff failure while keeping the update visible for retry", async () => {
+    const worker = await register("handoff-failed", 1);
+    const request = await requestExecutionWorkerUpdate(db, {
+      id: "77777777-7777-4777-8777-777777777779",
+      organizationId: projectId,
+      deviceId: worker.device.id,
+      requestedByUserId: "owner",
+      targetVersion: "2.0.0",
+      requestedAt: atMinute(2),
+    });
+    const workId = "88888888-8888-4888-8888-888888888888";
+    await failExecutionWorkerUpdateHandoff(db, {
+      requestId: request.id,
+      organizationId: projectId,
+      deviceId: worker.device.id,
+      projectId,
+      workerId: worker.worker.id,
+      workType: "issue",
+      workId,
+      runId: null,
+      claimTokenHash: fingerprint("failed-handoff"),
+      metadata: { workspacePath: "/tmp/failed-handoff" },
+      error: "provider process did not stop",
+      observedAt: atMinute(3),
+    });
+
+    expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toMatchObject({
+      id: request.id,
+      handoffState: "failed",
+      handoffError: "provider process did not stop",
+    });
+    expect(await db.prepare(
+      `select status, metadata_json from briar_execution_worker_update_handoffs
+       where update_request_id = ? and work_id = ?`
+    ).bind(request.id, workId).first()).toMatchObject({
+      status: "failed",
+    });
   });
 
   it("dispatches a queued issue to a selected Worker without an Agent", async () => {

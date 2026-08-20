@@ -8,6 +8,7 @@ export type WorkerUpdateDirective = {
   targetVersion: string;
   status: "requested";
   requestedAt: string;
+  handoffState?: "idle" | "draining" | "ready" | "failed";
 };
 
 export function supportsRemoteWorkerUpdates(

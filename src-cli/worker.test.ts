@@ -430,6 +430,74 @@ describe("briar worker loop", () => {
     expect(test.logs.some((line) => line.includes("lease renewal failed"))).toBe(true);
   });
 
+  it("hands an active provider to the next Worker during a planned update", async () => {
+    let heartbeatCount = 0;
+    let providerAborted = false;
+    const handoffs: Array<{
+      requestId: string;
+      conversationId: string | null | undefined;
+      workspacePath: string | null | undefined;
+    }> = [];
+    const test = harness([issue("issue-update")], {
+      heartbeat: async () => {
+        heartbeatCount += 1;
+        return heartbeatCount >= 2
+          ? {
+              acceptingWork: false,
+              updateDirective: {
+                id: "update-request",
+                targetVersion: "2.0.0",
+                status: "requested" as const,
+                requestedAt: new Date(0).toISOString(),
+                handoffState: "draining" as const,
+              },
+            }
+          : { acceptingWork: true };
+      },
+      runIssue: async (_claimed, signal, reportCheckpoint) => {
+        reportCheckpoint({
+          conversationId: "conversation-before-update",
+          workspacePath: "/tmp/worker-update-worktree",
+        });
+        await new Promise<void>((resolve) => {
+          if (signal.aborted) {
+            providerAborted = true;
+            resolve();
+            return;
+          }
+          signal.addEventListener("abort", () => {
+            providerAborted = true;
+            resolve();
+          }, { once: true });
+        });
+      },
+      handoff: async (_claimed, requestId, checkpoint) => {
+        handoffs.push({
+          requestId,
+          conversationId: checkpoint.conversationId,
+          workspacePath: checkpoint.workspacePath,
+        });
+      },
+    });
+
+    const result = await runWorkerLoop(test.dependencies, { once: true });
+
+    expect(result).toEqual({
+      processed: 0,
+      failures: 0,
+      stoppedBecause: "emptyQueue",
+    });
+    expect(providerAborted).toBe(true);
+    expect(handoffs).toEqual([{
+      requestId: "update-request",
+      conversationId: "conversation-before-update",
+      workspacePath: "/tmp/worker-update-worktree",
+    }]);
+    expect(test.logs).toContain(
+      "handed off issue-update for planned Worker update",
+    );
+  });
+
   it("does not wait out the renewal interval after an issue finishes", async () => {
     const test = harness([issue("issue-1"), issue("issue-2")]);
     await runWorkerLoop(test.dependencies, {
