@@ -110,6 +110,10 @@ import {
   isWebApp,
 } from "./lib/platform";
 import {
+  openProjectWindow,
+  readProjectWindowProjectId,
+} from "./lib/project-window";
+import {
   listenForBriarLinks,
   type BriarLinkTarget,
 } from "./lib/issue-links";
@@ -184,6 +188,7 @@ type AgentAutoHuntOptions = {
 
 export function App() {
   const { locale, t } = useI18n();
+  const [projectWindowProjectId] = useState(readProjectWindowProjectId);
   const autoHunt = useAutoHuntSessions();
   const [invitationToken, setInvitationToken] = useState(
     loadOrganizationInvitationToken,
@@ -194,6 +199,7 @@ export function App() {
   const scheduleSessionOptions = useMemo<UseBriarOptions>(() => ({
     adoptRemoteAgentSession: autoHunt.adoptRemoteSession,
     deferDefaultOrganization: true,
+    lockedProjectId: projectWindowProjectId,
     startScheduledAgentSession: (run) =>
       autoHunt.startTaskSession(run.projectId, run.agent.id, {
         agentName: run.agent.name,
@@ -224,6 +230,7 @@ export function App() {
     autoHunt.settleTaskSession,
     autoHunt.startTaskSession,
     autoHunt.startWorkerDispatchSession,
+    projectWindowProjectId,
   ]);
   const briar = useBriar(scheduleSessionOptions);
   const [organizationChannels, setOrganizationChannels] = useState<
@@ -467,6 +474,19 @@ export function App() {
     briar.token,
     inboxRealtime,
   );
+  const visibleInboxMessages = useMemo(
+    () =>
+      projectWindowProjectId
+        ? inbox.messages.filter(
+            (message) => message.projectId === projectWindowProjectId,
+          )
+        : inbox.messages,
+    [inbox.messages, projectWindowProjectId],
+  );
+  const visibleInboxUnreadCount = useMemo(
+    () => visibleInboxMessages.filter((message) => message.isUnread).length,
+    [visibleInboxMessages],
+  );
   const markInboxIssueRead = useCallback(
     (runId: string) => inbox.markIssueRead(runId),
     [inbox.markIssueRead],
@@ -480,7 +500,7 @@ export function App() {
     [inbox.messages],
   );
   useInboxNotifications(
-    briar.user?.id ?? null,
+    projectWindowProjectId ? null : (briar.user?.id ?? null),
     briar.activeOrganizationId,
     inbox.messages,
     inbox.notificationBaselineId,
@@ -488,17 +508,18 @@ export function App() {
     viewingIssueConversationRunId,
   );
   useEffect(() => {
+    if (projectWindowProjectId) return;
     void syncAppBadgeCount(inbox.unreadCount).catch(() => {
       // An unsupported desktop environment or Android launcher must not block the app.
     });
-  }, [inbox.unreadCount]);
+  }, [inbox.unreadCount, projectWindowProjectId]);
   const mobilePlatform = getMobilePlatform() ?? "android";
   const previewsLaunchIntro = isLaunchIntroPreview();
   const runsOnDesktopTauri = isDesktopTauri();
   const runsOnMacDesktop = isMacDesktopTauri();
   const runsOnWeb = isWebApp();
   useEffect(() => {
-    if (!runsOnMacDesktop) return;
+    if (!runsOnMacDesktop || projectWindowProjectId) return;
     const dashboard = briar.dashboard;
     if (!dashboard) return;
     const projectRuns: StatusTrayRun[] = dashboard.runs
@@ -521,9 +542,9 @@ export function App() {
       ...current.filter((run) => run.projectId !== dashboard.project.id),
       ...projectRuns,
     ]);
-  }, [briar.dashboard, runsOnMacDesktop]);
+  }, [briar.dashboard, projectWindowProjectId, runsOnMacDesktop]);
   useEffect(() => {
-    if (!runsOnMacDesktop) return;
+    if (!runsOnMacDesktop || projectWindowProjectId) return;
     const token = briar.token;
     const organizationId = briar.activeOrganizationId;
     if (!token || !organizationId) {
@@ -562,9 +583,14 @@ export function App() {
       request?.abort();
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [briar.activeOrganizationId, briar.token, runsOnMacDesktop]);
+  }, [
+    briar.activeOrganizationId,
+    briar.token,
+    projectWindowProjectId,
+    runsOnMacDesktop,
+  ]);
   useEffect(() => {
-    if (!runsOnMacDesktop) return;
+    if (!runsOnMacDesktop || projectWindowProjectId) return;
     const items = buildStatusTrayItems(
       statusTrayRuns,
       {
@@ -594,23 +620,25 @@ export function App() {
     });
   }, [
     locale,
+    projectWindowProjectId,
     runsOnMacDesktop,
     statusTrayRuns,
     t,
   ]);
   useEffect(() => {
-    if (!runsOnDesktopTauri) return;
+    if (!runsOnDesktopTauri || projectWindowProjectId) return;
     void import("@tauri-apps/api/core")
       .then(({ invoke }) => invoke("sync_execution_worker_labels"))
       .catch(() => {
         // Offline startup must not block the rest of the desktop app.
       });
-  }, [runsOnDesktopTauri]);
+  }, [projectWindowProjectId, runsOnDesktopTauri]);
   // Preview changes the timing, not the macOS presentation surface.
   const usesNativeLaunchIntro = isMacDesktopTauri();
   const [isLaunchIntroVisible, setIsLaunchIntroVisible] = useState(
     () =>
       !runsOnWeb &&
+      !projectWindowProjectId &&
       !usesNativeLaunchIntro &&
       (previewsLaunchIntro || shouldShowLaunchIntro()),
   );
@@ -715,6 +743,11 @@ export function App() {
   const openOrganizationChannel = useCallback(
     (channelId: string) => {
       if (!briar.activeOrganizationId) return;
+      if (
+        projectWindowProjectId &&
+        organizationChannels.find((channel) => channel.id === channelId)
+          ?.defaultProjectId !== projectWindowProjectId
+      ) return;
       startDesktopChannelTransition(channelId);
       setActiveChannelId(channelId);
       markOrganizationChannelRead(channelId);
@@ -724,6 +757,8 @@ export function App() {
       briar.activeOrganizationId,
       markOrganizationChannelRead,
       navigateToPage,
+      organizationChannels,
+      projectWindowProjectId,
     ],
   );
   const openOrganizationChannelSettings = useCallback(
@@ -766,7 +801,13 @@ export function App() {
     useState<InboxNotificationTarget | null>(null);
   const [inboxDetailTarget, setInboxDetailTarget] =
     useState<InboxNotificationTarget | null>(null);
-  useInboxNotificationClicks(setPendingInboxNotificationTarget);
+  const handleInboxNotificationClick = useCallback(
+    (target: InboxNotificationTarget) => {
+      if (!projectWindowProjectId) setPendingInboxNotificationTarget(target);
+    },
+    [projectWindowProjectId],
+  );
+  useInboxNotificationClicks(handleInboxNotificationClick);
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
   const [requestedRunInitialTab, setRequestedRunInitialTab] =
     useState<IssueDetailTab | null>(null);
@@ -798,11 +839,14 @@ export function App() {
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
   useEffect(
-    () => listenForBriarLinks(setPendingBriarLink),
-    [],
+    () =>
+      projectWindowProjectId
+        ? undefined
+        : listenForBriarLinks(setPendingBriarLink),
+    [projectWindowProjectId],
   );
   useEffect(() => {
-    if (!runsOnMacDesktop) return;
+    if (!runsOnMacDesktop || projectWindowProjectId) return;
     return listenForStatusTrayOpenRun((payload) => {
       setPendingBriarLink({
         kind: "issue",
@@ -810,7 +854,7 @@ export function App() {
         runId: payload.runId,
       });
     });
-  }, [runsOnMacDesktop]);
+  }, [projectWindowProjectId, runsOnMacDesktop]);
   useEffect(() => {
     if (!pendingBriarLink || !briar.user || briar.loading) return;
     if (pendingBriarLink.kind === "channel") {
@@ -978,13 +1022,44 @@ export function App() {
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
+  const projectWindowProject = projectWindowProjectId
+    ? briar.projects.find((project) => project.id === projectWindowProjectId) ?? null
+    : null;
   const activeOrganization = briar.organizations.find(
     (organization) => organization.id === briar.activeOrganizationId,
   );
-  const activeOrganizationProjects = briar.projects.filter(
-    (project) =>
-      project.organizationId === briar.activeOrganizationId ||
-      project.id === briar.activeProjectId,
+  const visibleProjects = projectWindowProjectId
+    ? projectWindowProject
+      ? [projectWindowProject]
+      : []
+    : briar.projects;
+  const activeOrganizationProjects = projectWindowProjectId
+    ? visibleProjects
+    : briar.projects.filter(
+        (project) =>
+          project.organizationId === briar.activeOrganizationId ||
+          project.id === briar.activeProjectId,
+      );
+  const visibleOrganizationChannels = projectWindowProjectId
+    ? organizationChannels.filter(
+        (channel) => channel.defaultProjectId === projectWindowProjectId,
+      )
+    : organizationChannels;
+  const visibleOrganizations = projectWindowProjectId
+    ? projectWindowProject?.organizationId
+      ? briar.organizations.filter(
+          (organization) =>
+            organization.id === projectWindowProject.organizationId,
+        )
+      : []
+    : briar.organizations;
+  const openProjectInNewWindow = useCallback(
+    async (projectId: string) => {
+      const project = briar.projects.find((candidate) => candidate.id === projectId);
+      if (!project) throw new Error("Project is no longer available.");
+      await openProjectWindow(project);
+    },
+    [briar.projects],
   );
   const requestedCompanionSession = briar.companionMode
     ? autoHunt.sessions.find(
@@ -1250,7 +1325,12 @@ export function App() {
   ]);
 
   useEffect(() => {
-    if (!runsOnDesktopTauri || !briar.token || plannedUpdateRecoveryRef.current) {
+    if (
+      !runsOnDesktopTauri ||
+      projectWindowProjectId ||
+      !briar.token ||
+      plannedUpdateRecoveryRef.current
+    ) {
       return;
     }
     const token = briar.token;
@@ -1304,6 +1384,7 @@ export function App() {
     autoHunt.startTaskSession,
     briar.token,
     dispatchAgentAutoHunt,
+    projectWindowProjectId,
     runsOnDesktopTauri,
   ]);
 
@@ -1351,7 +1432,7 @@ export function App() {
   ]);
 
   useEffect(() => {
-    if (!runsOnDesktopTauri) return;
+    if (!runsOnDesktopTauri || projectWindowProjectId) return;
     let cancelled = false;
 
     void import("@tauri-apps/api/core").then(async ({ invoke }) => {
@@ -1373,10 +1454,15 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [runsOnDesktopTauri, usesNativeLaunchIntro]);
+  }, [projectWindowProjectId, runsOnDesktopTauri, usesNativeLaunchIntro]);
 
   useEffect(() => {
-    if (!runsOnDesktopTauri || briar.companionMode || briar.loading) return;
+    if (
+      !runsOnDesktopTauri ||
+      projectWindowProjectId ||
+      briar.companionMode ||
+      briar.loading
+    ) return;
     const compact = shouldShowInitialOnboarding;
     if (!compact && !hasCompactedWindowForOnboarding.current) return;
     hasCompactedWindowForOnboarding.current = compact;
@@ -1391,6 +1477,7 @@ export function App() {
   }, [
     briar.companionMode,
     briar.loading,
+    projectWindowProjectId,
     runsOnDesktopTauri,
     shouldShowInitialOnboarding,
   ]);
@@ -1432,8 +1519,8 @@ export function App() {
           briar.setActiveProjectId(selection.projectId);
         }
       }}
-      organizations={briar.organizations}
-      projects={briar.projects}
+      organizations={visibleOrganizations}
+      projects={visibleProjects}
     />
   );
 
@@ -1578,7 +1665,7 @@ export function App() {
             : null
         }
         channelInboxSyncSignal={channelInboxSyncSignal}
-        channels={organizationChannels}
+        channels={visibleOrganizationChannels}
         currentUserId={briar.user?.id ?? null}
         inboxDetail
         onChannelSelect={setActiveChannelId}
@@ -1707,7 +1794,7 @@ export function App() {
             activeOrganizationId={briar.activeOrganizationId}
             activeProjectId={briar.activeProjectId}
             agents={issueAgents}
-            channels={organizationChannels}
+            channels={visibleOrganizationChannels}
             channelsLoading={channelsLoading}
             connectedProjectIds={briar.connectedProjectIds}
             isOpen={isSidebarOpen}
@@ -1760,6 +1847,11 @@ export function App() {
               setRequestedSessionId(null);
               resetNavigation("lobby");
             }}
+            onProjectOpenInNewWindow={
+              runsOnDesktopTauri && !projectWindowProjectId
+                ? openProjectInNewWindow
+                : undefined
+            }
             onProjectReadinessOpen={setRepositorySetupProjectId}
             onProjectSettings={(projectId) => {
               briar.setActiveProjectId(projectId);
@@ -1773,11 +1865,12 @@ export function App() {
             onSettings={openAppSettings}
             onLogout={() => void briar.logout()}
             organizations={briar.organizations}
-            projects={briar.projects}
+            projects={visibleProjects}
             projectReadiness={briar.projectReadiness}
+            projectWindowProjectId={projectWindowProjectId}
             sessions={autoHunt.sessions}
             token={briar.token}
-            unreadInboxCount={inbox.unreadCount}
+            unreadInboxCount={visibleInboxUnreadCount}
             user={briar.user}
           />
         ) : null}
@@ -1881,7 +1974,7 @@ export function App() {
             onLogoChange={briar.changeOrganizationLogo}
             onRename={briar.renameOrganization}
             connectedProjectIds={briar.connectedProjectIds}
-            projects={briar.projects}
+            projects={visibleProjects}
             token={briar.token ?? ""}
             userId={briar.user.id}
           />
@@ -1897,8 +1990,16 @@ export function App() {
           >
             <Inbox
               isSidebarOpen={isSidebarOpen}
-              messages={inbox.messages}
-              onMarkAllRead={inbox.markAllRead}
+              messages={visibleInboxMessages}
+              onMarkAllRead={
+                projectWindowProjectId
+                  ? () => {
+                      for (const message of visibleInboxMessages) {
+                        if (message.isUnread) inbox.markRead(message.id);
+                      }
+                    }
+                  : inbox.markAllRead
+              }
               onMarkRead={inbox.markRead}
               onOpen={(message) => {
                 const target = inboxNotificationTarget(message);
@@ -1922,7 +2023,7 @@ export function App() {
                 setInboxDetailTarget(target);
               }}
               projects={activeOrganizationProjects}
-              unreadCount={inbox.unreadCount}
+              unreadCount={visibleInboxUnreadCount}
             />
             <div
               aria-label={t("inbox.resizeDetailPane")}
@@ -2100,7 +2201,7 @@ export function App() {
                 : null
             }
             channelInboxSyncSignal={channelInboxSyncSignal}
-            channels={organizationChannels}
+            channels={visibleOrganizationChannels}
             projects={activeOrganizationProjects}
             currentUserId={briar.user?.id ?? null}
             onChannelSelect={setActiveChannelId}

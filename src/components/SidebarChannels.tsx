@@ -315,6 +315,7 @@ export function SidebarProjectChannels({
   projectId,
   projectName,
   organizationRole,
+  topLevel = false,
 }: {
   activeChannelId?: string | null;
   activePage: SidebarChannelPage;
@@ -327,6 +328,7 @@ export function SidebarProjectChannels({
   projectId: string;
   projectName: string;
   organizationRole?: OrganizationRole | null;
+  topLevel?: boolean;
 }) {
   const { t } = useI18n();
   const projectChannels = useMemo(
@@ -344,7 +346,11 @@ export function SidebarProjectChannels({
 
   const listId = `project-channel-list-${projectId}`;
   return (
-    <div className="sidebar-project-channels">
+    <div
+      className={`sidebar-project-channels${
+        topLevel ? " sidebar-project-channels-top-level" : ""
+      }`}
+    >
       <button
         aria-controls={listId}
         aria-expanded={expanded}

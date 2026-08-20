@@ -92,6 +92,33 @@ describe("active organization persistence", () => {
     });
   });
 
+  it("locks a project window to its requested project regardless of stored selection", () => {
+    writeActiveOrganizationId("user-1", "organization-1");
+
+    expect(
+      resolveActiveAccountSelection(
+        "user-1",
+        organizations,
+        projects,
+        "project-2",
+      ),
+    ).toEqual({
+      activeOrganizationId: "organization-2",
+      activeProjectId: "project-2",
+    });
+  });
+
+  it("does not fall through to another project when a locked project is unavailable", () => {
+    expect(
+      resolveActiveAccountSelection(
+        "user-1",
+        organizations,
+        projects,
+        "removed-project",
+      ),
+    ).toEqual({ activeOrganizationId: null, activeProjectId: null });
+  });
+
   it("keeps working when local storage is unavailable", () => {
     const getItem = vi
       .spyOn(window.localStorage, "getItem")

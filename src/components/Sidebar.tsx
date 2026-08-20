@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Check,
   Ellipsis,
+  ExternalLink,
   Inbox,
   LogOut,
   Plus,
@@ -40,6 +41,7 @@ import {
   SidebarProjectChannels,
 } from "./SidebarChannels";
 import { UpdateControl } from "./UpdateControl";
+import { useToast } from "./ui/toast";
 
 type SidebarPage =
   | "issues"
@@ -80,6 +82,7 @@ export function Sidebar({
   onAddOrganization,
   onOrganizationChange,
   onProjectChange,
+  onProjectOpenInNewWindow,
   onProjectReadinessOpen,
   onProjectSettings,
   onSettings,
@@ -87,6 +90,7 @@ export function Sidebar({
   organizations,
   projects,
   projectReadiness,
+  projectWindowProjectId = null,
   sessions,
   token,
   unreadInboxCount,
@@ -119,6 +123,7 @@ export function Sidebar({
   onAddOrganization: () => void;
   onOrganizationChange: (organizationId: string) => void;
   onProjectChange: (projectId: string) => void;
+  onProjectOpenInNewWindow?: (projectId: string) => Promise<void>;
   onProjectReadinessOpen: (projectId: string) => void;
   onProjectSettings: (projectId: string) => void;
   onSettings: () => void;
@@ -126,12 +131,14 @@ export function Sidebar({
   organizations: Organization[];
   projects: Project[];
   projectReadiness: Record<string, RepositoryReadiness>;
+  projectWindowProjectId?: string | null;
   sessions: AutoHuntSession[];
   token: string | null;
   unreadInboxCount: number;
   user: SessionUser;
 }) {
   const { locale, setLocale, t } = useI18n();
+  const { toast } = useToast();
   const [isOrganizationMenuOpen, setIsOrganizationMenuOpen] = useState(false);
   const organizationMenuRef = useRef<HTMLDivElement | null>(null);
   // Projects start expanded; only explicitly collapsed IDs are stored.
@@ -261,6 +268,12 @@ export function Sidebar({
   ];
   const activeOrganization =
     organizations.find(
+      (organization) =>
+        organization.id ===
+        projects.find((project) => project.id === projectWindowProjectId)
+          ?.organizationId,
+    ) ??
+    organizations.find(
       (organization) => organization.id === activeOrganizationId,
     ) ??
     organizations.find(
@@ -271,6 +284,10 @@ export function Sidebar({
     ) ??
     organizations[0] ??
     null;
+  const isProjectWindow = Boolean(projectWindowProjectId);
+  const projectWindowProject = isProjectWindow
+    ? projects.find((project) => project.id === projectWindowProjectId) ?? null
+    : null;
   const visibleProjects = activeOrganization
     ? projects.filter(
         (project) => project.organizationId === activeOrganization.id,
@@ -332,16 +349,38 @@ export function Sidebar({
   return (
     <aside
       aria-hidden={!isOpen}
-      className={`sidebar${isOpen ? "" : " sidebar-collapsed"}`}
+      className={`sidebar${isProjectWindow ? " sidebar-project-window" : ""}${
+        isOpen ? "" : " sidebar-collapsed"
+      }`}
       inert={!isOpen ? true : undefined}
       id="app-sidebar"
     >
       <div className="sidebar-toolbar" data-tauri-drag-region />
 
-      <div
-        className="sidebar-organization-switcher"
-        ref={organizationMenuRef}
-      >
+      {isProjectWindow ? (
+        <button
+          aria-label={
+            projectWindowProject
+              ? t("sidebar.openProjectHome", { name: projectWindowProject.name })
+              : t("sidebar.projectUnavailable")
+          }
+          className="sidebar-project-window-brand"
+          disabled={!projectWindowProject}
+          onClick={onLobbyOpen}
+          type="button"
+        >
+          {projectWindowProject ? (
+            <ProjectIcon className="size-5" project={projectWindowProject} />
+          ) : null}
+          <span>
+            {projectWindowProject?.name ?? t("sidebar.projectUnavailable")}
+          </span>
+        </button>
+      ) : (
+        <div
+          className="sidebar-organization-switcher"
+          ref={organizationMenuRef}
+        >
         <button
           aria-expanded={isOrganizationMenuOpen}
           aria-haspopup="menu"
@@ -441,7 +480,8 @@ export function Sidebar({
             </button>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       <nav aria-label={t("sidebar.mainMenu")} className="sidebar-primary-nav">
         <a
@@ -462,7 +502,22 @@ export function Sidebar({
             />
           )}
         </a>
-        {onChannelOpen ? (
+        {isProjectWindow && projectWindowProject && onChannelOpen ? (
+          <SidebarProjectChannels
+            activeChannelId={activeChannelId}
+            activePage={activePage}
+            channels={catalog}
+            channelsLoading={channelsLoading}
+            currentUserId={user.id}
+            onDeleteChannel={onChannelDelete}
+            onOpen={onChannelOpen}
+            onSettings={onChannelSettings}
+            organizationRole={organizationRole}
+            projectId={projectWindowProject.id}
+            projectName={projectWindowProject.name}
+            topLevel
+          />
+        ) : !isProjectWindow && onChannelOpen ? (
           <SidebarOrganizationChannels
             activeChannelId={activeChannelId}
             activePage={activePage}
@@ -478,6 +533,127 @@ export function Sidebar({
         ) : null}
       </nav>
 
+      {projectWindowProject ? (
+        <div className="sidebar-projects sidebar-project-window-tabs">
+          <div className="sidebar-project-list">
+            <div className="sidebar-project-views">
+              <div className="sidebar-project-view-row">
+                <a
+                  aria-current={activePage === "issues" ? "page" : undefined}
+                  className={`sidebar-project-view${
+                    activePage === "issues" ? " active" : ""
+                  }`}
+                  href="#issues"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onIssuesOpen();
+                  }}
+                >
+                  <Activity size={14} strokeWidth={1.7} />
+                  <span>{t("sidebar.issues")}</span>
+                </a>
+                <button
+                  aria-label={t("dashboard.createIssue")}
+                  className="sidebar-issue-add"
+                  onClick={() => onCreateIssue(projectWindowProject.id)}
+                  title={t("dashboard.createIssue")}
+                  type="button"
+                >
+                  <Plus aria-hidden="true" size={16} strokeWidth={1.7} />
+                </button>
+              </div>
+              <div className="sidebar-agent-navigation">
+                <a
+                  aria-current={activePage === "agents" ? "page" : undefined}
+                  className={`sidebar-project-view${
+                    activePage === "agents" ? " active" : ""
+                  }`}
+                  href="#agents"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onAgentsOpen();
+                  }}
+                >
+                  <Bot size={14} strokeWidth={1.7} />
+                  <span>{t("sidebar.agents")}</span>
+                </a>
+                {(runningAgentSessionsByProjectId.get(projectWindowProject.id) ?? [])
+                  .length > 0 ? (
+                  <div
+                    aria-label={t("sidebar.runningAgentSessions")}
+                    className="sidebar-agent-sessions"
+                  >
+                    {(runningAgentSessionsByProjectId.get(projectWindowProject.id) ?? [])
+                      .map(({ agent, session }) => {
+                        const title = agentSessionTitle(
+                          session,
+                          t("sidebar.untitledAgentSession"),
+                        );
+                        return (
+                          <button
+                            aria-label={t("sidebar.openAgentSession", { title })}
+                            className="sidebar-agent-session"
+                            key={session.id}
+                            onClick={() => onAgentSessionOpen(session.id)}
+                            title={title}
+                            type="button"
+                          >
+                            {agent ? (
+                              <ProjectAgentAvatar
+                                agent={agent}
+                                isRunning
+                                token={token}
+                              />
+                            ) : (
+                              <span
+                                aria-hidden="true"
+                                className="project-agent-avatar"
+                              >
+                                <Bot size={19} />
+                              </span>
+                            )}
+                            <span>
+                              <strong>{title}</strong>
+                              <small>
+                                <i aria-hidden="true" />
+                                {agent?.name ?? t("agents.title")}
+                              </small>
+                            </span>
+                            <ChevronRight
+                              aria-hidden="true"
+                              size={13}
+                              strokeWidth={1.8}
+                            />
+                          </button>
+                        );
+                      })}
+                  </div>
+                ) : null}
+              </div>
+              {isProjectScheduleTabEnabled(projectWindowProject) ? (
+                <a
+                  aria-current={activePage === "schedule" ? "page" : undefined}
+                  className={`sidebar-project-view${
+                    activePage === "schedule" ? " active" : ""
+                  }`}
+                  href="#schedule"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onScheduleOpen();
+                  }}
+                >
+                  <CalendarDays size={14} strokeWidth={1.7} />
+                  <span>{t("sidebar.schedule")}</span>
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : isProjectWindow ? (
+        <div className="sidebar-project-window-empty">
+          <p>{t("sidebar.projectUnavailableDescription")}</p>
+        </div>
+      ) : (
       <div className="sidebar-projects">
         <div className="sidebar-section-heading">
           <span>{t("sidebar.projects")}</span>
@@ -592,12 +768,30 @@ export function Sidebar({
                       ref={menuRef}
                       role="menu"
                     >
+                      {onProjectOpenInNewWindow ? (
+                        <button
+                          onClick={() => {
+                            setOpenProjectMenuId(null);
+                            void onProjectOpenInNewWindow(project.id).catch(() => {
+                              toast(t("sidebar.projectWindowOpenFailed"), {
+                                tone: "error",
+                              });
+                            });
+                          }}
+                          ref={menuItemRef}
+                          role="menuitem"
+                          type="button"
+                        >
+                          <ExternalLink size={16} strokeWidth={1.7} />
+                          <span>{t("sidebar.openProjectInNewWindow")}</span>
+                        </button>
+                      ) : null}
                       <button
                         onClick={() => {
                           setOpenProjectMenuId(null);
                           onProjectSettings(project.id);
                         }}
-                        ref={menuItemRef}
+                        ref={onProjectOpenInNewWindow ? undefined : menuItemRef}
                         role="menuitem"
                         type="button"
                       >
@@ -754,6 +948,7 @@ export function Sidebar({
           })}
         </div>
       </div>
+      )}
 
       <div className="sidebar-bottom">
         <div className="sidebar-footer-row">

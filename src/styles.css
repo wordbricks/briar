@@ -368,6 +368,13 @@ body { overflow: hidden; font-synthesis: none; }
 .window-navigation-button:focus-visible { outline:2px solid #8b70dd; outline-offset:2px; }
 .window-navigation-button:disabled { color:rgba(105,106,101,.28); cursor:default; }
 .sidebar-organization-switcher { height:42px; flex:0 0 42px; position:relative; display:flex; align-items:center; }
+.sidebar-project-window-brand { width:calc(100% - 20px); height:42px; flex:0 0 42px; margin:0 10px; padding:0 8px; display:flex; align-items:center; gap:9px; border:0; border-radius:9px; color:#373833; background:transparent; cursor:pointer; text-align:left; }
+.sidebar-project-window-brand:hover:not(:disabled) { background:rgba(44,45,41,.065); }
+.sidebar-project-window-brand:active:not(:disabled) { transform:scale(.985); }
+.sidebar-project-window-brand:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
+.sidebar-project-window-brand:disabled { cursor:default; }
+.sidebar-project-window-brand > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--text-md); font-weight:700; letter-spacing:-.25px; }
+.sidebar-project-window-brand > img,.sidebar-project-window-brand > svg { flex:0 0 auto; }
 .sidebar-brand { width:calc(100% - 20px); height:34px; margin:0 10px; padding:0 7px; display:flex; align-items:center; gap:5px; border:0; border-radius:8px; color:#373833; background:transparent; cursor:pointer; font-size:var(--text-md); font-weight:700; letter-spacing:-.25px; text-align:left; }
 .sidebar-brand:hover,.sidebar-brand[aria-expanded="true"] { background:rgba(44,45,41,.065); }
 .sidebar-brand:active { transform:scale(.985); }
@@ -413,6 +420,9 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-project-channels-toggle { padding:0 10px 0 36px; height:34px; gap:8px; font-size:var(--text-sm); font-weight:400; }
 .sidebar-project-channel-list button { padding-left:52px; }
 .sidebar-project-channel-list > p { margin-left:52px; }
+.sidebar-project-channels-top-level .sidebar-project-channels-toggle { padding:0 10px; gap:10px; font-weight:500; }
+.sidebar-project-channels-top-level .sidebar-project-channel-list button { padding-left:36px; }
+.sidebar-project-channels-top-level .sidebar-project-channel-list > p { margin-left:36px; }
 .sidebar-channel-context-menu { min-width:174px; z-index:80; padding:5px; border:1px solid var(--border); border-radius:11px; color:var(--popover-foreground); background:color-mix(in srgb,var(--popover) 98%,transparent); box-shadow:0 16px 45px rgba(0,0,0,.22); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); animation:sidebar-menu-in .12s cubic-bezier(.2,.8,.2,1); }
 .sidebar-channel-context-menu-item { height:34px; padding:0 9px; display:flex; align-items:center; gap:9px; border-radius:7px; outline:0; cursor:pointer; font-size:var(--text-xs); }
 .sidebar-channel-context-menu-item[data-highlighted] { color:var(--accent-foreground); background:var(--accent); }
@@ -458,6 +468,12 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-section-heading button:active { transform: scale(.95); }
 .sidebar-section-heading button:focus-visible, .sidebar-project-heading:focus-visible, .sidebar-project-toggle:focus-visible, .sidebar-project-menu-trigger:focus-visible, .sidebar-project-view:focus-visible, .sidebar-agent-session:focus-visible, .sidebar-issue-add:focus-visible { outline: 2px solid #8b70dd; outline-offset: -1px; }
 .sidebar-project-list { min-height: 0; padding: 0 10px 16px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(82,83,77,.2) transparent; }
+.sidebar-project-window-tabs { padding-top:2px; }
+.sidebar-project-window-tabs .sidebar-project-list { padding-top:0; }
+.sidebar-project-window-tabs .sidebar-project-view { padding-left:20px; }
+.sidebar-project-window-tabs .sidebar-agent-session { padding-left:29px; }
+.sidebar-project-window-empty { min-height:0; flex:1; padding:18px 20px; color:var(--muted-foreground); font-size:var(--text-xs); line-height:1.55; }
+.sidebar-project-window-empty p { margin:0; }
 .organization-settings-layout { min-width:0; flex:1; height:100%; display:flex; background:#f7f7f6; }
 .organization-settings-sidebar { width:252px; flex:0 0 252px; height:100%; display:flex; flex-direction:column; border-right:1px solid rgba(56,57,52,.09); background:#f1f1f0; }
 .organization-settings-sidebar.organization-settings-sidebar-collapsed { width:0; flex-basis:0; overflow:hidden; border-right-width:0; }
