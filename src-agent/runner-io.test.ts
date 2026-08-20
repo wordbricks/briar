@@ -1,9 +1,16 @@
 import { PassThrough } from "node:stream";
+import * as Schema from "effect/Schema";
 import { describe, expect, it, vi } from "vitest";
 import { createRunnerIo } from "./runner-io";
 
 type TestRequest = { type: "run"; message: string };
 type TestOutput = { type: "result"; message: string };
+
+const TestRequest = Schema.Struct({
+  type: Schema.Literal("run"),
+  message: Schema.String,
+});
+const decodeTestRequest = Schema.decodeUnknownResult(TestRequest);
 
 function testIo(onClose = vi.fn()) {
   const input = new PassThrough();
@@ -15,6 +22,7 @@ function testIo(onClose = vi.fn()) {
   });
   const io = createRunnerIo<TestRequest, TestOutput>({
     closeError: "input closed",
+    decodeRequest: decodeTestRequest,
     input,
     onClose,
     output,
@@ -79,6 +87,40 @@ describe("runner JSON-lines I/O", () => {
     input.write("{not-json}\n");
 
     await expect(io.request).rejects.toBeInstanceOf(SyntaxError);
+    io.close();
+  });
+
+  it("rejects a run request that does not match its provider schema", async () => {
+    const { input, io } = testIo();
+    input.write(`${JSON.stringify({ type: "run", message: 42 })}\n`);
+
+    const error = await io.request.catch((cause) => cause);
+    expect(Schema.isSchemaError(error)).toBe(true);
+    io.close();
+  });
+
+  it("does not approve a truthy non-boolean response", async () => {
+    const { input, io } = testIo();
+    await beginRun(input, io.request);
+    let settled = false;
+    const approval = io.waitForApproval("approval-1").finally(() => {
+      settled = true;
+    });
+
+    input.write(`${JSON.stringify({
+      type: "approvalResponse",
+      id: "approval-1",
+      approved: "true",
+    })}\n`);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(settled).toBe(false);
+
+    input.write(`${JSON.stringify({
+      type: "approvalResponse",
+      id: "approval-1",
+      approved: true,
+    })}\n`);
+    await expect(approval).resolves.toBe(true);
     io.close();
   });
 

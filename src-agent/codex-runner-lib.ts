@@ -1,4 +1,4 @@
-import type { AgentAttachment } from "./runner-attachments";
+import * as Schema from "effect/Schema";
 import type { JsonRpcMessage } from "./json-rpc-message";
 import {
   normalizedActivityText,
@@ -7,6 +7,10 @@ import {
   type AgentActivityStatus,
   type NormalizedAgentEvent,
 } from "./normalized-agent-event";
+import {
+  commonRunnerRequestFields,
+  runnerRequestDecoderOptions,
+} from "./runner-request";
 
 export type {
   AgentActivityKind,
@@ -14,22 +18,19 @@ export type {
   NormalizedAgentEvent,
 } from "./normalized-agent-event";
 
-export type CodexRunnerRequest = {
-  type: "run";
-  message: string;
-  workspaceRoot: string;
-  conversationId?: string | null;
-  instructions?: string | null;
-  outputSchema?: Record<string, unknown> | boolean | null;
-  model?: string | null;
-  effort?: string | null;
-  approvalPolicy: "untrusted" | "on-request" | "never";
-  sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
-  networkAccess: boolean;
-  externalTools?: boolean;
-  attachments?: AgentAttachment[];
-  codexBinary: string;
-};
+export const CodexRunnerRequest = Schema.Struct({
+  ...commonRunnerRequestFields,
+  effort: Schema.optional(Schema.NullOr(Schema.String)),
+  externalTools: Schema.optional(Schema.Boolean),
+  codexBinary: Schema.String,
+});
+
+export type CodexRunnerRequest = typeof CodexRunnerRequest.Type;
+
+export const decodeCodexRunnerRequest = Schema.decodeUnknownResult(
+  CodexRunnerRequest,
+  runnerRequestDecoderOptions,
+);
 
 export type CodexRunnerOutput =
   | {

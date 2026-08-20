@@ -3,6 +3,7 @@ import {
   BRIAR_OAUTH_REFERRER,
   buildGrokPromptParts,
   createGrokEventState,
+  decodeGrokRunnerRequest,
   finalizeGrokMessage,
   GROK_OAUTH2_REFERRER_ENV,
   grokSessionMeta,
@@ -423,6 +424,7 @@ async function main(runnerIo: GrokRunnerIo) {
 export async function runGrokRunner() {
   const runnerIo = createRunnerIo<GrokRunnerRequest, GrokRunnerOutput>({
     closeError: "Briar closed the Grok runner input.",
+    decodeRequest: decodeGrokRunnerRequest,
   });
   const { emit } = runnerIo;
   try {

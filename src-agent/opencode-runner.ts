@@ -12,6 +12,7 @@ import {
   buildOpenCodeParts,
   completeOpenCodeMessages,
   createOpenCodeEventState,
+  decodeOpenCodeRunnerRequest,
   isOpenCodeWritePermission,
   mapEffortToOpenCode,
   normalizeOpenCodeEvent,
@@ -428,6 +429,7 @@ async function main(runnerIo: OpenCodeRunnerIo) {
 export async function runOpenCodeRunner() {
   const runnerIo = createRunnerIo<OpenCodeRunnerRequest, OpenCodeRunnerOutput>({
     closeError: "Briar closed the OpenCode runner input.",
+    decodeRequest: decodeOpenCodeRunnerRequest,
   });
   const { emit } = runnerIo;
   try {

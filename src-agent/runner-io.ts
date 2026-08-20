@@ -1,12 +1,13 @@
 import { createInterface } from "node:readline";
+import * as Option from "effect/Option";
+import * as Result from "effect/Result";
+import type { SchemaError } from "effect/Schema";
+import {
+  decodeApprovalResponse,
+  isRunRequestEnvelope,
+} from "./runner-control-message";
 
 type RunRequest = { type: "run" };
-
-type ApprovalResponse = {
-  type: "approvalResponse";
-  id: string;
-  approved: boolean;
-};
 
 type PendingApproval = {
   abort?: () => void;
@@ -14,8 +15,9 @@ type PendingApproval = {
   resolve: (approved: boolean) => void;
 };
 
-export type RunnerIoOptions = {
+export type RunnerIoOptions<Request> = {
   closeError: string;
+  decodeRequest: (input: unknown) => Result.Result<Request, SchemaError>;
   input?: NodeJS.ReadableStream;
   onClose?: () => void;
   output?: Pick<NodeJS.WritableStream, "write">;
@@ -28,10 +30,11 @@ export type RunnerIoOptions = {
  */
 export function createRunnerIo<Request extends RunRequest, Output>({
   closeError,
+  decodeRequest,
   input = process.stdin,
   onClose,
   output = process.stdout,
-}: RunnerIoOptions) {
+}: RunnerIoOptions<Request>) {
   const lines = createInterface({ input, crlfDelay: Infinity });
   let resolveRequest: ((request: Request) => void) | undefined;
   let rejectRequest: ((error: Error) => void) | undefined;
@@ -52,22 +55,33 @@ export function createRunnerIo<Request extends RunRequest, Output>({
   }
 
   lines.on("line", (line) => {
+    let message: unknown;
     try {
-      const message = JSON.parse(line) as Request | ApprovalResponse;
-      if (message.type === "run") {
-        resolveRequest?.(message);
-        resolveRequest = undefined;
-        rejectRequest = undefined;
-        return;
-      }
-      if (message.type === "approvalResponse") {
-        settleApproval(message.id, message.approved);
-      }
+      message = JSON.parse(line);
     } catch (caught) {
       rejectRequest?.(
         caught instanceof Error ? caught : new Error(String(caught)),
       );
+      return;
     }
+
+    const approval = decodeApprovalResponse(message);
+    if (Option.isSome(approval)) {
+      settleApproval(approval.value.id, approval.value.approved);
+      return;
+    }
+    // Invalid approval payloads stay pending so a subsequent valid response,
+    // abort, or channel close can settle them without ever granting approval.
+    if (!isRunRequestEnvelope(message)) return;
+
+    const decoded = decodeRequest(message);
+    if (Result.isFailure(decoded)) {
+      rejectRequest?.(decoded.failure);
+    } else {
+      resolveRequest?.(decoded.success);
+    }
+    resolveRequest = undefined;
+    rejectRequest = undefined;
   });
 
   lines.on("close", () => {

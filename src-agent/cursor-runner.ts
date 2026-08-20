@@ -3,6 +3,7 @@ import { AcpJsonRpcConnection, type AcpJsonRpcMessage } from "./acp-json-rpc";
 import {
   buildCursorPromptParts,
   createCursorEventState,
+  decodeCursorRunnerRequest,
   cursorPermissionDecisionResult,
   cursorPermissionInput,
   cursorPermissionOptions,
@@ -375,6 +376,7 @@ async function main(runnerIo: CursorRunnerIo) {
 export async function runCursorRunner() {
   const runnerIo = createRunnerIo<CursorRunnerRequest, CursorRunnerOutput>({
     closeError: "Briar closed the Cursor runner input.",
+    decodeRequest: decodeCursorRunnerRequest,
   });
   try {
     await main(runnerIo);

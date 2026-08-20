@@ -5,8 +5,8 @@ import type {
   SDKMessage,
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import * as Schema from "effect/Schema";
 import { parse, resolve } from "node:path";
-import type { AgentAttachment } from "./runner-attachments";
 import {
   normalizedActivityText,
   normalizedActivityTitle,
@@ -14,6 +14,10 @@ import {
   type NormalizedAgentEvent,
 } from "./normalized-agent-event";
 import { readAgentImage } from "./runner-attachments";
+import {
+  commonRunnerRequestFields,
+  runnerRequestDecoderOptions,
+} from "./runner-request";
 
 export type {
   AgentActivityKind,
@@ -21,23 +25,22 @@ export type {
   NormalizedAgentEvent,
 } from "./normalized-agent-event";
 
-export type ClaudeRunnerRequest = {
-  type: "run";
-  message: string;
-  workspaceRoot: string;
-  conversationId?: string | null;
-  instructions?: string | null;
-  outputSchema?: Record<string, unknown> | boolean | null;
-  model?: string | null;
-  effort?: string | null;
-  approvalPolicy: "untrusted" | "on-request" | "never";
-  sandboxMode: "readOnly" | "workspaceWrite" | "dangerFullAccess";
-  networkAccess: boolean;
-  attachments?: AgentAttachment[];
+export const ClaudeRunnerRequest = Schema.Struct({
+  ...commonRunnerRequestFields,
+  effort: Schema.optional(Schema.NullOr(Schema.String)),
   /** Directories outside cwd the agent may write in (Auto Hunt worktrees). */
-  additionalDirectories?: string[];
-  claudeBinary: string;
-};
+  additionalDirectories: Schema.optional(
+    Schema.mutable(Schema.Array(Schema.String)),
+  ),
+  claudeBinary: Schema.String,
+});
+
+export type ClaudeRunnerRequest = typeof ClaudeRunnerRequest.Type;
+
+export const decodeClaudeRunnerRequest = Schema.decodeUnknownResult(
+  ClaudeRunnerRequest,
+  runnerRequestDecoderOptions,
+);
 
 export type ClaudeEventState = {
   activeMessageId: string | null;

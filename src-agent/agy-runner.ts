@@ -8,6 +8,7 @@ import {
   agyFinalMessage,
   agyEnvironment,
   createAgyEventState,
+  decodeAgyRunnerRequest,
   normalizeAgyEvent,
   type AgyRunnerOutput,
   type AgyRunnerRequest,
@@ -128,6 +129,7 @@ async function main(io: AgyRunnerIo) {
 let activeChild: ChildProcessWithoutNullStreams | null = null;
 const io = createRunnerIo<AgyRunnerRequest, AgyRunnerOutput>({
   closeError: "Antigravity runner 입력이 요청 전에 닫혔습니다.",
+  decodeRequest: decodeAgyRunnerRequest,
   onClose: () => stop(activeChild),
 });
 
