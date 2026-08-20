@@ -173,7 +173,7 @@ describe("ChannelMessageText", () => {
       "visually distinct",
     );
     expect(
-      markdown?.querySelector(".channel-message-table-wrap table th")
+      markdown?.querySelector(".markdown-table-wrap table th")
         ?.textContent,
     ).toBe("Name");
   });

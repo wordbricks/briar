@@ -1690,7 +1690,7 @@ body { overflow: hidden; font-synthesis: none; }
 .completed-issue-summary h1 { font-size:var(--text-base); }
 .completed-issue-summary h2 { padding-bottom:.35em; border-bottom:1px solid color-mix(in srgb,#4baa86 28%,var(--border)); font-size:var(--text-sm); }
 .completed-issue-summary h3,.completed-issue-summary h4 { font-size:var(--text-xs); }
-.completed-issue-summary p,.completed-issue-summary ul,.completed-issue-summary ol,.completed-issue-summary blockquote,.completed-issue-summary pre,.completed-issue-summary table { margin:.65em 0; }
+.completed-issue-summary p,.completed-issue-summary ul,.completed-issue-summary ol,.completed-issue-summary blockquote,.completed-issue-summary pre { margin:.65em 0; }
 .completed-issue-summary ul { list-style:disc; }
 .completed-issue-summary ol { list-style:decimal; }
 .completed-issue-summary ul,.completed-issue-summary ol { padding-left:1.5em; }
@@ -1905,6 +1905,35 @@ button.run-manual-qa-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-description-scroll .issue-description-inline-editor .issue-description-input::placeholder { color:var(--muted-foreground); -webkit-text-fill-color:var(--muted-foreground); }
 .issue-description-scroll .issue-description-inline-editor .issue-inline-attachment { margin:8px 0; }
 .issue-description-scroll .issue-description-inline-editor .issue-inline-attachment img { max-height:min(520px,62vh); }
+.markdown-content { min-width:0; max-width:100%; color:var(--foreground); overflow-wrap:anywhere; }
+.markdown-content > :first-child { margin-top:0; }
+.markdown-content > :last-child { margin-bottom:0; }
+.markdown-content h1,.markdown-content h2,.markdown-content h3,.markdown-content h4 { margin:1.3em 0 .55em; color:var(--foreground); line-height:1.3; letter-spacing:-.018em; }
+.markdown-content h1 { font-size:var(--text-md); }
+.markdown-content h2 { padding-bottom:.35em; border-bottom:1px solid var(--border); font-size:var(--text-base); }
+.markdown-content h3,.markdown-content h4 { font-size:var(--text-xs); }
+.markdown-content p { margin:0; overflow-wrap:anywhere; }
+.markdown-content p + p { margin-top:.7em; }
+.markdown-content a:not(.conversation-mention-button) { color:var(--accent-foreground,#4a3594); text-decoration:underline; text-decoration-thickness:.08em; text-underline-offset:2px; overflow-wrap:anywhere; }
+.markdown-content a:not(.conversation-mention-button):hover { color:var(--primary-hover,#1f1717); }
+.markdown-content a:not(.conversation-mention-button):focus-visible { border-radius:3px; outline:2px solid var(--ring); outline-offset:2px; }
+.markdown-content code { padding:.14em .38em; border:1px solid var(--border); border-radius:5px; color:var(--accent-foreground); background:var(--accent); font:500 .92em var(--font-mono,"DM Mono",ui-monospace,monospace); overflow-wrap:anywhere; }
+.markdown-content pre { max-width:100%; margin:.75em 0; overflow-x:auto; padding:12px 14px; border:1px solid var(--border); border-radius:9px; color:var(--foreground); background:var(--muted); font:var(--text-xs)/1.55 var(--font-mono,"DM Mono",ui-monospace,monospace); scrollbar-width:thin; }
+.markdown-content pre code { display:block; min-width:max-content; padding:0; border:0; border-radius:0; color:inherit; background:transparent; font:inherit; white-space:pre; overflow-wrap:normal; }
+.markdown-content ul { margin:.65em 0; padding-left:1.65em; list-style:disc; }
+.markdown-content ol { margin:.65em 0; padding-left:1.65em; list-style:decimal; }
+.markdown-content li + li { margin-top:.28em; }
+.markdown-content li > p { margin:.25em 0; }
+.markdown-content li::marker { color:var(--muted-foreground); }
+.markdown-content blockquote { margin:.8em 0; padding:.55em .9em; border-left:3px solid var(--accent-foreground); border-radius:0 8px 8px 0; color:var(--muted-foreground); background:color-mix(in srgb,var(--accent) 55%,transparent); overflow-wrap:anywhere; }
+.markdown-content blockquote > :first-child { margin-top:0; }
+.markdown-content blockquote > :last-child { margin-bottom:0; }
+.markdown-table-wrap { max-width:100%; margin:.75em 0; overflow-x:auto; border:1px solid var(--border); border-radius:9px; background:var(--card); scrollbar-width:thin; }
+.markdown-table-wrap table { width:max-content; min-width:100%; border-collapse:collapse; font-size:var(--text-xs); }
+.markdown-table-wrap th { padding:7px 9px; border-bottom:1px solid var(--border); color:var(--foreground); background:var(--muted); font-weight:650; text-align:left; white-space:nowrap; }
+.markdown-table-wrap td { padding:7px 9px; border-top:1px solid var(--border); color:var(--foreground); text-align:left; vertical-align:top; white-space:nowrap; }
+.markdown-content hr { margin:1em 0; border:0; border-top:1px solid var(--border); }
+.markdown-content input[type="checkbox"] { margin-right:.45em; accent-color:#7259c6; }
 .issue-description-markdown { min-width:0; color:var(--foreground); font-size:var(--text-xs); line-height:1.7; overflow-wrap:anywhere; }
 .issue-description-markdown > :first-child { margin-top:0; }
 .issue-description-markdown > :last-child { margin-bottom:0; }
@@ -1913,7 +1942,7 @@ button.run-manual-qa-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-description-markdown h2 { padding-bottom:.35em; border-bottom:1px solid var(--border); font-size:var(--text-base); }
 .issue-description-markdown h3 { font-size:var(--text-xs); }
 .issue-description-markdown h4 { font-size:var(--text-xs); }
-.issue-description-markdown p,.issue-description-markdown ul,.issue-description-markdown ol,.issue-description-markdown blockquote,.issue-description-markdown pre,.issue-description-markdown table { margin:.7em 0; }
+.issue-description-markdown p,.issue-description-markdown ul,.issue-description-markdown ol,.issue-description-markdown blockquote,.issue-description-markdown pre { margin:.7em 0; }
 .issue-description-markdown ul { padding-left:1.6em; list-style:disc; }
 .issue-description-markdown ol { padding-left:1.6em; list-style:decimal; }
 .issue-description-markdown li + li { margin-top:.25em; }
@@ -1922,9 +1951,6 @@ button.run-manual-qa-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-description-markdown code { padding:.14em .35em; border-radius:5px; color:var(--accent-foreground); background:var(--accent); font:500 .92em "DM Mono",monospace; }
 .issue-description-markdown pre { overflow-x:auto; padding:11px 12px; border:1px solid var(--border); border-radius:9px; background:var(--muted); }
 .issue-description-markdown pre code { padding:0; color:var(--foreground); background:transparent; }
-.issue-description-markdown table { width:100%; overflow:hidden; border-collapse:collapse; border:1px solid var(--border); border-radius:8px; font-size:var(--text-2xs); }
-.issue-description-markdown th,.issue-description-markdown td { padding:6px 8px; border:1px solid var(--border); text-align:left; }
-.issue-description-markdown th { color:var(--foreground); background:var(--muted); }
 .issue-description-markdown hr { height:1px; margin:1.2em 0; border:0; background:var(--border); }
 .issue-description-markdown input[type="checkbox"] { margin-right:.45em; accent-color:#7259c6; }
 .issue-description-markdown img { width:auto; max-width:100%; max-height:min(520px,62vh); display:block; object-fit:contain; border:1px solid var(--border); border-radius:9px; background:var(--muted); }
@@ -2003,9 +2029,6 @@ button.conversation-reply-summary:focus-visible { outline:2px solid var(--ring);
 .issue-message-body code { padding:.12em .3em; border-radius:5px; color:var(--accent-foreground); background:var(--accent); font:500 .92em "DM Mono",monospace; overflow-wrap:anywhere; }
 .issue-message-body pre { max-width:100%; margin:.55em 0; overflow-x:auto; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--muted); }
 .issue-message-body pre code { padding:0; color:var(--foreground); background:transparent; white-space:pre; }
-.issue-message-body table { width:100%; max-width:100%; margin:.55em 0; display:block; overflow-x:auto; border-collapse:collapse; border:1px solid var(--border); border-radius:8px; font-size:var(--text-2xs); }
-.issue-message-body th,.issue-message-body td { padding:5px 7px; border:1px solid var(--border); text-align:left; overflow-wrap:anywhere; }
-.issue-message-body th { color:var(--foreground); background:var(--muted); }
 
 .profile-dialog { width:min(430px,calc(100vw - 28px)); max-height:calc(100dvh - 32px); gap:22px; overflow-y:auto; border-radius:20px; padding:28px; }
 .profile-dialog-header { display:flex; flex-direction:row; align-items:center; gap:16px; padding-right:28px; text-align:left; }
@@ -7655,18 +7678,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
 }
 .channel-message-text blockquote > :first-child { margin-top:0; }
 .channel-message-text blockquote > :last-child { margin-bottom:0; }
-.channel-message-table-wrap {
-  max-width:100%;
-  margin:.75em 0;
-  overflow-x:auto;
-  border:1px solid var(--border);
-  border-radius:9px;
-  background:var(--card);
-  scrollbar-width:thin;
-}
-.channel-message-table-wrap table { width:max-content; min-width:100%; border-collapse:collapse; font-size:var(--text-xs); }
-.channel-message-table-wrap th { padding:7px 9px; border-bottom:1px solid var(--border); color:var(--foreground); background:var(--muted); font-weight:650; text-align:left; white-space:nowrap; }
-.channel-message-table-wrap td { padding:7px 9px; border-top:1px solid var(--border); color:var(--foreground); text-align:left; vertical-align:top; white-space:nowrap; }
 .channel-message-text hr { margin:1em 0; border:0; border-top:1px solid var(--border); }
 .companion-channel-document { display: inline-flex; margin-top: 6px; align-items: center; gap: 5px; border: 1px solid var(--border, #ddd8cf); border-radius: 8px; background: var(--card, #fff); padding: 4px 8px; font-size: 12px; }
 .companion-channel-proposal { display:flex; margin-top:8px; flex-wrap:wrap; align-items:center; gap:8px; border:1px solid color-mix(in srgb,var(--primary,#5b43aa) 28%,var(--border,#ddd8cf)); border-radius:10px; background:color-mix(in srgb,var(--primary,#5b43aa) 6%,var(--card,#fff)); padding:10px; }

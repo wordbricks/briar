@@ -85,14 +85,16 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from "react";
-import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { NativeSelect } from "./NativeSelect";
 import { ProviderSelect } from "./ProviderSelect";
 import { SelectMenu } from "./SelectMenu";
 import { AgentProviderIcon } from "./AgentIcons";
 import { AgentWorkLog } from "./AgentWorkLog";
 import { ImageLightbox } from "./ImageLightbox";
+import {
+  MarkdownContent,
+  defaultMarkdownUrlTransform,
+} from "./MarkdownContent";
 import { WorkerIcon } from "./WorkerIcon";
 import { ConversationScrollToBottomButton } from "./ConversationScrollToBottomButton";
 import {
@@ -6085,22 +6087,19 @@ export function RunPage({
                           }
                         />
                       ) : issueContent ? (
-                        <div className="issue-description-markdown">
-                          <ReactMarkdown
-                            components={{
-                              img: renderIssueMarkdownImage,
-                            }}
-                            remarkPlugins={[remarkGfm]}
-                            skipHtml
-                            urlTransform={(url, key) =>
-                              key === "src" && issueAttachmentReference(url)
-                                ? url
-                                : defaultUrlTransform(url)
-                            }
-                          >
-                            {issueContent}
-                          </ReactMarkdown>
-                        </div>
+                        <MarkdownContent
+                          className="issue-description-markdown"
+                          components={{
+                            img: renderIssueMarkdownImage,
+                          }}
+                          urlTransform={(url, key) =>
+                            key === "src" && issueAttachmentReference(url)
+                              ? url
+                              : defaultMarkdownUrlTransform(url)
+                          }
+                        >
+                          {issueContent}
+                        </MarkdownContent>
                       ) : (
                         <p className="issue-description-empty">{t("run.notSet")}</p>
                       )}
@@ -6227,22 +6226,19 @@ export function RunPage({
                                   <p>{t("run.reviewWorkResultDescription")}</p>
                                 </div>
                               </header>
-                              <div className="completed-issue-summary paused-result-summary">
-                                {pausedPartialSummary ? (
-                                  <ReactMarkdown
-                                    remarkPlugins={[remarkGfm]}
-                                    skipHtml
-                                  >
-                                    {pausedPartialSummary}
-                                  </ReactMarkdown>
-                                ) : (
+                              {pausedPartialSummary ? (
+                                <MarkdownContent className="completed-issue-summary paused-result-summary">
+                                  {pausedPartialSummary}
+                                </MarkdownContent>
+                              ) : (
+                                <div className="completed-issue-summary paused-result-summary">
                                   <ul>
                                     {pausedResultItems.map((item) => (
                                       <li key={item}>{item}</li>
                                     ))}
                                   </ul>
-                                )}
-                              </div>
+                                </div>
+                              )}
                               {run.structuredResult?.nextAction ? (
                                 <div className="completed-issue-next-action">
                                   <strong>{t("run.resultNextAction")}</strong>
@@ -6485,14 +6481,9 @@ export function RunPage({
                             </small>
                           </div>
                           {executionMetricsPanel}
-                          <div className="completed-issue-summary">
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              skipHtml
-                            >
-                              {completionSummary}
-                            </ReactMarkdown>
-                          </div>
+                          <MarkdownContent className="completed-issue-summary">
+                            {completionSummary}
+                          </MarkdownContent>
                           {run.structuredResult?.humanActionRequired &&
                           run.structuredResult.nextAction ? (
                             <div className="completed-issue-next-action">
@@ -9868,7 +9859,7 @@ function IssueMessageItem({
 }) {
   const { t } = useI18n();
   const remarkPlugins = useMemo(
-    () => [remarkGfm, remarkIssueMentions(mentionHandles)],
+    () => [remarkIssueMentions(mentionHandles)],
     [mentionHandles],
   );
   const messageAttachmentsRef = useRef(message.attachments ?? []);
@@ -9914,50 +9905,48 @@ function IssueMessageItem({
             <span>{parentMessage.body}</span>
           </blockquote>
         ) : null}
-        <div className="issue-message-body">
-          <ReactMarkdown
-            components={{
-              a: ({ children, href, node: _node, ...props }) => {
-                const mentionHandle = issueMentionHandleFromUrl(href);
-                const isMention = mentionHandle !== null;
-                if (isMention) {
-                  return (
-                    <button
-                      className="conversation-mention-button issue-mention-button"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        onMentionOpen(mentionHandle);
-                      }}
-                      type="button"
-                    >
-                      {children}
-                    </button>
-                  );
-                }
+        <MarkdownContent
+          className="issue-message-body"
+          components={{
+            a: ({ children, href, node: _node, ...props }) => {
+              const mentionHandle = issueMentionHandleFromUrl(href);
+              const isMention = mentionHandle !== null;
+              if (isMention) {
                 return (
-                  <a
-                    {...props}
-                    className={props.className}
-                    href={href}
-                    onClick={props.onClick}
+                  <button
+                    className="conversation-mention-button issue-mention-button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      onMentionOpen(mentionHandle);
+                    }}
+                    type="button"
                   >
                     {children}
-                  </a>
+                  </button>
                 );
-              },
-              img: renderMessageMarkdownImage,
-            }}
-            remarkPlugins={remarkPlugins}
-            skipHtml
-            urlTransform={(url) =>
-              isIssueMentionUrl(url) || issueAttachmentReference(url)
-                ? url
-                : defaultUrlTransform(url)
-            }
-          >
-            {message.body}
-          </ReactMarkdown>
-        </div>
+              }
+              return (
+                <a
+                  {...props}
+                  className={props.className}
+                  href={href}
+                  onClick={props.onClick}
+                >
+                  {children}
+                </a>
+              );
+            },
+            img: renderMessageMarkdownImage,
+          }}
+          remarkPlugins={remarkPlugins}
+          urlTransform={(url) =>
+            isIssueMentionUrl(url) || issueAttachmentReference(url)
+              ? url
+              : defaultMarkdownUrlTransform(url)
+          }
+        >
+          {message.body}
+        </MarkdownContent>
         {proposal ? (
           <section className="issue-rework-proposal">
             <header>

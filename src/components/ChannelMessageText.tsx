@@ -6,8 +6,6 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
-import remarkGfm from "remark-gfm";
 import type {
   ChannelAgentSummary,
   ChannelBlockTextObject,
@@ -29,6 +27,10 @@ import {
   type ProfileTarget,
 } from "./ProfileDialog";
 import { ImageLightbox } from "./ImageLightbox";
+import {
+  MarkdownContent,
+  defaultMarkdownUrlTransform,
+} from "./MarkdownContent";
 
 /** Converts the small Slack mrkdwn subset accepted by webhook blocks to GFM. */
 export function slackMrkdwnToMarkdown(value: string) {
@@ -39,31 +41,9 @@ export function slackMrkdwnToMarkdown(value: string) {
     .replace(/(?<!~)~([^~\n]+)~(?!~)/gu, "~~$1~~");
 }
 
-function MarkdownContent({
-  children,
-  className,
-  slack = false,
-}: {
-  children: string;
-  className?: string;
-  slack?: boolean;
-}) {
-  return (
-    <div className={className}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        skipHtml
-        urlTransform={defaultUrlTransform}
-      >
-        {slack ? slackMrkdwnToMarkdown(children) : children}
-      </ReactMarkdown>
-    </div>
-  );
-}
-
 function BlockText({ text }: { text: ChannelBlockTextObject }) {
   return text.type === "mrkdwn" ? (
-    <MarkdownContent slack>{text.text}</MarkdownContent>
+    <MarkdownContent>{slackMrkdwnToMarkdown(text.text)}</MarkdownContent>
   ) : (
     <p>{text.text}</p>
   );
@@ -80,7 +60,7 @@ function RichInline({ element }: { element: RichTextInline }) {
   if (element.type === "emoji") return <>:{element.name}:</>;
   let content: ReactNode = element.type === "link"
     ? (
-        <a href={defaultUrlTransform(element.url)}>
+        <a href={defaultMarkdownUrlTransform(element.url)}>
           {element.text ?? element.url}
         </a>
       )
@@ -196,7 +176,7 @@ export const ChannelMessageText = memo(function ChannelMessageText({
     return profiles;
   }, [agents, members, message.mentionedAgentIds, message.mentionedUserIds]);
   const remarkPlugins = useMemo(
-    () => [remarkGfm, remarkIssueMentions([...profilesByHandle.keys()])],
+    () => [remarkIssueMentions([...profilesByHandle.keys()])],
     [profilesByHandle],
   );
   const body = channelBodyWithoutImages(message.body);
@@ -209,57 +189,50 @@ export const ChannelMessageText = memo(function ChannelMessageText({
 
   return (
     <>
-      <div className="channel-message-text">
-        <ReactMarkdown
-          components={{
-            a: ({ children, href, node: _node, ...props }) => {
-              const handle = issueMentionHandleFromUrl(href)?.toLowerCase();
-              const mentionedProfile = handle
-                ? profilesByHandle.get(handle) ?? null
-                : null;
-              if (mentionedProfile) {
-                return (
-                  <button
-                    className="conversation-mention-button channel-mention-button"
-                    onClick={(event: MouseEvent<HTMLButtonElement>) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setProfile(mentionedProfile);
-                    }}
-                    type="button"
-                  >
-                    {children}
-                  </button>
-                );
-              }
+      <MarkdownContent
+        className="channel-message-text"
+        components={{
+          a: ({ children, href, node: _node, ...props }) => {
+            const handle = issueMentionHandleFromUrl(href)?.toLowerCase();
+            const mentionedProfile = handle
+              ? profilesByHandle.get(handle) ?? null
+              : null;
+            if (mentionedProfile) {
               return (
-                <a
-                  {...props}
-                  className={props.className}
-                  href={href}
-                  onClick={props.onClick}
+                <button
+                  className="conversation-mention-button channel-mention-button"
+                  onClick={(event: MouseEvent<HTMLButtonElement>) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setProfile(mentionedProfile);
+                  }}
+                  type="button"
                 >
                   {children}
-                </a>
+                </button>
               );
-            },
-            img: ({ alt, src }) =>
-              src ? <ImageLightbox alt={alt ?? ""} source={src} /> : null,
-            table: ({ children, node: _node, ...props }) => (
-              <div className="channel-message-table-wrap">
-                <table {...props}>{children}</table>
-              </div>
-            ),
-          }}
-          remarkPlugins={remarkPlugins}
-          skipHtml
-          urlTransform={(url) =>
-            isIssueMentionUrl(url) ? url : defaultUrlTransform(url)
-          }
-        >
-          {body}
-        </ReactMarkdown>
-      </div>
+            }
+            return (
+              <a
+                {...props}
+                className={props.className}
+                href={href}
+                onClick={props.onClick}
+              >
+                {children}
+              </a>
+            );
+          },
+          img: ({ alt, src }) =>
+            src ? <ImageLightbox alt={alt ?? ""} source={src} /> : null,
+        }}
+        remarkPlugins={remarkPlugins}
+        urlTransform={(url) =>
+          isIssueMentionUrl(url) ? url : defaultMarkdownUrlTransform(url)
+        }
+      >
+        {body}
+      </MarkdownContent>
       <ProfileDialog
         profile={profile}
         onOpenChange={(open) => {
