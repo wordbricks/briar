@@ -15,11 +15,6 @@ import { delimiter, isAbsolute, join } from "node:path";
 import type { ModelEffort } from "../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
 
-export type {
-  ModelEffort,
-} from "../src/lib/agent-provider-contract";
-export type { AgentProvider } from "../src/lib/agent-provider";
-
 export type ClaimedIssue = {
   workType?: "issue" | "issueReply" | "channelReply" | "projectAgentTask";
   workId?: string;

@@ -1,5 +1,6 @@
+import * as Option from "effect/Option";
 import {
-  issueAgentActivityFrameSchema,
+  decodeIssueAgentActivityFrameOption,
   type IssueAgentActivityFrame,
 } from "./channel-agent-activity";
 import { briarApiUrl } from "./api-config";
@@ -92,12 +93,14 @@ export class IssueActivityRealtimeTransport {
         } catch {
           return;
         }
-        const parsed = issueAgentActivityFrameSchema.safeParse(value);
+        const parsed = Option.getOrNull(
+          decodeIssueAgentActivityFrameOption(value),
+        );
         if (
-          !parsed.success || parsed.data.projectId !== this.input.projectId ||
-          parsed.data.runId !== this.input.runId
+          parsed === null || parsed.projectId !== this.input.projectId ||
+          parsed.runId !== this.input.runId
         ) return;
-        for (const listener of this.listeners) listener(parsed.data);
+        for (const listener of this.listeners) listener(parsed);
       });
       socket.addEventListener("close", finish);
       socket.addEventListener("error", () => {

@@ -84,8 +84,8 @@ describe("GitHub webhooks", () => {
   it("parses and validates supported event and delivery headers", () => {
     expect(
       parseGitHubWebhookHeaders(new Headers({
-        "X-GitHub-Event": "pull_request",
-        "X-GitHub-Delivery": deliveryId.toUpperCase(),
+        "X-GitHub-Event": " pull_request ",
+        "X-GitHub-Delivery": ` ${deliveryId.toUpperCase()} `,
       })),
     ).toEqual(pullRequestHeaders);
 
@@ -107,6 +107,7 @@ describe("GitHub webhooks", () => {
     expect(parseGitHubWebhook(headers, {
       zen: "Keep it logically awesome.",
       hook_id: 12345,
+      extra_delivery_field: "ignored",
     })).toEqual({
       deliveryId,
       event: "ping",

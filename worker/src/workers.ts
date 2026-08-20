@@ -7,6 +7,7 @@
  * limiting concurrency — see docs/plans/detached-execution-workers.md.
  */
 
+import * as Option from "effect/Option";
 import {
   isWorkerEmoji,
   isWorkerLogoDataUrl,
@@ -16,8 +17,8 @@ import {
   isSemanticVersion,
 } from "../../src/lib/semantic-version";
 import {
-  agentProviderCapabilityCatalogSchema,
   agentProviderSupportsSelection,
+  decodeAgentProviderCapabilityCatalogOption,
   type AgentProviderCapabilityCatalog,
   type ModelEffort,
 } from "../../src/lib/agent-provider-contract";
@@ -29,11 +30,10 @@ import {
   organizationAgentContextCapability,
 } from "../../src/lib/organization-agent-context-contract";
 import { isChannelApprovedIssue } from "./db";
-
-export type {
-  ModelEffort,
-} from "../../src/lib/agent-provider-contract";
-export type { AgentProvider } from "../../src/lib/agent-provider";
+import {
+  MAX_WORKER_CONCURRENT_SESSIONS,
+  MIN_WORKER_CONCURRENT_SESSIONS,
+} from "./worker-limits";
 
 export type ExecutionWorkerState = "online" | "stale" | "disabled";
 export type ExecutionWorkerReadiness = "ready" | "busy" | "needs_attention";
@@ -291,15 +291,6 @@ export const WORKER_CREDENTIAL_TOUCH_INTERVAL_MS = 5 * 60_000;
 export const STALLED_RUN_GRACE_MS = 5 * 60_000;
 /** Reaping past this many attempts blocks the run instead of looping forever. */
 export const MAX_CLAIM_ATTEMPTS = 5;
-export const MIN_WORKER_CONCURRENT_SESSIONS = 1;
-export const MAX_WORKER_CONCURRENT_SESSIONS = 16;
-
-export {
-  MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
-  MAX_TRANSCRIPT_HTTP_BODY_BYTES,
-  MAX_TRANSCRIPT_PAYLOAD_BYTES,
-  MAX_TRANSCRIPT_REQUEST_BYTES,
-} from "./transcript-limits";
 
 export class WorkerConflictError extends Error {}
 export class TranscriptLimitError extends Error {}
@@ -348,14 +339,11 @@ export function executionWorkerSupportsSelection(
     const capabilities = JSON.parse(worker.capabilities_json) as {
       providerCapabilities?: unknown;
     };
-    const parsed = agentProviderCapabilityCatalogSchema.safeParse(
+    const parsed = decodeAgentProviderCapabilityCatalogOption(
       capabilities.providerCapabilities,
     );
-    return parsed.success && agentProviderSupportsSelection(
-      parsed.data[provider],
-      model,
-      effort,
-    );
+    return Option.isSome(parsed) &&
+      agentProviderSupportsSelection(parsed.value[provider], model, effort);
   } catch {
     return false;
   }

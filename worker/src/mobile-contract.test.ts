@@ -1,20 +1,26 @@
 import { readFileSync } from "node:fs";
+import * as Option from "effect/Option";
 import { describe, expect, it } from "vitest";
-import worker, { inboxReadStatesInputSchema } from "./index";
+import worker from "./index";
 import {
-  mobileClientIds,
-  mobileDashboardDeltaSchema,
-  mobileDashboardSnapshotSchema,
   mobileAcceptChannelProposalResponseSchema,
   mobileAcceptIssueActionProposalResponseSchema,
   mobileChannelIssueProposalPayloadSchema,
   mobileChannelMessageSchema,
+  mobileClientIds,
+  mobileDashboardDeltaSchema,
+  mobileDashboardSnapshotSchema,
+  mobileInboxReadStatesSchema,
   mobileIssueExecutionApprovalRequestSchema,
   mobileIssueExecutionProposalSchema,
   mobileIssueMessagesResponseSchema,
   mobileOperationSchemas,
   mobileProjectAgentTaskRequestSchema,
 } from "./mobile-contract";
+import {
+  decodeMobileSchema,
+  decodeMobileSchemaOption,
+} from "./mobile-contract-schema";
 
 type FixtureOperation = {
   method: string;
@@ -76,41 +82,51 @@ describe("Companion mobile API contract", () => {
   });
 
   it("validates every shared request, response, and polling error fixture", () => {
-    for (const operationId of Object.keys(mobileOperationSchemas) as Array<
-      keyof typeof mobileOperationSchemas
-    >) {
-      const schemas = mobileOperationSchemas[operationId] as {
-        request?: { parse(value: unknown): unknown };
-        response: { parse(value: unknown): unknown };
-        errorResponse?: { parse(value: unknown): unknown };
-      };
+    for (
+      const operationId of Object.keys(mobileOperationSchemas) as Array<
+        keyof typeof mobileOperationSchemas
+      >
+    ) {
+      const schemas = mobileOperationSchemas[operationId];
       const operation = fixture.operations[operationId];
-      expect(() => schemas.response.parse(operation.response)).not.toThrow();
-      if (schemas.request) {
-        expect(() => schemas.request?.parse(operation.request)).not.toThrow();
+      expect(() => decodeMobileSchema(schemas.response, operation.response))
+        .not.toThrow();
+      if ("request" in schemas) {
+        expect(() => decodeMobileSchema(schemas.request, operation.request))
+          .not.toThrow();
       }
-      if (schemas.errorResponse) {
-        expect(() => schemas.errorResponse?.parse(operation.errorResponse))
+      if ("errorResponse" in schemas) {
+        expect(() =>
+          decodeMobileSchema(schemas.errorResponse, operation.errorResponse)
+        )
           .not.toThrow();
       }
     }
   });
 
   it("carries the Agent name with session snapshots", () => {
-    const listResponse = mobileOperationSchemas.listProjectAgentSessions.response
-      .parse(fixture.operations.listProjectAgentSessions.response);
-    const taskResponse = mobileOperationSchemas.runProjectAgentTask.response
-      .parse(fixture.operations.runProjectAgentTask.response);
+    const listResponse = decodeMobileSchema(
+      mobileOperationSchemas.listProjectAgentSessions.response,
+      fixture.operations.listProjectAgentSessions.response,
+    );
+    const taskResponse = decodeMobileSchema(
+      mobileOperationSchemas.runProjectAgentTask.response,
+      fixture.operations.runProjectAgentTask.response,
+    );
 
     expect(listResponse.sessions[0]?.agentName).toBe("Issue processing agent");
     expect(taskResponse.session.agentName).toBe("Issue processing agent");
   });
 
   it("carries Agent descriptions without replacing responsibilities", () => {
-    const projectAgent = mobileOperationSchemas.listProjectAgents.response
-      .parse(fixture.operations.listProjectAgents.response).agents[0];
-    const channelAgent = mobileOperationSchemas.getChannel.response
-      .parse(fixture.operations.getChannel.response).agents[0];
+    const projectAgent = decodeMobileSchema(
+      mobileOperationSchemas.listProjectAgents.response,
+      fixture.operations.listProjectAgents.response,
+    ).agents[0];
+    const channelAgent = decodeMobileSchema(
+      mobileOperationSchemas.getChannel.response,
+      fixture.operations.getChannel.response,
+    ).agents[0];
 
     expect(projectAgent?.description).toBe(
       "Handles issue processing and development work for the project.",
@@ -130,7 +146,7 @@ describe("Companion mobile API contract", () => {
     };
 
     expect(
-      inboxReadStatesInputSchema.parse(request).readVersions[
+      decodeMobileSchema(mobileInboxReadStatesSchema, request).readVersions[
         "channel:55555555-5555-4555-8555-555555555555"
       ],
     ).toBe("55555555-5555-4555-8555-555555555555");
@@ -138,11 +154,11 @@ describe("Companion mobile API contract", () => {
 
   it("preserves organization providers in full and delta dashboard payloads", () => {
     const organizationProviders = ["grok", "opencode", "codex"] as const;
-    const snapshot = mobileDashboardSnapshotSchema.parse({
+    const snapshot = decodeMobileSchema(mobileDashboardSnapshotSchema, {
       ...(fixture.operations.getDashboardSnapshot.response as object),
       organizationProviders,
     });
-    const delta = mobileDashboardDeltaSchema.parse({
+    const delta = decodeMobileSchema(mobileDashboardDeltaSchema, {
       ...(fixture.operations.getDashboardDelta.response as object),
       organizationProviders,
     });
@@ -157,18 +173,26 @@ describe("Companion mobile API contract", () => {
       unknown
     >;
 
-    expect(mobileProjectAgentTaskRequestSchema.parse(request).skillId).toBe(
+    expect(
+      decodeMobileSchema(mobileProjectAgentTaskRequestSchema, request).skillId,
+    ).toBe(
       "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     );
     const requestWithoutSkill = { ...request };
     delete requestWithoutSkill.skillId;
     expect(
-      mobileProjectAgentTaskRequestSchema.safeParse(requestWithoutSkill).success,
+      Option.isSome(
+        decodeMobileSchemaOption(
+          mobileProjectAgentTaskRequestSchema,
+          requestWithoutSkill,
+        ),
+      ),
     ).toBe(false);
   });
 
   it("requires the canonical issue details on issue-create proposals", () => {
-    const channel = mobileOperationSchemas.listChannelMessages.response.parse(
+    const channel = decodeMobileSchema(
+      mobileOperationSchemas.listChannelMessages.response,
       fixture.operations.listChannelMessages.response,
     );
     const proposal = channel.messages.find((message) => message.proposal)
@@ -182,17 +206,25 @@ describe("Companion mobile API contract", () => {
       });
     }
     expect(
-      mobileChannelIssueProposalPayloadSchema.safeParse({ issue: {} }).success,
+      Option.isSome(
+        decodeMobileSchemaOption(
+          mobileChannelIssueProposalPayloadSchema,
+          { issue: {} },
+        ),
+      ),
     ).toBe(false);
     expect(
-      mobileChannelIssueProposalPayloadSchema.safeParse({
-        issue: {
-          title: "Legacy proposal",
-          description: null,
-          priority: null,
-          status: "queued",
+      Option.isSome(decodeMobileSchemaOption(
+        mobileChannelIssueProposalPayloadSchema,
+        {
+          issue: {
+            title: "Legacy proposal",
+            description: null,
+            priority: null,
+            status: "queued",
+          },
         },
-      }).success,
+      )),
     ).toBe(true);
     expect(
       openapi.components.schemas.ChannelIssueProposalPayload.properties.issue
@@ -217,58 +249,70 @@ describe("Companion mobile API contract", () => {
       delegatedByAgentId: "66666666-6666-4666-8666-666666666666",
       delegatedByAgentName: "Bumble",
     } as const;
-    expect(mobileIssueExecutionProposalSchema.parse(executionProposal).status)
+    expect(
+      decodeMobileSchema(mobileIssueExecutionProposalSchema, executionProposal)
+        .status,
+    )
       .toBe("pending");
 
     const channelResponse = fixture.operations.listChannelMessages.response as {
       messages: Array<Record<string, unknown>>;
     };
-    const createMessage = channelResponse.messages.find((message) => message.proposal);
+    const createMessage = channelResponse.messages.find((message) =>
+      message.proposal
+    );
     expect(createMessage).toBeDefined();
-    const channelMessage = mobileChannelMessageSchema.parse({
+    const channelMessage = decodeMobileSchema(mobileChannelMessageSchema, {
       ...createMessage,
       executionProposal,
     });
     expect(channelMessage.proposal?.actionType).toBe("request_issue_create");
-    expect(channelMessage.executionProposal?.type).toBe("request_issue_execute");
+    expect(channelMessage.executionProposal?.type).toBe(
+      "request_issue_execute",
+    );
 
     const issueMessages = fixture.operations.listIssueMessages.response as {
       messages: Array<Record<string, unknown>>;
     };
     const issueMessage = issueMessages.messages[0];
-    const parsedIssueMessages = mobileIssueMessagesResponseSchema.parse({
-      messages: [{
-        ...issueMessage,
-        proposedAction: {
-          id: "abababab-abab-4bab-8bab-abababababab",
-          type: "request_issue_create",
-          issue: {
-            title: "온보딩 개편",
-            description: null,
-            priority: 2,
-            status: "backlog",
+    const parsedIssueMessages = decodeMobileSchema(
+      mobileIssueMessagesResponseSchema,
+      {
+        messages: [{
+          ...issueMessage,
+          proposedAction: {
+            id: "abababab-abab-4bab-8bab-abababababab",
+            type: "request_issue_create",
+            issue: {
+              title: "온보딩 개편",
+              description: null,
+              priority: 2,
+              status: "backlog",
+            },
+            executeAfterCreate: true,
+            status: "accepted",
+            acceptedAt: "2026-08-11T01:00:00.000Z",
+            resultRunId: "33333333-3333-4333-8333-333333333333",
           },
-          executeAfterCreate: true,
-          status: "accepted",
-          acceptedAt: "2026-08-11T01:00:00.000Z",
-          resultRunId: "33333333-3333-4333-8333-333333333333",
-        },
-        executionProposal,
-      }],
-    });
+          executionProposal,
+        }],
+      },
+    );
     expect(parsedIssueMessages.messages[0]?.proposedAction?.type)
       .toBe("request_issue_create");
     expect(parsedIssueMessages.messages[0]?.executionProposal?.status)
       .toBe("pending");
 
-    const acceptedChannel = mobileAcceptChannelProposalResponseSchema.parse(
+    const acceptedChannel = decodeMobileSchema(
+      mobileAcceptChannelProposalResponseSchema,
       fixture.operations.acceptChannelProposal.response,
     );
     expect(acceptedChannel.executionProposal).toMatchObject({
       status: "pending",
       runId: executionProposal.runId,
     });
-    const acceptedIssue = mobileAcceptIssueActionProposalResponseSchema.parse(
+    const acceptedIssue = decodeMobileSchema(
+      mobileAcceptIssueActionProposalResponseSchema,
       fixture.operations.acceptIssueActionProposal.response,
     );
     expect(acceptedIssue.proposal).toMatchObject({
@@ -280,20 +324,23 @@ describe("Companion mobile API contract", () => {
       status: "pending",
     });
 
-    const acceptedUpdate = mobileAcceptIssueActionProposalResponseSchema.parse({
-      proposal: {
-        id: "abababab-abab-4bab-8bab-abababababab",
-        type: "request_issue_update",
-        changes: { description: "Updated acceptance criteria." },
-        changedFields: ["description"],
-        status: "accepted",
-        acceptedAt: "2026-08-11T01:00:00.000Z",
+    const acceptedUpdate = decodeMobileSchema(
+      mobileAcceptIssueActionProposalResponseSchema,
+      {
+        proposal: {
+          id: "abababab-abab-4bab-8bab-abababababab",
+          type: "request_issue_update",
+          changes: { description: "Updated acceptance criteria." },
+          changedFields: ["description"],
+          status: "accepted",
+          acceptedAt: "2026-08-11T01:00:00.000Z",
+          resultRunId: executionProposal.runId,
+        },
+        outcome: "accepted",
         resultRunId: executionProposal.runId,
+        executionProposal: null,
       },
-      outcome: "accepted",
-      resultRunId: executionProposal.runId,
-      executionProposal: null,
-    });
+    );
     expect(acceptedUpdate.proposal.type).toBe("request_issue_update");
     expect(acceptedUpdate.proposal).not.toHaveProperty("executeAfterCreate");
   });
@@ -302,7 +349,7 @@ describe("Companion mobile API contract", () => {
     const channelResponse = fixture.operations.listChannelMessages.response as {
       messages: Array<Record<string, unknown>>;
     };
-    const parsed = mobileChannelMessageSchema.parse({
+    const parsed = decodeMobileSchema(mobileChannelMessageSchema, {
       ...channelResponse.messages[0],
       author: {
         type: "webhook",
@@ -322,7 +369,7 @@ describe("Companion mobile API contract", () => {
       messages: Array<Record<string, unknown>>;
     };
     const avatar = "data:image/png;base64,cHJvamVjdC1hdmF0YXI=";
-    const parsed = mobileChannelMessageSchema.parse({
+    const parsed = decodeMobileSchema(mobileChannelMessageSchema, {
       ...channelResponse.messages[0],
       author: {
         type: "agent",
@@ -340,15 +387,18 @@ describe("Companion mobile API contract", () => {
       image: avatar,
     });
     expect(
-      mobileChannelMessageSchema.safeParse({
-        ...channelResponse.messages[0],
-        author: {
-          type: "agent",
-          id: "66666666-6666-4666-8666-666666666666",
-          name: "Honey",
-          provider: "claude",
+      Option.isSome(decodeMobileSchemaOption(
+        mobileChannelMessageSchema,
+        {
+          ...channelResponse.messages[0],
+          author: {
+            type: "agent",
+            id: "66666666-6666-4666-8666-666666666666",
+            name: "Honey",
+            provider: "claude",
+          },
         },
-      }).success,
+      )),
     ).toBe(false);
   });
 
@@ -359,19 +409,27 @@ describe("Companion mobile API contract", () => {
       effort: null,
       workerId: null,
     };
-    expect(mobileIssueExecutionApprovalRequestSchema.parse(request)).toEqual(request);
     expect(
-      mobileIssueExecutionApprovalRequestSchema.safeParse({
-        provider: "codex",
-        model: null,
-        workerId: null,
-      }).success,
+      decodeMobileSchema(mobileIssueExecutionApprovalRequestSchema, request),
+    ).toEqual(request);
+    expect(
+      Option.isSome(decodeMobileSchemaOption(
+        mobileIssueExecutionApprovalRequestSchema,
+        {
+          provider: "codex",
+          model: null,
+          workerId: null,
+        },
+      )),
     ).toBe(false);
     expect(
-      mobileIssueExecutionApprovalRequestSchema.safeParse({
-        ...request,
-        requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      }).success,
+      Option.isSome(decodeMobileSchemaOption(
+        mobileIssueExecutionApprovalRequestSchema,
+        {
+          ...request,
+          requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        },
+      )),
     ).toBe(false);
     expect(
       openapi.components.schemas.IssueExecutionApprovalRequest.required,

@@ -1,5 +1,6 @@
+import * as Option from "effect/Option";
 import {
-  channelAgentActivityFrameSchema,
+  decodeChannelAgentActivityFrameOption,
   type ChannelAgentActivityFrame,
 } from "./channel-agent-activity";
 import { briarApiUrl } from "./api-config";
@@ -92,11 +93,13 @@ export class ChannelActivityRealtimeTransport {
         } catch {
           return;
         }
-        const parsed = channelAgentActivityFrameSchema.safeParse(value);
-        if (!parsed.success || parsed.data.channelId !== this.input.channelId) {
+        const parsed = Option.getOrNull(
+          decodeChannelAgentActivityFrameOption(value),
+        );
+        if (parsed === null || parsed.channelId !== this.input.channelId) {
           return;
         }
-        for (const listener of this.listeners) listener(parsed.data);
+        for (const listener of this.listeners) listener(parsed);
       });
       socket.addEventListener("close", finish);
       socket.addEventListener("error", () => {

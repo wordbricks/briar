@@ -21,7 +21,10 @@ import {
   transferIssue,
 } from "./db";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
-import { mobileAcceptIssueActionProposalResponseSchema } from "./mobile-contract";
+import {
+  mobileAcceptIssueActionProposalResponseSchema,
+} from "./mobile-contract";
+import { decodeMobileSchema } from "./mobile-contract-schema";
 import {
   dispatchHuntRun,
   leaseExpiryFrom,
@@ -647,7 +650,10 @@ describe("channel issue proposal approval route", () => {
     }), env());
     expect(accepted.status).toBe(200);
     const acceptedBody = await accepted.json();
-    expect(mobileAcceptIssueActionProposalResponseSchema.parse(acceptedBody))
+    expect(decodeMobileSchema(
+      mobileAcceptIssueActionProposalResponseSchema,
+      acceptedBody,
+    ))
       .toEqual({
         proposal: {
           id: updateProposalId,
@@ -670,7 +676,10 @@ describe("channel issue proposal approval route", () => {
     }), env());
     expect(retried.status).toBe(200);
     const retriedBody = await retried.json();
-    expect(mobileAcceptIssueActionProposalResponseSchema.parse(retriedBody))
+    expect(decodeMobileSchema(
+      mobileAcceptIssueActionProposalResponseSchema,
+      retriedBody,
+    ))
       .toEqual({
         proposal: {
           id: updateProposalId,

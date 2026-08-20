@@ -1,4 +1,5 @@
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import {
   archiveFormatVersion,
@@ -110,5 +111,14 @@ describe("archive Effect contracts", () => {
       .toThrow();
     expect(() => decodeArchiveManifest({ ...manifest, rowCount: Infinity }))
       .toThrow();
+  });
+
+  it("keeps corrupt persisted data out of the HTTP request error channel", () => {
+    try {
+      decodeArchiveManifest({ recordType: "manifest" });
+      throw new Error("Expected archive manifest decoding to fail");
+    } catch (error) {
+      expect(Schema.isSchemaError(error)).toBe(true);
+    }
   });
 });

@@ -12,7 +12,7 @@ describe("fetchCodexPet", () => {
             name: "Firefly",
             author: "Lingxiaotian",
             license: "CC BY-NC 4.0",
-            spriteVersionNumber: 1,
+            upstreamMetadata: { featured: true },
           },
         ]),
       )

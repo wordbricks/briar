@@ -1,38 +1,20 @@
 import { createHmac } from "node:crypto";
+import * as Option from "effect/Option";
 import { describe, expect, it, vi } from "vitest";
 import worker, {
   approvedIssueCreation,
   assertRunEventIdentityNotOverridden,
   assertChannelProposalAuthorScope,
   claimConversationJson,
-  accountDeletionInputSchema,
-  accountProfileInputSchema,
-  eventSchema,
   handleScheduledTask,
-  issueUpdateInputSchema,
-  issueExecutionPreferencesSchema,
   issueClaimExecutionConfig,
   issueReplyExecutionConfig,
   legacyAgentSkillInstructions,
   loadChannelCatalogSnapshot,
   loadOrganizationInboxConditionalSnapshot,
-  organizationLogoInputSchema,
-  organizationInvitationInputSchema,
-  organizationMemberRoleInputSchema,
   organizationUsageQuerySince,
   organizationUsageRunJson,
-  organizationUpdateInputSchema,
-  pausedRunReworkInputSchema,
-  parseProjectSettingsInput,
   projectUsageSummaryJson,
-  projectIconInputSchema,
-  projectIssueKeyPrefixInputSchema,
-  projectTabsInputSchema,
-  projectAgentSessionInputSchema,
-  projectAgentInputSchema,
-  projectAgentScheduleInputSchema,
-  projectAgentScheduleBatchClaimSchema,
-  projectAgentScheduleRunCompletionSchema,
   projectMutationProject,
   projectScheduleClaimMutation,
   readChannelReplyCompleteRequest,
@@ -41,14 +23,44 @@ import worker, {
   readTranscriptRequest,
   resolveChannelProposalTargetProjectId,
   responseWithPostCommitCleanup,
-  runEvidenceInputSchema,
-  runReworkInputSchema,
-  usageRangeDaysSchema,
-  workflowStageLifecycleInputSchema,
-  workerRegisterSchema,
-  workerSettingsSchema,
   type ScheduledTaskDependencies,
 } from "./index";
+import {
+  decodeAccountDeletionInput,
+  decodeAccountProfileInput,
+  decodeOrganizationInvitationInput,
+  decodeOrganizationLogoInput,
+  decodeOrganizationMemberRoleInput,
+  decodeOrganizationUpdateInput,
+  decodeProjectAgentScheduleBatchClaim,
+} from "./account-organization-request-contract";
+import {
+  decodeExecutionPreferences,
+  decodeIssueUpdateInput,
+} from "./issue-request-contract";
+import {
+  decodeProjectAgentInput,
+  decodeProjectAgentInputOption,
+  decodeProjectAgentScheduleInput,
+  decodeProjectAgentSessionInput,
+  decodeProjectIconInput,
+  decodeProjectIssueKeyPrefixInput,
+  decodeProjectTabsInput,
+} from "./project-request-contract";
+import {
+  decodePausedRunReworkInput,
+  decodeRunEvent,
+  decodeRunEvidenceInput,
+  decodeRunReworkInput,
+  decodeUsageRangeDays,
+  decodeWorkflowStageLifecycleInput,
+  parseProjectSettingsInput,
+} from "./run-request-contract";
+import {
+  decodeProjectAgentScheduleRunCompletion,
+  decodeWorkerRegister,
+  decodeWorkerSettings,
+} from "./worker-request-contract";
 import { decodeTranscriptRequest } from "./transcript-request";
 import { slackCreateIssueShortcutCallbackId } from "./slack";
 import {
@@ -327,8 +339,8 @@ describe("Worker HTTP contract", () => {
       responsibility: "Handle project work.",
     };
 
-    expect(projectAgentInputSchema.parse(input).skills).toBeUndefined();
-    expect(projectAgentInputSchema.parse({ ...input, skills: [] }).skills)
+    expect(decodeProjectAgentInput(input).skills).toBeUndefined();
+    expect(decodeProjectAgentInput({ ...input, skills: [] }).skills)
       .toEqual([]);
   });
 
@@ -350,15 +362,15 @@ describe("Worker HTTP contract", () => {
       ),
     };
 
-    expect(projectAgentInputSchema.safeParse(input).success).toBe(true);
-    expect(projectAgentInputSchema.safeParse({
+    expect(Option.isSome(decodeProjectAgentInputOption(input))).toBe(true);
+    expect(Option.isSome(decodeProjectAgentInputOption({
       ...input,
       responsibility: `${input.responsibility}x`,
-    }).success).toBe(false);
-    expect(projectAgentInputSchema.safeParse({
+    }))).toBe(false);
+    expect(Option.isSome(decodeProjectAgentInputOption({
       ...input,
       skills: [...input.skills, skill(agentSkillsMaxCount)],
-    }).success).toBe(false);
+    }))).toBe(false);
   });
 
   it("routes minute and six-hour scheduled work separately", async () => {
@@ -628,7 +640,7 @@ describe("Worker HTTP contract", () => {
 
   it("validates idempotent workflow stage lifecycle requests", () => {
     expect(
-      workflowStageLifecycleInputSchema.parse({
+      decodeWorkflowStageLifecycleInput({
         requestId: "11111111-1111-4111-8111-111111111111",
         attempt: 2,
         revision: 3,
@@ -636,7 +648,7 @@ describe("Worker HTTP contract", () => {
       }),
     ).toMatchObject({ attempt: 2, revision: 3 });
     expect(() =>
-      workflowStageLifecycleInputSchema.parse({
+      decodeWorkflowStageLifecycleInput({
         requestId: "not-a-uuid",
         attempt: 0,
         actor: "",
@@ -715,11 +727,11 @@ describe("Worker HTTP contract", () => {
   });
 
   it("bounds organization usage windows to the supported calendar ranges", () => {
-    expect(usageRangeDaysSchema.parse("7")).toBe(7);
-    expect(usageRangeDaysSchema.parse("30")).toBe(30);
-    expect(usageRangeDaysSchema.parse("90")).toBe(90);
+    expect(decodeUsageRangeDays("7")).toBe(7);
+    expect(decodeUsageRangeDays("30")).toBe(30);
+    expect(decodeUsageRangeDays("90")).toBe(90);
     for (const invalid of ["", "0", "91", "7.5", "all"]) {
-      expect(() => usageRangeDaysSchema.parse(invalid)).toThrow();
+      expect(() => decodeUsageRangeDays(invalid)).toThrow();
     }
     expect(
       organizationUsageQuerySince(
@@ -1040,15 +1052,15 @@ describe("Worker HTTP contract", () => {
 
   it("requires an email confirmation for account deletion", () => {
     expect(
-      accountDeletionInputSchema.parse({
+      decodeAccountDeletionInput({
         confirmation: " jay@example.com ",
       }),
     ).toEqual({ confirmation: "jay@example.com" });
     expect(() =>
-      accountDeletionInputSchema.parse({ confirmation: "DELETE" }),
+      decodeAccountDeletionInput({ confirmation: "DELETE" }),
     ).toThrow();
     expect(() =>
-      accountDeletionInputSchema.parse({
+      decodeAccountDeletionInput({
         confirmation: "jay@example.com",
         bypass: true,
       }),
@@ -1057,7 +1069,7 @@ describe("Worker HTTP contract", () => {
 
   it("normalizes and validates account profiles", () => {
     expect(
-      accountProfileInputSchema.parse({
+      decodeAccountProfileInput({
         username: " Jay_Dev ",
         name: " Jay Kim ",
         image: "data:image/webp;base64,aA==",
@@ -1068,7 +1080,7 @@ describe("Worker HTTP contract", () => {
       image: "data:image/webp;base64,aA==",
     });
     expect(
-      accountProfileInputSchema.parse({
+      decodeAccountProfileInput({
         username: "jay_dev",
         name: "Jay Kim",
         image: "https://lh3.googleusercontent.com/a/example=s96-c",
@@ -1079,21 +1091,21 @@ describe("Worker HTTP contract", () => {
       image: "https://lh3.googleusercontent.com/a/example=s96-c",
     });
     expect(() =>
-      accountProfileInputSchema.parse({
+      decodeAccountProfileInput({
         username: "has spaces",
         name: "Jay",
         image: null,
       }),
     ).toThrow();
     expect(() =>
-      accountProfileInputSchema.parse({
+      decodeAccountProfileInput({
         username: "jay",
         name: "Jay",
         image: "data:image/svg+xml;base64,aA==",
       }),
     ).toThrow();
     expect(() =>
-      accountProfileInputSchema.parse({
+      decodeAccountProfileInput({
         username: "jay",
         name: "Jay",
         image: "http://example.com/avatar.png",
@@ -1103,7 +1115,7 @@ describe("Worker HTTP contract", () => {
 
   it("normalizes invitation emails and requires a starting project", () => {
     expect(
-      organizationInvitationInputSchema.parse({
+      decodeOrganizationInvitationInput({
         email: "  New.Person@Example.COM ",
         role: "member",
         initialProjectId: "11111111-1111-4111-8111-111111111111",
@@ -1114,7 +1126,7 @@ describe("Worker HTTP contract", () => {
       initialProjectId: "11111111-1111-4111-8111-111111111111",
     });
     expect(() =>
-      organizationInvitationInputSchema.parse({
+      decodeOrganizationInvitationInput({
         email: "new.person@example.com",
       }),
     ).toThrow();
@@ -1126,11 +1138,11 @@ describe("Worker HTTP contract", () => {
       "data:image/png;base64,bG9nbw==",
       "data:image/jpeg;base64,bG9nbw==",
     ]) {
-      expect(projectIconInputSchema.parse({ icon })).toEqual({ icon });
+      expect(decodeProjectIconInput({ icon })).toEqual({ icon });
     }
-    expect(projectIconInputSchema.parse({ icon: null })).toEqual({ icon: null });
+    expect(decodeProjectIconInput({ icon: null })).toEqual({ icon: null });
     expect(() =>
-      projectIconInputSchema.parse({
+      decodeProjectIconInput({
         icon: "data:image/svg+xml;base64,bG9nbw==",
       }),
     ).toThrow();
@@ -1138,29 +1150,29 @@ describe("Worker HTTP contract", () => {
 
   it("normalizes project issue key prefixes and enforces the three-character limit", () => {
     expect(
-      projectIssueKeyPrefixInputSchema.parse({ issueKeyPrefix: " br " }),
+      decodeProjectIssueKeyPrefixInput({ issueKeyPrefix: " br " }),
     ).toEqual({ issueKeyPrefix: "BR" });
     expect(() =>
-      projectIssueKeyPrefixInputSchema.parse({ issueKeyPrefix: "LONG" }),
+      decodeProjectIssueKeyPrefixInput({ issueKeyPrefix: "LONG" }),
     ).toThrow();
     expect(() =>
-      projectIssueKeyPrefixInputSchema.parse({ issueKeyPrefix: "B-R" }),
+      decodeProjectIssueKeyPrefixInput({ issueKeyPrefix: "B-R" }),
     ).toThrow();
   });
 
   it("accepts only the optional schedule tab in project tab updates", () => {
-    expect(projectTabsInputSchema.parse({ schedule: false })).toEqual({
+    expect(decodeProjectTabsInput({ schedule: false })).toEqual({
       schedule: false,
     });
     expect(() =>
-      projectTabsInputSchema.parse({ issues: false, schedule: true }),
+      decodeProjectTabsInput({ issues: false, schedule: true }),
     ).toThrow();
-    expect(() => projectTabsInputSchema.parse({})).toThrow();
+    expect(() => decodeProjectTabsInput({})).toThrow();
   });
 
   it("validates structural issue model effort preferences", () => {
     expect(
-      issueExecutionPreferencesSchema.parse({
+      decodeExecutionPreferences({
         provider: "codex",
         model: "gpt-5.6-sol",
         effort: "ultra",
@@ -1171,14 +1183,14 @@ describe("Worker HTTP contract", () => {
       effort: "ultra",
     });
     expect(() =>
-      issueExecutionPreferencesSchema.parse({
+      decodeExecutionPreferences({
         provider: null,
         model: "gpt-5.6-sol",
         effort: null,
       }),
     ).toThrow(/provider is required/iu);
     expect(
-      issueExecutionPreferencesSchema.parse({
+      decodeExecutionPreferences({
         provider: "grok",
         model: "grok-4.6",
         effort: "xhigh",
@@ -1188,28 +1200,28 @@ describe("Worker HTTP contract", () => {
 
   it("accepts one Worker emoji or image and rejects invalid icon text", () => {
     expect(
-      workerSettingsSchema.parse({
+      decodeWorkerSettings({
         icon: { type: "emoji", value: "👩🏽‍💻" },
       }),
     ).toEqual({ icon: { type: "emoji", value: "👩🏽‍💻" } });
     expect(
-      workerSettingsSchema.parse({
+      decodeWorkerSettings({
         icon: { type: "image", value: "data:image/webp;base64,aA==" },
       }),
     ).toEqual({
       icon: { type: "image", value: "data:image/webp;base64,aA==" },
     });
     expect(() =>
-      workerSettingsSchema.parse({
+      decodeWorkerSettings({
         icon: { type: "emoji", value: "worker" },
       }),
     ).toThrow(/one emoji/u);
-    expect(workerSettingsSchema.parse({ icon: null })).toEqual({ icon: null });
+    expect(decodeWorkerSettings({ icon: null })).toEqual({ icon: null });
   });
 
   it("accepts Worker provider usage health and all supported providers during registration", () => {
     expect(
-      workerRegisterSchema.parse({
+      decodeWorkerRegister({
         label: "janet",
         deviceIdentity: `briar_device_${"a".repeat(64)}`,
         agentProvider: "codex",
@@ -1328,14 +1340,14 @@ describe("Worker HTTP contract", () => {
       },
     };
 
-    expect(eventSchema.parse(blockedEvent).structuredResult?.nextAction).toContain(
+    expect(decodeRunEvent(blockedEvent).structuredResult?.nextAction).toContain(
       "repository owner",
     );
     expect(() =>
-      eventSchema.parse({ ...blockedEvent, structuredResult: null }),
+      decodeRunEvent({ ...blockedEvent, structuredResult: null }),
     ).toThrow(/structured blocked result/u);
     expect(() =>
-      eventSchema.parse({
+      decodeRunEvent({
         ...blockedEvent,
         structuredResult: {
           ...blockedEvent.structuredResult,
@@ -1344,7 +1356,7 @@ describe("Worker HTTP contract", () => {
       }),
     ).toThrow(/blocked structured outcome/u);
     expect(() =>
-      eventSchema.parse({
+      decodeRunEvent({
         ...blockedEvent,
         structuredResult: {
           ...blockedEvent.structuredResult,
@@ -1387,12 +1399,12 @@ describe("Worker HTTP contract", () => {
         }],
         updatedAt: "2026-07-30T00:00:00.000Z",
       };
-    expect(projectAgentSessionInputSchema.parse(snapshot)).toMatchObject({
+    expect(decodeProjectAgentSessionInput(snapshot)).toMatchObject({
       agentName: "Inbox Agent",
       status: "running",
     });
     expect(
-      projectAgentSessionInputSchema.parse({
+      decodeProjectAgentSessionInput({
         ...snapshot,
         status: "skipped",
         completedAt: "2026-07-30T00:01:00.000Z",
@@ -1411,11 +1423,11 @@ describe("Worker HTTP contract", () => {
   });
 
   it("accepts only assignable organization member roles", () => {
-    expect(organizationMemberRoleInputSchema.parse({ role: "admin" })).toEqual({
+    expect(decodeOrganizationMemberRoleInput({ role: "admin" })).toEqual({
       role: "admin",
     });
     expect(() =>
-      organizationMemberRoleInputSchema.parse({ role: "owner" }),
+      decodeOrganizationMemberRoleInput({ role: "owner" }),
     ).toThrow();
   });
 
@@ -1495,7 +1507,7 @@ describe("Worker HTTP contract", () => {
 
   it("accepts exact workflow evidence names containing spaces and slashes", () => {
     expect(
-      runEvidenceInputSchema.parse({
+      decodeRunEvidenceInput({
         evidenceKey: "LOCAL-1:local_qa:signoff",
         stage: "local_qa",
         type: "  signoff/app worker  ",
@@ -1694,7 +1706,7 @@ describe("Worker HTTP contract", () => {
 
   it("requires an explicit earlier stage and reason for run rework", () => {
     expect(
-      runReworkInputSchema.parse({
+      decodeRunReworkInput({
         requestId: "11111111-1111-4111-8111-111111111111",
         workflowStage: "implementing",
         reason: "Local QA found a product-code defect.",
@@ -1707,7 +1719,7 @@ describe("Worker HTTP contract", () => {
       actor: "briar-workflow",
     });
     expect(() =>
-      runReworkInputSchema.parse({
+      decodeRunReworkInput({
         requestId: "11111111-1111-4111-8111-111111111111",
         workflowStage: "implementing",
         reason: " ",
@@ -1718,7 +1730,7 @@ describe("Worker HTTP contract", () => {
 
   it("requires exact checkpoint identity for paused run rework", () => {
     expect(
-      pausedRunReworkInputSchema.parse({
+      decodePausedRunReworkInput({
         requestId: "11111111-1111-4111-8111-111111111111",
         workflowStage: "local_qa",
         reason: "Keep the result in the Result tab and verify the revised copy.",
@@ -1733,7 +1745,7 @@ describe("Worker HTTP contract", () => {
       revision: 3,
     });
     expect(() =>
-      pausedRunReworkInputSchema.parse({
+      decodePausedRunReworkInput({
         requestId: "11111111-1111-4111-8111-111111111111",
         workflowStage: "local_qa",
         reason: "Apply review feedback",
@@ -1745,7 +1757,7 @@ describe("Worker HTTP contract", () => {
 
   it("normalizes recurring agent schedule input", () => {
     expect(
-      projectAgentScheduleInputSchema.parse({
+      decodeProjectAgentScheduleInput({
         agentId: "11111111-1111-4111-8111-111111111111",
         name: "  Weekly audit  ",
         recurrence: "weekly",
@@ -1766,7 +1778,7 @@ describe("Worker HTTP contract", () => {
       timeZone: "Asia/Seoul",
     });
     expect(
-      projectAgentScheduleInputSchema.parse({
+      decodeProjectAgentScheduleInput({
         agentId: "11111111-1111-4111-8111-111111111111",
         name: "Daily audit",
         recurrence: "daily",
@@ -1776,7 +1788,7 @@ describe("Worker HTTP contract", () => {
       }).dayOfWeek,
     ).toBeNull();
     expect(() =>
-      projectAgentScheduleInputSchema.parse({
+      decodeProjectAgentScheduleInput({
         agentId: "11111111-1111-4111-8111-111111111111",
         name: "Invalid zone",
         recurrence: "daily",
@@ -1788,7 +1800,7 @@ describe("Worker HTTP contract", () => {
 
   it("normalizes custom schedule days and requires a weekly selection", () => {
     expect(
-      projectAgentScheduleInputSchema.parse({
+      decodeProjectAgentScheduleInput({
         agentId: "11111111-1111-4111-8111-111111111111",
         name: "Alternating review",
         recurrence: "custom",
@@ -1807,7 +1819,7 @@ describe("Worker HTTP contract", () => {
       notificationLevel: "none",
     });
     expect(() =>
-      projectAgentScheduleInputSchema.parse({
+      decodeProjectAgentScheduleInput({
         agentId: "11111111-1111-4111-8111-111111111111",
         name: "Missing weekdays",
         recurrence: "custom",
@@ -1821,7 +1833,7 @@ describe("Worker HTTP contract", () => {
 
   it("accepts a name-only organization update", () => {
     expect(
-      organizationUpdateInputSchema.parse({ name: "  Briar Labs  " }),
+      decodeOrganizationUpdateInput({ name: "  Briar Labs  " }),
     ).toEqual({
       name: "Briar Labs",
     });
@@ -1829,25 +1841,25 @@ describe("Worker HTTP contract", () => {
 
   it("accepts bounded browser-supported organization logos or removal", () => {
     expect(
-      organizationLogoInputSchema.parse({
+      decodeOrganizationLogoInput({
         logo: "data:image/webp;base64,bG9nbw==",
       }),
     ).toEqual({ logo: "data:image/webp;base64,bG9nbw==" });
     expect(
-      organizationLogoInputSchema.parse({
+      decodeOrganizationLogoInput({
         logo: "data:image/png;base64,bG9nbw==",
       }),
     ).toEqual({ logo: "data:image/png;base64,bG9nbw==" });
     expect(
-      organizationLogoInputSchema.parse({
+      decodeOrganizationLogoInput({
         logo: "data:image/jpeg;base64,bG9nbw==",
       }),
     ).toEqual({ logo: "data:image/jpeg;base64,bG9nbw==" });
-    expect(organizationLogoInputSchema.parse({ logo: null })).toEqual({
+    expect(decodeOrganizationLogoInput({ logo: null })).toEqual({
       logo: null,
     });
     expect(() =>
-      organizationLogoInputSchema.parse({
+      decodeOrganizationLogoInput({
         logo: "data:image/gif;base64,bG9nbw==",
       }),
     ).toThrow();
@@ -1855,7 +1867,7 @@ describe("Worker HTTP contract", () => {
 
   it("validates editable issue fields", () => {
     expect(
-      issueUpdateInputSchema.parse({
+      decodeIssueUpdateInput({
         title: "  Updated issue  ",
         description: null,
         priority: 1,
@@ -1868,7 +1880,7 @@ describe("Worker HTTP contract", () => {
       assigneeUserId: "member-1",
     });
     expect(() =>
-      issueUpdateInputSchema.parse({
+      decodeIssueUpdateInput({
         title: "",
         description: null,
         priority: 5,
@@ -1879,7 +1891,7 @@ describe("Worker HTTP contract", () => {
   it("requires a matching outcome payload for schedule-run completion", () => {
     const claimToken = `briar_schedule_claim_${"a".repeat(64)}`;
     expect(
-      projectAgentScheduleRunCompletionSchema.parse({
+      decodeProjectAgentScheduleRunCompletion({
         claimToken,
         status: "completed",
         resultSummary: "Repository audit completed.",
@@ -1912,7 +1924,7 @@ describe("Worker HTTP contract", () => {
       error: null,
     });
     expect(() =>
-      projectAgentScheduleRunCompletionSchema.parse({
+      decodeProjectAgentScheduleRunCompletion({
         claimToken,
         status: "failed",
         resultSummary: null,
@@ -1930,7 +1942,7 @@ describe("Worker HTTP contract", () => {
       }),
     ).toThrow(/failed runs require an error/u);
     expect(() =>
-      projectAgentScheduleRunCompletionSchema.parse({
+      decodeProjectAgentScheduleRunCompletion({
         claimToken,
         status: "completed",
         resultSummary: "A legacy summary.",
@@ -1969,7 +1981,7 @@ describe("Worker HTTP contract", () => {
       "PUT",
       200,
     )).toBeNull();
-    expect(projectAgentScheduleBatchClaimSchema.parse({
+    expect(decodeProjectAgentScheduleBatchClaim({
       projectIds: [projectId, projectId],
     })).toEqual({ projectIds: [projectId, projectId] });
   });
@@ -2305,6 +2317,36 @@ describe("Worker HTTP contract", () => {
 
     expect(response.status).toBe(401);
     expect(prepare).not.toHaveBeenCalled();
+  });
+
+  it("maps malformed GitHub webhook payloads to the GitHub validation response", async () => {
+    const secret = "github-webhook-test-secret";
+    const body = JSON.stringify({ hook_id: 42 });
+    const signature = `sha256=${
+      createHmac("sha256", secret).update(body).digest("hex")
+    }`;
+    const response = await worker.fetch(
+      new Request("https://briar-api.example/github/webhooks", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-github-delivery": "33333333-3333-4333-8333-333333333333",
+          "x-github-event": "ping",
+          "x-hub-signature-256": signature,
+        },
+        body,
+      }),
+      {
+        DB: { prepare: vi.fn() },
+        GITHUB_WEBHOOK_SECRET: secret,
+      } as never,
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      message: "Invalid GitHub webhook",
+      issues: [{ path: ["zen"], message: expect.any(String) }],
+    });
   });
 
   it("stops reading an oversized GitHub webhook before signature verification", async () => {

@@ -1,13 +1,13 @@
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  organizationAgentContextAgentsPageSchema,
-  organizationAgentContextIssuePullRequestsPageSchema,
-  organizationAgentContextIssuesPageSchema,
-  organizationAgentContextProjectsPageSchema,
-  organizationAgentContextSessionsPageSchema,
-  organizationAgentContextLookupResponseSchema,
-  organizationAgentContextManifestSchema,
+  decodeOrganizationAgentContextAgentsPage,
+  decodeOrganizationAgentContextIssuePullRequestsPage,
+  decodeOrganizationAgentContextIssuesPage,
+  decodeOrganizationAgentContextLookupResponse,
+  decodeOrganizationAgentContextManifest,
+  decodeOrganizationAgentContextProjectsPage,
+  decodeOrganizationAgentContextSessionsPage,
 } from "../../src/lib/organization-agent-context-contract";
 import {
   type ArchiveBucket,
@@ -44,6 +44,21 @@ const archiveSweepAt = "2025-03-15T00:00:00.000Z";
 const currentDataAt = "2025-04-01T00:00:00.000Z";
 const snapshotAt = "2025-05-01T00:00:00.000Z";
 const futureDataAt = "2025-06-01T00:00:00.000Z";
+
+const mutateEncodedCursor = (
+  encoded: string | null,
+  mutate: (cursor: Record<string, unknown>) => void,
+) => {
+  if (!encoded) throw new Error("Expected a cursor");
+  const padded = encoded.replaceAll("-", "+").replaceAll("_", "/")
+    .padEnd(Math.ceil(encoded.length / 4) * 4, "=");
+  const cursor = JSON.parse(atob(padded)) as Record<string, unknown>;
+  mutate(cursor);
+  return btoa(JSON.stringify(cursor))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/u, "");
+};
 
 let miniflare: Miniflare;
 
@@ -443,7 +458,7 @@ describe("Organization Agent context pages", () => {
       snapshotAt,
       limit: 1,
     });
-    expect(() => organizationAgentContextProjectsPageSchema.parse(first))
+    expect(() => decodeOrganizationAgentContextProjectsPage(first))
       .not.toThrow();
     expect(first).toMatchObject({ total: 2, complete: false });
     expect(first.items.map((item) => item.id)).toEqual([projectId]);
@@ -455,7 +470,7 @@ describe("Organization Agent context pages", () => {
       limit: 1,
       cursor: first.nextCursor,
     });
-    expect(() => organizationAgentContextProjectsPageSchema.parse(second))
+    expect(() => decodeOrganizationAgentContextProjectsPage(second))
       .not.toThrow();
     expect(second).toMatchObject({ total: 2, complete: true });
     expect(second.items.map((item) => item.id)).toEqual([secondProjectId]);
@@ -486,7 +501,7 @@ describe("Organization Agent context pages", () => {
       snapshotAt,
       limit: 1,
     });
-    expect(() => organizationAgentContextAgentsPageSchema.parse(page))
+    expect(() => decodeOrganizationAgentContextAgentsPage(page))
       .not.toThrow();
     expect(page).toMatchObject({
       resource: "agents",
@@ -526,9 +541,9 @@ describe("Organization Agent context pages", () => {
       cursor: first.nextCursor,
     });
 
-    expect(() => organizationAgentContextIssuesPageSchema.parse(first))
+    expect(() => decodeOrganizationAgentContextIssuesPage(first))
       .not.toThrow();
-    expect(() => organizationAgentContextIssuesPageSchema.parse(second))
+    expect(() => decodeOrganizationAgentContextIssuesPage(second))
       .not.toThrow();
     expect(first).toMatchObject({ total: 2, complete: false });
     expect(second).toMatchObject({ total: 2, complete: true });
@@ -578,7 +593,7 @@ describe("Organization Agent context pages", () => {
         },
       );
       expect(() =>
-        organizationAgentContextIssuePullRequestsPageSchema.parse(page)
+        decodeOrganizationAgentContextIssuePullRequestsPage(page)
       ).not.toThrow();
       expect(page.total).toBe(101);
       items.push(...page.items);
@@ -614,7 +629,7 @@ describe("Organization Agent context pages", () => {
           cursor,
         },
       );
-      expect(() => organizationAgentContextSessionsPageSchema.parse(page))
+      expect(() => decodeOrganizationAgentContextSessionsPage(page))
         .not.toThrow();
       expectedTotal = page.total;
       items.push(...page.items);
@@ -667,7 +682,7 @@ describe("Organization Agent context pages", () => {
       workId,
       snapshotAt,
     });
-    expect(() => organizationAgentContextManifestSchema.parse(manifest))
+    expect(() => decodeOrganizationAgentContextManifest(manifest))
       .not.toThrow();
     expect(manifest.revision).toMatch(/^[0-9a-f]{64}$/u);
     expect(manifest.projects.map((project) => project.id)).toEqual([
@@ -716,7 +731,7 @@ describe("Organization Agent context pages", () => {
         },
       ],
     });
-    expect(() => organizationAgentContextLookupResponseSchema.parse(summaries))
+    expect(() => decodeOrganizationAgentContextLookupResponse(summaries))
       .not.toThrow();
     expect(JSON.stringify(summaries)).not.toContain("Inspect project state.");
     expect(JSON.stringify(summaries)).not.toContain("Visible issue description");
@@ -834,6 +849,95 @@ describe("Organization Agent context pages", () => {
         cursor: "not!base64",
       }),
     ).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
+  });
+
+  it("preserves strict cursor shapes, nonnegative positions, and offset dates", async () => {
+    const offsetSnapshotAt = "2025-05-01T09:00:00+09:00";
+    const projectPage = await listOrganizationAgentContextProjectsPage(db, {
+      organizationId,
+      workId,
+      snapshotAt: offsetSnapshotAt,
+      limit: 1,
+    });
+    expect(projectPage.nextCursor).not.toBeNull();
+    await expect(listOrganizationAgentContextProjectsPage(db, {
+      organizationId,
+      workId,
+      snapshotAt: offsetSnapshotAt,
+      cursor: projectPage.nextCursor,
+    })).resolves.toMatchObject({ complete: true });
+
+    const excessPropertyCursor = mutateEncodedCursor(
+      projectPage.nextCursor,
+      (cursor) => {
+        cursor.futureField = true;
+      },
+    );
+    await expect(listOrganizationAgentContextProjectsPage(db, {
+      organizationId,
+      workId,
+      snapshotAt: offsetSnapshotAt,
+      cursor: excessPropertyCursor,
+    })).rejects.toMatchObject({
+      name: "OrganizationAgentContextCursorError",
+      message: "Invalid organization context cursor",
+    });
+
+    const missingOffsetCursor = mutateEncodedCursor(
+      projectPage.nextCursor,
+      (cursor) => {
+        cursor.snapshotAt = "2025-05-01T09:00:00";
+      },
+    );
+    await expect(listOrganizationAgentContextProjectsPage(db, {
+      organizationId,
+      workId,
+      snapshotAt: "2025-05-01T09:00:00",
+      cursor: missingOffsetCursor,
+    })).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
+
+    const issuePage = await listOrganizationAgentContextIssuesPage(db, {
+      organizationId,
+      projectId,
+      workId,
+      snapshotAt,
+      limit: 1,
+    });
+    const negativePositionCursor = mutateEncodedCursor(
+      issuePage.nextCursor,
+      (cursor) => {
+        cursor.runNumber = -1;
+      },
+    );
+    await expect(listOrganizationAgentContextIssuesPage(db, {
+      organizationId,
+      projectId,
+      workId,
+      snapshotAt,
+      cursor: negativePositionCursor,
+    })).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
+
+    const pullRequestPage =
+      await listOrganizationAgentContextIssuePullRequestsPage(db, {
+        organizationId,
+        projectId,
+        workId,
+        snapshotAt,
+        limit: 1,
+      });
+    const negativePullRequestPositionCursor = mutateEncodedCursor(
+      pullRequestPage.nextCursor,
+      (cursor) => {
+        cursor.position = -1;
+      },
+    );
+    await expect(listOrganizationAgentContextIssuePullRequestsPage(db, {
+      organizationId,
+      projectId,
+      workId,
+      snapshotAt,
+      cursor: negativePullRequestPositionCursor,
+    })).rejects.toBeInstanceOf(OrganizationAgentContextCursorError);
   });
 
   it("shrinks encoded pages at item boundaries and rejects one oversized item", async () => {

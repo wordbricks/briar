@@ -8,6 +8,10 @@ import type {
 } from "./db";
 import { upsertProjectAgentSessionSummary } from "./db";
 import type { TranscriptSessionRow } from "./workers";
+import type {
+  AgentTranscriptSegmentRow,
+  AgentWorkLogEntryRow,
+} from "./agent-worklog";
 import {
   archiveFormatVersion,
   decodeArchivedExecutionAudit,
@@ -22,8 +26,6 @@ import {
   decodeArchiveLine,
   decodeArchiveManifest,
   decodeRelatedArchiveObjectKeysOption,
-  type AgentTranscriptSegmentArchiveRow,
-  type AgentWorkLogEntryArchiveRow,
   type ArchiveKind,
   type ExecutionAuditArchiveRow,
 } from "./archive-contract";
@@ -420,14 +422,14 @@ const transcriptCandidate = async (
        where session_id = ? order by sequence, entry_id`,
     )
     .bind(session.session_id)
-    .all<AgentWorkLogEntryArchiveRow>();
+    .all<AgentWorkLogEntryRow>();
   const segments = await db
     .prepare(
       `select * from briar_agent_transcript_segments
        where session_id = ? order by first_sequence, last_sequence`,
     )
     .bind(session.session_id)
-    .all<AgentTranscriptSegmentArchiveRow>();
+    .all<AgentTranscriptSegmentRow>();
   const workLogEntries = workLog.results ?? [];
   const transcriptSegments = segments.results ?? [];
   return {

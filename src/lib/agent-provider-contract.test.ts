@@ -1,10 +1,12 @@
+import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import {
-  agentProviderCapabilityCatalogSchema,
+  AgentProviderCapabilityCatalog,
   agentProviderSupportsSelection,
+  decodeAgentProviderCapabilityCatalog,
   emptyAgentProviderCapabilityCatalog,
   mergeAgentProviderCapabilityCatalogs,
-  modelEffortSchema,
+  ModelEffort,
 } from "./agent-provider-contract";
 import { agentProviderLabels, agentProviders } from "./agent-provider";
 
@@ -38,14 +40,16 @@ describe("agent provider contract", () => {
       label: "Grok 4.6",
       efforts: [{ id: "xhigh", label: "Extra high" }],
     }];
-    expect(agentProviderCapabilityCatalogSchema.parse(catalog)).toEqual(catalog);
-    expect(modelEffortSchema.parse("future-effort")).toBe("future-effort");
+    expect(decodeAgentProviderCapabilityCatalog(catalog)).toEqual(catalog);
+    expect(Schema.decodeUnknownSync(ModelEffort)("future-effort")).toBe(
+      "future-effort",
+    );
   });
 
   it("fills newly added providers for capability catalogs from older workers", () => {
     const legacy = emptyAgentProviderCapabilityCatalog();
     delete (legacy as Partial<typeof legacy>).agy;
-    const parsed = agentProviderCapabilityCatalogSchema.parse(legacy);
+    const parsed = decodeAgentProviderCapabilityCatalog(legacy);
     expect(parsed.agy).toEqual({
       models: [],
       defaultEfforts: [],

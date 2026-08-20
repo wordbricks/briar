@@ -1,8 +1,12 @@
+import * as Option from "effect/Option";
 import {
   autoHuntWorkflowStageCatalog,
   normalizeAutoHuntWorkflow,
 } from "../../src/lib/auto-hunt-contract";
-import { structuredAgentResultSchema } from "../../src/lib/agent-result";
+import {
+  decodeStructuredAgentResultOption,
+  type StructuredAgentResult,
+} from "../../src/lib/agent-result";
 import { inboxSessionMessageVersion } from "../../src/lib/inbox-session-version";
 import type {
   ChannelConversationNotificationRow,
@@ -101,7 +105,7 @@ export type InboxFeedMessage = {
   workflowStage?: string | null;
   workflowStageLabel?: string | null;
   priority?: number | null;
-  structuredResult?: ReturnType<typeof structuredAgentResultSchema.parse> | null;
+  structuredResult?: StructuredAgentResult | null;
   messageId?: string;
   rootMessageId?: string;
   body?: string;
@@ -204,10 +208,11 @@ function workflowStageLabel(run: InboxFeedRun) {
 function structuredResult(run: InboxFeedRun) {
   if (!run.structured_result_json) return null;
   try {
-    const parsed = structuredAgentResultSchema.safeParse(
-      JSON.parse(run.structured_result_json),
+    return Option.getOrNull(
+      decodeStructuredAgentResultOption(
+        JSON.parse(run.structured_result_json),
+      ),
     );
-    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }

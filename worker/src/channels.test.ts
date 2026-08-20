@@ -679,6 +679,18 @@ describe("organization channels", () => {
       body: JSON.stringify({ text: "Production deployed" }),
     }), apiEnv);
     expect(unsupported.status).toBe(415);
+    const malformed = await apiWorker.fetch(new Request(webhookUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "" }),
+    }), apiEnv);
+    expect(malformed.status).toBe(400);
+    await expect(malformed.json()).resolves.toMatchObject({
+      message: "Invalid request",
+      issues: expect.arrayContaining([
+        expect.objectContaining({ path: ["text"] }),
+      ]),
+    });
     const post = () => apiWorker.fetch(new Request(webhookUrl, {
       method: "POST",
       headers: {

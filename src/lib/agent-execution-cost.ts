@@ -1,10 +1,10 @@
 import * as Schema from "effect/Schema";
+import { IsoDateTimeWithOffset } from "./date-time-schema";
 import {
   AgentExecutionModelSourceSchema,
   AgentProviderSchema,
   NonnegativeSafeInteger,
   NullableTrimmedText,
-  ObservedAt,
   strictAgentExecutionSchemaOptions,
   TrimmedText,
 } from "./agent-execution-metrics/codec";
@@ -29,7 +29,7 @@ export const AgentExecutionCostRecord = Schema.Struct({
   modelSource: AgentExecutionModelSourceSchema,
   source: TrimmedText(128),
   amountUsdTicks: NonnegativeSafeInteger,
-  observedAt: ObservedAt,
+  observedAt: IsoDateTimeWithOffset,
 }).annotate({ parseOptions: strictAgentExecutionSchemaOptions });
 
 export type AgentExecutionCostRecord =

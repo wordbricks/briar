@@ -1,6 +1,8 @@
-import { z } from "zod";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
-import { structuredAgentResultSchema } from "../../src/lib/agent-result";
+import { decodeStructuredAgentResultOption } from "../../src/lib/agent-result";
+import { IsoDateTimeWithOffset } from "../../src/lib/date-time-schema";
 import type { OrganizationAgentContextLookupRequest } from "../../src/lib/organization-agent-context-contract";
 import {
   type ArchiveBucket,
@@ -34,116 +36,76 @@ type ContextPageInput = {
 
 type ProjectContextPageInput = ContextPageInput & { projectId: string };
 
-type ProjectCursor = {
-  schemaVersion: 1;
-  organizationId: string;
-  workId: string;
-  snapshotAt: string;
-  resource: "projects";
-  projectId: null;
-  createdAt: string;
-  id: string;
-};
+const cursorSchemaOptions = {
+  errors: "all",
+  onExcessProperty: "error",
+} as const;
+const strictCursor = <S extends Schema.Top>(schema: S) =>
+  schema.annotate({ parseOptions: cursorSchemaOptions });
+const cursorUuid = Schema.String.check(Schema.isUUID());
+const contextCursorBaseFields = {
+  schemaVersion: Schema.Literal(1),
+  organizationId: cursorUuid,
+  workId: cursorUuid,
+  snapshotAt: IsoDateTimeWithOffset,
+} as const;
 
-type IssueCursor = {
-  schemaVersion: 1;
-  organizationId: string;
-  workId: string;
-  snapshotAt: string;
-  resource: "issues";
-  projectId: string;
-  runNumber: number;
-};
+const agentCursorSchema = strictCursor(Schema.Struct({
+  ...contextCursorBaseFields,
+  resource: Schema.Literal("agents"),
+  projectId: cursorUuid,
+  createdAt: IsoDateTimeWithOffset,
+  id: cursorUuid,
+}));
+type AgentCursor = typeof agentCursorSchema.Type;
 
-type AgentCursor = {
-  schemaVersion: 1;
-  organizationId: string;
-  workId: string;
-  snapshotAt: string;
-  resource: "agents";
-  projectId: string;
-  createdAt: string;
-  id: string;
-};
+const issuePullRequestCursorSchema = strictCursor(Schema.Struct({
+  ...contextCursorBaseFields,
+  resource: Schema.Literal("issue-pull-requests"),
+  projectId: cursorUuid,
+  runNumber: Schema.Natural,
+  position: Schema.Natural,
+}));
+type IssuePullRequestCursor = typeof issuePullRequestCursorSchema.Type;
 
-type IssuePullRequestCursor = {
-  schemaVersion: 1;
-  organizationId: string;
-  workId: string;
-  snapshotAt: string;
-  resource: "issue-pull-requests";
-  projectId: string;
-  runNumber: number;
-  position: number;
-};
+const projectCursorSchema = strictCursor(Schema.Struct({
+  ...contextCursorBaseFields,
+  resource: Schema.Literal("projects"),
+  projectId: Schema.Null,
+  createdAt: IsoDateTimeWithOffset,
+  id: cursorUuid,
+}));
+type ProjectCursor = typeof projectCursorSchema.Type;
 
-type SessionCursor = {
-  schemaVersion: 1;
-  organizationId: string;
-  workId: string;
-  snapshotAt: string;
-  resource: "agent-sessions";
-  projectId: string;
-  id: string;
-};
+const issueCursorSchema = strictCursor(Schema.Struct({
+  ...contextCursorBaseFields,
+  resource: Schema.Literal("issues"),
+  projectId: cursorUuid,
+  runNumber: Schema.Natural,
+}));
+type IssueCursor = typeof issueCursorSchema.Type;
 
-type ContextCursor =
-  | ProjectCursor
-  | AgentCursor
-  | IssueCursor
-  | IssuePullRequestCursor
-  | SessionCursor;
+const sessionCursorSchema = strictCursor(Schema.Struct({
+  ...contextCursorBaseFields,
+  resource: Schema.Literal("agent-sessions"),
+  projectId: cursorUuid,
+  id: Schema.String.check(Schema.isLengthBetween(1, 128)),
+}));
+type SessionCursor = typeof sessionCursorSchema.Type;
 
-const contextCursorSchema = z.discriminatedUnion("resource", [
-  z.object({
-    schemaVersion: z.literal(1),
-    organizationId: z.string().uuid(),
-    workId: z.string().uuid(),
-    snapshotAt: z.string().datetime({ offset: true }),
-    resource: z.literal("agents"),
-    projectId: z.string().uuid(),
-    createdAt: z.string().datetime({ offset: true }),
-    id: z.string().uuid(),
-  }).strict(),
-  z.object({
-    schemaVersion: z.literal(1),
-    organizationId: z.string().uuid(),
-    workId: z.string().uuid(),
-    snapshotAt: z.string().datetime({ offset: true }),
-    resource: z.literal("issue-pull-requests"),
-    projectId: z.string().uuid(),
-    runNumber: z.number().int().nonnegative(),
-    position: z.number().int().nonnegative(),
-  }).strict(),
-  z.object({
-    schemaVersion: z.literal(1),
-    organizationId: z.string().uuid(),
-    workId: z.string().uuid(),
-    snapshotAt: z.string().datetime({ offset: true }),
-    resource: z.literal("projects"),
-    projectId: z.null(),
-    createdAt: z.string().datetime({ offset: true }),
-    id: z.string().uuid(),
-  }).strict(),
-  z.object({
-    schemaVersion: z.literal(1),
-    organizationId: z.string().uuid(),
-    workId: z.string().uuid(),
-    snapshotAt: z.string().datetime({ offset: true }),
-    resource: z.literal("issues"),
-    projectId: z.string().uuid(),
-    runNumber: z.number().int().nonnegative(),
-  }).strict(),
-  z.object({
-    schemaVersion: z.literal(1),
-    organizationId: z.string().uuid(),
-    workId: z.string().uuid(),
-    snapshotAt: z.string().datetime({ offset: true }),
-    resource: z.literal("agent-sessions"),
-    projectId: z.string().uuid(),
-    id: z.string().min(1).max(128),
-  }).strict(),
+const contextCursorSchema = Schema.Union([
+  agentCursorSchema,
+  issuePullRequestCursorSchema,
+  projectCursorSchema,
+  issueCursorSchema,
+  sessionCursorSchema,
 ]);
+type ContextCursor = typeof contextCursorSchema.Type;
+
+const decodeContextCursor = Schema.decodeUnknownSync(
+  contextCursorSchema,
+  cursorSchemaOptions,
+);
 
 export class OrganizationAgentContextCursorError extends Error {
   constructor(message = "Invalid organization context cursor") {
@@ -182,7 +144,7 @@ const decodeCursor = (
   try {
     const padded = encoded.replaceAll("-", "+").replaceAll("_", "/")
       .padEnd(Math.ceil(encoded.length / 4) * 4, "=");
-    const cursor = contextCursorSchema.parse(JSON.parse(atob(padded)));
+    const cursor = decodeContextCursor(JSON.parse(atob(padded)));
     if (
       cursor.organizationId !== expected.organizationId ||
       cursor.workId !== expected.workId ||
@@ -532,8 +494,8 @@ type ContextIssueRow = {
 };
 
 const contextIssueJson = (row: ContextIssueRow) => {
-  const structuredResult = structuredAgentResultSchema.safeParse(
-    parseJson(row.structured_result_json),
+  const structuredResult = Option.getOrNull(
+    decodeStructuredAgentResultOption(parseJson(row.structured_result_json)),
   );
   return {
     id: row.id,
@@ -561,7 +523,7 @@ const contextIssueJson = (row: ContextIssueRow) => {
       : null,
     issueDescription: row.issue_description,
     resultSummary: row.result_summary,
-    structuredResult: structuredResult.success ? structuredResult.data : null,
+    structuredResult,
     targetSha: row.target_sha,
     stagingQaStatus: row.staging_qa_status,
     productionQaStatus: row.production_qa_status,

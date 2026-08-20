@@ -409,9 +409,9 @@ export function detachedTranscriptSequence(
   return (claimAttempt - 1) * detachedTranscriptClaimStride + localSequence;
 }
 
-export type DetachedAgentProvider = AgentProvider;
+type DetachedAgentProvider = AgentProvider;
 
-export type DetachedAgentEffort = ModelEffort;
+type DetachedAgentEffort = ModelEffort;
 
 export type DetachedAgentSkill = {
   id: string;

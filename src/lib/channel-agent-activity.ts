@@ -1,89 +1,90 @@
-import { z } from "zod";
+import * as Schema from "effect/Schema";
+import { IsoDateTimeUtc } from "./date-time-schema";
 
 export const CHANNEL_AGENT_ACTIVITY_VERSION = 1 as const;
 export const CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH = 240;
 export const CHANNEL_AGENT_ACTIVITY_STALE_MS = 30_000;
 
-export const channelAgentActivityKindSchema = z.enum([
+const strictSchemaOptions = {
+  errors: "all",
+  onExcessProperty: "error",
+} as const;
+const PositiveInteger = Schema.Int.check(
+  Schema.isGreaterThanOrEqualTo(1),
+);
+
+export const ChannelAgentActivityKind = Schema.Literals([
   "message",
   "command",
   "fileChange",
   "webSearch",
   "tool",
 ]);
+export type ChannelAgentActivityKind =
+  typeof ChannelAgentActivityKind.Type;
 
-export const channelAgentActivityDescriptorSchema = z
-  .object({
-    id: z.string().trim().min(1).max(200),
-    kind: channelAgentActivityKindSchema,
-    headline: z
-      .string()
-      .trim()
-      .min(1)
-      .max(CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH),
-  })
-  .strict();
+export const ChannelAgentActivityDescriptor = Schema.Struct({
+  id: Schema.Trim.check(Schema.isLengthBetween(1, 200)),
+  kind: ChannelAgentActivityKind,
+  headline: Schema.Trim.check(
+    Schema.isLengthBetween(1, CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH),
+  ),
+}).annotate({ parseOptions: strictSchemaOptions });
+export type ChannelAgentActivityDescriptor =
+  typeof ChannelAgentActivityDescriptor.Type;
 
-export const channelAgentActivityPublishInputSchema = z
-  .object({
-    // MAX_SAFE_INTEGER is reserved for the server's terminal clear tombstone.
-    sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER - 1),
-    activity: channelAgentActivityDescriptorSchema.nullable(),
-  })
-  .strict();
+export const ChannelAgentActivityPublishInput = Schema.Struct({
+  // MAX_SAFE_INTEGER is reserved for the server's terminal clear tombstone.
+  sequence: PositiveInteger.check(
+    Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER - 1),
+  ),
+  activity: Schema.NullOr(ChannelAgentActivityDescriptor),
+}).annotate({ parseOptions: strictSchemaOptions });
+export type ChannelAgentActivityPublishInput =
+  typeof ChannelAgentActivityPublishInput.Type;
 
-export const channelAgentActivityFrameSchema = z
-  .object({
-    version: z.literal(CHANNEL_AGENT_ACTIVITY_VERSION),
-    replyJobId: z.uuid(),
-    attempt: z.number().int().positive(),
-    sequence: z.number().int().positive(),
-    agentId: z.uuid(),
-    channelId: z.uuid(),
-    triggerMessageId: z.uuid(),
-    parentMessageId: z.uuid(),
-    activity: channelAgentActivityDescriptorSchema.nullable(),
-    sentAt: z.iso.datetime(),
-    expiresAt: z.iso.datetime(),
-  })
-  .strict();
+export const ChannelAgentActivityFrame = Schema.Struct({
+  version: Schema.Literal(CHANNEL_AGENT_ACTIVITY_VERSION),
+  replyJobId: Schema.String.check(Schema.isUUID()),
+  attempt: PositiveInteger,
+  sequence: PositiveInteger,
+  agentId: Schema.String.check(Schema.isUUID()),
+  channelId: Schema.String.check(Schema.isUUID()),
+  triggerMessageId: Schema.String.check(Schema.isUUID()),
+  parentMessageId: Schema.String.check(Schema.isUUID()),
+  activity: Schema.NullOr(ChannelAgentActivityDescriptor),
+  sentAt: IsoDateTimeUtc,
+  expiresAt: IsoDateTimeUtc,
+}).annotate({ parseOptions: strictSchemaOptions });
+export type ChannelAgentActivityFrame =
+  typeof ChannelAgentActivityFrame.Type;
 
-export const issueAgentActivityFrameSchema = z
-  .object({
-    version: z.literal(CHANNEL_AGENT_ACTIVITY_VERSION),
-    replyJobId: z.uuid(),
-    attempt: z.number().int().positive(),
-    sequence: z.number().int().positive(),
-    projectId: z.uuid(),
-    runId: z.uuid(),
-    triggerMessageId: z.uuid(),
-    parentMessageId: z.uuid(),
-    activity: channelAgentActivityDescriptorSchema.nullable(),
-    sentAt: z.iso.datetime(),
-    expiresAt: z.iso.datetime(),
-  })
-  .strict();
+export const IssueAgentActivityFrame = Schema.Struct({
+  version: Schema.Literal(CHANNEL_AGENT_ACTIVITY_VERSION),
+  replyJobId: Schema.String.check(Schema.isUUID()),
+  attempt: PositiveInteger,
+  sequence: PositiveInteger,
+  projectId: Schema.String.check(Schema.isUUID()),
+  runId: Schema.String.check(Schema.isUUID()),
+  triggerMessageId: Schema.String.check(Schema.isUUID()),
+  parentMessageId: Schema.String.check(Schema.isUUID()),
+  activity: Schema.NullOr(ChannelAgentActivityDescriptor),
+  sentAt: IsoDateTimeUtc,
+  expiresAt: IsoDateTimeUtc,
+}).annotate({ parseOptions: strictSchemaOptions });
+export type IssueAgentActivityFrame =
+  typeof IssueAgentActivityFrame.Type;
 
-export const agentReplyActivityFrameSchema = z.union([
-  channelAgentActivityFrameSchema,
-  issueAgentActivityFrameSchema,
+export const AgentReplyActivityFrame = Schema.Union([
+  ChannelAgentActivityFrame,
+  IssueAgentActivityFrame,
 ]);
+export type AgentReplyActivityFrame =
+  typeof AgentReplyActivityFrame.Type;
 
-export type ChannelAgentActivityKind = z.infer<
-  typeof channelAgentActivityKindSchema
->;
-export type ChannelAgentActivityDescriptor = z.infer<
-  typeof channelAgentActivityDescriptorSchema
->;
-export type ChannelAgentActivityPublishInput = z.infer<
-  typeof channelAgentActivityPublishInputSchema
->;
-export type ChannelAgentActivityFrame = z.infer<
-  typeof channelAgentActivityFrameSchema
->;
-export type IssueAgentActivityFrame = z.infer<
-  typeof issueAgentActivityFrameSchema
->;
-export type AgentReplyActivityFrame = z.infer<
-  typeof agentReplyActivityFrameSchema
->;
+export const decodeChannelAgentActivityFrameOption =
+  Schema.decodeUnknownOption(ChannelAgentActivityFrame);
+export const decodeIssueAgentActivityFrameOption =
+  Schema.decodeUnknownOption(IssueAgentActivityFrame);
+export const decodeAgentReplyActivityFrameOption =
+  Schema.decodeUnknownOption(AgentReplyActivityFrame);

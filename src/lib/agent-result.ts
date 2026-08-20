@@ -1,4 +1,5 @@
-import { z } from "zod";
+import * as Schema from "effect/Schema";
+import { IsoDateTimeWithOffset } from "./date-time-schema";
 
 export const agentResultOutcomes = [
   "completed",
@@ -25,28 +26,42 @@ export const agentResultImpacts = [
   "organization",
 ] as const;
 
-export const structuredAgentResultSchema = z
-  .object({
-    summary: z.string().trim().min(1).max(100_000),
-    outcome: z.enum(agentResultOutcomes),
-    importance: z.enum(agentResultImportances),
-    urgency: z.enum(agentResultUrgencies),
-    impact: z.enum(agentResultImpacts),
-    humanActionRequired: z.boolean(),
-    nextAction: z.string().trim().min(1).max(4_000).nullable(),
-    dueAt: z.string().datetime({ offset: true }).nullable(),
-  })
-  .strict()
-  .superRefine((result, context) => {
-    if (result.humanActionRequired && !result.nextAction) {
-      context.addIssue({
-        code: "custom",
-        message: "humanActionRequired results require nextAction",
-        path: ["nextAction"],
-      });
-    }
-  });
+const strictSchemaOptions = {
+  errors: "all",
+  onExcessProperty: "error",
+} as const;
 
-export type StructuredAgentResult = z.infer<
-  typeof structuredAgentResultSchema
->;
+const trimmedText = (maximumLength: number) =>
+  Schema.Trim.check(Schema.isLengthBetween(1, maximumLength));
+
+export const StructuredAgentResult = Schema.Struct({
+  summary: trimmedText(100_000),
+  outcome: Schema.Literals(agentResultOutcomes),
+  importance: Schema.Literals(agentResultImportances),
+  urgency: Schema.Literals(agentResultUrgencies),
+  impact: Schema.Literals(agentResultImpacts),
+  humanActionRequired: Schema.Boolean,
+  nextAction: Schema.NullOr(trimmedText(4_000)),
+  dueAt: Schema.NullOr(IsoDateTimeWithOffset),
+}).check(
+  Schema.makeFilter((result) =>
+    result.humanActionRequired && !result.nextAction
+      ? {
+          path: ["nextAction"],
+          issue: "humanActionRequired results require nextAction",
+        }
+      : undefined
+  ),
+).annotate({ parseOptions: strictSchemaOptions });
+
+export type StructuredAgentResult = typeof StructuredAgentResult.Type;
+
+export const decodeStructuredAgentResult = Schema.decodeUnknownSync(
+  StructuredAgentResult,
+  strictSchemaOptions,
+);
+
+export const decodeStructuredAgentResultOption = Schema.decodeUnknownOption(
+  StructuredAgentResult,
+  strictSchemaOptions,
+);

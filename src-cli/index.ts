@@ -13,18 +13,14 @@ import {
 import { spawn } from "node:child_process";
 import { homedir, platform, tmpdir } from "node:os";
 import { basename, isAbsolute, join, resolve } from "node:path";
-import { z } from "zod";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import packageJson from "../package.json";
 import {
-  autoHuntEvidenceTypeMaxLength,
-  autoHuntEvidenceTypePattern,
-  autoHuntPersistedRunStatuses,
   autoHuntRequirementKinds,
-  autoHuntSources,
-  normalizeAutoHuntWorkflow,
   repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
-import { structuredAgentResultSchema } from "../src/lib/agent-result";
+import { decodeStructuredAgentResult } from "../src/lib/agent-result";
 import {
   agentExecutionCostRecordsFromObservations,
   agentExecutionMetrics,
@@ -32,27 +28,13 @@ import {
   agentExecutionUsageRecordsFromObservations,
   createAgentExecutionUsageCollector,
 } from "../src/lib/agent-execution-metrics";
-import {
-  modelEffortSchema,
-} from "../src/lib/agent-provider-contract";
-import {
-  agentProviders,
-  type AgentProvider,
-} from "../src/lib/agent-provider";
-import {
-  agentResponsibilityMaxLength,
-  agentSkillsMaxCount,
-} from "../src/lib/agent-limits";
+import type { ModelEffort } from "../src/lib/agent-provider-contract";
+import type { AgentProvider } from "../src/lib/agent-provider";
 import { validateEvidenceImages } from "../src/lib/evidence-images";
 import {
+  decodeOrganizationAgentContextRequestTurn,
   organizationAgentContextCapability,
-  organizationAgentContextDescriptorSchema,
-  organizationAgentContextRequestTurnSchema,
 } from "../src/lib/organization-agent-context-contract";
-import {
-  issueTitleAbsoluteMaxLength,
-  issueTitleOverLimitMessage,
-} from "../src/lib/issue-title";
 import {
   createDetachedTranscriptSequencer,
   detachedAgentPrompt,
@@ -179,189 +161,49 @@ import {
   briarIssueUrl,
   ensureBriarIssueLinkInGithubPullRequest,
 } from "./github-pr";
+import {
+  configErrorLocations,
+  decodeConfig,
+  type Config,
+  type ProjectConfig,
+} from "./config-contract";
+import {
+  decodeChannelMessagesInput,
+  decodeCreateIssueInput,
+  decodeDashboardRuns,
+  decodeIsoDateTimeWithOffset,
+  decodeRunEvidenceInput,
+  decodeUuid,
+  decodeVelenEnvelope,
+  decodeWorkflowStageId,
+  decodeWorkspaceMode,
+  httpErrorMessage,
+  validateRecoveryRunInput,
+  validateResumeRunInput,
+  validateReworkRunInput,
+  validateRunEventInput,
+  validateWorkflowTransitionInput,
+} from "./command-contract";
+import {
+  decodeClaimedChannelReply,
+  decodeClaimedIssueReply,
+  decodeClaimedProjectAgentTask,
+  decodeClaimedRun,
+  decodeDetachedAgentEffortOption,
+  decodeDetachedAgentSkillsOption,
+  decodeQueuedIssue,
+  decodeWorkerBinding,
+  decodeWorkerRegistration,
+  type ClaimedChannelReply,
+  type ClaimedIssueReply,
+  type ClaimedProjectAgentTask,
+  type ClaimedRun,
+  type DetachedAgentClaim,
+  type DetachedAgentSkill,
+  type QueuedAttachment,
+  type WorkerRegistration,
+} from "./worker-claim-contract";
 
-const workflowStageIdSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/u);
-const evidenceTypeSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(autoHuntEvidenceTypeMaxLength)
-  .regex(autoHuntEvidenceTypePattern);
-
-const workflowConfigSchema = z
-  .object({
-    version: z.literal(2),
-    requirements: z
-      .array(
-        z
-          .object({
-            id: workflowStageIdSchema,
-            label: z.string().min(1),
-            kind: z.enum(autoHuntRequirementKinds),
-            tool: z.string().regex(/^[a-zA-Z0-9_.+-]+$/u),
-            reason: z.string().min(1),
-          })
-          .strict(),
-      )
-      .optional(),
-    stages: z.array(
-      z.object({
-        id: workflowStageIdSchema,
-        label: z.string().min(1),
-        required: z.boolean(),
-        evidence: z.array(evidenceTypeSchema).optional(),
-        checks: z.array(z.string().min(1)).optional(),
-      }),
-    ).min(1),
-    execution: z
-      .object({
-        checkpoints: z
-          .array(
-            z
-              .object({
-                key: workflowStageIdSchema,
-                stage: workflowStageIdSchema,
-                position: z.enum(["before", "after"]),
-              })
-              .strict(),
-          )
-          .max(100)
-          .optional(),
-      })
-      .optional(),
-    completion: z.object({
-      requiredStages: z.array(workflowStageIdSchema),
-    }).optional(),
-  })
-  .strict()
-  .transform(normalizeAutoHuntWorkflow);
-
-const worktreeConfigSchema = z
-  .object({
-    enabled: z.boolean().optional(),
-    root: z.string().min(1).optional(),
-    branchPrefix: z.string().min(1).optional(),
-  })
-  .passthrough();
-
-const sandboxConfigSchema = z
-  .object({
-    /** False confines Auto Hunt writes to the assigned workspace. Defaults to true. */
-    fullAccess: z.boolean().optional(),
-  })
-  .passthrough();
-
-const claimWorktreeSchema = z.object({
-  path: z.string().min(1),
-  branch: z.string().min(1),
-  baseRef: z.string().min(1),
-  baseSha: z.string().min(1),
-});
-
-const workspaceModeSchema = z.enum(["project", "worktree", "current", "none"]);
-
-const autoHuntConfigSchema = z
-  .object({
-    velenOrg: z.string().min(1).optional(),
-    dataSource: z.string().min(1).optional(),
-    worktrees: worktreeConfigSchema.optional(),
-    sandbox: sandboxConfigSchema.optional(),
-    linear: z
-      .object({
-        enabled: z.boolean(),
-        source: z.string().regex(/^linear:\/\/[A-Za-z0-9._-]+$/u).optional(),
-        teamKey: z.string().min(1).optional(),
-      })
-      .passthrough()
-      .optional(),
-    githubRepository: z.string().min(1).optional(),
-    workflow: workflowConfigSchema.optional(),
-  })
-  .passthrough();
-
-const projectConfigSchema = z
-  .object({
-    id: z.string().uuid(),
-    repositoryPath: z.string(),
-    agentToken: z.string(),
-    apiUrl: z.string().url().optional(),
-    repositoryRemote: z.string().optional(),
-    llm: z
-      .object({ provider: z.enum(agentProviders) })
-      .passthrough()
-      .optional(),
-    autoHunt: autoHuntConfigSchema.optional(),
-    executionWorker: z
-      .object({
-        deviceId: z.string().uuid(),
-        workerId: z.string().min(1),
-        organizationId: z.string().uuid(),
-        token: z.string().startsWith("briar_worker_"),
-        label: z.string().min(1).max(100),
-        maxConcurrentSessions: z.number().int().min(1).max(16).default(1),
-      })
-      .optional(),
-    activeClaim: z
-      .object({
-        runId: z.string().uuid(),
-        sourceKey: z.string().min(1),
-        token: z.string().startsWith("briar_claim_").optional(),
-        leaseExpiresAt: z.string().datetime({ offset: true }),
-        worktree: claimWorktreeSchema.optional(),
-        finished: z.boolean().optional(),
-        terminalStatus: z.enum(["completed", "cancelled", "blocked", "failed"]).optional(),
-        finishedAt: z.string().datetime({ offset: true }).optional(),
-      })
-      .optional(),
-  })
-  .passthrough();
-
-const configSchema = z
-  .object({
-    apiUrl: z.string().url(),
-    userToken: z.string().optional(),
-    agentProviders: z
-      .object({
-        codex: z.boolean().default(true),
-        claude: z.boolean().default(true),
-        cursor: z.boolean().default(true),
-        grok: z.boolean().default(true),
-        agy: z.boolean().default(true),
-        opencode: z.boolean().default(true),
-        openrouter: z.boolean().default(true),
-      })
-      .default({
-        codex: true,
-        claude: true,
-        cursor: true,
-        grok: true,
-        agy: true,
-        opencode: true,
-        openrouter: true,
-      }),
-    openrouterApiKey: z.string().trim().min(10).max(500).optional(),
-    appSettings: z
-      .object({
-        preventSleepWhileRunning: z.boolean().default(false),
-        browserAutomationProvider: z
-          .enum(["ego-browser", "agent-browser"])
-          .default("ego-browser"),
-      })
-      .passthrough()
-      .default({
-        preventSleepWhileRunning: false,
-        browserAutomationProvider: "ego-browser",
-      }),
-    workerDeviceIdentity: z
-      .string()
-      .regex(/^briar_device_[0-9a-f]{64}$/u)
-      .optional(),
-    projects: z.array(projectConfigSchema).default([]),
-  })
-  .passthrough();
-
-type Config = z.infer<typeof configSchema>;
-type ProjectConfig = z.infer<typeof projectConfigSchema>;
 const openRouterOpenCodeConfig = JSON.stringify({
   provider: {
     openrouter: { options: { apiKey: "{env:OPENROUTER_API_KEY}" } },
@@ -453,21 +295,16 @@ async function loadConfig(): Promise<Config> {
   } catch {
     throw new Error("Briar 로컬 설정이 올바른 JSON이 아닙니다.");
   }
-  const parsed = configSchema.safeParse(storedConfig);
-  if (!parsed.success) {
-    const locations = [
-      ...new Set(
-        parsed.error.issues.map((issue) =>
-          issue.path.length > 0 ? issue.path.join(".") : "config",
-        ),
-      ),
-    ].slice(0, 3);
+  let config: Config;
+  try {
+    config = decodeConfig(storedConfig);
+  } catch (error) {
+    const locations = configErrorLocations(error);
     throw new Error(
       `Briar 로컬 설정이 손상되었습니다: ${locations.join(", ")} 항목을 확인하세요.`,
     );
   }
 
-  const config = parsed.data;
   const apiUrl = process.env.BRIAR_API_URL ?? config.apiUrl;
   return {
     ...config,
@@ -511,19 +348,8 @@ async function request<T>(
   });
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const errorBody = z
-      .object({
-        message: z.string().optional(),
-        error_description: z.string().optional(),
-        error: z.string().optional(),
-      })
-      .passthrough()
-      .safeParse(body);
     throw new HttpRequestError(
-      (errorBody.success &&
-        (errorBody.data.message ??
-          errorBody.data.error_description ??
-          errorBody.data.error)) ||
+      httpErrorMessage(body) ||
         `request failed (${response.status})`,
       response.status,
       body,
@@ -755,14 +581,6 @@ async function connectProject() {
   console.log("저장소 경로와 Agent 토큰은 이 컴퓨터에만 저장됩니다.");
 }
 
-const velenEnvelopeSchema = z
-  .object({
-    ok: z.boolean(),
-    data: z.unknown(),
-    requestId: z.string().optional(),
-  })
-  .passthrough();
-
 const velenExecutable = () =>
   Bun.which("velen") ?? join(homedir(), ".local", "bin", "velen");
 
@@ -780,7 +598,7 @@ function runVelen(commandArgs: string[]) {
     const message = result.stderr.toString().trim() || result.stdout.toString().trim();
     throw new Error(`Velen CLI 확인 실패: ${message || `exit ${result.exitCode}`}`);
   }
-  return velenEnvelopeSchema.parse(JSON.parse(result.stdout.toString()));
+  return decodeVelenEnvelope(JSON.parse(result.stdout.toString()));
 }
 
 function ensureConfiguredVelen(project?: ProjectConfig) {
@@ -998,67 +816,6 @@ async function showWorkflow() {
   );
 }
 
-const queuedAttachmentSchema = z.object({
-  id: z.string().uuid(),
-  filename: z.string().min(1).max(255),
-  contentType: z.string().regex(/^(?:image|video)\//u),
-  byteSize: z.number().int().positive().max(20 * 1024 * 1024),
-  url: z.string().startsWith("/"),
-});
-
-const queuedIssueMessageSchema = z.object({
-  id: z.string().uuid(),
-  runId: z.string().uuid(),
-  parentMessageId: z.string().uuid().nullable(),
-  body: z.string().min(1),
-  attachments: z.array(queuedAttachmentSchema).max(5).default([]),
-  author: z.object({
-    id: z.string().nullable(),
-    name: z.string().min(1),
-    image: z.string().nullable(),
-    provider: z.enum(agentProviders).nullable(),
-  }),
-  replyCount: z.number().int().nonnegative(),
-  createdAt: z.string().datetime({ offset: true }),
-  updatedAt: z.string().datetime({ offset: true }),
-});
-
-const queuedIssueSchema = z.object({
-  executionId: z.string().uuid().optional(),
-  runId: z.string().uuid(),
-  runNumber: z.number().int().positive(),
-  currentAttempt: z.number().int().positive(),
-  currentRevision: z.number().int().positive(),
-  source: z.enum(autoHuntSources),
-  sourceKey: z.string().min(1),
-  title: z.string().min(1),
-  description: z.string().nullable(),
-  priority: z.number().int().min(1).max(4).nullable(),
-  repository: z.string().min(1),
-  sourceCreatedAt: z.string().datetime({ offset: true }).nullable(),
-  createdByUserId: z.string().nullable().default(null),
-  context: z.record(z.string(), z.unknown()).nullable(),
-  reviewFeedback: z.string().nullable().default(null),
-  workflow: workflowConfigSchema,
-  workflowStage: z.string().nullable(),
-  startStage: z.string().nullable(),
-  resumeContext: z
-    .object({
-      checkpointKey: workflowStageIdSchema,
-      position: z.enum(["before", "after"]),
-      revision: z.number().int().positive(),
-      terminalReviewOnly: z.boolean(),
-    })
-    .nullable(),
-  attachments: z.array(queuedAttachmentSchema).max(5).default([]),
-  messages: z.array(queuedIssueMessageSchema).default([]),
-  claimToken: z.string().startsWith("briar_claim_"),
-  claimedBy: z.string().min(1),
-  claimedAt: z.string().datetime({ offset: true }),
-  leaseExpiresAt: z.string().datetime({ offset: true }),
-  claimAttempts: z.number().int().positive(),
-});
-
 function safeAttachmentFilename(filename: string) {
   const normalized = filename
     .normalize("NFC")
@@ -1073,7 +830,7 @@ async function downloadClaimAttachment(
   token: string,
   projectId: string,
   runId: string,
-  attachment: z.infer<typeof queuedAttachmentSchema>,
+  attachment: QueuedAttachment,
   storageDirectory = configDirectory,
 ) {
   const expectedPrefix = `/projects/${projectId}/runs/${runId}/attachments/`;
@@ -1106,7 +863,7 @@ async function claimWork() {
   const config = await loadConfig();
   const project = await currentProject(config);
   const runId = value("--run");
-  if (runId) z.string().uuid().parse(runId);
+  if (runId) decodeUuid(runId);
   if (
     project.activeClaim &&
     !project.activeClaim.finished &&
@@ -1133,7 +890,7 @@ async function claimWork() {
     console.log(JSON.stringify({ work: null }));
     return;
   }
-  const issue = queuedIssueSchema.parse(result.work);
+  const issue = decodeQueuedIssue(result.work);
   const agentToken = executionToken(project);
   config.projects = config.projects.map((candidate) =>
     candidate.id === project.id
@@ -1213,7 +970,7 @@ async function allocateClaimWorkspace(
     | null;
   workspaceError: string | null;
 }> {
-  const requestedMode = workspaceModeSchema.parse(value("--workspace") ?? "project");
+  const requestedMode = decodeWorkspaceMode(value("--workspace") ?? "project");
   const mode =
     requestedMode === "project"
       ? worktreesEnabled(project)
@@ -1374,16 +1131,7 @@ async function syncCompletedWorktreeRecordsFromDashboard(
     `/projects/${encodeURIComponent(project.id)}/dashboard`,
     config.userToken,
   );
-  const completedRuns = z
-    .array(
-      z.object({
-        id: z.string().uuid(),
-        status: z.string(),
-        branch: z.string().nullable(),
-        completedAt: z.string().datetime({ offset: true }).nullable(),
-      }),
-    )
-    .parse(dashboard.runs)
+  const completedRuns = decodeDashboardRuns(dashboard.runs)
     .filter(
       (run): run is typeof run & { branch: string; completedAt: string } =>
         run.status === "completed" && Boolean(run.branch && run.completedAt),
@@ -1437,9 +1185,9 @@ async function worktreeMaintain() {
       ? activeWorktree.baseRef
       : undefined;
   const completedAt = value("--completed-at");
-  if (completedAt) z.string().datetime({ offset: true }).parse(completedAt);
+  if (completedAt) decodeIsoDateTimeWithOffset(completedAt);
   const completedRunId = value("--run");
-  if (completedRunId) z.string().uuid().parse(completedRunId);
+  if (completedRunId) decodeUuid(completedRunId);
   if (Boolean(completedAt) !== Boolean(completedRunId)) {
     throw new Error("--completed-at and --run must be supplied together");
   }
@@ -1489,22 +1237,7 @@ async function createIssueCommand() {
   if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
   const project = await currentProject(config);
   const priorityValue = value("--priority");
-  const input = z.object({
-    title: z
-      .string()
-      .trim()
-      .min(1)
-      .max(issueTitleAbsoluteMaxLength)
-      .superRefine((title, context) => {
-        const message = issueTitleOverLimitMessage(title);
-        if (message) {
-          context.addIssue({ code: "custom", message });
-        }
-      }),
-    description: z.string().trim().max(100_000).nullable(),
-    priority: z.number().int().min(1).max(4).nullable(),
-    status: z.enum(["backlog", "queued"]),
-  }).parse({
+  const input = decodeCreateIssueInput({
     title: required("--title"),
     description: await optionalText("--description", "--description-file"),
     priority: priorityValue === undefined ? null : Number(priorityValue),
@@ -1529,10 +1262,8 @@ async function changeIssueDependencyCommand(action: "add" | "remove") {
   const config = await loadConfig();
   if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
   const project = await currentProject(config);
-  const dependentRunId = z.string().uuid().parse(required("--dependent-run"));
-  const prerequisiteRunId = z.string().uuid().parse(
-    required("--prerequisite-run"),
-  );
+  const dependentRunId = decodeUuid(required("--dependent-run"));
+  const prerequisiteRunId = decodeUuid(required("--prerequisite-run"));
   const path =
     `/projects/${encodeURIComponent(project.id)}` +
     `/runs/${encodeURIComponent(dependentRunId)}` +
@@ -1567,12 +1298,7 @@ async function listChannelMessagesCommand() {
   }
   const config = await loadConfig();
   const project = await currentProject(config);
-  const input = z.object({
-    channelId: z.string().uuid(),
-    limit: z.number().int().min(1).max(100),
-    cursor: z.string().uuid().nullable(),
-    parentMessageId: z.string().uuid().nullable(),
-  }).parse({
+  const input = decodeChannelMessagesInput({
     channelId: required("--channel-id"),
     limit: value("--limit") === undefined ? 50 : Number(value("--limit")),
     cursor: value("--cursor") ?? null,
@@ -1619,7 +1345,7 @@ async function addRunEvent(forcedStatus?: string) {
     "--structured-result-file",
   );
   const structuredResult = structuredResultValue
-    ? structuredAgentResultSchema.parse(JSON.parse(structuredResultValue))
+    ? decodeStructuredAgentResult(JSON.parse(structuredResultValue))
     : null;
   const runId = value("--run") ?? project.activeClaim?.runId ?? null;
   const sourceKey = value("--source-key") ?? project.activeClaim?.sourceKey ?? null;
@@ -1694,54 +1420,7 @@ async function addRunEvent(forcedStatus?: string) {
       "--status blocked requires humanActionRequired and an exact nextAction",
     );
   }
-  z.object({
-    runId: z.string().uuid().nullable(),
-    source: z.enum(autoHuntSources).nullable(),
-    sourceKey: z.string().min(1).nullable(),
-    title: z.string().min(1).nullable(),
-    status: z.enum(autoHuntPersistedRunStatuses).optional(),
-    workflowStage: workflowStageIdSchema.nullable().optional(),
-    eventKey: z.string().min(1),
-    occurredAt: z.string().datetime({ offset: true }),
-    actor: z.string().min(1),
-    repository: z.string().min(1),
-    detail: z.string().nullable(),
-    priority: z.number().int().min(1).max(4).nullable(),
-    branch: z.string().nullable(),
-    commitSha: z.string().regex(/^[0-9a-f]{7,64}$/u).nullable(),
-    tracker: z
-      .object({
-        provider: z.string().min(1).max(64),
-        issueId: z.string().nullable(),
-        identifier: z.string().nullable(),
-        url: z.string().url().nullable(),
-        state: z.string().nullable(),
-      })
-      .nullable(),
-    issueDescription: z.string().nullable(),
-    resultSummary: z.string().nullable(),
-    structuredResult: structuredAgentResultSchema.nullable(),
-    pullRequestUrls: z.array(z.string().url()).max(20),
-    targetSha: z.string().regex(/^[0-9a-f]{7,64}$/u).nullable(),
-    sourceCreatedAt: z.string().datetime({ offset: true }).nullable(),
-    context: z.record(z.string(), z.unknown()).nullable(),
-  }).superRefine((progress, context) => {
-    if (!progress.runId && (!progress.source || !progress.sourceKey || !progress.title)) {
-      context.addIssue({
-        code: "custom",
-        message: "--source, --source-key, and --title are required without --run",
-      });
-    }
-    if (!progress.status) {
-      context.addIssue({ code: "custom", message: "--status is required" });
-    }
-    if (progress.status === "running" && !progress.workflowStage) {
-      context.addIssue({
-        code: "custom",
-        message: "--workflow-stage is required with --status running",
-      });
-    }
-  }).parse(input);
+  validateRunEventInput(input);
   const result = await request<{
     runId: string;
     status: string;
@@ -1803,18 +1482,7 @@ async function addRunEvidence() {
     url: value("--url") ?? null,
     metadata: metadataValue ? JSON.parse(metadataValue) : null,
   };
-  const parsed = z.object({
-    evidenceKey: z.string().min(1).max(300),
-    stage: workflowStageIdSchema,
-    type: evidenceTypeSchema,
-    status: z.enum(["pending", "passed", "failed", "skipped"]),
-    observedAt: z.string().datetime({ offset: true }),
-    actor: z.string().min(1),
-    detail: z.string().nullable(),
-    command: z.string().min(1).max(2_000).nullable(),
-    url: z.string().url().nullable(),
-    metadata: z.record(z.string(), z.unknown()).nullable(),
-  }).parse(input);
+  const parsed = decodeRunEvidenceInput(input);
   if (
     parsed.type === "pull_request" &&
     parsed.url &&
@@ -1878,7 +1546,7 @@ async function listCurrentRunEvidence() {
   const project = await currentProject(config);
   const runId = value("--run") ?? project.activeClaim?.runId;
   if (!runId) throw new Error("--run is required when there is no active claim");
-  z.string().uuid().parse(runId);
+  decodeUuid(runId);
   const result = await request(
     config.apiUrl,
     `/runs/${runId}/evidence`,
@@ -1897,12 +1565,8 @@ async function recoverRun(action: "retry" | "cancel") {
     actor: value("--actor") ?? "briar-workflow",
     reason: value("--reason") ?? null,
   };
-  z.object({
-    requestId: z.string().uuid(),
-    actor: z.string().min(1).max(128),
-    reason: z.string().min(1).max(4_000).nullable(),
-  }).parse(input);
-  z.string().uuid().parse(runId);
+  validateRecoveryRunInput(input);
+  decodeUuid(runId);
   const result = await request<{
     runId: string;
     outcome: string;
@@ -1938,13 +1602,8 @@ async function reworkRun() {
     workflowStage: required("--to"),
     reason: required("--reason"),
   };
-  z.object({
-    requestId: z.string().uuid(),
-    actor: z.string().min(1).max(128),
-    workflowStage: workflowStageIdSchema,
-    reason: z.string().trim().min(1).max(4_000),
-  }).parse(input);
-  z.string().uuid().parse(runId);
+  validateReworkRunInput(input);
+  decodeUuid(runId);
   const result = await request<{
     runId: string;
     outcome: "reworked" | "already_reworked";
@@ -1980,26 +1639,8 @@ async function resumeRun() {
     attempt: value("--attempt") ? Number(value("--attempt")) : undefined,
     revision: value("--revision") ? Number(value("--revision")) : undefined,
   };
-  z.object({
-    requestId: z.string().uuid(),
-    actor: z.string().min(1).max(128),
-    checkpointKey: workflowStageIdSchema.optional(),
-    attempt: z.number().int().positive().optional(),
-    revision: z.number().int().positive().optional(),
-  }).superRefine((candidate, context) => {
-    const supplied = [
-      candidate.checkpointKey,
-      candidate.attempt,
-      candidate.revision,
-    ].filter((item) => item !== undefined).length;
-    if (supplied !== 0 && supplied !== 3) {
-      context.addIssue({
-        code: "custom",
-        message: "--checkpoint, --attempt, and --revision must be supplied together",
-      });
-    }
-  }).parse(input);
-  z.string().uuid().parse(runId);
+  validateResumeRunInput(input);
+  decodeUuid(runId);
   const result = await request<{
     runId: string;
     outcome: string;
@@ -2035,14 +1676,9 @@ async function transitionWorkflowStage(action: "start" | "complete") {
     attempt: value("--attempt") ? Number(value("--attempt")) : undefined,
     revision: value("--revision") ? Number(value("--revision")) : undefined,
   };
-  z.object({
-    requestId: z.string().uuid(),
-    actor: z.string().min(1).max(128),
-    attempt: z.number().int().positive().optional(),
-    revision: z.number().int().positive().optional(),
-  }).parse(input);
-  z.string().uuid().parse(runId);
-  workflowStageIdSchema.parse(stage);
+  validateWorkflowTransitionInput(input);
+  decodeUuid(runId);
+  decodeWorkflowStageId(stage);
   const result = await request<{
     runId: string;
     requestId: string;
@@ -2080,284 +1716,6 @@ async function transitionWorkflowStage(action: "start" | "complete") {
   console.log(JSON.stringify(result));
 }
 
-const workerRegistrationSchema = z.object({
-  organizationId: z.string().uuid(),
-  deviceId: z.string().uuid(),
-  worker: z.object({
-    id: z.string().min(1),
-    label: z.string().min(1),
-    state: z.enum(["online", "stale", "disabled"]),
-    maxConcurrentSessions: z.number().int().min(1).max(16),
-    lastHeartbeatAt: z.string(),
-  }),
-  workerToken: z.string().startsWith("briar_worker_"),
-});
-
-const workerBindingSchema = workerRegistrationSchema.omit({
-  workerToken: true,
-});
-
-const detachedAgentProviderSchema = z.enum(agentProviders);
-
-const detachedAgentEffortSchema = modelEffortSchema;
-
-const detachedAgentSkillSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  instructions: z.string(),
-  provider: detachedAgentProviderSchema,
-  model: z.string().nullable(),
-  effort: detachedAgentEffortSchema.nullable(),
-  kind: z.enum(["issue_processing", "custom"]),
-  position: z.number().int().nonnegative(),
-});
-
-const detachedAgentSkillExecutionTargetSchema = z.object({
-  projectId: z.string().uuid(),
-  agentId: z.string().uuid(),
-  skillId: z.string().uuid(),
-  skillName: z.string().trim().min(1).max(100),
-  request: z.string().trim().min(1).max(10_000),
-}).strict();
-
-const detachedAgentClaimSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  provider: detachedAgentProviderSchema,
-  model: z.string().nullable(),
-  effort: detachedAgentEffortSchema.nullable().default(null),
-  responsibility: z.string(),
-  skill: z.string().default(""),
-  skills: z.array(detachedAgentSkillSchema).default([]),
-});
-
-const claimedRunSchema = queuedIssueSchema.extend({
-  execution: z
-    .object({
-      provider: detachedAgentProviderSchema,
-      model: z.string().nullable(),
-      effort: detachedAgentEffortSchema.nullable().default(null),
-    })
-    .nullable()
-    .optional(),
-  agent: detachedAgentClaimSchema.nullable(),
-  activeSkill: detachedAgentSkillSchema.nullable().optional(),
-});
-
-const claimedProjectAgentTaskSchema = z.object({
-  workType: z.literal("projectAgentTask"),
-  workId: z.string().uuid(),
-  runId: z.string().uuid(),
-  sourceKey: z.string().min(1),
-  title: z.string().min(1),
-  claimToken: z.string().startsWith("briar_agent_task_claim_"),
-  claimAttempts: z.number().int().positive(),
-  claimedAt: z.string().datetime({ offset: true }),
-  leaseExpiresAt: z.string().datetime({ offset: true }),
-  request: z.string().min(1),
-  agent: detachedAgentClaimSchema,
-  activeSkill: detachedAgentSkillSchema.nullable().optional(),
-});
-
-type ClaimedProjectAgentTask = z.infer<typeof claimedProjectAgentTaskSchema>;
-
-const channelActivityCredentialSchema = z.object({
-  token: z.string().min(1),
-  expiresAt: z.string().datetime({ offset: true }),
-}).strict();
-
-const claimedIssueReplySchema = z.object({
-  workType: z.literal("issueReply"),
-  workId: z.string().uuid(),
-  runId: z.string().uuid(),
-  sourceKey: z.string().min(1),
-  title: z.string().min(1),
-  triggerMessageId: z.string().uuid(),
-  parentMessageId: z.string().uuid(),
-  provider: detachedAgentProviderSchema,
-  model: z.string().nullable(),
-  effort: detachedAgentEffortSchema.nullable().optional(),
-  agent: detachedAgentClaimSchema.nullable().optional(),
-  activeSkill: detachedAgentSkillSchema.nullable().optional(),
-  skillExecutionTarget:
-    detachedAgentSkillExecutionTargetSchema.nullable().default(null),
-  branch: z.string().nullable(),
-  requiresPreferredWorker: z.boolean().optional(),
-  claimToken: z.string().startsWith("briar_reply_claim_"),
-  claimedAt: z.string().datetime({ offset: true }),
-  leaseExpiresAt: z.string().datetime({ offset: true }),
-  activity: channelActivityCredentialSchema.nullable().optional().default(null),
-  snapshot: z.object({
-    run: z.record(z.string(), z.unknown()),
-    messages: z.array(queuedIssueMessageSchema),
-    agentTranscript: z.array(z.record(z.string(), z.unknown())).default([]),
-    evidence: z.array(z.record(z.string(), z.unknown())),
-  }),
-});
-
-type ClaimedIssueReply = z.infer<typeof claimedIssueReplySchema>;
-
-const channelDelegationTargetSchema = z.object({
-  agentId: z.string().uuid(),
-  agentName: z.string().trim().min(1).max(100),
-  projectId: z.string().uuid(),
-  projectName: z.string().trim().min(1).max(300),
-  responsibility: z
-    .string()
-    .trim()
-    .min(1)
-    .max(agentResponsibilityMaxLength),
-  skills: z.array(z.object({
-    id: z.string().uuid(),
-    name: z.string().trim().min(1).max(100),
-  }).strict()).max(agentSkillsMaxCount),
-}).strict();
-
-const claimedChannelDelegationSchema = z.object({
-  delegatedByReplyId: z.string().uuid(),
-  delegatedByAgentId: z.string().uuid(),
-  delegatedByAgentName: z.string().trim().min(1).max(100),
-  request: z.string().trim().min(1).max(10_000),
-}).strict();
-
-const claimedChannelReplySchema = z.object({
-  workType: z.literal("channelReply"),
-  workId: z.string().uuid(),
-  organizationId: z.string().uuid(),
-  channelId: z.string().uuid(),
-  /** Null for an organization Agent: there is no repository to open. */
-  projectId: z.string().uuid().nullable(),
-  scope: z.discriminatedUnion("kind", [
-    z.object({
-      kind: z.literal("organization"),
-      organizationId: z.string().uuid(),
-    }),
-    z.object({
-      kind: z.literal("project"),
-      organizationId: z.string().uuid(),
-      projectId: z.string().uuid(),
-    }),
-  ]).optional(),
-  runId: z.string().uuid(),
-  sourceKey: z.string().min(1),
-  title: z.string().min(1),
-  triggerMessageId: z.string().uuid(),
-  parentMessageId: z.string().uuid(),
-  provider: detachedAgentProviderSchema,
-  model: z.string().nullable(),
-  effort: detachedAgentEffortSchema.nullable().optional(),
-  agent: detachedAgentClaimSchema.nullable().optional(),
-  activeSkill: detachedAgentSkillSchema.nullable().optional(),
-  skillExecutionTarget:
-    detachedAgentSkillExecutionTargetSchema.nullable().default(null),
-  claimToken: z.string().startsWith("briar_channel_claim_"),
-  claimedAt: z.string().datetime({ offset: true }),
-  leaseExpiresAt: z.string().datetime({ offset: true }),
-  activity: channelActivityCredentialSchema.nullable().optional().default(null),
-  organizationContext:
-    organizationAgentContextDescriptorSchema.nullable().optional(),
-  delegation: claimedChannelDelegationSchema.nullable().default(null),
-  delegationTargets: z.array(channelDelegationTargetSchema).default([]),
-  snapshot: z.record(z.string(), z.unknown()),
-}).superRefine((reply, context) => {
-  const scope = reply.scope ?? (reply.projectId === null
-    ? { kind: "organization" as const, organizationId: reply.organizationId }
-    : {
-        kind: "project" as const,
-        organizationId: reply.organizationId,
-        projectId: reply.projectId,
-      });
-  if (scope.organizationId !== reply.organizationId) {
-    context.addIssue({
-      code: "custom",
-      message: "Channel reply organization scope does not match its claim",
-      path: ["scope", "organizationId"],
-    });
-  }
-  if (scope.kind === "organization") {
-    if (reply.projectId !== null) {
-      context.addIssue({
-        code: "custom",
-        message: "Organization reply cannot carry a project",
-        path: ["projectId"],
-      });
-    }
-    if (!reply.organizationContext) {
-      context.addIssue({
-        code: "custom",
-        message: "Organization reply requires complete context protocol metadata",
-        path: ["organizationContext"],
-      });
-    } else if (reply.organizationContext.snapshotAt !== reply.claimedAt) {
-      context.addIssue({
-        code: "custom",
-        message: "Organization context snapshot does not match its claim",
-        path: ["organizationContext", "snapshotAt"],
-      });
-    }
-    if (reply.delegation) {
-      context.addIssue({
-        code: "custom",
-        message: "Organization reply cannot itself be delegated",
-        path: ["delegation"],
-      });
-    }
-    if (reply.skillExecutionTarget) {
-      context.addIssue({
-        code: "custom",
-        message: "Organization reply cannot receive a Skill execution target",
-        path: ["skillExecutionTarget"],
-      });
-    }
-    return;
-  }
-  if (reply.organizationContext) {
-    context.addIssue({
-      code: "custom",
-      message: "Project reply cannot carry organization context",
-      path: ["organizationContext"],
-    });
-  }
-  if (reply.projectId !== scope.projectId) {
-    context.addIssue({
-      code: "custom",
-      message: "Project reply scope does not match its project",
-      path: ["scope", "projectId"],
-    });
-  }
-  if (reply.delegationTargets.length > 0) {
-    context.addIssue({
-      code: "custom",
-      message: "Project reply cannot receive delegation targets",
-      path: ["delegationTargets"],
-    });
-  }
-  if (
-    reply.skillExecutionTarget &&
-    (reply.skillExecutionTarget.projectId !== scope.projectId ||
-      reply.skillExecutionTarget.agentId !== reply.agent?.id ||
-      reply.skillExecutionTarget.skillId !== reply.activeSkill?.id ||
-      reply.skillExecutionTarget.skillName !== reply.activeSkill?.name)
-  ) {
-    context.addIssue({
-      code: "custom",
-      message: "Skill execution target does not match the claimed Agent Skill",
-      path: ["skillExecutionTarget"],
-    });
-  }
-}).transform((reply) => ({
-  ...reply,
-  scope: reply.scope ?? (reply.projectId === null
-    ? { kind: "organization" as const, organizationId: reply.organizationId }
-    : {
-        kind: "project" as const,
-        organizationId: reply.organizationId,
-        projectId: reply.projectId,
-      }),
-}));
-
-type ClaimedChannelReply = z.infer<typeof claimedChannelReplySchema>;
-
 const activeReplyActivityPublishers = new Map<
   string,
   ChannelActivityPublisher
@@ -2381,8 +1739,8 @@ function releaseCachedAnalysisWorktree(path: string) {
 }
 
 function detachedAgentWithActiveSkill(
-  agent: z.infer<typeof detachedAgentClaimSchema>,
-  activeSkill: z.infer<typeof detachedAgentSkillSchema> | null | undefined,
+  agent: DetachedAgentClaim,
+  activeSkill: DetachedAgentSkill | null | undefined,
 ): DetachedAgent {
   return {
     ...agent,
@@ -2392,23 +1750,19 @@ function detachedAgentWithActiveSkill(
 
 function detachedReplyAgent(input: {
   workId: string;
-  provider: z.infer<typeof detachedAgentProviderSchema>;
+  provider: AgentProvider;
   model: string | null;
-  effort?: z.infer<typeof detachedAgentEffortSchema> | null;
-  agent?: z.infer<typeof detachedAgentClaimSchema> | null;
-  activeSkill?: z.infer<typeof detachedAgentSkillSchema> | null;
+  effort?: ModelEffort | null;
+  agent?: DetachedAgentClaim | null;
+  activeSkill?: DetachedAgentSkill | null;
   snapshot: Record<string, unknown>;
   fallbackName: string;
   scope?: DetachedAgent["scope"];
 }): DetachedAgent {
-  const snapshotAgent =
-    input.snapshot.agent && typeof input.snapshot.agent === "object" &&
-      !Array.isArray(input.snapshot.agent)
-      ? input.snapshot.agent as Record<string, unknown>
-      : null;
-  const snapshotSkills = detachedAgentSkillSchema.array().safeParse(
-    snapshotAgent?.skills,
-  );
+  const snapshotAgent = Predicate.isObject(input.snapshot.agent)
+    ? input.snapshot.agent
+    : null;
+  const snapshotSkills = decodeDetachedAgentSkillsOption(snapshotAgent?.skills);
   const baseAgent = input.agent ?? {
     id: typeof snapshotAgent?.id === "string" && snapshotAgent.id.trim()
       ? snapshotAgent.id
@@ -2420,14 +1774,14 @@ function detachedReplyAgent(input: {
     model: input.model,
     effort:
       typeof snapshotAgent?.effort === "string" &&
-        detachedAgentEffortSchema.safeParse(snapshotAgent.effort).success
-        ? snapshotAgent.effort as z.infer<typeof detachedAgentEffortSchema>
+        Option.isSome(decodeDetachedAgentEffortOption(snapshotAgent.effort))
+        ? snapshotAgent.effort
         : null,
     responsibility: typeof snapshotAgent?.responsibility === "string"
       ? snapshotAgent.responsibility
       : "",
     skill: typeof snapshotAgent?.skill === "string" ? snapshotAgent.skill : "",
-    skills: snapshotSkills.success ? snapshotSkills.data : [],
+    skills: Option.getOrElse(snapshotSkills, () => []),
   };
   return {
     ...baseAgent,
@@ -2446,7 +1800,7 @@ function detachedReplyAgent(input: {
 async function runClaimedIssue(
   config: Config,
   project: ProjectConfig,
-  issue: z.infer<typeof claimedRunSchema>,
+  issue: ClaimedRun,
   workerToken: string,
   signal: AbortSignal,
 ) {
@@ -2483,7 +1837,7 @@ async function runClaimedIssue(
 async function runClaimedIssueInRuntime(
   config: Config,
   project: ProjectConfig,
-  issue: z.infer<typeof claimedRunSchema>,
+  issue: ClaimedRun,
   workerToken: string,
   signal: AbortSignal,
   runtimeDirectory: string,
@@ -2692,7 +2046,7 @@ async function runClaimedIssueInRuntime(
       }
       const turnFailure = detachedProviderTurnFailure(turn);
 
-      const runtimeConfig = configSchema.parse(
+      const runtimeConfig = decodeConfig(
         JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
       );
       const disposition = detachedRunDisposition(
@@ -2815,7 +2169,7 @@ async function runClaimedIssueInRuntime(
       try {
         let completedAt: string | undefined;
         try {
-          const runtimeConfig = configSchema.parse(
+          const runtimeConfig = decodeConfig(
             JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
           );
           const runtimeClaim = runtimeConfig.projects.find(
@@ -3518,7 +2872,7 @@ async function runClaimedChannelReply(
         attachmentPaths = parsedResult.attachmentPaths;
         break;
       }
-      const lookup = organizationAgentContextRequestTurnSchema.parse({
+      const lookup = decodeOrganizationAgentContextRequestTurn({
         contextRequests,
       });
       if (
@@ -3660,10 +3014,10 @@ async function workerRegisterCommand() {
     value("--max-sessions") ?? "",
     10,
   );
-  let registration: z.infer<typeof workerRegistrationSchema> | null = null;
+  let registration: WorkerRegistration | null = null;
   if (config.projects.some((candidate) => candidate.executionWorker)) {
     try {
-      const binding = workerBindingSchema.parse(
+      const binding = decodeWorkerBinding(
         await request(
           config.apiUrl,
           `/projects/${project.id}/workers/bind`,
@@ -3695,7 +3049,7 @@ async function workerRegisterCommand() {
       // below creates it and issues the first organization credential.
     }
   }
-  registration ??= workerRegistrationSchema.parse(
+  registration ??= decodeWorkerRegistration(
     await request(
       config.apiUrl,
       `/projects/${project.id}/workers/register`,
@@ -3974,17 +3328,17 @@ async function workerCommand() {
           ? Reflect.get(claim.work, "workType")
           : undefined;
         const work = workType === "issueReply"
-          ? claimedIssueReplySchema.parse(claim.work)
+          ? decodeClaimedIssueReply(claim.work)
           : workType === "projectAgentTask"
-            ? claimedProjectAgentTaskSchema.parse(claim.work)
+            ? decodeClaimedProjectAgentTask(claim.work)
             : workType === "channelReply"
-              ? claimedChannelReplySchema.parse(claim.work)
-              : claimedRunSchema.parse(claim.work);
+              ? decodeClaimedChannelReply(claim.work)
+              : decodeClaimedRun(claim.work);
         return { work };
       },
       renewLease: async (issue) => {
         if (issue.workType === "projectAgentTask") {
-          const task = claimedProjectAgentTaskSchema.parse(issue);
+          const task = decodeClaimedProjectAgentTask(issue);
           await request(
             config.apiUrl,
             `/agent-task-claims/${task.workId}/lease`,
@@ -4001,7 +3355,7 @@ async function workerCommand() {
           return;
         }
         if (issue.workType === "channelReply") {
-          const reply = claimedChannelReplySchema.parse(issue);
+          const reply = decodeClaimedChannelReply(issue);
           const renewed = await request<{
             leaseExpiresAt: string;
             activity?: ChannelActivityCredential | null;
@@ -4024,7 +3378,7 @@ async function workerCommand() {
           return;
         }
         if (issue.workType === "issueReply") {
-          const reply = claimedIssueReplySchema.parse(issue);
+          const reply = decodeClaimedIssueReply(issue);
           const renewed = await request<{
             leaseExpiresAt: string;
             activity?: ChannelActivityCredential | null;
@@ -4262,7 +3616,7 @@ async function workerCommand() {
       },
       runIssue: async (issue, signal) => {
         if (issue.workType === "projectAgentTask") {
-          const task = claimedProjectAgentTaskSchema.parse(issue);
+          const task = decodeClaimedProjectAgentTask(issue);
           await runProjectAgentTaskCompletionFlow({
             runProvider: () => runClaimedProjectAgentTask(
               config,
@@ -4296,7 +3650,7 @@ async function workerCommand() {
           return;
         }
         if (issue.workType === "channelReply") {
-          const reply = claimedChannelReplySchema.parse(issue);
+          const reply = decodeClaimedChannelReply(issue);
           try {
             await runClaimedChannelReply(
               config,
@@ -4317,7 +3671,7 @@ async function workerCommand() {
           return;
         }
         if (issue.workType === "issueReply") {
-          const reply = claimedIssueReplySchema.parse(issue);
+          const reply = decodeClaimedIssueReply(issue);
           try {
             await runClaimedIssueReply(
               config,
@@ -4340,7 +3694,7 @@ async function workerCommand() {
         await runClaimedIssue(
           config,
           project,
-          claimedRunSchema.parse(issue),
+          decodeClaimedRun(issue),
           workerToken,
           signal,
         );

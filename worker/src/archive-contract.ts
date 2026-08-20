@@ -13,7 +13,6 @@ import type {
   AgentTranscriptSegmentRow,
   AgentWorkLogEntryRow,
 } from "./agent-worklog";
-import { decodeRequestSync } from "./request-schema";
 import { PositiveSafeInteger, schemaDecodeOptions } from "./schema-codecs";
 
 export const archiveFormatVersion = 1;
@@ -250,39 +249,40 @@ export const ArchivedExecutionAudit = Schema.Struct({
   occurred_at: Schema.String,
 });
 
-export type AgentWorkLogEntryArchiveRow = AgentWorkLogEntryRow;
-export type AgentTranscriptSegmentArchiveRow = AgentTranscriptSegmentRow;
-
 export const RelatedArchiveObjectKeys = Schema.mutable(
   Schema.Array(Schema.String),
 );
 
-export const decodeArchiveManifest = decodeRequestSync(ArchiveManifest);
-export const decodeArchiveLine = decodeRequestSync(ArchiveLine);
+const decodeArchiveSync = <S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+) => Schema.decodeUnknownSync(schema, schemaDecodeOptions);
+
+export const decodeArchiveManifest = decodeArchiveSync(ArchiveManifest);
+export const decodeArchiveLine = decodeArchiveSync(ArchiveLine);
 export const decodeArchivedHuntEvent: (input: unknown) => HuntEventRow =
-  decodeRequestSync(ArchivedHuntEvent);
+  decodeArchiveSync(ArchivedHuntEvent);
 export const decodeArchivedRunEvidence: (input: unknown) => RunEvidenceRow =
-  decodeRequestSync(ArchivedRunEvidence);
+  decodeArchiveSync(ArchivedRunEvidence);
 export const decodeArchivedRunEvidenceImage:
   (input: unknown) => RunEvidenceImageRow =
-    decodeRequestSync(ArchivedRunEvidenceImage);
+    decodeArchiveSync(ArchivedRunEvidenceImage);
 export const decodeArchivedIssueMessage: (input: unknown) => IssueMessageRow =
-  decodeRequestSync(ArchivedIssueMessage);
+  decodeArchiveSync(ArchivedIssueMessage);
 export const decodeArchivedProjectAgentSession:
   (input: unknown) => ProjectAgentSessionRow =
-    decodeRequestSync(ArchivedProjectAgentSession);
+    decodeArchiveSync(ArchivedProjectAgentSession);
 export const decodeArchivedTranscriptSession:
   (input: unknown) => TranscriptSessionRow =
-    decodeRequestSync(ArchivedTranscriptSession);
+    decodeArchiveSync(ArchivedTranscriptSession);
 export const decodeArchivedWorkLogEntry:
-  (input: unknown) => AgentWorkLogEntryArchiveRow =
-    decodeRequestSync(ArchivedWorkLogEntry);
+  (input: unknown) => AgentWorkLogEntryRow =
+    decodeArchiveSync(ArchivedWorkLogEntry);
 export const decodeArchivedTranscriptSegment:
-  (input: unknown) => AgentTranscriptSegmentArchiveRow =
-    decodeRequestSync(ArchivedTranscriptSegment);
+  (input: unknown) => AgentTranscriptSegmentRow =
+    decodeArchiveSync(ArchivedTranscriptSegment);
 export const decodeArchivedExecutionAudit:
   (input: unknown) => ExecutionAuditArchiveRow =
-    decodeRequestSync(ArchivedExecutionAudit);
+    decodeArchiveSync(ArchivedExecutionAudit);
 
 export const decodeRelatedArchiveObjectKeysOption = Schema.decodeUnknownOption(
   RelatedArchiveObjectKeys,

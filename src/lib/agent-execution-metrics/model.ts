@@ -1,11 +1,11 @@
 import * as Schema from "effect/Schema";
 import type { AgentProvider } from "../agent-provider";
+import { IsoDateTimeWithOffset } from "../date-time-schema";
 import {
   AgentExecutionModelSourceSchema,
   AgentProviderSchema,
   NonnegativeSafeInteger,
   NullableTrimmedText,
-  ObservedAt,
   strictAgentExecutionSchemaOptions,
   TrimmedText,
 } from "./codec";
@@ -137,7 +137,7 @@ export const AgentExecutionUsageRecord = Schema.Struct({
   outputTokens: NullableTokenCount,
   reasoningOutputTokens: NullableTokenCount,
   totalTokens: NullableTokenCount,
-  observedAt: ObservedAt,
+  observedAt: IsoDateTimeWithOffset,
 }).check(
   Schema.makeFilter((record) => {
     const issues: Array<Schema.FilterIssue> = [];
@@ -191,4 +191,4 @@ export const decodeAgentExecutionUsageRecord = Schema.decodeUnknownSync(
   strictAgentExecutionSchemaOptions,
 );
 
-export const parseObservedAt = Schema.decodeUnknownSync(ObservedAt);
+export const parseObservedAt = Schema.decodeUnknownSync(IsoDateTimeWithOffset);

@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { briarApiUrl, briarWebAppOrigin } from "./api-config";
 export { briarApiUrl } from "./api-config";
 import { ApiError, isApiErrorStatus } from "./api/errors";
@@ -15,23 +14,39 @@ export {
   loadSession,
   updateAccountProfile,
 } from "./api/account";
-import { structuredAgentResultSchema } from "./agent-result";
+import { decodeInboxReadVersions } from "./api/inbox-contract";
+import {
+  decodeOrganizationResponse,
+  decodeOrganizationsResponse,
+} from "./api/organization-contract";
+import {
+  decodeClaimedProjectAgentScheduleRunResponse,
+  decodeLeaseExpirationResponse,
+  decodeProjectAgentResponse,
+  decodeProjectAgentScheduleResponse,
+  decodeProjectAgentScheduleRunResponse,
+  decodeProjectAgentScheduleRunsResponse,
+  decodeProjectAgentSchedulesResponse,
+  decodeProjectAgentSessionResponse,
+  decodeProjectAgentSessionsResponse,
+  decodeProjectAgentSessionSyncResponse,
+  decodeProjectAgentsResponse,
+} from "./api/project-agent-contract";
+import {
+  decodeProjectResponse,
+  decodeProjectsResponse,
+  decodeProjectUsageSummaryResponse,
+} from "./api/project-contract";
+import type { StructuredAgentResult } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
-  autoHuntRequirementKinds,
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
   type AutoHuntWorkflowCheckpoint,
 } from "./auto-hunt-contract";
-import {
-  defaultProjectAgentCalendarColor,
-  type ProjectAgentLocale,
-} from "./project-agent";
-import {
-  modelEffortSchema,
-  type ModelEffort,
-} from "./agent-provider-contract";
-import { agentProviders, type AgentProvider } from "./agent-provider";
+import type { ProjectAgentLocale } from "./project-agent";
+import type { ModelEffort } from "./agent-provider-contract";
+import type { AgentProvider } from "./agent-provider";
 import type { UsageRangeDays } from "./agent-usage-overview";
 import type { ProjectUsagePeriod } from "./project-usage-summary";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./agent-usage-pricing";
@@ -105,263 +120,8 @@ import type {
 
 const apiUrl = briarApiUrl;
 
-
-const projectSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string(),
-  issueKeyPrefix: z.string().regex(/^[A-Z0-9]{1,3}$/u).default("AH"),
-  scheduleTabEnabled: z.boolean().default(true),
-  icon: z
-    .string()
-    .max(400_000)
-    .regex(/^data:image\/(?:jpeg|png|webp);base64,/u)
-    .nullable()
-    .default(null),
-  organizationId: z.string().uuid(),
-  organizationName: z.string(),
-  role: z.enum(["owner", "admin", "member"]),
-  createdAt: z.string(),
-});
-const projectUsageSummarySchema = z.object({
-  period: z.enum(["day", "week", "month"]),
-  rangeStart: z.string(),
-  rangeEnd: z.string(),
-  totalTokens: z.number().int().nonnegative(),
-  trackedDurationMs: z.number().int().nonnegative(),
-  observedRuns: z.number().int().nonnegative(),
-  reportedRuns: z.number().int().nonnegative(),
-  completedIssues: z.number().int().nonnegative(),
-  timeline: z.array(z.object({
-    startAt: z.string(),
-    completedIssues: z.number().int().nonnegative(),
-    totalTokens: z.number().int().nonnegative(),
-  })),
-  issueCreators: z.array(z.object({
-    id: z.string().nullable(),
-    name: z.string().nullable(),
-    issues: z.number().int().nonnegative(),
-  })),
-  agents: z.array(z.object({
-    id: z.string().nullable(),
-    name: z.string().nullable(),
-    issues: z.number().int().nonnegative(),
-  })),
-  generatedAt: z.string(),
-});
-const projectAgentSchema = z.object({
-  id: z.string().uuid(),
-  projectId: z.string().uuid(),
-  name: z.string(),
-  avatar: z
-    .string()
-    .max(400_000)
-    .regex(/^data:image\/(?:jpeg|png|webp);base64,/u)
-    .nullable()
-    .default(null),
-  codexPet: z
-    .object({
-      slug: z.string(),
-      name: z.string(),
-      author: z.string(),
-      license: z.string(),
-      spriteVersion: z.union([z.literal(1), z.literal(2)]),
-      spriteSheetUrl: z.string().nullable(),
-    })
-    .nullable()
-    .default(null),
-  provider: z.enum(agentProviders),
-  model: z.string().nullable(),
-  effort: modelEffortSchema.nullable().default(null),
-  description: z.string().default(""),
-  responsibility: z.string(),
-  skill: z.string(),
-  skills: z
-    .array(
-      z.object({
-        id: z.string(),
-        agentId: z.string(),
-        name: z.string(),
-        instructions: z.string(),
-        provider: z.enum(agentProviders),
-        model: z.string().nullable(),
-        effort: modelEffortSchema.nullable().default(null),
-        kind: z.enum(["issue_processing", "custom"]),
-        position: z.number().int().nonnegative(),
-        createdAt: z.string(),
-        updatedAt: z.string(),
-      }),
-    )
-    .default([]),
-  calendarColor: z
-    .string()
-    .regex(/^#[0-9a-f]{6}$/iu)
-    .default(defaultProjectAgentCalendarColor),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
-const projectAgentSessionSchema = z.object({
-  id: z.string(),
-  projectId: z.string().uuid(),
-  dispatchGroupId: z.string(),
-  agentId: z.string().uuid().nullable(),
-  agentName: z.string().nullable().optional(),
-  skillId: z.string().uuid().nullable().optional(),
-  sessionType: z.enum(["task", "dispatch"]),
-  trigger: z.enum(["manual", "scheduled"]).nullable(),
-  scheduleId: z.string().nullable(),
-  scheduleRunId: z.string().nullable(),
-  parentSessionId: z.string().nullable(),
-  request: z.string().nullable(),
-  followUps: z.array(z.object({
-    id: z.string(),
-    message: z.string(),
-    sentAt: z.string(),
-  })).default([]),
-  status: z.enum(["running", "completed", "failed", "skipped", "interrupted"]),
-  issues: z.array(z.object({
-    runId: z.string(),
-    runNumber: z.number().int(),
-    sourceKey: z.string(),
-    title: z.string(),
-    outcome: z.enum([
-      "pending",
-      "completed",
-      "blocked",
-      "failed",
-      "skipped",
-    ]),
-    summary: z.string().nullable(),
-  })),
-  startedAt: z.string(),
-  completedAt: z.string().nullable(),
-  conversationId: z.string().nullable(),
-  workspaceRoot: z.null(),
-  summary: z.string().nullable(),
-  error: z.string().nullable(),
-  requestedWorkerId: z.string().nullable().optional(),
-  workerId: z.string().nullable().optional(),
-  events: z.array(z.object({
-    id: z.string(),
-    type: z.enum([
-      "started",
-      "completed",
-      "failed",
-      "skipped",
-      "interrupted",
-      "stopped",
-    ]),
-    occurredAt: z.string(),
-  })),
-  dispatchEvents: z.array(z.never()),
-  workers: z.array(z.never()),
-  updatedAt: z.string(),
-  archived: z.boolean().default(false),
-  detailLoaded: z.boolean().default(true),
-});
-const projectAgentScheduleSchema = z.object({
-  id: z.string().uuid(),
-  projectId: z.string().uuid(),
-  agentId: z.string().uuid(),
-  agentName: z.string(),
-  agentProvider: z.enum(agentProviders),
-  name: z.string(),
-  recurrence: z.enum([
-    "interval",
-    "daily",
-    "weekdays",
-    "weekly",
-    "custom",
-  ]),
-  timeOfDay: z.string(),
-  dayOfWeek: z.number().int().min(0).max(6).nullable(),
-  intervalValue: z.number().int().min(1).max(999).optional(),
-  intervalUnit: z.enum(["minute", "hour", "day", "week"]).optional(),
-  daysOfWeek: z.array(z.number().int().min(0).max(6)).optional(),
-  notificationLevel: z.enum(["important_updates", "none"]).optional(),
-  timeZone: z.string(),
-  enabled: z.boolean(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
-const autoHuntWorkflowSchema: z.ZodType<AutoHuntWorkflow> = z
-  .object({
-    version: z.literal(2),
-    requirements: z.array(z.object({
-      id: z.string(),
-      label: z.string(),
-      kind: z.enum(autoHuntRequirementKinds),
-      tool: z.string(),
-      reason: z.string(),
-    })).optional(),
-    stages: z.array(
-      z.object({
-        id: z.string(),
-        label: z.string(),
-        required: z.boolean(),
-        evidence: z.array(z.string()).optional(),
-        checks: z.array(z.string()).optional(),
-      }),
-    ),
-    execution: z
-      .object({
-        checkpoints: z.array(z.object({
-          key: z.string(),
-          stage: z.string(),
-          position: z.enum(["before", "after"]),
-        })).optional(),
-      })
-      .optional(),
-    completion: z.object({ requiredStages: z.array(z.string()) }).optional(),
-  })
-  .transform(normalizeAutoHuntWorkflow);
-const projectAgentScheduleRunSchema = z.object({
-  id: z.string().uuid(),
-  projectId: z.string().uuid(),
-  scheduleId: z.string().uuid(),
-  scheduleName: z.string(),
-  agent: projectAgentSchema.pick({
-    id: true,
-    name: true,
-    provider: true,
-    model: true,
-    effort: true,
-    description: true,
-    responsibility: true,
-    skill: true,
-    skills: true,
-  }),
-  workflow: autoHuntWorkflowSchema,
-  status: z.enum(["running", "completed", "failed"]),
-  scheduledFor: z.string(),
-  leaseExpiresAt: z.string().nullable(),
-  startedAt: z.string(),
-  completedAt: z.string().nullable(),
-  resultSummary: z.string().nullable(),
-  structuredResult: structuredAgentResultSchema.nullable(),
-  error: z.string().nullable(),
-});
-const claimedProjectAgentScheduleRunSchema =
-  projectAgentScheduleRunSchema.extend({
-    status: z.literal("running"),
-    claimToken: z.string().regex(/^briar_schedule_claim_[0-9a-f]{64}$/u),
-  });
-
 const normalizeDashboardWorkflow = (workflow: AutoHuntWorkflow) =>
   normalizeAutoHuntWorkflow(workflow);
-
-const organizationSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string(),
-  handle: z.string(),
-  logo: z
-    .string()
-    .max(400_000)
-    .regex(/^data:image\/(?:jpeg|png|webp);base64,/u)
-    .nullable()
-    .default(null),
-  role: z.enum(["owner", "admin", "member"]),
-  createdAt: z.string(),
-});
 
 export const isApiConfigured = Boolean(apiUrl);
 
@@ -455,8 +215,6 @@ export async function pollDeviceToken(
   }
 }
 
-const inboxReadVersionsSchema = z.record(z.string().min(1), z.string().min(1));
-
 export type InboxFeedSyncState = {
   etag: string | null;
 };
@@ -523,7 +281,7 @@ export async function loadInboxReadStates(
     "/inbox/read-states",
     token,
   );
-  return inboxReadVersionsSchema.parse(result.readVersions ?? {});
+  return decodeInboxReadVersions(result.readVersions ?? {});
 }
 
 export async function saveInboxReadStates(
@@ -538,12 +296,12 @@ export async function saveInboxReadStates(
       body: JSON.stringify({ readVersions }),
     },
   );
-  return inboxReadVersionsSchema.parse(result.readVersions ?? {});
+  return decodeInboxReadVersions(result.readVersions ?? {});
 }
 
 export async function loadProjects(token: string): Promise<Project[]> {
   const result = await request<{ projects: unknown[] }>("/projects", token);
-  return z.array(projectSchema).parse(result.projects);
+  return decodeProjectsResponse(result.projects);
 }
 
 export async function loadOrganizations(
@@ -553,13 +311,13 @@ export async function loadOrganizations(
     "/organizations",
     token,
   );
-  return z.array(organizationSchema).parse(result.organizations);
+  return decodeOrganizationsResponse(result.organizations);
 }
 
 export async function createOrganization(
   token: string,
   input: { name: string; handle: string },
-) {
+): Promise<{ organization: Organization }> {
   const result = await request<{ organization: unknown }>(
     "/organizations",
     token,
@@ -568,7 +326,7 @@ export async function createOrganization(
       body: JSON.stringify(input),
     },
   );
-  return { organization: organizationSchema.parse(result.organization) };
+  return { organization: decodeOrganizationResponse(result.organization) };
 }
 
 export async function isOrganizationHandleAvailable(
@@ -601,7 +359,7 @@ export async function updateOrganizationLogo(
   token: string,
   organizationId: string,
   logo: string | null,
-) {
+): Promise<{ organization: Organization }> {
   const result = await request<{ organization: unknown }>(
     `/organizations/${organizationId}/logo`,
     token,
@@ -610,7 +368,7 @@ export async function updateOrganizationLogo(
       body: JSON.stringify({ logo }),
     },
   );
-  return { organization: organizationSchema.parse(result.organization) };
+  return { organization: decodeOrganizationResponse(result.organization) };
 }
 
 export async function loadOrganizationMembers(
@@ -942,7 +700,7 @@ export async function loadProjectUsageSummary(
   period: ProjectUsagePeriod = "day",
   signal?: AbortSignal,
 ): Promise<ProjectUsageSummary> {
-  return projectUsageSummarySchema.parse(await request<ProjectUsageSummary>(
+  return decodeProjectUsageSummaryResponse(await request<ProjectUsageSummary>(
     `/projects/${encodeURIComponent(projectId)}/usage/summary?period=${period}`,
     token,
     { signal },
@@ -1102,7 +860,7 @@ export async function updateProjectIcon(
   token: string,
   projectId: string,
   icon: string | null,
-) {
+): Promise<{ project: Project }> {
   const result = await request<{ project: unknown }>(
     `/projects/${projectId}/icon`,
     token,
@@ -1111,14 +869,14 @@ export async function updateProjectIcon(
       body: JSON.stringify({ icon }),
     },
   );
-  return { project: projectSchema.parse(result.project) };
+  return { project: decodeProjectResponse(result.project) };
 }
 
 export async function updateProjectIssueKeyPrefix(
   token: string,
   projectId: string,
   issueKeyPrefix: string,
-) {
+): Promise<{ project: Project }> {
   const result = await request<{ project: unknown }>(
     `/projects/${projectId}/issue-key-prefix`,
     token,
@@ -1127,14 +885,14 @@ export async function updateProjectIssueKeyPrefix(
       body: JSON.stringify({ issueKeyPrefix }),
     },
   );
-  return { project: projectSchema.parse(result.project) };
+  return { project: decodeProjectResponse(result.project) };
 }
 
 export async function updateProjectTabs(
   token: string,
   projectId: string,
   tabs: { schedule: boolean },
-) {
+): Promise<{ project: Project }> {
   const result = await request<{ project: unknown }>(
     `/projects/${projectId}/tabs`,
     token,
@@ -1143,7 +901,7 @@ export async function updateProjectTabs(
       body: JSON.stringify(tabs),
     },
   );
-  return { project: projectSchema.parse(result.project) };
+  return { project: decodeProjectResponse(result.project) };
 }
 
 export async function loadProjectAgents(
@@ -1155,7 +913,7 @@ export async function loadProjectAgents(
     `/projects/${projectId}/agents?locale=${encodeURIComponent(locale)}`,
     token,
   );
-  return z.array(projectAgentSchema).parse(result.agents);
+  return decodeProjectAgentsResponse(result.agents);
 }
 
 export async function loadProjectAgentSessions(
@@ -1166,7 +924,7 @@ export async function loadProjectAgentSessions(
     `/projects/${projectId}/agent-sessions`,
     token,
   );
-  return z.array(projectAgentSessionSchema).parse(result.sessions).map(
+  return decodeProjectAgentSessionsResponse(result.sessions).map(
     (session) => ({
       ...session,
       localOwner: false,
@@ -1187,14 +945,6 @@ export type ProjectAgentSessionSyncResult = {
   sessions: AutoHuntSession[];
   deletedSessionIds: string[];
 };
-
-const projectAgentSessionSyncSchema = z.object({
-  cursor: z.number().int().nonnegative(),
-  hasMore: z.boolean(),
-  reset: z.boolean(),
-  sessions: z.array(projectAgentSessionSchema),
-  deletedSessionIds: z.array(z.string()),
-});
 
 export async function loadProjectAgentSessionChanges(
   token: string,
@@ -1237,7 +987,7 @@ export async function loadProjectAgentSessionChanges(
       Array.isArray(body?.issues) ? body.issues : undefined,
     );
   }
-  const result = projectAgentSessionSyncSchema.parse(await response.json());
+  const result = decodeProjectAgentSessionSyncResponse(await response.json());
   return {
     state: {
       cursor: result.cursor,
@@ -1264,7 +1014,7 @@ export async function loadProjectAgentSession(
     token,
   );
   return {
-    ...projectAgentSessionSchema.parse(result.session),
+    ...decodeProjectAgentSessionResponse(result.session),
     localOwner: false,
   } as AutoHuntSession;
 }
@@ -1294,7 +1044,7 @@ export async function runProjectAgentTaskOnWorker(
     },
   );
   return {
-    ...projectAgentSessionSchema.parse(result.session),
+    ...decodeProjectAgentSessionResponse(result.session),
     localOwner: false,
   } as AutoHuntSession;
 }
@@ -1336,7 +1086,7 @@ export async function upsertProjectAgentSession(
     },
   );
   return {
-    ...projectAgentSessionSchema.parse(result.session),
+    ...decodeProjectAgentSessionResponse(result.session),
     localOwner: session.localOwner,
     workspaceRoot: session.workspaceRoot,
     dispatchEvents: session.dispatchEvents,
@@ -1357,7 +1107,7 @@ export async function createProjectAgent(
       body: JSON.stringify(projectAgentInputJson(input)),
     },
   );
-  return projectAgentSchema.parse(result.agent);
+  return decodeProjectAgentResponse(result.agent);
 }
 
 export async function loadProjectAgentSchedules(
@@ -1368,7 +1118,7 @@ export async function loadProjectAgentSchedules(
     `/projects/${projectId}/agent-schedules`,
     token,
   );
-  return z.array(projectAgentScheduleSchema).parse(result.schedules);
+  return decodeProjectAgentSchedulesResponse(result.schedules);
 }
 
 export async function createProjectAgentSchedule(
@@ -1384,7 +1134,7 @@ export async function createProjectAgentSchedule(
       body: JSON.stringify(input),
     },
   );
-  return projectAgentScheduleSchema.parse(result.schedule);
+  return decodeProjectAgentScheduleResponse(result.schedule);
 }
 
 export async function updateProjectAgentSchedule(
@@ -1401,7 +1151,7 @@ export async function updateProjectAgentSchedule(
       body: JSON.stringify(input),
     },
   );
-  return projectAgentScheduleSchema.parse(result.schedule);
+  return decodeProjectAgentScheduleResponse(result.schedule);
 }
 
 export async function deleteProjectAgentSchedule(
@@ -1431,7 +1181,7 @@ export async function loadProjectAgentScheduleRuns(
     `/projects/${projectId}/agent-schedule-runs`,
     token,
   );
-  return z.array(projectAgentScheduleRunSchema).parse(result.runs);
+  return decodeProjectAgentScheduleRunsResponse(result.runs);
 }
 
 export async function claimProjectAgentScheduleRun(
@@ -1445,7 +1195,7 @@ export async function claimProjectAgentScheduleRun(
   );
   return result.run === null
     ? null
-    : claimedProjectAgentScheduleRunSchema.parse(result.run);
+    : decodeClaimedProjectAgentScheduleRunResponse(result.run);
 }
 
 export async function claimProjectAgentScheduleRuns(
@@ -1465,7 +1215,7 @@ export async function claimProjectAgentScheduleRuns(
       },
     );
     if (result.run !== null) {
-      return claimedProjectAgentScheduleRunSchema.parse(result.run);
+      return decodeClaimedProjectAgentScheduleRunResponse(result.run);
     }
   }
   return null;
@@ -1480,13 +1230,13 @@ export async function completeProjectAgentScheduleRun(
         claimToken: string;
         status: "completed";
         resultSummary: string;
-        structuredResult: z.infer<typeof structuredAgentResultSchema>;
+        structuredResult: StructuredAgentResult;
       }
     | {
         claimToken: string;
         status: "failed";
         error: string;
-        structuredResult: z.infer<typeof structuredAgentResultSchema>;
+        structuredResult: StructuredAgentResult;
       },
 ): Promise<ProjectAgentScheduleRun> {
   const result = await request<{ run: unknown }>(
@@ -1504,7 +1254,7 @@ export async function completeProjectAgentScheduleRun(
       }),
     },
   );
-  return projectAgentScheduleRunSchema.parse(result.run);
+  return decodeProjectAgentScheduleRunResponse(result.run);
 }
 
 export async function renewProjectAgentScheduleRun(
@@ -1521,7 +1271,7 @@ export async function renewProjectAgentScheduleRun(
       body: JSON.stringify({ claimToken }),
     },
   );
-  return z.string().parse(result.leaseExpiresAt);
+  return decodeLeaseExpirationResponse(result.leaseExpiresAt);
 }
 
 export async function updateProjectAgent(
@@ -1538,7 +1288,7 @@ export async function updateProjectAgent(
       body: JSON.stringify(projectAgentInputJson(input)),
     },
   );
-  return projectAgentSchema.parse(result.agent);
+  return decodeProjectAgentResponse(result.agent);
 }
 
 export async function deleteProjectAgent(
@@ -2037,7 +1787,7 @@ function validateAgentSkillExecutionAcceptance(
   input: AgentSkillExecutionApprovalInput,
 ) {
   const session = {
-    ...projectAgentSessionSchema.parse(result.session),
+    ...decodeProjectAgentSessionResponse(result.session),
     localOwner: false,
   } as AutoHuntSession;
   const snapshotChanged = skillExecutionSnapshotKeys.some(
