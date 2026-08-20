@@ -57,6 +57,13 @@ export function lovableWorkflowPreset(
         checks: [],
       },
       {
+        id: "reviewing",
+        label: "Review",
+        required: true,
+        evidence: ["review findings"],
+        checks: [],
+      },
+      {
         id: "local_qa",
         label: "Local validation",
         required: true,
@@ -65,9 +72,23 @@ export function lovableWorkflowPreset(
       },
       {
         id: "pr_open",
-        label: "Open pull request",
+        label: "Create pull request",
         required: true,
-        evidence: ["pull_request"],
+        evidence: ["branch", "commit", "push", "pull_request"],
+        checks: [],
+      },
+      {
+        id: "ci_qa",
+        label: "Required CI and signoff",
+        required: true,
+        evidence: ["ci", "signoff"],
+        checks: [],
+      },
+      {
+        id: "merged",
+        label: "Merge to main",
+        required: true,
+        evidence: ["merge_commit"],
         checks: [],
       },
     ],
@@ -79,7 +100,15 @@ export function lovableWorkflowPreset(
       }],
     },
     completion: {
-      requiredStages: ["analyzing", "implementing", "local_qa", "pr_open"],
+      requiredStages: [
+        "analyzing",
+        "implementing",
+        "reviewing",
+        "local_qa",
+        "pr_open",
+        "ci_qa",
+        "merged",
+      ],
     },
   });
 }
