@@ -20,6 +20,11 @@ import {
   type AgentUsageSnapshot,
   type AgentUsageWindow,
 } from "../lib/agent-usage";
+import {
+  defaultAppProviderSettings,
+  loadAppProviderSettings,
+  type AppProviderSettings,
+} from "../lib/project-llm";
 import { AgentProviderIcon } from "./AgentIcons";
 import {
   StatusPanel,
@@ -245,33 +250,22 @@ function ProviderDetails({
 }
 
 function StatusProvider({
-  loading,
   provider,
 }: {
-  loading: boolean;
   provider: AgentUsageProvider;
 }) {
   const { t } = useI18n();
   const window = tightestUsageWindow(provider);
   const name = providerName(provider.provider);
-  if (loading && !window) {
-    return (
-      <span className="agent-usage-status-provider">
-        <ProviderIcon provider={provider.provider} />
-        <small>{t("usage.refreshing")}</small>
-      </span>
-    );
-  }
   if (!window) {
     return (
-      <span className="agent-usage-status-provider">
+      <span
+        aria-label={name}
+        className="agent-usage-status-provider"
+        role="img"
+        title={name}
+      >
         <ProviderIcon provider={provider.provider} />
-        <small>
-          {name} ·{" "}
-          {provider.status === "unavailable"
-            ? t("usage.signIn")
-            : t("usage.unavailable")}
-        </small>
       </span>
     );
   }
@@ -292,10 +286,12 @@ function StatusProvider({
 
 export function AgentUsageStatusBar({
   loadUsage = loadAgentUsage,
+  loadProviderSettings = loadAppProviderSettings,
   onManageAccounts,
   onOpenUsageDetails,
 }: {
   loadUsage?: () => Promise<AgentUsageSnapshot>;
+  loadProviderSettings?: () => Promise<AppProviderSettings>;
   onManageAccounts: () => void;
   onOpenUsageDetails: () => void;
 }) {
@@ -303,6 +299,8 @@ export function AgentUsageStatusBar({
   const rootRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<Promise<void> | null>(null);
   const [snapshot, setSnapshot] = useState<AgentUsageSnapshot | null>(null);
+  const [providerSettings, setProviderSettings] =
+    useState<AppProviderSettings>(defaultAppProviderSettings);
   const [isOpen, setIsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [mode, setMode] = useState<UsageMode>("detailed");
@@ -312,19 +310,23 @@ export function AgentUsageStatusBar({
   const refresh = useCallback(() => {
     if (requestRef.current) return requestRef.current;
     setIsRefreshing(true);
-    const request = loadUsage()
-      .then((next) => {
-        setSnapshot(next);
-        recordAgentUsageSnapshot(next);
+    const request = Promise.allSettled([loadUsage(), loadProviderSettings()])
+      .then(([usageResult, settingsResult]) => {
+        if (usageResult.status === "fulfilled") {
+          setSnapshot(usageResult.value);
+          recordAgentUsageSnapshot(usageResult.value);
+        }
+        if (settingsResult.status === "fulfilled") {
+          setProviderSettings(settingsResult.value);
+        }
       })
-      .catch(() => undefined)
       .finally(() => {
         setIsRefreshing(false);
         requestRef.current = null;
       });
     requestRef.current = request;
     return request;
-  }, [loadUsage]);
+  }, [loadProviderSettings, loadUsage]);
 
   useEffect(() => {
     void refresh();
@@ -353,10 +355,10 @@ export function AgentUsageStatusBar({
 
   const providers = useMemo(
     () =>
-      quotaUsageProviders.map(
-        (provider) => snapshot?.[provider] ?? emptyUsageProvider(provider),
-      ),
-    [snapshot],
+      quotaUsageProviders
+        .filter((provider) => providerSettings[provider])
+        .map((provider) => snapshot?.[provider] ?? emptyUsageProvider(provider)),
+    [providerSettings, snapshot],
   );
 
   return (
@@ -466,7 +468,6 @@ export function AgentUsageStatusBar({
         {providers.map((provider) => (
           <StatusProvider
             key={provider.provider}
-            loading={isRefreshing}
             provider={provider}
           />
         ))}
