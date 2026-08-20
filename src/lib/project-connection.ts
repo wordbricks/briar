@@ -74,6 +74,14 @@ export type RepositoryReadiness = {
   issues: string[];
 };
 
+export type LovableRepositoryCompatibility = {
+  compatible: boolean;
+  stack: "tanstack-start" | "vite-react" | null;
+  packageManager: "bun" | "npm" | "pnpm" | "yarn" | null;
+  scripts: string[];
+  issues: string[];
+};
+
 export type LocalAutoHuntConfig = {
   velenOrg: string | null;
   dataSource?: string | null;
@@ -103,6 +111,7 @@ export async function resolveProjectConnectionWorkflow(
   role: "owner" | "admin" | "member" | undefined,
   existingWorkflow: AutoHuntWorkflow | undefined,
   generateWorkflow: () => Promise<AutoHuntWorkflow>,
+  compatiblePreset?: AutoHuntWorkflow,
 ) {
   if (
     existingWorkflow &&
@@ -117,6 +126,15 @@ export async function resolveProjectConnectionWorkflow(
     throw new Error(
       "An organization owner or admin must generate the project workflow before members can connect a repository.",
     );
+  }
+  if (
+    compatiblePreset &&
+    !isRepositoryWorkflowPending(compatiblePreset)
+  ) {
+    return {
+      workflow: compatiblePreset,
+      shouldPersistProjectSettings: true,
+    };
   }
   return {
     workflow: await generateWorkflow(),
@@ -183,6 +201,19 @@ export async function inspectRepositoryReadiness(
     repositoryPath,
     workflow,
   });
+}
+
+export async function inspectLovableRepositoryCompatibility(
+  repositoryPath: string,
+) {
+  if (!isTauri()) {
+    throw new Error("Lovable 저장소 검사는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<LovableRepositoryCompatibility>(
+    "inspect_lovable_repository_compatibility",
+    { repositoryPath },
+  );
 }
 
 export async function discoverRepositoryIcon(
