@@ -37,7 +37,10 @@ import {
   SettingsSidebar,
 } from "@/components/settings";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -1187,15 +1190,17 @@ export function ProjectSettings({
                 <small>{t("settings.workflowDescription")}</small>
               </span>
               <div className="project-settings-automation-actions">
-                <button
+                <Button
                   disabled={
                     isAnalyzingWorkflowRequirements ||
                     isRegeneratingWorkflow ||
                     isRevisingWorkflow ||
                     !workflowContract
                   }
+                  size="sm"
                   onClick={() => void analyzeWorkflowRequirements()}
                   type="button"
+                  variant="outline"
                 >
                   {isAnalyzingWorkflowRequirements ? (
                     <LoaderCircle className="spin" size={14} />
@@ -1205,16 +1210,18 @@ export function ProjectSettings({
                   {isAnalyzingWorkflowRequirements
                     ? t("settings.analyzingWorkflowRequirements")
                     : t("settings.analyzeWorkflowRequirements")}
-                </button>
-                <button
+                </Button>
+                <Button
                   disabled={
                     isAnalyzingWorkflowRequirements ||
                     isRegeneratingWorkflow ||
                     isRevisingWorkflow ||
                     !workflowContract
                   }
+                  size="sm"
                   onClick={() => void regenerateWorkflow()}
                   type="button"
+                  variant="outline"
                 >
                   {isRegeneratingWorkflow ? (
                     <LoaderCircle className="spin" size={14} />
@@ -1224,9 +1231,9 @@ export function ProjectSettings({
                   {isRegeneratingWorkflow
                     ? t("settings.regeneratingWorkflow")
                     : t("settings.regenerateWorkflow")}
-                </button>
+                </Button>
                 {workflowContract ? (
-                  <button
+                  <Button
                     aria-label={t("settings.copyWorkflow")}
                     onClick={() => {
                       void navigator.clipboard.writeText(workflowJson).then(() => {
@@ -1234,11 +1241,13 @@ export function ProjectSettings({
                         window.setTimeout(() => setWorkflowCopied(false), 1_500);
                       });
                     }}
+                    size="sm"
                     type="button"
+                    variant="outline"
                   >
                     {workflowCopied ? <Check size={14} /> : <Copy size={14} />}
                     {workflowCopied ? t("settings.copied") : t("settings.copyJson")}
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             </header>
@@ -1252,9 +1261,9 @@ export function ProjectSettings({
                 void reviseWorkflow();
               }}
             >
-              <label htmlFor={`workflow-revision-${project.id}`}>
+              <Label htmlFor={`workflow-revision-${project.id}`}>
                 {t("settings.workflowRevisionLabel")}
-              </label>
+              </Label>
               <Textarea
                 aria-label={t("settings.workflowRevisionLabel")}
                 disabled={
@@ -1274,7 +1283,7 @@ export function ProjectSettings({
               />
               <footer>
                 <small>{t("settings.workflowRevisionDescription")}</small>
-                <button
+                <Button
                   disabled={
                     isAnalyzingWorkflowRequirements ||
                     isRegeneratingWorkflow ||
@@ -1282,6 +1291,7 @@ export function ProjectSettings({
                     !workflowContract ||
                     !workflowRevisionRequest.trim()
                   }
+                  size="sm"
                   type="submit"
                 >
                   {isRevisingWorkflow ? (
@@ -1292,7 +1302,7 @@ export function ProjectSettings({
                   {isRevisingWorkflow
                     ? t("settings.workflowRevising")
                     : t("settings.workflowRevise")}
-                </button>
+                </Button>
               </footer>
             </form>
             <div aria-live="polite">
@@ -1348,9 +1358,14 @@ export function ProjectSettings({
                               const selected = (scope === "project" ? projectMandatory : userDefaults)
                                 .some((checkpoint) => checkpoint.stage === stage.id && checkpoint.position === position);
                               const locked = scope === "user" && mandatory;
+                              const checkboxId = `workflow-checkpoint-${project.id}-${scope}-${stage.id}-${position}`;
                               return (
-                                <label className={locked ? "locked" : ""} key={position}>
-                                  <input
+                                <Label
+                                  className={locked ? "locked" : ""}
+                                  htmlFor={checkboxId}
+                                  key={position}
+                                >
+                                  <Checkbox
                                     aria-label={`${stage.label} ${position} ${scope}`}
                                     checked={locked || selected}
                                     disabled={
@@ -1360,19 +1375,22 @@ export function ProjectSettings({
                                       locked ||
                                       (scope === "project" && project.role === "member")
                                     }
-                                    onChange={(event) => void updateCheckpointBoundary(
-                                      scope,
-                                      stage.id,
-                                      position,
-                                      event.currentTarget.checked,
-                                    )}
-                                    type="checkbox"
+                                    id={checkboxId}
+                                    onCheckedChange={(checked) => {
+                                      if (checked === "indeterminate") return;
+                                      void updateCheckpointBoundary(
+                                        scope,
+                                        stage.id,
+                                        position,
+                                        checked,
+                                      );
+                                    }}
                                   />
                                   {position === "before"
                                     ? t("settings.workflowBefore")
                                     : t("settings.workflowAfter")}
                                   {locked ? <ShieldCheck aria-hidden="true" size={12} /> : null}
-                                </label>
+                                </Label>
                               );
                             })}
                           </span>
@@ -1388,7 +1406,7 @@ export function ProjectSettings({
                         })}
                   </footer>
                 </section>
-                <div
+                <Card
                   aria-label={t("settings.workflowDiagram")}
                   className="project-workflow-contract"
                   role="group"
@@ -1410,13 +1428,15 @@ export function ProjectSettings({
                       </span>
                     </span>
                     {onRefreshHealth ? (
-                      <button
+                      <Button
                         aria-label={t("health.recheck")}
                         onClick={() => void onRefreshHealth()}
+                        size="icon-sm"
                         type="button"
+                        variant="outline"
                       >
                         <RefreshCw size={13} />
-                      </button>
+                      </Button>
                     ) : null}
                   </header>
                   {workflowContract.requirements.length ? (
@@ -1546,7 +1566,7 @@ export function ProjectSettings({
                     </div>
                   </footer>
                 </div>
-                </div>
+                </Card>
               </>
             ) : (
               <p className="project-settings-empty">{t("settings.loadingWorkflow")}</p>
