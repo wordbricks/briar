@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ChoiceCard } from "@/components/ui/choice-card";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
@@ -348,58 +349,50 @@ export function WorkerDispatchDialog({
               <p><CircleAlert size={15} />{t("worker.noneForProvider")}</p>
             ) : (
               <>
-                <button
-                  aria-pressed={workerId === ""}
+                <ChoiceCard
                   className="worker-readiness-row"
+                  description={t("worker.anyAvailableDetail")}
+                  icon={<Waypoints />}
+                  iconClassName="[&_svg]:size-[26px]"
+                  layout="horizontal"
+                  leading={<span className="worker-readiness-dot any" />}
                   onClick={() => {
                     selectionDirtyRef.current = true;
                     setWorkerId("");
                   }}
-                  type="button"
-                >
-                  <span className="worker-readiness-dot any" />
-                  <span className="worker-readiness-any-icon">
-                    <Waypoints size={30} />
-                  </span>
-                  <span>
-                    <strong>{t("worker.anyAvailable")}</strong>
-                    <small>{t("worker.anyAvailableDetail")}</small>
-                  </span>
-                  <Check
-                    aria-hidden="true"
-                    className="worker-readiness-check"
-                    size={16}
-                  />
-                </button>
+                  selected={workerId === ""}
+                  title={t("worker.anyAvailable")}
+                  trailing={workerId === "" ? <Check aria-hidden="true" /> : null}
+                />
                 {eligibleWorkers.map((worker) => (
-                  <button
-                    aria-pressed={workerId === worker.id}
+                  <ChoiceCard
                     className="worker-readiness-row"
-                    disabled={worker.readiness !== "available"}
-                    key={worker.id}
-                    onClick={() => {
-                      selectionDirtyRef.current = true;
-                      setWorkerId(worker.id);
-                    }}
-                    type="button"
-                  >
-                    <span className={`worker-readiness-dot ${worker.readiness}`} />
-                    <WorkerIcon icon={worker.icon} size={30} />
-                    <span>
-                      <strong>{worker.label}</strong>
-                      <small>
+                    description={
+                      <>
                         {t(`worker.readiness.${worker.readiness}` as MessageKey)}
                         {worker.readinessDetail
                           ? ` · ${worker.readinessDetail}`
                           : ""}
-                      </small>
-                    </span>
-                    <Check
-                      aria-hidden="true"
-                      className="worker-readiness-check"
-                      size={16}
-                    />
-                  </button>
+                      </>
+                    }
+                    disabled={worker.readiness !== "available"}
+                    icon={<WorkerIcon icon={worker.icon} size={30} />}
+                    iconClassName="bg-transparent"
+                    key={worker.id}
+                    layout="horizontal"
+                    leading={
+                      <span className={`worker-readiness-dot ${worker.readiness}`} />
+                    }
+                    onClick={() => {
+                      selectionDirtyRef.current = true;
+                      setWorkerId(worker.id);
+                    }}
+                    selected={workerId === worker.id}
+                    title={worker.label}
+                    trailing={
+                      workerId === worker.id ? <Check aria-hidden="true" /> : null
+                    }
+                  />
                 ))}
               </>
             )}
