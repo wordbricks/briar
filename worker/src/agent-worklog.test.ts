@@ -6,7 +6,7 @@ import {
   listAgentTranscriptSegments,
   readAgentWorkLog,
 } from "./agent-worklog";
-import { MAX_TRANSCRIPT_PAYLOAD_BYTES } from "./workers";
+import { MAX_TRANSCRIPT_PAYLOAD_BYTES } from "./transcript-limits";
 import {
   createIsolatedTestDatabase,
   executeD1Sql,

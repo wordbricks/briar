@@ -35,6 +35,7 @@ import worker, {
   projectAgentScheduleRunCompletionSchema,
   projectMutationProject,
   projectScheduleClaimMutation,
+  decodeTranscriptRequest,
   readChannelReplyCompleteRequest,
   readIssueRequest,
   readRunEvidenceRequest,
@@ -43,7 +44,6 @@ import worker, {
   responseWithPostCommitCleanup,
   runEvidenceInputSchema,
   runReworkInputSchema,
-  transcriptSchema,
   usageRangeDaysSchema,
   workflowStageLifecycleInputSchema,
   workerRegisterSchema,
@@ -655,7 +655,7 @@ describe("Worker HTTP contract", () => {
       durationMs: 90_000,
     };
     expect(
-      transcriptSchema.parse({
+      decodeTranscriptRequest({
         sessionId: "detached-run",
         runId: "11111111-1111-4111-8111-111111111111",
         runAttempt: 2,
@@ -667,7 +667,7 @@ describe("Worker HTTP contract", () => {
       }).executionMetrics,
     ).toEqual(metrics);
     expect(() =>
-      transcriptSchema.parse({
+      decodeTranscriptRequest({
         sessionId: "detached-run",
         runId: "11111111-1111-4111-8111-111111111111",
         agentProvider: "codex",
@@ -705,12 +705,12 @@ describe("Worker HTTP contract", () => {
       events: [{ sequence: 1, direction: "server" as const, payload: {} }],
     };
 
-    expect(transcriptSchema.parse(input).costRecords).toEqual([costRecord]);
+    expect(decodeTranscriptRequest(input).costRecords).toEqual([costRecord]);
     expect(() =>
-      transcriptSchema.parse({ ...input, executionId: undefined }),
+      decodeTranscriptRequest({ ...input, executionId: undefined }),
     ).toThrow(/executionId is required with costRecords/iu);
     expect(() =>
-      transcriptSchema.parse({ ...input, runAttempt: undefined }),
+      decodeTranscriptRequest({ ...input, runAttempt: undefined }),
     ).toThrow(/runAttempt is required with costRecords/iu);
   });
 
@@ -1580,6 +1580,34 @@ describe("Worker HTTP contract", () => {
         body,
       },
     ))).rejects.toThrow("Request body too large");
+  });
+
+  it("maps Effect transcript schema failures to an HTTP 400 response", async () => {
+    const response = await worker.fetch(
+      new Request("https://briar-api.example/transcripts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sessionId: "invalid-transcript",
+          agentProvider: "codex",
+          events: [],
+        }),
+      }),
+      {
+        BETTER_AUTH_SECRET: "test-secret-at-least-thirty-two-characters",
+        GOOGLE_CLIENT_ID: "test-client",
+        GOOGLE_CLIENT_SECRET: "test-secret",
+      } as never,
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      message: "Invalid request",
+      issues: [{
+        path: ["events"],
+        message: expect.any(String),
+      }],
+    });
   });
 
   it("parses channel reply images from multipart Worker complete requests", async () => {

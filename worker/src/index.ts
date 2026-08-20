@@ -1,4 +1,7 @@
 import { z } from "zod";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as SchemaIssue from "effect/SchemaIssue";
 import briarIconPng from "../../src/assets/app-icons/aubergine-riso.png";
 import {
   AutoHuntWorkflowValidationError,
@@ -21,10 +24,8 @@ import {
   structuredAgentResultSchema,
   type StructuredAgentResult,
 } from "../../src/lib/agent-result";
-import { agentExecutionCostRecordSchema } from "../../src/lib/agent-execution-cost";
 import {
-  agentExecutionMetricsSchema,
-  agentExecutionUsageRecordSchema,
+  decodeAgentExecutionMetricsOption,
 } from "../../src/lib/agent-execution-metrics";
 import {
   agentProviderLabels,
@@ -437,8 +438,6 @@ import {
   hasExecutionWorkerReadinessChanged,
   isExecutionWorkerAllowedForProject,
   MAX_WORKER_CONCURRENT_SESSIONS,
-  MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
-  MAX_TRANSCRIPT_HTTP_BODY_BYTES,
   WORKER_STALE_AFTER_MS,
   reapStalledHuntRuns,
   recordWorkerHeartbeat,
@@ -455,6 +454,16 @@ import {
   updateProjectExecutionWorkerPolicy,
   userOwnsExecutionWorkerDevice,
 } from "./workers";
+import { MAX_TRANSCRIPT_HTTP_BODY_BYTES } from "./transcript-limits";
+import {
+  decodeTranscriptRequestEffect,
+  TranscriptRequestDecodeError,
+} from "./transcript-request";
+
+export {
+  decodeTranscriptRequest,
+  transcriptSchema,
+} from "./transcript-request";
 import {
   ingestAgentTranscript,
   listAgentTranscriptSegments,
@@ -652,6 +661,8 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Expose-Headers": "ETag",
 };
+
+const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 
 export async function flushOrganizationInboxRealtimeOutbox(
   env: Env,
@@ -3015,115 +3026,6 @@ export const projectAgentScheduleRunCompletionSchema = z
     }
   });
 
-export const transcriptSchema = z
-  .object({
-    sessionId: z
-      .string()
-      .trim()
-      .min(1)
-      .max(128)
-      .regex(/^[A-Za-z0-9_-]+$/u),
-    runId: z.string().uuid().nullable().optional(),
-    runAttempt: z.number().int().positive().optional(),
-    executionId: z.string().uuid().optional(),
-    projectId: z.string().uuid().optional(),
-    workerId: z.string().trim().min(1).max(128).nullable().optional(),
-    agentProvider: z.enum(agentProviders),
-    executionMetrics: agentExecutionMetricsSchema.optional(),
-    usageRecords: z
-      .array(agentExecutionUsageRecordSchema)
-      .min(1)
-      .max(1_000)
-      .optional(),
-    costRecords: z
-      .array(agentExecutionCostRecordSchema)
-      .min(1)
-      .max(1_000)
-      .optional(),
-    events: z
-      .array(
-        z
-          .object({
-            sequence: z.number().int().positive(),
-            direction: z.enum(["client", "server"]),
-            payload: z.unknown(),
-          })
-          .strict(),
-      )
-      .min(1)
-      .max(MAX_TRANSCRIPT_EVENTS_PER_REQUEST),
-  })
-  .strict()
-  .superRefine((input, context) => {
-    if (
-      input.executionMetrics !== undefined &&
-      (!input.runId || input.runAttempt === undefined)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "runId and runAttempt are required with executionMetrics",
-        path: ["executionMetrics"],
-      });
-    }
-    if (input.executionId && !input.runId) {
-      context.addIssue({
-        code: "custom",
-        message: "runId is required with executionId",
-        path: ["executionId"],
-      });
-    }
-    if (input.usageRecords && !input.executionId) {
-      context.addIssue({
-        code: "custom",
-        message: "executionId is required with usageRecords",
-        path: ["usageRecords"],
-      });
-    }
-    if (input.usageRecords && input.runAttempt === undefined) {
-      context.addIssue({
-        code: "custom",
-        message: "runAttempt is required with usageRecords",
-        path: ["usageRecords"],
-      });
-    }
-    if (input.costRecords && !input.executionId) {
-      context.addIssue({
-        code: "custom",
-        message: "executionId is required with costRecords",
-        path: ["costRecords"],
-      });
-    }
-    if (input.costRecords && input.runAttempt === undefined) {
-      context.addIssue({
-        code: "custom",
-        message: "runAttempt is required with costRecords",
-        path: ["costRecords"],
-      });
-    }
-    if (
-      input.usageRecords?.some(
-        (record) => record.agentProvider !== input.agentProvider,
-      )
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "usage record providers must match agentProvider",
-        path: ["usageRecords"],
-      });
-    }
-    if (
-      input.costRecords?.some(
-        (record) => record.agentProvider !== input.agentProvider,
-      )
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "cost record providers must match agentProvider",
-        path: ["costRecords"],
-      });
-    }
-  });
-
 const recoveryUserInputSchema = z
   .object({
     requestId: z.string().uuid(),
@@ -3300,8 +3202,10 @@ async function readJson(
 }
 
 export async function readTranscriptRequest(request: Request) {
-  return transcriptSchema.parse(
-    await readJson(request, MAX_TRANSCRIPT_HTTP_BODY_BYTES),
+  return Effect.runPromise(
+    decodeTranscriptRequestEffect(
+      await readJson(request, MAX_TRANSCRIPT_HTTP_BODY_BYTES),
+    ),
   );
 }
 
@@ -5666,8 +5570,9 @@ const parseStructuredResult = (
 };
 
 const parseExecutionMetrics = (value: string | null) => {
-  const result = agentExecutionMetricsSchema.safeParse(parseJsonObject(value));
-  return result.success ? result.data : null;
+  return Option.getOrNull(
+    decodeAgentExecutionMetricsOption(parseJsonObject(value)),
+  );
 };
 
 const parseUsageExecutionMetrics = (value: string | null) => {
@@ -15863,6 +15768,12 @@ export default {
       }
       if (error instanceof OrganizationAgentContextPageTooLargeError) {
         return json({ message: error.message }, 413);
+      }
+      if (error instanceof TranscriptRequestDecodeError) {
+        return json({
+          message: "Invalid request",
+          issues: formatSchemaIssue(error.cause.issue).issues,
+        }, 400);
       }
       if (error instanceof z.ZodError) {
         return json({ message: "Invalid request", issues: error.issues }, 400);

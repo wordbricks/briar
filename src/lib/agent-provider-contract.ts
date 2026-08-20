@@ -1,21 +1,15 @@
 import { z } from "zod";
+import {
+  agentProviders,
+  type AgentProvider,
+} from "./agent-provider";
 
-export const agentProviders = [
-  "codex",
-  "claude",
-  "cursor",
-  "grok",
-  "agy",
-  "opencode",
-  "openrouter",
-] as const;
-export type AgentProvider = (typeof agentProviders)[number];
-
-export function agentProviderBinaryName(provider: AgentProvider) {
-  if (provider === "cursor") return "cursor-agent";
-  if (provider === "openrouter") return "opencode";
-  return provider;
-}
+export {
+  agentProviderBinaryName,
+  agentProviderLabels,
+  agentProviders,
+  type AgentProvider,
+} from "./agent-provider";
 
 /**
  * Model and effort identifiers are provider-owned capability values. Keep the
@@ -91,16 +85,6 @@ export const agentProviderCapabilityCatalogSchema = z
     }
     return catalog;
   });
-
-export const agentProviderLabels: Record<AgentProvider, string> = {
-  codex: "Codex",
-  claude: "Claude",
-  cursor: "Cursor",
-  grok: "Grok",
-  agy: "Antigravity",
-  opencode: "OpenCode",
-  openrouter: "OpenRouter",
-};
 
 export function emptyAgentProviderCapabilityCatalog(): AgentProviderCapabilityCatalog {
   return Object.fromEntries(

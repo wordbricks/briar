@@ -276,7 +276,7 @@ export type TranscriptSessionRow = {
 export type TranscriptEventInput = {
   sequence: number;
   direction: TranscriptDirection;
-  payload: unknown;
+  payload?: unknown;
 };
 
 /** Heartbeat older than this and the worker is reported as stale. */
@@ -292,13 +292,12 @@ export const MAX_CLAIM_ATTEMPTS = 5;
 export const MIN_WORKER_CONCURRENT_SESSIONS = 1;
 export const MAX_WORKER_CONCURRENT_SESSIONS = 16;
 
-export const MAX_TRANSCRIPT_PAYLOAD_BYTES = 32 * 1024;
-export const MAX_TRANSCRIPT_EVENTS_PER_REQUEST = 200;
-/** Sum of serialized event payload bytes, excluding the request envelope. */
-export const MAX_TRANSCRIPT_REQUEST_BYTES = 1024 * 1024;
-/** Allows the payload budget plus JSON event and request envelope overhead. */
-export const MAX_TRANSCRIPT_HTTP_BODY_BYTES =
-  MAX_TRANSCRIPT_REQUEST_BYTES + 64 * 1024;
+export {
+  MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
+  MAX_TRANSCRIPT_HTTP_BODY_BYTES,
+  MAX_TRANSCRIPT_PAYLOAD_BYTES,
+  MAX_TRANSCRIPT_REQUEST_BYTES,
+} from "./transcript-limits";
 
 export class WorkerConflictError extends Error {}
 export class TranscriptLimitError extends Error {}

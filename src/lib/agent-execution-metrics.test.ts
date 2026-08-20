@@ -6,13 +6,13 @@ import {
   agentExecutionTokenUsageFromPayload,
   agentExecutionTokenUsageFromObservations,
   agentExecutionUsageObservationsFromPayload,
-  agentExecutionUsageRecordSchema,
   agentExecutionUsageRecordsFromObservations,
   agyExecutionUsageObservationsFromPayload,
   claudeExecutionCostObservationsFromPayload,
   claudeExecutionUsageObservationsFromPayload,
   codexExecutionUsageObservationsFromPayload,
   createAgentExecutionUsageCollector,
+  decodeAgentExecutionUsageRecord,
   formatExecutionDuration,
   grokExecutionCostObservationsFromPayload,
   grokExecutionUsageObservationsFromPayload,
@@ -1139,32 +1139,30 @@ describe("agent execution metrics", () => {
       observedAt: "2026-08-10T01:00:00.000Z",
     };
 
-    expect(agentExecutionUsageRecordSchema.safeParse(record).success).toBe(
-      false,
-    );
-    expect(
-      agentExecutionUsageRecordSchema.safeParse({
+    expect(() => decodeAgentExecutionUsageRecord(record)).toThrow();
+    expect(() =>
+      decodeAgentExecutionUsageRecord({
         ...record,
         outputTokens: 10,
         reasoningOutputTokens: 11,
         totalTokens: 10,
-      }).success,
-    ).toBe(false);
-    expect(
-      agentExecutionUsageRecordSchema.safeParse({
+      })
+    ).toThrow();
+    expect(() =>
+      decodeAgentExecutionUsageRecord({
         ...record,
         reasoningOutputTokens: 1,
         totalTokens: 1,
-      }).success,
-    ).toBe(false);
+      })
+    ).toThrow();
     expect(
-      agentExecutionUsageRecordSchema.safeParse({
+      decodeAgentExecutionUsageRecord({
         ...record,
         outputTokens: 10,
         reasoningOutputTokens: 4,
         totalTokens: 10,
-      }).success,
-    ).toBe(true);
+      }),
+    ).toMatchObject({ outputTokens: 10, reasoningOutputTokens: 4 });
   });
 
   it("marks configured model enrichment as fallback rather than provider-reported", () => {

@@ -2,14 +2,16 @@ import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import { AGENT_EXECUTION_USD_TICKS_PER_DOLLAR } from "../agent-execution-cost";
+import { NonnegativeSafeInteger } from "./codec";
 
-const TokenCount = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 const NonnegativeUsd = Schema.Finite.check(
   Schema.isGreaterThanOrEqualTo(0),
 );
 
-const decodeString = Schema.decodeUnknownOption(Schema.String);
-const decodeTokenCount = Schema.decodeUnknownOption(TokenCount);
+const decodeNonEmptyString = Schema.decodeUnknownOption(
+  Schema.Trim.check(Schema.isNonEmpty()),
+);
+const decodeTokenCount = Schema.decodeUnknownOption(NonnegativeSafeInteger);
 const decodeNonnegativeUsd = Schema.decodeUnknownOption(NonnegativeUsd);
 
 export type ProviderPayloadRecord = Readonly<Record<string, unknown>>;
@@ -20,12 +22,7 @@ export const asRecord = (
   Predicate.isObject(value) ? value : null;
 
 export const nonEmptyString = (value: unknown): string | null =>
-  Option.getOrNull(
-    decodeString(value).pipe(
-      Option.map((text) => text.trim()),
-      Option.filter((text) => text.length > 0),
-    ),
-  );
+  Option.getOrNull(decodeNonEmptyString(value));
 
 export const tokenValue = (
   record: ProviderPayloadRecord,

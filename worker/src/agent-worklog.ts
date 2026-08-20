@@ -3,6 +3,8 @@ import {
   MAX_TRANSCRIPT_EVENTS_PER_REQUEST,
   MAX_TRANSCRIPT_PAYLOAD_BYTES,
   MAX_TRANSCRIPT_REQUEST_BYTES,
+} from "./transcript-limits";
+import {
   TranscriptLimitError,
   WorkerConflictError,
   type TranscriptDirection,

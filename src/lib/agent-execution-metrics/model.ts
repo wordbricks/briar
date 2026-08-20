@@ -1,26 +1,29 @@
-import { z } from "zod";
-import { agentProviders, type AgentProvider } from "../agent-provider-contract";
+import * as Schema from "effect/Schema";
+import type { AgentProvider } from "../agent-provider";
+import {
+  AgentExecutionModelSourceSchema,
+  AgentProviderSchema,
+  NonnegativeSafeInteger,
+  NullableTrimmedText,
+  ObservedAt,
+  strictAgentExecutionSchemaOptions,
+  TrimmedText,
+} from "./codec";
 
-const tokenCountSchema = z
-  .number()
-  .int()
-  .nonnegative()
-  .max(Number.MAX_SAFE_INTEGER);
-const observedAtSchema = z.string().datetime({ offset: true });
+const NullableTokenCount = Schema.NullOr(NonnegativeSafeInteger);
 
-export const agentExecutionMetricsSchema = z
-  .object({
-    inputTokens: tokenCountSchema.nullable(),
-    outputTokens: tokenCountSchema.nullable(),
-    cacheReadTokens: tokenCountSchema.nullable(),
-    cacheWriteTokens: tokenCountSchema.nullable(),
-    reasoningOutputTokens: tokenCountSchema.nullable(),
-    totalTokens: tokenCountSchema.nullable(),
-    durationMs: tokenCountSchema,
-  })
-  .strict();
+export const AgentExecutionMetrics = Schema.Struct({
+  inputTokens: NullableTokenCount,
+  outputTokens: NullableTokenCount,
+  cacheReadTokens: NullableTokenCount,
+  cacheWriteTokens: NullableTokenCount,
+  reasoningOutputTokens: NullableTokenCount,
+  totalTokens: NullableTokenCount,
+  durationMs: NonnegativeSafeInteger,
+}).annotate({ parseOptions: strictAgentExecutionSchemaOptions });
 
-export type AgentExecutionMetrics = z.infer<typeof agentExecutionMetricsSchema>;
+export type AgentExecutionMetrics = typeof AgentExecutionMetrics.Type;
+export const agentExecutionMetricsSchema = AgentExecutionMetrics;
 export type AgentExecutionTokenUsage = Omit<
   AgentExecutionMetrics,
   "durationMs"
@@ -118,33 +121,27 @@ export type AgentExecutionCollectedCostObservation =
     observedAt: string;
   };
 
-export const agentExecutionUsageRecordSchema = z
-  .object({
-    usageKey: z.string().trim().min(1).max(512),
-    sessionId: z.string().trim().min(1).max(512).nullable(),
-    scopeId: z.string().trim().min(1).max(512).nullable(),
-    turnId: z.string().trim().min(1).max(512).nullable(),
-    agentProvider: z.enum(agentProviders),
-    modelProvider: z.string().trim().min(1).max(256).nullable(),
-    model: z.string().trim().min(1).max(512).nullable(),
-    canonicalModel: z.string().trim().min(1).max(512).nullable(),
-    modelSource: z.enum([
-      "providerReported",
-      "providerConfig",
-      "configuredFallback",
-      "unknown",
-    ]),
-    source: z.string().trim().min(1).max(128),
-    uncachedInputTokens: tokenCountSchema.nullable(),
-    cacheReadTokens: tokenCountSchema.nullable(),
-    cacheWriteTokens: tokenCountSchema.nullable(),
-    outputTokens: tokenCountSchema.nullable(),
-    reasoningOutputTokens: tokenCountSchema.nullable(),
-    totalTokens: tokenCountSchema.nullable(),
-    observedAt: observedAtSchema,
-  })
-  .strict()
-  .superRefine((record, context) => {
+export const AgentExecutionUsageRecord = Schema.Struct({
+  usageKey: TrimmedText(512),
+  sessionId: NullableTrimmedText(512),
+  scopeId: NullableTrimmedText(512),
+  turnId: NullableTrimmedText(512),
+  agentProvider: AgentProviderSchema,
+  modelProvider: NullableTrimmedText(256),
+  model: NullableTrimmedText(512),
+  canonicalModel: NullableTrimmedText(512),
+  modelSource: AgentExecutionModelSourceSchema,
+  source: TrimmedText(128),
+  uncachedInputTokens: NullableTokenCount,
+  cacheReadTokens: NullableTokenCount,
+  cacheWriteTokens: NullableTokenCount,
+  outputTokens: NullableTokenCount,
+  reasoningOutputTokens: NullableTokenCount,
+  totalTokens: NullableTokenCount,
+  observedAt: ObservedAt,
+}).check(
+  Schema.makeFilter((record) => {
+    const issues: Array<Schema.FilterIssue> = [];
     if (
       record.uncachedInputTokens === null &&
       record.cacheReadTokens === null &&
@@ -153,29 +150,27 @@ export const agentExecutionUsageRecordSchema = z
       record.reasoningOutputTokens === null &&
       record.totalTokens === null
     ) {
-      context.addIssue({
-        code: "custom",
-        message: "usage records require at least one token value",
-      });
+      issues.push("usage records require at least one token value");
     }
     if (
       record.reasoningOutputTokens !== null &&
       (record.outputTokens === null ||
         record.reasoningOutputTokens > record.outputTokens)
     ) {
-      context.addIssue({
-        code: "custom",
-        message: "reasoningOutputTokens must be a subset of outputTokens",
+      issues.push({
         path: ["reasoningOutputTokens"],
+        issue: "reasoningOutputTokens must be a subset of outputTokens",
       });
     }
     // Total equality is intentionally not enforced because provider total
     // token semantics are not uniform.
-  });
+    return issues;
+  }),
+).annotate({ parseOptions: strictAgentExecutionSchemaOptions });
 
-export type AgentExecutionUsageRecord = z.infer<
-  typeof agentExecutionUsageRecordSchema
->;
+export type AgentExecutionUsageRecord =
+  typeof AgentExecutionUsageRecord.Type;
+export const agentExecutionUsageRecordSchema = AgentExecutionUsageRecord;
 
 export type AgentExecutionCollectedTokenObservation =
   AgentExecutionTokenObservation & {
@@ -183,4 +178,19 @@ export type AgentExecutionCollectedTokenObservation =
     observedAt: string;
   };
 
-export const parseObservedAt = (value: string) => observedAtSchema.parse(value);
+export const decodeAgentExecutionMetrics = Schema.decodeUnknownSync(
+  AgentExecutionMetrics,
+  strictAgentExecutionSchemaOptions,
+);
+
+export const decodeAgentExecutionMetricsOption = Schema.decodeUnknownOption(
+  AgentExecutionMetrics,
+  strictAgentExecutionSchemaOptions,
+);
+
+export const decodeAgentExecutionUsageRecord = Schema.decodeUnknownSync(
+  AgentExecutionUsageRecord,
+  strictAgentExecutionSchemaOptions,
+);
+
+export const parseObservedAt = Schema.decodeUnknownSync(ObservedAt);

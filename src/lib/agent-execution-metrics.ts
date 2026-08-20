@@ -1,20 +1,23 @@
 import * as Match from "effect/Match";
-import type { AgentProvider } from "./agent-provider-contract";
+import type { AgentProvider } from "./agent-provider";
 import type { AgentExecutionCostRecord } from "./agent-execution-cost";
 import {
   type AgentExecutionCollectedCostObservation,
   type AgentExecutionCollectedTokenObservation,
   type AgentExecutionCostObservation,
-  type AgentExecutionMetrics,
+  AgentExecutionMetrics,
   type AgentExecutionModelObservation,
   type AgentExecutionTokenObservation,
   type AgentExecutionTokenUsage,
   type AgentExecutionUsageObservation,
   type AgentExecutionUsageObservationBase,
   type AgentExecutionUsageProvider,
-  type AgentExecutionUsageRecord,
+  AgentExecutionUsageRecord,
   agentExecutionMetricsSchema,
   agentExecutionUsageRecordSchema,
+  decodeAgentExecutionMetrics,
+  decodeAgentExecutionMetricsOption,
+  decodeAgentExecutionUsageRecord,
   parseObservedAt,
 } from "./agent-execution-metrics/model";
 import {
@@ -37,15 +40,18 @@ export {
   type AgentExecutionCollectedCostObservation,
   type AgentExecutionCollectedTokenObservation,
   type AgentExecutionCostObservation,
-  type AgentExecutionMetrics,
+  AgentExecutionMetrics,
   type AgentExecutionModelObservation,
   type AgentExecutionTokenObservation,
   type AgentExecutionTokenUsage,
   type AgentExecutionUsageObservation,
   type AgentExecutionUsageProvider,
-  type AgentExecutionUsageRecord,
+  AgentExecutionUsageRecord,
   agentExecutionMetricsSchema,
   agentExecutionUsageRecordSchema,
+  decodeAgentExecutionMetrics,
+  decodeAgentExecutionMetricsOption,
+  decodeAgentExecutionUsageRecord,
   openCodeExecutionCostObservationsFromPayload,
   openCodeExecutionUsageObservationsFromPayload,
 };

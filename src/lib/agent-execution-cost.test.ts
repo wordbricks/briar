@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import * as Schema from "effect/Schema";
 
 import {
   AGENT_EXECUTION_USD_TICKS_PER_DOLLAR,
-  agentExecutionCostRecordSchema,
+  AgentExecutionCostRecord,
+  decodeAgentExecutionCostRecord,
 } from "./agent-execution-cost";
 
 const record = {
@@ -24,23 +26,32 @@ const record = {
 describe("agent execution cost records", () => {
   it("uses exact ten-decimal USD ticks", () => {
     expect(AGENT_EXECUTION_USD_TICKS_PER_DOLLAR).toBe(10_000_000_000);
-    expect(agentExecutionCostRecordSchema.parse(record)).toEqual(record);
+    expect(decodeAgentExecutionCostRecord(record)).toEqual(record);
   });
 
   it("rejects fractional, negative, and unsafe tick amounts", () => {
     for (const amountUsdTicks of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
-      expect(
-        agentExecutionCostRecordSchema.safeParse({
+      expect(() =>
+        decodeAgentExecutionCostRecord({
           ...record,
           amountUsdTicks,
-        }).success,
-      ).toBe(false);
+        })
+      ).toThrow();
     }
   });
 
   it("allows costs without a matching token usage observation", () => {
     expect(
-      agentExecutionCostRecordSchema.parse({ ...record, usageKey: null }),
+      decodeAgentExecutionCostRecord({ ...record, usageKey: null }),
     ).toMatchObject({ usageKey: null });
+  });
+
+  it("keeps strict decoding on the exported Effect schema", () => {
+    expect(() =>
+      Schema.decodeUnknownSync(AgentExecutionCostRecord)({
+        ...record,
+        requestTraceId: "trace-1",
+      })
+    ).toThrow();
   });
 });
