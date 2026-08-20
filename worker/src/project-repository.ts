@@ -20,13 +20,11 @@ export type ProjectRow = typeof ProjectRow.Type;
 
 const ProjectListRequest = Schema.Struct({ scopeId: Schema.String });
 
-const findProjects = SqlSchema.findAll({
-  Request: ProjectListRequest,
-  Result: ProjectRow,
-  execute: ({ scopeId: userId }) =>
-    Effect.flatMap(
-      SqlClient.SqlClient,
-      (sql) => sql`
+const makeProjectQueries = (sql: SqlClient.SqlClient) => {
+  const findProjects = SqlSchema.findAll({
+    Request: ProjectListRequest,
+    Result: ProjectRow,
+    execute: ({ scopeId: userId }) => sql`
         select project.id, project.name,
                project.issue_key_prefix,
                project.schedule_tab_enabled,
@@ -42,16 +40,12 @@ const findProjects = SqlSchema.findAll({
          and membership.user_id = ${userId}
         order by organization.created_at, project.created_at
       `,
-    ),
-});
+  });
 
-const findOrganizationProjects = SqlSchema.findAll({
-  Request: ProjectListRequest,
-  Result: ProjectRow,
-  execute: ({ scopeId: organizationId }) =>
-    Effect.flatMap(
-      SqlClient.SqlClient,
-      (sql) => sql`
+  const findOrganizationProjects = SqlSchema.findAll({
+    Request: ProjectListRequest,
+    Result: ProjectRow,
+    execute: ({ scopeId: organizationId }) => sql`
         select project.id, project.name,
                project.issue_key_prefix,
                project.schedule_tab_enabled,
@@ -65,8 +59,7 @@ const findOrganizationProjects = SqlSchema.findAll({
         where project.organization_id = ${organizationId}
         order by project.created_at
       `,
-    ),
-});
+  });
 
 const InboxProjectRow = Schema.Struct({
   id: Schema.String,
@@ -74,37 +67,48 @@ const InboxProjectRow = Schema.Struct({
   issue_key_prefix: Schema.String,
 });
 
-const findOrganizationInboxProjects = SqlSchema.findAll({
-  Request: ProjectListRequest,
-  Result: InboxProjectRow,
-  execute: ({ scopeId: organizationId }) =>
-    Effect.flatMap(
-      SqlClient.SqlClient,
-      (sql) => sql`
+  const findOrganizationInboxProjects = SqlSchema.findAll({
+    Request: ProjectListRequest,
+    Result: InboxProjectRow,
+    execute: ({ scopeId: organizationId }) => sql`
         select id, name, issue_key_prefix
         from briar_projects
         where organization_id = ${organizationId}
         order by created_at, id
       `,
-    ),
-});
+  });
+
+  return {
+    findOrganizationInboxProjects,
+    findOrganizationProjects,
+    findProjects,
+  };
+};
 
 const listProjectsEffect = Effect.fn("listProjectsEffect")(
   function*(userId: string) {
-    return yield* findProjects({ scopeId: userId });
+    const sql = yield* SqlClient.SqlClient;
+    const queries = makeProjectQueries(sql);
+    return yield* queries.findProjects({ scopeId: userId });
   },
 );
 
 const listOrganizationProjectsEffect = Effect.fn(
   "listOrganizationProjectsEffect",
 )(function*(organizationId: string) {
-  return yield* findOrganizationProjects({ scopeId: organizationId });
+  const sql = yield* SqlClient.SqlClient;
+  const queries = makeProjectQueries(sql);
+  return yield* queries.findOrganizationProjects({ scopeId: organizationId });
 });
 
 const listOrganizationInboxProjectsEffect = Effect.fn(
   "listOrganizationInboxProjectsEffect",
 )(function*(organizationId: string) {
-  return yield* findOrganizationInboxProjects({ scopeId: organizationId });
+  const sql = yield* SqlClient.SqlClient;
+  const queries = makeProjectQueries(sql);
+  return yield* queries.findOrganizationInboxProjects({
+    scopeId: organizationId,
+  });
 });
 
 export const listProjects = (

@@ -19,13 +19,11 @@ export type OrganizationRow = typeof OrganizationRow.Type;
 
 const ListOrganizationsRequest = Schema.Struct({ userId: Schema.String });
 
-const findOrganizations = SqlSchema.findAll({
-  Request: ListOrganizationsRequest,
-  Result: OrganizationRow,
-  execute: ({ userId }) =>
-    Effect.flatMap(
-      SqlClient.SqlClient,
-      (sql) => sql`
+const makeOrganizationQueries = (sql: SqlClient.SqlClient) => {
+  const findOrganizations = SqlSchema.findAll({
+    Request: ListOrganizationsRequest,
+    Result: OrganizationRow,
+    execute: ({ userId }) => sql`
         select organization.id, organization.name, organization.handle,
                coalesce(organization.logo_data_url, organization.logo) as logo,
                membership.role,
@@ -36,12 +34,16 @@ const findOrganizations = SqlSchema.findAll({
         where membership.user_id = ${userId}
         order by organization.created_at, organization.id
       `,
-    ),
-});
+  });
+
+  return { findOrganizations };
+};
 
 const listOrganizationsEffect = Effect.fn("listOrganizationsEffect")(
   function*(userId: string) {
-    return yield* findOrganizations({ userId });
+    const sql = yield* SqlClient.SqlClient;
+    const queries = makeOrganizationQueries(sql);
+    return yield* queries.findOrganizations({ userId });
   },
 );
 

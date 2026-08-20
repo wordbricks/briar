@@ -1,7 +1,7 @@
 import * as D1Client from "@effect/sql-d1/D1Client";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import * as SqlClient from "effect/unstable/sql/SqlClient";
+import type * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import { runD1 } from "./d1-runtime";
 
@@ -16,24 +16,26 @@ const ListInboxReadStatesRequest = Schema.Struct({
   userId: Schema.String,
 });
 
-const findInboxReadStates = SqlSchema.findAll({
-  Request: ListInboxReadStatesRequest,
-  Result: InboxReadStateRow,
-  execute: ({ userId }) =>
-    Effect.flatMap(
-      SqlClient.SqlClient,
-      (sql) => sql`
+const makeInboxReadStateQueries = (sql: SqlClient.SqlClient) => {
+  const findInboxReadStates = SqlSchema.findAll({
+    Request: ListInboxReadStatesRequest,
+    Result: InboxReadStateRow,
+    execute: ({ userId }) => sql`
         select message_id, version, updated_at
         from briar_inbox_read_states
         where user_id = ${userId}
         order by updated_at desc, message_id
       `,
-    ),
-});
+  });
+
+  return { findInboxReadStates };
+};
 
 const listInboxReadStatesEffect = Effect.fn("listInboxReadStatesEffect")(
   function*(userId: string) {
-    return yield* findInboxReadStates({ userId });
+    const sql = yield* D1Client.D1Client;
+    const queries = makeInboxReadStateQueries(sql);
+    return yield* queries.findInboxReadStates({ userId });
   },
 );
 
@@ -58,7 +60,9 @@ const upsertInboxReadStatesEffect = Effect.fn("upsertInboxReadStatesEffect")(
         ),
       );
     }
-    return yield* findInboxReadStates({ userId });
+    const sql = yield* D1Client.D1Client;
+    const queries = makeInboxReadStateQueries(sql);
+    return yield* queries.findInboxReadStates({ userId });
   },
 );
 

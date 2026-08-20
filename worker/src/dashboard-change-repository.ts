@@ -41,40 +41,30 @@ const DashboardChangeRequest = Schema.Struct({
   limit: Schema.Int,
 });
 
-const findDashboardSyncState = SqlSchema.findOneOption({
-  Request: ProjectRequest,
-  Result: Schema.Struct({ current_version: Schema.Int }),
-  execute: ({ projectId }) =>
-    Effect.flatMap(
-      SqlClient.SqlClient,
-      (sql) => sql`
+const makeDashboardChangeQueries = (sql: SqlClient.SqlClient) => {
+  const findDashboardSyncState = SqlSchema.findOneOption({
+    Request: ProjectRequest,
+    Result: Schema.Struct({ current_version: Schema.Int }),
+    execute: ({ projectId }) => sql`
         select current_version from briar_dashboard_sync_state
         where project_id = ${projectId}
       `,
-    ),
-});
+  });
 
-const findOldestDashboardChange = SqlSchema.findOneOption({
-  Request: ProjectRequest,
-  Result: Schema.Struct({ oldest_version: Schema.NullOr(Schema.Int) }),
-  execute: ({ projectId }) =>
-    Effect.flatMap(
-      SqlClient.SqlClient,
-      (sql) => sql`
+  const findOldestDashboardChange = SqlSchema.findOneOption({
+    Request: ProjectRequest,
+    Result: Schema.Struct({ oldest_version: Schema.NullOr(Schema.Int) }),
+    execute: ({ projectId }) => sql`
         select min(version) as oldest_version
         from briar_dashboard_changes
         where project_id = ${projectId}
       `,
-    ),
-});
+  });
 
-const findDashboardChanges = SqlSchema.findAll({
-  Request: DashboardChangeRequest,
-  Result: DashboardChangeRow,
-  execute: ({ projectId, cursor, currentVersion, limit }) =>
-    Effect.flatMap(
-      SqlClient.SqlClient,
-      (sql) => sql`
+  const findDashboardChanges = SqlSchema.findAll({
+    Request: DashboardChangeRequest,
+    Result: DashboardChangeRow,
+    execute: ({ projectId, cursor, currentVersion, limit }) => sql`
         select version, entity_type, entity_id, operation
         from briar_dashboard_changes
         where project_id = ${projectId}
@@ -83,13 +73,21 @@ const findDashboardChanges = SqlSchema.findAll({
         order by version
         limit ${limit}
       `,
-    ),
-});
+  });
+
+  return {
+    findDashboardChanges,
+    findDashboardSyncState,
+    findOldestDashboardChange,
+  };
+};
 
 const getDashboardSyncCursorEffect = Effect.fn(
   "getDashboardSyncCursorEffect",
 )(function*(projectId: string) {
-  const state = yield* findDashboardSyncState({ projectId });
+  const sql = yield* SqlClient.SqlClient;
+  const queries = makeDashboardChangeQueries(sql);
+  const state = yield* queries.findDashboardSyncState({ projectId });
   return Option.match(state, {
     onNone: () => 0,
     onSome: (row) => row.current_version,
@@ -98,8 +96,14 @@ const getDashboardSyncCursorEffect = Effect.fn(
 
 const listDashboardChangesEffect = Effect.fn("listDashboardChangesEffect")(
   function*(projectId: string, cursor: number) {
-    const currentVersion = yield* getDashboardSyncCursorEffect(projectId);
-    const oldest = yield* findOldestDashboardChange({ projectId });
+    const sql = yield* SqlClient.SqlClient;
+    const queries = makeDashboardChangeQueries(sql);
+    const state = yield* queries.findDashboardSyncState({ projectId });
+    const currentVersion = Option.match(state, {
+      onNone: () => 0,
+      onSome: (row) => row.current_version,
+    });
+    const oldest = yield* queries.findOldestDashboardChange({ projectId });
     const oldestVersion = Option.match(oldest, {
       onNone: () => null,
       onSome: (row) => row.oldest_version,
@@ -120,7 +124,7 @@ const listDashboardChangesEffect = Effect.fn("listDashboardChangesEffect")(
       };
     }
 
-    const rows = yield* findDashboardChanges({
+    const rows = yield* queries.findDashboardChanges({
       projectId,
       cursor,
       currentVersion,
