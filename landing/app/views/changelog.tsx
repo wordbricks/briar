@@ -30,6 +30,21 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.141",
+        date: "2026년 8월 20일",
+        title: "프로젝트 창과 상태 표현을 더 선명하게 정리합니다",
+        summary:
+          "프로젝트를 별도 데스크탑 창에서 열고, 온보딩·설정·사용량 상태를 공통 패널로 정리하며 제공자 활동과 아이콘을 테마에 맞게 정확히 보여줍니다.",
+        items: [
+          "데스크탑에서 프로젝트를 별도 창으로 열어 프로젝트별 Inbox·채널·설정을 독립적으로 확인하고, 창을 연 프로젝트와 조직을 고정합니다.",
+          "사용자별 조직 선택을 기억하고, 프로젝트 창에서는 해당 프로젝트의 Inbox·채널·알림만 표시합니다.",
+          "온보딩·프로젝트 설정·사용량·검토 상태를 공통 ChoiceCard·StatusPanel 구성요소와 의미 있는 상태 색상으로 통일합니다.",
+          "사용량 상태 바에는 활성화한 제공자만 표시하고, 사용량이 없어도 제공자 아이콘과 상태를 명확히 보여줍니다.",
+          "제공자 로고가 라이트 테마에서 올바르게 보이고 다크 테마에서 OpenCode·Codex 색상을 읽기 쉽게 전환합니다.",
+          "프로젝트 창·상태 패널·제공자 표시 회귀 테스트를 추가합니다.",
+        ],
+      },
+      {
         version: "1.2.140",
         date: "2026년 8월 20일",
         title: "다크 모드와 로컬 Worker 시작을 더 안정적으로 다듬습니다",
@@ -851,6 +866,21 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.141",
+        date: "August 20, 2026",
+        title: "Make project windows and status surfaces clearer",
+        summary:
+          "Open projects in dedicated desktop windows, consolidate onboarding, settings, and usage states, and keep provider activity and logos accurate across themes.",
+        items: [
+          "Open projects in dedicated desktop windows so each project keeps its own Inbox, channels, and settings context.",
+          "Remember the selected organization per user and lock project windows to the project and organization they opened.",
+          "Unify onboarding, project settings, usage, and review states with shared ChoiceCard and StatusPanel components and semantic tones.",
+          "Show only enabled providers in the usage status bar, with clear provider icons even when usage data is unavailable.",
+          "Restore provider logos in the light theme and switch OpenCode and Codex artwork for readable dark-theme contrast.",
+          "Add regression coverage for project windows, status panels, active-provider usage, and themed provider artwork.",
+        ],
+      },
       {
         version: "1.2.140",
         date: "August 20, 2026",
@@ -1764,7 +1794,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-140">
+          <a href="#v1-2-141">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1786,7 +1816,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.140"
+                      entry.version === "1.2.141" || entry.version === "1.2.140"
                         ? "2026-08-20"
                         : entry.version === "1.2.139" ||
                       entry.version === "1.2.138"
