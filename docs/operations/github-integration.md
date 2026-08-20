@@ -28,6 +28,9 @@ available to GitHub accounts outside the account that owns the App. Configure:
   starts the PKCE-protected authorization step after the setup callback.
 - Webhook URL: `https://<worker-host>/github/webhooks`
 - Webhook secret: the value of `BRIAR_GITHUB_WEBHOOK_SECRET`
+- Repository permission: **Administration — Read-only**
+- Repository permission: **Contents — Read-only**
+- Repository permission: **Commit statuses — Read and write**
 - Repository permission: **Pull requests — Read-only**
 - Repository permission: **Merge queues — Read-only**
 - Subscribe to events: **Pull request** and **Merge group**
@@ -36,11 +39,12 @@ available to GitHub accounts outside the account that owns the App. Configure:
 contains the reviewable permission/event template. Replace its host
 placeholders before using it to register an App.
 
-Record the App's **Client ID**, generate a **Client secret**, and record the App
-slug from `https://github.com/apps/<app-slug>`. The App does not need Contents
-write access, an App private key, or a long-lived user or installation token.
-Exact-SHA status publication uses the trusted Worker's local GitHub credential,
-not an issue agent token.
+Record the App's numeric **App ID** and **Client ID**, generate a **Client
+secret** and a PKCS#8 **private key**, and record the App slug from
+`https://github.com/apps/<app-slug>`. Contents remains read-only. Exact-SHA
+fetch and status publication use separate repository-scoped installation
+tokens that expire; neither a long-lived user credential nor the Worker host's
+local GitHub credential is used.
 
 GitHub sends a signed `ping` delivery when the webhook is saved. A successful
 configuration receives an HTTP 200 response from Briar.
@@ -59,6 +63,10 @@ bunx dotenvx set GITHUB_APP_CLIENT_SECRET '<github-app-client-secret>' \
   -f .env.production --no-native --no-armor
 bunx dotenvx set GITHUB_APP_SLUG '<github-app-slug>' \
   -f .env.production --no-native --no-armor
+bunx dotenvx set GITHUB_APP_ID '<numeric-github-app-id>' \
+  -f .env.production --no-native --no-armor
+bunx dotenvx set GITHUB_APP_PRIVATE_KEY_PKCS8 '<pkcs8-private-key-pem>' \
+  -f .env.production --no-native --no-armor
 bunx dotenvx set GITHUB_CALLBACK_ORIGIN 'https://<worker-host>' \
   -f .env.production --no-native --no-armor
 bunx dotenvx set GITHUB_WEBHOOK_SECRET "$BRIAR_GITHUB_WEBHOOK_SECRET" \
@@ -74,10 +82,11 @@ bun run d1:migrate:remote
 bun run worker:deploy
 ```
 
-The five GitHub settings form one optional deployment group. Configure all of
-them or none of them; the deployment wrapper rejects a partial group. Without
-the group, the rest of Briar remains available, the Integrations page reports
-that GitHub is not configured, and `POST /github/webhooks` returns 503.
+The OAuth/webhook settings remain one optional deployment group. The numeric
+App ID and private key are additionally required before an administrator can
+enable merge-group CI. Without them, normal GitHub integration remains
+available but merge-group profile activation and installation-token minting
+fail closed.
 
 ## 3. Connect a Briar organization
 
@@ -165,7 +174,14 @@ without that checkpoint.
   transient database failure.
 - Only a signed `merge_group.checks_requested` delivery can create an
   exact-SHA validation job. Other merge-group actions and repositories not
-  connected to the installation create no job.
+  connected to the installation create no job. Collection is default-off and
+  restricted to the configured `refs/heads/main` lane and designated isolated
+  Worker.
+- The installation must be reapproved after adding Merge queues read,
+  Contents read, Administration read, Commit statuses write, and the Merge
+  group event. `briar merge-queue doctor` checks the effective parent rules,
+  exact App-bound contexts, event subscriptions, and Worker readiness before
+  activation.
 
 GitHub does not automatically redeliver failed webhooks. Use the GitHub App's
 Recent deliveries screen to redeliver a failed request after correcting the
