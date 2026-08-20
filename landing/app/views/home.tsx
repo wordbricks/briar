@@ -207,7 +207,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
   ] as const;
 
   return (
-    <main id="top">
+    <main className="home-page" id="top">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
@@ -217,6 +217,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
       </a>
       <SiteHeader
         brandHref="#top"
+        className="home-header"
         copy={c}
         ctaLabel={c.nav.openWebApp}
         currentPath={PATH}
