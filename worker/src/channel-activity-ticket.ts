@@ -9,6 +9,7 @@ import {
   type IssueActivityPublishTokenPayload,
   type IssueActivitySocketTicketPayload,
 } from "./channel-activity-ticket-payload";
+import { signJsonToken, verifyJsonToken } from "./signed-json-token";
 
 export type {
   ChannelActivityPublishTokenPayload,
@@ -20,62 +21,19 @@ export type {
 export const CHANNEL_ACTIVITY_SOCKET_TICKET_TTL_MS = 60_000;
 export const CHANNEL_ACTIVITY_SOCKET_AUTHORIZATION_TTL_MS = 5 * 60_000;
 export const CHANNEL_ACTIVITY_PUBLISH_MAX_TTL_MS = 16 * 60_000;
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
-
-const base64UrlEncode = (bytes: Uint8Array) =>
-  btoa(String.fromCharCode(...bytes))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/u, "");
-
-const base64UrlDecode = (value: string) => {
-  if (!/^[A-Za-z0-9_-]+$/u.test(value)) throw new Error("Invalid base64url");
-  const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
-  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
-  return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
-};
-
-const hmacKey = (secret: string, usages: KeyUsage[]) =>
-  crypto.subtle.importKey(
-    "raw",
-    encoder.encode(`briar-channel-activity:${secret}`),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    usages,
-  );
+const channelActivityTokenDomain = "briar-channel-activity";
 
 async function signPayload(secret: string, payload: object) {
-  const encodedPayload = base64UrlEncode(
-    encoder.encode(JSON.stringify(payload)),
-  );
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    await hmacKey(secret, ["sign"]),
-    encoder.encode(encodedPayload),
-  );
-  return `${encodedPayload}.${base64UrlEncode(new Uint8Array(signature))}`;
+  return signJsonToken(channelActivityTokenDomain, secret, payload);
 }
 
 async function verifiedPayload(
   secret: string,
   token: string,
 ): Promise<string | null> {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 2) return null;
-    const [encodedPayload, encodedSignature] = parts;
-    const valid = await crypto.subtle.verify(
-      "HMAC",
-      await hmacKey(secret, ["verify"]),
-      base64UrlDecode(encodedSignature),
-      encoder.encode(encodedPayload),
-    );
-    if (!valid) return null;
-    return decoder.decode(base64UrlDecode(encodedPayload));
-  } catch {
-    return null;
-  }
+  return Option.getOrNull(
+    await verifyJsonToken(channelActivityTokenDomain, secret, token),
+  );
 }
 
 const expiresWithin = (expiresAt: number, now: number, maximumTtl: number) =>
