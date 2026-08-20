@@ -191,4 +191,35 @@ describe("merge-queue doctor", () => {
       baseBranch: "main",
     })).toThrow(/push permission/u);
   });
+
+  it("rejects classic strict=true even when the ruleset is correct", () => {
+    const command: CommandRunner = (args) => {
+      if (args[2]?.includes("rulesets?")) {
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify([{ id: 7, target: "branch", enforcement: "active" }]),
+          stderr: "",
+        };
+      }
+      if (args[2]?.endsWith("rulesets/7")) {
+        return { exitCode: 0, stdout: JSON.stringify(ruleset()), stderr: "" };
+      }
+      if (args[2]?.includes("required_status_checks")) {
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify({ strict: true, contexts: [] }),
+          stderr: "",
+        };
+      }
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({ permissions: { push: true } }),
+        stderr: "",
+      };
+    };
+    expect(() => doctorMergeQueue(command, {
+      repository: "wordbricks/briar",
+      baseBranch: "main",
+    })).toThrow(/strict=false/u);
+  });
 });

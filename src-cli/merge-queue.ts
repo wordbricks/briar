@@ -280,5 +280,21 @@ export function doctorMergeQueue(
   if (permission.push !== true) {
     throw new Error("The Worker credential requires repository push permission");
   }
+  const classic = command([
+    "gh",
+    "api",
+    `repos/${input.repository}/branches/${encodeURIComponent(input.baseBranch)}/protection/required_status_checks`,
+  ]);
+  if (classic.exitCode === 0) {
+    const protection = object(
+      parseJson(classic.stdout, "GitHub classic branch protection"),
+      "GitHub classic branch protection",
+    );
+    if (protection.strict !== false) {
+      throw new Error("Classic branch protection must use strict=false");
+    }
+  } else if (!/(?:HTTP 404|Not Found)/iu.test(classic.stderr)) {
+    throw new Error("GitHub classic branch protection could not be read");
+  }
   return { ...verified, repository: input.repository, baseBranch: input.baseBranch };
 }

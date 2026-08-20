@@ -1,4 +1,6 @@
+import { createHmac } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import worker from "./index";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
   claimNextMergeGroupValidationJob,
@@ -326,5 +328,79 @@ describe("merge-group exact-SHA validation jobs", () => {
       head_sha: sha("4"),
       error_code: "ci_failed",
     });
+  });
+
+  it("enqueues only connected checks_requested deliveries and deduplicates by SHA", async () => {
+    const secret = "merge-group-webhook-secret";
+    let delivery = 0;
+    const deliver = async (input: {
+      action: string;
+      installation: number;
+      headSha: string;
+    }) => {
+      delivery += 1;
+      const body = JSON.stringify({
+        action: input.action,
+        installation: { id: input.installation },
+        repository: { id: repositoryId, full_name: "wordbricks/briar" },
+        sender: { login: "github-merge-queue[bot]" },
+        merge_group: {
+          head_sha: input.headSha,
+          head_ref:
+            `refs/heads/gh-readonly-queue/main/pr-${delivery}-${input.headSha.slice(0, 8)}`,
+          base_sha: sha("a"),
+          base_ref: "refs/heads/main",
+        },
+      });
+      const signature = `sha256=${
+        createHmac("sha256", secret).update(body).digest("hex")
+      }`;
+      return worker.fetch(new Request("https://briar.example/github/webhooks", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-github-event": "merge_group",
+          "x-github-delivery":
+            `77777777-7777-4777-8777-${delivery.toString().padStart(12, "0")}`,
+          "x-hub-signature-256": signature,
+        },
+        body,
+      }), {
+        DB: db,
+        GITHUB_WEBHOOK_SECRET: secret,
+      } as never);
+    };
+
+    const head = sha("6");
+    await expect(deliver({
+      action: "checks_requested",
+      installation: installationId,
+      headSha: head,
+    }).then((response) => response.json())).resolves.toMatchObject({
+      ok: true,
+      event: "merge_group",
+      action: "checks_requested",
+      jobId: expect.any(String),
+    });
+    await deliver({
+      action: "checks_requested",
+      installation: installationId,
+      headSha: head,
+    });
+    await deliver({
+      action: "destroyed",
+      installation: installationId,
+      headSha: sha("7"),
+    });
+    await deliver({
+      action: "checks_requested",
+      installation: 9999,
+      headSha: sha("8"),
+    });
+    await expect(db.prepare(
+      `select count(*) as count from merge_group_validation_jobs
+       where head_sha in (?, ?, ?)`,
+    ).bind(head, sha("7"), sha("8")).first<number>("count"))
+      .resolves.toBe(1);
   });
 });
