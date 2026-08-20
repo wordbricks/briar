@@ -206,12 +206,19 @@ while :; do sleep 1; done
       signal: controller.signal,
       killGraceMs: 25,
     });
-    await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true), {
-      timeout: 5_000,
-    });
-    const descendantPid = Number((await readFile(pidFile, "utf8")).trim());
-    controller.abort(new Error("lease lost"));
-    await expect(running).rejects.toThrow("lease lost");
-    expect(() => process.kill(descendantPid, 0)).toThrow();
+    try {
+      await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true), {
+        timeout: 5_000,
+      });
+      const descendantPid = Number((await readFile(pidFile, "utf8")).trim());
+      controller.abort(new Error("lease lost"));
+      await expect(running).rejects.toThrow("lease lost");
+      expect(() => process.kill(descendantPid, 0)).toThrow();
+    } finally {
+      if (!controller.signal.aborted) {
+        controller.abort(new Error("test cleanup"));
+      }
+      await running.catch(() => undefined);
+    }
   });
 });
