@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  configureLocalExecutionWorker,
   connectLocalProject,
   inspectRepositoryReadiness,
   inspectVelen,
@@ -53,6 +54,16 @@ describe("local project connection", () => {
     await inspectVelen("wordbricks");
     expect(invoke).toHaveBeenCalledWith("inspect_velen", {
       org: "wordbricks",
+    });
+  });
+
+  it("configures this computer as a project Worker", async () => {
+    await configureLocalExecutionWorker("project-1", "user-token", true);
+
+    expect(invoke).toHaveBeenCalledWith("configure_execution_worker", {
+      projectId: "project-1",
+      userToken: "user-token",
+      enabled: true,
     });
   });
 

@@ -242,6 +242,22 @@ export async function connectLocalProject(input: {
   });
 }
 
+export async function configureLocalExecutionWorker(
+  projectId: string,
+  userToken: string,
+  enabled: boolean,
+) {
+  if (!isTauri()) {
+    throw new Error("Worker 설정은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke("configure_execution_worker", {
+    projectId,
+    userToken,
+    enabled,
+  });
+}
+
 export async function disconnectLocalProject(projectId: string) {
   if (!isTauri()) return;
   const { invoke } = await import("@tauri-apps/api/core");
