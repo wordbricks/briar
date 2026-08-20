@@ -31,6 +31,16 @@ import {
 } from "../../src/lib/organization-agent-context-contract";
 import { isChannelApprovedIssue } from "./db";
 import {
+  executionWorkerHandoffExists,
+  executionWorkerUpdateRequest,
+  executionWorkerUpdateIsReady,
+  pendingExecutionWorkerUpdate,
+} from "./worker-update-repository";
+import type {
+  WorkerUpdateHandoffWorkType,
+  WorkerUpdateRequest,
+} from "./worker-update-model";
+import {
   MAX_WORKER_CONCURRENT_SESSIONS,
   MIN_WORKER_CONCURRENT_SESSIONS,
 } from "./worker-limits";
@@ -124,7 +134,7 @@ export type OrganizationExecutionWorker = {
   createdAt: string;
   versions: Record<string, string>;
   remoteUpdateSupported: boolean;
-  updateRequest: ExecutionWorkerUpdateRequest | null;
+  updateRequest: WorkerUpdateRequest | null;
   bindings: Array<{
     id: string;
     projectId: string;
@@ -138,100 +148,6 @@ export type OrganizationExecutionWorker = {
     readinessDetail: string | null;
   }>;
 };
-
-export type ExecutionWorkerUpdateRequest = {
-  id: string;
-  targetVersion: string;
-  status: "requested" | "completed" | "cancelled";
-  requestedAt: string;
-  handoffState: "idle" | "draining" | "ready" | "failed";
-  handoffStartedAt: string | null;
-  handoffCompletedAt: string | null;
-  handoffError: string | null;
-};
-
-export type ExecutionWorkerUpdateHandoffWorkType =
-  | "issue"
-  | "projectAgentTask"
-  | "issueReply"
-  | "channelReply";
-
-export type ExecutionWorkerUpdateHandoffContext = {
-  requestId: string;
-  workType: ExecutionWorkerUpdateHandoffWorkType;
-  workId: string;
-  runId: string | null;
-  conversationId: string | null;
-  workspacePath: string | null;
-  createdAt: string;
-};
-
-type ExecutionWorkerUpdateRequestRow = {
-  id: string;
-  organization_id: string;
-  device_id: string;
-  requested_by_user_id: string;
-  target_version: string;
-  status: "requested" | "completed" | "cancelled";
-  requested_at: string;
-  updated_at: string;
-  completed_at: string | null;
-  handoff_state: "idle" | "draining" | "ready" | "failed";
-  handoff_started_at: string | null;
-  handoff_completed_at: string | null;
-  handoff_error: string | null;
-};
-
-const updateRequestJson = (
-  row: Pick<
-    ExecutionWorkerUpdateRequestRow,
-    | "id"
-    | "target_version"
-    | "status"
-    | "requested_at"
-    | "handoff_state"
-    | "handoff_started_at"
-    | "handoff_completed_at"
-    | "handoff_error"
-  >,
-): ExecutionWorkerUpdateRequest => ({
-  id: row.id,
-  targetVersion: row.target_version,
-  status: row.status,
-  requestedAt: row.requested_at,
-  handoffState: row.handoff_state,
-  handoffStartedAt: row.handoff_started_at,
-  handoffCompletedAt: row.handoff_completed_at,
-  handoffError: row.handoff_error,
-});
-
-export async function pendingExecutionWorkerUpdate(
-  db: D1Database,
-  deviceId: string,
-): Promise<ExecutionWorkerUpdateRequest | null> {
-  const row = await db
-    .prepare(
-      `select id, target_version, status, requested_at,
-              handoff_state, handoff_started_at, handoff_completed_at,
-              handoff_error
-       from briar_execution_worker_update_requests
-       where device_id = ? and status = 'requested'
-       order by requested_at desc limit 1`,
-    )
-    .bind(deviceId)
-    .first<Pick<
-      ExecutionWorkerUpdateRequestRow,
-      | "id"
-      | "target_version"
-      | "status"
-      | "requested_at"
-      | "handoff_state"
-      | "handoff_started_at"
-      | "handoff_completed_at"
-      | "handoff_error"
-    >>();
-  return row ? updateRequestJson(row) : null;
-}
 
 async function beginExecutionWorkerUpdate(
   db: D1Database,
@@ -274,7 +190,7 @@ export async function requestExecutionWorkerUpdate(
     targetVersion: string;
     requestedAt: string;
   },
-): Promise<ExecutionWorkerUpdateRequest> {
+): Promise<WorkerUpdateRequest> {
   const pending = await pendingExecutionWorkerUpdate(db, input.deviceId);
   if (pending) {
     await beginExecutionWorkerUpdate(db, {
@@ -357,17 +273,7 @@ export async function executionWorkerUpdateStatus(
   db: D1Database,
   input: { deviceId: string; requestId?: string; observedAt: string },
 ) {
-  const row = await db
-    .prepare(
-      `select id, target_version, status, requested_at,
-              handoff_state, handoff_started_at, handoff_completed_at,
-              handoff_error
-       from briar_execution_worker_update_requests
-       where device_id = ? and (? is null or id = ?)
-       order by requested_at desc limit 1`,
-    )
-    .bind(input.deviceId, input.requestId ?? null, input.requestId ?? null)
-    .first<ExecutionWorkerUpdateRequestRow>();
+  const row = await executionWorkerUpdateRequest(db, input);
   if (!row) return null;
   const activeWorkCount = row.status === "requested"
     ? await updateExecutionWorkerHandoffStateIfIdle(
@@ -377,17 +283,10 @@ export async function executionWorkerUpdateStatus(
         input.observedAt,
       )
     : 0;
-  const current = await db
-    .prepare(
-      `select id, target_version, status, requested_at,
-              handoff_state, handoff_started_at, handoff_completed_at,
-              handoff_error
-       from briar_execution_worker_update_requests
-       where id = ?`,
-    )
-    .bind(row.id)
-    .first<ExecutionWorkerUpdateRequestRow>();
-  const request = current ? updateRequestJson(current) : updateRequestJson(row);
+  const request = await executionWorkerUpdateRequest(db, {
+    deviceId: input.deviceId,
+    requestId: row.id,
+  }) ?? row;
   return {
     request,
     activeWorkCount,
@@ -433,7 +332,7 @@ export async function handoffExecutionWorkerClaim(
     deviceId: string;
     projectId: string;
     workerId: string;
-    workType: ExecutionWorkerUpdateHandoffWorkType;
+    workType: WorkerUpdateHandoffWorkType;
     workId: string;
     runId: string | null;
     claimTokenHash: string;
@@ -441,16 +340,11 @@ export async function handoffExecutionWorkerClaim(
     observedAt: string;
   },
 ) {
-  const request = await db
-    .prepare(
-      `select id, handoff_state
-       from briar_execution_worker_update_requests
-       where id = ? and device_id = ? and organization_id = ?
-         and status = 'requested'`,
-    )
-    .bind(input.requestId, input.deviceId, input.organizationId)
-    .first<{ id: string; handoff_state: string }>();
-  if (!request || !["draining", "ready"].includes(request.handoff_state)) {
+  if (!(await executionWorkerUpdateIsReady(db, {
+    requestId: input.requestId,
+    deviceId: input.deviceId,
+    organizationId: input.organizationId,
+  }))) {
     return { outcome: "not_ready" as const, activeWorkCount: 0 };
   }
 
@@ -582,16 +476,12 @@ export async function handoffExecutionWorkerClaim(
     );
   const [updated, inserted] = await db.batch([update, audit]);
   if ((updated.results?.length ?? 0) < 1) {
-    const existing = await db
-      .prepare(
-        `select 1 as handed_off
-         from briar_execution_worker_update_handoffs
-         where update_request_id = ? and work_type = ? and work_id = ?
-           and claim_token_hash = ?
-         limit 1`,
-      )
-      .bind(input.requestId, input.workType, input.workId, input.claimTokenHash)
-      .first<{ handed_off: number }>();
+    const existing = await executionWorkerHandoffExists(db, {
+      requestId: input.requestId,
+      workType: input.workType,
+      workId: input.workId,
+      claimTokenHash: input.claimTokenHash,
+    });
     if (!existing) return { outcome: "not_active" as const, activeWorkCount: 0 };
     const status = await executionWorkerUpdateStatus(db, {
       deviceId: input.deviceId,
@@ -626,7 +516,7 @@ export async function failExecutionWorkerUpdateHandoff(
     deviceId: string;
     projectId: string;
     workerId: string;
-    workType: ExecutionWorkerUpdateHandoffWorkType;
+    workType: WorkerUpdateHandoffWorkType;
     workId: string;
     runId: string | null;
     claimTokenHash: string;
@@ -690,59 +580,6 @@ export async function failExecutionWorkerUpdateHandoff(
         input.observedAt,
       ),
   ]);
-}
-
-export async function latestExecutionWorkerUpdateHandoff(
-  db: D1Database,
-  input: {
-    deviceId: string;
-    workType: ExecutionWorkerUpdateHandoffWorkType;
-    workId: string;
-  },
-): Promise<ExecutionWorkerUpdateHandoffContext | null> {
-  const row = await db
-    .prepare(
-      `select update_request_id, work_type, work_id, run_id,
-              metadata_json, created_at
-       from briar_execution_worker_update_handoffs
-       where device_id = ? and work_type = ? and work_id = ?
-         and status = 'handed_off'
-       order by updated_at desc, id desc limit 1`,
-    )
-    .bind(input.deviceId, input.workType, input.workId)
-    .first<{
-      update_request_id: string;
-      work_type: ExecutionWorkerUpdateHandoffWorkType;
-      work_id: string;
-      run_id: string | null;
-      metadata_json: string;
-      created_at: string;
-    }>();
-  if (!row) return null;
-  let metadata: Record<string, unknown> = {};
-  try {
-    const parsed = JSON.parse(row.metadata_json);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      metadata = parsed as Record<string, unknown>;
-    }
-  } catch {
-    // Optional checkpoint data must not make the new claim unusable.
-  }
-  return {
-    requestId: row.update_request_id,
-    workType: row.work_type,
-    workId: row.work_id,
-    runId: row.run_id,
-    conversationId:
-      typeof metadata.conversationId === "string"
-        ? metadata.conversationId
-        : null,
-    workspacePath:
-      typeof metadata.workspacePath === "string"
-        ? metadata.workspacePath
-        : null,
-    createdAt: row.created_at,
-  };
 }
 
 export type ExecutionWorkerCredentialPrincipal = {

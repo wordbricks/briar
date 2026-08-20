@@ -447,8 +447,6 @@ import {
   listExecutionWorkers,
   listOrganizationExecutionWorkers,
   listOrganizationExecutionProviders,
-  latestExecutionWorkerUpdateHandoff,
-  pendingExecutionWorkerUpdate,
   getProjectExecutionWorkerPolicy,
   hasExecutionWorkerReadinessChanged,
   isExecutionWorkerAllowedForProject,
@@ -468,6 +466,10 @@ import {
   updateProjectExecutionWorkerPolicy,
   userOwnsExecutionWorkerDevice,
 } from "./workers";
+import {
+  latestExecutionWorkerUpdateHandoff,
+  pendingExecutionWorkerUpdate,
+} from "./worker-update-repository";
 import { MAX_WORKER_CONCURRENT_SESSIONS } from "./worker-limits";
 import { MAX_TRANSCRIPT_HTTP_BODY_BYTES } from "./transcript-limits";
 import {

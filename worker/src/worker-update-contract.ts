@@ -7,13 +7,7 @@ import {
   UuidString,
 } from "./schema-codecs";
 import { decodeRequestSync } from "./request-schema";
-
-export const WorkerUpdateHandoffWorkType = Schema.Literals([
-  "issue",
-  "projectAgentTask",
-  "issueReply",
-  "channelReply",
-]);
+import { WorkerUpdateHandoffWorkType } from "./worker-update-model";
 
 const SemanticVersion = Schema.Trim.check(
   Schema.makeFilter((value) =>

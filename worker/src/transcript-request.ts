@@ -8,7 +8,7 @@ import {
 } from "../../src/lib/agent-execution-metrics";
 import { agentProviders } from "../../src/lib/agent-provider";
 import { MAX_TRANSCRIPT_EVENTS_PER_REQUEST } from "./transcript-limits";
-import { WorkerUpdateHandoffWorkType } from "./worker-update-contract";
+import { WorkerUpdateHandoffWorkType } from "./worker-update-model";
 
 const strictSchemaOptions = {
   errors: "all",
