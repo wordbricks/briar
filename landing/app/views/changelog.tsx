@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.142",
+        date: "2026년 8월 20일",
+        title: "채널에서 이슈 생성과 실행 승인을 한 번에 연결합니다",
+        summary:
+          "채널 제안에서 이슈 생성과 Agent 실행 설정을 하나의 승인 흐름으로 묶고, landing의 다음 행동을 더 분명하게 다듬었습니다.",
+        items: [
+          "채널에서 이슈를 만들고 실행할 때 프로젝트·Worker·제공자·모델·effort를 검토한 뒤 한 번의 승인으로 함께 처리합니다.",
+          "데스크탑과 iOS Companion에서 같은 채널 제안·실행 승인 상태를 보여주고, 재시도와 중복 요청에도 동일한 실행 결과를 유지합니다.",
+          "서버가 프로젝트·멤버십·정책·제공자·Worker 가능 여부를 승인 시점에 다시 확인해 실행 요청을 안전하게 예약합니다.",
+          "랜딩 홈페이지의 고정 헤더·언어 전환·다운로드 버튼·모바일 선택 흐름을 정리해 다음 행동을 더 쉽게 찾도록 합니다.",
+          "채널 이슈 생성·실행 승인과 관련된 UI·API·Worker·Companion 회귀 테스트를 보강합니다.",
+        ],
+      },
+      {
         version: "1.2.141",
         date: "2026년 8월 20일",
         title: "프로젝트 창과 상태 표현을 더 선명하게 정리합니다",
@@ -866,6 +880,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.142",
+        date: "August 20, 2026",
+        title: "Connect channel issue creation and execution approval in one step",
+        summary:
+          "Combine issue creation and Agent execution settings into one channel approval flow, and make the landing page's next action easier to find.",
+        items: [
+          "Review the project, Worker, provider, model, and effort before creating and executing an issue from a channel, then approve both together once.",
+          "Show the same channel proposal and execution-approval state on desktop and iOS Companion, with retries and duplicate requests converging on the same result.",
+          "Recheck project, membership, policy, provider, and Worker availability at approval time before safely reserving the execution request.",
+          "Refine the landing homepage's sticky header, language switcher, download buttons, and mobile choice flow so the next action is easier to discover.",
+          "Expand UI, API, Worker, and Companion regression coverage for channel issue creation and execution approval.",
+        ],
+      },
       {
         version: "1.2.141",
         date: "August 20, 2026",
@@ -1794,7 +1822,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-141">
+          <a href="#v1-2-142">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1816,7 +1844,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.141" || entry.version === "1.2.140"
+                      entry.version === "1.2.142" ||
+                      entry.version === "1.2.141" ||
+                      entry.version === "1.2.140"
                         ? "2026-08-20"
                         : entry.version === "1.2.139" ||
                       entry.version === "1.2.138"
