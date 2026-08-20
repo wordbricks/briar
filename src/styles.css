@@ -1173,21 +1173,11 @@ body { overflow: hidden; font-synthesis: none; }
 .worker-readiness-dot.busy { background:#7657d8; }
 .worker-readiness-dot.needs_attention { background:#e09f3e; }
 .worker-readiness-dot.any { background:#6550b3; box-shadow:0 0 0 3px rgba(101,80,179,.12); }
-.worker-readiness-any-icon { flex:0 0 auto; display:grid; place-items:center; width:30px; height:30px; border-radius:8px; background:#f2effb; color:#6550b3; }
 .worker-dispatch-form { display:grid; gap:16px; padding:8px 0; }
 .worker-dispatch-form>label { display:grid; gap:7px; }
 .worker-dispatch-form>label>span { display:flex; align-items:center; gap:7px; color:var(--muted-foreground); font-size:var(--text-xs); font-weight:600; }
 .worker-readiness-list { display:grid; gap:7px; max-height:190px; overflow:auto; }
 .worker-readiness-list>p { display:flex; align-items:center; gap:7px; margin:0; padding:10px; border-radius:8px; background:#fff7e6; color:#8a5b12; font-size:var(--text-xs); }
-.worker-readiness-row { width:100%; display:flex; align-items:center; gap:9px; padding:9px 10px; border:1px solid var(--border); border-radius:8px; color:inherit; background:var(--card); font:inherit; text-align:left; cursor:pointer; }
-.worker-readiness-row:hover:not(:disabled) { border-color:#c9c1e5; background:#f8f6ff; }
-.worker-readiness-row:focus-visible { outline:2px solid #8068ce; outline-offset:2px; }
-.worker-readiness-row[aria-pressed="true"] { border-color:#9b88d9; background:#f2effb; box-shadow:0 0 0 1px rgba(111,84,202,.1); }
-.worker-readiness-row:disabled { opacity:.65; cursor:not-allowed; }
-.worker-readiness-row>span:nth-child(3) { min-width:0; display:grid; gap:2px; }
-.worker-readiness-row small { color:var(--muted-foreground); }
-.worker-readiness-check { margin-left:auto; flex:0 0 auto; color:#6550b3; opacity:0; }
-.worker-readiness-row[aria-pressed="true"] .worker-readiness-check { opacity:1; }
 .kanban-board { min-width:0; min-height:0; flex:1; padding:12px; display:flex; flex-direction:row; align-items:stretch; gap:10px; overflow-x:auto; overflow-y:hidden; background:#f7f7f4; scrollbar-gutter:stable; }
 .kanban-column-shell { min-width:286px; flex:1 1 286px; height:100%; position:relative; }
 .kanban-column-shell.is-collapsed { flex:0 0 52px; width:52px; min-width:52px; max-width:52px; }
