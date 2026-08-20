@@ -511,6 +511,18 @@ struct EgoBrowserStatus {
     version: Option<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AsideBrowserStatus {
+    supported: bool,
+    installed: bool,
+    cli_ready: bool,
+    mcp_ready: bool,
+    skill_ready: bool,
+    browser_ready: bool,
+    version: Option<String>,
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RepositoryReadiness {
@@ -626,6 +638,7 @@ enum BrowserAutomationProvider {
     #[default]
     EgoBrowser,
     AgentBrowser,
+    Aside,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -2384,6 +2397,176 @@ async fn inspect_ego_browser(app: tauri::AppHandle) -> Result<EgoBrowserStatus, 
     tauri::async_runtime::spawn_blocking(move || inspect_ego_browser_sync(&home))
         .await
         .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn aside_supported() -> bool {
+    Command::new("/usr/bin/sw_vers")
+        .arg("-productVersion")
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| {
+            String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .split('.')
+                .next()?
+                .parse::<u32>()
+                .ok()
+        })
+        .is_some_and(|major| major >= 15)
+}
+
+#[cfg(target_os = "macos")]
+fn aside_installed(home: &Path) -> bool {
+    [
+        PathBuf::from("/Applications/Aside.app"),
+        PathBuf::from("/Applications/Aside Browser.app"),
+        home.join("Applications/Aside.app"),
+        home.join("Applications/Aside Browser.app"),
+    ]
+    .iter()
+    .any(|path| path.is_dir())
+}
+
+fn aside_browser_skill_ready(home: &Path) -> bool {
+    [
+        home.join(".codex/skills/browser/SKILL.md"),
+        home.join(".claude/skills/browser/SKILL.md"),
+        home.join(".cursor/skills/browser/SKILL.md"),
+        home.join(".grok/skills/browser/SKILL.md"),
+        home.join(".gemini/config/skills/browser/SKILL.md"),
+        home.join(".config/opencode/skills/browser/SKILL.md"),
+    ]
+    .iter()
+    .all(|path| path.is_file())
+}
+
+fn aside_output(home: &Path, binary: &Path, arguments: &[&str]) -> Option<std::process::Output> {
+    Command::new(binary)
+        .args(arguments)
+        .env("PATH", cli_execution_path(home).ok()?)
+        .env("HOME", home)
+        .output()
+        .ok()
+}
+
+fn inspect_aside_browser_sync(home: &Path) -> AsideBrowserStatus {
+    #[cfg(target_os = "macos")]
+    {
+        let supported = aside_supported();
+        let installed = aside_installed(home);
+        let binary = cli_execution_path(home)
+            .ok()
+            .and_then(|execution_path| which::which_in("aside", Some(execution_path), home).ok());
+        let version = binary.as_deref().and_then(|binary| {
+            aside_output(home, binary, &["--version"])
+                .filter(|output| output.status.success())
+                .and_then(|output| {
+                    parse_cli_version(&output.stdout).or_else(|| parse_cli_version(&output.stderr))
+                })
+        });
+        let cli_ready = version.is_some();
+        let mcp_ready = binary.as_deref().is_some_and(|binary| {
+            aside_output(home, binary, &["mcp", "--help"])
+                .is_some_and(|output| output.status.success())
+        });
+        let skill_ready = aside_browser_skill_ready(home);
+        AsideBrowserStatus {
+            supported,
+            installed,
+            cli_ready,
+            mcp_ready,
+            skill_ready,
+            browser_ready: supported && installed && cli_ready && mcp_ready && skill_ready,
+            version,
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = home;
+        AsideBrowserStatus {
+            supported: false,
+            installed: false,
+            cli_ready: false,
+            mcp_ready: false,
+            skill_ready: false,
+            browser_ready: false,
+            version: None,
+        }
+    }
+}
+
+#[tauri::command]
+async fn inspect_aside_browser(app: tauri::AppHandle) -> Result<AsideBrowserStatus, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || inspect_aside_browser_sync(&home))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn install_aside_cli(home: &Path) -> Result<(), String> {
+    let execution_path = cli_execution_path(home)?;
+    let shell = which::which_in("bash", Some(&execution_path), home)
+        .or_else(|_| which::which_in("sh", Some(&execution_path), home))
+        .map_err(|_| "Aside CLI 설치에 필요한 shell을 찾지 못했습니다.".to_string())?;
+    let output = Command::new(shell)
+        .env("PATH", &execution_path)
+        .env("HOME", home)
+        .args([
+            "-c",
+            "curl -fsSL https://releases.aside.com/install.sh | bash",
+        ])
+        .output()
+        .map_err(|error| format!("Aside CLI 설치 명령을 실행하지 못했습니다: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let detail = [output.stderr.as_slice(), output.stdout.as_slice()]
+        .into_iter()
+        .map(String::from_utf8_lossy)
+        .map(|value| value.trim().to_string())
+        .find(|value| !value.is_empty())
+        .unwrap_or_else(|| "unknown error".to_string());
+    Err(format!("Aside CLI를 설치하지 못했습니다: {detail}"))
+}
+
+#[tauri::command]
+async fn setup_aside_browser(app: tauri::AppHandle) -> Result<AsideBrowserStatus, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    let resource_directory = app
+        .path()
+        .resource_dir()
+        .map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(target_os = "macos")]
+        {
+            if !aside_supported() {
+                return Err("Aside는 macOS 15 이상에서만 사용할 수 있습니다.".to_string());
+            }
+            if !aside_installed(&home) {
+                return Err("Aside를 먼저 설치하고 로그인과 온보딩을 완료해 주세요.".to_string());
+            }
+            install_aside_cli(&home)?;
+            sync_auto_hunt_assets(&resource_directory, &home)?;
+            let status = inspect_aside_browser_sync(&home);
+            if !status.browser_ready {
+                return Err(format!(
+                    "Aside 설정 후 재확인에 실패했습니다. CLI: {}, MCP: {}, Skill: {}",
+                    status.cli_ready, status.mcp_ready, status.skill_ready
+                ));
+            }
+            Ok(status)
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (home, resource_directory);
+            Err("Aside는 macOS 15 이상에서만 사용할 수 있습니다.".to_string())
+        }
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -8334,10 +8517,12 @@ pub fn run() {
             inspect_open_code_terminal_path,
             configure_open_code_terminal_path,
             inspect_agent_browser,
+            inspect_aside_browser,
             inspect_ego_browser,
             open_agent_provider_login,
             install_onboarding_prerequisite,
             install_agent_browser,
+            setup_aside_browser,
             read_session_token,
             write_session_token,
             clear_session_token,
@@ -9079,6 +9264,49 @@ mod tests {
             String::from_utf8_lossy(&output.stdout).trim(),
             "agent-browser fixture"
         );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn detects_aside_cli_mcp_and_browser_skill_readiness() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let home = tempfile::tempdir().expect("fixture home should exist");
+        fs::create_dir_all(home.path().join("Applications/Aside.app"))
+            .expect("Aside app fixture should exist");
+        let binary = home.path().join(".local/bin/aside");
+        fs::create_dir_all(binary.parent().expect("binary should have a parent"))
+            .expect("local binary directory should exist");
+        fs::write(
+            &binary,
+            "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 1.26.810.1915; exit 0; fi\nif [ \"$1\" = \"mcp\" ] && [ \"$2\" = \"--help\" ]; then exit 0; fi\nexit 1\n",
+        )
+        .expect("Aside CLI fixture should be written");
+        fs::set_permissions(&binary, fs::Permissions::from_mode(0o700))
+            .expect("Aside CLI fixture should be executable");
+        for skill in [
+            ".codex/skills/browser/SKILL.md",
+            ".claude/skills/browser/SKILL.md",
+            ".cursor/skills/browser/SKILL.md",
+            ".grok/skills/browser/SKILL.md",
+            ".gemini/config/skills/browser/SKILL.md",
+            ".config/opencode/skills/browser/SKILL.md",
+        ] {
+            let skill = home.path().join(skill);
+            fs::create_dir_all(skill.parent().expect("skill should have a parent"))
+                .expect("skill directory should exist");
+            fs::write(skill, "# Browser\n").expect("skill fixture should be written");
+        }
+
+        let status = inspect_aside_browser_sync(home.path());
+
+        assert!(status.supported);
+        assert!(status.installed);
+        assert!(status.cli_ready);
+        assert!(status.mcp_ready);
+        assert!(status.skill_ready);
+        assert!(status.browser_ready);
+        assert_eq!(status.version.as_deref(), Some("1.26.810.1915"));
     }
 
     #[test]
@@ -9852,7 +10080,7 @@ branch refs/heads/briar/second-11111111
         update_browser_automation_settings_at(
             &config_path,
             BrowserAutomationSettings {
-                provider: BrowserAutomationProvider::AgentBrowser,
+                provider: BrowserAutomationProvider::Aside,
             },
         )
         .expect("browser automation settings should save");
@@ -9883,10 +10111,7 @@ branch refs/heads/briar/second-11111111
         assert_eq!(saved["agentProviders"]["codex"], false);
         assert_eq!(saved["agentProviders"]["claude"], true);
         assert_eq!(saved["appSettings"]["preventSleepWhileRunning"], true);
-        assert_eq!(
-            saved["appSettings"]["browserAutomationProvider"],
-            "agent-browser"
-        );
+        assert_eq!(saved["appSettings"]["browserAutomationProvider"], "aside");
         assert_eq!(saved["projects"][0]["llm"]["provider"], "claude");
         assert_eq!(saved["projects"][0]["llm"]["model"], "sonnet");
         assert_eq!(saved["projects"][0]["llm"]["effort"], "high");
