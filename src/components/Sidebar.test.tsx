@@ -1224,4 +1224,91 @@ describe("Sidebar", () => {
     await act(async () => root.unmount());
     container.remove();
   });
+
+  it("opens a project from its menu in a new window", async () => {
+    const onProjectOpenInNewWindow = vi.fn().mockResolvedValue(undefined);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          onProjectOpenInNewWindow={onProjectOpenInNewWindow}
+        />,
+      );
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".sidebar-project-menu-trigger")
+        ?.click();
+    });
+    const openButton = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        ".sidebar-project-menu [role='menuitem']",
+      ),
+    ).find((button) => button.textContent?.includes("새 윈도우에서 열기"));
+    expect(openButton).not.toBeNull();
+
+    await act(async () => openButton?.click());
+    expect(onProjectOpenInNewWindow).toHaveBeenCalledWith("project-1");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("renders only the locked project's identity, channels, and tabs in a project window", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activePage="issues"
+          channels={[
+            sidebarChannel("channel-org", "General", null),
+            sidebarChannel("channel-project", "Briar dev", "project-1"),
+            sidebarChannel("channel-other", "Console dev", "project-2"),
+          ]}
+          onChannelOpen={() => undefined}
+          projectWindowProjectId="project-1"
+          projects={[
+            ...sidebarProps.projects,
+            {
+              id: "project-2",
+              name: "Console",
+              organizationId: "organization-1",
+              organizationName: "Briar",
+              role: "member",
+              createdAt: "2026-07-23T00:00:00Z",
+            },
+          ]}
+        />,
+      );
+    });
+
+    expect(
+      container.querySelector(".sidebar-project-window-brand")?.textContent,
+    ).toContain("Briar");
+    expect(container.querySelector(".sidebar-organization-switcher")).toBeNull();
+    expect(container.querySelector(".sidebar-section-heading")).toBeNull();
+    expect(container.querySelector(".sidebar-project-menu-trigger")).toBeNull();
+
+    const topLevelChannels = container.querySelector(
+      ".sidebar-project-channels-top-level",
+    );
+    expect(topLevelChannels?.textContent).toContain("Briar dev");
+    expect(topLevelChannels?.textContent).not.toContain("General");
+    expect(topLevelChannels?.textContent).not.toContain("Console dev");
+
+    const projectTabs = container.querySelector(".sidebar-project-window-tabs");
+    expect(projectTabs?.textContent).toContain("이슈");
+    expect(projectTabs?.textContent).toContain("에이전트");
+    expect(projectTabs?.textContent).not.toContain("Console");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
 });

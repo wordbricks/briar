@@ -3,9 +3,10 @@
   "identifier": "default",
   "description": "Capabilities for the Briar main window",
   "platforms": ["macOS", "windows", "linux"],
-  "windows": ["main"],
+  "windows": ["main", "project-*"],
   "permissions": [
     "core:default",
+    "core:webview:allow-create-webview-window",
     "core:webview:allow-set-webview-zoom",
     "core:window:allow-start-dragging",
     "deep-link:default",

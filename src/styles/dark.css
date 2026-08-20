@@ -14,6 +14,7 @@
 }
 
 .dark .sidebar-brand,
+.dark .sidebar-project-window-brand,
 .dark .sidebar-primary-nav a,
 .dark .sidebar-channels-toggle,
 .dark .sidebar-channel-list button,
@@ -30,6 +31,7 @@
 
 .dark .sidebar-brand:hover,
 .dark .sidebar-brand[aria-expanded="true"],
+.dark .sidebar-project-window-brand:hover:not(:disabled),
 .dark .sidebar-primary-nav a:hover,
 .dark .sidebar-primary-nav a.active,
 .dark .sidebar-channels-toggle:hover,
