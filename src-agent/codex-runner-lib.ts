@@ -1,4 +1,5 @@
 import type { AgentAttachment } from "./runner-attachments";
+import type { JsonRpcMessage } from "./json-rpc-message";
 import {
   normalizedActivityText,
   normalizedActivityTitle,
@@ -66,18 +67,7 @@ export type CodexRunnerOutput =
       message: string;
     };
 
-export type CodexRpcMessage = {
-  jsonrpc?: string;
-  id?: number | string | null;
-  method?: string;
-  params?: unknown;
-  result?: unknown;
-  error?: {
-    code?: number;
-    message?: string;
-    data?: unknown;
-  };
-};
+export type CodexRpcMessage = JsonRpcMessage;
 
 export type CodexAppServerState = {
   phase:

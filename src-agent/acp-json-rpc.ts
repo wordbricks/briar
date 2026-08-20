@@ -1,13 +1,11 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import * as Option from "effect/Option";
+import {
+  decodeJsonRpcMessageJsonOption,
+  type JsonRpcMessage,
+} from "./json-rpc-message";
 
-export type AcpJsonRpcMessage = {
-  jsonrpc?: string;
-  id?: number | string | null;
-  method?: string;
-  params?: unknown;
-  result?: unknown;
-  error?: { code?: number; message?: string; data?: unknown };
-};
+export type AcpJsonRpcMessage = JsonRpcMessage;
 
 /**
  * Minimal newline-delimited JSON-RPC transport shared by ACP-backed provider
@@ -124,12 +122,9 @@ export class AcpJsonRpcConnection {
   }
 
   private handleLine(line: string) {
-    let message: AcpJsonRpcMessage;
-    try {
-      message = JSON.parse(line) as AcpJsonRpcMessage;
-    } catch {
-      return;
-    }
+    const decoded = decodeJsonRpcMessageJsonOption(line);
+    if (Option.isNone(decoded)) return;
+    const message = decoded.value;
 
     if (message.id !== undefined && message.id !== null && !message.method) {
       const pending = this.pending.get(message.id);
