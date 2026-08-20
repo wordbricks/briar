@@ -38,7 +38,7 @@ Briar installs and keeps its CLI and workflow skills in sync when a project is c
 
 ## Local development
 
-Requirements: Bun 1.3.14, Rust 1.96.0, the Tauri system prerequisites, Wrangler 4.x, and at least one supported coding-agent CLI.
+Requirements: Bun 1.4.0, Rust 1.96.0, the Tauri system prerequisites, Wrangler 4.x, and at least one supported coding-agent CLI.
 
 ```sh
 bun install

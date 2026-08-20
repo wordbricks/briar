@@ -36,7 +36,7 @@ Briar 在连接项目时会安装并同步 CLI 和工作流技能。Velen、Line
 
 ## 本地开发
 
-依赖：Bun 1.3.14、Rust 1.96.0、Tauri 系统依赖、Wrangler 4.x，以及至少一个受支持的编码 Agent CLI。
+依赖：Bun 1.4.0、Rust 1.96.0、Tauri 系统依赖、Wrangler 4.x，以及至少一个受支持的编码 Agent CLI。
 
 ```sh
 bun install
