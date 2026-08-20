@@ -4,6 +4,7 @@ import * as Result from "effect/Result";
 import type { SchemaError } from "effect/Schema";
 import {
   decodeApprovalResponse,
+  decodeApprovalResponseEnvelope,
   isRunRequestEnvelope,
 } from "./runner-control-message";
 
@@ -43,6 +44,7 @@ export function createRunnerIo<Request extends RunRequest, Output>({
     rejectRequest = reject;
   });
   const approvals = new Map<string, PendingApproval>();
+  let closed = false;
 
   function settleApproval(id: string, approved: boolean) {
     const pending = approvals.get(id);
@@ -70,8 +72,14 @@ export function createRunnerIo<Request extends RunRequest, Output>({
       settleApproval(approval.value.id, approval.value.approved);
       return;
     }
-    // Invalid approval payloads stay pending so a subsequent valid response,
-    // abort, or channel close can settle them without ever granting approval.
+
+    const approvalEnvelope = decodeApprovalResponseEnvelope(message);
+    if (Option.isSome(approvalEnvelope)) {
+      // A parent sends exactly one response for each approval. Deny a matching
+      // malformed response so the runner cannot approve it or wait forever.
+      settleApproval(approvalEnvelope.value.id, false);
+      return;
+    }
     if (!isRunRequestEnvelope(message)) return;
 
     const decoded = decodeRequest(message);
@@ -85,6 +93,7 @@ export function createRunnerIo<Request extends RunRequest, Output>({
   });
 
   lines.on("close", () => {
+    closed = true;
     rejectRequest?.(new Error(closeError));
     rejectRequest = undefined;
     resolveRequest = undefined;
@@ -97,6 +106,8 @@ export function createRunnerIo<Request extends RunRequest, Output>({
   }
 
   function waitForApproval(id: string, signal?: AbortSignal) {
+    if (closed) return Promise.resolve(false);
+
     return new Promise<boolean>((resolve) => {
       const pending: PendingApproval = { resolve };
       if (signal) {
@@ -113,7 +124,10 @@ export function createRunnerIo<Request extends RunRequest, Output>({
   }
 
   return {
-    close: () => lines.close(),
+    close: () => {
+      closed = true;
+      lines.close();
+    },
     emit,
     request,
     waitForApproval,

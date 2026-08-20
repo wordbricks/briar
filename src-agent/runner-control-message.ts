@@ -5,9 +5,17 @@ const decoderOptions = {
   propertyOrder: "original",
 } as const;
 
-const ApprovalResponse = Schema.Struct({
+const approvalResponseEnvelopeFields = {
   type: Schema.Literal("approvalResponse"),
   id: Schema.String,
+} satisfies Schema.Struct.Fields;
+
+const ApprovalResponseEnvelope = Schema.Struct(
+  approvalResponseEnvelopeFields,
+);
+
+const ApprovalResponse = Schema.Struct({
+  ...approvalResponseEnvelopeFields,
   approved: Schema.Boolean,
 });
 
@@ -17,6 +25,11 @@ const RunRequestEnvelope = Schema.Struct({
 
 export const decodeApprovalResponse = Schema.decodeUnknownOption(
   ApprovalResponse,
+  decoderOptions,
+);
+
+export const decodeApprovalResponseEnvelope = Schema.decodeUnknownOption(
+  ApprovalResponseEnvelope,
   decoderOptions,
 );
 

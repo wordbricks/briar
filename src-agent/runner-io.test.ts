@@ -99,7 +99,28 @@ describe("runner JSON-lines I/O", () => {
     io.close();
   });
 
-  it("does not approve a truthy non-boolean response", async () => {
+  it("denies malformed approval responses with a matching id", async () => {
+    const { input, io } = testIo();
+    await beginRun(input, io.request);
+    const truthyApproval = io.waitForApproval("approval-1");
+
+    input.write(`${JSON.stringify({
+      type: "approvalResponse",
+      id: "approval-1",
+      approved: "true",
+    })}\n`);
+    await expect(truthyApproval).resolves.toBe(false);
+
+    const missingApproval = io.waitForApproval("approval-2");
+    input.write(`${JSON.stringify({
+      type: "approvalResponse",
+      id: "approval-2",
+    })}\n`);
+    await expect(missingApproval).resolves.toBe(false);
+    io.close();
+  });
+
+  it("ignores a malformed approval response for an unknown id", async () => {
     const { input, io } = testIo();
     await beginRun(input, io.request);
     let settled = false;
@@ -109,7 +130,7 @@ describe("runner JSON-lines I/O", () => {
 
     input.write(`${JSON.stringify({
       type: "approvalResponse",
-      id: "approval-1",
+      id: "unknown",
       approved: "true",
     })}\n`);
     await new Promise((resolve) => setImmediate(resolve));
@@ -133,5 +154,15 @@ describe("runner JSON-lines I/O", () => {
 
     await expect(approval).resolves.toBe(false);
     io.close();
+  });
+
+  it("denies approvals registered after the input closes", async () => {
+    const { io, onClose } = testIo();
+    const request = expect(io.request).rejects.toThrow("input closed");
+    io.close();
+
+    await request;
+    await expect(io.waitForApproval("approval-1")).resolves.toBe(false);
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });
