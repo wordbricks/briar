@@ -1,7 +1,14 @@
 import { z } from "zod";
 import { briarApiUrl, briarWebAppOrigin } from "./api-config";
 export { briarApiUrl } from "./api-config";
-import { captureErrorDiagnostics } from "./error-diagnostics";
+import { ApiError, isApiErrorStatus } from "./api/errors";
+export {
+  ApiError,
+  apiErrorIssueMessages,
+  errorWithMessage,
+  isApiErrorStatus,
+} from "./api/errors";
+import { request } from "./api/request";
 import { structuredAgentResultSchema } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
@@ -361,113 +368,6 @@ const organizationSchema = z.object({
 });
 
 export const isApiConfigured = Boolean(apiUrl);
-
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-    readonly code?: string,
-    readonly issues?: readonly unknown[],
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
-
-export function isApiErrorStatus(error: unknown, status: number) {
-  return error instanceof ApiError && error.status === status;
-}
-
-export function errorWithMessage(error: unknown, message: string) {
-  if (error instanceof ApiError) {
-    return new ApiError(error.status, message, error.code, error.issues);
-  }
-  if (error instanceof Error && error.message === message) return error;
-  return new Error(message);
-}
-
-export function apiErrorIssueMessages(error: unknown) {
-  if (!(error instanceof ApiError) || !error.issues) return [];
-  return error.issues.flatMap((issue) => {
-    if (typeof issue === "string") return [issue];
-    if (!issue || typeof issue !== "object") return [];
-    const candidate = issue as { message?: unknown; path?: unknown };
-    if (typeof candidate.message !== "string") return [];
-    const path = Array.isArray(candidate.path)
-      ? candidate.path
-          .filter((part) =>
-            typeof part === "string" || typeof part === "number"
-          )
-          .join(".")
-      : "";
-    return [path ? `${path}: ${candidate.message}` : candidate.message];
-  });
-}
-
-async function request<T>(
-  path: string,
-  token: string | null,
-  init?: RequestInit,
-): Promise<T> {
-  if (!apiUrl) throw new Error("Briar API URL이 설정되지 않았습니다.");
-  const headers = new Headers(init?.headers);
-  headers.set("Accept", "application/json");
-  if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  const method = (init?.method ?? "GET").toUpperCase();
-  const startedAt = performance.now();
-  let response: Response;
-  try {
-    response = await fetch(`${apiUrl}${path}`, {
-      ...init,
-      headers,
-    });
-  } catch (caught) {
-    captureErrorDiagnostics(caught, {
-      durationMs: performance.now() - startedAt,
-      method,
-      path,
-      scope: "api_request",
-    });
-    throw caught;
-  }
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    const error = new ApiError(
-      response.status,
-      body?.message ??
-        body?.error_description ??
-        body?.error ??
-        `Briar API 요청 실패 (${response.status})`,
-      body?.code,
-      Array.isArray(body?.issues) ? body.issues : undefined,
-    );
-    captureErrorDiagnostics(error, {
-      code: error.code,
-      durationMs: performance.now() - startedAt,
-      method,
-      path,
-      scope: "api_request",
-      status: response.status,
-    });
-    throw error;
-  }
-  if (response.status === 204) return undefined as T;
-  try {
-    return await response.json() as T;
-  } catch (caught) {
-    captureErrorDiagnostics(caught, {
-      durationMs: performance.now() - startedAt,
-      method,
-      path,
-      scope: "api_response_parse",
-      status: response.status,
-    });
-    throw caught;
-  }
-}
 
 export type DeviceAuthorization = {
   deviceCode: string;
