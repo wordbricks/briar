@@ -29,6 +29,7 @@ import { MacSecurePasswordInput } from "./MacSecurePasswordInput";
 import { SelectMenu } from "./SelectMenu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { StatusPanel } from "@/components/ui/status-panel";
 import { Typography } from "@/components/ui/typography";
 
 type Step = "apiKey" | "teams" | "mapping" | "done";
@@ -426,7 +427,12 @@ export function LinearIssueImport({
 
       {hasProjectStatuses && step === "done" && result ? (
         <div className="project-settings-linear-import-body">
-          <p className="project-settings-linear-import-success">
+          <StatusPanel
+            className="project-settings-linear-import-success"
+            density="compact"
+            role="status"
+            tone="success"
+          >
             <Check size={14} />
             {t("settings.linearImportResult", {
               imported: result.imported,
@@ -434,7 +440,7 @@ export function LinearIssueImport({
               failed: result.failed,
               total: result.total,
             })}
-          </p>
+          </StatusPanel>
           {result.truncated ? (
             <p className="project-settings-linear-import-truncated">
               {t("settings.linearImportTruncated")}

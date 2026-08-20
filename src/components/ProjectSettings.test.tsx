@@ -475,7 +475,7 @@ describe("ProjectSettings", () => {
     });
 
     const deleteButton = container.querySelector<HTMLButtonElement>(
-      ".project-settings-danger > button",
+      '.project-settings-danger [data-slot="status-panel-action"] > button',
     );
     await act(async () => deleteButton?.click());
     expect(onDelete).not.toHaveBeenCalled();

@@ -21,6 +21,12 @@ import {
   type AgentUsageWindow,
 } from "../lib/agent-usage";
 import { AgentProviderIcon } from "./AgentIcons";
+import {
+  StatusPanel,
+  StatusPanelContent,
+  StatusPanelDescription,
+  StatusPanelTitle,
+} from "./ui/status-panel";
 
 const refreshIntervalMs = 5 * 60_000;
 type UsageMode = "detailed" | "compact";
@@ -174,24 +180,35 @@ function ProviderDetails({
         )}
       </header>
       <div className="agent-usage-provider-detail-body">
-        <div className={`agent-usage-health ${provider.status}`}>
-          <strong>
+        <StatusPanel
+          className="agent-usage-health"
+          density="compact"
+          role={provider.status === "ok" ? "status" : "alert"}
+          tone={provider.status === "ok" ? "success" : "destructive"}
+        >
+          <StatusPanelContent>
+            <StatusPanelTitle>
             {provider.status === "ok"
               ? t("usage.connected")
               : provider.status === "unavailable"
                 ? t("usage.signInRequired")
                 : t("usage.refreshFailed")}
-          </strong>
-          <small>
-            {t("usage.lastChecked", {
-              time: new Intl.DateTimeFormat(localeTag, {
-                hour: "numeric",
-                minute: "2-digit",
-              }).format(provider.updatedAt),
-            })}
-          </small>
-          {provider.error ? <p>{provider.error}</p> : null}
-        </div>
+            </StatusPanelTitle>
+            <StatusPanelDescription>
+              {t("usage.lastChecked", {
+                time: new Intl.DateTimeFormat(localeTag, {
+                  hour: "numeric",
+                  minute: "2-digit",
+                }).format(provider.updatedAt),
+              })}
+            </StatusPanelDescription>
+            {provider.error ? (
+              <StatusPanelDescription className="agent-usage-health-error">
+                {provider.error}
+              </StatusPanelDescription>
+            ) : null}
+          </StatusPanelContent>
+        </StatusPanel>
         {windows.length > 0 ? (
           <div className="agent-usage-detail-windows">
             {windows.map((window) => (
