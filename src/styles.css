@@ -816,114 +816,108 @@ body { overflow: hidden; font-synthesis: none; }
 .project-settings-sandbox strong { color:#4d4856; font-size:var(--text-2xs); }
 .project-settings-sandbox small { color:#88818e; font-size:var(--text-2xs); line-height:1.5; }
 .project-settings-sandbox-error { margin:8px 0 0; color:#a33d4e; font-size:var(--text-2xs); }
-.project-settings-automation { margin-top:18px; padding:20px; border:1px solid var(--border); border-radius:15px; background:var(--card); box-shadow:0 5px 18px rgba(38,42,32,.035); }
+.project-settings-automation { margin-top:18px; padding:20px; border:1px solid var(--border); border-radius:15px; background:var(--card); box-shadow:var(--shadow-sm); }
 .project-settings-automation > header { display:flex; align-items:flex-start; gap:11px; }
 .project-settings-automation > header > span:nth-child(2) { min-width:0; display:grid; gap:5px; }
-.project-settings-automation > header strong { color:#403e47; font-size:var(--text-xs); }
-.project-settings-automation > header small { color:#85828b; font-size:var(--text-2xs); line-height:1.5; }
+.project-settings-automation > header strong { color:var(--foreground); font-size:var(--text-xs); }
+.project-settings-automation > header small { color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.5; }
 .project-settings-automation-actions { margin-left:auto; display:flex; align-items:center; gap:7px; }
-.project-settings-automation-actions > button { height:30px; padding:0 10px; display:flex; align-items:center; gap:6px; border:1px solid #ddd8ed; border-radius:8px; color:#604ca6; background:#f7f4ff; cursor:pointer; font-size:var(--text-2xs); white-space:nowrap; }
-.project-settings-automation-actions > button:hover:not(:disabled) { border-color:#c9bee9; background:#f0ebff; }
-.project-settings-automation-actions > button:disabled { color:#9a96a3; background:#f4f3f6; cursor:not-allowed; }
-.project-settings-automation-icon { width:32px; height:32px; flex:0 0 32px; display:grid; place-items:center; border-radius:9px; color:#6650b4; background:#eeeafd; }
-.project-settings-workflow-ai-note { margin:14px 0 0 43px; color:#85828b; font-size:var(--text-2xs); line-height:1.6; }
-.project-settings-workflow-revision { margin:14px 0 0 43px; padding:13px; display:grid; gap:8px; border:1px solid #e0d9f2; border-radius:11px; background:#faf8ff; }
-.project-settings-workflow-revision > label { color:#514762; font-size:var(--text-2xs); font-weight:700; }
-.project-settings-workflow-revision textarea { min-height:72px; resize:vertical; border-color:#ddd6ef; background:#fff; font-size:var(--text-2xs); line-height:1.55; }
+.project-settings-automation-actions > button { height:30px; padding:0 10px; font-size:var(--text-2xs); }
+.project-settings-automation-icon { width:32px; height:32px; flex:0 0 32px; display:grid; place-items:center; border-radius:9px; color:var(--accent-foreground); background:var(--accent); }
+.project-settings-workflow-ai-note { margin:14px 0 0 43px; color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.6; }
+.project-settings-workflow-revision { margin:14px 0 0 43px; padding:13px; display:grid; gap:8px; border:1px solid var(--border); border-radius:11px; background:var(--muted); }
+.project-settings-workflow-revision > label { color:var(--foreground); font-size:var(--text-2xs); font-weight:700; }
+.project-settings-workflow-revision textarea { min-height:72px; resize:vertical; font-size:var(--text-2xs); line-height:1.55; }
 .project-settings-workflow-revision > footer { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.project-settings-workflow-revision > footer > small { color:#8a8394; font-size:var(--text-2xs); line-height:1.45; }
-.project-settings-workflow-revision > footer > button { height:30px; padding:0 11px; flex:0 0 auto; display:flex; align-items:center; gap:6px; border:1px solid #cfc3eb; border-radius:8px; color:#fff; background:#7157bd; cursor:pointer; font-size:var(--text-2xs); font-weight:700; white-space:nowrap; }
-.project-settings-workflow-revision > footer > button:hover:not(:disabled) { background:#6349ad; }
-.project-settings-workflow-revision > footer > button:disabled { border-color:#ddd9e5; color:#9d99a4; background:#efedf2; cursor:not-allowed; }
+.project-settings-workflow-revision > footer > small { color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.45; }
+.project-settings-workflow-revision > footer > button { height:30px; padding:0 11px; flex:0 0 auto; font-size:var(--text-2xs); font-weight:700; }
 .project-settings-workflow-success,.project-settings-workflow-error { margin:10px 0 0 43px; font-size:var(--text-2xs); line-height:1.5; }
-.project-settings-workflow-success { display:flex; align-items:center; gap:5px; color:#33775f; }
-.project-settings-workflow-error { color:#b04455; }
-.project-settings-workflow-pause { margin-top:14px; padding:12px 13px; display:flex; align-items:center; justify-content:space-between; gap:14px; border:1px solid #dcd5ef; border-radius:10px; background:#f7f4ff; }
-.project-settings-workflow-pause > span { min-width:0; display:flex; align-items:center; gap:9px; color:#6b4fc1; }
+.project-settings-workflow-success { display:flex; align-items:center; gap:5px; color:var(--status-success-foreground); }
+.project-settings-workflow-error { color:var(--status-destructive-foreground); }
+.project-settings-workflow-pause { margin-top:14px; padding:12px 13px; display:flex; align-items:center; justify-content:space-between; gap:14px; border:1px solid var(--border); border-radius:10px; background:var(--accent); }
+.project-settings-workflow-pause > span { min-width:0; display:flex; align-items:center; gap:9px; color:var(--accent-foreground); }
 .project-settings-workflow-pause > span > span { min-width:0; display:grid; gap:3px; }
-.project-settings-workflow-pause strong { color:#534565; font-size:var(--text-2xs); }
-.project-settings-workflow-pause small { color:#877d9b; font-size:var(--text-2xs); line-height:1.4; }
+.project-settings-workflow-pause strong { color:var(--foreground); font-size:var(--text-2xs); }
+.project-settings-workflow-pause small { color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.4; }
 .project-settings-workflow-pause > .select-menu { min-width:210px; }
-.project-settings-checkpoints { margin-top:14px; overflow:hidden; border:1px solid #dcd5ef; border-radius:12px; background:#fbfaff; }
-.project-settings-checkpoints > header { padding:13px 14px; border-bottom:1px solid #e6e0f1; background:#f7f4ff; }
-.project-settings-checkpoints > header > span { display:flex; align-items:flex-start; gap:9px; color:#6b4fc1; }
+.project-settings-checkpoints { margin-top:14px; overflow:hidden; border:1px solid var(--border); border-radius:12px; background:var(--card); }
+.project-settings-checkpoints > header { padding:13px 14px; border-bottom:1px solid var(--border); background:var(--muted); }
+.project-settings-checkpoints > header > span { display:flex; align-items:flex-start; gap:9px; color:var(--accent-foreground); }
 .project-settings-checkpoints > header > span > span { display:grid; gap:3px; }
-.project-settings-checkpoints header strong { color:#534565; font-size:var(--text-xs); }
-.project-settings-checkpoints header small { color:#877d9b; font-size:var(--text-2xs); line-height:1.4; }
+.project-settings-checkpoints header strong { color:var(--foreground); font-size:var(--text-xs); }
+.project-settings-checkpoints header small { color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.4; }
 .project-settings-checkpoint-grid { display:grid; }
 .checkpoint-grid-header,.checkpoint-grid-row { display:grid; grid-template-columns:minmax(150px,1fr) minmax(210px,1.2fr) minmax(210px,1.2fr); align-items:center; }
-.checkpoint-grid-header { min-height:34px; padding:0 14px; color:#786d88; background:#f2eef8; font-size:var(--text-2xs); }
-.checkpoint-grid-row { min-height:54px; padding:8px 14px; border-top:1px solid #eee9f4; }
+.checkpoint-grid-header { min-height:34px; padding:0 14px; color:var(--muted-foreground); background:var(--muted); font-size:var(--text-2xs); }
+.checkpoint-grid-row { min-height:54px; padding:8px 14px; border-top:1px solid var(--border); }
 .checkpoint-stage { display:grid; gap:2px; }
-.checkpoint-stage strong { color:#40364d; font-size:var(--text-xs); }
-.checkpoint-stage small { color:#988da5; font-size:var(--text-2xs); }
+.checkpoint-stage strong { color:var(--foreground); font-size:var(--text-xs); }
+.checkpoint-stage small { color:var(--muted-foreground); font-size:var(--text-2xs); }
 .checkpoint-options { display:flex; flex-wrap:wrap; gap:7px; }
-.checkpoint-options label { min-height:28px; padding:4px 8px; display:inline-flex; align-items:center; gap:5px; border:1px solid #ded7e8; border-radius:8px; color:#665b72; background:#fff; font-size:var(--text-2xs); cursor:pointer; }
-.checkpoint-options label:has(input:checked) { color:#5c40ae; border-color:#b9a9e5; background:#f2edff; }
-.checkpoint-options label.locked { color:#735aa9; border-style:dashed; cursor:not-allowed; }
-.checkpoint-options input { accent-color:#6b4fc1; }
-.project-settings-checkpoints > footer { padding:10px 14px; color:#746a80; border-top:1px solid #e6e0f1; background:#faf8fd; font-size:var(--text-2xs); }
-.checkpoint-resume-context { padding:9px 11px; display:grid; gap:3px; border:1px solid #ded5f2; border-radius:9px; color:#6a5797; background:#f8f4ff; }
+.checkpoint-options label { min-height:28px; padding:4px 8px; display:inline-flex; align-items:center; gap:5px; border:1px solid var(--input); border-radius:8px; color:var(--muted-foreground); background:var(--card); font-size:var(--text-2xs); cursor:pointer; }
+.checkpoint-options label:has([data-state="checked"]) { color:var(--accent-foreground); border-color:color-mix(in srgb,var(--primary) 45%,var(--border)); background:var(--accent); }
+.checkpoint-options label.locked { color:var(--accent-foreground); border-style:dashed; cursor:not-allowed; }
+.project-settings-checkpoints > footer { padding:10px 14px; color:var(--muted-foreground); border-top:1px solid var(--border); background:var(--muted); font-size:var(--text-2xs); }
+.checkpoint-resume-context { padding:9px 11px; display:grid; gap:3px; border:1px solid var(--border); border-radius:9px; color:var(--accent-foreground); background:var(--accent); }
 .checkpoint-resume-context span { font-size:var(--text-2xs); font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
-.checkpoint-resume-context strong { color:#4f416c; font-size:var(--text-xs); line-height:1.4; }
+.checkpoint-resume-context strong { color:var(--foreground); font-size:var(--text-xs); line-height:1.4; }
 @media (max-width: 760px) {
   .checkpoint-grid-header { display:none; }
   .checkpoint-grid-row { grid-template-columns:1fr; gap:8px; }
-  .checkpoint-options::before { width:90px; color:#8b8097; font-size:var(--text-2xs); }
+  .checkpoint-options::before { width:90px; color:var(--muted-foreground); font-size:var(--text-2xs); }
   .checkpoint-options:nth-child(2)::before { content:"Project"; }
   .checkpoint-options:nth-child(3)::before { content:"My defaults"; }
 }
-.project-workflow-contract { margin-top:17px; overflow:hidden; border:1px solid #ddd9e9; border-radius:12px; background:#fbfaff; }
-.project-workflow-repository { min-width:0; min-height:38px; padding:0 13px; display:flex; align-items:center; gap:9px; border-bottom:1px solid #e4e0ed; background:#f4f1fa; }
-.project-workflow-repository > span:first-child { color:#827b8d; font-size:var(--text-2xs); }
-.project-workflow-repository > strong { overflow:hidden; color:#4e475b; font:500 var(--text-2xs) "DM Mono",monospace; text-overflow:ellipsis; white-space:nowrap; }
-.project-workflow-version { margin-left:auto; flex:0 0 auto; color:#8d849e; font:500 var(--text-2xs) "DM Mono",monospace; text-transform:uppercase; }
-.project-workflow-requirements { padding:14px; border-bottom:1px solid #e4e0ed; background:#fdfcff; }
+.project-workflow-contract { margin-top:17px; overflow:hidden; }
+.project-workflow-repository { min-width:0; min-height:38px; padding:0 13px; display:flex; align-items:center; gap:9px; border-bottom:1px solid var(--border); background:var(--muted); }
+.project-workflow-repository > span:first-child { color:var(--muted-foreground); font-size:var(--text-2xs); }
+.project-workflow-repository > strong { overflow:hidden; color:var(--foreground); font:500 var(--text-2xs) "DM Mono",monospace; text-overflow:ellipsis; white-space:nowrap; }
+.project-workflow-version { margin-left:auto; flex:0 0 auto; color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; text-transform:uppercase; }
+.project-workflow-requirements { padding:14px; border-bottom:1px solid var(--border); background:var(--card); }
 .project-workflow-requirements > header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.project-workflow-requirements > header > span { display:flex; align-items:center; gap:8px; color:#6b4fc1; }
+.project-workflow-requirements > header > span { display:flex; align-items:center; gap:8px; color:var(--accent-foreground); }
 .project-workflow-requirements > header > span > span { display:grid; gap:2px; }
-.project-workflow-requirements header strong { color:#534565; font-size:var(--text-2xs); }
-.project-workflow-requirements header small,.project-workflow-requirements > p { color:#8b8493; font-size:var(--text-2xs); }
-.project-workflow-requirements header button { width:29px; height:29px; display:grid; place-items:center; border:1px solid #ddd7e9; border-radius:8px; color:#756a88; background:var(--card); cursor:pointer; }
+.project-workflow-requirements header strong { color:var(--foreground); font-size:var(--text-2xs); }
+.project-workflow-requirements header small,.project-workflow-requirements > p { color:var(--muted-foreground); font-size:var(--text-2xs); }
 .project-workflow-requirements > ul { margin:11px 0 0; padding:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; list-style:none; }
-.project-workflow-requirements > ul > li { min-width:0; padding:10px; display:grid; grid-template-columns:27px minmax(0,1fr) auto; align-items:center; gap:8px; border:1px solid #e5e0ed; border-radius:9px; background:var(--card); }
+.project-workflow-requirements > ul > li { min-width:0; padding:10px; display:grid; grid-template-columns:27px minmax(0,1fr) auto; align-items:center; gap:8px; border:1px solid var(--border); border-radius:9px; background:var(--card); }
 .project-workflow-requirements li > i { width:27px; height:27px; display:grid; place-items:center; border-radius:8px; font-style:normal; }
-.project-workflow-requirements li > i.ok { color:#33886d; background:#e7f6f0; }
-.project-workflow-requirements li > i.warning { color:#af6e20; background:#fff4df; }
+.project-workflow-requirements li > i.ok { color:var(--status-success-foreground); background:var(--status-success-surface); }
+.project-workflow-requirements li > i.warning { color:var(--status-warning-foreground); background:var(--status-warning-surface); }
 .project-workflow-requirements li > span { min-width:0; display:grid; gap:2px; }
-.project-workflow-requirements li strong { color:#4c4655; font-size:var(--text-2xs); }
-.project-workflow-requirements li small,.project-workflow-requirements li p { color:#89838e; font-size:var(--text-2xs); line-height:1.4; }
-.project-workflow-requirements li code { color:#8b8298; font:500 var(--text-2xs) "DM Mono",monospace; }
-.project-workflow-requirements li > em { padding:3px 5px; border-radius:6px; color:#a46b26; background:#fff1d8; font-size:var(--text-2xs); font-style:normal; white-space:nowrap; }
-.project-workflow-requirements li > i.ok ~ em { color:#36866d; background:#e7f6f0; }
+.project-workflow-requirements li strong { color:var(--foreground); font-size:var(--text-2xs); }
+.project-workflow-requirements li small,.project-workflow-requirements li p { color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.4; }
+.project-workflow-requirements li code { color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
+.project-workflow-requirements li > em { padding:3px 5px; border-radius:6px; color:var(--status-warning-foreground); background:var(--status-warning-surface); font-size:var(--text-2xs); font-style:normal; white-space:nowrap; }
+.project-workflow-requirements li > i.ok ~ em { color:var(--status-success-foreground); background:var(--status-success-surface); }
 .project-workflow-requirements li > p { margin:0; grid-column:2 / -1; }
 .project-workflow-requirements > p { margin:10px 0 0 24px; }
 .project-workflow-diagram { min-width:0; padding:18px; }
 .project-workflow-stages { margin:0; padding:0 0 6px; overflow-x:auto; display:flex; align-items:stretch; list-style:none; scrollbar-width:thin; }
 .project-workflow-stages > li { min-width:0; flex:0 0 auto; display:flex; align-items:center; }
-.project-workflow-stage { width:190px; min-height:184px; flex:0 0 190px; padding:13px; display:flex; flex-direction:column; border:1px solid #ded9eb; border-radius:11px; background:var(--card); box-shadow:0 4px 14px rgba(74,57,119,.055); }
-.project-workflow-stage.optional { border-style:dashed; background:#fcfbfe; }
+.project-workflow-stage { width:190px; min-height:184px; flex:0 0 190px; padding:13px; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:11px; background:var(--card); box-shadow:var(--shadow-xs); }
+.project-workflow-stage.optional { border-style:dashed; background:var(--muted); }
 .project-workflow-stage > header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.project-workflow-stage > header > span { width:24px; height:24px; display:grid; place-items:center; border-radius:8px; color:#fff; background:linear-gradient(145deg,#7458c6,#9378df); font:600 var(--text-2xs) "DM Mono",monospace; box-shadow:0 4px 10px rgba(107,78,185,.2); }
-.project-workflow-stage > header > em { padding:3px 6px; border-radius:999px; color:#6b4fc1; background:#eee8ff; font-size:var(--text-2xs); font-style:normal; font-weight:700; letter-spacing:.25px; }
-.project-workflow-stage.optional > header > em { color:#77747e; background:#efeff1; }
-.project-workflow-stage > strong { margin-top:11px; color:#3f3a48; font-size:var(--text-2xs); line-height:1.45; }
-.project-workflow-stage > code { margin-top:3px; color:#918a9c; font:500 var(--text-2xs) "DM Mono",monospace; }
-.project-workflow-pause-badge { margin-top:8px; align-self:flex-start; padding:3px 6px; border-radius:999px; color:#fff; background:#6b4fc1; font-size:var(--text-2xs); font-weight:700; }
+.project-workflow-stage > header > span { width:24px; height:24px; display:grid; place-items:center; border-radius:8px; color:var(--primary-foreground); background:var(--primary); font:600 var(--text-2xs) "DM Mono",monospace; box-shadow:0 4px 10px var(--primary-shadow); }
+.project-workflow-stage > header > em { padding:3px 6px; border-radius:999px; color:var(--accent-foreground); background:var(--accent); font-size:var(--text-2xs); font-style:normal; font-weight:700; letter-spacing:.25px; }
+.project-workflow-stage.optional > header > em { color:var(--secondary-foreground); background:var(--secondary); }
+.project-workflow-stage > strong { margin-top:11px; color:var(--foreground); font-size:var(--text-2xs); line-height:1.45; }
+.project-workflow-stage > code { margin-top:3px; color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
+.project-workflow-pause-badge { margin-top:8px; align-self:flex-start; padding:3px 6px; border-radius:999px; color:var(--primary-foreground); background:var(--primary); font-size:var(--text-2xs); font-weight:700; }
 .project-workflow-stage-detail { margin-top:11px; display:grid; gap:5px; }
-.project-workflow-stage-detail > span { color:#8b8493; font-size:var(--text-2xs); font-weight:700; letter-spacing:.35px; text-transform:uppercase; }
+.project-workflow-stage-detail > span { color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:700; letter-spacing:.35px; text-transform:uppercase; }
 .project-workflow-stage-detail > ul { margin:0; padding:0; display:flex; flex-wrap:wrap; gap:4px; list-style:none; }
-.project-workflow-stage-detail > ul > li { max-width:100%; padding:3px 5px; overflow:hidden; border:1px solid #e4dfed; border-radius:5px; color:#6d6578; background:#f7f4fc; font:500 var(--text-2xs) "DM Mono",monospace; text-overflow:ellipsis; white-space:nowrap; }
+.project-workflow-stage-detail > ul > li { max-width:100%; padding:3px 5px; overflow:hidden; border:1px solid var(--border); border-radius:5px; color:var(--muted-foreground); background:var(--muted); font:500 var(--text-2xs) "DM Mono",monospace; text-overflow:ellipsis; white-space:nowrap; }
 .project-workflow-stage-detail > .project-workflow-checks { display:grid; }
 .project-workflow-stage-detail > .project-workflow-checks > li { white-space:normal; overflow-wrap:anywhere; }
-.project-workflow-connector { width:34px; flex:0 0 34px; display:grid; place-items:center; color:#9b8fbb; }
-.project-workflow-summary { margin-top:12px; padding-top:12px; display:flex; flex-wrap:wrap; gap:8px; border-top:1px solid #e4e0ed; }
-.project-workflow-summary > div { min-width:190px; min-height:48px; flex:1; padding:9px 11px; display:flex; align-items:center; gap:9px; border:1px solid #dcd5ef; border-radius:9px; color:#6b4fc1; background:#f4f0ff; }
+.project-workflow-connector { width:34px; flex:0 0 34px; display:grid; place-items:center; color:var(--muted-foreground); }
+.project-workflow-summary { margin-top:12px; padding-top:12px; display:flex; flex-wrap:wrap; gap:8px; border-top:1px solid var(--border); }
+.project-workflow-summary > div { min-width:190px; min-height:48px; flex:1; padding:9px 11px; display:flex; align-items:center; gap:9px; border:1px solid var(--border); border-radius:9px; color:var(--accent-foreground); background:var(--accent); }
 .project-workflow-summary > div > span { min-width:0; display:grid; gap:3px; }
-.project-workflow-summary small { color:#877d9b; font-size:var(--text-2xs); font-weight:700; letter-spacing:.35px; text-transform:uppercase; }
-.project-workflow-summary strong { overflow:hidden; color:#534565; font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
-.project-workflow-summary > .project-workflow-pause-summary { color:#6b4fc1; border-color:#dcd5ef; background:#f4f0ff; }
-.project-settings-empty { margin:15px 0 0; padding:18px; border:1px dashed #dddeda; border-radius:10px; color:var(--muted-foreground); background:#fafaf8; font-size:var(--text-2xs); text-align:center; }
+.project-workflow-summary small { color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:700; letter-spacing:.35px; text-transform:uppercase; }
+.project-workflow-summary strong { overflow:hidden; color:var(--foreground); font-size:var(--text-2xs); text-overflow:ellipsis; white-space:nowrap; }
+.project-workflow-summary > .project-workflow-pause-summary { color:var(--accent-foreground); border-color:var(--border); background:var(--accent); }
+.project-settings-empty { margin:15px 0 0; padding:18px; border:1px dashed var(--border); border-radius:10px; color:var(--muted-foreground); background:var(--muted); font-size:var(--text-2xs); text-align:center; }
 .delete-project-dialog { width:min(420px,calc(100vw - 48px)); padding:26px; border:1px solid #e6dadd; border-radius:18px; background:var(--card); box-shadow:0 30px 100px rgba(40, 42, 34, 0.2); animation:delete-dialog-in .18s cubic-bezier(.2,.8,.2,1); }
 @keyframes delete-dialog-in { from { opacity:0; transform:translateY(5px) scale(.985); } }
 .delete-project-dialog-icon { width:38px; height:38px; display:grid; place-items:center; border-radius:11px; color:#b84357; background:#ffebee; }

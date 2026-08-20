@@ -224,13 +224,17 @@ describe("ProjectSettings", () => {
     );
     expect(container.querySelector(".project-workflow-contract pre")).toBeNull();
     expect(container.querySelectorAll(".project-workflow-stage")).toHaveLength(3);
-    const implementingBefore = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Implement before project"]',
+    const implementingBefore = container.querySelector<HTMLButtonElement>(
+      'button[role="checkbox"][aria-label="Implement before project"]',
     );
-    const mandatoryUserBoundary = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Local validation after user"]',
+    const mandatoryUserBoundary = container.querySelector<HTMLButtonElement>(
+      'button[role="checkbox"][aria-label="Local validation after user"]',
     );
-    expect(mandatoryUserBoundary?.checked).toBe(true);
+    expect(
+      container.querySelector<HTMLElement>(".project-workflow-contract")?.className,
+    ).toContain("bg-card");
+    expect(implementingBefore?.className).toContain("bg-card");
+    expect(mandatoryUserBoundary?.getAttribute("aria-checked")).toBe("true");
     expect(mandatoryUserBoundary?.disabled).toBe(true);
     await act(async () => implementingBefore?.click());
     expect(onSaveCheckpointPolicy).toHaveBeenCalledWith(
@@ -277,6 +281,7 @@ describe("ProjectSettings", () => {
         ".project-settings-automation-actions button",
       ),
     ).find((button) => button.textContent?.includes("필요 도구 분석하기"));
+    expect(analyzeRequirementsButton?.className).toContain("bg-card");
     await act(async () => analyzeRequirementsButton?.click());
     expect(onAnalyzeWorkflowRequirements).toHaveBeenCalledOnce();
     expect(container.textContent).toContain(
