@@ -1207,13 +1207,21 @@ describe("Worker HTTP contract", () => {
     expect(workerSettingsSchema.parse({ icon: null })).toEqual({ icon: null });
   });
 
-  it("accepts Worker provider usage health during registration", () => {
+  it("accepts Worker provider usage health and all supported providers during registration", () => {
     expect(
       workerRegisterSchema.parse({
         label: "janet",
         deviceIdentity: `briar_device_${"a".repeat(64)}`,
         agentProvider: "codex",
-        providers: ["codex", "claude"],
+        providers: [
+          "codex",
+          "claude",
+          "cursor",
+          "grok",
+          "agy",
+          "opencode",
+          "openrouter",
+        ],
         providerHealth: {
           codex: {
             installed: true,
@@ -1275,6 +1283,15 @@ describe("Worker HTTP contract", () => {
         versions: { briar: "1.2.116" },
       }),
     ).toMatchObject({
+      providers: [
+        "codex",
+        "claude",
+        "cursor",
+        "grok",
+        "agy",
+        "opencode",
+        "openrouter",
+      ],
       providerHealth: {
         codex: { usageExhausted: false, maxUsedPercent: 3 },
         claude: { usageExhausted: false, maxUsedPercent: null },
