@@ -21,6 +21,7 @@ import {
   repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
 import {
+  assertCanonicalMergeWaitCheckpoint,
   MERGE_GROUP_CI_CAPABILITY,
   MERGE_GROUP_CI_PROTOCOL,
   MERGE_GROUP_STATUS_CONTEXTS,
@@ -140,6 +141,10 @@ import {
   type CommandRunner as MergeGroupCommandRunner,
 } from "./merge-group-validation";
 import {
+  doctorMergeQueue,
+  enqueuePullRequestExact,
+} from "./merge-queue";
+import {
   sameApiEnvironment,
   selectProjectForApi,
 } from "./config-environment";
@@ -176,6 +181,7 @@ import {
 import {
   briarIssueUrl,
   ensureBriarIssueLinkInGithubPullRequest,
+  githubPullRequestTarget,
 } from "./github-pr";
 import {
   configErrorLocations,
@@ -3294,6 +3300,42 @@ const runMergeGroupCommand: MergeGroupCommandRunner = (
   };
 };
 
+async function mergeQueueDoctorCommand() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  assertCanonicalMergeWaitCheckpoint(configuredWorkflow(project));
+  const repository = project.autoHunt?.githubRepository;
+  if (!repository) {
+    throw new Error("The project does not have a connected GitHub repository");
+  }
+  console.log(JSON.stringify(doctorMergeQueue(runMergeGroupCommand, {
+    repository,
+    baseBranch: value("--base-branch") ?? "main",
+  })));
+}
+
+async function mergeQueueEnqueueCommand() {
+  const config = await loadConfig();
+  const project = await currentProject(config);
+  assertCanonicalMergeWaitCheckpoint(configuredWorkflow(project));
+  const repository = project.autoHunt?.githubRepository;
+  if (!repository) {
+    throw new Error("The project does not have a connected GitHub repository");
+  }
+  const baseBranch = value("--base-branch") ?? "main";
+  doctorMergeQueue(runMergeGroupCommand, { repository, baseBranch });
+  const pullRequestUrl = required("--pull-request");
+  const target = githubPullRequestTarget(pullRequestUrl);
+  if (!target || `${target.owner}/${target.repository}`.toLowerCase() !==
+      repository.toLowerCase()) {
+    throw new Error("The pull request does not belong to the connected repository");
+  }
+  console.log(JSON.stringify(enqueuePullRequestExact(runMergeGroupCommand, {
+    pullRequestUrl,
+    expectedBaseBranch: baseBranch,
+  })));
+}
+
 async function runClaimedMergeGroupValidation(input: {
   config: Config;
   project: ProjectConfig;
@@ -4278,6 +4320,9 @@ const usage = `Briar CLI
     [--limit <1-100>] [--cursor <message-uuid>]
     [--parent-message-id <root-message-uuid>]
   briar workflow show
+  briar merge-queue doctor [--base-branch <branch>]
+  briar merge-queue enqueue --pull-request <GitHub URL>
+    [--base-branch <branch>]
   briar queue claim [--run <uuid>] [--workspace <project|worktree|current|none>]
     [--base-branch <ref>]
   briar worktree show
@@ -4372,6 +4417,12 @@ async function main() {
     return changeIssueDependencyCommand("remove");
   }
   if (args[0] === "workflow" && args[1] === "show") return showWorkflow();
+  if (args[0] === "merge-queue" && args[1] === "doctor") {
+    return mergeQueueDoctorCommand();
+  }
+  if (args[0] === "merge-queue" && args[1] === "enqueue") {
+    return mergeQueueEnqueueCommand();
+  }
   if (args[0] === "queue" && args[1] === "claim") return claimWork();
   if (args[0] === "worktree" && args[1] === "show") return worktreeShow();
   if (args[0] === "worktree" && args[1] === "list") return worktreeList();

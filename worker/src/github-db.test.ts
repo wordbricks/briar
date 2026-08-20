@@ -47,7 +47,7 @@ const nextDeliveryId = () => {
 
 type Checkpoint = {
   key: string;
-  stage: "implementing" | "pr_open";
+  stage: "implementing" | "pr_open" | "merged";
   position: "before" | "after";
 };
 
@@ -104,6 +104,21 @@ const workflowFor = (checkpoint: Checkpoint) => {
         {
           id: "staging_qa",
           label: "Staging QA",
+          required: false,
+          evidence: [],
+        },
+      ]
+    : checkpoint.stage === "merged"
+    ? [
+        {
+          id: "pr_open",
+          label: "Pull request",
+          required: false,
+          evidence: [],
+        },
+        {
+          id: "merged",
+          label: "Merge",
           required: false,
           evidence: [],
         },
@@ -1514,8 +1529,12 @@ describe("GitHub pull request D1 integration", () => {
     ).resolves.toBe(0);
   });
 
-  it("waits for every current pull request to merge before resuming", async () => {
-    const scenario = await createScenario();
+  it("waits for every current pull request at the canonical merge checkpoint", async () => {
+    const scenario = await createScenario({
+      key: "project-before-merged",
+      stage: "merged",
+      position: "before",
+    });
     const first = await addPullRequestEvidence(scenario);
     const second = await addPullRequestEvidence(scenario);
     await pauseAtConfiguredCheckpoint(scenario);

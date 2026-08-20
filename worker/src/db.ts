@@ -20,6 +20,10 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../../src/lib/agent-result";
+import {
+  MERGE_WAIT_CHECKPOINT,
+  MERGE_WAIT_CHECKPOINT_KEYS,
+} from "../../src/lib/merge-group-validation-contract";
 import { inboxSessionMessageVersion } from "../../src/lib/inbox-session-version";
 import type { AgentExecutionCostRecord } from "../../src/lib/agent-execution-cost";
 import type {
@@ -11309,14 +11313,20 @@ export async function resumeRunAfterGithubMerge(
       `select checkpoint_key, attempt, revision
        from briar_run_checkpoint_progress
        where run_id = ? and attempt = ? and revision = ?
-         and checkpoint_key = ? and stage_id = 'pr_open'
-         and position = 'after' and state = 'waiting'`,
+         and checkpoint_key = ? and state = 'waiting'
+         and (
+           (stage_id = 'pr_open' and position = 'after')
+           or (checkpoint_key in (?, ?) and stage_id = ? and position = ?)
+         )`,
     )
     .bind(
       run.id,
       run.current_attempt,
       run.current_revision,
       run.waiting_checkpoint_key,
+      ...MERGE_WAIT_CHECKPOINT_KEYS,
+      MERGE_WAIT_CHECKPOINT.stage,
+      MERGE_WAIT_CHECKPOINT.position,
     )
     .first<Pick<
       WorkflowCheckpointProgressRow,
@@ -11374,7 +11384,7 @@ export async function reconcileGithubMergedRuns(
        where run.status = 'running'
          and run.paused_at is not null
          and run.resume_requested_at is null
-         and run.workflow_stage = 'pr_open'
+         and run.workflow_stage in ('pr_open', 'merged')
          and exists (
            select 1 from briar_run_pull_requests link
            where link.project_id = run.project_id and link.run_id = run.id
@@ -11446,8 +11456,16 @@ export async function reconcileGithubMergedRuns(
                and checkpoint.attempt = run.current_attempt
                and checkpoint.revision = run.current_revision
                and checkpoint.checkpoint_key = run.waiting_checkpoint_key
-               and checkpoint.stage_id = 'pr_open'
-               and checkpoint.position = 'after'
+               and (
+                 (checkpoint.stage_id = 'pr_open' and checkpoint.position = 'after')
+                 or (
+                   checkpoint.checkpoint_key in (
+                     'issue-before-merged', 'project-before-merged'
+                   )
+                   and checkpoint.stage_id = 'merged'
+                   and checkpoint.position = 'before'
+                 )
+               )
                and checkpoint.state = 'waiting'
            )
          )

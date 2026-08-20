@@ -18,13 +18,17 @@ export const MERGE_WAIT_CHECKPOINT = {
   stage: "merged",
   position: "before",
 } as const;
+export const MERGE_WAIT_CHECKPOINT_KEYS = [
+  "issue-before-merged",
+  "project-before-merged",
+] as const;
 
 export function hasCanonicalMergeWaitCheckpoint(
   workflow: Pick<AutoHuntWorkflow, "stages" | "execution">,
 ) {
   return workflow.stages.some((stage) => stage.id === MERGE_WAIT_CHECKPOINT.stage) &&
     workflow.execution.checkpoints.some((checkpoint) =>
-      checkpoint.key === MERGE_WAIT_CHECKPOINT.key &&
+      MERGE_WAIT_CHECKPOINT_KEYS.some((key) => checkpoint.key === key) &&
       checkpoint.stage === MERGE_WAIT_CHECKPOINT.stage &&
       checkpoint.position === MERGE_WAIT_CHECKPOINT.position
     );
@@ -35,7 +39,7 @@ export function assertCanonicalMergeWaitCheckpoint(
 ) {
   if (!hasCanonicalMergeWaitCheckpoint(workflow)) {
     throw new Error(
-      "Merge queue requires the issue-before-merged checkpoint before the merged stage",
+      "Merge queue requires the canonical before-merged checkpoint",
     );
   }
 }
