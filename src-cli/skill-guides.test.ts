@@ -51,6 +51,8 @@ describe("bundled skill guides", () => {
     expect(guide?.markdown).toContain("# Browser Automation");
     expect(guide?.markdown).toContain("ego-browser nodejs");
     expect(guide?.markdown).toContain("agent-browser skills get core --full");
+    expect(guide?.markdown).toContain("aside mcp --help");
+    expect(guide?.markdown).toContain("## Verification with Aside");
     expect(guide?.markdown).toContain("{{BROWSER_AUTOMATION_PROVIDER}}");
     expect(guide?.markdown).toContain("Briar Settings → Browser");
     expect(guide?.markdown).toContain("briar run evidence add");
@@ -67,7 +69,7 @@ describe("bundled skill guides", () => {
     expect(configured).toContain(
       "selected **`agent-browser`** in **Briar Settings → Browser**",
     );
-    expect(configured).toContain("Never switch to the other browser tool automatically");
+    expect(configured).toContain("Never switch to another browser tool automatically");
     expect(configured).not.toContain("{{BROWSER_AUTOMATION_PROVIDER}}");
   });
 

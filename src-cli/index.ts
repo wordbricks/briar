@@ -342,7 +342,7 @@ const configSchema = z
       .object({
         preventSleepWhileRunning: z.boolean().default(false),
         browserAutomationProvider: z
-          .enum(["ego-browser", "agent-browser"])
+          .enum(["ego-browser", "agent-browser", "aside"])
           .default("ego-browser"),
       })
       .passthrough()
@@ -371,13 +371,18 @@ function providerExecutionEnvironment(
   provider: AgentProvider,
   environment: NodeJS.ProcessEnv,
 ): NodeJS.ProcessEnv {
-  if (provider !== "openrouter") return environment;
+  const browserEnvironment = {
+    ...environment,
+    BRIAR_BROWSER_AUTOMATION_PROVIDER:
+      config.appSettings.browserAutomationProvider,
+  };
+  if (provider !== "openrouter") return browserEnvironment;
   const apiKey = config.openrouterApiKey?.trim();
   if (!apiKey) {
     throw new Error("앱 설정에서 OpenRouter API 키를 먼저 저장하세요.");
   }
   return {
-    ...environment,
+    ...browserEnvironment,
     OPENROUTER_API_KEY: apiKey,
     OPENCODE_CONFIG_CONTENT: openRouterOpenCodeConfig,
   };
