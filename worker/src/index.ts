@@ -558,15 +558,9 @@ import {
   decodeDispatchRun,
   decodeExecutionWorkerPolicy,
   decodeIssueReplyClaimInput,
-  decodeMergeBatchEnqueueInput,
-  decodeMergeBatchFailureInput,
-  decodeMergeBatchGroupInput,
-  decodeMergeBatchLeaseInput,
-  decodeMergeBatchValidationInput,
   decodeLeaseRenew,
   decodeProjectAgentScheduleRunCompletion,
   decodeProjectAgentScheduleRunRenew,
-  decodeRepositoryMergePolicyInput,
   decodeWorkerBind,
   decodeWorkerClaimInput,
   decodeWorkerConcurrency,
@@ -575,18 +569,6 @@ import {
   decodeWorkerRegister,
   decodeWorkerSettings,
 } from "./worker-request-contract";
-import {
-  claimNextMergeBatch,
-  completeMergeBatchValidation,
-  failMergeBatch,
-  observeMergedBatchPullRequest,
-  recordMergeBatchMemberEnqueued,
-  recordMergeGroup,
-  registerReadyMergeCandidate,
-  retryMergeBatch,
-  renewMergeBatchLease,
-  suspendRunForMergeBatch,
-} from "./merge-batches";
 import {
   decodeWorkerUpdateHandoff,
   decodeWorkerUpdatePrepare,
@@ -3939,7 +3921,6 @@ async function handleGithubWebhookRequest(request: Request, env: Env) {
       draft: event.draft,
       headSha: event.headSha,
       baseSha: event.baseSha,
-      baseBranch: event.baseBranch,
       mergeCommitSha: event.mergeCommitSha,
       openedAt: event.createdAt,
       closedAt: event.closedAt,
@@ -3950,14 +3931,6 @@ async function handleGithubWebhookRequest(request: Request, env: Env) {
       observedAt: claimedAt,
       organizationId: connection?.organization_id ?? null,
     });
-    if (event.state === "merged" && event.mergedAt) {
-      await observeMergedBatchPullRequest(env.DB, {
-        repositoryId: event.repositoryId,
-        pullRequestNumber: event.number,
-        headSha: event.headSha,
-        mergedAt: event.mergedAt,
-      });
-    }
     // The signed provider snapshot includes its exact Briar issue links. A PR
     // evidence request that commits after this handler can consume that
     // snapshot, so successful deliveries are safe to complete even when no
@@ -12471,101 +12444,6 @@ async function route(
     });
   }
 
-  const repositoryMergePolicyMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/merge-policy$/u,
-  );
-  if (repositoryMergePolicyMatch && ["GET", "PUT"].includes(request.method)) {
-    const projectId = await requireAgentProject(db, request);
-    if (projectId !== repositoryMergePolicyMatch[1]) {
-      throw new HttpError(403, "Merge policy belongs to another project");
-    }
-    if (request.method === "GET") {
-      const policy = await db.prepare(
-        `select repository_id, repository, base_branch, enabled,
-                quiet_window_ms, validation_command, status_contexts_json,
-                created_at, updated_at
-         from briar_repository_merge_policies
-         where project_id = ?
-         order by enabled desc, updated_at desc limit 1`,
-      ).bind(projectId).first<{
-        repository_id: number;
-        repository: string;
-        base_branch: string;
-        enabled: number;
-        quiet_window_ms: number;
-        validation_command: string;
-        status_contexts_json: string;
-        created_at: string;
-        updated_at: string;
-      }>();
-      return json({
-        policy: policy
-          ? {
-              repositoryId: policy.repository_id,
-              repository: policy.repository,
-              baseBranch: policy.base_branch,
-              enabled: policy.enabled === 1,
-              quietWindowMs: policy.quiet_window_ms,
-              validationCommand: policy.validation_command,
-              statusContexts: JSON.parse(policy.status_contexts_json),
-              createdAt: policy.created_at,
-              updatedAt: policy.updated_at,
-            }
-          : null,
-      });
-    }
-    const input = decodeRepositoryMergePolicyInput(await readJson(request));
-    const observedAt = new Date().toISOString();
-    await db.prepare(
-      `insert into briar_repository_merge_policies (
-         project_id, repository_id, repository, base_branch, enabled,
-         quiet_window_ms, validation_command, status_contexts_json,
-         created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       on conflict(project_id, repository_id, base_branch) do update set
-         repository = excluded.repository,
-         enabled = excluded.enabled,
-         quiet_window_ms = excluded.quiet_window_ms,
-         validation_command = excluded.validation_command,
-         status_contexts_json = excluded.status_contexts_json,
-         updated_at = excluded.updated_at`,
-    ).bind(
-      projectId,
-      input.repositoryId,
-      input.repository.toLowerCase(),
-      input.baseBranch,
-      input.enabled ? 1 : 0,
-      input.quietWindowMs,
-      input.validationCommand,
-      JSON.stringify(input.statusContexts),
-      observedAt,
-      observedAt,
-    ).run();
-    return json({ policy: { ...input, updatedAt: observedAt } });
-  }
-
-  const retryMergeBatchMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/merge-batches\/([0-9a-f-]+)\/retry$/u,
-  );
-  if (retryMergeBatchMatch && request.method === "POST") {
-    const projectId = await requireAgentProject(db, request);
-    if (projectId !== retryMergeBatchMatch[1]) {
-      throw new HttpError(403, "Merge batch belongs to another project");
-    }
-    const result = await retryMergeBatch(db, {
-      projectId,
-      batchId: retryMergeBatchMatch[2],
-      observedAt: new Date().toISOString(),
-    });
-    if (!result) {
-      throw new HttpError(
-        409,
-        "Only a failed current-revision merge batch can be retried",
-      );
-    }
-    return json({ batchId: result.id, state: result.state });
-  }
-
   if (pathname === "/worker-claims" && request.method === "POST") {
     const input = decodeWorkerClaimInput(await readJson(request));
     const authenticatedWorker = await requireWorkerProjectBinding(
@@ -12575,10 +12453,6 @@ async function route(
       input.workerId,
     );
     const claimRoutes = [
-      {
-        pathname: "/merge-batch-claims",
-        body: input,
-      },
       {
         pathname: "/issue-reply-claims",
         body: input,
@@ -12621,166 +12495,6 @@ async function route(
       if (result.work !== null) return json({ work: result.work });
     }
     return json({ work: null, retryAfterMs: 15_000 });
-  }
-
-  if (pathname === "/merge-batch-claims" && request.method === "POST") {
-    const input = decodeWorkerClaimInput(await readJson(request));
-    const authenticatedWorker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-      workerClaimContext,
-    );
-    const claimedAt = new Date().toISOString();
-    if (
-      workerStateAt(
-        authenticatedWorker.binding.last_heartbeat_at,
-        claimedAt,
-        authenticatedWorker.binding.state,
-      ) !== "online" ||
-      authenticatedWorker.binding.accepting_work !== 1 ||
-      authenticatedWorker.binding.readiness_state === "needs_attention"
-    ) {
-      throw new HttpError(409, "Worker is not ready to coordinate merges");
-    }
-    const claimToken =
-      `briar_merge_batch_claim_${crypto.randomUUID().replaceAll("-", "")}` +
-      crypto.randomUUID().replaceAll("-", "");
-    const claimed = await claimNextMergeBatch(db, input.projectId, {
-      workerId: authenticatedWorker.binding.id,
-      claimedBy: input.claimedBy,
-      claimTokenHash: await sha256(claimToken),
-      claimedAt,
-      leaseExpiresAt: leaseExpiryFrom(claimedAt),
-    });
-    if (!claimed) return json({ work: null });
-    const policy = await db.prepare(
-      `select validation_command, status_contexts_json
-       from briar_repository_merge_policies
-       where project_id = ? and repository_id = ? and base_branch = ?`,
-    ).bind(
-      input.projectId,
-      claimed.batch.repository_id,
-      claimed.batch.base_branch,
-    ).first<{
-      validation_command: string;
-      status_contexts_json: string;
-    }>();
-    if (!policy) {
-      throw new HttpError(409, "Repository merge policy is no longer enabled");
-    }
-    return json({
-      work: {
-        workType: "mergeBatch",
-        workId: claimed.batch.id,
-        runId: claimed.batch.id,
-        sourceKey:
-          `merge-batch:${claimed.batch.repository}:${claimed.batch.base_branch}:${claimed.batch.id}`,
-        title:
-          `${claimed.batch.repository}:${claimed.batch.base_branch} merge batch`,
-        claimToken,
-        claimAttempts: claimed.batch.claim_attempts,
-        claimedAt: claimed.batch.claimed_at,
-        leaseExpiresAt: claimed.batch.lease_expires_at,
-        state: claimed.batch.state,
-        repository: claimed.batch.repository,
-        repositoryId: claimed.batch.repository_id,
-        baseBranch: claimed.batch.base_branch,
-        mergeGroupRef: claimed.batch.merge_group_ref,
-        mergeGroupSha: claimed.batch.merge_group_sha,
-        validationCommand: policy.validation_command,
-        statusContexts: JSON.parse(policy.status_contexts_json),
-        members: claimed.members.map((member) => ({
-          id: member.id,
-          runId: member.run_id,
-          attempt: member.attempt,
-          revision: member.revision,
-          pullRequestId: member.pull_request_id,
-          pullRequestNodeId: member.pull_request_node_id,
-          pullRequestNumber: member.pull_request_number,
-          pullRequestUrl: member.pull_request_url,
-          frozenHeadSha: member.frozen_head_sha,
-          state: member.state,
-          queueEntryId: member.queue_entry_id,
-        })),
-      },
-    });
-  }
-
-  const mergeBatchOperationMatch = pathname.match(
-    /^\/merge-batch-claims\/([0-9a-f-]+)\/(lease|enqueue|merge-group|validation|failure)$/u,
-  );
-  if (mergeBatchOperationMatch && request.method === "POST") {
-    const batchId = mergeBatchOperationMatch[1];
-    const operation = mergeBatchOperationMatch[2];
-    const raw = await readJson(request);
-    const observedAt = new Date().toISOString();
-    const fenceFor = async (input: {
-      projectId: string;
-      workerId: string;
-      claimToken: string;
-    }) => {
-      const authenticatedWorker = await requireWorkerProjectBinding(
-        db,
-        request,
-        input.projectId,
-        input.workerId,
-        workerClaimContext,
-      );
-      return {
-        batchId,
-        projectId: input.projectId,
-        workerId: authenticatedWorker.binding.id,
-        claimTokenHash: await sha256(input.claimToken),
-      };
-    };
-    let result: unknown;
-    if (operation === "lease") {
-      const input = decodeMergeBatchLeaseInput(raw);
-      result = await renewMergeBatchLease(db, {
-          ...await fenceFor(input),
-          authenticatedAt: observedAt,
-          leaseExpiresAt: leaseExpiryFrom(observedAt),
-      });
-    } else if (operation === "enqueue") {
-      const input = decodeMergeBatchEnqueueInput(raw);
-      result = await recordMergeBatchMemberEnqueued(db, {
-        ...await fenceFor(input),
-        candidateId: input.candidateId,
-        expectedHeadSha: input.expectedHeadSha,
-        queueEntryId: input.queueEntryId,
-        observedAt,
-      });
-    } else if (operation === "merge-group") {
-      const input = decodeMergeBatchGroupInput(raw);
-      result = await recordMergeGroup(db, {
-        ...await fenceFor(input),
-        mergeGroupRef: input.mergeGroupRef,
-        mergeGroupSha: input.mergeGroupSha,
-        observedAt,
-      });
-    } else if (operation === "validation") {
-      const input = decodeMergeBatchValidationInput(raw);
-      result = await completeMergeBatchValidation(db, {
-        ...await fenceFor(input),
-        mergeGroupSha: input.mergeGroupSha,
-        observedAt,
-      });
-    } else {
-      const input = decodeMergeBatchFailureInput(raw);
-      result = await failMergeBatch(db, {
-        ...await fenceFor(input),
-        outcome: input.outcome,
-        code: input.code,
-        detail: input.detail,
-        observedAt,
-      });
-    }
-    if (!result) {
-      throw new HttpError(409, "Merge batch claim or exact SHA fence changed");
-    }
-    return json(operation === "lease" ? { leaseExpiresAt: result } : { batch: result });
   }
 
   if (pathname === "/issue-reply-claims" && request.method === "POST") {
@@ -14637,55 +14351,10 @@ async function route(
               agentStageLifecycleMatch[1],
             )
           : null;
-      let mergeBatch: { candidateId: string } | null = null;
-      if (
-        agentStageLifecycleMatch[3] === "complete" &&
-        agentStageLifecycleMatch[2] === "ci_qa" &&
-        ["completed", "already_completed"].includes(result.outcome)
-      ) {
-        const policy = await db.prepare(
-          `select policy.base_branch, policy.quiet_window_ms
-           from briar_hunt_runs run
-           join briar_run_pull_requests link
-             on link.project_id = run.project_id and link.run_id = run.id
-            and link.attempt = run.current_attempt
-            and link.revision = run.current_revision
-           join briar_repository_merge_policies policy
-             on policy.project_id = run.project_id
-            and policy.repository_id = link.repository_id
-            and policy.base_branch = coalesce(link.base_branch, 'main')
-            and policy.enabled = 1
-           where run.project_id = ? and run.id = ?
-           limit 1`,
-        ).bind(projectId, agentStageLifecycleMatch[1]).first<{
-          base_branch: string;
-          quiet_window_ms: number;
-        }>();
-        if (policy) {
-          const observedAt = new Date().toISOString();
-          const candidate = await registerReadyMergeCandidate(db, {
-            projectId,
-            runId: agentStageLifecycleMatch[1],
-            readyAt: observedAt,
-            baseBranch: policy.base_branch,
-            quietWindowMs: policy.quiet_window_ms,
-          });
-          if (candidate && await suspendRunForMergeBatch(db, {
-            projectId,
-            runId: agentStageLifecycleMatch[1],
-            attempt: result.attempt!,
-            revision: result.revision!,
-            observedAt,
-          })) {
-            mergeBatch = { candidateId: candidate.id };
-          }
-        }
-      }
       return json({
         runId: agentStageLifecycleMatch[1],
         requestId: input.requestId,
         ...result,
-        ...(mergeBatch ? { outcome: "delegated", mergeBatch } : {}),
         ...(githubAutoResume ? { githubAutoResume } : {}),
       });
     } catch (error) {

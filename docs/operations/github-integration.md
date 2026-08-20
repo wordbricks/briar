@@ -93,12 +93,6 @@ readiness. The local `gh` login is still required for a worker to push branches
 and create or inspect pull requests; the GitHub App connection supplies signed
 inbound events.
 
-The same separation applies to repository merge coordination. The App remains
-pull-request read-only; a selected Worker's authenticated `gh` performs exact-
-head queue admission and status publication without administrator bypass. The
-native queue setup is described in
-[`repository-merge-queue.md`](repository-merge-queue.md).
-
 ## 4. Link a project and pull request
 
 The Briar project must have a GitHub repository in `owner/repository` form. The
@@ -136,10 +130,6 @@ unverifiable evidence safe.
 For a current run revision with multiple linked PRs, Briar waits until all of
 them are merged. Links from an earlier attempt or revision cannot approve a
 newer checkpoint.
-
-Merge batches retain each original PR as the immutable run identity. Briar does
-not create an aggregate PR: once GitHub's queue merges an original PR, the same
-signed webhook path updates its stored link and resumes that current revision.
 
 ## State and retry behavior
 
