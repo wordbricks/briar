@@ -325,6 +325,7 @@ export type ProjectAgentTaskJobRow = {
   claimed_at: string | null;
   lease_expires_at: string | null;
   attempts: number;
+  planned_update_resume: number;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -464,6 +465,7 @@ export type HuntRunRow = {
   claimed_at: string | null;
   lease_expires_at: string | null;
   claim_attempts: number;
+  planned_update_resume: number;
   last_execution_id: string | null;
   paused_at: string | null;
   resume_requested_at: string | null;
@@ -787,6 +789,7 @@ export type IssueAgentReplyJobRow = {
   claimed_at: string | null;
   lease_expires_at: string | null;
   attempts: number;
+  planned_update_resume: number;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -5226,7 +5229,8 @@ export async function claimNextProjectAgentTask(
       `update briar_project_agent_task_jobs
        set status = 'running', claimed_worker_id = ?,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
-           attempts = attempts + 1, error = null, updated_at = ?
+           attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
+           planned_update_resume = 0, error = null, updated_at = ?
        where id = (
          select job.id
          from briar_project_agent_task_jobs job
@@ -8150,7 +8154,8 @@ export async function claimNextIssueAgentReply(
              else ?
            end,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
-           attempts = attempts + 1, error = null, updated_at = ?
+           attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
+           planned_update_resume = 0, error = null, updated_at = ?
        where id = (
          select job.id
          from briar_issue_agent_reply_jobs job
@@ -10144,7 +10149,10 @@ export async function claimNextQueuedHuntRun(
     .prepare(
       `update briar_hunt_runs
        set claim_token_hash = ?, claimed_by = ?, claimed_at = ?,
-           lease_expires_at = ?, claim_attempts = claim_attempts + 1,
+           lease_expires_at = ?,
+           claim_attempts = claim_attempts +
+             case when planned_update_resume = 1 then 0 else 1 end,
+           planned_update_resume = 0,
            last_execution_id = ?,
            worker_id = ?,
            status = case

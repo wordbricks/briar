@@ -469,10 +469,30 @@ export function OrganizationWorkersSettings({
                     {mayManage ? (
                       <div className="ml-auto flex items-center gap-1.5">
                         {worker.updateRequest ? (
-                          <Badge variant="warning">
-                            {t("organization.workerUpdatePending", {
-                              version: worker.updateRequest.targetVersion,
-                            })}
+                          <Badge
+                            title={
+                              worker.updateRequest.handoffState === "failed"
+                                ? t("organization.workerUpdateDelayedWithReason", {
+                                    version: worker.updateRequest.targetVersion,
+                                    reason:
+                                      worker.updateRequest.handoffError ??
+                                      t("organization.workerUpdateDelayed"),
+                                  })
+                                : undefined
+                            }
+                            variant={
+                              worker.updateRequest.handoffState === "failed"
+                                ? "destructive"
+                                : "warning"
+                            }
+                          >
+                            {worker.updateRequest.handoffState === "failed"
+                              ? t("organization.workerUpdateDelayed", {
+                                  version: worker.updateRequest.targetVersion,
+                                })
+                              : t("organization.workerUpdatePending", {
+                                  version: worker.updateRequest.targetVersion,
+                                })}
                           </Badge>
                         ) : null}
                         <Button
@@ -484,7 +504,8 @@ export function OrganizationWorkersSettings({
                             worker.state !== "online" ||
                             !worker.remoteUpdateSupported ||
                             !updateAvailable ||
-                            Boolean(worker.updateRequest)
+                            (Boolean(worker.updateRequest) &&
+                              worker.updateRequest?.handoffState !== "failed")
                           }
                           onClick={() => void requestUpdate(worker)}
                           size="icon-sm"

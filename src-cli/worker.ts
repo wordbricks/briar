@@ -61,6 +61,26 @@ export type WorkerClaimOptions = {
   repliesOnly?: boolean;
 };
 
+export type WorkerLoopUpdateDirective = {
+  id: string;
+  targetVersion: string;
+  status: "requested";
+  requestedAt: string;
+  handoffState?: "idle" | "draining" | "ready" | "failed";
+};
+
+export type WorkerExecutionCheckpoint = {
+  conversationId?: string | null;
+  workspacePath?: string | null;
+};
+
+export class WorkerUpdateDrainError extends Error {
+  constructor() {
+    super("Worker is draining for a planned update");
+    this.name = "WorkerUpdateDrainError";
+  }
+}
+
 export const isReplyWork = (
   issue: Pick<ClaimedIssue, "workType">,
 ): boolean => issue.workType === "issueReply" || issue.workType === "channelReply";
@@ -77,9 +97,20 @@ export type WorkerLoopDependencies = {
   ) => Promise<{
     acceptingWork?: boolean;
     maxConcurrentSessions?: number;
+    updateDirective?: WorkerLoopUpdateDirective | null;
   } | void>;
   /** Run the agent for one claimed issue. */
-  runIssue: (issue: ClaimedIssue, signal: AbortSignal) => Promise<void>;
+  runIssue: (
+    issue: ClaimedIssue,
+    signal: AbortSignal,
+    checkpoint: (value: WorkerExecutionCheckpoint) => void,
+  ) => Promise<void>;
+  /** Atomically release one claim to the next Worker after its provider stops. */
+  handoff?: (
+    issue: ClaimedIssue,
+    requestId: string,
+    checkpoint: WorkerExecutionCheckpoint,
+  ) => Promise<void>;
   /**
    * Wait, returning early when `signal` aborts. The lease-renewal wait must be
    * interruptible: otherwise a finished issue still holds the loop for a full
@@ -236,9 +267,11 @@ export async function runWorkerLoop(
   let lastHeartbeatAt = Number.NEGATIVE_INFINITY;
   const active = new Map<
     string,
-    Promise<{ issue: ClaimedIssue; error: unknown | null }>
+    Promise<{ issue: ClaimedIssue; error: unknown | null; handedOff: boolean }>
   >();
+  const activeControllers = new Map<string, AbortController>();
   let activeSlotCount = 0;
+  let updateDirective: WorkerLoopUpdateDirective | null = null;
   const serialTails = new Map<string, Promise<void>>();
   const executionKey = (issue: ClaimedIssue) =>
     issue.workId ?? issue.executionId ?? `${issue.runId}:${issue.claimToken}`;
@@ -247,7 +280,11 @@ export async function runWorkerLoop(
 
   const applyHeartbeat = (
     heartbeat:
-      | { acceptingWork?: boolean; maxConcurrentSessions?: number }
+      | {
+          acceptingWork?: boolean;
+          maxConcurrentSessions?: number;
+          updateDirective?: WorkerLoopUpdateDirective | null;
+        }
       | void,
   ) => {
     if (heartbeat?.acceptingWork !== undefined) {
@@ -257,6 +294,15 @@ export async function runWorkerLoop(
       maxConcurrentSessions = normalizeConcurrency(
         heartbeat.maxConcurrentSessions,
       );
+    }
+    if (heartbeat?.updateDirective) {
+      updateDirective = heartbeat.updateDirective;
+      acceptingWork = false;
+      for (const controller of activeControllers.values()) {
+        if (!controller.signal.aborted) {
+          controller.abort(new WorkerUpdateDrainError());
+        }
+      }
     }
   };
   const reportState = async () => {
@@ -273,6 +319,9 @@ export async function runWorkerLoop(
   const execute = async (issue: ClaimedIssue, waitForTurn: Promise<void>) => {
     const renewal = new AbortController();
     const execution = new AbortController();
+    const key = executionKey(issue);
+    activeControllers.set(key, execution);
+    let checkpoint: WorkerExecutionCheckpoint = {};
     let leaseFailure: unknown = null;
     const renewalLoop = (async () => {
       while (!renewal.signal.aborted) {
@@ -298,17 +347,60 @@ export async function runWorkerLoop(
       // Rework can make the same run claimable before its previous provider
       // process has exited. Renew the new claim above, but do not let two
       // agents edit the same issue worktree at the same time.
-      await waitForTurn;
+      if (updateDirective) {
+        await Promise.race([
+          waitForTurn,
+          new Promise<void>((resolve) => {
+            if (execution.signal.aborted) {
+              resolve();
+              return;
+            }
+            execution.signal.addEventListener("abort", () => resolve(), {
+              once: true,
+            });
+          }),
+        ]);
+      } else {
+        // Preserve the pre-update lease-failure behavior: a provider that is
+        // already starting still receives the aborted signal and can stop
+        // its child process, while an update arriving before its turn is
+        // handled by the branch above on the next scheduling pass.
+        await waitForTurn;
+      }
+      if (execution.signal.aborted && updateDirective) {
+        throw execution.signal.reason ?? new WorkerUpdateDrainError();
+      }
       if (leaseFailure) throw leaseFailure;
-      await dependencies.runIssue(issue, execution.signal);
+      await dependencies.runIssue(issue, execution.signal, (value) => {
+        checkpoint = { ...checkpoint, ...value };
+      });
       if (leaseFailure) throw leaseFailure;
-      return { issue, error: null };
+      if (updateDirective && execution.signal.aborted) {
+        if (!dependencies.handoff) {
+          throw new Error("Worker update handoff is not configured");
+        }
+        await dependencies.handoff(issue, updateDirective.id, checkpoint);
+        return { issue, error: null, handedOff: true };
+      }
+      return { issue, error: null, handedOff: false };
     } catch (error) {
-      return { issue, error };
+      if (updateDirective && execution.signal.aborted) {
+        try {
+          if (!dependencies.handoff) {
+            throw new Error("Worker update handoff is not configured");
+          }
+          await dependencies.handoff(issue, updateDirective.id, checkpoint);
+          return { issue, error: null, handedOff: true };
+        } catch (handoffError) {
+          return { issue, error: handoffError, handedOff: false };
+        }
+      }
+      return { issue, error, handedOff: false };
     } finally {
       renewal.abort();
       execution.abort();
       await renewalLoop;
+      activeControllers.delete(key);
     }
   };
 
@@ -437,9 +529,16 @@ export async function runWorkerLoop(
     active.delete(executionKey(outcome.issue));
     if (!isReplyWork(outcome.issue)) activeSlotCount -= 1;
     if (outcome.error === null) {
-      processed += 1;
-      consecutiveFailures = 0;
-      dependencies.log(`finished ${outcome.issue.sourceKey}`);
+      if (outcome.handedOff) {
+        consecutiveFailures = 0;
+        dependencies.log(
+          `handed off ${outcome.issue.sourceKey} for planned Worker update`,
+        );
+      } else {
+        processed += 1;
+        consecutiveFailures = 0;
+        dependencies.log(`finished ${outcome.issue.sourceKey}`);
+      }
     } else {
       failures += 1;
       consecutiveFailures += 1;

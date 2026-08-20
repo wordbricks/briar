@@ -428,12 +428,16 @@ import {
   executionWorkerDeviceForBinding,
   executionWorkerProviders,
   executionWorkerSupportsOrganizationAgentContext,
+  executionWorkerUpdateStatus,
+  failExecutionWorkerUpdateHandoff,
+  handoffExecutionWorkerClaim,
   hasAvailableChannelReplyWorker,
   leaseExpiryFrom,
   listExecutionAuditEvents,
   listExecutionWorkers,
   listOrganizationExecutionWorkers,
   listOrganizationExecutionProviders,
+  latestExecutionWorkerUpdateHandoff,
   pendingExecutionWorkerUpdate,
   getProjectExecutionWorkerPolicy,
   hasExecutionWorkerReadinessChanged,
@@ -3129,6 +3133,38 @@ const workerHeartbeatSchema = z
   })
   .strict();
 
+const workerUpdateHandoffWorkTypeSchema = z.enum([
+  "issue",
+  "projectAgentTask",
+  "issueReply",
+  "channelReply",
+]);
+
+const workerUpdatePrepareSchema = z
+  .object({
+    targetVersion: z.string().trim().refine(isSemanticVersion, "Semantic version required"),
+  })
+  .strict();
+
+const workerUpdateHandoffSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    projectId: z.string().uuid(),
+    workType: workerUpdateHandoffWorkTypeSchema,
+    workId: z.string().uuid(),
+    runId: z.string().uuid().nullable().optional(),
+    claimToken: z.string().trim().min(20).max(256),
+    checkpoint: z
+      .object({
+        conversationId: z.string().trim().max(512).nullable().optional(),
+        workspacePath: z.string().trim().max(2_000).nullable().optional(),
+      })
+      .strict()
+      .optional()
+      .default({}),
+  })
+  .strict();
+
 const workerLabelSchema = z
   .object({
     label: z.string().trim().min(1).max(100),
@@ -3243,6 +3279,9 @@ export const transcriptSchema = z
     executionId: z.string().uuid().optional(),
     projectId: z.string().uuid().optional(),
     workerId: z.string().trim().min(1).max(128).nullable().optional(),
+    workType: workerUpdateHandoffWorkTypeSchema.optional(),
+    workId: z.string().uuid().optional(),
+    claimToken: z.string().trim().min(20).max(256).optional(),
     agentProvider: z.enum(agentProviders),
     executionMetrics: agentExecutionMetricsSchema.optional(),
     usageRecords: z
@@ -12941,6 +12980,154 @@ async function route(
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  const workerUpdatePrepareMatch = pathname.match(
+    /^\/workers\/([0-9a-zA-Z-]+)\/update-handoff\/prepare$/u,
+  );
+  if (workerUpdatePrepareMatch && request.method === "POST") {
+    const principal = await requireWorkerCredential(db, request);
+    const binding = await executionWorkerBindingById(
+      db,
+      principal.deviceId,
+      workerUpdatePrepareMatch[1],
+    );
+    if (!binding || binding.state === "disabled") {
+      throw new HttpError(403, "Worker is not enabled for this project");
+    }
+    const input = workerUpdatePrepareSchema.parse(await readJson(request));
+    const observedAt = new Date().toISOString();
+    const updateRequest = await requestExecutionWorkerUpdate(db, {
+      id: crypto.randomUUID(),
+      organizationId: principal.organizationId,
+      deviceId: principal.deviceId,
+      requestedByUserId: principal.ownerUserId,
+      targetVersion: input.targetVersion,
+      requestedAt: observedAt,
+    });
+    const status = await executionWorkerUpdateStatus(db, {
+      deviceId: principal.deviceId,
+      requestId: updateRequest.id,
+      observedAt,
+    });
+    return json({
+      requestId: updateRequest.id,
+      targetVersion: updateRequest.targetVersion,
+      handoffState: status?.request.handoffState ?? updateRequest.handoffState,
+      activeWorkCount: status?.activeWorkCount ?? 0,
+      ready: status?.ready ?? false,
+    }, 202);
+  }
+
+  const workerUpdateStatusMatch = pathname.match(
+    /^\/workers\/([0-9a-zA-Z-]+)\/update-handoff\/status$/u,
+  );
+  if (workerUpdateStatusMatch && request.method === "GET") {
+    const principal = await requireWorkerCredential(db, request);
+    const binding = await executionWorkerBindingById(
+      db,
+      principal.deviceId,
+      workerUpdateStatusMatch[1],
+    );
+    if (!binding || binding.state === "disabled") {
+      throw new HttpError(403, "Worker is not enabled for this project");
+    }
+    const requestId = new URL(request.url).searchParams.get("requestId") ?? undefined;
+    if (requestId) z.string().uuid().parse(requestId);
+    const status = await executionWorkerUpdateStatus(db, {
+      deviceId: principal.deviceId,
+      requestId,
+      observedAt: new Date().toISOString(),
+    });
+    if (!status) return json({ request: null, activeWorkCount: 0, ready: true });
+    return json({
+      requestId: status.request.id,
+      targetVersion: status.request.targetVersion,
+      status: status.request.status,
+      handoffState: status.request.handoffState,
+      handoffError: status.request.handoffError,
+      activeWorkCount: status.activeWorkCount,
+      ready: status.ready,
+    });
+  }
+
+  const workerUpdateClaimMatch = pathname.match(
+    /^\/workers\/([0-9a-zA-Z-]+)\/update-handoff\/claim$/u,
+  );
+  if (workerUpdateClaimMatch && request.method === "POST") {
+    const principal = await requireWorkerCredential(db, request);
+    const binding = await executionWorkerBindingById(
+      db,
+      principal.deviceId,
+      workerUpdateClaimMatch[1],
+    );
+    if (!binding || binding.state === "disabled") {
+      throw new HttpError(403, "Worker is not enabled for this project");
+    }
+    const input = workerUpdateHandoffSchema.parse(await readJson(request));
+    if (input.projectId !== binding.project_id) {
+      throw new HttpError(403, "Worker handoff project does not match its binding");
+    }
+    const observedAt = new Date().toISOString();
+    const claimTokenHash = await sha256(input.claimToken);
+    let outcome;
+    try {
+      outcome = await handoffExecutionWorkerClaim(db, {
+        requestId: input.requestId,
+        organizationId: principal.organizationId,
+        deviceId: principal.deviceId,
+        projectId: input.projectId,
+        workerId: binding.id,
+        workType: input.workType,
+        workId: input.workId,
+        runId: input.runId ?? null,
+        claimTokenHash,
+        metadata: input.checkpoint,
+        observedAt,
+      });
+    } catch (error) {
+      try {
+        await failExecutionWorkerUpdateHandoff(db, {
+          requestId: input.requestId,
+          organizationId: principal.organizationId,
+          deviceId: principal.deviceId,
+          projectId: input.projectId,
+          workerId: binding.id,
+          workType: input.workType,
+          workId: input.workId,
+          runId: input.runId ?? null,
+          claimTokenHash,
+          metadata: input.checkpoint,
+          error: error instanceof Error ? error.message : String(error),
+          observedAt,
+        });
+      } catch (failureError) {
+        console.error(
+          `worker update handoff failure could not be recorded: ${
+            failureError instanceof Error ? failureError.message : String(failureError)
+          }`,
+        );
+      }
+      throw error;
+    }
+    if (outcome.outcome === "not_ready") {
+      throw new HttpError(409, "Worker update handoff is not draining");
+    }
+    if (outcome.outcome === "not_active") {
+      throw new HttpError(409, "Worker claim is no longer active");
+    }
+    const status = await executionWorkerUpdateStatus(db, {
+      deviceId: principal.deviceId,
+      requestId: input.requestId,
+      observedAt: new Date().toISOString(),
+    });
+    return json({
+      outcome: outcome.outcome,
+      requestId: input.requestId,
+      handoffState: status?.request.handoffState ?? "draining",
+      activeWorkCount: outcome.activeWorkCount,
+      ready: status?.ready ?? false,
+    });
+  }
+
   const workerHeartbeatMatch = pathname.match(
     /^\/workers\/([0-9a-zA-Z-]+)\/heartbeat$/u,
   );
@@ -12956,12 +13143,19 @@ async function route(
     }
     const input = workerHeartbeatSchema.parse(await readJson(request));
     const observedAt = new Date().toISOString();
+    const pendingBeforeHeartbeat = await pendingExecutionWorkerUpdate(
+      db,
+      principal.deviceId,
+    );
+    const updateIsDraining = pendingBeforeHeartbeat?.handoffState === "draining";
     const worker = await recordWorkerHeartbeat(db, binding.project_id, {
       workerId: workerHeartbeatMatch[1],
       versions: input.versions,
-      acceptingWork: input.acceptingWork,
-      readinessState: input.readinessState,
-      readinessDetail: input.readinessDetail,
+      acceptingWork: updateIsDraining ? false : input.acceptingWork,
+      readinessState: updateIsDraining ? "busy" : input.readinessState,
+      readinessDetail: updateIsDraining
+        ? "계획된 업데이트 handoff를 진행 중입니다."
+        : input.readinessDetail,
       capabilities: input.capabilities,
       observedAt,
     });
@@ -13090,6 +13284,8 @@ async function route(
     const input = await readTranscriptRequest(request);
     const recordedAt = new Date().toISOString();
     let authenticatedWorkerId: string | null = null;
+    let authenticatedWorkerDeviceId: string | null = null;
+    let authenticatedWorkerOrganizationId: string | null = null;
     let authenticatedExecutionAttempt: RunExecutionAttemptRow | null = null;
     const projectId = bearerToken(request).startsWith("briar_worker_")
       ? (() => {
@@ -13107,6 +13303,8 @@ async function route(
         input.workerId ?? undefined,
       );
       authenticatedWorkerId = worker.binding.id;
+      authenticatedWorkerDeviceId = worker.principal.deviceId;
+      authenticatedWorkerOrganizationId = worker.principal.organizationId;
       if (input.executionId) {
         authenticatedExecutionAttempt = await getRunExecutionAttempt(
           db,
@@ -13135,6 +13333,105 @@ async function route(
     }
     if (input.executionId && !authenticatedExecutionAttempt) {
       throw new HttpError(403, "Only execution workers can report an execution");
+    }
+    const hasWorkerClaimIdentity = Boolean(
+      input.claimToken || input.workType || input.workId,
+    );
+    if (authenticatedWorkerDeviceId && !hasWorkerClaimIdentity) {
+      const pendingUpdate = await pendingExecutionWorkerUpdate(
+        db,
+        authenticatedWorkerDeviceId,
+      );
+      if (pendingUpdate && pendingUpdate.handoffState !== "idle") {
+        throw new HttpError(
+          409,
+          "Worker transcript claim identity is required during a planned update",
+        );
+      }
+    }
+    if (input.claimToken || input.workType || input.workId) {
+      if (
+        !authenticatedWorkerId ||
+        !authenticatedWorkerDeviceId ||
+        !input.claimToken ||
+        !input.workType ||
+        !input.workId
+      ) {
+        throw new HttpError(400, "Worker transcript claim identity is incomplete");
+      }
+      const claimTokenHash = await sha256(input.claimToken);
+      const active = input.workType === "issue"
+        ? await db
+            .prepare(
+              `select 1 as active
+               from briar_hunt_runs
+               where id = ? and project_id = ? and worker_id = ?
+                 and claim_token_hash = ? and lease_expires_at > ?
+                 and status not in
+                   ('backlog', 'completed', 'cancelled', 'blocked', 'failed')`,
+            )
+            .bind(
+              input.workId,
+              projectId,
+              authenticatedWorkerId,
+              claimTokenHash,
+              recordedAt,
+            )
+            .first<{ active: number }>()
+        : input.workType === "projectAgentTask"
+          ? await db
+              .prepare(
+                `select 1 as active
+                 from briar_project_agent_task_jobs
+                 where id = ? and project_id = ? and status = 'running'
+                   and claimed_worker_id = ? and claim_token_hash = ?
+                   and lease_expires_at > ?`,
+              )
+              .bind(
+                input.workId,
+                projectId,
+                authenticatedWorkerId,
+                claimTokenHash,
+                recordedAt,
+              )
+              .first<{ active: number }>()
+          : input.workType === "issueReply"
+            ? await db
+                .prepare(
+                  `select 1 as active
+                   from briar_issue_agent_reply_jobs
+                   where id = ? and project_id = ? and status = 'running'
+                     and claimed_worker_id = ? and claim_token_hash = ?
+                     and lease_expires_at > ?`,
+                )
+                .bind(
+                  input.workId,
+                  projectId,
+                  authenticatedWorkerId,
+                  claimTokenHash,
+                  recordedAt,
+                )
+                .first<{ active: number }>()
+            : await db
+                .prepare(
+                  `select 1 as active
+                   from briar_channel_agent_reply_jobs
+                   where id = ? and organization_id = ? and status = 'running'
+                     and claimed_device_id = ? and claimed_worker_id = ?
+                     and claim_token_hash = ? and lease_expires_at > ?`,
+                )
+                .bind(
+                  input.workId,
+                  authenticatedWorkerOrganizationId,
+                  authenticatedWorkerDeviceId,
+                  authenticatedWorkerId,
+                  claimTokenHash,
+                  recordedAt,
+                )
+                .first<{ active: number }>();
+      if (!active) {
+        throw new HttpError(409, "Worker claim is no longer active");
+      }
     }
     if (
       input.executionMetrics &&
@@ -13622,6 +13919,11 @@ async function route(
       agent,
       prioritizeAgent: job.agent_id !== null,
     });
+    const handoffContext = await latestExecutionWorkerUpdateHandoff(db, {
+      deviceId: authenticatedWorker.principal.deviceId,
+      workType: "issueReply",
+      workId: job.id,
+    });
     return json({
       work: {
         workType: "issueReply",
@@ -13635,6 +13937,7 @@ async function route(
         model: replyExecution.model,
         effort: replyExecution.effort,
         activeSkill: activeSkill ? agentSkillJson(activeSkill) : null,
+        handoffContext,
         skillExecutionTarget: selectedSkill && agent && triggerMessage
           ? {
               projectId: input.projectId,
@@ -13930,6 +14233,11 @@ async function route(
             deviceId: principal.deviceId,
           })
         : null;
+      const handoffContext = await latestExecutionWorkerUpdateHandoff(db, {
+        deviceId: principal.deviceId,
+        workType: "channelReply",
+        workId: job.id,
+      });
       return json({
         work: {
           workType: "channelReply",
@@ -13986,6 +14294,7 @@ async function route(
           claimedAt: job.claimed_at,
           leaseExpiresAt: job.lease_expires_at,
           activity,
+          handoffContext,
           organizationContext: agent.project_id === null
             ? organizationAgentContextDescriptorSchema.parse({
                 schemaVersion: 1,
@@ -14922,6 +15231,11 @@ async function route(
     if (!activeSkill) {
       throw new HttpError(409, "Agent task lost its selected Skill");
     }
+    const handoffContext = await latestExecutionWorkerUpdateHandoff(db, {
+      deviceId: authenticatedWorker.principal.deviceId,
+      workType: "projectAgentTask",
+      workId: job.id,
+    });
     return json({
       work: {
         workType: "projectAgentTask",
@@ -14935,6 +15249,7 @@ async function route(
         leaseExpiresAt: job.lease_expires_at,
         request: job.request,
         activeSkill: agentSkillJson(activeSkill),
+        handoffContext,
         agent: {
           id: job.agent_id,
           name: job.agent_name,
@@ -15184,6 +15499,13 @@ async function route(
     const workflowContext = run
       ? await claimWorkflowContext(db, projectId, run)
       : { startStage: null, resumeContext: null };
+    const handoffContext = run && authenticatedWorker
+      ? await latestExecutionWorkerUpdateHandoff(db, {
+          deviceId: authenticatedWorker.principal.deviceId,
+          workType: "issue",
+          workId: run.id,
+        })
+      : null;
     return json({
       work: run
         ? {
@@ -15215,6 +15537,7 @@ async function route(
             claimedAt: run.claimed_at,
             leaseExpiresAt: run.lease_expires_at,
             claimAttempts: run.claim_attempts,
+            handoffContext,
             execution: execution?.provider
               ? execution
               : null,

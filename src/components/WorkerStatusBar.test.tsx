@@ -469,6 +469,87 @@ describe("WorkerStatusBar", () => {
     await act(async () => root.unmount());
   });
 
+  it("shows the handoff failure reason and allows a retry", async () => {
+    vi.mocked(loadOrganizationExecutionWorkers).mockResolvedValue({
+      workers: [
+        {
+          deviceId: "device-1",
+          ownerUserId: "owner-1",
+          ownerName: "Owner",
+          label: "Janet's Mac",
+          state: "online",
+          maxConcurrentSessions: 1,
+          activeSessions: 0,
+          lastHeartbeatAt: "2026-07-29T00:00:00Z",
+          createdAt: "2026-07-29T00:00:00Z",
+          versions: { briar: "1.2.69" },
+          remoteUpdateSupported: true,
+          updateRequest: {
+            id: "77777777-7777-4777-8777-777777777777",
+            targetVersion: "1.2.84",
+            status: "requested",
+            requestedAt: "2026-07-29T00:01:00Z",
+            handoffState: "failed",
+            handoffError: "Provider process did not stop",
+          },
+          bindings: [],
+        },
+      ],
+      latestVersion: "1.2.84",
+      canManage: true,
+      generatedAt: "2026-07-29T00:01:00Z",
+    });
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <WorkerStatusBar
+            onOpenSettings={() => undefined}
+            organizationId="organization-1"
+            token="token"
+            userId="owner-1"
+            workers={[
+              worker({
+                versions: { briar: "1.2.69" },
+                capabilities: {
+                  remoteUpdates: { supported: true, protocol: 1 },
+                },
+              }),
+            ]}
+          />
+        </I18nProvider>,
+      );
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".worker-status-trigger")
+        ?.click();
+      await Promise.resolve();
+    });
+
+    const update = container.querySelector<HTMLButtonElement>(
+      ".worker-status-update",
+    );
+    expect(update?.disabled).toBe(false);
+    expect(update?.getAttribute("aria-label")).toBe(
+      "v1.2.84 업데이트 지연됨",
+    );
+    expect(update?.title).toContain("Provider process did not stop");
+
+    await act(async () => update?.click());
+    expect(requestOrganizationExecutionWorkerUpdate).toHaveBeenCalledWith(
+      "token",
+      "organization-1",
+      "device-1",
+    );
+
+    await act(async () => root.unmount());
+  });
+
   it("opens Worker settings from the popover header", async () => {
     const container = document.createElement("div");
     document.body.append(container);
