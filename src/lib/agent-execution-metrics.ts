@@ -1,236 +1,53 @@
-import { z } from "zod";
-import { agentProviders, type AgentProvider } from "./agent-provider-contract";
+import * as Match from "effect/Match";
+import type { AgentProvider } from "./agent-provider-contract";
+import type { AgentExecutionCostRecord } from "./agent-execution-cost";
 import {
-  AGENT_EXECUTION_USD_TICKS_PER_DOLLAR,
-  type AgentExecutionCostRecord,
-} from "./agent-execution-cost";
+  type AgentExecutionCollectedCostObservation,
+  type AgentExecutionCollectedTokenObservation,
+  type AgentExecutionCostObservation,
+  type AgentExecutionMetrics,
+  type AgentExecutionModelObservation,
+  type AgentExecutionTokenObservation,
+  type AgentExecutionTokenUsage,
+  type AgentExecutionUsageObservation,
+  type AgentExecutionUsageObservationBase,
+  type AgentExecutionUsageProvider,
+  type AgentExecutionUsageRecord,
+  agentExecutionMetricsSchema,
+  agentExecutionUsageRecordSchema,
+  parseObservedAt,
+} from "./agent-execution-metrics/model";
+import {
+  asRecord,
+  dedupeKey,
+  exactUsdTicks,
+  nonEmptyString,
+  runnerPayload,
+  tokenSum,
+  tokenValue,
+  usdAmountToTicks,
+} from "./agent-execution-metrics/payload";
+import {
+  openCodeExecutionCostObservationsFromPayload,
+  openCodeExecutionObservationsFromPayload,
+  openCodeExecutionUsageObservationsFromPayload,
+} from "./agent-execution-metrics/providers/opencode";
 
-const tokenCountSchema = z
-  .number()
-  .int()
-  .nonnegative()
-  .max(Number.MAX_SAFE_INTEGER);
-const observedAtSchema = z.string().datetime({ offset: true });
-
-export const agentExecutionMetricsSchema = z
-  .object({
-    inputTokens: tokenCountSchema.nullable(),
-    outputTokens: tokenCountSchema.nullable(),
-    cacheReadTokens: tokenCountSchema.nullable(),
-    cacheWriteTokens: tokenCountSchema.nullable(),
-    reasoningOutputTokens: tokenCountSchema.nullable(),
-    totalTokens: tokenCountSchema.nullable(),
-    durationMs: tokenCountSchema,
-  })
-  .strict();
-
-export type AgentExecutionMetrics = z.infer<typeof agentExecutionMetricsSchema>;
-export type AgentExecutionTokenUsage = Omit<
-  AgentExecutionMetrics,
-  "durationMs"
->;
-export type AgentExecutionUsageProvider = AgentProvider;
-
-type AgentExecutionUsageObservationBase = {
-  /** Briar runtime provider, separate from the provider's billing namespace. */
-  provider: AgentProvider;
-  model: string | null;
-  canonicalModel: string | null;
-  /** Raw provider/billing namespace such as openai, bedrock, or vertex. */
-  modelProvider: string | null;
-  modelSource:
-    "providerReported" | "providerConfig" | "configuredFallback" | "unknown";
-  scopeId: string | null;
-  sessionId: string | null;
-  turnId: string | null;
-  /** Stable when the provider supplies enough identity to replace a replay. */
-  dedupeKey: string | null;
-};
-
-export type AgentExecutionModelObservation =
-  AgentExecutionUsageObservationBase & {
-    kind: "model";
-    source:
-      | "claude.init"
-      | "claude.assistant"
-      | "agy.init"
-      | "codex.config"
-      | "codex.modelDefault"
-      | "codex.thread"
-      | "codex.turnRequest"
-      | "codex.threadSettings"
-      | "codex.rerouted"
-      | "opencode.assistant"
-      | "grok.session"
-      | "grok.sessionNew"
-      | "grok.sessionLoad"
-      | "grok.modelSet";
-  };
-
-export type AgentExecutionTokenObservation =
-  AgentExecutionUsageObservationBase & {
-    /**
-     * A delta is one provider message/turn. A cumulative observation replaces
-     * earlier deltas for the same session and model.
-     */
-    kind: "delta" | "cumulative";
-    tokenUsage: AgentExecutionTokenUsage;
-    source:
-      | "claude.assistant.usage"
-      | "claude.result.modelUsage"
-      | "claude.result.usage"
-      | "agy.result.usage"
-      | "codex.threadTokenUsage"
-      | "codex.turnUsage"
-      | "opencode.step.usage"
-      | "opencode.assistant.usage"
-      | "grok.turnCompleted.modelUsage"
-      | "grok.turnCompleted.usage"
-      | "grok.prompt.metaModelUsage"
-      | "grok.prompt.metaUsage"
-      | "grok.prompt.usage";
-  };
-
-export type AgentExecutionUsageObservation =
-  AgentExecutionModelObservation | AgentExecutionTokenObservation;
-
-export type AgentExecutionCostObservation =
-  AgentExecutionUsageObservationBase & {
-    kind: "cost";
-    amountUsdTicks: number;
-    usageKey: string | null;
-    source:
-      | "claude.result.modelUsage.costUSD"
-      | "claude.result.total_cost_usd"
-      | "opencode.step.cost"
-      | "opencode.assistant.cost"
-      | "grok.usageUpdate.cost"
-      | "grok.prompt.costUsdTicks"
-      | "grok.prompt.metaCostUsdTicks"
-      | "grok.prompt.metaModelUsage.costUsdTicks"
-      | "grok.turnCompleted.costUsdTicks"
-      | "grok.turnCompleted.modelUsage.costUsdTicks";
-  };
-
-export type AgentExecutionCollectedCostObservation =
-  AgentExecutionCostObservation & {
-    dedupeKey: string;
-    observedAt: string;
-  };
-
-export const agentExecutionUsageRecordSchema = z
-  .object({
-    usageKey: z.string().trim().min(1).max(512),
-    sessionId: z.string().trim().min(1).max(512).nullable(),
-    scopeId: z.string().trim().min(1).max(512).nullable(),
-    turnId: z.string().trim().min(1).max(512).nullable(),
-    agentProvider: z.enum(agentProviders),
-    modelProvider: z.string().trim().min(1).max(256).nullable(),
-    model: z.string().trim().min(1).max(512).nullable(),
-    canonicalModel: z.string().trim().min(1).max(512).nullable(),
-    modelSource: z.enum([
-      "providerReported",
-      "providerConfig",
-      "configuredFallback",
-      "unknown",
-    ]),
-    source: z.string().trim().min(1).max(128),
-    uncachedInputTokens: tokenCountSchema.nullable(),
-    cacheReadTokens: tokenCountSchema.nullable(),
-    cacheWriteTokens: tokenCountSchema.nullable(),
-    outputTokens: tokenCountSchema.nullable(),
-    reasoningOutputTokens: tokenCountSchema.nullable(),
-    totalTokens: tokenCountSchema.nullable(),
-    observedAt: observedAtSchema,
-  })
-  .strict()
-  .superRefine((record, context) => {
-    if (
-      record.uncachedInputTokens === null &&
-      record.cacheReadTokens === null &&
-      record.cacheWriteTokens === null &&
-      record.outputTokens === null &&
-      record.reasoningOutputTokens === null &&
-      record.totalTokens === null
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "usage records require at least one token value",
-      });
-    }
-    if (
-      record.reasoningOutputTokens !== null &&
-      (record.outputTokens === null ||
-        record.reasoningOutputTokens > record.outputTokens)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "reasoningOutputTokens must be a subset of outputTokens",
-        path: ["reasoningOutputTokens"],
-      });
-    }
-    // Total equality is intentionally not enforced because provider total
-    // token semantics are not uniform.
-  });
-
-export type AgentExecutionUsageRecord = z.infer<
-  typeof agentExecutionUsageRecordSchema
->;
-
-export type AgentExecutionCollectedTokenObservation =
-  AgentExecutionTokenObservation & {
-    dedupeKey: string;
-    observedAt: string;
-  };
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-
-const nonEmptyString = (value: unknown): string | null => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed || null;
-};
-
-const tokenValue = (
-  record: Record<string, unknown>,
-  ...keys: string[]
-): number | null => {
-  for (const key of keys) {
-    const value = record[key];
-    if (
-      typeof value === "number" &&
-      Number.isSafeInteger(value) &&
-      value >= 0
-    ) {
-      return value;
-    }
-  }
-  return null;
-};
-
-const tokenSum = (...values: Array<number | null>): number | null => {
-  const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
-  return Number.isSafeInteger(total) && total >= 0 ? total : null;
-};
-
-const usdAmountToTicks = (value: unknown): number | null => {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    return null;
-  }
-  const ticks = Math.round(value * AGENT_EXECUTION_USD_TICKS_PER_DOLLAR);
-  return Number.isSafeInteger(ticks) && ticks >= 0 ? ticks : null;
-};
-
-const exactUsdTicks = (record: Record<string, unknown>): number | null =>
-  tokenValue(record, "costUsdTicks", "cost_usd_ticks");
-
-const runnerPayload = (payload: unknown) => {
-  const root = asRecord(payload);
-  if (!root) return null;
-  return asRecord(root.raw) ?? root;
+export {
+  type AgentExecutionCollectedCostObservation,
+  type AgentExecutionCollectedTokenObservation,
+  type AgentExecutionCostObservation,
+  type AgentExecutionMetrics,
+  type AgentExecutionModelObservation,
+  type AgentExecutionTokenObservation,
+  type AgentExecutionTokenUsage,
+  type AgentExecutionUsageObservation,
+  type AgentExecutionUsageProvider,
+  type AgentExecutionUsageRecord,
+  agentExecutionMetricsSchema,
+  agentExecutionUsageRecordSchema,
+  openCodeExecutionCostObservationsFromPayload,
+  openCodeExecutionUsageObservationsFromPayload,
 };
 
 const normalizedTokenUsage = (
@@ -363,9 +180,6 @@ const tokenUsageDifference = (
     fallback?.totalTokens,
   ),
 });
-
-const dedupeKey = (...parts: Array<string | null>) =>
-  parts.every((part) => part !== null) ? parts.join(":") : null;
 
 const claudeIdentity = (message: Record<string, unknown>) => ({
   sessionId: nonEmptyString(message.session_id),
@@ -773,172 +587,6 @@ export function codexExecutionUsageObservationsFromPayload(
     : [];
 }
 
-const openCodeTokenUsage = (
-  tokens: Record<string, unknown>,
-): AgentExecutionTokenUsage | null => {
-  const cache = asRecord(tokens.cache);
-  const inputTokens = tokenValue(tokens, "input");
-  const rawOutputTokens = tokenValue(tokens, "output");
-  const reasoningOutputTokens = tokenValue(tokens, "reasoning");
-  const cacheReadTokens = cache ? tokenValue(cache, "read") : null;
-  const cacheWriteTokens = cache ? tokenValue(cache, "write") : null;
-  const explicitTotal = tokenValue(tokens, "total");
-  if (
-    inputTokens === null &&
-    rawOutputTokens === null &&
-    reasoningOutputTokens === null &&
-    cacheReadTokens === null &&
-    cacheWriteTokens === null &&
-    explicitTotal === null
-  ) {
-    return null;
-  }
-
-  // OpenCode stores uncached input and reasoning as disjoint buckets. Briar's
-  // canonical contract keeps reasoning as a subset of output instead.
-  const outputTokens =
-    rawOutputTokens === null && reasoningOutputTokens === null
-      ? null
-      : tokenSum(rawOutputTokens, reasoningOutputTokens);
-  return {
-    inputTokens,
-    outputTokens,
-    cacheReadTokens,
-    cacheWriteTokens,
-    reasoningOutputTokens,
-    totalTokens:
-      explicitTotal ??
-      tokenSum(
-        inputTokens,
-        rawOutputTokens,
-        reasoningOutputTokens,
-        cacheReadTokens,
-        cacheWriteTokens,
-      ),
-  };
-};
-
-const openCodeAssistantObservations = (
-  assistant: Record<string, unknown>,
-  includeUsage: boolean,
-): AgentExecutionUsageObservation[] => {
-  if (assistant.role !== "assistant") return [];
-  const messageId = nonEmptyString(assistant.id);
-  const sessionId = nonEmptyString(assistant.sessionID);
-  const turnId = nonEmptyString(assistant.parentID);
-  const model = nonEmptyString(assistant.modelID);
-  const modelProvider = nonEmptyString(assistant.providerID);
-  const observations: AgentExecutionUsageObservation[] = [];
-
-  if (model) {
-    observations.push({
-      kind: "model",
-      provider: "opencode",
-      model,
-      canonicalModel: null,
-      modelProvider,
-      modelSource: "providerReported",
-      source: "opencode.assistant",
-      scopeId: messageId,
-      sessionId,
-      turnId,
-      dedupeKey: dedupeKey("opencode", "message", messageId, "model"),
-    });
-  }
-
-  const tokens = includeUsage ? asRecord(assistant.tokens) : null;
-  const tokenUsage = tokens ? openCodeTokenUsage(tokens) : null;
-  if (tokenUsage) {
-    observations.push({
-      kind: "delta",
-      provider: "opencode",
-      model,
-      canonicalModel: null,
-      modelProvider,
-      modelSource: model ? "providerReported" : "unknown",
-      tokenUsage,
-      source: "opencode.assistant.usage",
-      scopeId: messageId,
-      sessionId,
-      turnId,
-      dedupeKey: dedupeKey("opencode", "message", messageId, "usage"),
-    });
-  }
-  return observations;
-};
-
-const openCodeStepObservation = (
-  part: Record<string, unknown>,
-): AgentExecutionTokenObservation | null => {
-  if (part.type !== "step-finish") return null;
-  const tokens = asRecord(part.tokens);
-  const tokenUsage = tokens ? openCodeTokenUsage(tokens) : null;
-  if (!tokenUsage) return null;
-  const partId = nonEmptyString(part.id);
-  const messageId = nonEmptyString(part.messageID);
-  const sessionId = nonEmptyString(part.sessionID);
-  return {
-    kind: "delta",
-    provider: "opencode",
-    model: null,
-    canonicalModel: null,
-    modelProvider: null,
-    modelSource: "unknown",
-    tokenUsage,
-    source: "opencode.step.usage",
-    scopeId: messageId,
-    sessionId,
-    turnId: null,
-    dedupeKey: dedupeKey("opencode", "part", partId, "usage"),
-  };
-};
-
-export function openCodeExecutionUsageObservationsFromPayload(
-  payload: unknown,
-): AgentExecutionUsageObservation[] {
-  const message = runnerPayload(payload);
-  if (!message) return [];
-
-  const properties = asRecord(message.properties);
-  const eventAssistant =
-    message.type === "message.updated" ? asRecord(properties?.info) : null;
-  const responseAssistant = asRecord(message.info);
-  const directAssistant = message.role === "assistant" ? message : null;
-  const assistant = eventAssistant ?? responseAssistant ?? directAssistant;
-
-  const parts: Record<string, unknown>[] = [];
-  if (message.type === "message.part.updated") {
-    const part = asRecord(properties?.part);
-    if (part) parts.push(part);
-  } else if (message.type === "step-finish") {
-    parts.push(message);
-  }
-  if (Array.isArray(message.parts)) {
-    parts.push(
-      ...message.parts.flatMap((part) => {
-        const record = asRecord(part);
-        return record ? [record] : [];
-      }),
-    );
-  }
-
-  const stepObservations = parts.flatMap((part) => {
-    const observation = openCodeStepObservation(part);
-    return observation ? [observation] : [];
-  });
-  const assistantId = nonEmptyString(assistant?.id);
-  const hasAssistantStep = stepObservations.some(
-    (observation) =>
-      assistantId === null || observation.scopeId === assistantId,
-  );
-  return [
-    ...(assistant
-      ? openCodeAssistantObservations(assistant, !hasAssistantStep)
-      : []),
-    ...stepObservations,
-  ];
-}
-
 const grokTokenUsage = (
   usage: Record<string, unknown>,
   thoughtTokensAreSeparate: boolean,
@@ -1266,22 +914,7 @@ export function agentExecutionUsageObservationsFromPayload(
   provider: AgentExecutionUsageProvider,
   payload: unknown,
 ): AgentExecutionUsageObservation[] {
-  if (provider === "claude") {
-    return claudeExecutionUsageObservationsFromPayload(payload);
-  }
-  if (provider === "codex") {
-    return codexExecutionUsageObservationsFromPayload(payload);
-  }
-  if (provider === "agy") {
-    return agyExecutionUsageObservationsFromPayload(payload);
-  }
-  if (provider === "opencode") {
-    return openCodeExecutionUsageObservationsFromPayload(payload);
-  }
-  if (provider === "grok") {
-    return grokExecutionUsageObservationsFromPayload(payload);
-  }
-  return [];
+  return agentExecutionObservationsFromPayload(provider, payload).usage;
 }
 
 export function claudeExecutionCostObservationsFromPayload(
@@ -1379,110 +1012,6 @@ export function claudeExecutionCostObservationsFromPayload(
       dedupeKey: dedupeKey("claude", "session", scopeId, "cost"),
     },
   ];
-}
-
-const openCodeAssistantCostObservation = (
-  assistant: Record<string, unknown>,
-): AgentExecutionCostObservation | null => {
-  if (assistant.role !== "assistant") return null;
-  const amountUsdTicks = usdAmountToTicks(assistant.cost);
-  if (amountUsdTicks === null) return null;
-  const messageId = nonEmptyString(assistant.id);
-  const sessionId = nonEmptyString(assistant.sessionID);
-  const turnId = nonEmptyString(assistant.parentID);
-  const model = nonEmptyString(assistant.modelID);
-  const tokens = asRecord(assistant.tokens);
-  return {
-    kind: "cost",
-    provider: "opencode",
-    model,
-    canonicalModel: null,
-    modelProvider: nonEmptyString(assistant.providerID),
-    modelSource: model ? "providerReported" : "unknown",
-    amountUsdTicks,
-    usageKey:
-      tokens && openCodeTokenUsage(tokens)
-        ? dedupeKey("opencode", "message", messageId, "usage")
-        : null,
-    source: "opencode.assistant.cost",
-    scopeId: messageId,
-    sessionId,
-    turnId,
-    dedupeKey: dedupeKey("opencode", "message", messageId, "cost"),
-  };
-};
-
-const openCodeStepCostObservation = (
-  part: Record<string, unknown>,
-): AgentExecutionCostObservation | null => {
-  if (part.type !== "step-finish") return null;
-  const amountUsdTicks = usdAmountToTicks(part.cost);
-  if (amountUsdTicks === null) return null;
-  const partId = nonEmptyString(part.id);
-  const messageId = nonEmptyString(part.messageID);
-  const sessionId = nonEmptyString(part.sessionID);
-  const tokens = asRecord(part.tokens);
-  return {
-    kind: "cost",
-    provider: "opencode",
-    model: null,
-    canonicalModel: null,
-    modelProvider: null,
-    modelSource: "unknown",
-    amountUsdTicks,
-    usageKey:
-      tokens && openCodeTokenUsage(tokens)
-        ? dedupeKey("opencode", "part", partId, "usage")
-        : null,
-    source: "opencode.step.cost",
-    scopeId: messageId,
-    sessionId,
-    turnId: null,
-    dedupeKey: dedupeKey("opencode", "part", partId, "cost"),
-  };
-};
-
-export function openCodeExecutionCostObservationsFromPayload(
-  payload: unknown,
-): AgentExecutionCostObservation[] {
-  const message = runnerPayload(payload);
-  if (!message) return [];
-  const properties = asRecord(message.properties);
-  const eventAssistant =
-    message.type === "message.updated" ? asRecord(properties?.info) : null;
-  const responseAssistant = asRecord(message.info);
-  const directAssistant = message.role === "assistant" ? message : null;
-  const assistant = eventAssistant ?? responseAssistant ?? directAssistant;
-
-  const parts: Record<string, unknown>[] = [];
-  if (message.type === "message.part.updated") {
-    const part = asRecord(properties?.part);
-    if (part) parts.push(part);
-  } else if (message.type === "step-finish") {
-    parts.push(message);
-  }
-  if (Array.isArray(message.parts)) {
-    parts.push(
-      ...message.parts.flatMap((part) => {
-        const record = asRecord(part);
-        return record ? [record] : [];
-      }),
-    );
-  }
-
-  const stepCosts = parts.flatMap((part) => {
-    const observation = openCodeStepCostObservation(part);
-    return observation ? [observation] : [];
-  });
-  const assistantId = nonEmptyString(assistant?.id);
-  const hasAssistantStepCost = stepCosts.some(
-    (observation) =>
-      assistantId === null || observation.scopeId === assistantId,
-  );
-  const assistantCost = assistant && !hasAssistantStepCost
-    ? openCodeAssistantCostObservation(assistant)
-    : null;
-  return [...(assistantCost ? [assistantCost] : []), ...stepCosts];
 }
 
 const grokUsageCostIsIncomplete = (usage: Record<string, unknown>) =>
@@ -1704,16 +1233,42 @@ export function agentExecutionCostObservationsFromPayload(
   provider: AgentExecutionUsageProvider,
   payload: unknown,
 ): AgentExecutionCostObservation[] {
-  if (provider === "claude") {
-    return claudeExecutionCostObservationsFromPayload(payload);
-  }
-  if (provider === "opencode") {
-    return openCodeExecutionCostObservationsFromPayload(payload);
-  }
-  if (provider === "grok") {
-    return grokExecutionCostObservationsFromPayload(payload);
-  }
-  return [];
+  return agentExecutionObservationsFromPayload(provider, payload).costs;
+}
+
+function agentExecutionObservationsFromPayload(
+  provider: AgentExecutionUsageProvider,
+  payload: unknown,
+) {
+  return Match.value(provider).pipe(
+    Match.when("claude", () => ({
+      usage: claudeExecutionUsageObservationsFromPayload(payload),
+      costs: claudeExecutionCostObservationsFromPayload(payload),
+    })),
+    Match.when("codex", () => ({
+      usage: codexExecutionUsageObservationsFromPayload(payload),
+      costs: [] as AgentExecutionCostObservation[],
+    })),
+    Match.when("cursor", () => ({
+      usage: [] as AgentExecutionUsageObservation[],
+      costs: [] as AgentExecutionCostObservation[],
+    })),
+    Match.when("grok", () => ({
+      usage: grokExecutionUsageObservationsFromPayload(payload),
+      costs: grokExecutionCostObservationsFromPayload(payload),
+    })),
+    Match.when("agy", () => ({
+      usage: agyExecutionUsageObservationsFromPayload(payload),
+      costs: [] as AgentExecutionCostObservation[],
+    })),
+    Match.when("opencode", () =>
+      openCodeExecutionObservationsFromPayload(payload)),
+    Match.when("openrouter", () => ({
+      usage: [] as AgentExecutionUsageObservation[],
+      costs: [] as AgentExecutionCostObservation[],
+    })),
+    Match.exhaustive,
+  );
 }
 
 const aggregateTokenUsage = (
@@ -2058,14 +1613,14 @@ export function createAgentExecutionUsageCollector(
   };
 
   const observe = (payload: unknown, observedAt = new Date().toISOString()) => {
-    const normalizedObservedAt = observedAtSchema.parse(observedAt);
+    const normalizedObservedAt = parseObservedAt(observedAt);
     const codexTokenUsageSnapshot =
       provider === "codex" ? codexTokenUsageSnapshotFromPayload(payload) : null;
-    const observations = agentExecutionUsageObservationsFromPayload(
+    const decodedObservations = agentExecutionObservationsFromPayload(
       provider,
       payload,
     );
-    observations.forEach((observation) => {
+    decodedObservations.usage.forEach((observation) => {
       if (observation.kind === "model") {
         if (
           observation.provider === "claude" &&
@@ -2323,10 +1878,7 @@ export function createAgentExecutionUsageCollector(
         collectCostObservation(cumulativeCost, normalizedObservedAt);
       }
     }
-    for (const costObservation of agentExecutionCostObservationsFromPayload(
-      provider,
-      payload,
-    )) {
+    for (const costObservation of decodedObservations.costs) {
       collectCostObservation(costObservation, normalizedObservedAt);
     }
   };
