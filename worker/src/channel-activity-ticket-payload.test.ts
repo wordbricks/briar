@@ -110,12 +110,12 @@ describe("channel activity ticket payload schemas", () => {
 
   it("preserves additional signed claims", () => {
     const payload = { ...channelPublishPayload, futureClaim: "supported" };
+    const decoded = Option.getOrNull(
+      decodeJson(decodeChannelActivityPublishTokenPayloadJson, payload),
+    );
 
-    expect(
-      Option.getOrNull(
-        decodeJson(decodeChannelActivityPublishTokenPayloadJson, payload),
-      ),
-    ).toEqual(payload);
+    expect(decoded).toEqual(payload);
+    expect(Object.keys(decoded ?? {})).toEqual(Object.keys(payload));
   });
 
   it("keeps the existing UUID version and casing semantics", () => {

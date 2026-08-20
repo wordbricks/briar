@@ -78,7 +78,10 @@ export const IssueActivitySocketTicketPayload = Schema.Struct({
 export type IssueActivitySocketTicketPayload =
   typeof IssueActivitySocketTicketPayload.Type;
 
-const decoderOptions = { onExcessProperty: "preserve" } as const;
+const decoderOptions = {
+  onExcessProperty: "preserve",
+  propertyOrder: "original",
+} as const;
 
 export const decodeChannelActivityPublishTokenPayloadJson =
   Schema.decodeUnknownOption(
