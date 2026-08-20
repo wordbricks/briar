@@ -1,37 +1,62 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { z } from "zod";
+import * as Schema from "effect/Schema";
 import { channelReplyClaimTokenHeader } from "../src/lib/channels-contract";
 import type { AgentImageAttachment } from "../src-agent/runner-attachments";
 
 export const channelReplyImageDirectoryName = ".briar-channel-images";
-export { channelReplyClaimTokenHeader };
 
 const maxChannelReplyImages = 5;
 const maxChannelReplyImageBytes = 20 * 1024 * 1024;
 const maxChannelReplyImageTotalBytes = 25 * 1024 * 1024;
 
-const channelReplyImageSchema = z.object({
-  id: z.string().uuid(),
-  filename: z.string().min(1).max(255),
-  contentType: z.string().regex(/^image\/(?:avif|gif|jpeg|png|webp)$/u),
-  byteSize: z.number().int().positive().max(maxChannelReplyImageBytes),
+const preserveExcessProperties = {
+  onExcessProperty: "preserve",
+} as const;
+
+const Uuid = Schema.String.check(Schema.isUUID());
+
+const ChannelReplyImage = Schema.Struct({
+  id: Schema.mutableKey(Uuid),
+  filename: Schema.mutableKey(
+    Schema.String.check(Schema.isLengthBetween(1, 255)),
+  ),
+  contentType: Schema.mutableKey(
+    Schema.String.check(
+      Schema.isPattern(/^image\/(?:avif|gif|jpeg|png|webp)$/u),
+    ),
+  ),
+  byteSize: Schema.mutableKey(
+    Schema.Int.check(
+      Schema.isGreaterThan(0),
+      Schema.isLessThanOrEqualTo(maxChannelReplyImageBytes),
+    ),
+  ),
 });
 
-const channelReplySnapshotSchema = z
-  .object({
-    messages: z.array(
-      z
-        .object({
-          id: z.string().uuid(),
-          attachments: z.array(z.unknown()),
-        })
-        .passthrough(),
-    ),
-  })
-  .passthrough();
+const ChannelReplySnapshotMessage = Schema.Struct({
+  id: Schema.mutableKey(Uuid),
+  attachments: Schema.mutableKey(
+    Schema.mutable(Schema.Array(Schema.Unknown)),
+  ),
+}).annotate({ parseOptions: preserveExcessProperties });
 
-type ChannelReplyImage = z.infer<typeof channelReplyImageSchema>;
+const ChannelReplySnapshot = Schema.Struct({
+  messages: Schema.mutableKey(
+    Schema.mutable(Schema.Array(ChannelReplySnapshotMessage)),
+  ),
+}).annotate({ parseOptions: preserveExcessProperties });
+
+const ChannelReplyImages = Schema.mutable(
+  Schema.Array(ChannelReplyImage),
+).check(Schema.isMaxLength(maxChannelReplyImages));
+
+const decodeChannelReplySnapshot = Schema.decodeUnknownSync(
+  ChannelReplySnapshot,
+);
+const decodeChannelReplyImages = Schema.decodeUnknownSync(ChannelReplyImages);
+
+type ChannelReplyImage = typeof ChannelReplyImage.Type;
 type ChannelReplyImageFetcher = (
   input: string | URL | Request,
   init?: RequestInit,
@@ -44,12 +69,9 @@ export function channelReplyImagesForTrigger(
   snapshot: Record<string, unknown>,
   triggerMessageId: string,
 ): ChannelReplyImage[] {
-  const parsed = channelReplySnapshotSchema.parse(snapshot);
+  const parsed = decodeChannelReplySnapshot(snapshot);
   const trigger = parsed.messages.find((message) => message.id === triggerMessageId);
-  const images = z
-    .array(channelReplyImageSchema)
-    .max(maxChannelReplyImages)
-    .parse(trigger?.attachments ?? []);
+  const images = decodeChannelReplyImages(trigger?.attachments ?? []);
   const totalBytes = images.reduce((total, image) => total + image.byteSize, 0);
   if (totalBytes > maxChannelReplyImageTotalBytes) {
     throw new Error("Channel reply images exceed the total download limit");
