@@ -4282,6 +4282,10 @@
             "type": "string",
             "nullable": true
           },
+          "requestedByUserId": {
+            "type": "string",
+            "nullable": true
+          },
           "conversationId": {
             "type": "string",
             "nullable": true

@@ -162,6 +162,42 @@ describe("API errors", () => {
     );
   });
 
+  it("submits create-and-execute settings in the same channel approval", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({
+        outcome: "accepted",
+        projectId: "project-2",
+        resultRunId: "run-2",
+        executionProposal: { id: "execution-2", status: "accepted" },
+        dispatch: { runId: "run-2", outcome: "dispatched" },
+      }), { headers: { "Content-Type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const execution = {
+      provider: "codex" as const,
+      model: "gpt-5.6-sol",
+      effort: "high" as const,
+      workerId: "worker-1",
+    };
+
+    await acceptChannelProposal(
+      "token",
+      "organization-1",
+      "channel-1",
+      "proposal-1",
+      "project-2",
+      execution,
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ projectId: "project-2", execution }),
+      }),
+    );
+  });
+
   it("sends only user-selected settings for channel execution approval", async () => {
     const response = {
       proposal: { id: "execution-1", status: "accepted" },

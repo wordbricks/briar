@@ -60,6 +60,7 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(sessions.sessions.first?.status, .completed)
         XCTAssertEqual(sessions.sessions.first?.agentName, "Issue processing agent")
         XCTAssertEqual(sessions.sessions.first?.issues.first?.runNumber, 3832)
+        XCTAssertEqual(sessions.sessions.first?.requestedByUserId, "fixture-user")
 
         let taskPayload = try XCTUnwrap(operations["runProjectAgentTask"]?["response"])
         let taskData = try JSONSerialization.data(withJSONObject: taskPayload)
@@ -934,13 +935,15 @@ final class AgentsInboxSystemTests: XCTestCase {
             events: [
                 .init(id: "e1", type: .failed, occurredAt: Date(timeIntervalSince1970: 1_700_000_080)),
             ],
-            updatedAt: Date(timeIntervalSince1970: 1_700_000_080)
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_080),
+            requestedByUserId: "u1"
         )
 
         let messages = InboxMessageBuilder.build(
             snapshot: snapshot,
             sessions: [session],
-            project: project
+            project: project,
+            currentUserID: "u1"
         )
         XCTAssertEqual(messages.count, 5)
         // In-progress issues never surface as a message; only decision and
@@ -1104,6 +1107,66 @@ final class AgentsInboxSystemTests: XCTestCase {
             restored.update(snapshot: snapshot, sessions: [session], project: project)
             XCTAssertEqual(restored.unreadCount, 0)
         }
+    }
+
+    func testInboxSessionMessagesAreLimitedToTheCurrentRequester() {
+        let project = ProjectsResponse.Project(
+            id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
+            name: "Briar",
+            icon: nil,
+            organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
+            organizationName: "Wordbricks",
+            role: .owner,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let completedAt = Date(timeIntervalSince1970: 1_700_000_080)
+        func terminalSession(id: String, requester: String?) -> ProjectAgentSession {
+            ProjectAgentSession(
+                id: id,
+                projectId: project.id,
+                dispatchGroupId: id,
+                agentId: nil,
+                sessionType: .task,
+                trigger: .manual,
+                scheduleId: nil,
+                scheduleRunId: nil,
+                parentSessionId: nil,
+                request: "Private result",
+                status: .failed,
+                issues: [],
+                startedAt: completedAt.addingTimeInterval(-60),
+                completedAt: completedAt,
+                conversationId: nil,
+                workspaceRoot: nil,
+                summary: nil,
+                error: "Runner stopped",
+                events: [.init(id: "\(id)-failed", type: .failed, occurredAt: completedAt)],
+                updatedAt: completedAt,
+                requestedByUserId: requester
+            )
+        }
+        let sessions = [
+            terminalSession(id: "owned-by-a", requester: "user-a"),
+            terminalSession(id: "owned-by-b", requester: "user-b"),
+            terminalSession(id: "legacy-unknown", requester: nil),
+        ]
+
+        let userA = InboxMessageBuilder.build(
+            snapshot: nil,
+            sessions: sessions,
+            project: project,
+            currentUserID: "user-a"
+        )
+        let userB = InboxMessageBuilder.build(
+            snapshot: nil,
+            sessions: sessions,
+            project: project,
+            currentUserID: "user-b"
+        )
+
+        XCTAssertEqual(userA.map(\.id), ["session:owned-by-a"])
+        XCTAssertEqual(userB.map(\.id), ["session:owned-by-b"])
+        XCTAssertTrue(userA.first?.requiresAttention == true)
     }
 
     func testCollapseLinkedSessionsHidesParentsWithChildren() async {

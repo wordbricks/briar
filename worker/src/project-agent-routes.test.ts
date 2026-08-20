@@ -8,7 +8,9 @@ describe("project Agent routes", () => {
   const organizationId = "11111111-1111-4111-8111-111111111111";
   const projectId = "22222222-2222-4222-8222-222222222222";
   const ownerId = "project-agent-route-owner";
+  const memberId = "project-agent-route-member";
   const sessionToken = "project-agent-route-session-token";
+  const memberSessionToken = "project-agent-route-member-session-token";
   const now = "2026-08-10T00:00:00.000Z";
   let db: D1Database;
 
@@ -23,11 +25,21 @@ describe("project Agent routes", () => {
        values (?, 'Owner', 'owner@example.com', 1, ?, ?)`,
     ).bind(ownerId, now, now).run();
     await db.prepare(
+      `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+       values (?, 'Member', 'member@example.com', 1, ?, ?)`,
+    ).bind(memberId, now, now).run();
+    await db.prepare(
       `insert into "session" (
          id, expiresAt, token, createdAt, updatedAt, userId
        ) values ('project-agent-route-session', '2099-01-01T00:00:00.000Z',
                  ?, ?, ?, ?)`,
     ).bind(sessionToken, now, now, ownerId).run();
+    await db.prepare(
+      `insert into "session" (
+         id, expiresAt, token, createdAt, updatedAt, userId
+       ) values ('project-agent-route-member-session',
+                 '2099-01-01T00:00:00.000Z', ?, ?, ?, ?)`,
+    ).bind(memberSessionToken, now, now, memberId).run();
     await db.prepare(
       `insert into briar_organizations (id, name, handle, created_at, updated_at)
        values (?, 'Agent Routes', 'agent-routes', ?, ?)`,
@@ -37,6 +49,11 @@ describe("project Agent routes", () => {
          organization_id, user_id, role, created_at, updated_at
        ) values (?, ?, 'owner', ?, ?)`,
     ).bind(organizationId, ownerId, now, now).run();
+    await db.prepare(
+      `insert into briar_organization_members (
+         organization_id, user_id, role, created_at, updated_at
+       ) values (?, ?, 'member', ?, ?)`,
+    ).bind(organizationId, memberId, now, now).run();
     await db.prepare(
       `insert into briar_projects (
          id, owner_user_id, organization_id, name, agent_token_hash,
@@ -230,6 +247,9 @@ describe("project Agent routes", () => {
       env(),
     );
     expect(created.status).toBe(200);
+    await expect(created.clone().json()).resolves.toMatchObject({
+      session: { requestedByUserId: ownerId },
+    });
 
     const snapshot = await worker.fetch(
       request(`/projects/${projectId}/agent-sessions/changes`, "GET"),
@@ -281,6 +301,7 @@ describe("project Agent routes", () => {
           ],
           updatedAt: completedAt,
         },
+        { authorization: `Bearer ${memberSessionToken}` },
       ),
       env(),
     );
@@ -316,9 +337,88 @@ describe("project Agent routes", () => {
     await expect(detail.json()).resolves.toMatchObject({
       session: {
         id: sessionId,
+        requestedByUserId: ownerId,
         summary: "Repository review complete.",
         events: [{ id: "event-1" }, { id: "event-2" }],
         detailLoaded: true,
+      },
+    });
+
+    const childSessionId = "session-sync-child";
+    const child = await worker.fetch(
+      request(
+        `/projects/${projectId}/agent-sessions/${childSessionId}`,
+        "PUT",
+        {
+          ...input,
+          dispatchGroupId: childSessionId,
+          parentSessionId: sessionId,
+          startedAt: "2026-08-10T01:06:00.000Z",
+          updatedAt: "2026-08-10T01:06:00.000Z",
+        },
+        { authorization: `Bearer ${memberSessionToken}` },
+      ),
+      env(),
+    );
+    expect(child.status).toBe(200);
+    await expect(child.json()).resolves.toMatchObject({
+      session: {
+        id: childSessionId,
+        parentSessionId: sessionId,
+        requestedByUserId: ownerId,
+      },
+    });
+
+    const scheduledAgentResponse = await worker.fetch(
+      request(`/projects/${projectId}/agents`, "POST", {
+        name: "Scheduled Agent",
+        provider: "codex",
+        responsibility: "Run scheduled work.",
+      }),
+      env(),
+    );
+    const scheduledAgent = await scheduledAgentResponse.json<{
+      agent: { id: string };
+    }>();
+    const scheduleResponse = await worker.fetch(
+      request(`/projects/${projectId}/agent-schedules`, "POST", {
+        agentId: scheduledAgent.agent.id,
+        name: "Owner schedule",
+        recurrence: "daily",
+        timeOfDay: "09:00",
+        dayOfWeek: null,
+        notificationLevel: "important_updates",
+        timeZone: "Asia/Seoul",
+      }),
+      env(),
+    );
+    expect(scheduleResponse.status).toBe(201);
+    const schedule = await scheduleResponse.json<{ schedule: { id: string } }>();
+    const scheduledSessionId = "session-sync-scheduled";
+    const scheduledSession = await worker.fetch(
+      request(
+        `/projects/${projectId}/agent-sessions/${scheduledSessionId}`,
+        "PUT",
+        {
+          ...input,
+          dispatchGroupId: scheduledSessionId,
+          agentId: scheduledAgent.agent.id,
+          trigger: "scheduled",
+          scheduleId: schedule.schedule.id,
+          scheduleRunId: "schedule-run-1",
+          startedAt: "2026-08-10T01:07:00.000Z",
+          updatedAt: "2026-08-10T01:07:00.000Z",
+        },
+        { authorization: `Bearer ${memberSessionToken}` },
+      ),
+      env(),
+    );
+    expect(scheduledSession.status).toBe(200);
+    await expect(scheduledSession.json()).resolves.toMatchObject({
+      session: {
+        id: scheduledSessionId,
+        trigger: "scheduled",
+        requestedByUserId: ownerId,
       },
     });
   });

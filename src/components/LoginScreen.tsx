@@ -36,6 +36,7 @@ export function LoginScreen({
         companionMode && "companion-login-shell",
         embedded && "embedded-login-shell",
       )}
+      data-tauri-drag-region
     >
       <div className="login-glow" />
       <section className="login-card rounded-3xl border border-border bg-card shadow-lg">

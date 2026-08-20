@@ -237,6 +237,7 @@ const projectAgentSessionSchema = z.object({
   error: z.string().nullable(),
   requestedWorkerId: z.string().nullable().optional(),
   workerId: z.string().nullable().optional(),
+  requestedByUserId: z.string().nullable().optional(),
   events: z.array(z.object({
     id: z.string(),
     type: z.enum([
@@ -2084,17 +2085,24 @@ export async function acceptChannelProposal(
   channelId: string,
   proposalId: string,
   projectId: string | null,
+  execution: IssueExecutionApprovalInput | null = null,
 ) {
   return request<{
     outcome: "accepted" | "already_accepted";
     projectId: string;
     resultRunId: string;
-    /** Present on new servers when create approval materializes execution. */
+    /** Present when create approval materializes or accepts execution. */
     executionProposal?: ChannelExecutionProposal | null;
+    dispatch?: HuntDispatchResult | null;
   }>(
     `/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/accept`,
     token,
-    { method: "POST", body: JSON.stringify({ projectId }) },
+    {
+      method: "POST",
+      body: JSON.stringify(execution
+        ? { projectId, execution }
+        : { projectId }),
+    },
   );
 }
 

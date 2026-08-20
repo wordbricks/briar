@@ -135,6 +135,7 @@ import {
   channelIssueProposalRequestsExecution,
 } from "./ChannelIssueProposalDetails";
 import { IssueExecutionApproval } from "./IssueExecutionApproval";
+import { IssueCreateExecutionApproval } from "./IssueCreateExecutionApproval";
 import { AgentSkillExecutionApproval } from "./AgentSkillExecutionApproval";
 import {
   CHANNEL_REALTIME_FALLBACK_MS,
@@ -1700,6 +1701,18 @@ export function Channels({
     [token],
   );
 
+  const loadCreateExecutionProposalContext = useCallback(
+    async (projectId: string) => {
+      const dashboard = await loadDashboard(token, projectId);
+      return {
+        run: null,
+        workers: dashboard.workers ?? [],
+        policy: dashboard.executionPolicy,
+      };
+    },
+    [token],
+  );
+
   const loadSkillExecutionProposalContext = useCallback(
     async (proposal: AgentSkillExecutionProposal) => {
       const dashboard = await loadDashboard(token, proposal.projectId);
@@ -1845,8 +1858,13 @@ export function Channels({
   );
 
   const acceptProposal = useCallback(
-    async (message: ChannelMessage) => {
-      if (!activeChannelId || !message.proposal) return;
+    async (
+      message: ChannelMessage,
+      execution: IssueExecutionApprovalInput | null = null,
+    ): Promise<string | null | undefined> => {
+      if (!activeChannelId || !message.proposal) {
+        return t("executionApproval.targetUnavailable");
+      }
       const proposalId = message.proposal.id;
       const requestsExecution = channelIssueProposalRequestsExecution(
         message.proposal,
@@ -1869,13 +1887,22 @@ export function Channels({
       setAcceptingProposalId(proposalId);
       setError(null);
       try {
-        const result = await acceptChannelProposal(
-          token,
-          organizationId,
-          activeChannelId,
-          proposalId,
-          projectId,
-        );
+        const result = execution
+          ? await acceptChannelProposal(
+              token,
+              organizationId,
+              activeChannelId,
+              proposalId,
+              projectId,
+              execution,
+            )
+          : await acceptChannelProposal(
+              token,
+              organizationId,
+              activeChannelId,
+              proposalId,
+              projectId,
+            );
         const hasExecutionFollowUp =
           requestsExecution || result.executionProposal != null;
         if (!approvalContextIsCurrent()) return;
@@ -1940,10 +1967,13 @@ export function Channels({
             }
           }
         }
+        return null;
       } catch (cause) {
+        const failure = errorMessage(cause);
         if (approvalContextIsCurrent()) {
-          setError(errorMessage(cause));
+          setError(failure);
         }
+        return failure;
       } finally {
         if (approvalContextIsCurrent()) {
           setBusy(false);
@@ -1961,6 +1991,7 @@ export function Channels({
       recordProposalMessages,
       refreshProposalState,
       token,
+      t,
       updateRootMessages,
     ],
   );
@@ -2106,7 +2137,7 @@ export function Channels({
         <section className="channel-main">
         {activeChannel ? (
           <>
-            <header className="channel-header">
+            <header className="channel-header" data-tauri-drag-region>
               <div className="channel-header-title">
                 {activeChannel.visibility === "private" ? (
                   <Lock size={16} aria-hidden="true" />
@@ -2194,7 +2225,11 @@ export function Channels({
                       members={members}
                       localeTag={localeTag}
                       currentUserId={currentUserId}
-                      onAcceptProposal={() => void acceptProposal(message)}
+                      onAcceptProposal={(input) =>
+                        acceptProposal(message, input ?? null)}
+                      loadCreateExecutionProposalContext={
+                        loadCreateExecutionProposalContext
+                      }
                       loadExecutionProposalContext={() =>
                         loadExecutionProposalContext(message.executionProposal!)}
                       loadSkillExecutionProposalContext={() =>
@@ -2338,7 +2373,11 @@ export function Channels({
                 members={members}
                 localeTag={localeTag}
                 currentUserId={currentUserId}
-                onAcceptProposal={() => void acceptProposal(message)}
+                onAcceptProposal={(input) =>
+                  acceptProposal(message, input ?? null)}
+                loadCreateExecutionProposalContext={
+                  loadCreateExecutionProposalContext
+                }
                 loadExecutionProposalContext={() =>
                   loadExecutionProposalContext(message.executionProposal!)}
                 loadSkillExecutionProposalContext={() =>
@@ -3499,6 +3538,7 @@ const MessageRow = memo(function MessageRow({
   acceptingProposal,
   agents,
   channel,
+  loadCreateExecutionProposalContext,
   loadExecutionProposalContext,
   loadSkillExecutionProposalContext,
   message,
@@ -3525,6 +3565,11 @@ const MessageRow = memo(function MessageRow({
   acceptingProposal: boolean;
   agents: ChannelAgentSummary[];
   channel: ChannelSummary;
+  loadCreateExecutionProposalContext: (projectId: string) => Promise<{
+    run: HuntRun | null;
+    workers: ExecutionWorker[];
+    policy?: ProjectExecutionWorkerPolicy;
+  }>;
   loadExecutionProposalContext: () => Promise<{
     run: HuntRun | null;
     workers: ExecutionWorker[];
@@ -3539,7 +3584,9 @@ const MessageRow = memo(function MessageRow({
   localeTag: string;
   currentUserId: string | null;
   onOpenThread?: () => void;
-  onAcceptProposal: () => void;
+  onAcceptProposal: (
+    input?: IssueExecutionApprovalInput,
+  ) => Promise<string | null | undefined>;
   onAcceptExecutionProposal: (
     input: IssueExecutionApprovalInput,
   ) => Promise<ChannelExecutionProposal>;
@@ -3591,6 +3638,7 @@ const MessageRow = memo(function MessageRow({
     issueProposal?.status === "pending" && !issueProposal.projectId &&
     !channel.defaultProjectId;
   const proposalIssue = channelIssueProposalDetails(issueProposal);
+  const requestsExecution = channelIssueProposalRequestsExecution(issueProposal);
   const executionProjectName = message.executionProposal
     ? availableProjects.find(
         (project) => project.id === message.executionProposal?.projectId,
@@ -3690,7 +3738,42 @@ const MessageRow = memo(function MessageRow({
                 ))}
               </select>
             ) : null}
-            {issueProposal.status === "pending" ? (
+            {requestsExecution && proposalProjectId && proposalIssue ? (
+              <>
+                <IssueCreateExecutionApproval
+                  disabledReason={channel.archivedAt
+                    ? t("executionApproval.archived")
+                    : busy && !acceptingProposal
+                      ? t("executionApproval.approvalUnavailable")
+                      : null}
+                  executionProposal={message.executionProposal}
+                  issueAccepted={issueProposal.status === "accepted"}
+                  loadExecutionContext={() =>
+                    loadCreateExecutionProposalContext(proposalProjectId)}
+                  onAccept={(input) => onAcceptProposal(input)}
+                  projectName={proposalProjectName}
+                  proposalId={issueProposal.id}
+                  targetTitle={proposalIssue.title}
+                />
+                {issueProposal.status === "accepted" &&
+                    issueProposal.projectId &&
+                    issueProposal.resultRunId &&
+                    onIssueOpen ? (
+                  <button
+                    className="channel-proposal-view-button"
+                    onClick={() => {
+                      void onIssueOpen(
+                        issueProposal.projectId!,
+                        issueProposal.resultRunId!,
+                      );
+                    }}
+                    type="button"
+                  >
+                    {t("channel.viewIssue")}
+                  </button>
+                ) : null}
+              </>
+            ) : issueProposal.status === "pending" ? (
               <button
                 aria-busy={acceptingProposal}
                 className="channel-proposal-approve-button"
@@ -3698,7 +3781,7 @@ const MessageRow = memo(function MessageRow({
                   busy || Boolean(channel.archivedAt) ||
                   !proposalProjectId || !proposalIssue
                 }
-                onClick={onAcceptProposal}
+                onClick={() => void onAcceptProposal()}
                 type="button"
               >
                 {acceptingProposal ? (
@@ -3729,7 +3812,7 @@ const MessageRow = memo(function MessageRow({
           </div>
         ) : null}
 
-        {message.executionProposal ? (
+        {message.executionProposal && !requestsExecution ? (
           <IssueExecutionApproval
             disabledReason={channel.archivedAt
               ? t("executionApproval.archived")

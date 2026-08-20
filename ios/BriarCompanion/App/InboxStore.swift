@@ -214,6 +214,15 @@ final class InboxStore: ObservableObject {
                         !subscribed.contains(message.targetId)
                     }
                 }
+                let authorizedSessionMessageIDs = Set(
+                    response.messages.compactMap { message in
+                        message.kind == .session ? message.id : nil
+                    }
+                )
+                self.messages.removeAll { message in
+                    message.kind == .session &&
+                        !authorizedSessionMessageIDs.contains(message.id)
+                }
                 let storedByID = Dictionary(
                     uniqueKeysWithValues: self.messages.map { ($0.id, $0) }
                 )

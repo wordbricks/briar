@@ -123,6 +123,7 @@ type ParsedSession = {
   id: string;
   agentName: string | null;
   parentSessionId: string | null;
+  requestedByUserId: string | null;
   request: string | null;
   status: "completed" | "failed";
   issues: Array<{ title: string; outcome: string }>;
@@ -172,6 +173,7 @@ function parseSession(
     id: row.session_id,
     agentName: optionalString(payload.agentName)?.trim() || null,
     parentSessionId: optionalString(payload.parentSessionId),
+    requestedByUserId: optionalString(payload.requestedByUserId),
     request: optionalString(payload.request),
     status,
     issues,
@@ -221,6 +223,7 @@ function structuredResult(run: InboxFeedRun) {
 export function buildInboxFeedMessages(
   projectData: readonly InboxFeedProjectData[],
   channelNotifications: readonly InboxFeedChannelNotification[],
+  currentUserId: string,
 ): InboxFeedMessage[] {
   const messages: InboxFeedMessage[] = [];
   const parsedSessions: ParsedSession[] = [];
@@ -286,7 +289,9 @@ export function buildInboxFeedMessages(
 
     for (const row of sessionSummaries) {
       const session = parseSession(project, row);
-      if (session) parsedSessions.push(session);
+      if (session?.requestedByUserId === currentUserId) {
+        parsedSessions.push(session);
+      }
     }
   }
 

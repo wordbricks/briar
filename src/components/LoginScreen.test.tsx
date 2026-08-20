@@ -15,6 +15,7 @@ describe("LoginScreen", () => {
       <LoginScreen {...baseProps} loginCode={null} />,
     );
 
+    expect(markup.match(/data-tauri-drag-region/g)).toHaveLength(1);
     expect(markup).toContain("이메일 인증코드로 계속하기");
     expect(markup).toContain("Google로 계속하기");
     expect(markup.indexOf("이메일 인증코드로 계속하기")).toBeLessThan(
@@ -83,7 +84,9 @@ describe("LoginScreen", () => {
       <LoginScreen {...baseProps} embedded loginCode={null} />,
     );
 
-    expect(markup).toContain('<div class="login-shell embedded-login-shell">');
+    expect(markup).toContain(
+      '<div class="login-shell embedded-login-shell" data-tauri-drag-region',
+    );
     expect(markup).not.toContain("<main");
   });
 });

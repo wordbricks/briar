@@ -539,6 +539,25 @@ func validateIssueExecutionApproval(
     }
     guard let run else { throw IssueExecutionApprovalError.targetUnavailable }
 
+    try validateIssueExecutionSelection(
+        snapshot: snapshot,
+        projectID: proposal.projectId,
+        request: request
+    )
+    return run
+}
+
+/// Validates the execution half of a combined create-and-execute approval
+/// before the issue exists. The server repeats these checks at mutation time.
+func validateIssueExecutionSelection(
+    snapshot: DashboardSnapshot,
+    projectID: UUID,
+    request: AcceptIssueExecutionProposalRequest? = nil
+) throws {
+    guard snapshot.project.id == projectID else {
+        throw IssueExecutionApprovalError.targetUnavailable
+    }
+
     // Conversational approval is based on the target project's exact
     // capability snapshot. Missing provider data is not permission to infer
     // that every provider is available.
@@ -580,7 +599,6 @@ func validateIssueExecutionApproval(
             throw IssueExecutionApprovalError.workerUnavailable
         }
     }
-    return run
 }
 
 extension AcceptIssueExecutionProposalRequest {
@@ -825,7 +843,7 @@ struct DispatchRunRequest: Codable, Sendable {
     }
 }
 
-struct DispatchRunResponse: Codable, Sendable {
+struct DispatchRunResponse: Codable, Equatable, Sendable {
     let runId: UUID
     let agentId: UUID?
     let provider: AgentProvider

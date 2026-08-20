@@ -111,6 +111,7 @@ import {
   channelIssueProposalRequestsExecution,
 } from "./ChannelIssueProposalDetails";
 import { IssueExecutionApproval } from "./IssueExecutionApproval";
+import { IssueCreateExecutionApproval } from "./IssueCreateExecutionApproval";
 import { AgentSkillExecutionApproval } from "./AgentSkillExecutionApproval";
 import { ConversationScrollToBottomButton } from "./ConversationScrollToBottomButton";
 import {
@@ -1288,6 +1289,18 @@ export function CompanionChannels({
     [token],
   );
 
+  const loadCreateExecutionProposalContext = useCallback(
+    async (projectId: string) => {
+      const dashboard = await loadDashboard(token, projectId);
+      return {
+        run: null,
+        workers: dashboard.workers ?? [],
+        policy: dashboard.executionPolicy,
+      };
+    },
+    [token],
+  );
+
   const loadSkillExecutionProposalContext = useCallback(
     async (proposal: AgentSkillExecutionProposal) => {
       const dashboard = await loadDashboard(token, proposal.projectId);
@@ -1416,12 +1429,15 @@ export function CompanionChannels({
   );
 
   const acceptProposal = useCallback(
-    async (item: ChannelMessage) => {
+    async (
+      item: ChannelMessage,
+      execution: IssueExecutionApprovalInput | null = null,
+    ): Promise<string | null | undefined> => {
       if (
         !channel ||
         item.proposal?.actionType !== "request_issue_create" ||
         !channelIssueProposalDetails(item.proposal)
-      ) return;
+      ) return t("executionApproval.targetUnavailable");
       const proposalId = item.proposal.id;
       const requestsExecution = channelIssueProposalRequestsExecution(
         item.proposal,
@@ -1443,13 +1459,22 @@ export function CompanionChannels({
       setAcceptingProposalId(proposalId);
       setError(null);
       try {
-        const result = await acceptChannelProposal(
-          token,
-          organizationId,
-          channel.id,
-          proposalId,
-          projectId,
-        );
+        const result = execution
+          ? await acceptChannelProposal(
+              token,
+              organizationId,
+              channel.id,
+              proposalId,
+              projectId,
+              execution,
+            )
+          : await acceptChannelProposal(
+              token,
+              organizationId,
+              channel.id,
+              proposalId,
+              projectId,
+            );
         const hasExecutionFollowUp =
           requestsExecution || result.executionProposal != null;
         if (!approvalContextIsCurrent()) return;
@@ -1510,10 +1535,13 @@ export function CompanionChannels({
             }
           }
         }
+        return null;
       } catch (cause) {
+        const failure = message(cause);
         if (approvalContextIsCurrent()) {
-          setError(message(cause));
+          setError(failure);
         }
+        return failure;
       } finally {
         if (approvalContextIsCurrent()) {
           setBusy(false);
@@ -1530,6 +1558,7 @@ export function CompanionChannels({
       recordProposalMessages,
       refreshProposalState,
       token,
+      t,
     ],
   );
 
@@ -1689,7 +1718,11 @@ export function CompanionChannels({
               key={item.id}
               members={members}
               message={item}
-              onAcceptProposal={() => void acceptProposal(item)}
+              onAcceptProposal={(input) =>
+                acceptProposal(item, input ?? null)}
+              loadCreateExecutionProposalContext={
+                loadCreateExecutionProposalContext
+              }
               loadExecutionProposalContext={() =>
                 loadExecutionProposalContext(item.executionProposal!)}
               loadSkillExecutionProposalContext={() =>
@@ -1801,7 +1834,11 @@ export function CompanionChannels({
               key={item.id}
               members={members}
               message={item}
-              onAcceptProposal={() => void acceptProposal(item)}
+              onAcceptProposal={(input) =>
+                acceptProposal(item, input ?? null)}
+              loadCreateExecutionProposalContext={
+                loadCreateExecutionProposalContext
+              }
               loadExecutionProposalContext={() =>
                 loadExecutionProposalContext(item.executionProposal!)}
               loadSkillExecutionProposalContext={() =>
@@ -1984,6 +2021,7 @@ function MessageRow({
   busy,
   channel,
   currentUserId,
+  loadCreateExecutionProposalContext,
   loadExecutionProposalContext,
   loadSkillExecutionProposalContext,
   members,
@@ -2010,6 +2048,11 @@ function MessageRow({
   busy: boolean;
   channel: ChannelSummary;
   currentUserId: string | null;
+  loadCreateExecutionProposalContext: (projectId: string) => Promise<{
+    run: HuntRun | null;
+    workers: ExecutionWorker[];
+    policy?: ProjectExecutionWorkerPolicy;
+  }>;
   loadExecutionProposalContext: () => Promise<{
     run: HuntRun | null;
     workers: ExecutionWorker[];
@@ -2021,7 +2064,9 @@ function MessageRow({
   }>;
   members: ChannelMember[];
   message: ChannelMessage;
-  onAcceptProposal: () => void;
+  onAcceptProposal: (
+    input?: IssueExecutionApprovalInput,
+  ) => Promise<string | null | undefined>;
   onAcceptExecutionProposal: (
     input: IssueExecutionApprovalInput,
   ) => Promise<ChannelExecutionProposal>;
@@ -2061,6 +2106,7 @@ function MessageRow({
       proposalProjectId
     : null;
   const proposalIssue = channelIssueProposalDetails(issueProposal);
+  const requestsExecution = channelIssueProposalRequestsExecution(issueProposal);
   const executionProjectName = message.executionProposal
     ? projects.find(
         (project) => project.id === message.executionProposal?.projectId,
@@ -2134,7 +2180,37 @@ function MessageRow({
                 ))}
               </select>
             ) : null}
-            {issueProposal.status === "pending" ? (
+            {requestsExecution && proposalProjectId && proposalIssue ? (
+              <>
+                <IssueCreateExecutionApproval
+                  disabledReason={channel.archivedAt
+                    ? t("executionApproval.archived")
+                    : busy && !acceptingProposal
+                      ? t("executionApproval.approvalUnavailable")
+                      : null}
+                  executionProposal={message.executionProposal}
+                  issueAccepted={issueProposal.status === "accepted"}
+                  loadExecutionContext={() =>
+                    loadCreateExecutionProposalContext(proposalProjectId)}
+                  onAccept={(input) => onAcceptProposal(input)}
+                  projectName={proposalProjectName}
+                  proposalId={issueProposal.id}
+                  targetTitle={proposalIssue.title}
+                />
+                {issueProposal.status === "accepted" &&
+                    acceptedProjectId && acceptedRunId && onIssueOpen ? (
+                  <button
+                    className="channel-proposal-view-button"
+                    onClick={() => {
+                      void onIssueOpen(acceptedProjectId, acceptedRunId);
+                    }}
+                    type="button"
+                  >
+                    {t("channel.viewIssue")}
+                  </button>
+                ) : null}
+              </>
+            ) : issueProposal.status === "pending" ? (
               <button
                 aria-busy={acceptingProposal}
                 className="channel-proposal-approve-button"
@@ -2142,7 +2218,7 @@ function MessageRow({
                   busy || Boolean(channel.archivedAt) ||
                   !proposalProjectId || !proposalIssue
                 }
-                onClick={onAcceptProposal}
+                onClick={() => void onAcceptProposal()}
                 type="button"
               >
                 {acceptingProposal ? (
@@ -2167,7 +2243,7 @@ function MessageRow({
             ) : null}
           </div>
         ) : null}
-        {message.executionProposal ? (
+        {message.executionProposal && !requestsExecution ? (
           <IssueExecutionApproval
             disabledReason={channel.archivedAt
               ? t("executionApproval.archived")

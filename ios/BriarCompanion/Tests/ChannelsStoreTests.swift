@@ -1112,6 +1112,57 @@ final class ChannelsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testCombinedCreateApprovalCreatesAndDispatchesThroughOneRequest() async throws {
+        let execution = executionApprovalResponse()
+        let configured = try await proposalStore(
+            response: AcceptChannelProposalResponse(
+                outcome: .accepted,
+                projectId: projectID,
+                resultRunId: resultRunID,
+                executionProposal: execution.proposal,
+                dispatch: execution.dispatch
+            ),
+            requestsExecutionFollowUp: true
+        )
+
+        let result = await configured.store.acceptProposal(
+            channelID: channelID,
+            proposalID: proposalID,
+            projectID: projectID,
+            execution: executionApprovalRequest()
+        )
+
+        XCTAssertEqual(result?.executionProposal?.status, .accepted)
+        XCTAssertEqual(result?.dispatch, execution.dispatch)
+        XCTAssertEqual(configured.store.messages.first?.proposal?.status, .accepted)
+        XCTAssertEqual(
+            configured.store.messages.first?.executionProposal?.status,
+            .accepted
+        )
+        let combinedRequestCount = await configured.api.requestCount(
+            for: configured.acceptPath
+        )
+        XCTAssertEqual(combinedRequestCount, 1)
+        let separatePath = MobileAPIContract.Endpoint.acceptChannelExecutionProposal(
+            organizationID: organizationID,
+            channelID: channelID,
+            proposalID: executionProposalID
+        )
+        let separateRequestCount = await configured.api.requestCount(for: separatePath)
+        XCTAssertEqual(separateRequestCount, 0)
+        let recordedBody = await configured.api.lastJSONBody(for: configured.acceptPath)
+        let body = try XCTUnwrap(recordedBody)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: body) as? [String: Any]
+        )
+        XCTAssertEqual(
+            (object["execution"] as? [String: Any])?["workerId"] as? String,
+            "worker-1"
+        )
+        configured.store.applicationDidEnterBackground()
+    }
+
+    @MainActor
     func testAcceptProposalFailureKeepsProposalPendingAndSurfacesError() async throws {
         let configured = try await proposalStore(response: nil)
 
@@ -2742,6 +2793,11 @@ final class ChannelsStoreTests: XCTestCase {
             listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
             detailPath: detailResponses,
         ]
+        if requestsExecutionFollowUp {
+            routes[MobileAPIContract.Endpoint.dashboard(projectID: projectID)] = [
+                try encoded(executionDashboard(dispatched: false)),
+            ]
+        }
         if focusThread {
             routes[MobileAPIContract.Endpoint.channelMessages(
                 organizationID: organizationID,
