@@ -3921,6 +3921,7 @@ async function handleGithubWebhookRequest(request: Request, env: Env) {
       draft: event.draft,
       headSha: event.headSha,
       baseSha: event.baseSha,
+      baseBranch: event.baseBranch,
       mergeCommitSha: event.mergeCommitSha,
       openedAt: event.createdAt,
       closedAt: event.closedAt,
