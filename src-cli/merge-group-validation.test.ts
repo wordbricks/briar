@@ -94,12 +94,12 @@ ${scriptBody}
 
 describe("exact-SHA merge-group foundation", () => {
   it("is wired only through the audited-runtime-gated local adapter", async () => {
-    const [entrypoint, adapter] = await Promise.all([
-      readFile("src-cli/index.ts", "utf8"),
+    const [workerCommands, adapter] = await Promise.all([
+      readFile("src-cli/worker-commands.ts", "utf8"),
       readFile("src-cli/merge-queue.ts", "utf8"),
     ]);
-    expect(entrypoint).toContain("resolveMergeGroupContainerRuntime()");
-    expect(entrypoint).toContain("claimMergeBatchIfReady");
+    expect(workerCommands).toContain("resolveMergeGroupContainerRuntime()");
+    expect(workerCommands).toContain("claimMergeBatchIfReady");
     expect(adapter).toContain("if (input.repliesOnly || input.runtime === null)");
   });
 

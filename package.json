@@ -118,6 +118,7 @@
     "wrangler": "4.118.0"
   },
   "overrides": {
+    "@effect/platform-node-shared": "4.0.0-rc.108",
     "@hono/node-server": "2.0.12",
     "fast-uri": "3.1.5",
     "hono": "4.12.34",

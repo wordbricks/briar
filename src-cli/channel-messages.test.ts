@@ -104,9 +104,9 @@ describe("channel messages CLI", () => {
     const result = await runCli(directory, ["channel", "messages", "--help"]);
 
     expect(result).toMatchObject({ exitCode: 0, stderr: "" });
-    expect(result.stdout).toContain("--channel-id <uuid>");
-    expect(result.stdout).toContain("--cursor <message-uuid>");
-    expect(result.stdout).toContain("--parent-message-id <root-message-uuid>");
+    expect(result.stdout).toContain("--channel-id uuid");
+    expect(result.stdout).toContain("--cursor message-uuid");
+    expect(result.stdout).toContain("--parent-message-id root-message-uuid");
   });
 
   it("requests a paginated thread with the connected Project Agent token", async () => {
