@@ -450,7 +450,9 @@ mod tests {
 
         let alpha = image
             .rgba()
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|pixel| pixel[3])
             .collect::<Vec<_>>();
         let opaque_pixels = alpha.iter().filter(|value| **value >= 240).count();
