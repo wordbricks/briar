@@ -74,12 +74,13 @@ export function useInboxNotifications(
   baselineId = "local",
   viewingChannelId: string | null = null,
   viewingIssueConversationRunId: string | null = null,
+  initialSyncComplete = true,
 ) {
   const { t } = useI18n();
   const baselineRef = useRef<NotificationBaseline | null>(null);
 
   useEffect(() => {
-    if (!userId || !organizationId) {
+    if (!userId || !organizationId || !initialSyncComplete) {
       baselineRef.current = null;
       return;
     }
@@ -126,6 +127,7 @@ export function useInboxNotifications(
     }
   }, [
     baselineId,
+    initialSyncComplete,
     messages,
     organizationId,
     t,

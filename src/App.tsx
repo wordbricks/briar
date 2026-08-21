@@ -506,6 +506,7 @@ export function App() {
     inbox.notificationBaselineId,
     viewingChannelId,
     viewingIssueConversationRunId,
+    inbox.initialSyncComplete,
   );
   useEffect(() => {
     if (projectWindowProjectId) return;
