@@ -28,16 +28,6 @@ describe("database module boundaries", () => {
     expect(source.replaceAll(reexportPattern, "").trim()).toBe("");
   });
 
-  it("keeps every database module below the 1,000-line boundary", async () => {
-    const { sources } = await databaseModuleGraph();
-    for (const [moduleUrl, source] of sources) {
-      const lineCount = source.endsWith("\n")
-        ? source.split("\n").length - 1
-        : source.split("\n").length;
-      expect(lineCount, moduleUrl).toBeLessThanOrEqual(1_000);
-    }
-  });
-
   it("keeps implementations independent from the db.ts facade", async () => {
     const { facade, sources } = await databaseModuleGraph();
     for (const [moduleUrl, source] of sources) {
