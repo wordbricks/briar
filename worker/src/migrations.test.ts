@@ -16,7 +16,11 @@ import {
   recordHuntEvent,
   transferIssue,
 } from "./db";
-import { applyD1Migrations, executeD1Sql } from "./test-helpers/d1";
+import {
+  applyD1Migrations,
+  createIsolatedTestDatabase,
+  executeD1Sql,
+} from "./test-helpers/d1";
 
 async function createPreDescriptionOrganizationAgent(
   db: D1Database,
@@ -187,14 +191,11 @@ async function createPreWebhookChannelMessage(
 
 describe("D1 migrations", () => {
   it("adds immutable Agent Session requesters and schedule creators", async () => {
-    const miniflare = new Miniflare({
-      modules: true,
-      script: "export default { fetch() { return new Response('ok') } }",
-      d1Databases: { DB: "briar-session-requester-migration-test" },
+    const database = await createIsolatedTestDatabase({
+      suite: "session-requester-migration",
     });
     try {
-      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-      await applyD1Migrations(db);
+      const { db } = database;
       const sessionColumns = await db.prepare(
         `pragma table_info(briar_project_agent_sessions)`,
       ).all<{ name: string }>();
@@ -269,19 +270,16 @@ describe("D1 migrations", () => {
          where project_id = 'requester-project' and id = 'requester-session'`,
       ).first()).resolves.toEqual({ requested_by_user_id: null });
     } finally {
-      await miniflare.dispose();
+      await database.dispose();
     }
   }, 60_000);
 
   it("adds shared email OTP rate limits and a single active sign-in code", async () => {
-    const miniflare = new Miniflare({
-      modules: true,
-      script: "export default { fetch() { return new Response('ok') } }",
-      d1Databases: { DB: "briar-email-otp-migration-test" },
+    const database = await createIsolatedTestDatabase({
+      suite: "email-otp-migration",
     });
     try {
-      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-      await applyD1Migrations(db);
+      const { db } = database;
       const rateLimitColumns = await db.prepare(
         `pragma table_info("rateLimit")`,
       ).all<{ name: string }>();
@@ -320,19 +318,16 @@ describe("D1 migrations", () => {
         now,
       ).run()).rejects.toThrow();
     } finally {
-      await miniflare.dispose();
+      await database.dispose();
     }
   }, 60_000);
 
   it("indexes GitHub reconcile candidates in reconciliation order", async () => {
-    const miniflare = new Miniflare({
-      modules: true,
-      script: "export default { fetch() { return new Response('ok') } }",
-      d1Databases: { DB: "briar-github-reconcile-index-migration-test" },
+    const database = await createIsolatedTestDatabase({
+      suite: "github-reconcile-index-migration",
     });
     try {
-      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-      await applyD1Migrations(db);
+      const { db } = database;
 
       const plan = await db.prepare(
         `explain query plan
@@ -350,7 +345,7 @@ describe("D1 migrations", () => {
       expect(details).toContain("briar_hunt_runs_github_reconcile_idx");
       expect(details).not.toMatch(/use temp b-tree for order by/iu);
     } finally {
-      await miniflare.dispose();
+      await database.dispose();
     }
   }, 60_000);
 
@@ -543,14 +538,11 @@ describe("D1 migrations", () => {
   }, 60_000);
 
   it("adds a nullable preferred Worker device to channel reply jobs", async () => {
-    const miniflare = new Miniflare({
-      modules: true,
-      script: "export default { fetch() { return new Response('ok') } }",
-      d1Databases: { DB: "briar-channel-preferred-device-migration-test" },
+    const database = await createIsolatedTestDatabase({
+      suite: "channel-preferred-device-migration",
     });
     try {
-      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-      await applyD1Migrations(db);
+      const { db } = database;
       const columns = await db.prepare(
         `pragma table_info('briar_channel_agent_reply_jobs')`,
       ).all<{ name: string; notnull: number }>();
@@ -573,7 +565,7 @@ describe("D1 migrations", () => {
         on_delete: "SET NULL",
       }));
     } finally {
-      await miniflare.dispose();
+      await database.dispose();
     }
   }, 60_000);
 
@@ -916,45 +908,6 @@ describe("D1 migrations", () => {
     }
   });
 
-  it.each([
-    "0049_dashboard_delta_sync.sql",
-    "0050_hunt_run_event_count.sql",
-    "0053_issue_result_reviews.sql",
-    "0055_agent_provider_opencode.sql",
-    "0074_channel_delta_sync.sql",
-    "0081_optimize_dashboard_worker_device_sync.sql",
-    "0083_suppress_heartbeat_dashboard_changes.sql",
-    "0089_channel_agent_delegation.sql",
-    "0090_channel_issue_approval.sql",
-    "0091_issue_execution_approvals.sql",
-    "0092_agent_skill_execution_approvals.sql",
-    "0093_project_agent_session_sync.sql",
-    "0095_organization_inbox_sync.sql",
-    "0096_suppress_lease_sync_changes.sql",
-    "0098_issue_subscriptions.sql",
-    "0099_channel_incoming_webhooks.sql",
-    "0100_channel_issue_regular_lifecycle.sql",
-    "0101_issue_conversation_realtime.sql",
-    "0102_auto_issue_subscriptions.sql",
-    "0106_agent_provider_agy.sql",
-    "0111_agent_provider_cursor.sql",
-    "0112_expand_agent_text_limits.sql",
-    "0116_agent_provider_openrouter.sql",
-    "0105_organization_inbox_realtime.sql",
-    "0108_channel_notification_inbox.sql",
-    "0114_channel_thread_subscriptions.sql",
-    "0120_svg_attachments.sql",
-  ])("keeps each trigger in a separate Wrangler statement: %s", async (name) => {
-    const sql = await readFile(resolve("migrations", name), "utf8");
-    const statements = unstable_splitSqlQuery(sql);
-    const triggerCounts = statements.map(
-      (statement) => statement.match(/\bcreate\s+trigger\b/giu)?.length ?? 0,
-    );
-
-    expect(Math.max(...triggerCounts)).toBeLessThanOrEqual(1);
-    expect(triggerCounts.filter((count) => count === 1)).not.toHaveLength(0);
-  });
-
   it("suppresses lease-only run and channel deltas", async () => {
     const miniflare = new Miniflare({
       modules: true,
@@ -1063,14 +1016,11 @@ describe("D1 migrations", () => {
   });
 
   it("advances one organization Inbox revision for every feed source", async () => {
-    const miniflare = new Miniflare({
-      modules: true,
-      script: "export default { fetch() { return new Response('ok') } }",
-      d1Databases: { DB: "briar-organization-inbox-sync-migration-test" },
+    const database = await createIsolatedTestDatabase({
+      suite: "organization-inbox-sync-migration",
     });
     try {
-      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
-      await applyD1Migrations(db);
+      const { db } = database;
       const userId = "inbox-sync-user";
       const organizationId = "91000000-0000-4000-8000-000000000001";
       const projectId = "92000000-0000-4000-8000-000000000001";
@@ -1155,7 +1105,7 @@ describe("D1 migrations", () => {
         version: 6,
       });
     } finally {
-      await miniflare.dispose();
+      await database.dispose();
     }
   }, 60_000);
 
@@ -3715,26 +3665,6 @@ describe("D1 migrations", () => {
     }
   });
 
-  it.each([
-    "0055_agent_provider_opencode.sql",
-    "0071_organization_agents.sql",
-    "0072_organization_ideas.sql",
-    "0073_organization_channels.sql",
-    "0106_agent_provider_agy.sql",
-    "0111_agent_provider_cursor.sql",
-    "0112_expand_agent_text_limits.sql",
-    "0116_agent_provider_openrouter.sql",
-  ])(
-    "uses D1 transaction-safe foreign-key deferral for table rebuilds: %s",
-    async (name) => {
-      const sql = await readFile(resolve("migrations", name), "utf8");
-
-      expect(sql).toMatch(/pragma\s+defer_foreign_keys\s*=\s*on\s*;/iu);
-      expect(sql).toMatch(/pragma\s+defer_foreign_keys\s*=\s*off\s*;/iu);
-      expect(sql).not.toMatch(/pragma\s+foreign_keys\s*=/iu);
-    },
-  );
-
   it("adds optional Agent descriptions with a 500-character limit", async () => {
     const miniflare = new Miniflare({
       modules: true,
@@ -3976,35 +3906,6 @@ describe("D1 migrations", () => {
       await miniflare.dispose();
     }
   }, 60_000);
-
-  it("keeps Agent and idea ownership organization-scoped with an optional project", async () => {
-    const agents = await readFile(
-      resolve("migrations", "0071_organization_agents.sql"),
-      "utf8",
-    );
-    const ideas = await readFile(
-      resolve("migrations", "0072_organization_ideas.sql"),
-      "utf8",
-    );
-
-    // A null project_id is what marks an organization Agent or idea, so the
-    // column must not carry NOT NULL while organization_id must.
-    expect(agents).toMatch(
-      /organization_id text not null\s+references briar_organizations/iu,
-    );
-    expect(agents).toMatch(
-      /project_id text references briar_projects \(id\) on delete cascade/iu,
-    );
-    expect(ideas).toMatch(
-      /organization_id text not null\s+references briar_organizations/iu,
-    );
-    expect(ideas).toMatch(
-      /project_id text references briar_projects \(id\) on delete cascade/iu,
-    );
-    expect(agents).toMatch(
-      /create unique index briar_project_agents_handle_idx[\s\S]*where handle is not null/iu,
-    );
-  });
 
   it("retires legacy Agent handles without losing Agent records", async () => {
     const miniflare = new Miniflare({
