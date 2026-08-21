@@ -3,6 +3,7 @@ import {
   exchangeGithubOAuthCode,
   extractBriarIssueLinks,
   githubPkceChallenge,
+  mergeQueueTailPullRequestNumber,
   parseGitHubWebhook,
   parseGitHubWebhookHeaders,
   verifyGithubOAuthInstallation,
@@ -96,6 +97,11 @@ describe("GitHub webhooks", () => {
     expect(() => parseGitHubWebhookHeaders(new Headers({
       "x-github-event": "issues",
     }))).toThrow();
+
+    expect(parseGitHubWebhookHeaders(new Headers({
+      "x-github-event": "merge_group",
+      "x-github-delivery": deliveryId,
+    }))).toEqual({ event: "merge_group", deliveryId });
   });
 
   it("parses a GitHub webhook setup ping", () => {
@@ -242,6 +248,59 @@ describe("GitHub webhooks", () => {
       mergeCommitSha: "c".repeat(40),
       mergedAt: "2026-08-04T09:40:00.000Z",
     });
+  });
+
+  it("parses merge-group identity exactly and leaves action filtering to the handler", () => {
+    const payload = {
+      action: "checks_requested",
+      installation: { id: 901 },
+      repository: { id: 701, full_name: "wordbricks/briar" },
+      sender: { login: "github-merge-queue[bot]" },
+      merge_group: {
+        head_sha: "c".repeat(40),
+        head_ref: "refs/heads/gh-readonly-queue/main/pr-42-deadbeef",
+        base_sha: "b".repeat(40),
+        base_ref: "refs/heads/main",
+      },
+    };
+
+    expect(parseGitHubWebhook(
+      { event: "merge_group", deliveryId },
+      payload,
+    )).toEqual({
+      deliveryId,
+      event: "merge_group",
+      action: "checks_requested",
+      installationId: 901,
+      repositoryId: 701,
+      repositoryFullName: "wordbricks/briar",
+      senderLogin: "github-merge-queue[bot]",
+      headSha: "c".repeat(40),
+      headRef: "refs/heads/gh-readonly-queue/main/pr-42-deadbeef",
+      baseSha: "b".repeat(40),
+      baseRef: "refs/heads/main",
+    });
+
+    expect(parseGitHubWebhook(
+      { event: "merge_group", deliveryId },
+      { ...payload, action: "destroyed" },
+    )).toMatchObject({ event: "merge_group", action: "destroyed" });
+    expect(() => parseGitHubWebhook(
+      { event: "merge_group", deliveryId },
+      {
+        ...payload,
+        merge_group: { ...payload.merge_group, head_sha: "c".repeat(39) },
+      },
+    )).toThrow();
+
+    expect(mergeQueueTailPullRequestNumber(
+      payload.merge_group.head_ref,
+      payload.merge_group.base_ref,
+    )).toBe(42);
+    expect(mergeQueueTailPullRequestNumber(
+      "refs/heads/gh-readonly-queue/release/pr-42-deadbeef",
+      "refs/heads/release",
+    )).toBeNull();
   });
 
   it("extracts unique Briar issue links from bodies, capped at twenty", () => {

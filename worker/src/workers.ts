@@ -1201,13 +1201,25 @@ export async function recordWorkerHeartbeat(
                   where holder.device_id = device.id
                     and task.status = 'running'
                     and task.lease_expires_at > ?
+                  union all
+                  select batch.id
+                  from briar_merge_batches batch
+                  join briar_execution_workers holder
+                    on holder.id = batch.claimed_worker_id
+                  where holder.device_id = device.id
+                    and batch.claim_token_hash is not null
+                    and batch.lease_expires_at > ?
+                    and batch.state in (
+                      'enqueueing', 'waiting_tail', 'validating',
+                      'publishing', 'draining'
+                    )
                 ) active_work
               ) as active_sessions
        from briar_execution_workers worker
        join briar_execution_worker_devices device on device.id = worker.device_id
        where worker.id = ?`,
     )
-    .bind(input.observedAt, input.observedAt, input.workerId)
+    .bind(input.observedAt, input.observedAt, input.observedAt, input.workerId)
     .first<ExecutionWorkerRow>();
   if (!updated) {
     throw new WorkerConflictError("Worker heartbeat update was not persisted");
@@ -1418,6 +1430,18 @@ export async function listExecutionWorkers(
                   where holder.device_id = device.id
                     and task.status = 'running'
                     and task.lease_expires_at > ?
+                  union all
+                  select batch.id
+                  from briar_merge_batches batch
+                  join briar_execution_workers holder
+                    on holder.id = batch.claimed_worker_id
+                  where holder.device_id = device.id
+                    and batch.claim_token_hash is not null
+                    and batch.lease_expires_at > ?
+                    and batch.state in (
+                      'enqueueing', 'waiting_tail', 'validating',
+                      'publishing', 'draining'
+                    )
                 ) active_work
               ) as active_sessions
        from briar_execution_workers worker
@@ -1425,7 +1449,7 @@ export async function listExecutionWorkers(
        where worker.project_id = ?
        order by worker.last_heartbeat_at desc, worker.id asc`,
     )
-    .bind(observedAt, observedAt, projectId)
+    .bind(observedAt, observedAt, observedAt, projectId)
     .all<
       ExecutionWorkerRow & {
         owner_user_id: string;
@@ -1562,6 +1586,18 @@ export async function listOrganizationExecutionWorkers(
                   where holder.device_id = device.id
                     and task.status = 'running'
                     and task.lease_expires_at > ?
+                  union all
+                  select batch.id
+                  from briar_merge_batches batch
+                  join briar_execution_workers holder
+                    on holder.id = batch.claimed_worker_id
+                  where holder.device_id = device.id
+                    and batch.claim_token_hash is not null
+                    and batch.lease_expires_at > ?
+                    and batch.state in (
+                      'enqueueing', 'waiting_tail', 'validating',
+                      'publishing', 'draining'
+                    )
                 ) active_work
               ) as active_sessions
        from briar_execution_worker_devices device
@@ -1572,7 +1608,7 @@ export async function listOrganizationExecutionWorkers(
        where device.organization_id = ?
        order by device.last_heartbeat_at desc, device.id, project.created_at`,
     )
-    .bind(observedAt, observedAt, organizationId)
+    .bind(observedAt, observedAt, observedAt, organizationId)
     .all<{
       device_id: string;
       owner_user_id: string;
@@ -2682,6 +2718,17 @@ export async function countExecutionWorkerDeviceSessions(
          where worker.device_id = ? and task.status = 'running'
            and task.lease_expires_at > ?
          union all
+         select batch.id
+         from briar_merge_batches batch
+         join briar_execution_workers worker
+           on worker.id = batch.claimed_worker_id
+         where worker.device_id = ?
+           and batch.claim_token_hash is not null
+           and batch.lease_expires_at > ?
+           and batch.state in (
+             'enqueueing', 'waiting_tail', 'validating', 'publishing', 'draining'
+           )
+         union all
          select reply.id
          from briar_issue_agent_reply_jobs reply
          join briar_execution_workers worker
@@ -2698,6 +2745,8 @@ export async function countExecutionWorkerDeviceSessions(
        ) active_work`,
     )
     .bind(
+      deviceId,
+      observedAt,
       deviceId,
       observedAt,
       deviceId,
