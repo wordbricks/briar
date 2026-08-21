@@ -1,0 +1,11 @@
+env = false
+telemetry = false
+
+[install]
+auto = "disable"
+frozenLockfile = true
+ignoreScripts = true
+prefer = "offline"
+
+[run]
+shell = "system"
