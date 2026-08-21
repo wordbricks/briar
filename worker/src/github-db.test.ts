@@ -225,6 +225,7 @@ describe("GitHub pull request D1 integration", () => {
       draft: false,
       headSha: "a".repeat(40),
       baseSha: "b".repeat(40),
+      baseBranch: "main",
       mergeCommitSha: state === "merged" ? "c".repeat(40) : null,
       openedAt: "2029-12-31T00:00:00.000Z",
       closedAt: closed ? providerUpdatedAt : null,
@@ -367,6 +368,24 @@ describe("GitHub pull request D1 integration", () => {
     await expect(
       getHuntRunForProject(db, scenario.projectId, scenario.runId),
     ).resolves.toMatchObject({ pull_request_urls: JSON.stringify([pullRequest.url]) });
+  });
+
+  it("copies the signed base branch when evidence binds an existing snapshot", async () => {
+    const scenario = await createScenario();
+    const number = ++pullRequestNumber;
+    const url = `https://github.com/${repository}/pull/${number}`;
+    await syncGithubPullRequest(db, pullRequestEvent({ number, url }, "open", {
+      baseBranch: "release",
+      baseSha: "d".repeat(40),
+    }));
+
+    const pullRequest = await addPullRequestEvidence(scenario, number);
+    await expect(pullRequestRow(scenario, pullRequest.url)).resolves
+      .toMatchObject({
+        state: "open",
+        base_sha: "d".repeat(40),
+        base_branch: "release",
+      });
   });
 
   it("rejects new URL-only evidence before storing a false success", async () => {

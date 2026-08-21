@@ -80,6 +80,11 @@ export async function configureMergeQueueProfile(
        repository_id = excluded.repository_id,
        repository = excluded.repository,
        base_branch = excluded.base_branch,
+       created_at = case
+         when briar_merge_queue_profiles.repository_id <> excluded.repository_id
+           or briar_merge_queue_profiles.repository <> excluded.repository
+         then excluded.created_at else briar_merge_queue_profiles.created_at
+       end,
        enabled = excluded.enabled,
        quiet_window_ms = excluded.quiet_window_ms,
        max_batch_size = excluded.max_batch_size,

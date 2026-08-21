@@ -92,12 +92,22 @@ export const GitHubPullRequestWebhookPayload = Schema.Struct({
     merge_commit_sha: Schema.NullOr(trimmedText(1, 128)),
     body: Schema.NullOr(Schema.String),
     head: Schema.Struct({ sha: trimmedText(1, 128) }),
-    base: Schema.Struct({ sha: trimmedText(1, 128) }),
+    base: Schema.Struct({
+      sha: trimmedText(1, 128),
+      ref: trimmedText(1, 255),
+    }),
     merged_at: NullableGitHubTimestamp,
     closed_at: NullableGitHubTimestamp,
     created_at: IsoDateTimeWithOffset,
     updated_at: IsoDateTimeWithOffset,
   }),
+  changes: Schema.optional(Schema.Struct({
+    base: Schema.optional(Schema.Struct({
+      ref: Schema.optional(Schema.Struct({
+        from: trimmedText(1, 255),
+      })),
+    })),
+  })),
 });
 
 export const GitHubMergeGroupWebhookPayload = Schema.Struct({

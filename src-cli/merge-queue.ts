@@ -1067,6 +1067,28 @@ async function publishMergeBatch(input: NormalizedMergeBatchExecutionInput) {
   const byContext = new Map<MergeGroupCiContext, typeof proof[number]>();
   for (const result of proof) byContext.set(result.context, result);
   const failed = proof.some((result) => !result.passed);
+  const signedMergeAlreadyObserved = input.claim.members.some((member) =>
+    member.state === "merged"
+  );
+  if (!failed && signedMergeAlreadyObserved) {
+    // A required status can merge one or more cohort entries before the
+    // publication receipt reaches Briar. Once a signed merged webhook has
+    // been durably projected into this exact claim, the queue ref is expected
+    // to be gone and cannot be re-fenced. The immutable successful proof plus
+    // signed merge evidence is sufficient to finish the lease-fenced receipt.
+    await renewMergeBatchClaim(input.api, input.claim, input.workerId);
+    const authority = assertPublishAuthorityValues(input.claim);
+    await postClaimAction(
+      input.api,
+      input.claim,
+      "published",
+      {
+        ...commonClaimBody(input.claim, input.workerId),
+        mergeGroupSha: authority.mergeGroupSha,
+      },
+    );
+    return;
+  }
   for (const context of MERGE_GROUP_CI_CONTEXTS) {
     if (input.signal.aborted) throw input.signal.reason;
     const result = byContext.get(context);

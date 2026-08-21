@@ -11,6 +11,7 @@ import {
   reconcileReadyMergeCandidates,
   recordMergeBatchCandidateEnqueued,
   recordMergeBatchValidationProof,
+  recordSignedMergeQueuePullRequestObservation,
   recordSignedMergeGroupHead,
   registerReadyMergeCandidates,
   releaseMergeBatchLease,
@@ -20,6 +21,7 @@ import {
 } from "./merge-batches";
 
 const baseTime = Date.parse("2026-08-21T00:00:00.000Z");
+const installationId = 901;
 const at = (scenario: number, seconds: number) =>
   new Date(baseTime + scenario * 1_000_000 + seconds * 1_000).toISOString();
 const sha = (character: string) => character.repeat(40);
@@ -101,6 +103,16 @@ describe("native merge queue coordinator", () => {
            organization_id, user_id, role, created_at, updated_at
          ) values ('merge-org', 'merge-owner', 'owner', ?, ?)`,
       ).bind(at(0, 0), at(0, 0)),
+      db.prepare(
+        `insert into briar_github_connections (
+           installation_id, organization_id, installation_account_id,
+           account_login, account_avatar_url, authorized_github_user_id,
+           authorized_github_user_login, connected_by_user_id, status,
+           connected_at, disconnected_at, updated_at
+         ) values (?, 'merge-org', 1, 'wordbricks',
+                   'https://avatars.githubusercontent.com/u/1', 1,
+                   'merge-owner', 'merge-owner', 'connected', ?, null, ?)`,
+      ).bind(installationId, at(0, 0), at(0, 0)),
     ]);
   });
 
@@ -134,7 +146,7 @@ describe("native merge queue coordinator", () => {
       ).bind(
         projectId,
         `Merge Project ${scenario}`,
-        tokenHash(scenario.toString(16)),
+        scenario.toString(16).padStart(64, "0"),
         at(scenario, 0),
         at(scenario, 0),
       ),
@@ -159,6 +171,19 @@ describe("native merge queue coordinator", () => {
         at(scenario, 0),
       ),
       db.prepare(
+        `insert into briar_github_connection_repositories (
+           installation_id, repository_id, owner, name, full_name,
+           created_at, updated_at
+         ) values (?, ?, 'wordbricks', ?, ?, ?, ?)`,
+      ).bind(
+        installationId,
+        repositoryId,
+        `briar-${scenario}`,
+        repository,
+        at(scenario, 0),
+        at(scenario, 0),
+      ),
+      db.prepare(
         `insert or ignore into briar_execution_worker_devices (
            id, organization_id, owner_user_id, label, device_identity_hash,
            state, max_concurrent_sessions, last_heartbeat_at, created_at, updated_at
@@ -166,7 +191,7 @@ describe("native merge queue coordinator", () => {
       ).bind(
         deviceId,
         `Merge device ${scenario}`,
-        tokenHash(((scenario + 1) % 16).toString(16)),
+        (scenario + 100).toString(16).padStart(64, "0"),
         options.maxConcurrentSessions ?? 5,
         at(scenario, 0),
         at(scenario, 0),
@@ -184,7 +209,7 @@ describe("native merge queue coordinator", () => {
         projectId,
         deviceId,
         `Merge worker ${scenario}`,
-        tokenHash(((scenario + 2) % 16).toString(16)),
+        (scenario + 200).toString(16).padStart(64, "0"),
         at(scenario, 0),
         at(scenario, 0),
         at(scenario, 0),
@@ -253,16 +278,18 @@ describe("native merge queue coordinator", () => {
         db.prepare(
           `insert into briar_run_pull_requests (
            project_id, run_id, attempt, revision, revision_started_at, url,
-           repository_id, repository, pull_request_id, pull_request_node_id,
+           installation_id, repository_id, repository,
+           pull_request_id, pull_request_node_id,
            pull_request_number, state, draft, head_sha, base_sha, base_branch,
            opened_at, provider_updated_at, created_at, updated_at
-         ) values (?, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?, 'open', 0, ?, ?, 'main',
+         ) values (?, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'open', 0, ?, ?, 'main',
                    ?, ?, ?, ?)`,
         ).bind(
           lane.projectId,
           runId,
           input.readyAt,
           `https://github.com/${lane.repository}/pull/${pullRequestNumber}`,
+          installationId,
           lane.repositoryId,
           lane.repository,
           100_000 + pullRequestNumber,
@@ -590,6 +617,279 @@ describe("native merge queue coordinator", () => {
       claimedAt: at(4, 5),
       leaseExpiresAt: at(4, 30),
     })).resolves.toBeNull();
+  });
+
+  it("does not revive old ci_qa after an out-of-order A-to-B-to-A force-push", async () => {
+    const lane = await setupLane(16);
+    const originalHead = sha("4");
+    const run = await createReadyRun(lane, {
+      readyAt: at(16, 1),
+      headSha: originalHead,
+    });
+    await registerRun(lane, run, at(16, 1));
+    await db.prepare(
+      `update briar_run_stage_progress set finished_at = ?
+       where run_id = ? and attempt = 1 and revision = 1 and stage_id = 'ci_qa'`,
+    ).bind("2026-08-21T13:26:41+09:00", run.runId).run();
+
+    // The newer A-return delivery may win the mutable snapshot before a
+    // delayed B delivery arrives. Append-only signed identity still records
+    // B and invalidates the older ci_qa proof.
+    await recordSignedMergeQueuePullRequestObservation(db, {
+      deliveryId: "force-push-returned-a",
+      repositoryId: lane.repositoryId,
+      pullRequestNumber: run.pullRequestNumbers[0]!,
+      action: "synchronize",
+      identityChanged: true,
+      headSha: originalHead,
+      baseBranch: "main",
+      receivedAt: at(16, 2),
+    });
+    await recordSignedMergeQueuePullRequestObservation(db, {
+      deliveryId: "force-push-delayed-b",
+      repositoryId: lane.repositoryId,
+      pullRequestNumber: run.pullRequestNumbers[0]!,
+      action: "synchronize",
+      identityChanged: true,
+      headSha: sha("5"),
+      baseBranch: "main",
+      receivedAt: at(16, 3),
+    });
+    await expect(reconcileReadyMergeCandidates(db, {
+      projectId: lane.projectId,
+      runId: run.runId,
+      observedAt: at(16, 3),
+    })).resolves.toMatchObject({ invalidatedReady: 1 });
+
+    const stale = await registerRun(lane, run, at(16, 4));
+    expect(stale).toMatchObject([{
+      state: "failed",
+      failure_code: "readiness_changed",
+      frozen_head_sha: originalHead,
+    }]);
+    await expect(sealNextMergeBatch(db, {
+      projectId: lane.projectId,
+      observedAt: at(16, 4),
+    })).resolves.toBeNull();
+
+    // A genuinely newer ci_qa completion forms a fresh proof boundary and
+    // may safely make the exact current head eligible again.
+    await db.prepare(
+      `update briar_run_stage_progress set finished_at = ?
+       where run_id = ? and attempt = 1 and revision = 1 and stage_id = 'ci_qa'`,
+    ).bind(at(16, 5), run.runId).run();
+    const refreshed = await registerRun(lane, run, at(16, 6));
+    expect(refreshed).toMatchObject([{
+      state: "ready",
+      frozen_head_sha: originalHead,
+      failure_code: null,
+    }]);
+  });
+
+  it("keeps force-push history while a configured profile is disabled", async () => {
+    const lane = await setupLane(19, { enabled: false });
+    const run = await createReadyRun(lane, {
+      readyAt: at(19, 1),
+      headSha: sha("4"),
+    });
+    await recordSignedMergeQueuePullRequestObservation(db, {
+      deliveryId: "disabled-profile-force-return",
+      repositoryId: lane.repositoryId,
+      pullRequestNumber: run.pullRequestNumbers[0]!,
+      action: "synchronize",
+      identityChanged: true,
+      headSha: run.headSha,
+      baseBranch: "main",
+      receivedAt: at(19, 2),
+    });
+    await db.prepare(
+      `update briar_merge_queue_profiles set enabled = 1, updated_at = ?
+       where project_id = ?`,
+    ).bind(at(19, 3), lane.projectId).run();
+
+    await expect(registerRun(lane, run, at(19, 3))).resolves.toEqual([]);
+    await expect(sealNextMergeBatch(db, {
+      projectId: lane.projectId,
+      observedAt: at(19, 5),
+    })).resolves.toBeNull();
+  });
+
+  it("requires ci_qa completed after the merge-queue profile was configured", async () => {
+    const lane = await setupLane(20, { enabled: false });
+    const run = await createReadyRun(lane, {
+      readyAt: at(20, 1),
+      headSha: sha("5"),
+    });
+    await db.prepare(
+      `update briar_merge_queue_profiles
+       set enabled = 1, created_at = ?, updated_at = ? where project_id = ?`,
+    ).bind(at(20, 2), at(20, 2), lane.projectId).run();
+    await expect(registerRun(lane, run, at(20, 3))).resolves.toEqual([]);
+
+    await db.prepare(
+      `update briar_run_stage_progress set finished_at = ?
+       where run_id = ? and attempt = 1 and revision = 1 and stage_id = 'ci_qa'`,
+    ).bind(at(20, 4), run.runId).run();
+    await expect(registerRun(lane, run, at(20, 4))).resolves.toMatchObject([{
+      state: "ready",
+      frozen_head_sha: run.headSha,
+    }]);
+  });
+
+  it("requires fresh ci_qa after a GitHub integration reconnect", async () => {
+    const lane = await setupLane(21);
+    const run = await createReadyRun(lane, {
+      readyAt: at(21, 1),
+      headSha: sha("6"),
+    });
+    await registerRun(lane, run, at(21, 1));
+    await db.prepare(
+      `update briar_github_connections
+       set status = 'disconnected', disconnected_at = ?, updated_at = ?
+       where installation_id = ?`,
+    ).bind(at(21, 2), at(21, 2), installationId).run();
+    await expect(reconcileReadyMergeCandidates(db, {
+      projectId: lane.projectId,
+      runId: run.runId,
+      observedAt: at(21, 2),
+    })).resolves.toMatchObject({ invalidatedReady: 1 });
+
+    await db.prepare(
+      `update briar_github_connections
+       set status = 'connected', connected_at = ?, disconnected_at = null,
+           updated_at = ? where installation_id = ?`,
+    ).bind(at(21, 3), at(21, 3), installationId).run();
+    await expect(registerRun(lane, run, at(21, 3))).resolves.toMatchObject([{
+      state: "failed",
+      failure_code: "readiness_changed",
+    }]);
+
+    await db.prepare(
+      `update briar_run_stage_progress set finished_at = ?
+       where run_id = ? and attempt = 1 and revision = 1 and stage_id = 'ci_qa'`,
+    ).bind(at(21, 4), run.runId).run();
+    await expect(registerRun(lane, run, at(21, 4))).resolves.toMatchObject([{
+      state: "ready",
+      frozen_head_sha: run.headSha,
+    }]);
+    await db.prepare(
+      `update briar_github_connections set connected_at = ?, updated_at = ?
+       where installation_id = ?`,
+    ).bind(at(0, 0), at(21, 5), installationId).run();
+  });
+
+  it("requires fresh ci_qa after repository access is restored", async () => {
+    const lane = await setupLane(22);
+    const run = await createReadyRun(lane, {
+      readyAt: at(22, 1),
+      headSha: sha("7"),
+    });
+    await registerRun(lane, run, at(22, 1));
+    await db.prepare(
+      `delete from briar_github_connection_repositories
+       where installation_id = ? and repository_id = ?`,
+    ).bind(installationId, lane.repositoryId).run();
+    await expect(reconcileReadyMergeCandidates(db, {
+      projectId: lane.projectId,
+      runId: run.runId,
+      observedAt: at(22, 2),
+    })).resolves.toMatchObject({ invalidatedReady: 1 });
+
+    await db.prepare(
+      `insert into briar_github_connection_repositories (
+         installation_id, repository_id, owner, name, full_name,
+         created_at, updated_at
+       ) values (?, ?, 'wordbricks', 'briar-22', ?, ?, ?)`,
+    ).bind(
+      installationId, lane.repositoryId, lane.repository,
+      at(22, 3), at(22, 3),
+    ).run();
+    await expect(registerRun(lane, run, at(22, 3))).resolves.toMatchObject([{
+      state: "failed",
+      failure_code: "readiness_changed",
+    }]);
+
+    await db.prepare(
+      `update briar_run_stage_progress set finished_at = ?
+       where run_id = ? and attempt = 1 and revision = 1 and stage_id = 'ci_qa'`,
+    ).bind(at(22, 4), run.runId).run();
+    await expect(registerRun(lane, run, at(22, 4))).resolves.toMatchObject([{
+      state: "ready",
+      frozen_head_sha: run.headSha,
+    }]);
+  });
+
+  it("accepts main SHA advance without weakening the base-branch fence", async () => {
+    const lane = await setupLane(17);
+    const run = await createReadyRun(lane, {
+      readyAt: at(17, 1),
+      headSha: sha("6"),
+      baseSha: sha("1"),
+    });
+    await registerRun(lane, run, at(17, 1));
+    const sealed = await sealNextMergeBatch(db, {
+      projectId: lane.projectId,
+      observedAt: at(17, 3),
+    });
+    expect(sealed).toMatchObject({ batch: { state: "frozen" } });
+
+    await db.prepare(
+      `update briar_run_pull_requests
+       set base_sha = ?, base_branch = 'main', updated_at = ?
+       where run_id = ? and attempt = 1 and revision = 1`,
+    ).bind(sha("2"), at(17, 4), run.runId).run();
+    await expect(reconcileReadyMergeCandidates(db, {
+      projectId: lane.projectId,
+      runId: run.runId,
+      observedAt: at(17, 4),
+    })).resolves.toMatchObject({
+      invalidatedSealed: 0,
+      blockedBatches: 0,
+    });
+    await expect(claimNextMergeBatch(db, lane.projectId, {
+      deviceId: lane.deviceId,
+      workerId: lane.workerId,
+      claimedBy: "main-drift",
+      claimTokenHash: tokenHash("1"),
+      claimedAt: at(17, 5),
+      leaseExpiresAt: at(17, 40),
+    })).resolves.toMatchObject({
+      phase: "enqueue",
+      members: [{ frozen_base_sha: sha("1") }],
+    });
+  });
+
+  it("blocks a sealed PR when a signed webhook retargets its base branch", async () => {
+    const lane = await setupLane(18);
+    const run = await createReadyRun(lane, {
+      readyAt: at(18, 1),
+      headSha: sha("7"),
+    });
+    await registerRun(lane, run, at(18, 1));
+    const sealed = await sealNextMergeBatch(db, {
+      projectId: lane.projectId,
+      observedAt: at(18, 3),
+    });
+    expect(sealed).toMatchObject({ batch: { state: "frozen" } });
+
+    await db.prepare(
+      `update briar_run_pull_requests
+       set base_sha = ?, base_branch = 'release', updated_at = ?
+       where run_id = ? and attempt = 1 and revision = 1`,
+    ).bind(sha("8"), at(18, 4), run.runId).run();
+    await expect(reconcileReadyMergeCandidates(db, {
+      projectId: lane.projectId,
+      runId: run.runId,
+      observedAt: at(18, 4),
+    })).resolves.toMatchObject({
+      invalidatedSealed: 1,
+      blockedBatches: 1,
+    });
+    await expect(
+      db.prepare("select state from briar_merge_batches where id = ?")
+        .bind(sealed!.batch.id)
+        .first<{ state: string }>(),
+    ).resolves.toEqual({ state: "blocked" });
   });
 
   it("selects only the exact final cumulative head regardless of arrival order", async () => {
@@ -935,6 +1235,201 @@ describe("native merge queue coordinator", () => {
       "select * from briar_merge_batches where id = ?",
     ).bind(context.claim.batch.id).first<MergeBatchRow>();
     expect(completed?.state).toBe("completed");
+  });
+
+  it("recovers publication after a signed merge races the final receipt", async () => {
+    const lane = await setupLane(15);
+    const run = await createReadyRun(lane, {
+      readyAt: at(15, 1),
+      headSha: sha("9"),
+      pullRequestCount: 2,
+    });
+    const context = await advanceToValidating(lane, [run], at(15, 2));
+    const proof = await recordMergeBatchValidationProof(db, {
+      batchId: context.claim.batch.id,
+      projectId: lane.projectId,
+      workerId: context.workerId,
+      claimTokenHash: context.claimTokenHash,
+      mergeGroupSha: context.mergeGroupSha,
+      validationResults: successfulValidationResults,
+      validatedAt: at(15, 23),
+    });
+    expect(proof?.state).toBe("publishing");
+
+    const member = context.claim.members[0]!;
+    const deliveryId = "merged-before-publication-receipt";
+    const mergedAt = at(15, 24);
+    await signedDelivery(deliveryId, "pull_request", "closed", mergedAt, false);
+    await db.prepare(
+      `update briar_run_pull_requests
+       set state = 'merged', base_sha = ?, merged_at = ?,
+           last_delivery_id = ?, updated_at = ?
+       where run_id = ? and attempt = ? and revision = ?
+         and repository_id = ? and pull_request_number = ?
+         and head_sha = ?`,
+    ).bind(
+      sha("f"), mergedAt, deliveryId, mergedAt, member.run_id,
+      member.attempt, member.revision, member.repository_id,
+      member.pull_request_number, member.frozen_head_sha,
+    ).run();
+    await registerReadyMergeCandidates(db, {
+      projectId: lane.projectId,
+      runId: member.run_id,
+      attempt: member.attempt,
+      revision: member.revision,
+      readyAt: mergedAt,
+    });
+    await expect(observeSignedMergedBatchPullRequest(db, {
+      deliveryId,
+      repositoryId: lane.repositoryId,
+      pullRequestNumber: member.pull_request_number,
+      headSha: member.frozen_head_sha,
+      mergedAt,
+    })).resolves.toMatchObject({
+      candidate: { state: "merged" },
+      batch: { state: "publishing" },
+    });
+
+    const reclaimedTokenHash = tokenHash("c");
+    const reclaimed = await claimNextMergeBatch(db, lane.projectId, {
+      deviceId: lane.deviceId,
+      workerId: context.workerId,
+      claimedBy: "publication-recovery",
+      claimTokenHash: reclaimedTokenHash,
+      claimedAt: at(15, 81),
+      leaseExpiresAt: at(15, 141),
+    });
+    expect(reclaimed).toMatchObject({
+      phase: "publish",
+      batch: { state: "publishing", claim_attempts: 2 },
+      members: [{ state: "merged" }, { state: "enqueued" }],
+    });
+    await expect(completeMergeBatchPublication(db, {
+      batchId: context.claim.batch.id,
+      projectId: lane.projectId,
+      workerId: context.workerId,
+      claimTokenHash: reclaimedTokenHash,
+      mergeGroupSha: context.mergeGroupSha,
+      publishedAt: at(15, 82),
+    })).resolves.toMatchObject({
+      state: "awaiting_merge",
+      completed_at: null,
+      claim_token_hash: null,
+    });
+
+    const last = context.claim.members[1]!;
+    const finalDeliveryId = "merged-after-publication-recovery";
+    const finalMergedAt = at(15, 83);
+    await signedDelivery(
+      finalDeliveryId, "pull_request", "closed", finalMergedAt, false,
+    );
+    await db.prepare(
+      `update briar_run_pull_requests
+       set state = 'merged', base_sha = ?, merged_at = ?,
+           last_delivery_id = ?, updated_at = ?
+       where run_id = ? and attempt = ? and revision = ?
+         and repository_id = ? and pull_request_number = ?
+         and head_sha = ?`,
+    ).bind(
+      sha("f"), finalMergedAt, finalDeliveryId, finalMergedAt, last.run_id,
+      last.attempt, last.revision, last.repository_id,
+      last.pull_request_number, last.frozen_head_sha,
+    ).run();
+    await registerReadyMergeCandidates(db, {
+      projectId: lane.projectId,
+      runId: last.run_id,
+      attempt: last.attempt,
+      revision: last.revision,
+      readyAt: finalMergedAt,
+    });
+    await expect(observeSignedMergedBatchPullRequest(db, {
+      deliveryId: finalDeliveryId,
+      repositoryId: lane.repositoryId,
+      pullRequestNumber: last.pull_request_number,
+      headSha: last.frozen_head_sha,
+      mergedAt: finalMergedAt,
+    })).resolves.toMatchObject({
+      candidate: { state: "merged" },
+      batch: { state: "completed", completed_at: finalMergedAt },
+    });
+  });
+
+  it("completes from durable signed receipts after repository authority is lost", async () => {
+    const lane = await setupLane(23);
+    const run = await createReadyRun(lane, {
+      readyAt: at(23, 1),
+      headSha: sha("d"),
+      pullRequestCount: 2,
+    });
+    const context = await advanceToValidating(lane, [run], at(23, 2));
+    await expect(recordMergeBatchValidationProof(db, {
+      batchId: context.claim.batch.id,
+      projectId: lane.projectId,
+      workerId: context.workerId,
+      claimTokenHash: context.claimTokenHash,
+      mergeGroupSha: context.mergeGroupSha,
+      validationResults: successfulValidationResults,
+      validatedAt: at(23, 23),
+    })).resolves.toMatchObject({ state: "publishing" });
+
+    for (const [index, member] of context.claim.members.entries()) {
+      const deliveryId = `merged-before-authority-loss-${index}`;
+      const mergedAt = at(23, 24 + index);
+      await signedDelivery(deliveryId, "pull_request", "closed", mergedAt, false);
+      await db.prepare(
+        `update briar_run_pull_requests
+         set state = 'merged', base_sha = ?, merged_at = ?,
+             last_delivery_id = ?, updated_at = ?
+         where run_id = ? and attempt = ? and revision = ?
+           and repository_id = ? and pull_request_number = ?
+           and head_sha = ?`,
+      ).bind(
+        sha("f"), mergedAt, deliveryId, mergedAt, member.run_id,
+        member.attempt, member.revision, member.repository_id,
+        member.pull_request_number, member.frozen_head_sha,
+      ).run();
+      await expect(observeSignedMergedBatchPullRequest(db, {
+        deliveryId,
+        repositoryId: lane.repositoryId,
+        pullRequestNumber: member.pull_request_number,
+        headSha: member.frozen_head_sha,
+        mergedAt,
+      })).resolves.toMatchObject({
+        candidate: { state: "merged", merged_delivery_id: deliveryId },
+        batch: { state: "publishing" },
+      });
+    }
+
+    await db.prepare(
+      `delete from briar_github_connection_repositories
+       where installation_id = ? and repository_id = ?`,
+    ).bind(installationId, lane.repositoryId).run();
+
+    await expect(completeMergeBatchPublication(db, {
+      batchId: context.claim.batch.id,
+      projectId: lane.projectId,
+      workerId: context.workerId,
+      claimTokenHash: context.claimTokenHash,
+      mergeGroupSha: context.mergeGroupSha,
+      publishedAt: at(23, 28),
+    })).resolves.toMatchObject({
+      state: "completed",
+      completed_at: at(23, 28),
+      claim_token_hash: null,
+    });
+    await db.prepare(
+      `insert into briar_github_connection_repositories (
+         installation_id, repository_id, owner, name, full_name,
+         created_at, updated_at
+       ) values (?, ?, 'wordbricks', ?, ?, ?, ?)`,
+    ).bind(
+      installationId,
+      lane.repositoryId,
+      `briar-${lane.scenario}`,
+      lane.repository,
+      at(23, 0),
+      at(23, 29),
+    ).run();
   });
 
   it("seals whole run sets and blocks a cohort when a current PR is added", async () => {
@@ -1423,6 +1918,32 @@ describe("native merge queue coordinator", () => {
       })).resolves.toBeNull();
     }
 
+    const replyMessageId = "reply-capacity-trigger";
+    await db.batch([
+      db.prepare(
+        `insert into briar_issue_messages (
+           id, project_id, run_id, body, created_at, updated_at
+         ) values (?, ?, ?, 'Interactive reply', ?, ?)`,
+      ).bind(
+        replyMessageId, firstLane.projectId, firstRun.runId,
+        at(12, 20), at(12, 20),
+      ),
+      db.prepare(
+        `insert into briar_issue_agent_reply_jobs (
+           id, project_id, run_id, trigger_message_id, parent_message_id,
+           reply_message_id, status, claimed_worker_id, claim_token_hash,
+           claimed_at, lease_expires_at, attempts, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, 1, ?, ?)`,
+      ).bind(
+        "reply-capacity-job", firstLane.projectId, firstRun.runId,
+        replyMessageId, replyMessageId, "reply-capacity-result",
+        firstLane.workerId, tokenHash("d"), at(12, 20), at(12, 40),
+        at(12, 20), at(12, 20),
+      ),
+    ]);
+
+    // Reply jobs run outside the regular execution slot in the local loop;
+    // they must not starve the repository delivery lane.
     const concurrentAt = at(12, 21);
     const tokenHashes = [tokenHash("8"), tokenHash("9")] as const;
     const claims = await Promise.all([

@@ -180,6 +180,32 @@ create index briar_merge_batch_candidates_pull_request_head_idx
     repository_id, pull_request_number, frozen_head_sha, state
   );
 
+-- Signed PR identity changes are append-only across the disabled rollout
+-- phase. A force-push may return to the same object ID and webhook delivery
+-- order is not authoritative, so the canonical mutable PR snapshot alone
+-- cannot fence reuse of a ci_qa result completed before that generation.
+create table briar_merge_queue_pull_request_observations (
+  delivery_id text primary key not null,
+  repository_id integer not null check (repository_id > 0),
+  pull_request_number integer not null check (pull_request_number > 0),
+  action text not null check (
+    action = trim(action) and length(action) between 1 and 100
+  ),
+  identity_changed integer not null check (identity_changed in (0, 1)),
+  head_sha text not null check (
+    length(head_sha) = 40 and head_sha not glob '*[^0-9a-f]*'
+  ),
+  base_branch text not null check (
+    base_branch = trim(base_branch) and length(base_branch) between 1 and 255
+  ),
+  received_at text not null
+);
+
+create index briar_merge_queue_pull_request_observations_identity_idx
+  on briar_merge_queue_pull_request_observations (
+    repository_id, pull_request_number, received_at
+  );
+
 create table briar_merge_group_heads (
   -- Append-only copy of the signed authority. It deliberately outlives the
   -- generic webhook inbox retention window.

@@ -400,6 +400,7 @@ import {
   observeSignedMergedBatchPullRequest,
   recordMergeBatchCandidateEnqueued,
   recordMergeBatchValidationProof,
+  recordSignedMergeQueuePullRequestObservation,
   recordSignedMergeGroupHead,
   reconcileReadyMergeCandidates,
   registerReadyMergeCandidates,
@@ -4011,6 +4012,16 @@ async function handleGithubWebhookRequest(request: Request, env: Env) {
       return json({ ok: true, event: event.event, matchedRunCount: 0 });
     }
 
+    await recordSignedMergeQueuePullRequestObservation(env.DB, {
+      deliveryId: event.deliveryId,
+      repositoryId: event.repositoryId,
+      pullRequestNumber: event.number,
+      action: event.action,
+      identityChanged: event.action === "synchronize" || event.baseBranchChanged,
+      headSha: event.headSha,
+      baseBranch: event.baseBranch,
+      receivedAt: claimedAt,
+    });
     const result = await syncGithubPullRequest(env.DB, {
       deliveryId: event.deliveryId,
       installationId: event.installationId,
@@ -4024,6 +4035,7 @@ async function handleGithubWebhookRequest(request: Request, env: Env) {
       draft: event.draft,
       headSha: event.headSha,
       baseSha: event.baseSha,
+      baseBranch: event.baseBranch,
       mergeCommitSha: event.mergeCommitSha,
       openedAt: event.createdAt,
       closedAt: event.closedAt,
@@ -12729,17 +12741,6 @@ async function route(
       authenticatedWorker.binding.readiness_state === "needs_attention"
     ) {
       throw new HttpError(409, "Worker is not ready to claim a merge batch");
-    }
-    const activeSessions = await countExecutionWorkerDeviceSessions(
-      db,
-      authenticatedWorker.principal.deviceId,
-      observedAt,
-    );
-    if (
-      activeSessions >=
-        (authenticatedWorker.binding.max_concurrent_sessions ?? 1)
-    ) {
-      return json({ work: null, retryAfterMs: 15_000 });
     }
     const claimToken =
       `briar_merge_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;

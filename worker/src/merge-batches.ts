@@ -216,7 +216,24 @@ const currentReadyCandidate = (
       and run.current_attempt = ${candidate}.attempt
       and run.current_revision = ${candidate}.revision
       and run.status = 'running'
+      and unixepoch(progress.finished_at) >= unixepoch(profile.created_at)
       and run.commit_sha = ${candidate}.frozen_head_sha
+      and exists (
+        select 1
+        from briar_projects project
+        join briar_github_connections connection
+          on connection.organization_id = project.organization_id
+         and connection.installation_id = link.installation_id
+         and connection.status = 'connected'
+        join briar_github_connection_repositories connected_repository
+          on connected_repository.installation_id = connection.installation_id
+         and connected_repository.repository_id = link.repository_id
+        where project.id = run.project_id
+          and unixepoch(progress.finished_at) >=
+            unixepoch(connection.connected_at)
+          and unixepoch(progress.finished_at) >=
+            unixepoch(connected_repository.created_at)
+      )
       and link.state in (${acceptedStates}) and link.draft = 0
       and link.pull_request_id = ${candidate}.pull_request_id
       and link.pull_request_node_id = ${candidate}.pull_request_node_id
@@ -224,10 +241,24 @@ const currentReadyCandidate = (
       and link.repository = ${candidate}.repository
       and coalesce(link.base_branch, 'main') = ${candidate}.base_branch
       and link.head_sha = ${candidate}.frozen_head_sha
+      and not exists (
+        select 1
+        from briar_merge_queue_pull_request_observations observation
+        where observation.repository_id = ${candidate}.repository_id
+          and observation.pull_request_number = ${candidate}.pull_request_number
+          and unixepoch(observation.received_at) >=
+            unixepoch(progress.finished_at)
+          and (
+            observation.identity_changed = 1
+            or
+            observation.head_sha <> ${candidate}.frozen_head_sha
+            or observation.base_branch <> ${candidate}.base_branch
+          )
+      )
       ${
-  options.requireFrozenBaseSha === false
-    ? ""
-    : `and link.base_sha = ${candidate}.frozen_base_sha`
+  options.requireFrozenBaseSha === true
+    ? `and link.base_sha = ${candidate}.frozen_base_sha`
+    : ""
 }
       ${
   options.requireSignedMerge
@@ -310,6 +341,19 @@ const completeBatchRunSets = (batch: string) => `
           and current_link.merged_at <= ${batch}.frozen_at
         )
     )
+  )`;
+
+const allBatchCandidatesHaveSignedMergeReceipts = (batch: string) => `
+  exists (
+    select 1 from briar_merge_batch_candidates candidate
+    where candidate.batch_id = ${batch}.id
+  )
+  and not exists (
+    select 1 from briar_merge_batch_candidates candidate
+    where candidate.batch_id = ${batch}.id
+      and (candidate.state <> 'merged'
+        or candidate.merged_delivery_id is null
+        or candidate.merged_at is null)
   )`;
 
 const pendingFinalHead = (batch: string) => `
@@ -514,10 +558,7 @@ export async function reconcileReadyMergeCandidates(
            updated_at = ?
        where candidate.project_id = ? ${runScope}
          and candidate.batch_id is null and candidate.state = 'ready'
-         and (
-           not (${currentReadyCandidate("candidate")})
-           or not (${completeRunCandidateSet("candidate")})
-         )`,
+         and not (${currentReadyCandidate("candidate")})`,
     ).bind(input.observedAt, ...scopeBindings),
     db.prepare(
       `update briar_merge_batch_candidates as candidate
@@ -534,7 +575,7 @@ export async function reconcileReadyMergeCandidates(
              exists (
                select 1 from briar_merge_batches batch
                where batch.id = candidate.batch_id
-                 and batch.state in ('awaiting_merge', 'draining')
+                 and batch.state in ('publishing', 'awaiting_merge', 'draining')
              )
              and ${
         currentReadyCandidate("candidate", "'merged'", {
@@ -639,12 +680,44 @@ export async function registerReadyMergeCandidates(
       and profile.enabled = 1
      where run.project_id = ? and run.id = ?
        and run.current_attempt = ? and run.current_revision = ?
-       and run.status = 'running' and run.commit_sha = link.head_sha
+       and run.status = 'running'
+       and unixepoch(progress.finished_at) >= unixepoch(profile.created_at)
+       and run.commit_sha = link.head_sha
+       and exists (
+         select 1
+         from briar_projects project
+         join briar_github_connections connection
+           on connection.organization_id = project.organization_id
+          and connection.installation_id = link.installation_id
+          and connection.status = 'connected'
+         join briar_github_connection_repositories connected_repository
+           on connected_repository.installation_id = connection.installation_id
+          and connected_repository.repository_id = link.repository_id
+         where project.id = run.project_id
+           and unixepoch(progress.finished_at) >=
+             unixepoch(connection.connected_at)
+           and unixepoch(progress.finished_at) >=
+             unixepoch(connected_repository.created_at)
+       )
        and link.state = 'open' and link.draft = 0
        and length(link.head_sha) = 40
        and link.head_sha not glob '*[^0-9a-f]*'
        and length(link.base_sha) = 40
        and link.base_sha not glob '*[^0-9a-f]*'
+       and not exists (
+         select 1
+         from briar_merge_queue_pull_request_observations observation
+         where observation.repository_id = link.repository_id
+           and observation.pull_request_number = link.pull_request_number
+           and unixepoch(observation.received_at) >=
+             unixepoch(progress.finished_at)
+           and (
+             observation.identity_changed = 1
+             or
+             observation.head_sha <> run.commit_sha
+             or observation.base_branch <> profile.base_branch
+           )
+       )
        and not exists (
          select 1 from briar_run_pull_requests current_link
          where current_link.project_id = run.project_id
@@ -918,20 +991,6 @@ export async function claimNextMergeBatch(
                   and task.status = 'running' and task.lease_expires_at > ?)
                +
                (select count(*)
-                from briar_issue_agent_reply_jobs reply
-                join briar_execution_workers holder
-                  on holder.id = reply.claimed_worker_id
-                where holder.device_id = selected_device.id
-                  and reply.status = 'running' and reply.lease_expires_at > ?)
-               +
-               (select count(*)
-                from briar_channel_agent_reply_jobs reply
-                join briar_execution_workers holder
-                  on holder.id = reply.claimed_worker_id
-                where holder.device_id = selected_device.id
-                  and reply.status = 'running' and reply.lease_expires_at > ?)
-               +
-               (select count(*)
                 from briar_merge_batches active_batch
                 join briar_execution_workers holder
                   on holder.id = active_batch.claimed_worker_id
@@ -968,8 +1027,6 @@ export async function claimNextMergeBatch(
     input.claimedAt,
     input.workerId,
     input.deviceId,
-    input.claimedAt,
-    input.claimedAt,
     input.claimedAt,
     input.claimedAt,
     input.claimedAt,
@@ -1141,6 +1198,58 @@ export async function recordMergeBatchCandidateEnqueued(
     "select * from briar_merge_batches where id = ?",
   ).bind(input.batchId).first<MergeBatchRow>();
   return { candidate, batch: batch! };
+}
+
+/**
+ * Keeps signed PR identity changes append-only once a merge-queue profile is
+ * configured, including its disabled rollout phase. Mutable provider
+ * snapshots intentionally ignore delayed events;
+ * this security fence must not, because A -> B -> A cannot reuse A's ci_qa.
+ */
+export async function recordSignedMergeQueuePullRequestObservation(
+  db: D1Database,
+  input: {
+    deliveryId: string;
+    repositoryId: number;
+    pullRequestNumber: number;
+    action: string;
+    identityChanged: boolean;
+    headSha: string;
+    baseBranch: string;
+    receivedAt: string;
+  },
+) {
+  return db.prepare(
+    `insert or ignore into briar_merge_queue_pull_request_observations (
+       delivery_id, repository_id, pull_request_number, action,
+       identity_changed, head_sha, base_branch, received_at
+     )
+     select ?, ?, ?, ?, ?, ?, ?, ?
+     where exists (
+       select 1 from briar_merge_queue_profiles profile
+       where profile.repository_id = ?
+     )
+     returning *`,
+  ).bind(
+    input.deliveryId,
+    input.repositoryId,
+    input.pullRequestNumber,
+    input.action,
+    input.identityChanged ? 1 : 0,
+    input.headSha,
+    input.baseBranch,
+    input.receivedAt,
+    input.repositoryId,
+  ).first<{
+    delivery_id: string;
+    repository_id: number;
+    pull_request_number: number;
+    action: string;
+    identity_changed: number;
+    head_sha: string;
+    base_branch: string;
+    received_at: string;
+  }>();
 }
 
 /**
@@ -1494,13 +1603,24 @@ export async function completeMergeBatchPublication(
   return db.prepare(
     `update briar_merge_batches
      set state = case
+           when exists (
+             select 1 from json_each(validation_results_json) result
+             where json_extract(result.value, '$.passed') is not 1
+           ) then 'draining'
+           when ${allBatchCandidatesHaveSignedMergeReceipts(
+    "briar_merge_batches",
+  )} then 'completed'
+           else 'awaiting_merge'
+         end,
+         published_at = ?,
+         completed_at = case
            when not exists (
              select 1 from json_each(validation_results_json) result
              where json_extract(result.value, '$.passed') is not 1
-           ) then 'awaiting_merge'
-           else 'draining'
+           ) and ${allBatchCandidatesHaveSignedMergeReceipts(
+    "briar_merge_batches",
+  )} then ? else completed_at
          end,
-         published_at = ?,
          failure_code = case
            when not exists (
              select 1 from json_each(validation_results_json) result
@@ -1519,16 +1639,39 @@ export async function completeMergeBatchPublication(
      where ${liveLeaseFence} and state = 'publishing'
        and merge_group_sha = ? and validation_results_json is not null
        and validated_at is not null
-       and ${completeBatchRunSets("briar_merge_batches")}
-       and not exists (
-         select 1 from briar_merge_batch_candidates candidate
-         where candidate.batch_id = briar_merge_batches.id
-           and (candidate.state <> 'enqueued' or not (${
-      currentReadyCandidate("candidate")
-    }))
+       and (
+         (
+           not exists (
+             select 1 from json_each(validation_results_json) result
+             where json_extract(result.value, '$.passed') is not 1
+           )
+           and ${allBatchCandidatesHaveSignedMergeReceipts(
+    "briar_merge_batches",
+  )}
+         )
+         or (
+           ${completeBatchRunSets("briar_merge_batches")}
+           and not exists (
+             select 1 from briar_merge_batch_candidates candidate
+             where candidate.batch_id = briar_merge_batches.id
+               and not (
+                 (candidate.state = 'enqueued'
+                   and ${currentReadyCandidate("candidate", "'open'", {
+      requireFrozenBaseSha: false,
+    })})
+                 or
+                 (candidate.state = 'merged'
+                   and ${currentReadyCandidate("candidate", "'merged'", {
+      requireFrozenBaseSha: false,
+      requireSignedMerge: true,
+    })})
+               )
+           )
+         )
        )
      returning *`,
   ).bind(
+    input.publishedAt,
     input.publishedAt,
     input.publishedAt,
     input.batchId,
@@ -1562,7 +1705,7 @@ export async function observeSignedMergedBatchPullRequest(
      where candidate.repository_id = ? and candidate.pull_request_number = ?
        and candidate.frozen_head_sha = ?
        and candidate.state in ('enqueued', 'merged')
-       and batch.state in ('awaiting_merge', 'completed')
+       and batch.state in ('publishing', 'awaiting_merge', 'completed')
      order by batch.created_at desc limit 1`,
   ).bind(
     input.repositoryId,
@@ -1607,7 +1750,7 @@ export async function observeSignedMergedBatchPullRequest(
          and exists (
            select 1 from briar_merge_batches batch
            where batch.id = candidate.batch_id
-             and batch.state in ('awaiting_merge', 'completed')
+             and batch.state in ('publishing', 'awaiting_merge', 'completed')
          )
        returning *`,
     ).bind(
