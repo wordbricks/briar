@@ -8,6 +8,7 @@ import {
   loadAgentProviderModels,
 } from "../lib/project-llm";
 import type { ExecutionWorker } from "../types";
+import { writeAgentProviderModelPreference } from "../lib/agent-model-preferences";
 import { WorkerDispatchDialog } from "./WorkerDispatchDialog";
 
 vi.mock("../lib/project-llm", async (importOriginal) => {
@@ -47,6 +48,7 @@ describe("WorkerDispatchDialog", () => {
         IS_REACT_ACT_ENVIRONMENT: boolean;
       }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+    window.localStorage.clear();
     vi.mocked(loadAgentProviderModels).mockReset();
     vi.mocked(loadAgentProviderModels).mockResolvedValue({
       ...defaultAgentProviderModelCatalog,
@@ -71,6 +73,67 @@ describe("WorkerDispatchDialog", () => {
         error: null,
       },
     });
+  });
+
+  it("preselects the provider default and lists favorite models first", async () => {
+    vi.mocked(loadAgentProviderModels).mockResolvedValue({
+      ...defaultAgentProviderModelCatalog,
+      codex: {
+        models: [
+          { id: "gpt-standard", label: "GPT Standard" },
+          { id: "gpt-favorite", label: "GPT Favorite" },
+        ],
+        defaultEfforts: [],
+        allowCustomModels: false,
+        error: null,
+      },
+    });
+    writeAgentProviderModelPreference("codex", {
+      defaultModel: "gpt-favorite",
+      favoriteModels: ["gpt-favorite"],
+    });
+    const onSubmit = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          open
+          run={null}
+          workers={[worker("worker-preferences", "Preferences Mac")]}
+        />,
+      );
+    });
+
+    const modelSelect = document.body.querySelector<HTMLButtonElement>(
+      '[aria-label="선호 모델"]',
+    );
+    expect(modelSelect?.textContent).toContain("GPT Favorite");
+    await act(async () => modelSelect?.click());
+    expect(
+      Array.from(
+        document.body.querySelectorAll<HTMLElement>(
+          '[aria-label="선호 모델"] [role="option"]',
+        ),
+      ).map((option) => option.dataset.value),
+    ).toEqual(["", "gpt-favorite", "gpt-standard"]);
+
+    const dispatch = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("실행 배정"));
+    await act(async () => dispatch?.click());
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "codex",
+      model: "gpt-favorite",
+    }));
+
+    await act(async () => root.unmount());
   });
 
   afterEach(() => {

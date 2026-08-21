@@ -19,6 +19,7 @@ import {
   updateOpenRouterApiKey,
 } from "../lib/project-llm";
 import type { RepositoryReadiness } from "../lib/project-connection";
+import { readAgentProviderModelPreferences } from "../lib/agent-model-preferences";
 import {
   loadAppRuntimeSettings,
   updateAppRuntimeSettings,
@@ -706,6 +707,27 @@ describe("AppSettings", () => {
     expect(container.textContent).toContain("Connected");
     expect(container.textContent).toContain("Supported models");
     expect(container.textContent).toContain("GPT-5.6 Sol");
+
+    const defaultModelSelect = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Default"]',
+    );
+    await act(async () => defaultModelSelect?.click());
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '.select-menu-option[data-value="gpt-5.6-sol"]',
+        )
+        ?.click();
+    });
+    const favoriteButton = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Star GPT-5.6 Sol"]',
+    );
+    await act(async () => favoriteButton?.click());
+    expect(favoriteButton?.getAttribute("aria-pressed")).toBe("true");
+    expect(readAgentProviderModelPreferences().codex).toEqual({
+      defaultModel: "gpt-5.6-sol",
+      favoriteModels: ["gpt-5.6-sol"],
+    });
 
     const claudeDetails = container.querySelector<HTMLButtonElement>(
       '[aria-label="Toggle Claude details"]',
