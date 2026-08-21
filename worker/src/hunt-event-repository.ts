@@ -1,3 +1,4 @@
+import * as Equivalence from "effect/Equivalence";
 import {
   isTerminalTrackerState,
   additionalWorkflowCheckpoints,
@@ -37,19 +38,72 @@ import {
 import { loadStageRevisionRequirements } from "./run-stage-revision-repository";
 import { assertWorkflowRunCompletion } from "./workflow-completion-repository";
 
-const sameEvent = (row: HuntEventRow, input: HuntEventInput) =>
-  row.stage === input.stage &&
-  row.status === input.status &&
-  row.workflow_stage === input.workflowStage &&
-  row.detail === input.detail &&
-  row.actor === input.actor &&
-  row.branch === input.branch &&
-  row.commit_sha === input.commitSha &&
-  row.qa_status === input.qaStatus &&
-  row.tracker_issue_state === (input.tracker?.state ?? null) &&
-  row.pull_request_urls === stableJson(input.pullRequestUrls) &&
-  row.target_sha === input.targetSha &&
-  row.occurred_at === input.occurredAt;
+type ComparableHuntEvent = Pick<
+  HuntEventRow,
+  | "stage"
+  | "status"
+  | "workflow_stage"
+  | "detail"
+  | "actor"
+  | "branch"
+  | "commit_sha"
+  | "qa_status"
+  | "tracker_issue_state"
+  | "pull_request_urls"
+  | "target_sha"
+  | "occurred_at"
+>;
+
+type NormalizedHuntEventInput = Omit<
+  HuntEventInput,
+  "status" | "workflowStage"
+> & {
+  status: HuntEventRow["status"];
+  workflowStage: HuntEventRow["workflow_stage"];
+};
+
+const comparableHuntEventFields = {
+  stage: Equivalence.strictEqual<ComparableHuntEvent["stage"]>(),
+  status: Equivalence.strictEqual<ComparableHuntEvent["status"]>(),
+  workflow_stage:
+    Equivalence.strictEqual<ComparableHuntEvent["workflow_stage"]>(),
+  detail: Equivalence.strictEqual<ComparableHuntEvent["detail"]>(),
+  actor: Equivalence.strictEqual<ComparableHuntEvent["actor"]>(),
+  branch: Equivalence.strictEqual<ComparableHuntEvent["branch"]>(),
+  commit_sha: Equivalence.strictEqual<ComparableHuntEvent["commit_sha"]>(),
+  qa_status: Equivalence.strictEqual<ComparableHuntEvent["qa_status"]>(),
+  tracker_issue_state:
+    Equivalence.strictEqual<ComparableHuntEvent["tracker_issue_state"]>(),
+  pull_request_urls:
+    Equivalence.strictEqual<ComparableHuntEvent["pull_request_urls"]>(),
+  target_sha: Equivalence.strictEqual<ComparableHuntEvent["target_sha"]>(),
+  occurred_at: Equivalence.strictEqual<ComparableHuntEvent["occurred_at"]>(),
+} satisfies {
+  [K in keyof ComparableHuntEvent]: Equivalence.Equivalence<
+    ComparableHuntEvent[K]
+  >;
+};
+
+const comparableHuntEvent = Equivalence.Struct(comparableHuntEventFields);
+
+const sameEvent = (
+  row: HuntEventRow,
+  input: NormalizedHuntEventInput,
+) =>
+  comparableHuntEvent(row, {
+    stage: input.stage,
+    status: input.status,
+    workflow_stage: input.workflowStage,
+    detail: input.detail,
+    actor: input.actor,
+    branch: input.branch,
+    commit_sha: input.commitSha,
+    qa_status: input.qaStatus,
+    tracker_issue_state: input.tracker?.state ?? null,
+    pull_request_urls: stableJson(input.pullRequestUrls),
+    target_sha: input.targetSha,
+    occurred_at: input.occurredAt,
+  });
 
 const loadRunForIdentity = async (
   db: D1Database,
