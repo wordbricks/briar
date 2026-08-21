@@ -1,4 +1,5 @@
-import { Check, Cpu, LoaderCircle, Save } from "lucide-react";
+import { Check, Cpu, Save } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useMemo, useState } from "react";
 
 import { SettingsAlert } from "@/components/settings";
@@ -171,7 +172,7 @@ export function ProjectExecutionSettings({
 
         {loading ? (
           <div className="grid min-h-32 place-items-center">
-            <LoaderCircle className="animate-spin" size={20} />
+            <Spinner size={20} />
           </div>
         ) : (
           <>
@@ -322,7 +323,7 @@ export function ProjectExecutionSettings({
                 type="button"
               >
                 {saving ? (
-                  <LoaderCircle className="animate-spin" size={14} />
+                  <Spinner size={14} />
                 ) : !dirty ? (
                   <Check size={14} />
                 ) : (

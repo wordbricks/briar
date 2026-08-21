@@ -5,7 +5,6 @@ import {
   CircleAlert,
   ExternalLink,
   LayoutTemplate,
-  LoaderCircle,
   Pencil,
   Play,
   Plus,
@@ -13,6 +12,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -486,7 +486,7 @@ export function ProjectAgents({
               </div>
             ) : isLoading ? (
               <div className="project-agents-state" aria-live="polite">
-                <LoaderCircle className="spin" size={21} />
+                <Spinner size={21} />
                 <Typography as="strong" variant="body">
                   {t("agents.loading")}
                 </Typography>
@@ -625,10 +625,8 @@ export function ProjectAgents({
                           type="button"
                         >
                           {isStarting ? (
-                            <LoaderCircle
-                              aria-hidden="true"
-                              className="spin"
-                              size={14}
+                            <Spinner
+                              aria-hidden="true" size={14}
                             />
                           ) : (
                             <Play
@@ -1171,7 +1169,7 @@ export function ProjectAgentDialog({
               type="submit"
             >
               {isSubmitting ? (
-                <LoaderCircle className="spin" size={14} />
+                <Spinner size={14} />
               ) : isEditing ? (
                 <Pencil size={14} />
               ) : (

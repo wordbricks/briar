@@ -1,4 +1,5 @@
-import { Bot, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import { Bot, Pencil, Plus, Trash2 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useState } from "react";
 
 import { SettingsAlert, SettingsPageHeader } from "@/components/settings";
@@ -224,7 +225,7 @@ export function OrganizationAgentsSettings({
           aria-live="polite"
           className="flex min-h-48 items-center justify-center gap-2 rounded-xl border border-border bg-card text-muted-foreground"
         >
-          <LoaderCircle className="animate-spin" size={20} />
+          <Spinner size={20} />
           <Typography variant="bodySm">{t("organization.agentsLoading")}</Typography>
         </div>
       ) : agents.length === 0 ? (
@@ -390,7 +391,7 @@ export function OrganizationAgentsSettings({
               type="button"
             >
               {isSavingSkills ? (
-                <LoaderCircle className="animate-spin" size={16} />
+                <Spinner size={16} />
               ) : null}
               {t(isSavingSkills ? "common.saving" : "common.save")}
             </Button>
@@ -430,7 +431,7 @@ export function OrganizationAgentsSettings({
               type="button"
               variant="destructive"
             >
-              {isDeleting ? <LoaderCircle className="animate-spin" size={16} /> : null}
+              {isDeleting ? <Spinner size={16} /> : null}
               {t(
                 isDeleting
                   ? "organization.agentsDeleting"
@@ -642,7 +643,7 @@ function OrganizationAgentCreateDialog({
             type="submit"
           >
             {isSubmitting ? (
-              <LoaderCircle className="animate-spin" size={16} />
+              <Spinner size={16} />
             ) : (
               <Plus aria-hidden="true" size={16} />
             )}

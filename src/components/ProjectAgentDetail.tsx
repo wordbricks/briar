@@ -1,4 +1,5 @@
-import { ArrowLeft, LoaderCircle, Play } from "lucide-react";
+import { ArrowLeft, Play } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useState } from "react";
 
 import {
@@ -287,7 +288,7 @@ export function ProjectAgentDetail({
             type="button"
           >
             {isTaskStarting ? (
-              <LoaderCircle className="spin" size={17} />
+              <Spinner size={17} />
             ) : (
               <Play fill="currentColor" size={17} />
             )}

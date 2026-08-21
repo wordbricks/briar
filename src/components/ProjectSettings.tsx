@@ -14,7 +14,6 @@ import {
   GitBranch,
   ImagePlus,
   LayoutList,
-  LoaderCircle,
   Plug,
   RefreshCw,
   Save,
@@ -23,6 +22,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
@@ -882,7 +882,7 @@ export function ProjectSettings({
                   onClick={() => void refreshVelen()}
                   type="button"
                 >
-                  <RefreshCw className={velenLoading ? "spin" : undefined} size={14} />
+                  <Spinner icon={RefreshCw} size={14} spinning={velenLoading} />
                 </button>
               </div>
             </header>
@@ -937,7 +937,7 @@ export function ProjectSettings({
                 type="button"
               >
                 {velenSaving ? (
-                  <LoaderCircle className="spin" size={14} />
+                  <Spinner size={14} />
                 ) : !velenChanged ? (
                   <Check size={14} />
                 ) : null}
@@ -1105,7 +1105,7 @@ export function ProjectSettings({
                   type="button"
                 >
                   {runtimeSaving ? (
-                    <LoaderCircle className="spin" size={14} />
+                    <Spinner size={14} />
                   ) : !runtimeChanged ? (
                     <Check size={14} />
                   ) : (
@@ -1203,7 +1203,7 @@ export function ProjectSettings({
                   variant="outline"
                 >
                   {isAnalyzingWorkflowRequirements ? (
-                    <LoaderCircle className="spin" size={14} />
+                    <Spinner size={14} />
                   ) : (
                     <Cpu size={14} />
                   )}
@@ -1224,7 +1224,7 @@ export function ProjectSettings({
                   variant="outline"
                 >
                   {isRegeneratingWorkflow ? (
-                    <LoaderCircle className="spin" size={14} />
+                    <Spinner size={14} />
                   ) : (
                     <RefreshCw size={14} />
                   )}
@@ -1295,7 +1295,7 @@ export function ProjectSettings({
                   type="submit"
                 >
                   {isRevisingWorkflow ? (
-                    <LoaderCircle className="spin" size={14} />
+                    <Spinner size={14} />
                   ) : (
                     <Sparkles size={14} />
                   )}
@@ -1641,7 +1641,7 @@ export function ProjectSettings({
               variant="destructive"
             >
               {isDeleting ? (
-                <LoaderCircle className="spin" size={15} />
+                <Spinner size={15} />
               ) : (
                 <Trash2 size={15} />
               )}

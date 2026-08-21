@@ -1,4 +1,5 @@
-import { Bot, LoaderCircle } from "lucide-react";
+import { Bot } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useLayoutEffect, useRef } from "react";
 
 import { AgentProviderIcon } from "./AgentIcons";
@@ -72,7 +73,7 @@ export function AgentWorkLog({
               </strong>
               {!isComplete ? (
                 <small className="auto-hunt-message-streaming">
-                  <LoaderCircle className="spin" size={11} />
+                  <Spinner size={11} />
                   {t("autoHunt.agentMessage.streaming")}
                 </small>
               ) : null}

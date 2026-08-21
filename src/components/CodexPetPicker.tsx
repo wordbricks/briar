@@ -1,11 +1,11 @@
 import {
   CircleAlert,
   ExternalLink,
-  LoaderCircle,
   Search,
   Sparkles,
   X,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "../i18n";
 import {
@@ -124,7 +124,7 @@ export function CodexPetPicker({
             <div className="codex-pet-picker-content">
               {loading ? (
                 <p className="codex-pet-picker-state">
-                  <LoaderCircle className="spin" size={20} />
+                  <Spinner size={20} />
                   {t("agents.codexPetLoading")}
                 </p>
               ) : error ? (
@@ -176,7 +176,7 @@ export function CodexPetPicker({
                           type="button"
                         >
                           {selecting ? (
-                            <LoaderCircle className="spin" size={14} />
+                            <Spinner size={14} />
                           ) : (
                             t("agents.selectCodexPetAction")
                           )}

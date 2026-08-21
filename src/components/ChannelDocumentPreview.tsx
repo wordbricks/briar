@@ -1,4 +1,5 @@
-import { FileText, LoaderCircle, RefreshCw } from "lucide-react";
+import { FileText, RefreshCw } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useCallback, useRef, useState } from "react";
 import {
   Dialog,
@@ -92,7 +93,7 @@ export function ChannelDocumentPreview({
           <div className="channel-document-dialog-body">
             {loading ? (
               <div className="channel-document-state" role="status">
-                <LoaderCircle aria-hidden="true" className="animate-spin" size={20} />
+                <Spinner aria-hidden="true" size={20} />
                 {t("channel.documentLoading")}
               </div>
             ) : error ? (

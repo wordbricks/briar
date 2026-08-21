@@ -3,13 +3,13 @@ import {
   ChevronLeft,
   FileText,
   Hash,
-  LoaderCircle,
   Lock,
   MessageSquare,
   Plus,
   Send,
   Webhook,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import {
   useCallback,
   useEffect,
@@ -1707,7 +1707,7 @@ export function CompanionChannels({
               )}
             ref={threadMessagesScrollRef}
           >
-            {loading && !thread ? <Spinner /> : null}
+            {loading && !thread ? <CompanionChannelLoadingSpinner /> : null}
             {(thread ?? []).map((item) => (
             <MessageRow
               acceptingProposal={acceptingProposalId === item.proposal?.id}
@@ -1822,8 +1822,8 @@ export function CompanionChannels({
             }}
             ref={channelMessagesScrollRef}
           >
-            {loadingEarlierMessages ? <Spinner /> : null}
-            {loading && messages.length === 0 ? <Spinner /> : null}
+            {loadingEarlierMessages ? <CompanionChannelLoadingSpinner /> : null}
+            {loading && messages.length === 0 ? <CompanionChannelLoadingSpinner /> : null}
             {messages.map((item) => (
             <MessageRow
               acceptingProposal={acceptingProposalId === item.proposal?.id}
@@ -1921,7 +1921,7 @@ export function CompanionChannels({
     <ChannelMessageImageCacheProvider cache={imageCache}>
       <section className="companion-channels">
       {error ? <p className="companion-channel-error">{error}</p> : null}
-      {loading && channels.length === 0 ? <Spinner /> : null}
+      {loading && channels.length === 0 ? <CompanionChannelLoadingSpinner /> : null}
       {groups.map((group) => (
         <div className="companion-channel-group" key={group.key}>
           <h2 className="companion-channel-divider">{group.label}</h2>
@@ -2223,7 +2223,7 @@ function MessageRow({
               >
                 {acceptingProposal ? (
                   <>
-                    <LoaderCircle aria-hidden="true" className="spin" size={15} />
+                    <Spinner aria-hidden="true" size={15} />
                     {t("channel.creatingIssue")}
                   </>
                 ) : (
@@ -2533,10 +2533,10 @@ function relativeTime(value: string, locale: string) {
   return formatter.format(Math.round(elapsedSeconds / 86_400), "day");
 }
 
-function Spinner() {
+function CompanionChannelLoadingSpinner() {
   return (
     <p className="companion-channel-loading">
-      <LoaderCircle className="spin" size={16} />
+      <Spinner size={16} />
     </p>
   );
 }

@@ -1,4 +1,5 @@
-import { ArrowUpRight, LoaderCircle, Mail, X } from "lucide-react";
+import { ArrowUpRight, Mail, X } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 
 import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
@@ -119,7 +120,7 @@ export function LoginScreen({
               type="button"
             >
               {loading ? (
-                <LoaderCircle className="spin" size={18} />
+                <Spinner size={18} />
               ) : (
                 <Mail size={18} />
               )}

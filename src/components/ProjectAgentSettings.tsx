@@ -5,10 +5,10 @@ import {
   CircleAlert,
   Cpu,
   ImagePlus,
-  LoaderCircle,
   Save,
   Trash2,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useState } from "react";
 import { useI18n } from "../i18n";
 import {
@@ -206,7 +206,7 @@ export function ProjectAgentSettings({
             type="button"
           >
             {profileSaving ? (
-              <LoaderCircle className="spin" size={14} />
+              <Spinner size={14} />
             ) : !profileChanged ? (
               <Check size={14} />
             ) : (
@@ -513,7 +513,7 @@ export function ProjectAgentSettings({
                   type="submit"
                 >
                   {profileSaving ? (
-                    <LoaderCircle className="spin" size={14} />
+                    <Spinner size={14} />
                   ) : !profileChanged ? (
                     <Check size={14} />
                   ) : (
@@ -608,7 +608,7 @@ export function ProjectAgentSettings({
               variant="destructive"
             >
               {isDeleting ? (
-                <LoaderCircle className="spin" size={15} />
+                <Spinner size={15} />
               ) : (
                 <Trash2 size={15} />
               )}

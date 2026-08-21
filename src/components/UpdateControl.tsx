@@ -1,4 +1,5 @@
-import { CircleAlert, Download, LoaderCircle } from "lucide-react";
+import { CircleAlert, Download } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useI18n } from "../i18n";
 import { useAppUpdate } from "./AppUpdateProvider";
 
@@ -35,7 +36,7 @@ export function UpdateControl() {
         type="button"
       >
         {isInstalling
-          ? <LoaderCircle aria-hidden="true" className="spin" size={14} />
+          ? <Spinner aria-hidden="true" size={14} />
           : <Download aria-hidden="true" size={14} />}
       </button>
     </div>

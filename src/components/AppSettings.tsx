@@ -4,13 +4,13 @@ import {
   Download,
   Github,
   GitBranch,
-  LoaderCircle,
   Moon,
   RefreshCw,
   Settings2,
   SquareTerminal,
   Star,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
@@ -612,7 +612,7 @@ export function AppSettings({
                       title={t("appSettings.refreshProviders")}
                     >
                       {providersLoading ? (
-                        <LoaderCircle className="spin" size={16} />
+                        <Spinner size={16} />
                       ) : (
                         <RefreshCw size={16} />
                       )}
@@ -691,7 +691,7 @@ export function AppSettings({
                         type="button"
                         variant="outline"
                       >
-                        <LoaderCircle className="spin" />
+                        <Spinner />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.codex.installed === false ? (
@@ -708,9 +708,8 @@ export function AppSettings({
                         {t("appSettings.install")}
                       </Button>
                     ) : providerSaving === "codex" ? (
-                      <LoaderCircle
+                      <Spinner
                         aria-label={t("common.saving")}
-                        className="spin"
                         size={16}
                       />
                     ) : null
@@ -778,7 +777,7 @@ export function AppSettings({
                         type="button"
                         variant="outline"
                       >
-                        <LoaderCircle className="spin" />
+                        <Spinner />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.claude.installed === false ? (
@@ -795,9 +794,8 @@ export function AppSettings({
                         {t("appSettings.install")}
                       </Button>
                     ) : providerSaving === "claude" ? (
-                      <LoaderCircle
+                      <Spinner
                         aria-label={t("common.saving")}
-                        className="spin"
                         size={16}
                       />
                     ) : null
@@ -865,7 +863,7 @@ export function AppSettings({
                         type="button"
                         variant="outline"
                       >
-                        <LoaderCircle className="spin" />
+                        <Spinner />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.cursor.installed === false ? (
@@ -882,9 +880,8 @@ export function AppSettings({
                         {t("appSettings.install")}
                       </Button>
                     ) : providerSaving === "cursor" ? (
-                      <LoaderCircle
+                      <Spinner
                         aria-label={t("common.saving")}
-                        className="spin"
                         size={16}
                       />
                     ) : null
@@ -952,7 +949,7 @@ export function AppSettings({
                         type="button"
                         variant="outline"
                       >
-                        <LoaderCircle className="spin" />
+                        <Spinner />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.grok.installed === false ? (
@@ -969,9 +966,8 @@ export function AppSettings({
                         {t("appSettings.install")}
                       </Button>
                     ) : providerSaving === "grok" ? (
-                      <LoaderCircle
+                      <Spinner
                         aria-label={t("common.saving")}
-                        className="spin"
                         size={16}
                       />
                     ) : null
@@ -1041,7 +1037,7 @@ export function AppSettings({
                         type="button"
                         variant="outline"
                       >
-                        <LoaderCircle className="spin" />
+                        <Spinner />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.agy.installed === false ? (
@@ -1058,9 +1054,8 @@ export function AppSettings({
                         {t("appSettings.install")}
                       </Button>
                     ) : providerSaving === "agy" ? (
-                      <LoaderCircle
+                      <Spinner
                         aria-label={t("common.saving")}
-                        className="spin"
                         size={16}
                       />
                     ) : null
@@ -1138,7 +1133,7 @@ export function AppSettings({
                         type="button"
                         variant="outline"
                       >
-                        <LoaderCircle className="spin" />
+                        <Spinner />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.opencode.installed === false ? (
@@ -1165,7 +1160,7 @@ export function AppSettings({
                         variant="outline"
                       >
                         {terminalPathSaving ? (
-                          <LoaderCircle className="spin" />
+                          <Spinner />
                         ) : (
                           <SquareTerminal />
                         )}
@@ -1176,9 +1171,8 @@ export function AppSettings({
                         )}
                       </Button>
                     ) : providerSaving === "opencode" ? (
-                      <LoaderCircle
+                      <Spinner
                         aria-label={t("common.saving")}
-                        className="spin"
                         size={16}
                       />
                     ) : null
@@ -1245,7 +1239,7 @@ export function AppSettings({
                   trailing={
                     providerInstalling === "openrouter" ? (
                       <Button disabled size="sm" type="button" variant="outline">
-                        <LoaderCircle className="spin" />
+                        <Spinner />
                         {t("appSettings.installing")}
                       </Button>
                     ) : providerStatuses?.openrouter.installed === false ? (
@@ -1262,9 +1256,8 @@ export function AppSettings({
                         {t("appSettings.install")}
                       </Button>
                     ) : providerSaving === "openrouter" || openRouterKeySaving ? (
-                      <LoaderCircle
+                      <Spinner
                         aria-label={t("common.saving")}
-                        className="spin"
                         size={16}
                       />
                     ) : null
@@ -1288,7 +1281,7 @@ export function AppSettings({
                     title={t("appSettings.refresh")}
                   >
                     {loading ? (
-                      <LoaderCircle className="spin" size={16} />
+                      <Spinner size={16} />
                     ) : (
                       <RefreshCw size={16} />
                     )}
@@ -1630,7 +1623,7 @@ function OpenRouterDetails({
             size="sm"
             type="button"
           >
-            {saving ? <LoaderCircle className="spin" /> : null}
+            {saving ? <Spinner /> : null}
             {t("common.save")}
           </Button>
           {configured ? (
@@ -1705,7 +1698,7 @@ function ProviderDetails({
         </div>
         <div className="flex min-w-0 items-center gap-3 rounded-lg border border-border/80 bg-card px-3 py-3">
           {loading ? (
-            <LoaderCircle aria-hidden="true" className="spin shrink-0 text-muted-foreground" size={18} />
+            <Spinner aria-hidden="true" className="shrink-0 text-muted-foreground" size={18} />
           ) : (
             <CircleCheck
               aria-hidden="true"
@@ -1732,7 +1725,7 @@ function ProviderDetails({
             type="button"
             variant="outline"
           >
-            {loginOpening ? <LoaderCircle className="spin" /> : null}
+            {loginOpening ? <Spinner /> : null}
             {connected ? t("usage.reauthenticate") : t("usage.signInAction")}
           </Button>
         </div>

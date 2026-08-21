@@ -5,7 +5,6 @@ import {
   Copy,
   Hash,
   Headphones,
-  LoaderCircle,
   Lock,
   MessageSquare,
   MoreHorizontal,
@@ -20,6 +19,7 @@ import {
   Webhook,
   X,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import {
   useCallback,
   useEffect,
@@ -2211,7 +2211,7 @@ export function Channels({
                   />
                   {loadingEarlierMessages ? (
                     <div className="channel-message-page-loader" role="status">
-                      <LoaderCircle aria-hidden="true" className="spin" size={15} />
+                      <Spinner aria-hidden="true" size={15} />
                     </div>
                   ) : null}
                   <VirtualizedChannelMessageList
@@ -3185,7 +3185,7 @@ function ChannelWebhooksDialog({
 
         <div className="channel-webhook-list">
           {loading ? (
-            <p className="channel-invite-status"><LoaderCircle className="spin" size={16} />{t("channel.webhookLoading")}</p>
+            <p className="channel-invite-status"><Spinner size={16} />{t("channel.webhookLoading")}</p>
           ) : webhooks.length === 0 ? (
             <p className="channel-invite-status">{t("channel.webhookEmpty")}</p>
           ) : webhooks.map((webhook) => (
@@ -3447,7 +3447,7 @@ function ChannelInviteDialog({
             <div className="channel-invite-results">
               {loading ? (
                 <p className="channel-invite-status">
-                  <LoaderCircle className="spin" size={16} />
+                  <Spinner size={16} />
                   {t("channel.inviteLoading")}
                 </p>
               ) : filtered.length > 0 ? (
@@ -3786,7 +3786,7 @@ const MessageRow = memo(function MessageRow({
               >
                 {acceptingProposal ? (
                   <>
-                    <LoaderCircle aria-hidden="true" className="spin" size={15} />
+                    <Spinner aria-hidden="true" size={15} />
                     {t("channel.creatingIssue")}
                   </>
                 ) : (

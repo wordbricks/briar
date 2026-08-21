@@ -2,12 +2,12 @@ import {
   Cpu,
   Download,
   ImagePlus,
-  LoaderCircle,
   MonitorCog,
   Pencil,
   RefreshCw,
   Trash2,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { SettingsAlert, SettingsPageHeader } from "@/components/settings";
@@ -323,10 +323,7 @@ export function OrganizationWorkersSettings({
             type="button"
             variant="ghost"
           >
-            <RefreshCw
-              className={loading ? "animate-spin" : undefined}
-              size={16}
-            />
+            <Spinner icon={RefreshCw} size={16} spinning={loading} />
           </Button>
         </header>
         <div className="divide-y divide-border">
@@ -386,7 +383,7 @@ export function OrganizationWorkersSettings({
         </div>
         {loading && workers.length === 0 ? (
           <div className="grid min-h-32 place-items-center rounded-xl border border-border bg-card">
-            <LoaderCircle className="animate-spin" size={20} />
+            <Spinner size={20} />
           </div>
         ) : workers.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border p-8 text-center">

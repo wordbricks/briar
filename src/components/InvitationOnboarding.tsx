@@ -3,10 +3,10 @@ import {
   Building2,
   Check,
   FolderKanban,
-  LoaderCircle,
   LogOut,
   Mail,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -184,7 +184,7 @@ export function InvitationOnboarding({
                   type="button"
                 >
                   {accepting ? (
-                    <LoaderCircle className="spin" size={17} />
+                    <Spinner size={17} />
                   ) : (
                     <Check size={17} />
                   )}
@@ -230,7 +230,7 @@ export function InvitationOnboarding({
                   type="button"
                 >
                   {loginLoading ? (
-                    <LoaderCircle className="spin" size={18} />
+                    <Spinner size={18} />
                   ) : (
                     <Mail size={18} />
                   )}

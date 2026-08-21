@@ -24,7 +24,6 @@ import {
   ListChecks,
   List,
   ListFilter,
-  LoaderCircle,
   Maximize2,
   MessageCircle,
   MoreHorizontal,
@@ -45,6 +44,7 @@ import {
   Waypoints,
   X,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
@@ -2079,7 +2079,7 @@ export function HuntDashboard({
               variant="destructive"
             >
               {deletingIssueId ? (
-                <LoaderCircle className="spin" size={15} />
+                <Spinner size={15} />
               ) : (
                 <Trash2 size={15} />
               )}
@@ -2178,7 +2178,7 @@ export function HuntDashboard({
               type="button"
             >
               {deletingIssueId ? (
-                <LoaderCircle className="spin" size={15} />
+                <Spinner size={15} />
               ) : (
                 <FolderInput size={15} />
               )}
@@ -2501,7 +2501,7 @@ export function EditIssueDialog({
               disabled={isSubmitting || !title.trim() || titleTooLong}
               type="submit"
             >
-              {isSubmitting && <LoaderCircle className="spin" size={13} />}
+              {isSubmitting && <Spinner size={13} />}
               {isSubmitting ? t("common.saving") : t("common.save")}
             </button>
           </div>
@@ -3131,7 +3131,7 @@ export function CreateIssueDialog({
               }
               type="submit"
             >
-              {isSubmitting && <LoaderCircle className="spin" size={13} />}
+              {isSubmitting && <Spinner size={13} />}
               {isSubmitting ? t("issue.submitting") : t("issue.submit")}
             </button>
           </div>
@@ -3447,7 +3447,7 @@ function IssueInlineAttachmentPreview({
         </span>
       )}
       {!previewUrl && !failed && file && (
-        <LoaderCircle aria-hidden="true" className="spin" size={14} />
+        <Spinner aria-hidden="true" size={14} />
       )}
       <button aria-label={removeLabel} onClick={onRemove} type="button">
         <Trash2 size={14} />
@@ -3900,7 +3900,7 @@ function IssueContextMenu({
             onSelect={() => onProcessNow?.()}
           >
             {isProcessing ? (
-              <LoaderCircle aria-hidden="true" className="spin" size={17} />
+              <Spinner aria-hidden="true" size={17} />
             ) : (
               <Bot aria-hidden="true" size={17} />
             )}
@@ -5679,7 +5679,7 @@ export function RunPage({
             type="button"
           >
             {isProcessing ? (
-              <LoaderCircle aria-hidden="true" className="spin" size={15} />
+              <Spinner aria-hidden="true" size={15} />
             ) : (
               <Play aria-hidden="true" size={15} />
             )}
@@ -5705,7 +5705,7 @@ export function RunPage({
       title={inlineSaveLabel}
     >
       {inlineSaveStatus === "saving" ? (
-        <LoaderCircle aria-hidden="true" className="spin" size={13} />
+        <Spinner aria-hidden="true" size={13} />
       ) : inlineSaveStatus === "failed" ? (
         <CircleAlert aria-hidden="true" size={13} />
       ) : (
@@ -6032,9 +6032,10 @@ export function RunPage({
                                   onClick={() => void runAction(onRetry)}
                                   type="button"
                                 >
-                                  <RotateCcw
-                                    className={isRecovering ? "spin" : ""}
+                                  <Spinner
+                                    icon={RotateCcw}
                                     size={14}
+                                    spinning={isRecovering}
                                   />
                                   {t("run.retry")}
                                 </button>
@@ -6147,9 +6148,10 @@ export function RunPage({
                                   onClick={() => void runAction(onRetry)}
                                   type="button"
                                 >
-                                  <RotateCcw
-                                    className={isRecovering ? "spin" : ""}
+                                  <Spinner
+                                    icon={RotateCcw}
                                     size={14}
+                                    spinning={isRecovering}
                                   />
                                   {t("run.retry")}
                                 </button>
@@ -6295,10 +6297,8 @@ export function RunPage({
                               type="button"
                             >
                               {resumeIsPending ? (
-                                <LoaderCircle
-                                  aria-hidden="true"
-                                  className="spin"
-                                  size={14}
+                                <Spinner
+                                  aria-hidden="true" size={14}
                                 />
                               ) : (
                                 <RotateCcw aria-hidden="true" size={14} />
@@ -6383,10 +6383,8 @@ export function RunPage({
                                   type="submit"
                                 >
                                   {isSubmittingRework ? (
-                                    <LoaderCircle
-                                      aria-hidden="true"
-                                      className="spin"
-                                      size={14}
+                                    <Spinner
+                                      aria-hidden="true" size={14}
                                     />
                                   ) : (
                                     <GitFork aria-hidden="true" size={14} />
@@ -6420,7 +6418,7 @@ export function RunPage({
                               </header>
                               {runEventsLoading ? (
                                 <div className="paused-review-state">
-                                  <LoaderCircle className="spin" size={15} />
+                                  <Spinner size={15} />
                                   {t("run.activityLoading")}
                                 </div>
                               ) : runEventsLoadError ? (
@@ -6558,10 +6556,8 @@ export function RunPage({
                                 type="button"
                               >
                                 {isCompletingResultReview ? (
-                                  <LoaderCircle
-                                    aria-hidden="true"
-                                    className="spin"
-                                    size={15}
+                                  <Spinner
+                                    aria-hidden="true" size={15}
                                   />
                                 ) : (
                                   <Check aria-hidden="true" size={15} />
@@ -6763,7 +6759,7 @@ export function RunPage({
                         value={placementValue}
                       />
                     </span>
-                    {isRecovering && <LoaderCircle className="spin" size={14} />}
+                    {isRecovering && <Spinner size={14} />}
                   </label>
                   <label className="run-property">
                     <span className="run-property-icon priority"><Signal size={15} /></span>
@@ -7082,7 +7078,7 @@ export function RunPage({
               variant="destructive"
             >
               {isDeletingIssue ? (
-                <LoaderCircle className="spin" size={15} />
+                <Spinner size={15} />
               ) : (
                 <Trash2 size={15} />
               )}
@@ -7161,7 +7157,7 @@ export function RunPage({
               type="button"
             >
               {isDeletingIssue ? (
-                <LoaderCircle className="spin" size={15} />
+                <Spinner size={15} />
               ) : (
                 <FolderInput size={15} />
               )}
@@ -7262,7 +7258,7 @@ function IssueActionsMenu({
           type="button"
         >
           {disabled ? (
-            <LoaderCircle className="spin" size={15} />
+            <Spinner size={15} />
           ) : (
             <MoreHorizontal size={16} />
           )}
@@ -7426,7 +7422,7 @@ function IssueDependenciesPanel({
               type="button"
             >
               {isUpdating ? (
-                <LoaderCircle className="spin" size={13} />
+                <Spinner size={13} />
               ) : (
                 <X size={13} />
               )}
@@ -7467,7 +7463,7 @@ function IssueDependenciesPanel({
             }}
             type="button"
           >
-            {isUpdating ? <LoaderCircle className="spin" size={13} /> : <Plus size={13} />}
+            {isUpdating ? <Spinner size={13} /> : <Plus size={13} />}
             {t("issue.dependencyAdd")}
           </button>
         </div>
@@ -7525,7 +7521,7 @@ function IssueDependenciesPanel({
                     <strong>{candidate.title}</strong>
                   </span>
                   {isUpdating ? (
-                    <LoaderCircle className="spin" size={15} />
+                    <Spinner size={15} />
                   ) : (
                     <Plus size={15} />
                   )}
@@ -7670,7 +7666,7 @@ function IssueWorkflowProgress({
                 type="button"
               >
                 {savingBoundary === boundary ? (
-                  <LoaderCircle aria-hidden="true" className="spin" size={10} />
+                  <Spinner aria-hidden="true" size={10} />
                 ) : (
                   <Clock3 aria-hidden="true" size={10} />
                 )}
@@ -7862,7 +7858,7 @@ export function IssueAgentActivityPanel({
         </div>
       ) : loading ? (
         <div className="auto-hunt-event-state">
-          <LoaderCircle className="spin" size={14} />
+          <Spinner size={14} />
           {t("run.agentActivityLoading")}
         </div>
       ) : activity.length === 0 ? (
@@ -8361,7 +8357,7 @@ function RunManualQaGuide({
       </header>
       {loading ? (
         <div className="run-manual-qa-state">
-          <LoaderCircle aria-hidden="true" className="spin" size={15} />
+          <Spinner aria-hidden="true" size={15} />
           {t("run.manualQaLoading")}
         </div>
       ) : loadError ? (
@@ -8602,7 +8598,7 @@ function RunEvidenceImagePreview({
           disabled
           type="button"
         >
-          {!failed ? <LoaderCircle className="spin" size={20} /> : null}
+          {!failed ? <Spinner size={20} /> : null}
           {failed ? <CircleAlert size={20} /> : null}
         </button>
       )}
@@ -9549,7 +9545,7 @@ function IssueConversation({
               type="button"
             >
               {subscriptionPending ? (
-                <LoaderCircle aria-hidden="true" className="spin" size={13} />
+                <Spinner aria-hidden="true" size={13} />
               ) : (
                 <Bell aria-hidden="true" size={13} />
               )}
@@ -9571,7 +9567,7 @@ function IssueConversation({
         >
         {loading ? (
           <div className="issue-message-state">
-            <LoaderCircle className="spin" size={16} />
+            <Spinner size={16} />
             {t("run.messagesLoading")}
           </div>
         ) : loadError ? (
@@ -10038,7 +10034,7 @@ function IssueMessageItem({
                 type="button"
               >
                 {actionProposalState?.accepting ? (
-                  <LoaderCircle aria-hidden="true" className="spin" size={15} />
+                  <Spinner aria-hidden="true" size={15} />
                 ) : proposal.type === "request_issue_create" ? (
                   <Plus aria-hidden="true" size={15} />
                 ) : (
@@ -10641,7 +10637,7 @@ function MessageComposer({
           type="submit"
         >
           {sending ? (
-            <LoaderCircle className="spin" size={16} />
+            <Spinner size={16} />
           ) : (
             <Send aria-hidden="true" size={19} strokeWidth={2.2} />
           )}
@@ -10717,7 +10713,7 @@ function IssueMarkdownImage({
   if (!source) {
     return (
       <span className="issue-markdown-image-state" role="img" aria-label={alt}>
-        <LoaderCircle aria-hidden="true" className="spin" size={16} />
+        <Spinner aria-hidden="true" size={16} />
         {alt}
       </span>
     );
@@ -10883,7 +10879,7 @@ function RunStatusPill({
       className={`status-pill ${tone}${reviewed ? " reviewed" : ""}`}
       title={reviewed ? t("run.resultReviewed") : undefined}
     >
-      {status === "running" && <LoaderCircle className="spin" size={11} />}
+      {status === "running" && <Spinner size={11} />}
       {reviewed && (
         <BadgeCheck
           aria-hidden="true"

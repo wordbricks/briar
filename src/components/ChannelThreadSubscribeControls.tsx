@@ -1,4 +1,5 @@
-import { Bell, LoaderCircle } from "lucide-react";
+import { Bell } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useI18n } from "../i18n";
 import type { ChannelMember, ChannelThreadSubscriber } from "../lib/channels-contract";
 
@@ -59,7 +60,7 @@ export function ChannelThreadSubscribeControls({
           type="button"
         >
           {pending ? (
-            <LoaderCircle aria-hidden="true" className="spin" size={13} />
+            <Spinner aria-hidden="true" size={13} />
           ) : (
             <Bell aria-hidden="true" size={13} />
           )}

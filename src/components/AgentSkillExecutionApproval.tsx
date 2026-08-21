@@ -3,11 +3,11 @@ import {
   Bot,
   CircleAlert,
   Cpu,
-  LoaderCircle,
   Play,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -388,7 +388,7 @@ export function AgentSkillExecutionApproval<
                 onClick={() => void openApproval()}
                 type="button"
               >
-                {opening ? <LoaderCircle className="spin" size={15} /> : <Play size={15} />}
+                {opening ? <Spinner size={15} /> : <Play size={15} />}
                 {opening ? t("skillExecution.loading") : t("skillExecution.review")}
               </button>
             </footer>
@@ -453,7 +453,7 @@ export function AgentSkillExecutionApproval<
               {t("common.cancel")}
             </Button>
             <Button disabled={!canAccept || accepting} onClick={() => void accept()}>
-              {accepting ? <LoaderCircle className="spin" size={15} /> : <Play size={15} />}
+              {accepting ? <Spinner size={15} /> : <Play size={15} />}
               {accepting ? t("skillExecution.approving") : t("skillExecution.approve")}
             </Button>
           </DialogFooter>

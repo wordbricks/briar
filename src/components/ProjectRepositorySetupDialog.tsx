@@ -4,12 +4,12 @@ import {
   Download,
   FolderGit2,
   Github,
-  LoaderCircle,
   LogIn,
   RefreshCw,
   UploadCloud,
   X,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useRef } from "react";
 import { useI18n } from "../i18n";
 import type { RepositoryReadiness } from "../lib/project-connection";
@@ -146,7 +146,7 @@ export function ProjectRepositorySetupDialog({
             onClick={() => void onRefresh()}
             type="button"
           >
-            <RefreshCw className={loading ? "spin" : ""} size={15} />
+            <Spinner icon={RefreshCw} size={15} spinning={loading} />
             {t("repositorySetup.recheck")}
           </button>
           {!readiness?.ghInstalled ? (
@@ -156,7 +156,7 @@ export function ProjectRepositorySetupDialog({
               onClick={() => void onInstallGithub()}
               type="button"
             >
-              {loading ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />}
+              {loading ? <Spinner size={15} /> : <Download size={15} />}
               {t("repositorySetup.installGh")}
             </button>
           ) : !readiness.prReady ? (
@@ -166,7 +166,7 @@ export function ProjectRepositorySetupDialog({
               onClick={() => void onLoginGithub()}
               type="button"
             >
-              {loading ? <LoaderCircle className="spin" size={15} /> : <LogIn size={15} />}
+              {loading ? <Spinner size={15} /> : <LogIn size={15} />}
               {t(
                 loading && !readiness.ghAuthenticated
                   ? "repositorySetup.completeLoginGithub"

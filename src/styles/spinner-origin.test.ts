@@ -8,7 +8,7 @@ const styles = readFileSync(
 );
 
 const originRule = styles.match(
-  /\.spin,\s*\.animate-spin,\s*\.spinning\s*\{([^}]*)\}/,
+  /\.spin\s*\{([^}]*)\}/,
 )?.[1];
 
 describe("spinner rotation origin", () => {
@@ -19,8 +19,10 @@ describe("spinner rotation origin", () => {
     expect(originRule).toContain("display: inline-block");
   });
 
-  it("defines .spin only once and does not override Tailwind spin keyframes", () => {
+  it("defines one shared spin rule and does not override Tailwind spin keyframes", () => {
     expect(styles.match(/\.spin\s*\{/g)).toHaveLength(1);
+    expect(styles).not.toContain(".animate-spin");
+    expect(styles).not.toContain(".spinning");
     expect(styles).not.toMatch(/@keyframes\s+spin\s*\{/);
   });
 });

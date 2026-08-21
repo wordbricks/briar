@@ -1,4 +1,5 @@
-import { CircleAlert, LoaderCircle, X } from "lucide-react";
+import { CircleAlert, X } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import {
   createContext,
   useCallback,
@@ -291,7 +292,7 @@ function ChannelMessageImage({
   } else if (!source) {
     preview = (
       <span className="channel-message-image-state" title={attachment.filename}>
-        <LoaderCircle aria-hidden="true" className="spin" size={18} />
+        <Spinner aria-hidden="true" size={18} />
       </span>
     );
   } else {
