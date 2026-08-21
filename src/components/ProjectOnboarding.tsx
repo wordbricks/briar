@@ -45,6 +45,7 @@ import {
 import { formatExecutionDuration } from "../lib/agent-execution-metrics";
 import { useI18n } from "../i18n";
 import lovableLogo from "../assets/lovable-color.png";
+import lovableTutorialVideo from "../assets/lovable-export.mp4";
 import { DeveloperToolsSetup } from "./DeveloperToolsSetup";
 import { ChoiceCard } from "./ui/choice-card";
 import {
@@ -714,10 +715,12 @@ export function ProjectOnboarding({
                 <h1>{t("onboarding.lovableTutorialTitle")}</h1>
                 <p className="onboarding-copy">{t("onboarding.lovableTutorialDescription")}</p>
                 <div className="lovable-video-frame">
-                  <iframe
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                    src="https://www.youtube-nocookie.com/embed/zgNkhU4SYgQ?rel=0"
+                  <video
+                    aria-label={t("onboarding.lovableVideoTitle")}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    src={lovableTutorialVideo}
                     title={t("onboarding.lovableVideoTitle")}
                   />
                 </div>
