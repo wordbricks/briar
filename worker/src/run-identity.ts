@@ -1,6 +1,5 @@
 import { type AutoHuntSource } from "../../src/lib/auto-hunt-contract";
 
-
 export const digestRunId = async (
   projectId: string,
   source: AutoHuntSource,

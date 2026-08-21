@@ -9,7 +9,6 @@ import {
   type AgentSkillRow,
 } from "./agent-skills";
 
-
 export type ProjectAgentProvider = AgentSkillProvider;
 export type ModelEffort = AgentSkillEffort;
 

@@ -1,6 +1,5 @@
 import { type HuntRunRow } from "./hunt-run-model";
 
-
 export async function getHuntRunForProject(
   db: D1Database,
   projectId: string,

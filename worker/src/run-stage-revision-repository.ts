@@ -1,7 +1,6 @@
 import { type HuntRunRow } from "./hunt-run-model";
 import { getHuntRunForProject } from "./hunt-run-repository";
 
-
 export const loadStageRevisionRequirements = async (
   db: D1Database,
   run: HuntRunRow,

@@ -5,11 +5,11 @@ import {
   type DashboardStage,
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
+
 import {
   type ModelEffort,
   type ProjectAgentProvider,
 } from "./project-agent-model";
-
 
 export type HuntRunRow = {
   id: string;

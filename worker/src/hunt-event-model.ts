@@ -7,11 +7,11 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../../src/lib/agent-result";
+
 import {
   type ModelEffort,
   type ProjectAgentProvider,
 } from "./project-agent-model";
-
 
 export type HuntEventRow = {
   id: string;

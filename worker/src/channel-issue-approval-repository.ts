@@ -1,6 +1,5 @@
 import { type HuntRunRow } from "./hunt-run-model";
 
-
 export const channelApprovalTablesAvailable = async (db: D1Database) => {
   const result = await db
     .prepare(

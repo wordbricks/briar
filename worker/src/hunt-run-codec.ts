@@ -3,8 +3,8 @@ import {
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
 } from "../../src/lib/auto-hunt-contract";
-import { type HuntRunRow } from "./hunt-run-model";
 
+import { type HuntRunRow } from "./hunt-run-model";
 
 export const stableJson = (value: unknown) => JSON.stringify(value);
 export const parseWorkflow = (value: string | null | undefined) => {
