@@ -2,7 +2,7 @@
   "version": "1.4.0",
   "targets": {
     "aarch64-apple-darwin": {
-      "sha256": "539598c775882420b9d8deb7dc14d845f20f7d26f5600c50ab067dde6ac3f3bf"
+      "sha256": "1f755d4e53cf6fe73602530552b3e8f5b8e5fde2c85b9f3b5908a830b6d262ce"
     },
     "x86_64-apple-darwin": {
       "sha256": "ca8a18d0116d7b6b19f53bb0d8c48e487c0757cab4dc3f4f8cc5e43a44cd75d8"
