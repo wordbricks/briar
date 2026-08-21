@@ -100,6 +100,7 @@ describe("inbox notification change detection", () => {
         channelMessage,
         "channel-1",
         null,
+        null,
         true,
       ),
     ).toBe(true);
@@ -108,6 +109,7 @@ describe("inbox notification change detection", () => {
         channelMessage,
         "channel-2",
         null,
+        null,
         true,
       ),
     ).toBe(false);
@@ -115,6 +117,7 @@ describe("inbox notification change detection", () => {
       shouldSuppressInboxNotification(
         channelMessage,
         "channel-1",
+        null,
         null,
         false,
       ),
@@ -124,9 +127,36 @@ describe("inbox notification change detection", () => {
         message("issue-1", "v1"),
         "channel-1",
         null,
+        null,
         true,
       ),
     ).toBe(false);
+
+    const threadReply: InboxMessageWithReadState = {
+      ...channelMessage,
+      id: "channel:message-2",
+      messageId: "message-2",
+      rootMessageId: "thread-root",
+      version: "message-2",
+    };
+    expect(
+      shouldSuppressInboxNotification(
+        threadReply,
+        "channel-1",
+        null,
+        null,
+        true,
+      ),
+    ).toBe(false);
+    expect(
+      shouldSuppressInboxNotification(
+        threadReply,
+        "channel-1",
+        "thread-root",
+        null,
+        true,
+      ),
+    ).toBe(true);
   });
 
   it("suppresses a conversation notification for the issue being viewed", () => {
@@ -151,6 +181,7 @@ describe("inbox notification change detection", () => {
       shouldSuppressInboxNotification(
         conversationMessage,
         null,
+        null,
         "run-1",
         true,
       ),
@@ -158,6 +189,7 @@ describe("inbox notification change detection", () => {
     expect(
       shouldSuppressInboxNotification(
         conversationMessage,
+        null,
         null,
         "run-2",
         true,
@@ -167,6 +199,7 @@ describe("inbox notification change detection", () => {
       shouldSuppressInboxNotification(
         conversationMessage,
         null,
+        null,
         "run-1",
         false,
       ),
@@ -174,6 +207,7 @@ describe("inbox notification change detection", () => {
     expect(
       shouldSuppressInboxNotification(
         message("run-1", "v1"),
+        null,
         null,
         "run-1",
         true,

@@ -730,6 +730,7 @@ final class ChannelsStore: ObservableObject {
     }
 
     var viewingChannelID: UUID? { focusedChannelID }
+    var viewingThreadParentID: UUID? { focusedThreadParentID }
 
     func isMessageOptimistic(_ messageID: UUID) -> Bool {
         optimisticMessageIDs.contains(messageID)

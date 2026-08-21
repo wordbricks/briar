@@ -53,7 +53,10 @@ type DirectMessagesProps = {
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
   onIssueCreated?: (projectId: string, runId: string) => void | Promise<void>;
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
-  onViewingChannelChange?: (channelId: string | null) => void;
+  onViewingChannelChange?: (
+    channelId: string | null,
+    threadRootMessageId: string | null,
+  ) => void;
   onCreateAgent?: () => void;
 };
 

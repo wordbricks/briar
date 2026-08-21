@@ -304,7 +304,7 @@ describe("Inbox messages", () => {
     expect(classifyInboxMessage(message)).toBe("action_required");
   });
 
-  it("treats subscribed channel thread updates as activity", () => {
+  it("treats subscribed channel thread updates as action required", () => {
     const [message] = buildCurrentInboxMessages(
       {
         ...demoDashboard,
@@ -333,7 +333,7 @@ describe("Inbox messages", () => {
       kind: "channel",
       reason: "subscription",
     });
-    expect(classifyInboxMessage(message)).toBe("activity");
+    expect(classifyInboxMessage(message)).toBe("action_required");
   });
 
   it("includes only subscribed issue updates and treats regular messages as activity", () => {
