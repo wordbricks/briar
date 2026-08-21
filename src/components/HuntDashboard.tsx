@@ -266,6 +266,7 @@ import {
   type ModelEffort,
 } from "../lib/project-llm";
 import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
+import { useAgentProviderModelPreferences } from "../hooks/useAgentProviderModelPreferences";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 
@@ -2659,6 +2660,7 @@ export function CreateIssueDialog({
 }) {
   const { locale, t } = useI18n();
   const providerModels = useAgentProviderModels();
+  const providerModelPreferences = useAgentProviderModelPreferences();
   const [initialDraft] = useState(() => {
     const draft = loadCreateIssueDraft();
     return draft && projects.some((project) => project.id === draft.projectId)
@@ -2683,8 +2685,14 @@ export function CreateIssueDialog({
   const [preferredProvider, setPreferredProvider] = useState(
     initialDraft?.preferredProvider ?? "",
   );
-  const [preferredModel, setPreferredModel] = useState(
-    initialDraft?.preferredModel ?? "",
+  const [preferredModel, setPreferredModel] = useState(() =>
+    initialDraft?.preferredModel ??
+      (initialDraft?.preferredProvider
+        ? providerModelPreferences[
+            initialDraft.preferredProvider as AgentProvider
+          ].defaultModel
+        : null) ??
+      ""
   );
   const [preferredEffort, setPreferredEffort] = useState(
     initialDraft?.preferredEffort ?? "high",
@@ -3016,7 +3024,12 @@ export function CreateIssueDialog({
               label={t("issue.preferredProvider")}
               onValueChange={(value) => {
                 setPreferredProvider(value);
-                if (preferredModel) setPreferredModel("");
+                setPreferredModel(
+                  value
+                    ? providerModelPreferences[value as AgentProvider]
+                        .defaultModel ?? ""
+                    : "",
+                );
                 setPreferredEffort("high");
               }}
               providers={availableProviders}
@@ -3036,6 +3049,9 @@ export function CreateIssueDialog({
                     preferredProvider as AgentProvider,
                     t("settings.providerDefaultModel"),
                     preferredModel,
+                    providerModelPreferences[
+                      preferredProvider as AgentProvider
+                    ].favoriteModels,
                   )
                 : []}
               placeholder={t("issue.selectProviderFirst")}

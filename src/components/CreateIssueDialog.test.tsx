@@ -11,6 +11,7 @@ import { CreateIssueDialog } from "./HuntDashboard";
 import type { CreateIssueInput } from "../types";
 import { createIssueDraftStorageKey } from "../lib/create-issue-draft";
 import { demoDashboard } from "../lib/demo-data";
+import { writeAgentProviderModelPreference } from "../lib/agent-model-preferences";
 
 vi.mock("../lib/project-llm", async (importOriginal) => {
   const original = await importOriginal<typeof import("../lib/project-llm")>();
@@ -1160,6 +1161,10 @@ describe("CreateIssueDialog attachments", () => {
         error: null,
       },
     });
+    writeAgentProviderModelPreference("opencode", {
+      defaultModel: "anthropic/claude-sonnet-4",
+      favoriteModels: ["anthropic/claude-sonnet-4"],
+    });
     const root = createRoot(container);
     await act(async () => root.render(
       <CreateIssueDialog
@@ -1188,6 +1193,22 @@ describe("CreateIssueDialog attachments", () => {
       )?.click();
     });
 
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        ".issue-model-select .select-menu-trigger",
+      )?.textContent,
+    ).toContain("Claude Sonnet 4");
+    expect(
+      Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[aria-label="선호 모델"] [role="option"]',
+        ),
+      ).map((option) => option.dataset.value),
+    ).toEqual([
+      "",
+      "anthropic/claude-sonnet-4",
+      "openai/gpt-5.6",
+    ]);
     expect(document.body.textContent).toContain("GPT 5.6");
     expect(document.body.textContent).toContain("openai/gpt-5.6");
     expect(document.body.textContent).toContain("Claude Sonnet 4");

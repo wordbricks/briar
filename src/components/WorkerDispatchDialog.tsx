@@ -27,6 +27,7 @@ import {
   type ModelEffort,
 } from "../lib/project-llm";
 import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
+import { useAgentProviderModelPreferences } from "../hooks/useAgentProviderModelPreferences";
 import type {
   ExecutionWorker,
   HuntRun,
@@ -79,6 +80,7 @@ export function WorkerDispatchDialog({
   const [effort, setEffort] = useState("");
   const [workerId, setWorkerId] = useState("");
   const providerModels = useAgentProviderModels(open);
+  const providerModelPreferences = useAgentProviderModelPreferences();
   const selectionSessionRef = useRef<string | null>(null);
   const selectionDirtyRef = useRef(false);
   const initializingProviderRef = useRef<AgentProvider | null>(null);
@@ -120,8 +122,10 @@ export function WorkerDispatchDialog({
         providerModels,
         provider,
         t("settings.providerDefaultModel"),
+        model,
+        providerModelPreferences[provider].favoriteModels,
       ),
-    [provider, providerModels, t],
+    [model, provider, providerModelPreferences, providerModels, t],
   );
   const selectedModelKnown = modelOptions.some(
     (option) => option.value === model,
@@ -158,15 +162,18 @@ export function WorkerDispatchDialog({
       healthyProviders[0] ??
       "codex";
     initializingProviderRef.current = initialProvider;
+    const requestedModel = initialSelection
+      ? initialSelection.model
+      : run?.preferredProvider
+        ? run.preferredModel
+        : run?.requestedProvider
+          ? run.requestedModel
+          : null;
     setProvider(initialProvider);
     setModel(
-      initialSelection
-        ? (initialSelection.model ?? "")
-        : run?.preferredProvider
-          ? (run.preferredModel ?? "")
-          : run?.requestedProvider
-            ? (run.requestedModel ?? "")
-            : "",
+      requestedModel ??
+        providerModelPreferences[initialProvider].defaultModel ??
+        "",
     );
     setEffort(
       initialSelection
@@ -187,6 +194,7 @@ export function WorkerDispatchDialog({
     open,
     policy?.defaultWorkerId,
     policyWorkers,
+    providerModelPreferences,
     run?.preferredEffort,
     run?.preferredModel,
     run?.preferredProvider,
@@ -209,10 +217,11 @@ export function WorkerDispatchDialog({
     ) return;
     initializingProviderRef.current = null;
     if (healthyProviders.includes(provider)) return;
-    setProvider(healthyProviders[0]);
-    setModel("");
+    const nextProvider = healthyProviders[0];
+    setProvider(nextProvider);
+    setModel(providerModelPreferences[nextProvider].defaultModel ?? "");
     setEffort("");
-  }, [healthyProviders, open, provider]);
+  }, [healthyProviders, open, provider, providerModelPreferences]);
 
   useEffect(() => {
     if (workerId === "") return;
@@ -268,8 +277,11 @@ export function WorkerDispatchDialog({
               label={t("worker.provider")}
               onValueChange={(value) => {
                 selectionDirtyRef.current = true;
-                setProvider(value as AgentProvider);
-                setModel("");
+                const nextProvider = value as AgentProvider;
+                setProvider(nextProvider);
+                setModel(
+                  providerModelPreferences[nextProvider].defaultModel ?? "",
+                );
                 setEffort("");
               }}
               providers={healthyProviders}

@@ -48,15 +48,41 @@ export type AgentProviderModelCatalog = AgentProviderCapabilityCatalog;
 export const defaultAgentProviderModelCatalog: AgentProviderModelCatalog =
   emptyAgentProviderCapabilityCatalog();
 
+export function sortAgentModelsByPreference<T extends { id: string }>(
+  models: readonly T[],
+  favoriteModels: readonly string[] = [],
+): T[] {
+  const favoriteOrder = new Map(
+    favoriteModels.map((model, index) => [model, index]),
+  );
+  return models
+    .map((model, index) => ({ model, index }))
+    .sort((left, right) => {
+      const leftFavorite = favoriteOrder.get(left.model.id);
+      const rightFavorite = favoriteOrder.get(right.model.id);
+      if (leftFavorite !== undefined && rightFavorite !== undefined) {
+        return leftFavorite - rightFavorite;
+      }
+      if (leftFavorite !== undefined) return -1;
+      if (rightFavorite !== undefined) return 1;
+      return left.index - right.index;
+    })
+    .map(({ model }) => model);
+}
+
 export function agentModelOptions(
   catalog: AgentProviderModelCatalog,
   provider: AgentProvider,
   providerDefaultLabel: string,
   selectedModel?: string | null,
+  favoriteModels: readonly string[] = [],
 ) {
   const options = [
     { value: "", label: providerDefaultLabel },
-    ...catalog[provider].models.map((model) => ({
+    ...sortAgentModelsByPreference(
+      catalog[provider].models,
+      favoriteModels,
+    ).map((model) => ({
       value: model.id,
       label: model.label,
       description: model.label === model.id ? undefined : model.id,

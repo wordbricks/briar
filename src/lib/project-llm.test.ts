@@ -133,6 +133,35 @@ describe("project LLM gateway", () => {
     ]);
   });
 
+  it("keeps favorite models first without disturbing the remaining catalog order", () => {
+    const catalog = {
+      codex: {
+        models: [
+          { id: "gpt-standard", label: "Standard" },
+          { id: "gpt-favorite", label: "Favorite" },
+          { id: "gpt-other", label: "Other" },
+        ],
+        error: null,
+      },
+      claude: { models: [], error: null },
+      cursor: { models: [], error: null },
+      grok: { models: [], error: null },
+      agy: { models: [], error: null },
+      opencode: { models: [], error: null },
+      openrouter: { models: [], error: null },
+    };
+
+    expect(
+      agentModelOptions(
+        catalog,
+        "codex",
+        "Provider default",
+        null,
+        ["gpt-favorite"],
+      ).map((option) => option.value),
+    ).toEqual(["", "gpt-favorite", "gpt-standard", "gpt-other"]);
+  });
+
   it("rolls provider message deltas into request-scoped progress updates", async () => {
     let progressHandler:
       | ((event: { payload: Record<string, unknown> }) => void)

@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Settings2,
   SquareTerminal,
+  Star,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -56,7 +57,13 @@ import {
   type AppProviderSettings,
   type OpenRouterCredentialStatus,
   defaultAgentProviderModelCatalog,
+  sortAgentModelsByPreference,
 } from "../lib/project-llm";
+import {
+  readAgentProviderModelPreferences,
+  writeAgentProviderModelPreference,
+  type AgentProviderModelPreference,
+} from "../lib/agent-model-preferences";
 import {
   loadAppRuntimeSettings,
   updateAppRuntimeSettings,
@@ -87,6 +94,7 @@ import { AccountDeletionSettings } from "./AccountDeletionSettings";
 import { AccountProfileSettings } from "./AccountProfileSettings";
 import { BrowserSettings } from "./BrowserSettings";
 import { KeybindingsSettings } from "./KeybindingsSettings";
+import { NativeSelect } from "./NativeSelect";
 import {
   appSettingsNavigationGroups,
   appSettingsNavigationItems,
@@ -207,6 +215,9 @@ export function AppSettings({
   const [providerModels, setProviderModels] = useState(
     defaultAgentProviderModelCatalog,
   );
+  const [providerModelPreferences, setProviderModelPreferences] = useState(
+    readAgentProviderModelPreferences,
+  );
   const [openRouterCredential, setOpenRouterCredential] =
     useState<OpenRouterCredentialStatus>({ configured: false });
   const [openRouterApiKey, setOpenRouterApiKey] = useState("");
@@ -304,6 +315,34 @@ export function AppSettings({
       setProviderSaving(null);
     }
   };
+
+  const updateProviderModelPreference = (
+    provider: AgentProvider,
+    update: (current: AgentProviderModelPreference) => AgentProviderModelPreference,
+  ) => {
+    setProviderModelPreferences(
+      writeAgentProviderModelPreference(
+        provider,
+        update(providerModelPreferences[provider]),
+      ),
+    );
+  };
+
+  const providerModelPreferenceProps = (provider: AgentProvider) => ({
+    modelPreference: providerModelPreferences[provider],
+    onDefaultModelChange: (model: string) =>
+      updateProviderModelPreference(provider, (current) => ({
+        ...current,
+        defaultModel: model || null,
+      })),
+    onToggleFavorite: (model: string) =>
+      updateProviderModelPreference(provider, (current) => ({
+        ...current,
+        favoriteModels: current.favoriteModels.includes(model)
+          ? current.favoriteModels.filter((favorite) => favorite !== model)
+          : [...current.favoriteModels, model],
+      })),
+  });
 
   const openProviderLogin = async (provider: AgentProvider) => {
     if (providerLoginOpening) return;
@@ -608,6 +647,7 @@ export function AppSettings({
                   }
                   details={
                     <ProviderDetails
+                      {...providerModelPreferenceProps("codex")}
                       authenticated={providerStatuses?.codex.authenticated}
                       installed={providerStatuses?.codex.installed}
                       loading={providersLoading && !providerStatuses}
@@ -694,6 +734,7 @@ export function AppSettings({
                   }
                   details={
                     <ProviderDetails
+                      {...providerModelPreferenceProps("claude")}
                       authenticated={providerStatuses?.claude.authenticated}
                       installed={providerStatuses?.claude.installed}
                       loading={providersLoading && !providerStatuses}
@@ -780,6 +821,7 @@ export function AppSettings({
                   }
                   details={
                     <ProviderDetails
+                      {...providerModelPreferenceProps("cursor")}
                       authenticated={providerStatuses?.cursor.authenticated}
                       installed={providerStatuses?.cursor.installed}
                       loading={providersLoading && !providerStatuses}
@@ -866,6 +908,7 @@ export function AppSettings({
                   }
                   details={
                     <ProviderDetails
+                      {...providerModelPreferenceProps("grok")}
                       authenticated={providerStatuses?.grok.authenticated}
                       installed={providerStatuses?.grok.installed}
                       loading={providersLoading && !providerStatuses}
@@ -952,6 +995,7 @@ export function AppSettings({
                   }
                   details={
                     <ProviderDetails
+                      {...providerModelPreferenceProps("agy")}
                       authenticated={providerStatuses?.agy.authenticated}
                       installed={providerStatuses?.agy.installed}
                       loading={providersLoading && !providerStatuses}
@@ -1048,6 +1092,7 @@ export function AppSettings({
                   }
                   details={
                     <ProviderDetails
+                      {...providerModelPreferenceProps("opencode")}
                       authenticated={providerStatuses?.opencode.authenticated}
                       installed={providerStatuses?.opencode.installed}
                       loading={providersLoading && !providerStatuses}
@@ -1159,6 +1204,7 @@ export function AppSettings({
                   }
                   details={
                     <OpenRouterDetails
+                      {...providerModelPreferenceProps("openrouter")}
                       apiKey={openRouterApiKey}
                       configured={openRouterCredential.configured}
                       installed={providerStatuses?.openrouter.installed}
@@ -1382,25 +1428,168 @@ export function AppSettings({
   );
 }
 
+function ProviderModelsSettings({
+  loading,
+  modelPreference,
+  models,
+  onDefaultModelChange,
+  onToggleFavorite,
+}: {
+  loading: boolean;
+  modelPreference: AgentProviderModelPreference;
+  models: AgentProviderModelCatalogEntry;
+  onDefaultModelChange: (model: string) => void;
+  onToggleFavorite: (model: string) => void;
+}) {
+  const { t } = useI18n();
+  const orderedModels = sortAgentModelsByPreference(
+    models.models,
+    modelPreference.favoriteModels,
+  );
+  const defaultModelKnown = !modelPreference.defaultModel || models.models.some(
+    (model) => model.id === modelPreference.defaultModel,
+  );
+  const defaultModelOptions = [
+    { label: t("settings.providerDefaultModel"), value: "" },
+    ...(!defaultModelKnown && modelPreference.defaultModel
+      ? [{
+          label: modelPreference.defaultModel,
+          value: modelPreference.defaultModel,
+        }]
+      : []),
+    ...orderedModels.map((model) => ({
+      description: model.label === model.id ? undefined : model.id,
+      label: model.label,
+      value: model.id,
+    })),
+  ];
+
+  return (
+    <section aria-label={t("appSettings.supportedModels")} className="min-w-0">
+      <div className="flex items-center justify-between gap-3">
+        <Typography as="h3" className="font-semibold" variant="bodySm">
+          {t("appSettings.supportedModels")}
+        </Typography>
+        <Typography tone="muted" variant="caption">
+          {t("appSettings.modelCount", { count: models.models.length })}
+        </Typography>
+      </div>
+      {models.error ? (
+        <Typography as="p" className="mt-1 text-warning" variant="caption">
+          {t("appSettings.modelListFallback")}
+        </Typography>
+      ) : null}
+      <div className="mt-3 grid gap-1.5">
+        <Typography as="span" className="font-medium" variant="caption">
+          {t("appSettings.defaultModel")}
+        </Typography>
+        <NativeSelect
+          disabled={loading}
+          label={t("appSettings.defaultModel")}
+          onValueChange={onDefaultModelChange}
+          options={defaultModelOptions}
+          searchable={models.models.length > 8}
+          searchEmptyMessage={t("issue.noModelsFound")}
+          searchPlaceholder={t("issue.searchModels")}
+          value={modelPreference.defaultModel ?? ""}
+        />
+        <Typography as="p" tone="muted" variant="caption">
+          {t("appSettings.defaultModelDescription")}
+        </Typography>
+      </div>
+      {loading ? (
+        <Typography as="p" className="mt-3" tone="muted" variant="bodySm">
+          {t("appSettings.checkingProviders")}
+        </Typography>
+      ) : orderedModels.length > 0 ? (
+        <div className="mt-3 max-h-56 overflow-y-auto rounded-lg border border-border/80 bg-card">
+          {orderedModels.map((model) => {
+            const favorite = modelPreference.favoriteModels.includes(model.id);
+            return (
+              <div
+                className="flex min-w-0 items-center gap-3 border-b border-border/70 px-3 py-2.5 last:border-b-0"
+                key={model.id}
+              >
+                <div className="min-w-0 flex-1">
+                  <Typography as="strong" className="block truncate" variant="bodySm">
+                    {model.label}
+                  </Typography>
+                  {model.label !== model.id ? (
+                    <code className="block truncate text-xs text-muted-foreground">{model.id}</code>
+                  ) : null}
+                </div>
+                {modelPreference.defaultModel === model.id ? (
+                  <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+                    {t("appSettings.defaultModel")}
+                  </span>
+                ) : model.isDefault ? (
+                  <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+                    {t("settings.providerDefaultModel")}
+                  </span>
+                ) : null}
+                <Button
+                  aria-label={t(
+                    favorite
+                      ? "appSettings.removeFavoriteModel"
+                      : "appSettings.addFavoriteModel",
+                    { model: model.label },
+                  )}
+                  aria-pressed={favorite}
+                  className={favorite ? "text-warning" : "text-muted-foreground"}
+                  onClick={() => onToggleFavorite(model.id)}
+                  size="icon-sm"
+                  title={t(
+                    favorite
+                      ? "appSettings.removeFavoriteModel"
+                      : "appSettings.addFavoriteModel",
+                    { model: model.label },
+                  )}
+                  type="button"
+                  variant="ghost"
+                >
+                  <Star fill={favorite ? "currentColor" : "none"} />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <Typography as="p" className="mt-3 rounded-lg border border-dashed border-border px-3 py-4" tone="muted" variant="bodySm">
+          {t("appSettings.noSupportedModels")}
+        </Typography>
+      )}
+      <Typography as="p" className="mt-2" tone="muted" variant="caption">
+        {t("appSettings.favoriteModelDescription")}
+      </Typography>
+    </section>
+  );
+}
+
 function OpenRouterDetails({
   apiKey,
   configured,
   installed,
   loading,
+  modelPreference,
   models,
   onApiKeyChange,
+  onDefaultModelChange,
   onRemove,
   onSave,
+  onToggleFavorite,
   saving,
 }: {
   apiKey: string;
   configured: boolean;
   installed?: boolean;
   loading: boolean;
+  modelPreference: AgentProviderModelPreference;
   models: AgentProviderModelCatalogEntry;
   onApiKeyChange: (value: string) => void;
+  onDefaultModelChange: (model: string) => void;
   onRemove: () => void;
   onSave: () => void;
+  onToggleFavorite: (model: string) => void;
   saving: boolean;
 }) {
   const { t } = useI18n();
@@ -1457,38 +1646,13 @@ function OpenRouterDetails({
           ) : null}
         </div>
       </section>
-      <section aria-label={t("appSettings.supportedModels")} className="min-w-0">
-        <div className="flex items-center justify-between gap-3">
-          <Typography as="h3" className="font-semibold" variant="bodySm">
-            {t("appSettings.supportedModels")}
-          </Typography>
-          <Typography tone="muted" variant="caption">
-            {t("appSettings.modelCount", { count: models.models.length })}
-          </Typography>
-        </div>
-        {loading ? (
-          <Typography as="p" className="mt-3" tone="muted" variant="bodySm">
-            {t("appSettings.checkingProviders")}
-          </Typography>
-        ) : models.models.length > 0 ? (
-          <div className="mt-3 max-h-56 overflow-y-auto rounded-lg border border-border/80 bg-card">
-            {models.models.map((model) => (
-              <div className="border-b border-border/70 px-3 py-2.5 last:border-b-0" key={model.id}>
-                <Typography as="strong" className="block truncate" variant="bodySm">
-                  {model.label}
-                </Typography>
-                {model.label !== model.id ? (
-                  <code className="block truncate text-xs text-muted-foreground">{model.id}</code>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Typography as="p" className="mt-3 rounded-lg border border-dashed border-border px-3 py-4" tone="muted" variant="bodySm">
-            {t("appSettings.noSupportedModels")}
-          </Typography>
-        )}
-      </section>
+      <ProviderModelsSettings
+        loading={loading}
+        modelPreference={modelPreference}
+        models={models}
+        onDefaultModelChange={onDefaultModelChange}
+        onToggleFavorite={onToggleFavorite}
+      />
     </div>
   );
 }
@@ -1498,8 +1662,11 @@ function ProviderDetails({
   installed,
   loading,
   loginOpening,
+  modelPreference,
   models,
+  onDefaultModelChange,
   onLogin,
+  onToggleFavorite,
   providerName,
   usage,
 }: {
@@ -1507,8 +1674,11 @@ function ProviderDetails({
   installed?: boolean;
   loading: boolean;
   loginOpening: boolean;
+  modelPreference: AgentProviderModelPreference;
   models: AgentProviderModelCatalogEntry;
+  onDefaultModelChange: (model: string) => void;
   onLogin: () => void;
+  onToggleFavorite: (model: string) => void;
   providerName: string;
   usage?: AgentUsageProvider;
 }) {
@@ -1573,49 +1743,13 @@ function ProviderDetails({
         ) : null}
       </section>
 
-      <section aria-label={t("appSettings.supportedModels")} className="min-w-0">
-        <div className="flex items-center justify-between gap-3">
-          <Typography as="h3" variant="bodySm" className="font-semibold">
-            {t("appSettings.supportedModels")}
-          </Typography>
-          <Typography tone="muted" variant="caption">
-            {t("appSettings.modelCount", { count: models.models.length })}
-          </Typography>
-        </div>
-        {models.error ? (
-          <Typography as="p" className="mt-1 text-warning" variant="caption">
-            {t("appSettings.modelListFallback")}
-          </Typography>
-        ) : null}
-        {models.models.length > 0 ? (
-          <div className="mt-3 max-h-56 overflow-y-auto rounded-lg border border-border/80 bg-card">
-            {models.models.map((model) => (
-              <div
-                className="flex min-w-0 items-center gap-3 border-b border-border/70 px-3 py-2.5 last:border-b-0"
-                key={model.id}
-              >
-                <div className="min-w-0 flex-1">
-                  <Typography as="strong" className="block truncate" variant="bodySm">
-                    {model.label}
-                  </Typography>
-                  {model.label !== model.id ? (
-                    <code className="block truncate text-xs text-muted-foreground">{model.id}</code>
-                  ) : null}
-                </div>
-                {model.isDefault ? (
-                  <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
-                    {t("appSettings.defaultModel")}
-                  </span>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Typography as="p" className="mt-3 rounded-lg border border-dashed border-border px-3 py-4" tone="muted" variant="bodySm">
-            {t("appSettings.noSupportedModels")}
-          </Typography>
-        )}
-      </section>
+      <ProviderModelsSettings
+        loading={loading}
+        modelPreference={modelPreference}
+        models={models}
+        onDefaultModelChange={onDefaultModelChange}
+        onToggleFavorite={onToggleFavorite}
+      />
     </div>
   );
 }
