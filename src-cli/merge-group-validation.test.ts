@@ -87,6 +87,18 @@ ${scriptBody}
 }
 
 describe("exact-SHA merge-group foundation", () => {
+  it("is not wired into a production Worker or CLI entrypoint", async () => {
+    const entrypoints = await Promise.all([
+      readFile("src-cli/index.ts", "utf8"),
+      readFile("worker/src/index.ts", "utf8"),
+      readFile("src-cli/worker-claim-contract.ts", "utf8"),
+    ]);
+    for (const source of entrypoints) {
+      expect(source).not.toContain("merge-group-validation");
+      expect(source).not.toContain("merge_group_ci");
+    }
+  });
+
   it("keeps the image policy unpublished and disabled by default", () => {
     expect(imagePolicy).toMatchObject({
       protocol: 1,
