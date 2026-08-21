@@ -17,12 +17,15 @@ import {
   MERGE_GROUP_CI_IMAGE_REPOSITORY,
   MERGE_GROUP_CI_MAX_DEADLINE_MS,
   MERGE_GROUP_CI_MAX_OUTPUT_BYTES,
+  MERGE_GROUP_CI_PHASES,
 } from "../src/lib/merge-group-validation-contract";
 import {
   assertTrustedCandidateConfiguration,
   disposeExactShaValidation,
   ExactShaValidationInputError,
+  type GitRunner,
   isMergeGroupCiControlPath,
+  isAuditedMergeGroupImagePolicy,
   mergeGroupDockerArguments,
   MergeGroupCiDefinitionChangedError,
   MergeGroupCiInfrastructureError,
@@ -37,6 +40,8 @@ const baseSha = "a".repeat(40);
 const headSha = "b".repeat(40);
 const sourceRef =
   "refs/briar/merge-group-validation/11111111-1111-4111-8111-111111111111";
+const protectedBaseRef =
+  "refs/briar/merge-group-validation-base/11111111-1111-4111-8111-111111111111";
 const image = `${MERGE_GROUP_CI_IMAGE_REPOSITORY}@sha256:${"c".repeat(64)}`;
 const roots: string[] = [];
 
@@ -79,7 +84,8 @@ for argument in "$@"; do
     --cidfile=*) printf '%s' "$$" >"\${argument#*=}" ;;
   esac
 done
-context="\${@: -1}"
+context="\${@: -2:1}"
+phase="\${@: -1}"
 ${scriptBody}
 `);
   await chmod(executable, 0o700);
@@ -110,35 +116,42 @@ describe("exact-SHA merge-group foundation", () => {
       },
       rollout: { published: false, enabled: false },
     });
-    expect(resolveMergeGroupContainerRuntime({
-      repository: imagePolicy.repository,
-      manifestDigest: imagePolicy.manifestDigest,
-      ...imagePolicy.rollout,
-    }, () => "/usr/bin/docker", () => true)).toMatchObject({ ready: false });
+    expect(resolveMergeGroupContainerRuntime(
+      () => "/usr/bin/docker",
+      () => true,
+    )).toMatchObject({ ready: false });
   });
 
-  it("accepts only an enabled, installed image at the audited repository digest", () => {
-    const ready = resolveMergeGroupContainerRuntime({
+  it("binds runtime readiness to the independently audited digest", () => {
+    const auditedDigest = `sha256:${"c".repeat(64)}`;
+    const enabledPolicy = {
+      schemaVersion: 1,
+      protocol: 1,
       repository: MERGE_GROUP_CI_IMAGE_REPOSITORY,
-      manifestDigest: `sha256:${"c".repeat(64)}`,
-      published: true,
-      enabled: true,
-    }, () => "/usr/bin/docker", (executable, inspectedImage) => {
-      expect(executable).toBe("/usr/bin/docker");
-      expect(inspectedImage).toBe(image);
-      return true;
-    });
-    expect(ready).toEqual({
-      ready: true,
-      executable: "/usr/bin/docker",
-      image,
-    });
-    expect(resolveMergeGroupContainerRuntime({
-      repository: "example.invalid/attacker/image",
-      manifestDigest: `sha256:${"c".repeat(64)}`,
-      published: true,
-      enabled: true,
-    }, () => "/usr/bin/docker", () => true)).toMatchObject({ ready: false });
+      manifestDigest: auditedDigest,
+      platforms: ["linux/arm64"],
+      verification: {
+        independentBuilds: 2,
+        matchingManifestDigests: true,
+        verifiedAt: "2026-08-21T00:00:00.000Z",
+      },
+      rollout: { published: true, enabled: true },
+    };
+    expect(isAuditedMergeGroupImagePolicy(enabledPolicy, auditedDigest)).toBe(true);
+    expect(isAuditedMergeGroupImagePolicy(
+      { ...enabledPolicy, manifestDigest: `sha256:${"d".repeat(64)}` },
+      auditedDigest,
+    )).toBe(false);
+    expect(isAuditedMergeGroupImagePolicy({
+      ...enabledPolicy,
+      verification: { ...enabledPolicy.verification, independentBuilds: 2.5 },
+    }, auditedDigest)).toBe(false);
+    const inspect = vi.fn(() => true);
+    expect(resolveMergeGroupContainerRuntime(
+      () => "/usr/bin/docker",
+      inspect,
+    )).toMatchObject({ ready: false });
+    expect(inspect).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -149,6 +162,9 @@ describe("exact-SHA merge-group foundation", () => {
     "config/merge-group-vitest.config.ts",
     "vitest.config.ts",
     "nested/vite.config.mts",
+    ".postcssrc.cjs",
+    "web/.postcssrc.ts",
+    ".babelrc.mjs",
     "bunfig.toml",
     ".env.test",
     ".dev.vars.local",
@@ -175,24 +191,78 @@ describe("exact-SHA merge-group foundation", () => {
     ])).not.toThrow();
   });
 
-  it("verifies an exact local ref and creates a credential-free bundle", async () => {
-    const calls: string[][] = [];
-    const git = (args: string[]) => {
-      calls.push(args);
-      if (args[0] === "rev-parse") {
-        return { exitCode: 0, stdout: `${headSha}\n`, stderr: "" };
+  it("keeps every fixed phase in the trusted wrapper and out of candidate-writable PATH", async () => {
+    const wrapper = await readFile("scripts/ci-merge-group.sh", "utf8");
+    for (const context of MERGE_GROUP_CI_CONTEXTS) {
+      for (const phase of MERGE_GROUP_CI_PHASES[context]) {
+        expect(wrapper).toContain(`${context}:${phase}`);
       }
-      if (args[0] === "diff") {
+    }
+    expect(wrapper).toContain("PATH=/opt/briar/trusted-bin:");
+    expect(wrapper).not.toContain("/scratch/bin");
+    expect(wrapper).toContain("rustup run 1.96.0 rustc --version");
+    expect(wrapper).not.toContain("rustup toolchain install");
+  });
+
+  it("rejects an executable auto-config before trusted files or a bundle are read", async () => {
+    const operations: string[] = [];
+    const git: GitRunner = (args) => {
+      const operation = args[1];
+      operations.push(operation);
+      if (operation === "rev-parse") {
+        return {
+          exitCode: 0,
+          stdout: args.at(-1) === `${protectedBaseRef}^{commit}`
+            ? `${baseSha}\n`
+            : `${headSha}\n`,
+          stderr: "",
+        };
+      }
+      if (operation === "diff") {
+        return { exitCode: 0, stdout: ".postcssrc.cjs\0", stderr: "" };
+      }
+      return { exitCode: 0, stdout: "", stderr: "" };
+    };
+
+    await expect(prepareExactShaValidation(git, "/repo", {
+      executionId: "11111111-1111-4111-8111-111111111111",
+      sourceRef,
+      protectedBaseRef,
+      baseSha,
+      headSha,
+    })).rejects.toBeInstanceOf(MergeGroupCiDefinitionChangedError);
+    expect(operations).not.toContain("show");
+    expect(operations).not.toContain("bundle");
+  });
+
+  it("verifies an exact local ref and creates a credential-free bundle", async () => {
+    const calls: Array<{
+      args: string[];
+      options: Parameters<GitRunner>[1];
+    }> = [];
+    const git: GitRunner = (args, options) => {
+      calls.push({ args, options });
+      const operation = args[1];
+      if (operation === "rev-parse") {
+        return {
+          exitCode: 0,
+          stdout: args.at(-1) === `${protectedBaseRef}^{commit}`
+            ? `${baseSha}\n`
+            : `${headSha}\n`,
+          stderr: "",
+        };
+      }
+      if (operation === "diff") {
         return { exitCode: 0, stdout: "src/app.ts\0", stderr: "" };
       }
-      if (args[0] === "show") {
+      if (operation === "show") {
         return { exitCode: 0, stdout: "trusted base file\n", stderr: "" };
       }
-      if (args[0] === "bundle" && args[1] === "create") {
-        writeFileSync(args[2], "bundle");
+      if (operation === "bundle" && args[2] === "create") {
+        writeFileSync(args[3], "bundle");
         return { exitCode: 0, stdout: "", stderr: "" };
       }
-      if (args[0] === "bundle" && args[1] === "list-heads") {
+      if (operation === "bundle" && args[2] === "list-heads") {
         return {
           exitCode: 0,
           stdout: `${headSha} ${sourceRef}\n`,
@@ -205,24 +275,60 @@ describe("exact-SHA merge-group foundation", () => {
     const prepared = await prepareExactShaValidation(git, "/repo", {
       executionId: "11111111-1111-4111-8111-111111111111",
       sourceRef,
+      protectedBaseRef,
       baseSha,
       headSha,
     });
-    expect(calls).toContainEqual([
+    expect(calls.map((call) => call.args)).toContainEqual([
+      "--no-replace-objects",
+      "fetch",
+      "--no-tags",
+      "--force",
+      "/repo",
+      `+${protectedBaseRef}:${protectedBaseRef}`,
+      `+${sourceRef}:${sourceRef}`,
+    ]);
+    expect(calls.map((call) => call.args)).toContainEqual([
+      "--no-replace-objects",
+      "fsck",
+      "--strict",
+      "--no-dangling",
+    ]);
+    expect(calls.map((call) => call.args)).toContainEqual([
+      "--no-replace-objects",
+      "rev-parse",
+      "--verify",
+      `${protectedBaseRef}^{commit}`,
+    ]);
+    expect(calls.map((call) => call.args)).toContainEqual([
+      "--no-replace-objects",
       "merge-base",
       "--is-ancestor",
       baseSha,
       headSha,
     ]);
-    expect(calls).toContainEqual([
+    expect(calls.map((call) => call.args)).toContainEqual([
+      "--no-replace-objects",
       "bundle",
       "create",
       prepared.bundlePath,
       sourceRef,
     ]);
-    expect(calls.flat().join(" ")).not.toMatch(/token|authorization/iu);
+    expect(calls.flatMap((call) => call.args).join(" ")).not.toMatch(
+      /token|authorization/iu,
+    );
+    for (const call of calls) {
+      expect(call.options.env).toMatchObject({
+        GIT_CONFIG_GLOBAL: "/dev/null",
+        GIT_CONFIG_NOSYSTEM: "1",
+        GIT_NO_REPLACE_OBJECTS: "1",
+      });
+      expect(call.options.env).not.toHaveProperty("GH_TOKEN");
+      expect(call.options.cwd).not.toBe("/repo");
+    }
     expect((await stat(prepared.root)).mode & 0o777).toBe(0o700);
     expect((await stat(prepared.bundlePath)).mode & 0o777).toBe(0o444);
+    expect((await stat(prepared.profilePath)).mode & 0o777).toBe(0o555);
     expect(await readFile(prepared.profilePath, "utf8")).toContain("trusted base");
     await disposeExactShaValidation(prepared);
     expect(existsSync(prepared.root)).toBe(false);
@@ -233,26 +339,52 @@ describe("exact-SHA merge-group foundation", () => {
     await expect(prepareExactShaValidation(never, "/repo", {
       executionId: "bad/id",
       sourceRef,
+      protectedBaseRef,
       baseSha,
       headSha,
     })).rejects.toBeInstanceOf(ExactShaValidationInputError);
     expect(never).not.toHaveBeenCalled();
 
-    const moved = (args: string[]) => args[0] === "rev-parse"
-      ? { exitCode: 0, stdout: `${"d".repeat(40)}\n`, stderr: "" }
-      : { exitCode: 0, stdout: "", stderr: "" };
+    await expect(prepareExactShaValidation(never, "/repo", {
+      executionId: "11111111-1111-4111-8111-111111111111",
+      sourceRef,
+      protectedBaseRef: "refs/heads/main",
+      baseSha,
+      headSha,
+    })).rejects.toThrow(/private ref bound to this execution/iu);
+    expect(never).not.toHaveBeenCalled();
+
+    const moved = (args: string[]) => {
+      if (args[1] !== "rev-parse") {
+        return { exitCode: 0, stdout: "", stderr: "" };
+      }
+      return {
+        exitCode: 0,
+        stdout: args.at(-1) === `${protectedBaseRef}^{commit}`
+          ? `${baseSha}\n`
+          : `${"d".repeat(40)}\n`,
+        stderr: "",
+      };
+    };
     await expect(prepareExactShaValidation(moved, "/repo", {
       executionId: "11111111-1111-4111-8111-111111111111",
       sourceRef,
+      protectedBaseRef,
       baseSha,
       headSha,
     })).rejects.toThrow(/exact SHA/iu);
 
     const nonAncestor = (args: string[]) => {
-      if (args[0] === "rev-parse") {
-        return { exitCode: 0, stdout: `${headSha}\n`, stderr: "" };
+      if (args[1] === "rev-parse") {
+        return {
+          exitCode: 0,
+          stdout: args.at(-1) === `${protectedBaseRef}^{commit}`
+            ? `${baseSha}\n`
+            : `${headSha}\n`,
+          stderr: "",
+        };
       }
-      if (args[0] === "merge-base") {
+      if (args[1] === "merge-base") {
         return { exitCode: 1, stdout: "", stderr: "" };
       }
       return { exitCode: 0, stdout: "", stderr: "" };
@@ -260,9 +392,24 @@ describe("exact-SHA merge-group foundation", () => {
     await expect(prepareExactShaValidation(nonAncestor, "/repo", {
       executionId: "11111111-1111-4111-8111-111111111111",
       sourceRef,
+      protectedBaseRef,
       baseSha,
       headSha,
     })).rejects.toThrow(/descend/iu);
+
+    const neverSelfBase = vi.fn(() => ({
+      exitCode: 0,
+      stdout: "",
+      stderr: "",
+    }));
+    await expect(prepareExactShaValidation(neverSelfBase, "/repo", {
+      executionId: "11111111-1111-4111-8111-111111111111",
+      sourceRef,
+      protectedBaseRef,
+      baseSha: headSha,
+      headSha,
+    })).rejects.toThrow(/must be distinct/iu);
+    expect(neverSelfBase).not.toHaveBeenCalled();
   });
 
   it("builds a fixed, credential-free, resource-bounded Docker invocation", async () => {
@@ -271,10 +418,15 @@ describe("exact-SHA merge-group foundation", () => {
       prepared,
       runtime: { executable: "/usr/bin/docker", image },
       context: "app-worker",
+      phase: "app-check",
       containerName: "briar-merge-group-run-app-worker-abc123",
       cidFile: join(prepared.root, "container.cid"),
+      deadlineSeconds: 60,
+      deadlineUnix: 1_787_270_400,
     });
     expect(args).toEqual(expect.arrayContaining([
+      "--rm",
+      "--init",
       "--pull=never",
       "--network=none",
       "--read-only",
@@ -285,10 +437,15 @@ describe("exact-SHA merge-group foundation", () => {
       "--memory-swap=8g",
       "--cpus=2",
       "--pids-limit=512",
+      "--label=io.briar.merge-group-ci.phase=app-check",
+      "--label=io.briar.merge-group-ci.deadline-unix=1787270400",
       "--env=HOME=/scratch/home",
       `--env=BRIAR_CI_HEAD_SHA=${headSha}`,
       image,
+      "/usr/bin/timeout",
+      "60s",
       "app-worker",
+      "app-check",
     ]));
     const serialized = args.join("\n");
     expect(serialized).not.toContain("GH_TOKEN");
@@ -296,14 +453,15 @@ describe("exact-SHA merge-group foundation", () => {
     expect(serialized).not.toContain("DOCKER_CONFIG");
     expect(serialized).not.toContain("dst=/repo");
     expect(serialized).not.toContain("dst=/workspace");
+    expect(serialized).toContain("dst=/opt/briar/trusted-bin/bun,readonly");
   });
 
-  it("runs every context in a separate clean container without host credentials", async () => {
+  it("runs every phase in a fresh container without host credentials", async () => {
     const prepared = await preparedFixture();
     const fake = await fakeDocker(`
-env >"${join(prepared.root, "environment-")}$context.txt"
-printf '%s\n' "$@" >"${join(prepared.root, "arguments-")}$context.txt"
-printf 'context=%s\n' "$context"
+env >"${join(prepared.root, "environment-")}$context-$phase.txt"
+printf '%s\n' "$@" >"${join(prepared.root, "arguments-")}$context-$phase.txt"
+printf 'context=%s phase=%s\n' "$context" "$phase"
 exit 0`);
     vi.stubEnv("GH_TOKEN", "github-secret");
     vi.stubEnv("BRIAR_WORKER_TOKEN", "worker-secret");
@@ -322,25 +480,29 @@ exit 0`);
 
     const names = new Set<string>();
     for (const context of MERGE_GROUP_CI_CONTEXTS) {
-      const environment = await readFile(
-        join(prepared.root, `environment-${context}.txt`),
-        "utf8",
-      );
-      expect(environment).not.toContain("github-secret");
-      expect(environment).not.toContain("worker-secret");
-      expect(environment).not.toContain("NODE_OPTIONS");
-      expect(environment).not.toContain("DOCKER_CONFIG");
-      expect(environment).toContain(`HOME=${prepared.root}`);
-      const argumentsText = await readFile(
-        join(prepared.root, `arguments-${context}.txt`),
-        "utf8",
-      );
-      const name = argumentsText.split("\n")
-        .find((argument) => argument.startsWith("--name="));
-      expect(name).toBeDefined();
-      names.add(name!);
+      for (const phase of MERGE_GROUP_CI_PHASES[context]) {
+        const environment = await readFile(
+          join(prepared.root, `environment-${context}-${phase}.txt`),
+          "utf8",
+        );
+        expect(environment).not.toContain("github-secret");
+        expect(environment).not.toContain("worker-secret");
+        expect(environment).not.toContain("NODE_OPTIONS");
+        expect(environment).not.toContain("DOCKER_CONFIG");
+        expect(environment).toContain(`HOME=${prepared.root}`);
+        const argumentsText = await readFile(
+          join(prepared.root, `arguments-${context}-${phase}.txt`),
+          "utf8",
+        );
+        const name = argumentsText.split("\n")
+          .find((argument) => argument.startsWith("--name="));
+        expect(name).toBeDefined();
+        names.add(name!);
+      }
     }
-    expect(names.size).toBe(4);
+    expect(names.size).toBe(
+      Object.values(MERGE_GROUP_CI_PHASES).flat().length,
+    );
   });
 
   it("classifies deterministic CI failures without treating them as infrastructure", async () => {
@@ -363,15 +525,20 @@ exit 0`);
     expect(results.filter((result) => result.passed)).toHaveLength(3);
   });
 
-  it("fails bounded infrastructure exits and rejects an overlong deadline", async () => {
+  it.each([75, 124])("fails bounded infrastructure exit %i", async (exitCode) => {
     const prepared = await preparedFixture();
-    const fake = await fakeDocker("exit 75");
+    const fake = await fakeDocker(`exit ${exitCode}`);
     await expect(runFixedMergeGroupValidation({
       prepared,
       runtime: { executable: fake.executable, image },
       signal: new AbortController().signal,
       deadlineMs: 10_000,
     })).rejects.toBeInstanceOf(MergeGroupCiInfrastructureError);
+  });
+
+  it("rejects an overlong deadline", async () => {
+    const prepared = await preparedFixture();
+    const fake = await fakeDocker("exit 0");
     await expect(runFixedMergeGroupValidation({
       prepared,
       runtime: { executable: fake.executable, image },
@@ -455,8 +622,15 @@ while :; do sleep 1; done`);
       signal: new AbortController().signal,
       deadlineMs: 10_000,
     });
-    expect(results[0].logSha256).toBe(
-      createHash("sha256").update("stable log").digest("hex"),
-    );
+    const phaseLogHash = createHash("sha256").update("stable log").digest("hex");
+    const expected = createHash("sha256");
+    for (const phase of MERGE_GROUP_CI_PHASES["app-worker"]) {
+      expected.update(phase);
+      expected.update("\0");
+      expected.update(phaseLogHash);
+      expected.update("\0");
+      expected.update("0\n");
+    }
+    expect(results[0].logSha256).toBe(expected.digest("hex"));
   });
 });

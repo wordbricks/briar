@@ -1,6 +1,10 @@
 export const MERGE_GROUP_CI_PROTOCOL = 1;
 export const MERGE_GROUP_CI_IMAGE_REPOSITORY =
   "ghcr.io/wordbricks/briar-merge-group-ci";
+export const MERGE_GROUP_CI_SOURCE_REF_PREFIX =
+  "refs/briar/merge-group-validation";
+export const MERGE_GROUP_CI_PROTECTED_BASE_REF_PREFIX =
+  "refs/briar/merge-group-validation-base";
 
 // Publishing and enabling an independently reproduced digest is a separate
 // rollout step. No production path may run a mutable tag or an unverified
@@ -15,6 +19,35 @@ export const MERGE_GROUP_CI_CONTEXTS = [
 ] as const;
 
 export type MergeGroupCiContext = typeof MERGE_GROUP_CI_CONTEXTS[number];
+
+// Every phase receives a fresh exact-head checkout in a new container. Keep
+// candidate-executing phases separate so one successful command cannot rewrite
+// the tools or workspace used by a later required command.
+export const MERGE_GROUP_CI_PHASES = {
+  "app-worker": [
+    "app-check",
+    "app-d1-prepare",
+    "app-test",
+    "app-shell",
+    "app-ios-verify",
+    "app-build",
+    "app-release-build",
+    "app-worker-check",
+    "app-worker-build",
+    "app-worker-startup",
+  ],
+  "d1-migrations": ["d1-apply", "d1-test"],
+  rust: ["rust-fmt", "rust-clippy", "rust-test"],
+  security: [
+    "security-bun-audit",
+    "security-rust-audit",
+    "security-encrypted-env",
+    "security-gitleaks",
+  ],
+} as const satisfies Record<MergeGroupCiContext, readonly string[]>;
+
+export type MergeGroupCiPhase =
+  typeof MERGE_GROUP_CI_PHASES[MergeGroupCiContext][number];
 
 export const MERGE_GROUP_CI_PROFILE_PATH = "scripts/ci-merge-group.sh";
 export const MERGE_GROUP_CI_LOCAL_PROFILE_PATH = "scripts/ci-local.sh";

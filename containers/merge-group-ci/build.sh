@@ -27,9 +27,13 @@ image_id="$(cat "$iid_file")"
   exit 1
 }
 
-"$runtime" image inspect \
+inspection="$("$runtime" image inspect \
   --format '{{.Id}} {{.Config.User}} {{index .Config.Labels "io.briar.merge-group-ci.protocol"}}' \
-  "$tag"
+  "$tag")"
+[[ "$inspection" == "$image_id 65532:65532 1" ]] || {
+  echo "OCI image identity, non-root user, or protocol label mismatch: $inspection" >&2
+  exit 1
+}
 
 echo "Review image built locally as $tag ($image_id)."
 echo "The rollout manifest intentionally remains unpublished and disabled."

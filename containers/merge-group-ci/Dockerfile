@@ -1,5 +1,7 @@
 FROM docker.io/library/rust:1.96.0-bookworm@sha256:5e2214abe154fe26e39f64488952e5c991eeed1d6d6da7cc8381ae83927f0cfc
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 ARG TARGETARCH
 ARG BUN_VERSION=1.4.0
 ARG NODE_VERSION=22.23.2
@@ -73,7 +75,9 @@ RUN set -eux; \
   install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks; \
   rm -rf /tmp/bun /tmp/bun.zip /tmp/node.tar.xz /tmp/cargo-audit* /tmp/gitleaks*
 
-RUN mkdir -p /opt/briar/cargo /opt/briar/rustup /opt/briar/bun-cache \
+RUN mkdir -p \
+    /opt/briar/cargo /opt/briar/rustup /opt/briar/bun-cache \
+    /opt/briar/trusted-bin \
   && cp -a /usr/local/cargo/. /opt/briar/cargo/ \
   && cp -a /usr/local/rustup/. /opt/briar/rustup/
 
@@ -95,14 +99,22 @@ RUN bun --version | grep -Fx "${BUN_VERSION}" \
   && node --version | grep -Fx "v${NODE_VERSION}" \
   && cargo-audit --version | grep -Fx "cargo-audit ${CARGO_AUDIT_VERSION}" \
   && gitleaks version | grep -Fx "${GITLEAKS_VERSION}" \
+  && command -v timeout | grep -Fx /usr/bin/timeout \
   && bun install --frozen-lockfile --ignore-scripts \
   && bun audit --audit-level high --ignore GHSA-f88m-g3jw-g9cj \
   && sha256sum bun.lock > /opt/briar/audited-bun-lock.sha256 \
   && cargo fetch --locked --manifest-path src-tauri/Cargo.toml
 
-RUN git clone --no-checkout https://github.com/RustSec/advisory-db.git \
-      /opt/briar/cargo/advisory-db \
+RUN git init --quiet /opt/briar/cargo/advisory-db \
+  && git -C /opt/briar/cargo/advisory-db remote add origin \
+      https://github.com/RustSec/advisory-db.git \
+  && git -C /opt/briar/cargo/advisory-db fetch --depth=1 --no-tags origin \
+      "${ADVISORY_DB_COMMIT}" \
   && git -C /opt/briar/cargo/advisory-db checkout --detach "${ADVISORY_DB_COMMIT}" \
+  && git -C /opt/briar/cargo/advisory-db remote remove origin \
+  && rm -f /opt/briar/cargo/advisory-db/.git/FETCH_HEAD \
+  && git -C /opt/briar/cargo/advisory-db reflog expire --expire=now --all \
+  && git -C /opt/briar/cargo/advisory-db gc --prune=now \
   && cargo audit --no-fetch --stale --file src-tauri/Cargo.lock
 
 RUN chmod -R a+rX /opt/briar \
