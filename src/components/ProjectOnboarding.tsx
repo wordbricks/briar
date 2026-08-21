@@ -13,12 +13,12 @@ import {
   GitBranch,
   Github,
   Info,
-  LoaderCircle,
   PlayCircle,
   Sparkles,
   Wrench,
   X,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { ProjectConnection } from "../hooks/useBriar";
 import { ApiError, apiErrorIssueMessages } from "../lib/api";
@@ -797,7 +797,7 @@ export function ProjectOnboarding({
                     type="submit"
                   >
                     {lovableImporting ? (
-                      <><LoaderCircle className="spin" size={17} />{t("onboarding.lovableCloning")}</>
+                      <><Spinner size={17} />{t("onboarding.lovableCloning")}</>
                     ) : (
                       <>{t("onboarding.confirm")}<ArrowRight size={17} /></>
                     )}
@@ -842,7 +842,7 @@ export function ProjectOnboarding({
                         onClick={() => void selectRepository()}
                         type="button"
                       >
-                        {selectingRepository ? <LoaderCircle className="spin" size={14} /> : <FolderOpen size={14} />}
+                        {selectingRepository ? <Spinner size={14} /> : <FolderOpen size={14} />}
                         {selectingRepository
                           ? t("onboarding.repositorySelecting")
                           : repositoryPath
@@ -924,7 +924,7 @@ export function ProjectOnboarding({
                   </>
                 ) : (
                   <>
-                    <span className="onboarding-process-icon"><LoaderCircle className="spin" size={27} /></span>
+                    <span className="onboarding-process-icon"><Spinner size={27} /></span>
                     <h1>
                       {lovablePreset
                         ? t("onboarding.lovablePresetTitle")
@@ -964,7 +964,7 @@ export function ProjectOnboarding({
                     value={workflowRevision}
                   />
                   <button disabled={revisingWorkflow || !workflowRevision.trim()} type="submit">
-                    {revisingWorkflow ? <LoaderCircle className="spin" size={14} /> : <Sparkles size={14} />}
+                    {revisingWorkflow ? <Spinner size={14} /> : <Sparkles size={14} />}
                     {revisingWorkflow ? t("onboarding.workflowRevising") : t("onboarding.workflowRevise")}
                   </button>
                 </form>

@@ -12,6 +12,7 @@ import {
   Settings,
   Sparkles,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MainContent, PageHeader } from "./layout";
@@ -283,7 +284,12 @@ export function ProjectLobby({
               onClick={() => void refreshUsage(true)}
               type="button"
             >
-              <RefreshCw aria-hidden className={usageLoading ? "spinning" : ""} size={15} />
+              <Spinner
+                aria-hidden
+                icon={RefreshCw}
+                size={15}
+                spinning={usageLoading}
+              />
               <span>{t("lobby.refresh")}</span>
             </button>
           </section>

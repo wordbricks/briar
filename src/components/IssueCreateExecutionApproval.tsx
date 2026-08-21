@@ -1,4 +1,5 @@
-import { BadgeCheck, CircleAlert, LoaderCircle, Play } from "lucide-react";
+import { BadgeCheck, CircleAlert, Play } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import type { ChannelExecutionProposal } from "../lib/channels-contract";
@@ -141,7 +142,7 @@ export function IssueCreateExecutionApproval({
           type="button"
         >
           {opening || accepting ? (
-            <LoaderCircle aria-hidden="true" className="spin" size={15} />
+            <Spinner aria-hidden="true" size={15} />
           ) : (
             <Play aria-hidden="true" size={15} />
           )}

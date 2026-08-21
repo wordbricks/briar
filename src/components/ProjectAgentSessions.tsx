@@ -1,8 +1,8 @@
 import {
   Bot,
   ChevronRight,
-  LoaderCircle,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useMemo } from "react";
 
 import { EmptyState } from "@/components/layout";
@@ -107,7 +107,7 @@ function SessionStatusIcon({ status }: { status: AutoHuntSessionStatus }) {
   return (
     <span className={`auto-hunt-session-icon ${status}`}>
       {status === "running" ? (
-        <LoaderCircle className="spin" size={17} />
+        <Spinner size={17} />
       ) : (
         <Bot size={17} />
       )}

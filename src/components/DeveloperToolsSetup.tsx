@@ -2,10 +2,10 @@ import {
   ArrowRight,
   Check,
   Download,
-  LoaderCircle,
   SquareTerminal,
   Wrench,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "../i18n";
 import {
@@ -166,7 +166,7 @@ export function DeveloperToolsSetup({
                   className="initial-prerequisite-check checking"
                   role="status"
                 >
-                  <LoaderCircle className="spin" size={16} />
+                  <Spinner size={16} />
                   {t("initialOnboarding.checking")}
                 </span>
               ) : needsTerminalPath ? (
@@ -177,7 +177,7 @@ export function DeveloperToolsSetup({
                   type="button"
                 >
                   {terminalPathSaving ? (
-                    <LoaderCircle className="spin" size={14} />
+                    <Spinner size={14} />
                   ) : (
                     <SquareTerminal size={14} />
                   )}
@@ -203,7 +203,7 @@ export function DeveloperToolsSetup({
                   type="button"
                 >
                   {isInstalling ? (
-                    <LoaderCircle className="spin" size={14} />
+                    <Spinner size={14} />
                   ) : (
                     <Download size={14} />
                   )}

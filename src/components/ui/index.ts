@@ -29,6 +29,8 @@ export { LoadingState } from "./loading-state";
 export type { LoadingStateVariant } from "./loading-state";
 export { Separator } from "./separator";
 export { Skeleton } from "./skeleton";
+export { Spinner } from "./spinner";
+export type { SpinnerProps } from "./spinner";
 export {
   StatusPanel,
   StatusPanelAction,

@@ -6,6 +6,7 @@ import {
   RefreshCw,
   Settings,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
 import { useI18n } from "../i18n";
@@ -114,7 +115,7 @@ export function CompanionHeader({
             onClick={onRefresh}
             type="button"
           >
-            <RefreshCw className={loading ? "spin" : ""} size={19} />
+            <Spinner icon={RefreshCw} size={19} spinning={loading} />
           </button>
           <div className="companion-account-menu" ref={accountMenuRef}>
             <button

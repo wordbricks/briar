@@ -8,12 +8,12 @@ import {
   CircleAlert,
   Clock3,
   ListFilter,
-  LoaderCircle,
   Pencil,
   Plus,
   Trash2,
   X,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import {
   useEffect,
   useMemo,
@@ -477,7 +477,7 @@ export function ProjectSchedule({
               type="button"
             >
               {isScheduleDataLoading ? (
-                <LoaderCircle className="spin" size={16} />
+                <Spinner size={16} />
               ) : (
                 <Plus size={16} />
               )}
@@ -1005,7 +1005,7 @@ export function DeleteProjectAgentScheduleDialog({
             type="button"
           >
             {isDeleting ? (
-              <LoaderCircle className="spin" size={14} />
+              <Spinner size={14} />
             ) : (
               <Trash2 size={14} />
             )}
@@ -1449,7 +1449,7 @@ export function CreateProjectAgentScheduleDialog({
             type="submit"
           >
             {isSubmitting ? (
-              <LoaderCircle className="spin" size={15} />
+              <Spinner size={15} />
             ) : isEditing ? (
               <Pencil size={15} />
             ) : (

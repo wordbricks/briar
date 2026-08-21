@@ -6,6 +6,7 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { SettingsAlert, SettingsPageHeader } from "@/components/settings";
@@ -246,9 +247,10 @@ export function OrganizationIntegrationsSettings({
             type="button"
             variant="ghost"
           >
-            <RefreshCw
+            <Spinner
               aria-hidden="true"
-              className={refreshing ? "animate-spin" : undefined}
+              icon={RefreshCw}
+              spinning={refreshing}
               size={16}
             />
           </Button>

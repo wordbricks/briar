@@ -2,11 +2,11 @@ import {
   Check,
   CircleAlert,
   ImagePlus,
-  LoaderCircle,
   Save,
   Trash2,
   UserRound,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -218,7 +218,7 @@ export function AccountProfileSettings({
           type="submit"
         >
           {saving ? (
-            <LoaderCircle aria-hidden="true" className="spin" size={15} />
+            <Spinner aria-hidden="true" size={15} />
           ) : !changed ? (
             <Check aria-hidden="true" size={15} />
           ) : (

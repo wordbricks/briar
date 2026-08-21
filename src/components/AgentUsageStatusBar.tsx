@@ -5,6 +5,7 @@ import {
   CircleX,
   RefreshCw,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import {
@@ -392,9 +393,10 @@ export function AgentUsageStatusBar({
                   onClick={() => void refresh()}
                   type="button"
                 >
-                  <RefreshCw
+                  <Spinner
                     aria-hidden
-                    className={isRefreshing ? "spin" : ""}
+                    icon={RefreshCw}
+                    spinning={isRefreshing}
                     size={13}
                   />
                 </button>
@@ -471,9 +473,10 @@ export function AgentUsageStatusBar({
             provider={provider}
           />
         ))}
-        <RefreshCw
+        <Spinner
           aria-hidden
-          className={isRefreshing ? "spin" : ""}
+          icon={RefreshCw}
+          spinning={isRefreshing}
           size={10}
         />
       </button>

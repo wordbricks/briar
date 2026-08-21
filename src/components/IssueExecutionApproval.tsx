@@ -1,10 +1,10 @@
 import {
   BadgeCheck,
   CircleAlert,
-  LoaderCircle,
   Play,
   ShieldCheck,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import {
   useCallback,
   useEffect,
@@ -386,7 +386,7 @@ export function IssueExecutionApproval<T extends ExecutionProposalView>({
               type="button"
             >
               {opening ? (
-                <LoaderCircle aria-hidden="true" className="spin" size={15} />
+                <Spinner aria-hidden="true" size={15} />
               ) : (
                 <Play aria-hidden="true" size={15} />
               )}

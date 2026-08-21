@@ -1,10 +1,10 @@
 import {
   Download,
-  LoaderCircle,
   Monitor,
   RefreshCw,
   Settings,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import {
@@ -253,10 +253,11 @@ export function WorkerStatusBar({
                 title={t("worker.refresh")}
                 type="button"
               >
-                <RefreshCw
+                <Spinner
                   aria-hidden
-                  className={isRefreshing ? "spin" : undefined}
+                  icon={RefreshCw}
                   size={14}
+                  spinning={isRefreshing}
                   strokeWidth={1.8}
                 />
               </button>
@@ -435,9 +436,8 @@ export function WorkerStatusBar({
                         type="button"
                       >
                         {isUpdating || isPending ? (
-                          <LoaderCircle
+                          <Spinner
                             aria-hidden
-                            className="spin"
                             size={13}
                             strokeWidth={1.8}
                           />

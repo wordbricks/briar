@@ -4,12 +4,12 @@ import {
   ChevronRight,
   CircleAlert,
   Download,
-  LoaderCircle,
   Link2,
   OctagonX,
   Play,
   Send,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useMemo, useState } from "react";
 
 import { MainContent, PageHeader } from "@/components/layout";
@@ -307,7 +307,7 @@ export function ProjectAgentSessionDetail({
                 variant="destructive"
               >
                 {isStopping ? (
-                  <LoaderCircle className="spin" />
+                  <Spinner />
                 ) : (
                   <OctagonX />
                 )}
@@ -421,7 +421,7 @@ export function ProjectAgentSessionDetail({
                     </div>
                   ) : executionEvents.isLoading ? (
                     <div className="auto-hunt-event-state">
-                      <LoaderCircle className="spin" size={14} />
+                      <Spinner size={14} />
                       {t("autoHunt.eventsLoading")}
                     </div>
                   ) : (
@@ -460,7 +460,7 @@ export function ProjectAgentSessionDetail({
                         type="submit"
                       >
                         {isSendingFollowUp
-                          ? <LoaderCircle className="spin" />
+                          ? <Spinner />
                           : <Send />}
                       </Button>
                       {followUpError ? (

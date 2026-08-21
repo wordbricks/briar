@@ -1,4 +1,5 @@
-import { LoaderCircle, Play } from "lucide-react";
+import { Play } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -209,7 +210,7 @@ export function ProjectAgentTaskDialog({
             type="submit"
           >
             {isSubmitting ? (
-              <LoaderCircle className="spin" size={16} />
+              <Spinner size={16} />
             ) : (
               <Play size={16} />
             )}

@@ -1,4 +1,5 @@
-import { CheckCircle2, LoaderCircle, RefreshCw } from "lucide-react";
+import { CheckCircle2, RefreshCw } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import { APP_VERSION, formatAppVersionLabel } from "../lib/app-version";
@@ -92,7 +93,7 @@ export function AppVersionStatus({
               type="button"
             >
               {isChecking ? (
-                <LoaderCircle aria-hidden="true" className="spin" size={14} />
+                <Spinner aria-hidden="true" size={14} />
               ) : (
                 <RefreshCw aria-hidden="true" size={14} />
               )}

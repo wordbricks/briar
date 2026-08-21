@@ -2,9 +2,9 @@ import {
   Check,
   Download,
   Link2,
-  LoaderCircle,
   RefreshCw,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useMemo, useState } from "react";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
@@ -263,7 +263,7 @@ export function LinearIssueImport({
           <footer>
             <p>{t("settings.linearImportOneTimeNote")}</p>
             <button disabled={busy || !apiKey.trim()} onClick={() => void connect()} type="button">
-              {busy ? <LoaderCircle className="spin" size={14} /> : <Link2 size={14} />}
+              {busy ? <Spinner size={14} /> : <Link2 size={14} />}
               {busy
                 ? t("settings.linearImportConnecting")
                 : t("settings.linearImportConnect")}
@@ -334,7 +334,7 @@ export function LinearIssueImport({
               onClick={() => void loadStates()}
               type="button"
             >
-              {busy ? <LoaderCircle className="spin" size={14} /> : null}
+              {busy ? <Spinner size={14} /> : null}
               {busy
                 ? t("settings.linearImportLoadingStates")
                 : t("settings.linearImportContinueMapping", {
@@ -413,7 +413,7 @@ export function LinearIssueImport({
               type="button"
             >
               {busy ? (
-                <LoaderCircle className="spin" size={14} />
+                <Spinner size={14} />
               ) : (
                 <Download size={14} />
               )}

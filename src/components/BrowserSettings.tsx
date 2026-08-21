@@ -3,9 +3,9 @@ import {
   Download,
   ExternalLink,
   Globe2,
-  LoaderCircle,
   RefreshCw,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -183,7 +183,7 @@ export function BrowserSettings() {
             title={t("browser.refresh")}
           >
             {loading ? (
-              <LoaderCircle className="spin" size={16} />
+              <Spinner size={16} />
             ) : (
               <RefreshCw size={16} />
             )}
@@ -317,7 +317,7 @@ export function BrowserSettings() {
               variant="outline"
             >
               {installing ? (
-                <LoaderCircle className="spin" />
+                <Spinner />
               ) : (
                 <Download />
               )}
@@ -408,7 +408,7 @@ export function BrowserSettings() {
               variant="outline"
             >
               {settingUpAside ? (
-                <LoaderCircle className="spin" />
+                <Spinner />
               ) : (
                 <Download />
               )}

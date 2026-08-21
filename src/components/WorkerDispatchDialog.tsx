@@ -2,10 +2,10 @@ import {
   Check,
   CircleAlert,
   Cpu,
-  LoaderCircle,
   Waypoints,
   BrainCircuit,
 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog,
@@ -449,7 +449,7 @@ export function WorkerDispatchDialog({
             {didDispatchSuccessfully ? (
               <Check aria-hidden="true" size={15} />
             ) : isDispatching ? (
-              <LoaderCircle className="spin" size={15} />
+              <Spinner size={15} />
             ) : null}
             {didDispatchSuccessfully
               ? t(isApproval

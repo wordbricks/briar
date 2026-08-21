@@ -1,4 +1,5 @@
-import { CircleAlert, LoaderCircle, Trash2 } from "lucide-react";
+import { CircleAlert, Trash2 } from "lucide-react";
+import { Spinner } from "./ui/spinner";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -152,7 +153,7 @@ export function AccountDeletionSettings({
               variant="destructive"
             >
               {deleting ? (
-                <LoaderCircle aria-hidden="true" className="spin" size={15} />
+                <Spinner aria-hidden="true" size={15} />
               ) : (
                 <Trash2 aria-hidden="true" size={15} />
               )}
