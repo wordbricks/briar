@@ -225,6 +225,7 @@ final class LocalNotificationService: ObservableObject {
         messages: [InboxMessage],
         baselineID: String = "local",
         viewingChannelID: UUID? = nil,
+        viewingChannelThreadID: UUID? = nil,
         viewingIssueConversationID: UUID? = nil
     ) async {
         let currentIDs = Set(messages.map(\.id))
@@ -252,6 +253,7 @@ final class LocalNotificationService: ObservableObject {
                 Self.shouldDeliver(
                     message,
                     viewingChannelID: viewingChannelID,
+                    viewingChannelThreadID: viewingChannelThreadID,
                     viewingIssueConversationID: viewingIssueConversationID
                 )
         }
@@ -264,13 +266,16 @@ final class LocalNotificationService: ObservableObject {
     static func shouldDeliver(
         _ message: InboxMessage,
         viewingChannelID: UUID?,
+        viewingChannelThreadID: UUID? = nil,
         viewingIssueConversationID: UUID? = nil
     ) -> Bool {
         guard let notificationTargetID = UUID(uuidString: message.targetId) else {
             return true
         }
         if message.kind == .channel, let viewingChannelID {
-            return notificationTargetID != viewingChannelID
+            guard notificationTargetID == viewingChannelID else { return true }
+            if message.rootMessageId == message.channelMessageId { return false }
+            return message.rootMessageId != viewingChannelThreadID
         }
         if message.kind == .conversation, let viewingIssueConversationID {
             return notificationTargetID != viewingIssueConversationID

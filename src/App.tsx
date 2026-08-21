@@ -252,8 +252,19 @@ export function App() {
     null,
   );
   const [viewingChannelId, setViewingChannelId] = useState<string | null>(null);
+  const [viewingChannelThreadRootMessageId, setViewingChannelThreadRootMessageId]
+    = useState<string | null>(null);
   const [viewingIssueConversationRunId, setViewingIssueConversationRunId] =
     useState<string | null>(null);
+  const handleViewingChannelChange = useCallback(
+    (channelId: string | null, threadRootMessageId: string | null = null) => {
+      setViewingChannelId(channelId);
+      setViewingChannelThreadRootMessageId(
+        channelId ? threadRootMessageId : null,
+      );
+    },
+    [],
+  );
   const [channelsLoading, setChannelsLoading] = useState(false);
   const [channelCatalogSnapshot, setChannelCatalogSnapshot] = useState<{
     organizationId: string;
@@ -506,6 +517,7 @@ export function App() {
     inbox.messages,
     inbox.notificationBaselineId,
     viewingChannelId,
+    viewingChannelThreadRootMessageId,
     viewingIssueConversationRunId,
     inbox.initialSyncComplete,
   );
@@ -1723,7 +1735,7 @@ export function App() {
           navigateToIssue(runId);
         }}
         onSkillSessionAccepted={autoHunt.adoptRemoteSession}
-        onViewingChannelChange={setViewingChannelId}
+        onViewingChannelChange={handleViewingChannelChange}
         organizationId={briar.activeOrganizationId}
         organizationName={activeOrganization?.name}
         projects={activeOrganizationProjects}
@@ -2051,7 +2063,7 @@ export function App() {
               navigateToIssue(runId);
             }}
             onSkillSessionAccepted={autoHunt.adoptRemoteSession}
-            onViewingChannelChange={setViewingChannelId}
+            onViewingChannelChange={handleViewingChannelChange}
             organizationId={briar.activeOrganizationId}
             organizationName={activeOrganization?.name}
             projects={activeOrganizationProjects}
@@ -2286,7 +2298,7 @@ export function App() {
             onChannelSelect={setActiveChannelId}
             onChannelsChange={setOrganizationChannels}
             onSkillSessionAccepted={autoHunt.adoptRemoteSession}
-            onViewingChannelChange={setViewingChannelId}
+            onViewingChannelChange={handleViewingChannelChange}
             organizationId={briar.activeOrganizationId}
             organizationName={activeOrganization?.name}
             initialInviteChannelId={initialChannelInviteId}
@@ -2513,7 +2525,7 @@ export function App() {
               organizationId={briar.activeOrganizationId}
               projects={activeOrganizationProjects}
               onSkillSessionAccepted={autoHunt.adoptRemoteSession}
-              onViewingChannelChange={setViewingChannelId}
+              onViewingChannelChange={handleViewingChannelChange}
               token={briar.token}
               channelCache={companionChannelCache.current}
               requestedMessage={requestedChannelMessage}

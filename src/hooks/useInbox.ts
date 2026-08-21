@@ -489,7 +489,12 @@ export function inboxReadVersionsToPush(
 export function classifyInboxMessage(
   message: InboxMessage,
 ): InboxCategory {
-  if (message.kind === "conversation" || message.kind === "channel") {
+  if (message.kind === "channel") {
+    // A channel subscription is scoped to one thread, so every later reply is
+    // actionable for that subscriber just like a direct thread reply.
+    return "action_required";
+  }
+  if (message.kind === "conversation") {
     return message.reason === "subscription" ? "activity" : "action_required";
   }
   if (message.kind === "session") {
@@ -1080,16 +1085,14 @@ export function useInbox(
       }
       realtimeDebounce = window.setTimeout(() => {
         realtimeDebounce = null;
-        if (!document.hidden) void refresh();
+        void refresh();
       }, INBOX_REALTIME_DEBOUNCE_MS);
     });
-    const updateRealtimeVisibility = () => {
-      if (!realtime) return;
-      if (document.hidden) realtime.stop();
-      else realtime.start();
-    };
-    document.addEventListener("visibilitychange", updateRealtimeVisibility);
-    updateRealtimeVisibility();
+    // Inbox realtime is what lets system notifications arrive while the app
+    // window is hidden. Other organization consumers may pause in the
+    // background, but this consumer deliberately keeps the shared socket
+    // alive until the authenticated Inbox scope is disposed.
+    realtime?.start();
     const stopPolling = startDashboardPolling(
       () => void refresh(),
       undefined,
@@ -1101,10 +1104,6 @@ export function useInbox(
       stopPolling();
       unsubscribe?.();
       realtime?.stop();
-      document.removeEventListener(
-        "visibilitychange",
-        updateRealtimeVisibility,
-      );
       if (realtimeDebounce !== null) {
         window.clearTimeout(realtimeDebounce);
       }

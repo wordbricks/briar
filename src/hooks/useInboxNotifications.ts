@@ -51,12 +51,18 @@ export function inboxConversationSyncSignal(
 export function shouldSuppressInboxNotification(
   message: InboxMessageWithReadState,
   viewingChannelId: string | null,
+  viewingChannelThreadRootMessageId: string | null,
   viewingIssueConversationRunId: string | null,
   appIsFocused: boolean,
 ) {
   if (!appIsFocused) return false;
   if (message.kind === "channel") {
-    return message.channelId === viewingChannelId;
+    if (message.channelId !== viewingChannelId) return false;
+    // Root messages are visible in the open channel. Thread replies are only
+    // visible when that exact thread is open, so another thread in the same
+    // channel must not suppress its notification.
+    return message.rootMessageId === message.messageId ||
+      message.rootMessageId === viewingChannelThreadRootMessageId;
   }
   return message.kind === "conversation" &&
     message.targetId === viewingIssueConversationRunId;
@@ -73,6 +79,7 @@ export function useInboxNotifications(
   messages: InboxMessageWithReadState[],
   baselineId = "local",
   viewingChannelId: string | null = null,
+  viewingChannelThreadRootMessageId: string | null = null,
   viewingIssueConversationRunId: string | null = null,
   initialSyncComplete = true,
 ) {
@@ -112,6 +119,7 @@ export function useInboxNotifications(
         shouldSuppressInboxNotification(
           message,
           viewingChannelId,
+          viewingChannelThreadRootMessageId,
           viewingIssueConversationRunId,
           appIsFocused(),
         )
@@ -133,6 +141,7 @@ export function useInboxNotifications(
     t,
     userId,
     viewingChannelId,
+    viewingChannelThreadRootMessageId,
     viewingIssueConversationRunId,
   ]);
 }

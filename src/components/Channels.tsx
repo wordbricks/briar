@@ -234,7 +234,10 @@ type ChannelsProps = {
   channelInboxSyncSignal?: string;
   onIssueCreated?: (projectId: string, runId: string) => void | Promise<void>;
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
-  onViewingChannelChange?: (channelId: string | null) => void;
+  onViewingChannelChange?: (
+    channelId: string | null,
+    threadRootMessageId: string | null,
+  ) => void;
   initialInviteChannelId?: string | null;
   onInitialInviteHandled?: (channelId: string) => void;
   initialSettingsChannelId?: string | null;
@@ -406,10 +409,6 @@ export function Channels({
   const { toast } = useToast();
   const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
   useEffect(() => {
-    onViewingChannelChange?.(activeChannelId);
-    return () => onViewingChannelChange?.(null);
-  }, [activeChannelId, onViewingChannelChange]);
-  useEffect(() => {
     if (!activeChannelId) return;
     const channel = channels.find((item) => item.id === activeChannelId);
     if (!channel || !channelHasUnread(channel)) return;
@@ -444,6 +443,10 @@ export function Channels({
     activeChannelId,
   );
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
+  useEffect(() => {
+    onViewingChannelChange?.(activeChannelId, threadParentId);
+    return () => onViewingChannelChange?.(null, null);
+  }, [activeChannelId, onViewingChannelChange, threadParentId]);
   const [threadMessages, setThreadMessages] = useState<ChannelMessage[]>([]);
   const [threadSubscriptionPending, setThreadSubscriptionPending] = useState(false);
   const [proposalProjects, setProposalProjects] = useState<

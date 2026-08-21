@@ -154,6 +154,9 @@ struct CompanionRootView: View {
                 let viewingChannelID = scenePhase == .active
                     ? channels.viewingChannelID
                     : nil
+                let viewingChannelThreadID = scenePhase == .active
+                    ? channels.viewingThreadParentID
+                    : nil
                 let viewingIssueConversationID = scenePhase == .active
                     ? issueConversationView.runID
                     : nil
@@ -167,6 +170,7 @@ struct CompanionRootView: View {
                     messages: messages,
                     baselineID: baselineID,
                     viewingChannelID: viewingChannelID,
+                    viewingChannelThreadID: viewingChannelThreadID,
                     viewingIssueConversationID: viewingIssueConversationID
                 )
             }
@@ -179,6 +183,9 @@ struct CompanionRootView: View {
                 let viewingChannelID = scenePhase == .active
                     ? channels.viewingChannelID
                     : nil
+                let viewingChannelThreadID = scenePhase == .active
+                    ? channels.viewingThreadParentID
+                    : nil
                 let viewingIssueConversationID = scenePhase == .active
                     ? issueConversationView.runID
                     : nil
@@ -192,6 +199,7 @@ struct CompanionRootView: View {
                     messages: messages,
                     baselineID: baselineID,
                     viewingChannelID: viewingChannelID,
+                    viewingChannelThreadID: viewingChannelThreadID,
                     viewingIssueConversationID: viewingIssueConversationID
                 )
             }

@@ -292,7 +292,7 @@ enum InboxMessageBuilder {
                         : notification.reason == "subscription"
                             ? L10n.text("구독한 스레드")
                             : L10n.text("답글"),
-                    requiresAttention: notification.reason != "subscription",
+                    requiresAttention: true,
                     priority: nil,
                     structuredResult: nil,
                     reason: notification.reason,
@@ -338,7 +338,10 @@ enum InboxMessageBuilder {
     }
 
     static func classify(_ message: InboxMessage) -> InboxCategory {
-        if message.kind == .conversation || message.kind == .channel {
+        if message.kind == .channel {
+            return .actionRequired
+        }
+        if message.kind == .conversation {
             return message.reason == "subscription" ? .activity : .actionRequired
         }
         if message.kind == .session {

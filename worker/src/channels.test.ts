@@ -393,6 +393,8 @@ describe("organization channels", () => {
     const rootId = "e2000000-0000-4000-8000-000000000010";
     const replyId = "e2000000-0000-4000-8000-000000000011";
     const laterReplyId = "e2000000-0000-4000-8000-000000000012";
+    const participantNotificationId =
+      "e2000000-0000-4000-8000-000000000013";
     await createChannel(db, {
       id: channelId,
       organizationId,
@@ -478,6 +480,28 @@ describe("organization channels", () => {
       listChannelConversationNotifications(db, organizationId, outsiderId),
     ).resolves.not.toEqual(expect.arrayContaining([
       expect.objectContaining({ id: laterReplyId }),
+    ]));
+
+    await createChannelMessage(db, {
+      id: participantNotificationId,
+      channelId,
+      parentMessageId: rootId,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "A reply for the participating subscriber",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(45),
+    });
+    await expect(
+      listChannelConversationNotifications(db, organizationId, outsiderId),
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: participantNotificationId,
+        notification_reason: "subscription",
+      }),
     ]));
   });
 
