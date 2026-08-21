@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { BunRuntime, BunServices } from "@effect/platform-bun";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import { Command } from "effect/unstable/cli";
 import packageJson from "../package.json";
 import { briarCommand } from "./cli-app";

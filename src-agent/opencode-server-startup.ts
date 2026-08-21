@@ -38,6 +38,8 @@ export const waitForOpenCodeServerUrl = Effect.fnUntraced(function*(
     const onClose = (code: number | null) =>
       settle(
         Effect.fail(
+          // Preserve the native process error contract used by this callback.
+          // @effect-diagnostics-next-line globalErrorInEffectFailure:off
           new Error(
             `OpenCode server exited before startup${code === null ? "" : ` (code ${code})`}.\n${output}`,
           ),
@@ -74,6 +76,8 @@ export const waitForOpenCodeServerUrl = Effect.fnUntraced(function*(
       duration: timeout,
       orElse: () =>
         Effect.fail(
+          // This boundary intentionally rejects with a native Error for callers.
+          // @effect-diagnostics-next-line globalErrorInEffectFailure:off
           new Error(`Timed out waiting for OpenCode server startup.\n${output}`),
         ),
     }),

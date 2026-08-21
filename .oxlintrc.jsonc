@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "jsPlugins": [
+    { "name": "@effect", "specifier": "@effect/eslint-plugin" },
+  ],
+  "categories": {
+    "correctness": "off",
+  },
+  "rules": {
+    "@effect/no-import-from-barrel-package": [
+      "error",
+      { "packageNames": ["effect"] },
+    ],
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/.wrangler/**",
+    "**/target/**",
+  ],
+}
