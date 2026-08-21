@@ -9,4 +9,32 @@ interface Env {
   GITHUB_APP_SLUG?: string;
   /** Fixed public Worker origin registered in the GitHub App callback URLs. */
   GITHUB_CALLBACK_ORIGIN?: string;
+  /** Emergency switch for new managed-computer applications. */
+  MANAGED_COMPUTER_APPLICATIONS_ENABLED?: string;
+  /** Server-only pilot promotion code; never exposed by product metadata. */
+  MANAGED_COMPUTER_PROMOTION_CODE?: string;
+  MANAGED_COMPUTER_ORGANIZATION_LIMIT?: string;
+  MANAGED_COMPUTER_FLEET_LIMIT?: string;
+  MANAGED_COMPUTER_LIFETIME_DAYS?: string;
+  MANAGED_COMPUTER_STOPPED_RETENTION_DAYS?: string;
+  MANAGED_COMPUTER_ENROLLMENT_TTL_MINUTES?: string;
+  MANAGED_COMPUTER_AWS_REGION?: string;
+  MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_ID?: string;
+  MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_VERSION?: string;
+  MANAGED_COMPUTER_INSTANCE_TYPE?: string;
+  MANAGED_COMPUTER_VOLUME_GIB?: string;
+  MANAGED_COMPUTER_VCPU?: string;
+  MANAGED_COMPUTER_MEMORY_GIB?: string;
+  MANAGED_COMPUTER_API_ORIGIN?: string;
+  /** HMAC key for deterministic, retry-safe one-time enrollment material. */
+  MANAGED_COMPUTER_ENROLLMENT_SECRET?: string;
+  /** Region-matched AWS RSA public key used to verify EC2 identity documents. */
+  MANAGED_COMPUTER_AWS_IDENTITY_PUBLIC_KEY?: string;
+  MANAGED_COMPUTER_AWS_ACCESS_KEY_ID?: string;
+  MANAGED_COMPUTER_AWS_SECRET_ACCESS_KEY?: string;
+  MANAGED_COMPUTER_AWS_SESSION_TOKEN?: string;
+  MANAGED_COMPUTER_PROVISIONING: Workflow<{
+    managedComputerId: string;
+    provisioningJobId: string;
+  }>;
 }

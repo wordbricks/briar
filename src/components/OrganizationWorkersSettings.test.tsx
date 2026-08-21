@@ -14,11 +14,39 @@ import { OrganizationWorkersSettings } from "./OrganizationWorkersSettings";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("../lib/platform", () => ({ isDesktopTauri: () => true }));
 vi.mock("../lib/api", () => ({
+  applyForManagedComputer: vi.fn(),
   disableOrganizationExecutionWorker: vi.fn(),
+  loadManagedComputerProduct: vi.fn(async () => ({
+    product: {
+      currency: "USD",
+      monthlyPriceCents: 10_000,
+      quantity: 1,
+      specification: {
+        instanceType: "m7i.large",
+        vcpu: 2,
+        memoryGiB: 8,
+        volumeGiB: 100,
+        maxConcurrentRuns: 1,
+        region: "us-east-1",
+      },
+      modelApiCostsIncluded: false,
+    },
+    applicationsEnabled: false,
+    configurationReady: false,
+    canApply: true,
+    organizationLimit: 1,
+    fleetLimit: 1,
+  })),
+  loadManagedComputers: vi.fn(async () => ({
+    computers: [],
+    generatedAt: "2026-08-22T00:00:00.000Z",
+  })),
   loadOrganizationExecutionWorkers: vi.fn(),
   requestOrganizationExecutionWorkerUpdate: vi.fn(),
+  retryManagedComputer: vi.fn(),
   updateOrganizationExecutionWorkerConcurrency: vi.fn(),
   updateOrganizationExecutionWorkerIcon: vi.fn(),
+  validateManagedComputerPromotion: vi.fn(),
 }));
 
 describe("OrganizationWorkersSettings", () => {
@@ -161,7 +189,7 @@ describe("OrganizationWorkersSettings", () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          '[aria-label="renamed-host Worker 아이콘 편집"]',
+          '[aria-label="renamed-host 컴퓨터 아이콘 편집"]',
         )
         ?.click();
     });
@@ -219,7 +247,7 @@ describe("OrganizationWorkersSettings", () => {
     });
 
     const update = container.querySelector<HTMLButtonElement>(
-      '[aria-label="renamed-host Worker 업데이트"]',
+      '[aria-label="renamed-host 컴퓨터 업데이트"]',
     );
     expect(update?.disabled).toBe(false);
     await act(async () => update?.click());

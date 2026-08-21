@@ -1,0 +1,83 @@
+# Briar 관리형 컴퓨터 파일럿 배포
+
+## 범위와 안전 경계
+
+- 고객은 컴퓨터 사양, 리전, 디스크 또는 네트워크 값을 API에 전달할 수 없다. Cloudflare Worker가 고정된 Launch Template ID와 숫자 버전만 사용한다.
+- `GETBRIAR` 원문은 Cloudflare secret으로만 설정한다. 클라이언트는 입력값을 서버에 보내며 서버 응답 전에는 할인을 적용하지 않는다.
+- EC2 user-data에는 만료되는 enrollment nonce와 관리형 컴퓨터 ID만 들어간다. 장기 Worker credential, AWS 키, GitHub 토큰, 저장소 또는 에이전트 자격 증명은 들어가지 않는다.
+- Enrollment은 nonce와 더불어 AWS가 서명한 **원본 EC2 instance identity document**를 검증한다. 파싱한 JSON을 다시 서병화하지 않아 공백 하나가 바뀌어도 서명 검증이 실패한다.
+- 인바운드 보안 그룹 규칙과 SSH 키는 없다. 운영 접근은 SSM Session Manager로만 수행한다.
+- 파일럿 신청을 꺼도 생성 중·사용 중인 컴퓨터의 Workflow, 만료, drain, 중지 및 종료 처리는 계속된다.
+
+## 1. AMI 준비
+
+버전이 고정된 AMI에 다음 항목을 설치한다.
+
+1. Briar CLI와 Worker 서비스, Bun, 지원할 에이전트 CLI.
+2. 최신 Amazon SSM Agent.
+3. `infrastructure/managed-computers/briar-managed-enroll`을 `/opt/briar/bin/`에 모드 `0755`로 설치한다.
+4. `briar-managed-enroll.service`를 `/etc/systemd/system/`에 설치하고 `systemctl daemon-reload`를 실행한다. 서비스는 EC2 user-data가 명시적으로 시작한다.
+5. `briar-worker.service`는 `/var/lib/briar/worker-credential.json`을 읽되 저장소와 모델 제공자가 설정되고 heartbeat 건강 검사를 통과하기 전에는 `acceptingWork=false`, 동시 실행 수 1을 보고해야 한다.
+
+AMI ID와 설치된 Briar/Bun/에이전트 버전을 릴리스 기록에 남긴다. 기존 데스크톱 자격 증명이나 홈 디렉터리를 AMI에 포함하지 않는다.
+
+## 2. AWS 스택
+
+`infrastructure/managed-computers/cloudformation.yaml`을 테스트/스테이징 계정에 적용한다. Private subnet은 NAT 또는 필요한 VPC endpoint를 통해 HTTPS outbound가 가능해야 한다.
+
+스택 출력에서 다음 값을 기록한다.
+
+- `LaunchTemplateId`
+- 숫자인 `LaunchTemplateVersion` (`$Latest` 또는 `$Default` 금지)
+- `ProvisionerPolicyArn`
+- `SecurityGroupId`
+
+보안 검토 후 `ProvisionerPolicyArn`을 Cloudflare에서 사용하는 정확한 IAM principal에만 연결한다. 템플릿은 자동 연결하지 않아 잘못된 principal에 권한이 붙는 것을 방지한다.
+
+## 3. D1 및 Cloudflare
+
+1. D1 migration `0125_managed_computers.sql`을 적용한다.
+2. Wrangler 배포에 `MANAGED_COMPUTER_PROVISIONING` Workflow binding이 포함되는지 dry-run으로 확인한다.
+3. 일반 Worker 변수:
+   - `MANAGED_COMPUTER_APPLICATIONS_ENABLED=true`
+   - `MANAGED_COMPUTER_ORGANIZATION_LIMIT=1`
+   - `MANAGED_COMPUTER_FLEET_LIMIT=<승인된 전체 한도>`
+   - `MANAGED_COMPUTER_LIFETIME_DAYS=<파일럿 수명>`
+   - `MANAGED_COMPUTER_STOPPED_RETENTION_DAYS=<중지 후 보존 기간>`
+   - `MANAGED_COMPUTER_ENROLLMENT_TTL_MINUTES=30`
+   - `MANAGED_COMPUTER_AWS_REGION=<스택 리전>`
+   - `MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_ID=<출력값>`
+   - `MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_VERSION=<숫자 출력값>`
+   - `MANAGED_COMPUTER_INSTANCE_TYPE`, `MANAGED_COMPUTER_VOLUME_GIB`, `MANAGED_COMPUTER_VCPU`, `MANAGED_COMPUTER_MEMORY_GIB`
+   - `MANAGED_COMPUTER_API_ORIGIN=https://briar.wordbricks.ai`
+   - `MANAGED_COMPUTER_AWS_IDENTITY_PUBLIC_KEY=<스택 리전의 AWS RSA 인증서에서 추출한 PUBLIC KEY PEM>`
+4. Cloudflare secrets:
+   - `MANAGED_COMPUTER_PROMOTION_CODE=GETBRIAR`
+   - `MANAGED_COMPUTER_ENROLLMENT_SECRET=<32바이트 이상 무작위 값>`
+   - `MANAGED_COMPUTER_AWS_ACCESS_KEY_ID`
+   - `MANAGED_COMPUTER_AWS_SECRET_ACCESS_KEY`
+   - 단기 자격 증명을 쓰는 경우 `MANAGED_COMPUTER_AWS_SESSION_TOKEN`
+
+Identity public key는 AWS의 **해당 리전 RSA 인증서**를 공식 `regions-certs` 문서에서 받아 `openssl x509 -pubkey -noout -in certificate.pem`으로 추출한다. DSA/PKCS7이 아닌 `instance-identity/signature` 검증용 RSA 키여야 한다. 리전을 바꾸면 키도 함께 바꾸고 신규 신청을 다시 켜기 전 서명 음수 테스트를 수행한다.
+
+모든 설정과 migration이 준비되기 전에는 `MANAGED_COMPUTER_APPLICATIONS_ENABLED=false`를 유지한다.
+
+## 4. 스테이징 검증
+
+조직 owner/admin 계정으로 다음을 확인한다.
+
+1. 구매창에서 잘못된 코드가 거절되고 서버가 확인한 코드만 US$0이 된다. 결제수단 입력은 없어야 한다.
+2. 동일 `requestId`와 `Idempotency-Key`를 반복해도 D1 컴퓨터·프로모션 사용·EC2 인스턴스가 각각 하나다.
+3. 일반 멤버, 두 번째 사용자 사용, 두 번째 조직 컴퓨터, fleet 한도 초과가 각기 거절된다.
+4. EC2의 Launch Template 버전, `HttpTokens=required`, 암호화 EBS, 네 가지 Briar 태그, 빈 inbound 규칙, SSH key 미설정을 확인한다.
+5. SSM이 Online인 실제 인스턴스만 enrollment에 성공하고, nonce 만료·원본 document 변조·다른 instance identity·다른 조직 ID는 거절된다.
+6. 등록 직후 상태는 `설정 필요`이며 저장소와 모델 제공자를 사용자가 설정한다. 건강한 heartbeat와 프로젝트 연결 후에만 `사용 가능`이 된다.
+7. 실패 후 재시도와 Workflow 재실행에서 EC2 `ClientToken`이 동일한 인스턴스를 돌려주는지 확인한다.
+8. 만료 시간을 앞당긴 테스트 데이터로 새 작업 차단 → drain → stop → 보존 기간 후 terminate와 credential revoke를 확인한다.
+
+## 중단과 복구
+
+- 신규 신청 즉시 중단: `MANAGED_COMPUTER_APPLICATIONS_ENABLED=false`로 배포한다. 기존 컴퓨터 lifecycle은 유지된다.
+- 준비 실패: UI의 제한된 재시도(최대 3회)를 사용한다. 동일 EC2 client token과 user-data가 재사용된다.
+- 고아 리소스: 6시간 reconciliation 결과의 `orphanInstanceIds`와 `briar-managed=true` 태그를 대조한다. 자동 종료하지 말고 D1 감사 기록과 조직 태그를 확인한 뒤 운영자가 처리한다.
+- 파일럿 종료: 수명 정책을 통해 drain과 stop을 먼저 수행한다. 즉시 terminate하지 않는다.

@@ -40,6 +40,7 @@
       "/organizations*",
       "/projects*",
       "/workers*",
+      "/managed-computers*",
       "/worker-claims",
       "/runs*",
       "/transcripts",
@@ -81,6 +82,16 @@
       }
     ]
   },
+  "workflows": [
+    {
+      "binding": "MANAGED_COMPUTER_PROVISIONING",
+      "name": "briar-managed-computer-provisioning",
+      "class_name": "ManagedComputerProvisioningWorkflow",
+      "limits": {
+        "steps": 500
+      }
+    }
+  ],
   "exports": {
     "ChannelRealtimeHub": {
       "type": "durable-object",
