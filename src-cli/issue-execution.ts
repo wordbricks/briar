@@ -1,0 +1,759 @@
+
+import { Buffer } from "node:buffer";
+import { existsSync } from "node:fs";
+import {
+  chmod,
+  mkdtemp,
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { homedir, platform, tmpdir } from "node:os";
+import { basename, isAbsolute, join, resolve } from "node:path";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import packageJson from "../package.json";
+import {
+  autoHuntRequirementKinds,
+  repositoryWorkflowPendingStageId,
+} from "../src/lib/auto-hunt-contract";
+import { decodeStructuredAgentResult } from "../src/lib/agent-result";
+import {
+  agentExecutionCostRecordsFromObservations,
+  agentExecutionMetrics,
+  agentExecutionTokenUsageFromObservations,
+  agentExecutionUsageRecordsFromObservations,
+  createAgentExecutionUsageCollector,
+} from "../src/lib/agent-execution-metrics";
+import type { ModelEffort } from "../src/lib/agent-provider-contract";
+import type { AgentProvider } from "../src/lib/agent-provider";
+import { validateEvidenceImages } from "../src/lib/evidence-images";
+import {
+  decodeOrganizationAgentContextRequestTurn,
+  organizationAgentContextCapability,
+} from "../src/lib/organization-agent-context-contract";
+import {
+  createDetachedTranscriptSequencer,
+  detachedAgentPrompt,
+  detachedChannelReplyPrompt,
+  detachedChannelReplyOutputSchema,
+  detachedIssueReplyPrompt,
+  detachedIssueReplyOutputSchema,
+  detachedProjectAgentPrompt,
+  detachedPayloadDirection,
+  detachedProviderBlockedRunEvent,
+  detachedProviderBlockFromPayload,
+  detachedRunContinuationPrompt,
+  detachedRunDisposition,
+  detachedRunRecoveryPrompt,
+  detachedRunTurnDecision,
+  detachedTranscriptPayload,
+  detachedTranscriptSessionId,
+  parseDetachedIssueReplyResult,
+  parseDetachedJsonResult,
+  runProjectAgentTaskCompletionFlow,
+  shouldPersistDetachedTranscriptPayload,
+  type DetachedAgent,
+} from "./agent-runner";
+import { agentImageAttachments } from "../src-agent/runner-attachments";
+import {
+  assertDetachedProviderTurnSucceeded,
+  detachedProviderTurnFailure,
+  runDetachedProviderTurn,
+} from "./detached-provider-turn";
+import {
+  TranscriptBatcher,
+  type TranscriptBatchEvent,
+} from "./transcript-batcher";
+import {
+  ChannelActivityPublisher,
+  type ChannelActivityCredential,
+} from "./channel-activity-publisher";
+import {
+  HttpRequestError,
+  uploadExecutionMetricsWithCostCompatibility,
+} from "./execution-metrics-upload";
+import {
+  inspectWorkflowRequirements,
+  workflowRequirementReadinessDetail,
+} from "./workflow-requirements";
+import {
+  createWorkerDeviceIdentity,
+  defaultWorkerLabel,
+  errorDelayMs,
+  issueWorkerSessionDirectory,
+  interruptibleSleep,
+  restartInstalledServices,
+  runWorkerLoop,
+  serviceDefinition,
+  workerCliPath,
+  workerExecutionPath,
+  writeServiceDefinition,
+  type ClaimedIssue,
+  type WorkerExecutionCheckpoint,
+} from "./worker";
+import {
+  claimMergeBatchIfReady,
+  executeClaimedMergeBatch,
+  inspectMergeQueueDoctor,
+  mergeQueueProfileFromResponse,
+  releaseMergeBatchClaim,
+  renewMergeBatchClaim,
+  type MergeBatchApi,
+} from "./merge-queue";
+import { resolveMergeGroupContainerRuntime } from "./merge-group-validation";
+import {
+  supportsRemoteWorkerUpdates,
+  workerUpdateDeepLink,
+  type WorkerUpdateDirective,
+} from "./worker-update";
+import {
+  allocateAnalysisWorktree,
+  allocateCachedAnalysisWorktree,
+  allocateIssueWorktree,
+  analysisWorktreePath,
+  defaultWorktreeRoot,
+  findExistingIssueWorktree,
+  issueReplyWorkspaceMode,
+  listCompletedWorktrees,
+  listIssueWorktrees,
+  maintainIdleAnalysisWorktrees,
+  maintainTerminalIssueWorktree,
+  markCachedAnalysisWorktreeIdle,
+  projectWorktreeRoot,
+  recordCompletedWorktree,
+  removeAnalysisWorktree,
+  removeCompletedWorktreeRecord,
+  removeIssueWorktree,
+  resolveBaseRef,
+  samePath,
+  type GitRunner,
+  type IssueWorktree,
+  type WorktreeSettings,
+} from "./worktree";
+import {
+  sameApiEnvironment,
+  selectProjectForApi,
+} from "./config-environment";
+import {
+  channelReplyCompleteRequestBody,
+  collectChannelReplyAttachments,
+  parseChannelReplyAgentResult,
+} from "./channel-reply-attachments";
+import {
+  channelReplyImageDirectory,
+  cleanupChannelReplyImages,
+  downloadChannelReplyImages,
+} from "./channel-reply-images";
+import { cleanupChannelReplyResources } from "./channel-reply-cleanup";
+import { assertChannelReplyWorkspaceScope } from "./channel-reply-scope";
+import {
+  cleanupOrphanedOrganizationAgentWorkspaces,
+  cleanupOrganizationAgentContext,
+  downloadOrganizationAgentContextManifest,
+  hydrateOrganizationAgentContext,
+  prepareOrganizationAgentWorkspace,
+} from "./organization-agent-context";
+import {
+  healthyWorkerProviders,
+  inspectWorkerProviderHealth,
+  providerHealthReadinessDetail,
+} from "./provider-health";
+import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
+import {
+  configureBrowserSkillGuide,
+  getSkillGuide,
+  skillGuides,
+} from "./skill-guides";
+import {
+  briarIssueUrl,
+  ensureBriarIssueLinkInGithubPullRequest,
+} from "./github-pr";
+import {
+  configErrorLocations,
+  decodeConfig,
+  type Config,
+  type ProjectConfig,
+} from "./config-contract";
+import {
+  decodeChannelMessagesInput,
+  decodeCreateIssueInput,
+  decodeDashboardRuns,
+  decodeIsoDateTimeWithOffset,
+  decodeRunEvidenceInput,
+  decodeUuid,
+  decodeVelenEnvelope,
+  decodeWorkflowStageId,
+  decodeWorkspaceMode,
+  httpErrorMessage,
+  validateRecoveryRunInput,
+  validateResumeRunInput,
+  validateReworkRunInput,
+  validateRunEventInput,
+  validateWorkflowTransitionInput,
+} from "./command-contract";
+import {
+  decodeClaimedChannelReply,
+  decodeClaimedIssueReply,
+  decodeClaimedMergeBatch,
+  decodeClaimedProjectAgentTask,
+  decodeClaimedRun,
+  decodeDetachedAgentEffortOption,
+  decodeDetachedAgentSkillsOption,
+  decodeQueuedIssue,
+  decodeWorkerBinding,
+  decodeWorkerRegistration,
+  type ClaimedChannelReply,
+  type ClaimedIssueReply,
+  type ClaimedProjectAgentTask,
+  type ClaimedRun,
+  type DetachedAgentClaim,
+  type DetachedAgentSkill,
+  type QueuedAttachment,
+  type WorkerRegistration,
+} from "./worker-claim-contract";
+
+import {
+  providerExecutionEnvironment,
+  configDirectory,
+  value,
+  saveConfigAt,
+  request,
+  serializeTranscriptRequest,
+  isTranscriptPayloadTooLarge,
+  runGit,
+  worktreeSettings,
+} from "./command-support";
+import {
+  downloadClaimAttachment,
+  allocateClaimWorkspace,
+} from "./worktree-commands";
+
+const activeReplyActivityPublishers = new Map<
+  string,
+  ChannelActivityPublisher
+>();
+const activeCachedAnalysisWorktreePaths = new Map<string, number>();
+
+function retainCachedAnalysisWorktree(path: string) {
+  activeCachedAnalysisWorktreePaths.set(
+    path,
+    (activeCachedAnalysisWorktreePaths.get(path) ?? 0) + 1,
+  );
+}
+
+function releaseCachedAnalysisWorktree(path: string) {
+  const remaining = (activeCachedAnalysisWorktreePaths.get(path) ?? 1) - 1;
+  if (remaining <= 0) {
+    activeCachedAnalysisWorktreePaths.delete(path);
+  } else {
+    activeCachedAnalysisWorktreePaths.set(path, remaining);
+  }
+}
+
+function detachedAgentWithActiveSkill(
+  agent: DetachedAgentClaim,
+  activeSkill: DetachedAgentSkill | null | undefined,
+): DetachedAgent {
+  return {
+    ...agent,
+    activeSkill: activeSkill ?? null,
+  };
+}
+
+function detachedReplyAgent(input: {
+  workId: string;
+  provider: AgentProvider;
+  model: string | null;
+  effort?: ModelEffort | null;
+  agent?: DetachedAgentClaim | null;
+  activeSkill?: DetachedAgentSkill | null;
+  snapshot: Record<string, unknown>;
+  fallbackName: string;
+  scope?: DetachedAgent["scope"];
+}): DetachedAgent {
+  const snapshotAgent = Predicate.isObject(input.snapshot.agent)
+    ? input.snapshot.agent
+    : null;
+  const snapshotSkills = decodeDetachedAgentSkillsOption(snapshotAgent?.skills);
+  const baseAgent = input.agent ?? {
+    id: typeof snapshotAgent?.id === "string" && snapshotAgent.id.trim()
+      ? snapshotAgent.id
+      : input.workId,
+    name: typeof snapshotAgent?.name === "string" && snapshotAgent.name.trim()
+      ? snapshotAgent.name
+      : input.fallbackName,
+    provider: input.provider,
+    model: input.model,
+    effort:
+      typeof snapshotAgent?.effort === "string" &&
+        Option.isSome(decodeDetachedAgentEffortOption(snapshotAgent.effort))
+        ? snapshotAgent.effort
+        : null,
+    responsibility: typeof snapshotAgent?.responsibility === "string"
+      ? snapshotAgent.responsibility
+      : "",
+    skill: typeof snapshotAgent?.skill === "string" ? snapshotAgent.skill : "",
+    skills: Option.getOrElse(snapshotSkills, () => []),
+  };
+  return {
+    ...baseAgent,
+    // The top-level execution fields are snapshotted by the server and remain
+    // authoritative during rolling upgrades, even when Agent defaults change.
+    provider: input.provider,
+    model: input.model,
+    effort: input.effort !== undefined
+      ? input.effort
+      : input.activeSkill?.effort ?? baseAgent.effort,
+    activeSkill: input.activeSkill ?? null,
+    scope: input.scope,
+  };
+}
+
+async function runClaimedIssue(
+  config: Config,
+  project: ProjectConfig,
+  issue: ClaimedRun,
+  workerToken: string,
+  signal: AbortSignal,
+  reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
+) {
+  const runtimeDirectory = issueWorkerSessionDirectory(configDirectory, issue);
+  const runtimeConfig = structuredClone(config);
+  runtimeConfig.projects = runtimeConfig.projects.map((candidate) =>
+    candidate.id === project.id
+      ? {
+          ...candidate,
+          activeClaim: {
+            runId: issue.runId,
+            sourceKey: issue.sourceKey,
+            token: issue.claimToken,
+            leaseExpiresAt: issue.leaseExpiresAt,
+          },
+        }
+      : candidate,
+  );
+  await saveConfigAt(runtimeDirectory, runtimeConfig);
+  try {
+    await runClaimedIssueInRuntime(
+      runtimeConfig,
+      project,
+      issue,
+      workerToken,
+      signal,
+      runtimeDirectory,
+      reportCheckpoint,
+    );
+  } finally {
+    await rm(runtimeDirectory, { recursive: true, force: true });
+  }
+}
+
+async function runClaimedIssueInRuntime(
+  config: Config,
+  project: ProjectConfig,
+  issue: ClaimedRun,
+  workerToken: string,
+  signal: AbortSignal,
+  runtimeDirectory: string,
+  reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
+) {
+  const execution = issue.execution ??
+    (issue.agent
+      ? {
+          provider: issue.agent.provider,
+          model: issue.agent.model,
+          effort: issue.agent.effort,
+        }
+      : null);
+  if (!execution) {
+    throw new Error("이 실행에 사용할 프로바이더가 지정되지 않았습니다.");
+  }
+  const activeProject =
+    config.projects.find((candidate) => candidate.id === project.id) ?? project;
+  const { workspace, workspaceError } = await allocateClaimWorkspace(
+    config,
+    activeProject,
+    issue,
+    runtimeDirectory,
+  );
+  if (!workspace?.path) {
+    throw new Error(
+      `Worker workspace allocation failed: ${workspaceError ?? "no workspace"}`,
+    );
+  }
+  reportCheckpoint?.({ workspacePath: workspace.path });
+
+  const provider = execution.provider;
+  const attachments = await Promise.all(
+    issue.attachments.map(async (attachment) => {
+      try {
+        return {
+          ...attachment,
+          localPath: await downloadClaimAttachment(
+            config.apiUrl,
+            workerToken,
+            project.id,
+            issue.runId,
+            attachment,
+            runtimeDirectory,
+          ),
+          downloadError: null,
+        };
+      } catch (error) {
+        return {
+          ...attachment,
+          localPath: null,
+          downloadError: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }),
+  );
+  const logicalAgent = issue.agent
+    ? detachedAgentWithActiveSkill(issue.agent, issue.activeSkill)
+    : null;
+  const prompt = detachedAgentPrompt({
+    agent: logicalAgent,
+    snapshot: {
+      runId: issue.runId,
+      runNumber: issue.runNumber,
+      currentAttempt: issue.currentAttempt,
+      currentRevision: issue.currentRevision,
+      source: issue.source,
+      sourceKey: issue.sourceKey,
+      title: issue.title,
+      issueDescription: issue.description,
+      briarIssueUrl: briarIssueUrl(
+        config.apiUrl,
+        project.id,
+        issue.runId,
+      ),
+      priority: issue.priority,
+      sourceCreatedAt: issue.sourceCreatedAt,
+      createdByUserId: issue.createdByUserId,
+      context: issue.context,
+      reviewFeedback: issue.reviewFeedback,
+      workflow: issue.workflow,
+      startStage: issue.startStage,
+      resumeContext: issue.resumeContext,
+      attachments,
+      conversation: issue.messages,
+    },
+    workspacePath: workspace.path,
+    startStage: issue.startStage,
+    resumeContext: issue.resumeContext,
+  });
+  const fullAccess = activeProject.autoHunt?.sandbox?.fullAccess ?? true;
+  const sessionId = detachedTranscriptSessionId(
+    issue.runId,
+    issue.executionId,
+  );
+  const environment = providerExecutionEnvironment(config, provider, {
+    ...process.env,
+    PATH: workerExecutionPath(),
+    BRIAR_CLI: workerCliPath(),
+    BRIAR_WORKER_TOKEN: workerToken,
+    BRIAR_PROJECT_ID: project.id,
+    BRIAR_CONFIG_HOME: runtimeDirectory,
+  });
+
+  const detachedAgent: DetachedAgent = {
+    id: logicalAgent?.id ?? issue.runId,
+    name: logicalAgent?.name ?? "Briar Worker",
+    provider: execution.provider,
+    model: execution.model,
+    effort: execution.effort,
+    responsibility: logicalAgent?.responsibility ?? "",
+    skill: logicalAgent?.skill ?? "",
+    skills: logicalAgent?.skills ?? [],
+    activeSkill: logicalAgent?.activeSkill ?? null,
+  };
+  const providerAttachments = agentImageAttachments(attachments);
+
+  const executionStartedAt = Date.now();
+  const transcriptSequencer = createDetachedTranscriptSequencer(
+    issue.claimAttempts,
+  );
+  const usageCollector = createAgentExecutionUsageCollector(provider, {
+    configuredModel: execution.model,
+  });
+  const transcriptEnvelope = {
+    projectId: project.id,
+    sessionId,
+    runId: issue.runId,
+    workType: "issue" as const,
+    workId: issue.runId,
+    claimToken: issue.claimToken,
+    ...(issue.executionId ? { executionId: issue.executionId } : {}),
+    workerId: activeProject.executionWorker?.workerId,
+    agentProvider: provider,
+  };
+  const transcriptBatcher = new TranscriptBatcher({
+    send: async (events) => {
+      await request(config.apiUrl, "/transcripts", workerToken, {
+        method: "POST",
+        body: serializeTranscriptRequest(transcriptEnvelope, events),
+      });
+    },
+    measureBytes: (events) =>
+      Buffer.byteLength(
+        serializeTranscriptRequest(transcriptEnvelope, events),
+        "utf8",
+      ),
+    isPayloadTooLarge: isTranscriptPayloadTooLarge,
+    onError: (error) => {
+      console.error(
+        `transcript upload failed for ${issue.sourceKey}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    },
+  });
+  let conversationId: string | null = issue.handoffContext?.conversationId ?? null;
+  if (conversationId) reportCheckpoint?.({ conversationId });
+  let nextPrompt = prompt;
+  let turnNumber = 0;
+  let consecutiveProviderTurnFailures = 0;
+  try {
+    for (;;) {
+      turnNumber += 1;
+      let runnerBlock: ReturnType<typeof detachedProviderBlockFromPayload> = null;
+      const turn = await runDetachedProviderTurn({
+        agent: detachedAgent,
+        prompt: nextPrompt,
+        workspacePath: workspace.path,
+        fullAccess,
+        conversationId,
+        attachments:
+          turnNumber === 1 || !conversationId
+            ? providerAttachments
+            : undefined,
+        environment,
+        signal,
+        onConversationId: (nextConversationId) => {
+          conversationId = nextConversationId;
+          reportCheckpoint?.({ conversationId: nextConversationId });
+        },
+        onPayload: async (rawPayload, line) => {
+          usageCollector.observe(rawPayload, new Date().toISOString());
+          runnerBlock ??= detachedProviderBlockFromPayload(rawPayload);
+          const direction = detachedPayloadDirection(rawPayload);
+          const payload = detachedTranscriptPayload(rawPayload, line);
+          const transcriptSequence = transcriptSequencer.nextForPayload(payload);
+          if (transcriptSequence !== null) {
+            await transcriptBatcher.enqueue({
+              sequence: transcriptSequence,
+              direction,
+              payload,
+            });
+          }
+        },
+      });
+      await transcriptBatcher.flush();
+      conversationId = turn.conversationId;
+      if (runnerBlock) {
+        await request(config.apiUrl, "/run-events", workerToken, {
+          method: "POST",
+          headers: { "X-Briar-Claim-Token": issue.claimToken },
+          body: JSON.stringify(
+            detachedProviderBlockedRunEvent({
+              block: runnerBlock,
+              runId: issue.runId,
+              attempt: issue.currentAttempt,
+              actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
+              repository: issue.repository,
+              model: execution.model,
+              occurredAt: new Date().toISOString(),
+            }),
+          ),
+        });
+        return;
+      }
+      const turnFailure = detachedProviderTurnFailure(turn);
+
+      const runtimeConfig = decodeConfig(
+        JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
+      );
+      const disposition = detachedRunDisposition(
+        runtimeConfig.projects.find((candidate) => candidate.id === project.id)
+          ?.activeClaim,
+        issue.runId,
+      );
+      const turnDecision = detachedRunTurnDecision(disposition, turnFailure);
+      if (turnDecision === "stop") return;
+
+      if (turnDecision === "recover" && turnFailure) {
+        consecutiveProviderTurnFailures += 1;
+        console.error(
+          `recovering ${issue.sourceKey}: agent turn ${turnNumber} failed while the run remained active: ${turnFailure}`,
+        );
+        nextPrompt = detachedRunRecoveryPrompt({
+          runId: issue.runId,
+          sourceKey: issue.sourceKey,
+          failure: turnFailure,
+        });
+        if (!conversationId) {
+          nextPrompt = `${nextPrompt}\n\nThe provider did not return a reusable conversation ID, so the durable issue context follows again.\n\n${prompt}`;
+        }
+        await interruptibleSleep(
+          errorDelayMs(consecutiveProviderTurnFailures, 30_000),
+          signal,
+        );
+        continue;
+      }
+      consecutiveProviderTurnFailures = 0;
+
+      console.error(
+        `continuing ${issue.sourceKey}: agent turn ${turnNumber} ended while the run remained active`,
+      );
+      nextPrompt = detachedRunContinuationPrompt({
+        runId: issue.runId,
+        sourceKey: issue.sourceKey,
+      });
+      if (!conversationId) {
+        nextPrompt = `${nextPrompt}\n\nThe provider did not return a reusable conversation ID, so the durable issue context follows again.\n\n${prompt}`;
+      }
+    }
+  } catch (error) {
+    if (!signal.aborted) {
+      try {
+        await request(config.apiUrl, "/run-events", workerToken, {
+          method: "POST",
+          headers: { "X-Briar-Claim-Token": issue.claimToken },
+          body: JSON.stringify({
+            runId: issue.runId,
+            status: "failed",
+            workflowStage: null,
+            eventKey: `detached:${issue.currentAttempt}:agent-failed`,
+            occurredAt: new Date().toISOString(),
+            actor: `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
+            repository: issue.repository,
+            detail: error instanceof Error ? error.message : String(error),
+            pullRequestUrls: [],
+          }),
+        });
+      } catch {
+        // A cancellation or reassignment invalidates the claim before the
+        // process exits. That expected late write must not hide the root error.
+      }
+    }
+    throw error;
+  } finally {
+    await transcriptBatcher.flush();
+    const usageObservations = usageCollector.finish();
+    const usageRecords = agentExecutionUsageRecordsFromObservations(
+      usageObservations,
+    );
+    const costRecords = agentExecutionCostRecordsFromObservations(
+      usageCollector.finishCosts(),
+    );
+    const executionMetrics = agentExecutionMetrics(
+      Date.now() - executionStartedAt,
+      agentExecutionTokenUsageFromObservations(usageObservations),
+    );
+    try {
+      const metricsPayload = {
+        projectId: project.id,
+        sessionId,
+        runId: issue.runId,
+        runAttempt: issue.currentAttempt,
+        workType: "issue" as const,
+        workId: issue.runId,
+        claimToken: issue.claimToken,
+        ...(issue.executionId ? { executionId: issue.executionId } : {}),
+        workerId: activeProject.executionWorker?.workerId,
+        agentProvider: provider,
+        executionMetrics,
+        ...(issue.executionId && usageRecords.length > 0
+          ? { usageRecords }
+          : {}),
+        ...(issue.executionId && costRecords.length > 0
+          ? { costRecords }
+          : {}),
+        events: [
+          {
+            sequence: transcriptSequencer.next(),
+            direction: "server",
+            payload: { type: "execution.metrics", executionMetrics },
+          },
+        ],
+      };
+      await uploadExecutionMetricsWithCostCompatibility({
+        payload: metricsPayload,
+        send: (payload) =>
+          request(config.apiUrl, "/transcripts", workerToken, {
+            method: "POST",
+            body: JSON.stringify(payload),
+          }),
+      });
+    } catch (error) {
+      console.error(
+        `execution metrics upload failed for ${issue.sourceKey}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    if (workspace.type === "worktree") {
+      try {
+        let completedAt: string | undefined;
+        try {
+          const runtimeConfig = decodeConfig(
+            JSON.parse(await readFile(join(runtimeDirectory, "config.json"), "utf8")),
+          );
+          const runtimeClaim = runtimeConfig.projects.find(
+            (candidate) => candidate.id === project.id,
+          )?.activeClaim;
+          if (
+            runtimeClaim?.runId === issue.runId &&
+            runtimeClaim.terminalStatus === "completed"
+          ) {
+            completedAt = runtimeClaim.finishedAt;
+          }
+        } catch {
+          // Maintenance still compacts reproducible artifacts without a
+          // completion timestamp; deletion remains disabled.
+        }
+        if (completedAt) {
+          await recordCompletedWorktree(
+            projectWorktreeRoot(worktreeSettings(project).root, project.id),
+            {
+              runId: issue.runId,
+              path: workspace.path,
+              branch: workspace.branch,
+              completedAt,
+            },
+          );
+        }
+        const maintenance = await maintainTerminalIssueWorktree(
+          runGit,
+          project.repositoryPath,
+          { path: workspace.path, branch: workspace.branch },
+          { baseRef: workspace.baseRef, ...(completedAt ? { completedAt } : {}) },
+        );
+        console.error(
+          `worktree maintenance for ${issue.sourceKey}: ${JSON.stringify(maintenance)}`,
+        );
+      } catch (error) {
+        console.error(
+          `worktree maintenance failed for ${issue.sourceKey}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+  }
+}
+
+export {
+  activeReplyActivityPublishers,
+  activeCachedAnalysisWorktreePaths,
+  retainCachedAnalysisWorktree,
+  releaseCachedAnalysisWorktree,
+  detachedAgentWithActiveSkill,
+  detachedReplyAgent,
+  runClaimedIssue,
+  runClaimedIssueInRuntime,
+};
+
