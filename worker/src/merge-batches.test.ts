@@ -125,6 +125,7 @@ describe("native merge queue coordinator", () => {
       maxBatchSize?: number;
       maxConcurrentSessions?: number;
       deviceId?: string;
+      quietWindowMs?: number;
     } = {},
   ): Promise<Lane> => {
     const projectId = `11111111-1111-4111-8111-${
@@ -160,12 +161,13 @@ describe("native merge queue coordinator", () => {
         `insert into briar_merge_queue_profiles (
            project_id, repository_id, repository, base_branch, enabled,
            quiet_window_ms, max_batch_size, created_at, updated_at
-         ) values (?, ?, ?, 'main', ?, 1000, ?, ?, ?)`,
+         ) values (?, ?, ?, 'main', ?, ?, ?, ?, ?)`,
       ).bind(
         projectId,
         repositoryId,
         repository,
         options.enabled === false ? 0 : 1,
+        options.quietWindowMs ?? 1000,
         options.maxBatchSize ?? 5,
         at(scenario, 0),
         at(scenario, 0),
@@ -513,6 +515,29 @@ describe("native merge queue coordinator", () => {
         .map((candidate) => candidate.ordinal)
         .sort(),
     ).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("collects until five minutes after the latest ready PR", async () => {
+    const lane = await setupLane(24, {
+      maxBatchSize: 5,
+      quietWindowMs: 300_000,
+    });
+    const first = await createReadyRun(lane, { readyAt: at(24, 1) });
+    await registerRun(lane, first, at(24, 1));
+    const second = await createReadyRun(lane, { readyAt: at(24, 61) });
+    await registerRun(lane, second, at(24, 61));
+
+    await expect(sealNextMergeBatch(db, {
+      projectId: lane.projectId,
+      observedAt: at(24, 301),
+    })).resolves.toBeNull();
+    await expect(sealNextMergeBatch(db, {
+      projectId: lane.projectId,
+      observedAt: at(24, 361),
+    })).resolves.toMatchObject({
+      batch: { state: "frozen" },
+      members: [{ run_id: first.runId }, { run_id: second.runId }],
+    });
   });
 
   it("fences renew, release, and enqueue after a lease is reclaimed", async () => {
