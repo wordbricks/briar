@@ -52,10 +52,9 @@ async function preparedFixture(): Promise<PreparedExactShaValidation> {
   roots.push(root);
   const paths = {
     bundlePath: join(root, "repository.bundle"),
-    profilePath: join(root, "ci-local.sh"),
+    profilePath: join(root, "ci-merge-group.sh"),
+    localProfilePath: join(root, "ci-local.sh"),
     bunConfigPath: join(root, "bunfig.toml"),
-    vitestConfigPath: join(root, "vitest.config.ts"),
-    vitestSetupPath: join(root, "vitest.setup.ts"),
   };
   await Promise.all(Object.values(paths).map((path) => writeFile(path, "fixture\n")));
   return {
