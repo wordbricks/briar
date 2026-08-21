@@ -1,10 +1,11 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import checkedInImagePolicy from "../config/merge-group-ci-image.json";
 import {
+  MERGE_GROUP_CI_AUDITED_IMAGE,
   MERGE_GROUP_CI_BUN_CONFIG_PATH,
   MERGE_GROUP_CI_CONTAINER_LIMITS,
   MERGE_GROUP_CI_CONTEXT_CONCURRENCY,
@@ -14,11 +15,15 @@ import {
   MERGE_GROUP_CI_LOCAL_PROFILE_PATH,
   MERGE_GROUP_CI_MAX_DEADLINE_MS,
   MERGE_GROUP_CI_MAX_OUTPUT_BYTES,
+  MERGE_GROUP_CI_PHASES,
+  MERGE_GROUP_CI_PROTECTED_BASE_REF_PREFIX,
   MERGE_GROUP_CI_PROFILE_PATH,
   MERGE_GROUP_CI_PROTOCOL,
   MERGE_GROUP_CI_RETAINED_LOG_BYTES,
+  MERGE_GROUP_CI_SOURCE_REF_PREFIX,
   MERGE_GROUP_CI_TRUSTED_FILES,
   type MergeGroupCiContext,
+  type MergeGroupCiPhase,
 } from "../src/lib/merge-group-validation-contract";
 
 export type CommandResult = {
@@ -29,7 +34,12 @@ export type CommandResult = {
 
 export type GitRunner = (
   command: string[],
-  options?: { cwd?: string; timeoutMs?: number },
+  options: {
+    cwd: string;
+    timeoutMs: number;
+    /** Complete child environment; implementations must not merge process.env. */
+    env: Readonly<Record<string, string>>;
+  },
 ) => CommandResult;
 
 export class ExactShaValidationInputError extends Error {
@@ -56,7 +66,8 @@ export class MergeGroupCiInfrastructureError extends Error {
 const automaticControlBasenames = [
   /^(?:bunfig(?:\..+)?\.toml)$/u,
   /^(?:vitest|vite)\.(?:config|workspace)\.[^/]+$/u,
-  /^(?:postcss|tailwind|eslint|prettier)\.config\.[^/]+$/u,
+  /^(?:babel|postcss|tailwind|eslint|prettier)\.config\.[^/]+$/u,
+  /^\.(?:babel|postcss|eslint|prettier)rc(?:\.[^/]+)?$/u,
   /^(?:tsconfig)(?:\..+)?\.json$/u,
   /^(?:rust-toolchain)(?:\.toml)?$/u,
   /^(?:tauri\.conf\.[^/]+|wrangler\.(?:jsonc?|toml))$/u,
@@ -116,15 +127,37 @@ function assertExecutionId(value: string) {
   }
 }
 
-function assertSourceRef(value: string) {
-  if (
-    !/^refs\/briar\/merge-group-validation\/[a-z0-9][a-z0-9._-]{0,100}$/u
-      .test(value) || value.includes("..")
-  ) {
+function assertExecutionRef(
+  name: "sourceRef" | "protectedBaseRef",
+  value: string,
+  expectedPrefix: string,
+  executionId: string,
+) {
+  const expected = `${expectedPrefix}/${executionId}`;
+  if (value !== expected) {
     throw new ExactShaValidationInputError(
-      "sourceRef must be a private Briar merge-group validation ref",
+      `${name} must be the private ref bound to this execution`,
     );
   }
+}
+
+const GIT_TIMEOUT_MS = 30_000;
+
+function sanitizedGitEnvironment(root: string) {
+  return {
+    GIT_ATTR_NOSYSTEM: "1",
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_CONFIG_SYSTEM: "/dev/null",
+    GIT_NO_REPLACE_OBJECTS: "1",
+    GIT_OPTIONAL_LOCKS: "0",
+    GIT_TERMINAL_PROMPT: "0",
+    HOME: root,
+    LANG: "C",
+    LC_ALL: "C",
+    PATH: "/usr/local/bin:/usr/bin:/bin",
+    XDG_CONFIG_HOME: root,
+  } as const;
 }
 
 export type PreparedExactShaValidation = {
@@ -144,91 +177,164 @@ export async function prepareExactShaValidation(
   input: {
     executionId: string;
     sourceRef: string;
+    protectedBaseRef: string;
     baseSha: string;
     headSha: string;
   },
 ): Promise<PreparedExactShaValidation> {
   assertExecutionId(input.executionId);
-  assertSourceRef(input.sourceRef);
+  assertExecutionRef(
+    "sourceRef",
+    input.sourceRef,
+    MERGE_GROUP_CI_SOURCE_REF_PREFIX,
+    input.executionId,
+  );
+  assertExecutionRef(
+    "protectedBaseRef",
+    input.protectedBaseRef,
+    MERGE_GROUP_CI_PROTECTED_BASE_REF_PREFIX,
+    input.executionId,
+  );
   assertObjectId("baseSha", input.baseSha);
   assertObjectId("headSha", input.headSha);
-
-  const sourceHead = git([
-    "rev-parse",
-    "--verify",
-    `${input.sourceRef}^{commit}`,
-  ], { cwd: repositoryPath });
-  if (sourceHead.exitCode !== 0 || sourceHead.stdout.trim() !== input.headSha) {
+  if (input.baseSha === input.headSha) {
     throw new ExactShaValidationInputError(
-      "The local validation ref does not resolve to the expected exact SHA",
+      "The protected base SHA and candidate SHA must be distinct",
     );
   }
-  const baseExists = git(["cat-file", "-e", `${input.baseSha}^{commit}`], {
-    cwd: repositoryPath,
-  });
-  const descendsFromBase = git([
-    "merge-base",
-    "--is-ancestor",
-    input.baseSha,
-    input.headSha,
-  ], { cwd: repositoryPath });
-  if (baseExists.exitCode !== 0 || descendsFromBase.exitCode !== 0) {
-    throw new ExactShaValidationInputError(
-      "The exact candidate SHA does not descend from the trusted base SHA",
-    );
-  }
-
-  const changedPaths = git([
-    "diff",
-    "--name-only",
-    "-z",
-    input.baseSha,
-    input.headSha,
-    "--",
-  ], { cwd: repositoryPath });
-  if (changedPaths.exitCode !== 0) {
-    throw new MergeGroupCiInfrastructureError(
-      `Candidate path inspection failed: ${changedPaths.stderr.trim()}`,
-    );
-  }
-  assertTrustedCandidateConfiguration(
-    changedPaths.stdout.split("\0").filter(Boolean),
-  );
 
   const root = await mkdtemp(join(tmpdir(), "briar-merge-group-ci."));
-  await chmod(root, 0o700);
   try {
+    await chmod(root, 0o700);
+    const env = sanitizedGitEnvironment(root);
+    const runGit = (
+      command: string[],
+      cwd: string,
+      timeoutMs = GIT_TIMEOUT_MS,
+    ) =>
+      git(["--no-replace-objects", ...command], {
+        cwd,
+        env,
+        timeoutMs,
+      });
+    const quarantinePath = join(root, "repository.git");
+    const initialized = runGit(["init", "--bare", quarantinePath], root);
+    if (initialized.exitCode !== 0) {
+      throw new MergeGroupCiInfrastructureError(
+        `Git quarantine initialization failed: ${initialized.stderr.trim()}`,
+      );
+    }
+    const fetched = runGit([
+      "fetch",
+      "--no-tags",
+      "--force",
+      resolve(repositoryPath),
+      `+${input.protectedBaseRef}:${input.protectedBaseRef}`,
+      `+${input.sourceRef}:${input.sourceRef}`,
+    ], quarantinePath, 120_000);
+    if (fetched.exitCode !== 0) {
+      throw new MergeGroupCiInfrastructureError(
+        `Exact refs could not be copied into Git quarantine: ${fetched.stderr.trim()}`,
+      );
+    }
+    const checkedObjects = runGit(
+      ["fsck", "--strict", "--no-dangling"],
+      quarantinePath,
+      120_000,
+    );
+    if (checkedObjects.exitCode !== 0) {
+      throw new MergeGroupCiInfrastructureError(
+        `Git quarantine object verification failed: ${checkedObjects.stderr.trim()}`,
+      );
+    }
+
+    const protectedBase = runGit([
+      "rev-parse",
+      "--verify",
+      `${input.protectedBaseRef}^{commit}`,
+    ], quarantinePath);
+    if (
+      protectedBase.exitCode !== 0 ||
+      protectedBase.stdout.trim() !== input.baseSha
+    ) {
+      throw new ExactShaValidationInputError(
+        "The protected base ref does not resolve to the expected exact SHA",
+      );
+    }
+    const sourceHead = runGit([
+      "rev-parse",
+      "--verify",
+      `${input.sourceRef}^{commit}`,
+    ], quarantinePath);
+    if (sourceHead.exitCode !== 0 || sourceHead.stdout.trim() !== input.headSha) {
+      throw new ExactShaValidationInputError(
+        "The local validation ref does not resolve to the expected exact SHA",
+      );
+    }
+    const descendsFromBase = runGit([
+      "merge-base",
+      "--is-ancestor",
+      input.baseSha,
+      input.headSha,
+    ], quarantinePath);
+    if (descendsFromBase.exitCode !== 0) {
+      throw new ExactShaValidationInputError(
+        "The exact candidate SHA does not descend from the protected base SHA",
+      );
+    }
+
+    const changedPaths = runGit([
+      "diff",
+      "--name-only",
+      "-z",
+      input.baseSha,
+      input.headSha,
+      "--",
+    ], quarantinePath);
+    if (changedPaths.exitCode !== 0) {
+      throw new MergeGroupCiInfrastructureError(
+        `Candidate path inspection failed: ${changedPaths.stderr.trim()}`,
+      );
+    }
+    assertTrustedCandidateConfiguration(
+      changedPaths.stdout.split("\0").filter(Boolean),
+    );
+
     const trustedPaths = new Map<string, string>();
     for (const [repositoryPathname, filename] of MERGE_GROUP_CI_TRUSTED_FILES) {
-      const source = git(["show", `${input.baseSha}:${repositoryPathname}`], {
-        cwd: repositoryPath,
-      });
+      const source = runGit(
+        ["show", `${input.baseSha}:${repositoryPathname}`],
+        quarantinePath,
+      );
       if (source.exitCode !== 0 || source.stdout.length === 0) {
         throw new MergeGroupCiInfrastructureError(
           `Trusted base file could not be loaded: ${repositoryPathname}`,
         );
       }
       const destination = join(root, filename);
-      await writeFile(destination, source.stdout, { mode: 0o444 });
+      await writeFile(destination, source.stdout, {
+        mode: filename.endsWith(".sh") ? 0o555 : 0o444,
+      });
       trustedPaths.set(repositoryPathname, destination);
     }
 
     const bundlePath = join(root, "repository.bundle");
-    const bundled = git([
+    const bundled = runGit([
       "bundle",
       "create",
       bundlePath,
       input.sourceRef,
-    ], { cwd: repositoryPath, timeoutMs: 120_000 });
+    ], quarantinePath, 120_000);
     if (bundled.exitCode !== 0) {
       throw new MergeGroupCiInfrastructureError(
         `Exact repository bundle failed: ${bundled.stderr.trim()}`,
       );
     }
     await chmod(bundlePath, 0o444);
-    const bundleHeads = git(["bundle", "list-heads", bundlePath], {
-      cwd: repositoryPath,
-    });
+    const bundleHeads = runGit(
+      ["bundle", "list-heads", bundlePath],
+      quarantinePath,
+    );
     const containsExactHead = bundleHeads.exitCode === 0 &&
       bundleHeads.stdout.split("\n").some((line) =>
         line === `${input.headSha} ${input.sourceRef}`
@@ -274,14 +380,44 @@ export type MergeGroupContainerRuntime = {
 };
 
 export type MergeGroupImagePolicy = {
+  schemaVersion: number;
+  protocol: number;
   repository: string;
   manifestDigest: string | null;
-  published: boolean;
-  enabled: boolean;
+  platforms: string[];
+  verification: {
+    independentBuilds: number;
+    matchingManifestDigests: boolean;
+    verifiedAt: string | null;
+  };
+  rollout: {
+    published: boolean;
+    enabled: boolean;
+  };
 };
 
-export function resolveMergeGroupContainerRuntime(
+export function isAuditedMergeGroupImagePolicy(
   policy: MergeGroupImagePolicy,
+  auditedDigest: string | null,
+) {
+  return auditedDigest !== null &&
+    policy.schemaVersion === 1 &&
+    policy.protocol === MERGE_GROUP_CI_PROTOCOL &&
+    policy.repository === MERGE_GROUP_CI_IMAGE_REPOSITORY &&
+    policy.manifestDigest === auditedDigest &&
+    /^sha256:[0-9a-f]{64}$/u.test(auditedDigest) &&
+    policy.platforms.length > 0 &&
+    policy.platforms.every((platform) => /^linux\/(?:amd64|arm64)$/u.test(platform)) &&
+    Number.isInteger(policy.verification.independentBuilds) &&
+    policy.verification.independentBuilds >= 2 &&
+    policy.verification.matchingManifestDigests &&
+    policy.verification.verifiedAt !== null &&
+    !Number.isNaN(Date.parse(policy.verification.verifiedAt)) &&
+    policy.rollout.published &&
+    policy.rollout.enabled;
+}
+
+export function resolveMergeGroupContainerRuntime(
   which: (command: string) => string | null = (command) => Bun.which(command),
   inspect: (executable: string, image: string) => boolean = (executable, image) => {
     const result = spawnSync(executable, [
@@ -304,18 +440,16 @@ export function resolveMergeGroupContainerRuntime(
       result.stdout.trim() === `65532:65532 ${MERGE_GROUP_CI_PROTOCOL}`;
   },
 ): { ready: false; detail: string } | ({ ready: true } & MergeGroupContainerRuntime) {
-  if (!policy.published || !policy.enabled || policy.manifestDigest === null) {
-    return { ready: false, detail: "The audited OCI image is not published and enabled" };
-  }
-  if (
-    policy.repository !== MERGE_GROUP_CI_IMAGE_REPOSITORY ||
-    !/^sha256:[0-9a-f]{64}$/u.test(policy.manifestDigest)
-  ) {
-    return { ready: false, detail: "The OCI image policy is not immutable" };
+  const policy = checkedInImagePolicy as MergeGroupImagePolicy;
+  if (!isAuditedMergeGroupImagePolicy(policy, MERGE_GROUP_CI_AUDITED_IMAGE)) {
+    return {
+      ready: false,
+      detail: "The checked-in OCI image is not independently audited and enabled",
+    };
   }
   const executable = which("docker");
   if (!executable) return { ready: false, detail: "Docker is not installed" };
-  const image = `${policy.repository}@${policy.manifestDigest}`;
+  const image = `${policy.repository}@${policy.manifestDigest!}`;
   if (!inspect(executable, image)) {
     return { ready: false, detail: "The audited OCI image is not installed locally" };
   }
@@ -347,8 +481,11 @@ export function mergeGroupDockerArguments(input: {
   prepared: PreparedExactShaValidation;
   runtime: MergeGroupContainerRuntime;
   context: MergeGroupCiContext;
+  phase: MergeGroupCiPhase;
   containerName: string;
   cidFile: string;
+  deadlineSeconds: number;
+  deadlineUnix: number;
 }) {
   if (!/^[a-z0-9][a-z0-9._/-]*[a-z0-9-]@sha256:[0-9a-f]{64}$/u
     .test(input.runtime.image)) {
@@ -356,6 +493,16 @@ export function mergeGroupDockerArguments(input: {
   }
   if (!/^briar-merge-group-[a-z0-9-]{1,100}$/u.test(input.containerName)) {
     throw new ExactShaValidationInputError("OCI container name is invalid");
+  }
+  if (!(MERGE_GROUP_CI_PHASES[input.context] as readonly string[]).includes(input.phase)) {
+    throw new ExactShaValidationInputError("OCI validation phase does not match its context");
+  }
+  if (
+    !Number.isInteger(input.deadlineSeconds) || input.deadlineSeconds < 1 ||
+    input.deadlineSeconds > Math.ceil(MERGE_GROUP_CI_MAX_DEADLINE_MS / 1_000) ||
+    !Number.isInteger(input.deadlineUnix) || input.deadlineUnix < 1
+  ) {
+    throw new ExactShaValidationInputError("OCI validation deadline is invalid");
   }
   for (const path of [
     input.prepared.bundlePath,
@@ -367,8 +514,11 @@ export function mergeGroupDockerArguments(input: {
 
   return [
     "run",
+    "--rm",
+    "--init",
     `--name=${input.containerName}`,
     `--cidfile=${input.cidFile}`,
+    "--stop-timeout=5",
     "--pull=never",
     "--network=none",
     "--read-only",
@@ -383,8 +533,14 @@ export function mergeGroupDockerArguments(input: {
     `--pids-limit=${MERGE_GROUP_CI_CONTAINER_LIMITS.pids}`,
     "--ulimit=nofile=4096:4096",
     "--ulimit=core=0:0",
+    `--label=io.briar.merge-group-ci.protocol=${MERGE_GROUP_CI_PROTOCOL}`,
+    `--label=io.briar.merge-group-ci.execution=${input.prepared.executionId}`,
+    `--label=io.briar.merge-group-ci.context=${input.context}`,
+    `--label=io.briar.merge-group-ci.phase=${input.phase}`,
+    `--label=io.briar.merge-group-ci.deadline-unix=${input.deadlineUnix}`,
     `--mount=type=bind,src=${input.prepared.bundlePath},dst=/opt/briar/repository.bundle,readonly`,
     `--mount=type=bind,src=${input.prepared.profilePath},dst=/opt/briar/ci-merge-group.sh,readonly`,
+    `--mount=type=bind,src=${input.prepared.profilePath},dst=/opt/briar/trusted-bin/bun,readonly`,
     `--mount=type=bind,src=${input.prepared.localProfilePath},dst=/opt/briar/ci-local.sh,readonly`,
     `--mount=type=bind,src=${input.prepared.bunConfigPath},dst=/opt/briar/bunfig.toml,readonly`,
     "--env=CI=true",
@@ -401,9 +557,14 @@ export function mergeGroupDockerArguments(input: {
     "--env=BRIAR_CI_BUN_CONFIG=/opt/briar/bunfig.toml",
     `--env=BRIAR_CI_HEAD_SHA=${input.prepared.headSha}`,
     input.runtime.image,
+    "/usr/bin/timeout",
+    "--signal=TERM",
+    "--kill-after=5s",
+    `${input.deadlineSeconds}s`,
     "/bin/bash",
     "/opt/briar/ci-merge-group.sh",
     input.context,
+    input.phase,
   ];
 }
 
@@ -415,6 +576,10 @@ export type MergeGroupContextResult = {
   log: string;
   logSha256: string;
   logTruncated: boolean;
+};
+
+type MergeGroupPhaseResult = Omit<MergeGroupContextResult, "context"> & {
+  phase: MergeGroupCiPhase;
 };
 
 function dockerEnvironment(root: string) {
@@ -434,7 +599,7 @@ function removeContainer(
     encoding: "utf8",
     env: dockerEnvironment(root),
     shell: false,
-    timeout: 30_000,
+    timeout: 10_000,
   });
 }
 
@@ -447,35 +612,39 @@ function containerExists(
     encoding: "utf8",
     env: dockerEnvironment(root),
     shell: false,
-    timeout: 10_000,
+    timeout: 5_000,
   }).status === 0;
 }
 
-async function runMergeGroupContext(input: {
+async function runMergeGroupPhase(input: {
   prepared: PreparedExactShaValidation;
   runtime: MergeGroupContainerRuntime;
   context: MergeGroupCiContext;
+  phase: MergeGroupCiPhase;
   signal: AbortSignal;
   deadlineAt: number;
   killGraceMs: number;
-}): Promise<MergeGroupContextResult> {
+}): Promise<MergeGroupPhaseResult> {
   const nonce = randomUUID().replaceAll("-", "").slice(0, 12);
-  const safeExecutionId = input.prepared.executionId.slice(0, 40);
+  const safeExecutionId = input.prepared.executionId.slice(0, 24);
   const containerName =
-    `briar-merge-group-${safeExecutionId}-${input.context}-${nonce}`;
+    `briar-merge-group-${safeExecutionId}-${input.context}-${input.phase}-${nonce}`;
   const cidFile = join(input.prepared.root, `${containerName}.cid`);
-  const args = mergeGroupDockerArguments({
-    prepared: input.prepared,
-    runtime: input.runtime,
-    context: input.context,
-    containerName,
-    cidFile,
-  });
   const remaining = input.deadlineAt - Date.now();
   if (remaining <= 0) {
     throw new MergeGroupCiInfrastructureError("Exact-SHA validation deadline expired");
   }
   if (input.signal.aborted) throw input.signal.reason;
+  const args = mergeGroupDockerArguments({
+    prepared: input.prepared,
+    runtime: input.runtime,
+    context: input.context,
+    phase: input.phase,
+    containerName,
+    cidFile,
+    deadlineSeconds: Math.max(1, Math.ceil(remaining / 1_000)),
+    deadlineUnix: Math.ceil(input.deadlineAt / 1_000),
+  });
 
   const hash = createHash("sha256");
   const chunks: Buffer[] = [];
@@ -485,19 +654,19 @@ async function runMergeGroupContext(input: {
   let child: ChildProcess | null = null;
   let stop: "external" | "deadline" | "output" | null = null;
   let primaryError: unknown;
-  let result: MergeGroupContextResult | undefined;
+  let result: MergeGroupPhaseResult | undefined;
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
   let killTimer: ReturnType<typeof setTimeout> | undefined;
 
   const requestStop = (reason: typeof stop) => {
-    if (stop !== null) return;
-    stop = reason;
+    if (stop === null) stop = reason;
     if (child) terminateProcessGroup(child, "SIGTERM");
-    removeContainer(input.runtime, containerName, input.prepared.root);
-    killTimer = setTimeout(() => {
-      if (child) terminateProcessGroup(child, "SIGKILL");
-      removeContainer(input.runtime, containerName, input.prepared.root);
-    }, input.killGraceMs);
+    if (!killTimer) {
+      killTimer = setTimeout(() => {
+        if (child) terminateProcessGroup(child, "SIGKILL");
+        removeContainer(input.runtime, containerName, input.prepared.root);
+      }, input.killGraceMs);
+    }
   };
   const onAbort = () => requestStop("external");
   const capture = (chunk: Buffer) => {
@@ -554,7 +723,7 @@ async function runMergeGroupContext(input: {
     const log = Buffer.concat(chunks).toString("utf8") || "(no container output)";
     if (stop === "output") {
       result = {
-        context: input.context,
+        phase: input.phase,
         passed: false,
         exitCode: 1,
         failureCode: "output_limit",
@@ -562,13 +731,13 @@ async function runMergeGroupContext(input: {
         logSha256: hash.digest("hex"),
         logTruncated: true,
       };
-    } else if ([75, 125, 126, 127, 137].includes(exitCode)) {
+    } else if ([75, 124, 125, 126, 127].includes(exitCode)) {
       throw new MergeGroupCiInfrastructureError(
-        `Isolated ${input.context} validation failed as infrastructure (${exitCode})`,
+        `Isolated ${input.phase} validation failed as infrastructure (${exitCode})`,
       );
     } else {
       result = {
-        context: input.context,
+        phase: input.phase,
         passed: exitCode === 0,
         exitCode,
         failureCode: exitCode === 0 ? null : "ci_failed",
@@ -583,17 +752,15 @@ async function runMergeGroupContext(input: {
     input.signal.removeEventListener("abort", onAbort);
     if (deadlineTimer) clearTimeout(deadlineTimer);
     if (killTimer) clearTimeout(killTimer);
-    const hadContainer = existsSync(cidFile);
-    const removed = removeContainer(input.runtime, containerName, input.prepared.root);
+    removeContainer(input.runtime, containerName, input.prepared.root);
     const stillExists = containerExists(
       input.runtime,
       containerName,
       input.prepared.root,
     );
-    const cleanupFailed = stillExists || (hadContainer && removed.status !== 0);
-    if (cleanupFailed) {
+    if (stillExists) {
       const cleanupError = new MergeGroupCiInfrastructureError(
-        `OCI container cleanup was not acknowledged for ${input.context}`,
+        `OCI container cleanup was not acknowledged for ${input.phase}`,
       );
       primaryError = primaryError === undefined
         ? cleanupError
@@ -604,6 +771,64 @@ async function runMergeGroupContext(input: {
 
   if (primaryError !== undefined) throw primaryError;
   return result!;
+}
+
+async function runMergeGroupContext(input: {
+  prepared: PreparedExactShaValidation;
+  runtime: MergeGroupContainerRuntime;
+  context: MergeGroupCiContext;
+  signal: AbortSignal;
+  deadlineAt: number;
+  killGraceMs: number;
+}): Promise<MergeGroupContextResult> {
+  const hash = createHash("sha256");
+  const chunks: Buffer[] = [];
+  let retainedBytes = 0;
+  let logTruncated = false;
+
+  for (const phase of MERGE_GROUP_CI_PHASES[input.context]) {
+    const phaseResult = await runMergeGroupPhase({
+      ...input,
+      phase,
+    });
+    hash.update(phase);
+    hash.update("\0");
+    hash.update(phaseResult.logSha256);
+    hash.update("\0");
+    hash.update(String(phaseResult.exitCode));
+    hash.update("\n");
+
+    const phaseLog = Buffer.from(`[${phase}]\n${phaseResult.log}\n`);
+    const retain = Math.max(0, MERGE_GROUP_CI_RETAINED_LOG_BYTES - retainedBytes);
+    if (retain > 0) {
+      const retained = phaseLog.subarray(0, retain);
+      chunks.push(retained);
+      retainedBytes += retained.length;
+    }
+    if (phaseLog.length > retain || phaseResult.logTruncated) logTruncated = true;
+
+    if (!phaseResult.passed) {
+      return {
+        context: input.context,
+        passed: false,
+        exitCode: phaseResult.exitCode,
+        failureCode: phaseResult.failureCode,
+        log: Buffer.concat(chunks).toString("utf8"),
+        logSha256: hash.digest("hex"),
+        logTruncated,
+      };
+    }
+  }
+
+  return {
+    context: input.context,
+    passed: true,
+    exitCode: 0,
+    failureCode: null,
+    log: Buffer.concat(chunks).toString("utf8") || "(no container output)",
+    logSha256: hash.digest("hex"),
+    logTruncated,
+  };
 }
 
 export async function runFixedMergeGroupValidation(input: {
@@ -618,6 +843,12 @@ export async function runFixedMergeGroupValidation(input: {
     deadlineMs > MERGE_GROUP_CI_MAX_DEADLINE_MS) {
     throw new ExactShaValidationInputError(
       `deadlineMs must be between 1000 and ${MERGE_GROUP_CI_MAX_DEADLINE_MS}`,
+    );
+  }
+  const killGraceMs = input.killGraceMs ?? 5_000;
+  if (!Number.isInteger(killGraceMs) || killGraceMs < 10 || killGraceMs > 30_000) {
+    throw new ExactShaValidationInputError(
+      "killGraceMs must be between 10 and 30000",
     );
   }
   const deadlineAt = Date.now() + deadlineMs;
@@ -640,7 +871,7 @@ export async function runFixedMergeGroupValidation(input: {
           context: MERGE_GROUP_CI_CONTEXTS[index],
           signal: controller.signal,
           deadlineAt,
-          killGraceMs: input.killGraceMs ?? 5_000,
+          killGraceMs,
         });
       } catch (error) {
         if (firstError === undefined) firstError = error;
