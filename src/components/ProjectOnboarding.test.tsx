@@ -261,8 +261,8 @@ describe("ProjectOnboarding", () => {
     await act(async () => buttonWithText(container, "Migrate from Lovable")?.click());
 
     expect(container.textContent).toContain("먼저 Lovable을 GitHub와 연결");
-    expect(container.querySelector("iframe")?.getAttribute("src")).toContain(
-      "youtube-nocookie.com/embed/zgNkhU4SYgQ",
+    expect(container.querySelector("video")?.getAttribute("src")).toContain(
+      "lovable-export.mp4",
     );
     await act(async () => buttonWithText(container, "영상대로 연결했어요")?.click());
 
