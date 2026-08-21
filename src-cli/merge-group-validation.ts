@@ -11,14 +11,13 @@ import {
   MERGE_GROUP_CI_CONTEXTS,
   MERGE_GROUP_CI_DEFAULT_DEADLINE_MS,
   MERGE_GROUP_CI_IMAGE_REPOSITORY,
+  MERGE_GROUP_CI_LOCAL_PROFILE_PATH,
   MERGE_GROUP_CI_MAX_DEADLINE_MS,
   MERGE_GROUP_CI_MAX_OUTPUT_BYTES,
   MERGE_GROUP_CI_PROFILE_PATH,
   MERGE_GROUP_CI_PROTOCOL,
   MERGE_GROUP_CI_RETAINED_LOG_BYTES,
   MERGE_GROUP_CI_TRUSTED_FILES,
-  MERGE_GROUP_CI_VITEST_CONFIG_PATH,
-  MERGE_GROUP_CI_VITEST_SETUP_PATH,
   type MergeGroupCiContext,
 } from "../src/lib/merge-group-validation-contract";
 
@@ -71,8 +70,7 @@ const automaticControlBasenames = [
 const exactControlPaths = new Set([
   MERGE_GROUP_CI_PROFILE_PATH,
   MERGE_GROUP_CI_BUN_CONFIG_PATH,
-  MERGE_GROUP_CI_VITEST_CONFIG_PATH,
-  MERGE_GROUP_CI_VITEST_SETUP_PATH,
+  MERGE_GROUP_CI_LOCAL_PROFILE_PATH,
   "src/test/setup.ts",
   "scripts/d1-test-template.ts",
   "worker/src/test-helpers/d1.ts",
@@ -136,9 +134,8 @@ export type PreparedExactShaValidation = {
   root: string;
   bundlePath: string;
   profilePath: string;
+  localProfilePath: string;
   bunConfigPath: string;
-  vitestConfigPath: string;
-  vitestSetupPath: string;
 };
 
 export async function prepareExactShaValidation(
@@ -249,9 +246,8 @@ export async function prepareExactShaValidation(
       root,
       bundlePath,
       profilePath: trustedPaths.get(MERGE_GROUP_CI_PROFILE_PATH)!,
+      localProfilePath: trustedPaths.get(MERGE_GROUP_CI_LOCAL_PROFILE_PATH)!,
       bunConfigPath: trustedPaths.get(MERGE_GROUP_CI_BUN_CONFIG_PATH)!,
-      vitestConfigPath: trustedPaths.get(MERGE_GROUP_CI_VITEST_CONFIG_PATH)!,
-      vitestSetupPath: trustedPaths.get(MERGE_GROUP_CI_VITEST_SETUP_PATH)!,
     };
   } catch (error) {
     await rm(root, { recursive: true, force: true });
@@ -364,9 +360,8 @@ export function mergeGroupDockerArguments(input: {
   for (const path of [
     input.prepared.bundlePath,
     input.prepared.profilePath,
+    input.prepared.localProfilePath,
     input.prepared.bunConfigPath,
-    input.prepared.vitestConfigPath,
-    input.prepared.vitestSetupPath,
     input.cidFile,
   ]) assertMountPath(path);
 
@@ -389,10 +384,9 @@ export function mergeGroupDockerArguments(input: {
     "--ulimit=nofile=4096:4096",
     "--ulimit=core=0:0",
     `--mount=type=bind,src=${input.prepared.bundlePath},dst=/opt/briar/repository.bundle,readonly`,
-    `--mount=type=bind,src=${input.prepared.profilePath},dst=/opt/briar/ci-local.sh,readonly`,
+    `--mount=type=bind,src=${input.prepared.profilePath},dst=/opt/briar/ci-merge-group.sh,readonly`,
+    `--mount=type=bind,src=${input.prepared.localProfilePath},dst=/opt/briar/ci-local.sh,readonly`,
     `--mount=type=bind,src=${input.prepared.bunConfigPath},dst=/opt/briar/bunfig.toml,readonly`,
-    `--mount=type=bind,src=${input.prepared.vitestConfigPath},dst=/opt/briar/vitest.config.ts,readonly`,
-    `--mount=type=bind,src=${input.prepared.vitestSetupPath},dst=/opt/briar/vitest.setup.ts,readonly`,
     "--env=CI=true",
     "--env=GIT_TERMINAL_PROMPT=0",
     "--env=GH_PROMPT_DISABLED=1",
@@ -405,11 +399,10 @@ export function mergeGroupDockerArguments(input: {
     "--env=BRIAR_CI_WORKSPACE_ROOT=/scratch/workspace",
     "--env=BRIAR_CI_REPOSITORY_BUNDLE=/opt/briar/repository.bundle",
     "--env=BRIAR_CI_BUN_CONFIG=/opt/briar/bunfig.toml",
-    "--env=BRIAR_CI_VITEST_CONFIG=/opt/briar/vitest.config.ts",
     `--env=BRIAR_CI_HEAD_SHA=${input.prepared.headSha}`,
     input.runtime.image,
     "/bin/bash",
-    "/opt/briar/ci-local.sh",
+    "/opt/briar/ci-merge-group.sh",
     input.context,
   ];
 }

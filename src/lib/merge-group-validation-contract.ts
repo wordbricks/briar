@@ -16,19 +16,15 @@ export const MERGE_GROUP_CI_CONTEXTS = [
 
 export type MergeGroupCiContext = typeof MERGE_GROUP_CI_CONTEXTS[number];
 
-export const MERGE_GROUP_CI_PROFILE_PATH = "scripts/ci-local.sh";
+export const MERGE_GROUP_CI_PROFILE_PATH = "scripts/ci-merge-group.sh";
+export const MERGE_GROUP_CI_LOCAL_PROFILE_PATH = "scripts/ci-local.sh";
 export const MERGE_GROUP_CI_BUN_CONFIG_PATH =
   "config/merge-group-bunfig.toml";
-export const MERGE_GROUP_CI_VITEST_CONFIG_PATH =
-  "config/merge-group-vitest.config.ts";
-export const MERGE_GROUP_CI_VITEST_SETUP_PATH =
-  "config/merge-group-vitest.setup.ts";
 
 export const MERGE_GROUP_CI_TRUSTED_FILES = [
-  [MERGE_GROUP_CI_PROFILE_PATH, "ci-local.sh"],
+  [MERGE_GROUP_CI_PROFILE_PATH, "ci-merge-group.sh"],
+  [MERGE_GROUP_CI_LOCAL_PROFILE_PATH, "ci-local.sh"],
   [MERGE_GROUP_CI_BUN_CONFIG_PATH, "bunfig.toml"],
-  [MERGE_GROUP_CI_VITEST_CONFIG_PATH, "vitest.config.ts"],
-  [MERGE_GROUP_CI_VITEST_SETUP_PATH, "vitest.setup.ts"],
 ] as const;
 
 export const MERGE_GROUP_CI_DEFAULT_DEADLINE_MS = 20 * 60_000;

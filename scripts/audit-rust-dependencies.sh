@@ -3,11 +3,18 @@ set -euo pipefail
 
 cargo_audit_bin="${CARGO_AUDIT_BIN:-cargo-audit}"
 lockfile="src-tauri/Cargo.lock"
+run_audit() {
+  if [[ "${BRIAR_TRUSTED_MERGE_GROUP_CI:-}" == "1" ]]; then
+    "$cargo_audit_bin" audit --no-fetch --stale "$@"
+  else
+    "$cargo_audit_bin" audit "$@"
+  fi
+}
 
 # Keep accepted warnings visible before enforcing the exact dated allowlist.
-"$cargo_audit_bin" audit --file "$lockfile"
+run_audit --file "$lockfile"
 
-"$cargo_audit_bin" audit --file "$lockfile" --deny warnings \
+run_audit --file "$lockfile" --deny warnings \
   --ignore RUSTSEC-2024-0370 \
   --ignore RUSTSEC-2024-0411 \
   --ignore RUSTSEC-2024-0412 \
