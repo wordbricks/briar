@@ -62,6 +62,12 @@ type NormalizedHuntEventInput = Omit<
   workflowStage: HuntEventRow["workflow_stage"];
 };
 
+// Event-key replays intentionally compare only these persisted fields with
+// strict equality. Keep this explicit rather than deriving it from Schema: if
+// a field later becomes an object or array, schema-derived equality could
+// silently broaden to structural equality. Data would also change the row and
+// input representation, while Struct.makeEquivalence is only an alias for
+// Equivalence.Struct.
 const comparableHuntEventFields = {
   stage: Equivalence.strictEqual<ComparableHuntEvent["stage"]>(),
   status: Equivalence.strictEqual<ComparableHuntEvent["status"]>(),
