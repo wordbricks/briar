@@ -27,12 +27,24 @@ available to GitHub accounts outside the account that owns the App. Configure:
   starts the PKCE-protected authorization step after the setup callback.
 - Webhook URL: `https://<worker-host>/github/webhooks`
 - Webhook secret: the value of `BRIAR_GITHUB_WEBHOOK_SECRET`
-- Repository permission: **Pull requests — Read-only**
-- Subscribe to event: **Pull request**
+- Repository permissions:
+  - **Pull requests — Read-only**
+  - **Merge queues — Read-only**
+- Subscribe to events:
+  - **Pull request**
+  - **Merge group**
 
 Record the App's **Client ID**, generate a **Client secret**, and record the App
 slug from `https://github.com/apps/<app-slug>`. The App does not need Contents
-write access, an App private key, or a long-lived user or installation token.
+or Commit statuses write access, an App private key, or a long-lived user or
+installation token. Signed webhooks are inbound authority only; the designated
+local Worker uses its existing `gh` login for exact-head enqueue and status
+publication.
+
+Existing installations may require an organization owner to approve the added
+Merge queues permission and event subscription before native batching can be
+enabled. Ordinary pull-request synchronization continues to work while the
+merge-queue profile remains disabled.
 
 GitHub sends a signed `ping` delivery when the webhook is saved. A successful
 configuration receives an HTTP 200 response from Briar.
@@ -137,6 +149,9 @@ newer checkpoint.
 - `closed` with `merged: false` stores closed state and leaves review paused.
 - Only `pull_request`, `action: closed`, and `merged: true` stores merged state
   and evaluates automatic resume.
+- A run whose current revision belongs to an active Briar merge batch remains
+  paused until every original PR in that batch has a signed merged delivery.
+  The existing one-minute reconciliation resumes it after the batch completes.
 - Merge state is stored before resume is attempted. If PR evidence is already
   linked and merge arrives before the run reaches its checkpoint, checkpoint
   creation immediately reconciles the stored state.
