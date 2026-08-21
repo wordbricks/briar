@@ -1,80 +1,11 @@
-
-import { Buffer } from "node:buffer";
-import { existsSync } from "node:fs";
-import {
-  chmod,
-  mkdtemp,
-  mkdir,
-  readFile,
-  rm,
-  writeFile,
-} from "node:fs/promises";
 import { spawn } from "node:child_process";
-import { homedir, platform, tmpdir } from "node:os";
-import { basename, isAbsolute, join, resolve } from "node:path";
-import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
-import packageJson from "../package.json";
-import {
-  autoHuntRequirementKinds,
-  repositoryWorkflowPendingStageId,
-} from "../src/lib/auto-hunt-contract";
-import { decodeStructuredAgentResult } from "../src/lib/agent-result";
-import {
-  agentExecutionCostRecordsFromObservations,
-  agentExecutionMetrics,
-  agentExecutionTokenUsageFromObservations,
-  agentExecutionUsageRecordsFromObservations,
-  createAgentExecutionUsageCollector,
-} from "../src/lib/agent-execution-metrics";
-import type { ModelEffort } from "../src/lib/agent-provider-contract";
-import type { AgentProvider } from "../src/lib/agent-provider";
-import { validateEvidenceImages } from "../src/lib/evidence-images";
-import {
-  decodeOrganizationAgentContextRequestTurn,
-  organizationAgentContextCapability,
-} from "../src/lib/organization-agent-context-contract";
-import {
-  createDetachedTranscriptSequencer,
-  detachedAgentPrompt,
-  detachedChannelReplyPrompt,
-  detachedChannelReplyOutputSchema,
-  detachedIssueReplyPrompt,
-  detachedIssueReplyOutputSchema,
-  detachedProjectAgentPrompt,
-  detachedPayloadDirection,
-  detachedProviderBlockedRunEvent,
-  detachedProviderBlockFromPayload,
-  detachedRunContinuationPrompt,
-  detachedRunDisposition,
-  detachedRunRecoveryPrompt,
-  detachedRunTurnDecision,
-  detachedTranscriptPayload,
-  detachedTranscriptSessionId,
-  parseDetachedIssueReplyResult,
-  parseDetachedJsonResult,
-  runProjectAgentTaskCompletionFlow,
-  shouldPersistDetachedTranscriptPayload,
-  type DetachedAgent,
-} from "./agent-runner";
-import { agentImageAttachments } from "../src-agent/runner-attachments";
-import {
-  assertDetachedProviderTurnSucceeded,
-  detachedProviderTurnFailure,
-  runDetachedProviderTurn,
-} from "./detached-provider-turn";
-import {
-  TranscriptBatcher,
-  type TranscriptBatchEvent,
-} from "./transcript-batcher";
-import {
-  ChannelActivityPublisher,
-  type ChannelActivityCredential,
-} from "./channel-activity-publisher";
-import {
-  HttpRequestError,
-  uploadExecutionMetricsWithCostCompatibility,
-} from "./execution-metrics-upload";
+import { platform } from "node:os";
+import { join } from "node:path";
+import { autoHuntRequirementKinds } from "../src/lib/auto-hunt-contract";
+import { organizationAgentContextCapability } from "../src/lib/organization-agent-context-contract";
+import { runProjectAgentTaskCompletionFlow } from "./agent-runner";
+import { type ChannelActivityCredential } from "./channel-activity-publisher";
+import { HttpRequestError } from "./execution-metrics-upload";
 import {
   inspectWorkflowRequirements,
   workflowRequirementReadinessDetail,
@@ -82,23 +13,12 @@ import {
 import {
   createWorkerDeviceIdentity,
   defaultWorkerLabel,
-  errorDelayMs,
-  issueWorkerSessionDirectory,
   interruptibleSleep,
-  restartInstalledServices,
   runWorkerLoop,
-  serviceDefinition,
-  workerCliPath,
-  workerExecutionPath,
-  writeServiceDefinition,
-  type ClaimedIssue,
-  type WorkerExecutionCheckpoint,
 } from "./worker";
 import {
   claimMergeBatchIfReady,
   executeClaimedMergeBatch,
-  inspectMergeQueueDoctor,
-  mergeQueueProfileFromResponse,
   releaseMergeBatchClaim,
   renewMergeBatchClaim,
   type MergeBatchApi,
@@ -110,52 +30,10 @@ import {
   type WorkerUpdateDirective,
 } from "./worker-update";
 import {
-  allocateAnalysisWorktree,
-  allocateCachedAnalysisWorktree,
-  allocateIssueWorktree,
-  analysisWorktreePath,
-  defaultWorktreeRoot,
-  findExistingIssueWorktree,
-  issueReplyWorkspaceMode,
-  listCompletedWorktrees,
-  listIssueWorktrees,
   maintainIdleAnalysisWorktrees,
-  maintainTerminalIssueWorktree,
-  markCachedAnalysisWorktreeIdle,
   projectWorktreeRoot,
-  recordCompletedWorktree,
-  removeAnalysisWorktree,
-  removeCompletedWorktreeRecord,
-  removeIssueWorktree,
-  resolveBaseRef,
-  samePath,
-  type GitRunner,
-  type IssueWorktree,
-  type WorktreeSettings,
 } from "./worktree";
-import {
-  sameApiEnvironment,
-  selectProjectForApi,
-} from "./config-environment";
-import {
-  channelReplyCompleteRequestBody,
-  collectChannelReplyAttachments,
-  parseChannelReplyAgentResult,
-} from "./channel-reply-attachments";
-import {
-  channelReplyImageDirectory,
-  cleanupChannelReplyImages,
-  downloadChannelReplyImages,
-} from "./channel-reply-images";
-import { cleanupChannelReplyResources } from "./channel-reply-cleanup";
-import { assertChannelReplyWorkspaceScope } from "./channel-reply-scope";
-import {
-  cleanupOrphanedOrganizationAgentWorkspaces,
-  cleanupOrganizationAgentContext,
-  downloadOrganizationAgentContextManifest,
-  hydrateOrganizationAgentContext,
-  prepareOrganizationAgentWorkspace,
-} from "./organization-agent-context";
+import { cleanupOrphanedOrganizationAgentWorkspaces } from "./organization-agent-context";
 import {
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
@@ -163,62 +41,18 @@ import {
 } from "./provider-health";
 import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
 import {
-  configureBrowserSkillGuide,
-  getSkillGuide,
-  skillGuides,
-} from "./skill-guides";
-import {
-  briarIssueUrl,
-  ensureBriarIssueLinkInGithubPullRequest,
-} from "./github-pr";
-import {
-  configErrorLocations,
-  decodeConfig,
-  type Config,
-  type ProjectConfig,
-} from "./config-contract";
-import {
-  decodeChannelMessagesInput,
-  decodeCreateIssueInput,
-  decodeDashboardRuns,
-  decodeIsoDateTimeWithOffset,
-  decodeRunEvidenceInput,
-  decodeUuid,
-  decodeVelenEnvelope,
-  decodeWorkflowStageId,
-  decodeWorkspaceMode,
-  httpErrorMessage,
-  validateRecoveryRunInput,
-  validateResumeRunInput,
-  validateReworkRunInput,
-  validateRunEventInput,
-  validateWorkflowTransitionInput,
-} from "./command-contract";
-import {
   decodeClaimedChannelReply,
   decodeClaimedIssueReply,
   decodeClaimedMergeBatch,
   decodeClaimedProjectAgentTask,
   decodeClaimedRun,
-  decodeDetachedAgentEffortOption,
-  decodeDetachedAgentSkillsOption,
-  decodeQueuedIssue,
   decodeWorkerBinding,
   decodeWorkerRegistration,
-  type ClaimedChannelReply,
-  type ClaimedIssueReply,
-  type ClaimedProjectAgentTask,
-  type ClaimedRun,
-  type DetachedAgentClaim,
-  type DetachedAgentSkill,
-  type QueuedAttachment,
   type WorkerRegistration,
 } from "./worker-claim-contract";
-
 import {
   configDirectory,
   cliVersion,
-  values,
   value,
   has,
   loadConfig,
@@ -1075,190 +909,10 @@ async function workerCommand() {
   console.log(JSON.stringify(result));
 }
 
-async function workerStatus() {
-  const config = await loadConfig();
-  const project = value("--project")
-    ? config.projects.find((candidate) => candidate.id === value("--project"))
-    : await currentProject(config);
-  if (!project) {
-    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
-  }
-  const definition = serviceDefinition({
-    projectId: project.id,
-    briarBinary: process.execPath,
-    workingDirectory: project.repositoryPath,
-  });
-  console.log(
-    JSON.stringify(
-      {
-        projectId: project.id,
-        service: definition.label,
-        unitPath: definition.path,
-        logPath: definition.logPath,
-        registered: Boolean(project.executionWorker),
-        workerId: project.executionWorker?.workerId ?? null,
-        deviceId: project.executionWorker?.deviceId ?? null,
-        label: project.executionWorker?.label ?? null,
-        maxConcurrentSessions:
-          project.executionWorker?.maxConcurrentSessions ?? null,
-      },
-      null,
-      2,
-    ),
-  );
-}
-
-async function workerRestartServices() {
-  const config = await loadConfig();
-  const projects = config.projects.filter((project) => {
-    if (!project.executionWorker) return false;
-    const definition = serviceDefinition({
-      projectId: project.id,
-      briarBinary: process.execPath,
-      workingDirectory: project.repositoryPath,
-    });
-    return existsSync(definition.path);
-  });
-  const handoffs = new Map<
-    string,
-    { workerId: string; token: string; requestId: string }
-  >();
-  for (const project of projects) {
-    const registered = project.executionWorker;
-    if (!registered || handoffs.has(registered.workerId)) continue;
-    const prepared = await request<{
-      requestId: string;
-      targetVersion: string;
-      handoffState: string;
-      activeWorkCount: number;
-      ready: boolean;
-    }>(
-      config.apiUrl,
-      `/workers/${registered.workerId}/update-handoff/prepare`,
-      registered.token,
-      {
-        method: "POST",
-        body: JSON.stringify({ targetVersion: cliVersion }),
-      },
-    );
-    handoffs.set(registered.workerId, {
-      workerId: registered.workerId,
-      token: registered.token,
-      requestId: prepared.requestId,
-    });
-  }
-
-  const deadline = Date.now() + 30_000;
-  while (true) {
-    let ready = true;
-    for (const handoff of handoffs.values()) {
-      const status = await request<{
-        handoffState: string;
-        activeWorkCount: number;
-        ready: boolean;
-        handoffError?: string | null;
-      }>(
-        config.apiUrl,
-        `/workers/${handoff.workerId}/update-handoff/status?requestId=${encodeURIComponent(handoff.requestId)}`,
-        handoff.token,
-      );
-      if (status.handoffState === "failed") {
-        throw new Error(
-          `Worker update handoff failed: ${status.handoffError ?? "unknown reason"}`,
-        );
-      }
-      if (!status.ready || status.activeWorkCount > 0) ready = false;
-    }
-    if (ready) break;
-    if (Date.now() >= deadline) {
-      throw new Error(
-        "Worker update handoff timed out after 30 seconds; services were not restarted so the old lease remains the safe fallback.",
-      );
-    }
-    await Bun.sleep(500);
-  }
-
-  const definitions = config.projects
-    .filter((project) => Boolean(project.executionWorker))
-    .map((project) =>
-      serviceDefinition({
-        projectId: project.id,
-        briarBinary: process.execPath,
-        workingDirectory: project.repositoryPath,
-      }),
-    );
-  const result = restartInstalledServices(definitions, {
-    exists: existsSync,
-    run: (command) => {
-      const spawned = Bun.spawnSync({
-        cmd: command,
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-      return {
-        success: spawned.success,
-        error: new TextDecoder().decode(spawned.stderr).trim(),
-      };
-    },
-  });
-  console.log(JSON.stringify(result));
-}
-
-async function workerService(action: "install" | "uninstall") {
-  const config = await loadConfig();
-  const project = value("--project")
-    ? config.projects.find((candidate) => candidate.id === value("--project"))
-    : await currentProject(config);
-  if (!project) {
-    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
-  }
-  if (action === "install" && !project.executionWorker) {
-    throw new Error(
-      "서비스를 설치하기 전에 `briar worker register`를 실행하세요.",
-    );
-  }
-  const briarBinary = value("--briar-binary") ?? process.execPath;
-  const runtimeBinary = value("--runtime-binary");
-  const cliScript = value("--cli-script");
-  const definition = serviceDefinition({
-    projectId: project.id,
-    briarBinary,
-    runtimeBinary,
-    cliScript,
-    workingDirectory: project.repositoryPath,
-  });
-  const command =
-    action === "install" ? definition.enableCommand : definition.disableCommand;
-  if (action === "install") {
-    await writeServiceDefinition(definition);
-  }
-  const argv =
-    command[0] === "launchctl"
-      ? [...command, definition.path]
-      : command;
-  const spawned = Bun.spawnSync({ cmd: argv, stdout: "pipe", stderr: "pipe" });
-  if (!spawned.success) {
-    throw new Error(
-      `서비스 ${action === "install" ? "설치" : "제거"}에 실패했습니다: ${new TextDecoder().decode(spawned.stderr).trim()}`,
-    );
-  }
-  console.log(
-    JSON.stringify({
-      action,
-      service: definition.label,
-      unitPath: definition.path,
-      logPath: definition.logPath,
-    }),
-  );
-}
-
 export {
   workerRegisterCommand,
   workerUnregisterCommand,
   workerSyncLabelCommand,
   workerCommand,
-  workerStatus,
-  workerRestartServices,
-  workerService,
 };
 

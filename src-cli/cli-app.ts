@@ -37,12 +37,14 @@ import {
 import {
   workerCommand,
   workerRegisterCommand,
-  workerRestartServices,
-  workerService,
-  workerStatus,
   workerSyncLabelCommand,
   workerUnregisterCommand,
 } from "./worker-commands";
+import {
+  workerRestartServices,
+  workerService,
+  workerStatus,
+} from "./worker-service-commands";
 import {
   configureMergeQueueCommand,
   listSkillGuides,

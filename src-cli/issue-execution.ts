@@ -1,25 +1,11 @@
-
 import { Buffer } from "node:buffer";
-import { existsSync } from "node:fs";
 import {
-  chmod,
-  mkdtemp,
-  mkdir,
   readFile,
   rm,
-  writeFile,
 } from "node:fs/promises";
-import { spawn } from "node:child_process";
-import { homedir, platform, tmpdir } from "node:os";
-import { basename, isAbsolute, join, resolve } from "node:path";
+import { join } from "node:path";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
-import packageJson from "../package.json";
-import {
-  autoHuntRequirementKinds,
-  repositoryWorkflowPendingStageId,
-} from "../src/lib/auto-hunt-contract";
-import { decodeStructuredAgentResult } from "../src/lib/agent-result";
 import {
   agentExecutionCostRecordsFromObservations,
   agentExecutionMetrics,
@@ -27,21 +13,11 @@ import {
   agentExecutionUsageRecordsFromObservations,
   createAgentExecutionUsageCollector,
 } from "../src/lib/agent-execution-metrics";
-import type { ModelEffort } from "../src/lib/agent-provider-contract";
-import type { AgentProvider } from "../src/lib/agent-provider";
-import { validateEvidenceImages } from "../src/lib/evidence-images";
-import {
-  decodeOrganizationAgentContextRequestTurn,
-  organizationAgentContextCapability,
-} from "../src/lib/organization-agent-context-contract";
+import { type ModelEffort } from "../src/lib/agent-provider-contract";
+import { type AgentProvider } from "../src/lib/agent-provider";
 import {
   createDetachedTranscriptSequencer,
   detachedAgentPrompt,
-  detachedChannelReplyPrompt,
-  detachedChannelReplyOutputSchema,
-  detachedIssueReplyPrompt,
-  detachedIssueReplyOutputSchema,
-  detachedProjectAgentPrompt,
   detachedPayloadDirection,
   detachedProviderBlockedRunEvent,
   detachedProviderBlockFromPayload,
@@ -51,170 +27,42 @@ import {
   detachedRunTurnDecision,
   detachedTranscriptPayload,
   detachedTranscriptSessionId,
-  parseDetachedIssueReplyResult,
-  parseDetachedJsonResult,
-  runProjectAgentTaskCompletionFlow,
-  shouldPersistDetachedTranscriptPayload,
   type DetachedAgent,
 } from "./agent-runner";
 import { agentImageAttachments } from "../src-agent/runner-attachments";
 import {
-  assertDetachedProviderTurnSucceeded,
   detachedProviderTurnFailure,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
+import { TranscriptBatcher } from "./transcript-batcher";
+import { ChannelActivityPublisher } from "./channel-activity-publisher";
+import { uploadExecutionMetricsWithCostCompatibility } from "./execution-metrics-upload";
 import {
-  TranscriptBatcher,
-  type TranscriptBatchEvent,
-} from "./transcript-batcher";
-import {
-  ChannelActivityPublisher,
-  type ChannelActivityCredential,
-} from "./channel-activity-publisher";
-import {
-  HttpRequestError,
-  uploadExecutionMetricsWithCostCompatibility,
-} from "./execution-metrics-upload";
-import {
-  inspectWorkflowRequirements,
-  workflowRequirementReadinessDetail,
-} from "./workflow-requirements";
-import {
-  createWorkerDeviceIdentity,
-  defaultWorkerLabel,
   errorDelayMs,
   issueWorkerSessionDirectory,
   interruptibleSleep,
-  restartInstalledServices,
-  runWorkerLoop,
-  serviceDefinition,
   workerCliPath,
   workerExecutionPath,
-  writeServiceDefinition,
-  type ClaimedIssue,
   type WorkerExecutionCheckpoint,
 } from "./worker";
 import {
-  claimMergeBatchIfReady,
-  executeClaimedMergeBatch,
-  inspectMergeQueueDoctor,
-  mergeQueueProfileFromResponse,
-  releaseMergeBatchClaim,
-  renewMergeBatchClaim,
-  type MergeBatchApi,
-} from "./merge-queue";
-import { resolveMergeGroupContainerRuntime } from "./merge-group-validation";
-import {
-  supportsRemoteWorkerUpdates,
-  workerUpdateDeepLink,
-  type WorkerUpdateDirective,
-} from "./worker-update";
-import {
-  allocateAnalysisWorktree,
-  allocateCachedAnalysisWorktree,
-  allocateIssueWorktree,
-  analysisWorktreePath,
-  defaultWorktreeRoot,
-  findExistingIssueWorktree,
-  issueReplyWorkspaceMode,
-  listCompletedWorktrees,
-  listIssueWorktrees,
-  maintainIdleAnalysisWorktrees,
   maintainTerminalIssueWorktree,
-  markCachedAnalysisWorktreeIdle,
   projectWorktreeRoot,
   recordCompletedWorktree,
-  removeAnalysisWorktree,
-  removeCompletedWorktreeRecord,
-  removeIssueWorktree,
-  resolveBaseRef,
-  samePath,
-  type GitRunner,
-  type IssueWorktree,
-  type WorktreeSettings,
 } from "./worktree";
+import { briarIssueUrl } from "./github-pr";
 import {
-  sameApiEnvironment,
-  selectProjectForApi,
-} from "./config-environment";
-import {
-  channelReplyCompleteRequestBody,
-  collectChannelReplyAttachments,
-  parseChannelReplyAgentResult,
-} from "./channel-reply-attachments";
-import {
-  channelReplyImageDirectory,
-  cleanupChannelReplyImages,
-  downloadChannelReplyImages,
-} from "./channel-reply-images";
-import { cleanupChannelReplyResources } from "./channel-reply-cleanup";
-import { assertChannelReplyWorkspaceScope } from "./channel-reply-scope";
-import {
-  cleanupOrphanedOrganizationAgentWorkspaces,
-  cleanupOrganizationAgentContext,
-  downloadOrganizationAgentContextManifest,
-  hydrateOrganizationAgentContext,
-  prepareOrganizationAgentWorkspace,
-} from "./organization-agent-context";
-import {
-  healthyWorkerProviders,
-  inspectWorkerProviderHealth,
-  providerHealthReadinessDetail,
-} from "./provider-health";
-import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
-import {
-  configureBrowserSkillGuide,
-  getSkillGuide,
-  skillGuides,
-} from "./skill-guides";
-import {
-  briarIssueUrl,
-  ensureBriarIssueLinkInGithubPullRequest,
-} from "./github-pr";
-import {
-  configErrorLocations,
   decodeConfig,
   type Config,
   type ProjectConfig,
 } from "./config-contract";
 import {
-  decodeChannelMessagesInput,
-  decodeCreateIssueInput,
-  decodeDashboardRuns,
-  decodeIsoDateTimeWithOffset,
-  decodeRunEvidenceInput,
-  decodeUuid,
-  decodeVelenEnvelope,
-  decodeWorkflowStageId,
-  decodeWorkspaceMode,
-  httpErrorMessage,
-  validateRecoveryRunInput,
-  validateResumeRunInput,
-  validateReworkRunInput,
-  validateRunEventInput,
-  validateWorkflowTransitionInput,
-} from "./command-contract";
-import {
-  decodeClaimedChannelReply,
-  decodeClaimedIssueReply,
-  decodeClaimedMergeBatch,
-  decodeClaimedProjectAgentTask,
-  decodeClaimedRun,
   decodeDetachedAgentEffortOption,
   decodeDetachedAgentSkillsOption,
-  decodeQueuedIssue,
-  decodeWorkerBinding,
-  decodeWorkerRegistration,
-  type ClaimedChannelReply,
-  type ClaimedIssueReply,
-  type ClaimedProjectAgentTask,
   type ClaimedRun,
   type DetachedAgentClaim,
   type DetachedAgentSkill,
-  type QueuedAttachment,
-  type WorkerRegistration,
 } from "./worker-claim-contract";
-
 import {
   providerExecutionEnvironment,
   configDirectory,
