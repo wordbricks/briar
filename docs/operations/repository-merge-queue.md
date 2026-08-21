@@ -20,6 +20,8 @@ The coordinator enforces these boundaries:
 - `ci_qa` completion and the current exact PR identity make a candidate ready;
 - a force-push, draft change, close, base retarget, or run revision change
   invalidates a mutable candidate and blocks an already-frozen cohort;
+- collection stays open until five minutes after the latest ready candidate;
+  reaching the five-PR limit freezes the cohort immediately;
 - one transaction freezes at most five candidates with stable ordinals;
 - enqueue uses GitHub GraphQL `expectedHeadOid` and `jump: false`, followed by
   an exact identity readback;
@@ -92,7 +94,7 @@ request review. Roll out in this order during an explicit maintenance window:
 briar merge-queue configure --disable
 briar merge-queue doctor --json
 briar merge-queue configure --enable \
-  --quiet-window-ms 30000 --max-batch-size 5
+  --quiet-window-ms 300000 --max-batch-size 5
 ```
 
 `doctor` is read-only. It validates the audited local runtime, local `gh`
@@ -108,7 +110,7 @@ GET /projects/<project-id>/merge-queue-profile
 PUT /projects/<project-id>/merge-queue-profile
 {
   "enabled": false,
-  "quietWindowMs": 30000,
+  "quietWindowMs": 300000,
   "maxBatchSize": 5
 }
 ```

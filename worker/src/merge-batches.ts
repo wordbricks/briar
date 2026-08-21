@@ -3,7 +3,7 @@ import {
   type MergeGroupCiContext,
 } from "../../src/lib/merge-group-validation-contract";
 
-export const DEFAULT_MERGE_BATCH_QUIET_WINDOW_MS = 30_000;
+export const DEFAULT_MERGE_BATCH_QUIET_WINDOW_MS = 5 * 60_000;
 export const MAX_MERGE_BATCH_SIZE = 5;
 
 export type MergeBatchState =
@@ -505,6 +505,59 @@ async function ensureCollectingBatch(
   ).bind(lane.repository_id, lane.base_branch).first<MergeBatchRow>();
 }
 
+/** Keep collection open until the lane has been quiet since its latest PR. */
+async function extendCollectingBatchQuietWindow(
+  db: D1Database,
+  projectId: string,
+  observedAt: string,
+) {
+  const collection = await db.prepare(
+    `select batch.id, batch.quiet_until, profile.quiet_window_ms,
+            max(candidate.ready_at) as latest_ready_at
+     from briar_merge_batches batch
+     join briar_merge_queue_profiles profile
+       on profile.project_id = batch.project_id
+      and profile.repository_id = batch.repository_id
+      and profile.repository = batch.repository
+      and profile.base_branch = batch.base_branch
+      and profile.enabled = 1
+     join briar_merge_batch_candidates candidate
+       on candidate.project_id = batch.project_id
+      and candidate.repository_id = batch.repository_id
+      and candidate.base_branch = batch.base_branch
+      and candidate.batch_id is null and candidate.state = 'ready'
+     where batch.project_id = ? and batch.state = 'collecting'
+       and ${currentReadyCandidate("candidate")}
+       and ${completeRunCandidateSet("candidate")}
+     group by batch.id, batch.quiet_until, profile.quiet_window_ms
+     limit 1`,
+  ).bind(projectId).first<{
+    id: string;
+    quiet_until: string;
+    quiet_window_ms: number;
+    latest_ready_at: string;
+  }>();
+  if (!collection) return;
+
+  const quietUntil = addMilliseconds(
+    collection.latest_ready_at,
+    collection.quiet_window_ms,
+  );
+  if (Date.parse(quietUntil) <= Date.parse(collection.quiet_until)) return;
+  await db.prepare(
+    `update briar_merge_batches
+     set quiet_until = ?, updated_at = ?
+     where id = ? and project_id = ? and state = 'collecting'
+       and julianday(quiet_until) < julianday(?)`,
+  ).bind(
+    quietUntil,
+    observedAt,
+    collection.id,
+    projectId,
+    quietUntil,
+  ).run();
+}
+
 /**
  * Invalidates mutable candidates and blocks immutable cohorts on generation
  * drift. A blocked cohort intentionally retains the global repository lane.
@@ -787,6 +840,7 @@ export async function registerReadyMergeCandidates(
     retireDuplicateReadyCandidatesStatement(db, input.projectId, input.readyAt),
   ]);
   await ensureCollectingBatch(db, input.projectId, input.readyAt);
+  await extendCollectingBatchQuietWindow(db, input.projectId, input.readyAt);
   const registered = await db.prepare(
     `select * from briar_merge_batch_candidates
      where project_id = ? and run_id = ? and attempt = ? and revision = ?
@@ -807,6 +861,11 @@ export async function sealNextMergeBatch(
 ): Promise<MergeBatchWithMembers | null> {
   await reconcileReadyMergeCandidates(db, input);
   await ensureCollectingBatch(db, input.projectId, input.observedAt);
+  await extendCollectingBatchQuietWindow(
+    db,
+    input.projectId,
+    input.observedAt,
+  );
 
   const collecting = await db.prepare(
     `select batch.*, min(profile.max_batch_size, ?) as seal_limit
