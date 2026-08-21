@@ -1018,6 +1018,16 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         "utf8",
       ),
     );
+    for (const migration of [
+      "0121_repository_merge_batches.sql",
+      "0122_remove_repository_merge_batches.sql",
+      "0123_native_merge_queue_coordinator.sql",
+    ]) {
+      await executeSql(
+        db,
+        await readFile(resolve("migrations", migration), "utf8"),
+      );
+    }
     await executeSql(
       db,
       `alter table briar_project_agent_sessions
