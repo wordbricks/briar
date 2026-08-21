@@ -99,6 +99,10 @@ const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
     alreadyResumed: 0,
     deferred: 0,
   })),
+  reconcileManagedComputers: vi.fn(async () => ({
+    skipped: true as const,
+    reason: "not_configured" as const,
+  })),
 });
 
 const scheduledController = (cron: string): ScheduledController => ({

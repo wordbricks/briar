@@ -1,0 +1,21 @@
+[Unit]
+Description=Enroll a Briar managed computer once
+After=network-online.target amazon-ssm-agent.service
+Wants=network-online.target amazon-ssm-agent.service
+StartLimitIntervalSec=1800
+StartLimitBurst=60
+
+[Service]
+Type=oneshot
+ExecStart=/opt/briar/bin/briar-managed-enroll
+Restart=on-failure
+RestartSec=10
+RestartPreventExitStatus=1
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/briar
+
+[Install]
+WantedBy=multi-user.target

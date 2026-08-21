@@ -353,9 +353,9 @@ describe("ProjectSettings", () => {
 
     await openSection("execution");
     expect(container.textContent).toContain("프로젝트 실행 정책");
-    expect(container.textContent).toContain("모든 연결된 Worker 허용");
+    expect(container.textContent).toContain("연결된 모든 컴퓨터 허용");
     expect(container.textContent).toContain(
-      "조직 설정 → Workers에서 관리합니다.",
+      "조직 설정 → 컴퓨터에서 관리합니다.",
     );
 
     await openSection("integrations");

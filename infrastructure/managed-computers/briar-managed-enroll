@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_dir=/var/lib/briar
+config_file="$state_dir/managed-enrollment.json"
+identity_file="$state_dir/instance-identity.json"
+signature_file="$state_dir/instance-identity-signature"
+credential_file="$state_dir/worker-credential.json"
+
+test -r "$config_file"
+install -d -m 0700 "$state_dir"
+
+imds_token="$(curl --fail --silent --show-error --request PUT \
+  --header 'X-aws-ec2-metadata-token-ttl-seconds: 300' \
+  http://169.254.169.254/latest/api/token)"
+curl --fail --silent --show-error \
+  --header "X-aws-ec2-metadata-token: $imds_token" \
+  http://169.254.169.254/latest/dynamic/instance-identity/document \
+  > "$identity_file"
+curl --fail --silent --show-error \
+  --header "X-aws-ec2-metadata-token: $imds_token" \
+  http://169.254.169.254/latest/dynamic/instance-identity/signature \
+  > "$signature_file"
+unset imds_token
+chmod 0600 "$config_file" "$identity_file" "$signature_file"
+
+BRIAR_VERSION="${BRIAR_VERSION:-unknown}" /opt/briar/bin/bun --eval '
+  const fs = require("node:fs");
+  const state = "/var/lib/briar";
+  const config = JSON.parse(fs.readFileSync(`${state}/managed-enrollment.json`, "utf8"));
+  const identityDocument = fs.readFileSync(`${state}/instance-identity.json`, "utf8");
+  const identitySignature = fs.readFileSync(`${state}/instance-identity-signature`, "utf8");
+  const response = await fetch(
+    `${config.apiOrigin}/managed-computers/${config.managedComputerId}/enroll`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nonce: config.nonce,
+        identityDocument,
+        identitySignature,
+        briarVersion: process.env.BRIAR_VERSION ?? "unknown",
+      }),
+    },
+  );
+  if (!response.ok) process.exit(response.status === 409 ? 75 : 1);
+  const enrollment = await response.json();
+  fs.writeFileSync(`${state}/worker-credential.json`, JSON.stringify(enrollment), {
+    mode: 0o600,
+  });
+'
+
+rm -f "$config_file" "$identity_file" "$signature_file"
+systemctl enable --now briar-worker.service

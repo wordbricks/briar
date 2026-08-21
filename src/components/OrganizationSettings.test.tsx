@@ -246,7 +246,7 @@ describe("OrganizationSettings", () => {
     ).toContain("멤버 및 초대");
     expect(
       container.querySelector('[aria-label="조직 설정 메뉴"]')?.textContent,
-    ).toContain("Workers");
+    ).toContain("컴퓨터");
 
     const nameInput = container.querySelector<HTMLInputElement>(
       "#organization-name",
