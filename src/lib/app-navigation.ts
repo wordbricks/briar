@@ -3,6 +3,7 @@ export type ActivePage =
   | "issues"
   | "agents"
   | "channels"
+  | "dms"
   | "schedule"
   | "inbox"
   | "organization-create"

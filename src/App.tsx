@@ -17,6 +17,7 @@ import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import { Channels } from "./components/Channels";
+import { DirectMessages } from "./components/DirectMessages";
 import {
   CompanionChannels,
   type CompanionChannelCache,
@@ -752,7 +753,11 @@ export function App() {
       startDesktopChannelTransition(channelId);
       setActiveChannelId(channelId);
       markOrganizationChannelRead(channelId);
-      navigateToPage("channels");
+      navigateToPage(
+        organizationChannels.find((channel) => channel.id === channelId)?.kind === "dm"
+          ? "dms"
+          : "channels",
+      );
     },
     [
       briar.activeOrganizationId,
@@ -891,7 +896,15 @@ export function App() {
       setActiveChannelId(pendingBriarLink.channelId);
       markOrganizationChannelRead(pendingBriarLink.channelId);
       if (briar.companionMode) setCompanionPage("home");
-      else navigateToPage("channels");
+      else {
+        navigateToPage(
+          organizationChannels.find(
+              (channel) => channel.id === pendingBriarLink.channelId,
+            )?.kind === "dm"
+            ? "dms"
+            : "channels",
+        );
+      }
       setPendingBriarLink(null);
       return;
     }
@@ -934,6 +947,7 @@ export function App() {
     markOrganizationChannelRead,
     navigateToIssue,
     navigateToPage,
+    organizationChannels,
     pendingBriarLink,
   ]);
   useEffect(() => {
@@ -981,7 +995,15 @@ export function App() {
       setActiveChannelId(pendingInboxNotificationTarget.targetId);
       markOrganizationChannelRead(pendingInboxNotificationTarget.targetId);
       if (briar.companionMode) setCompanionPage("home");
-      else navigateToPage("channels");
+      else {
+        navigateToPage(
+          organizationChannels.find(
+              (channel) => channel.id === pendingInboxNotificationTarget.targetId,
+            )?.kind === "dm"
+            ? "dms"
+            : "channels",
+        );
+      }
     } else {
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
@@ -1000,6 +1022,7 @@ export function App() {
     markOrganizationChannelRead,
     navigateToIssue,
     navigateToPage,
+    organizationChannels,
     pendingInboxNotificationTarget,
   ]);
   useMobileNavigationGestures(briar.companionMode);
@@ -1043,9 +1066,17 @@ export function App() {
       );
   const visibleOrganizationChannels = projectWindowProjectId
     ? organizationChannels.filter(
-        (channel) => channel.defaultProjectId === projectWindowProjectId,
+        (channel) =>
+          channel.kind !== "dm" &&
+          channel.defaultProjectId === projectWindowProjectId,
       )
-    : organizationChannels;
+    : organizationChannels.filter((channel) => channel.kind !== "dm");
+  const organizationDirectMessages = projectWindowProjectId
+    ? []
+    : organizationChannels.filter((channel) => channel.kind === "dm");
+  const unreadDirectMessageCount = organizationDirectMessages.filter(
+    channelHasUnread,
+  ).length;
   const visibleOrganizations = projectWindowProjectId
     ? projectWindowProject?.organizationId
       ? briar.organizations.filter(
@@ -1809,6 +1840,15 @@ export function App() {
             onLobbyOpen={() => navigateToPage("lobby")}
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
+            onDmsOpen={() => {
+              const activeIsDirectMessage = organizationDirectMessages.some(
+                (channel) => channel.id === activeChannelId,
+              );
+              if (!activeIsDirectMessage) {
+                setActiveChannelId(organizationDirectMessages[0]?.id ?? null);
+              }
+              navigateToPage("dms");
+            }}
             onChannelCreate={
               briar.activeOrganizationId && briar.token
                 ? createOrganizationChannel
@@ -1872,6 +1912,7 @@ export function App() {
             sessions={autoHunt.sessions}
             token={briar.token}
             unreadInboxCount={visibleInboxUnreadCount}
+            unreadDmCount={unreadDirectMessageCount}
             user={briar.user}
           />
         ) : null}
@@ -1978,6 +2019,43 @@ export function App() {
             projects={visibleProjects}
             token={briar.token ?? ""}
             userId={briar.user.id}
+          />
+        ) : activePage === "dms" &&
+          !projectWindowProjectId &&
+          briar.activeOrganizationId &&
+          briar.token ? (
+          <DirectMessages
+            activeChannelId={activeChannelId}
+            channelCatalogCursor={
+              channelCatalogSnapshot?.organizationId === briar.activeOrganizationId
+                ? channelCatalogSnapshot.cursor
+                : null
+            }
+            channelInboxSyncSignal={channelInboxSyncSignal}
+            channels={organizationDirectMessages}
+            currentUserId={briar.user?.id ?? null}
+            onChannelSelect={setActiveChannelId}
+            onChannelsChange={setOrganizationChannels}
+            onCreateAgent={() => {
+              setSettingsTarget({
+                scope: "organization",
+                organizationId: briar.activeOrganizationId!,
+                section: "agents",
+              });
+              setIsSidebarOpen(true);
+              navigateToPage("settings");
+            }}
+            onIssueCreated={async (projectId, runId) => {
+              await briar.ensureProjectSelected(projectId);
+              setRequestedRunId(runId);
+              navigateToIssue(runId);
+            }}
+            onSkillSessionAccepted={autoHunt.adoptRemoteSession}
+            onViewingChannelChange={setViewingChannelId}
+            organizationId={briar.activeOrganizationId}
+            organizationName={activeOrganization?.name}
+            projects={activeOrganizationProjects}
+            token={briar.token}
           />
         ) : activePage === "inbox" ? (
           <div
