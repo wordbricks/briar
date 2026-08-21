@@ -952,6 +952,13 @@ describe("conversational Agent Skill execution approval", () => {
         body: JSON.stringify({
           projectId,
           sessionId: taskId,
+          // Worker v1.2.139 sent the direct-task UUID in runId even though
+          // direct Project Agent tasks are not Hunt runs. Keep this legacy
+          // field in the regression payload to verify server compatibility.
+          runId: taskId,
+          workType: "projectAgentTask",
+          workId: taskId,
+          claimToken: work.claimToken,
           workerId,
           agentProvider: "codex",
           events: [{

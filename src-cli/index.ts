@@ -2279,7 +2279,6 @@ async function runClaimedProjectAgentTask(
   const transcriptEnvelope = {
     projectId: project.id,
     sessionId: task.workId,
-    runId: task.runId,
     workType: "projectAgentTask" as const,
     workId: task.workId,
     claimToken: task.claimToken,

@@ -12283,6 +12283,13 @@ async function route(
   if (pathname === "/transcripts" && request.method === "POST") {
     const input = await readTranscriptRequest(request);
     const recordedAt = new Date().toISOString();
+    // Direct Project Agent tasks use their task UUID as the transcript session
+    // key, but that UUID is not a Hunt run. Older Workers included it in the
+    // compatibility runId field, so normalize it before run authorization and
+    // persistence instead of rejecting otherwise valid task transcripts.
+    const transcriptRunId = input.workType === "projectAgentTask"
+      ? null
+      : input.runId ?? null;
     let authenticatedWorkerId: string | null = null;
     let authenticatedWorkerDeviceId: string | null = null;
     let authenticatedWorkerOrganizationId: string | null = null;
@@ -12325,8 +12332,9 @@ async function route(
           throw new HttpError(409, "Execution attempt does not match runAttempt");
         }
       } else if (
-        input.runId &&
-        (await requireRunExecutionProject(db, request, input.runId)) !== projectId
+        transcriptRunId &&
+        (await requireRunExecutionProject(db, request, transcriptRunId)) !==
+          projectId
       ) {
         throw new HttpError(403, "Run is not assigned to this worker");
       }
@@ -12483,7 +12491,7 @@ async function route(
       : 0;
     const result = await ingestAgentTranscript(db, env.ARCHIVES, projectId, {
       sessionId: input.sessionId,
-      runId: input.runId ?? null,
+      runId: transcriptRunId,
       workerId: authenticatedWorkerId ?? input.workerId ?? null,
       agentProvider: input.agentProvider,
       events: input.events,
