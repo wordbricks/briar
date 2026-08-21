@@ -167,6 +167,7 @@ export type RunPullRequestRow = {
   draft: number | null;
   head_sha: string | null;
   base_sha: string | null;
+  base_branch: string | null;
   merge_commit_sha: string | null;
   opened_at: string | null;
   closed_at: string | null;
@@ -190,6 +191,7 @@ export type GithubPullRequestSyncInput = {
   draft: boolean;
   headSha: string;
   baseSha: string;
+  baseBranch: string;
   mergeCommitSha: string | null;
   openedAt: string;
   closedAt: string | null;
@@ -11559,10 +11561,11 @@ export async function syncGithubPullRequest(
       `insert into briar_github_pull_requests (
          repository_id, pull_request_number, installation_id, repository,
          pull_request_id, pull_request_node_id, url, state, draft,
-         head_sha, base_sha, merge_commit_sha, opened_at, closed_at, merged_at,
+         head_sha, base_sha, base_branch, merge_commit_sha,
+         opened_at, closed_at, merged_at,
          provider_updated_at, last_delivery_id, briar_issue_links_json,
          created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        on conflict(repository_id, pull_request_number) do update set
          installation_id = excluded.installation_id,
          repository = excluded.repository,
@@ -11573,6 +11576,7 @@ export async function syncGithubPullRequest(
          draft = excluded.draft,
          head_sha = excluded.head_sha,
          base_sha = excluded.base_sha,
+         base_branch = excluded.base_branch,
          merge_commit_sha = excluded.merge_commit_sha,
          opened_at = excluded.opened_at,
          closed_at = excluded.closed_at,
@@ -11610,6 +11614,7 @@ export async function syncGithubPullRequest(
       input.draft ? 1 : 0,
       input.headSha,
       input.baseSha,
+      input.baseBranch,
       input.mergeCommitSha,
       input.openedAt,
       input.closedAt,
@@ -11642,7 +11647,7 @@ export async function syncGithubPullRequest(
          set installation_id = ?, repository_id = ?, repository = ?, url = ?,
              pull_request_id = ?, pull_request_node_id = ?,
              pull_request_number = ?, state = ?, draft = ?,
-             head_sha = ?, base_sha = ?, merge_commit_sha = ?,
+             head_sha = ?, base_sha = ?, base_branch = ?, merge_commit_sha = ?,
              opened_at = ?, closed_at = ?, merged_at = ?,
              provider_updated_at = ?, last_delivery_id = ?, updated_at = ?
          where run_id = ? and project_id = ? and attempt = ? and revision = ?
@@ -11673,6 +11678,7 @@ export async function syncGithubPullRequest(
         input.draft ? 1 : 0,
         input.headSha,
         input.baseSha,
+        input.baseBranch,
         input.mergeCommitSha,
         input.openedAt,
         input.closedAt,
@@ -11878,7 +11884,7 @@ export async function recordRunEvidence(
            project_id, run_id, attempt, revision, revision_started_at, url,
            installation_id, repository_id, repository,
            pull_request_id, pull_request_node_id, pull_request_number,
-           state, draft, head_sha, base_sha, merge_commit_sha,
+           state, draft, head_sha, base_sha, base_branch, merge_commit_sha,
            opened_at, closed_at, merged_at, provider_updated_at,
            last_delivery_id, created_at, updated_at
          )
@@ -11888,7 +11894,7 @@ export async function recordRunEvidence(
                 ?, snapshot.installation_id,
                 ?, ?, ?, ?, ?,
                 coalesce(snapshot.state, 'unknown'), snapshot.draft,
-                snapshot.head_sha, snapshot.base_sha,
+                snapshot.head_sha, snapshot.base_sha, snapshot.base_branch,
                 snapshot.merge_commit_sha, snapshot.opened_at,
                 snapshot.closed_at, snapshot.merged_at,
                 snapshot.provider_updated_at, snapshot.last_delivery_id,
@@ -11949,6 +11955,7 @@ export async function recordRunEvidence(
            draft = excluded.draft,
            head_sha = excluded.head_sha,
            base_sha = excluded.base_sha,
+           base_branch = excluded.base_branch,
            merge_commit_sha = excluded.merge_commit_sha,
            opened_at = excluded.opened_at,
            closed_at = excluded.closed_at,

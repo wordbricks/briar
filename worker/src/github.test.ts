@@ -48,7 +48,7 @@ function pullRequestPayload(input: {
       merge_commit_sha: input.merged ? "c".repeat(40) : null,
       body: input.body ?? "No Briar link yet",
       head: { sha: "a".repeat(40) },
-      base: { sha: "b".repeat(40) },
+      base: { sha: "b".repeat(40), ref: "main" },
       merged_at: input.merged ? "2026-08-04T09:40:00Z" : null,
       closed_at: input.state === "closed"
         ? "2026-08-04T09:40:00Z"
@@ -193,8 +193,25 @@ describe("GitHub webhooks", () => {
       isMerged: false,
       headSha: "a".repeat(40),
       baseSha: "b".repeat(40),
+      baseBranch: "main",
+      baseBranchChanged: false,
       providerUpdatedAt: "2026-08-04T09:34:56.000Z",
       briarIssueLinks: [{ projectId, runId }],
+    });
+  });
+
+  it("marks a signed base-branch return as an identity generation change", () => {
+    const parsed = parseGitHubWebhook(
+      pullRequestHeaders,
+      {
+        ...pullRequestPayload({ action: "edited" }),
+        changes: { base: { ref: { from: "release" } } },
+      },
+    );
+    expect(parsed).toMatchObject({
+      action: "edited",
+      baseBranch: "main",
+      baseBranchChanged: true,
     });
   });
 

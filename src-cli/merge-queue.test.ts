@@ -18,7 +18,7 @@ import {
 
 const batchId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
-const memberId = "33333333-3333-4333-8333-333333333333";
+const memberId = "3".repeat(32);
 const runId = "44444444-4444-4444-8444-444444444444";
 const headSha = "a".repeat(40);
 const historicalBaseSha = "b".repeat(40);
@@ -240,9 +240,10 @@ function recordingApi() {
 }
 
 describe("local GitHub merge-queue worker", () => {
-  it("accepts a sealed single-member batch with an independent signed base", () => {
+  it("decodes a sealed member with the production opaque candidate ID", () => {
     const claim = claimFixture("publish");
     expect(claim.members).toHaveLength(1);
+    expect(claim.members[0].id).toBe(memberId);
     expect(claim.members[0].baseSha).toBe(historicalBaseSha);
     expect(claim.batch.mergeGroupBaseSha).toBe(signedBaseSha);
   });
@@ -606,6 +607,38 @@ describe("local GitHub merge-queue worker", () => {
     expect(api.calls.at(-1)?.path).toBe(
       `/merge-batch-claims/${batchId}/published`,
     );
+  });
+
+  it("recovers a successful publication receipt after a signed merge removes the queue ref", async () => {
+    const initial = claimFixture("publish");
+    const claim = decodeClaimedMergeBatch({
+      ...initial,
+      claimAttempts: 2,
+      members: initial.members.map((member) => ({
+        ...member,
+        state: "merged",
+      })),
+    });
+    const api = recordingApi();
+    const run = vi.fn<MergeQueueCommandRunner>(() => {
+      throw new Error("signed merge recovery must not inspect a deleted queue ref");
+    });
+
+    await executeClaimedMergeBatch({
+      claim,
+      workerId: "worker-1",
+      repositoryPath: "/repo",
+      runtime,
+      signal: new AbortController().signal,
+      api: api.api,
+      runCommand: run,
+    });
+
+    expect(run).not.toHaveBeenCalled();
+    expect(api.calls.map((call) => call.path)).toEqual([
+      `/merge-batch-claims/${batchId}/lease`,
+      `/merge-batch-claims/${batchId}/published`,
+    ]);
   });
 
   it("doctors only exact-main active no-bypass effective rules", () => {

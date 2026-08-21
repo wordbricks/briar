@@ -34,6 +34,11 @@ const defaultedWith = <S extends Schema.Constraint>(
   Schema.withDecodingDefaultType<S>(Effect.sync(value))(schema);
 
 const Uuid = Schema.String.check(Schema.isUUID());
+// Merge-batch candidates are durable, opaque database identifiers. They are
+// currently 32 lowercase hexadecimal characters, rather than UUIDs.
+const MergeBatchCandidateId = Schema.NonEmptyString.check(
+  Schema.isLengthBetween(1, 128),
+);
 const PositiveInteger = Schema.Int.check(Schema.isGreaterThan(0));
 const NonNegativeInteger = Schema.Int.check(
   Schema.isGreaterThanOrEqualTo(0),
@@ -272,7 +277,7 @@ const MergeBatchValidationResult = strict(Schema.Struct({
 }));
 
 const MergeBatchMember = strict(Schema.Struct({
-  id: Uuid,
+  id: MergeBatchCandidateId,
   ordinal: PositiveInteger,
   runId: Uuid,
   attempt: PositiveInteger,

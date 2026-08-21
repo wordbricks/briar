@@ -77,6 +77,46 @@ describe("merge queue profile", () => {
     });
   });
 
+  it("starts a fresh CI boundary when a profile changes repositories", async () => {
+    await configureMergeQueueProfile(db, {
+      projectId: secondProject,
+      repositoryId: 702,
+      repository: "wordbricks/first",
+      enabled: false,
+      quietWindowMs: 30_000,
+      maxBatchSize: 5,
+      observedAt,
+    });
+    const retargetedAt = "2026-08-21T03:01:00.000Z";
+    await configureMergeQueueProfile(db, {
+      projectId: secondProject,
+      repositoryId: 703,
+      repository: "wordbricks/second",
+      enabled: false,
+      quietWindowMs: 20_000,
+      maxBatchSize: 4,
+      observedAt: retargetedAt,
+    });
+    await expect(getMergeQueueProfile(db, secondProject)).resolves
+      .toMatchObject({
+        repository_id: 703,
+        repository: "wordbricks/second",
+        created_at: retargetedAt,
+      });
+
+    await configureMergeQueueProfile(db, {
+      projectId: secondProject,
+      repositoryId: 703,
+      repository: "wordbricks/second",
+      enabled: false,
+      quietWindowMs: 10_000,
+      maxBatchSize: 3,
+      observedAt: "2026-08-21T03:02:00.000Z",
+    });
+    await expect(getMergeQueueProfile(db, secondProject)).resolves
+      .toMatchObject({ created_at: retargetedAt });
+  });
+
   it("will not disable a lane while an active batch holds it", async () => {
     await db.prepare(
       `insert into briar_merge_batches (

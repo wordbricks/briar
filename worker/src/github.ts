@@ -394,6 +394,10 @@ export function parseGitHubWebhook(
       isMerged,
       headSha: pullRequest.head.sha,
       baseSha: pullRequest.base.sha,
+      baseBranch: pullRequest.base.ref,
+      baseBranchChanged:
+        parsed.changes?.base?.ref?.from !== undefined &&
+        parsed.changes.base.ref.from !== pullRequest.base.ref,
       mergeCommitSha: pullRequest.merge_commit_sha,
       body: pullRequest.body,
       briarIssueLinks: extractBriarIssueLinks(pullRequest.body),
