@@ -1,6 +1,6 @@
 {
   "name": "briar",
-  "version": "1.2.145",
+  "version": "1.2.146",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",

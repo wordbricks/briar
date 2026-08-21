@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.146",
+        date: "2026년 8월 21일",
+        title: "제공자 설정과 저장소 전달 흐름을 더 안정적으로 연결합니다",
+        summary:
+          "제공자 모델 선호를 저장하고 로컬 Worker 기반 native merge queue를 exact-SHA 검증으로 확장하며, Lovable 안내와 Bun 1.4 런타임을 최신화했습니다.",
+        items: [
+          "로컬 Worker 기반 native merge queue coordinator가 저장소별 전달을 조정하고, GitHub merge group의 exact SHA를 검증한 뒤 네 가지 signoff 상태를 안전하게 게시하도록 지원합니다.",
+          "제공자 설정에서 기본 모델을 지정하고 자주 쓰는 모델을 즐겨찾기에 추가해 이슈·Project Agent·채널 실행에서 선택지를 빠르게 찾을 수 있습니다.",
+          "제공자별 모델 선호를 로컬에 저장하고 기본 모델과 즐겨찾기 순서를 실행 화면에서 재사용해 설정과 작업 배정을 일관되게 연결합니다.",
+          "Lovable GitHub 튜토리얼 영상을 새 제품 흐름으로 교체해 저장소 온보딩을 더 쉽게 이해할 수 있습니다.",
+          "데스크톱과 Worker 빌드가 Bun 1.4.0을 사용하도록 런타임·타입·문서를 갱신합니다.",
+        ],
+      },
+      {
         version: "1.2.145",
         date: "2026년 8월 21일",
         title: "저장소 병합 큐와 타입 안전한 실행 경계를 강화합니다",
@@ -919,6 +933,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.146",
+        date: "August 21, 2026",
+        title: "Connect provider settings and repository delivery more reliably",
+        summary:
+          "Persist provider model preferences, extend the local Worker native merge queue with exact-SHA validation, refresh the Lovable onboarding tutorial, and update the Bun 1.4 runtime.",
+        items: [
+          "Coordinate repository delivery through the local Worker native merge queue, verify the exact GitHub merge-group SHA, and publish all four signoff statuses only after validation proof is stored.",
+          "Set a default model and favorite frequently used models in provider settings so issue, Project Agent, and channel runs are faster to configure.",
+          "Persist provider-specific model preferences locally and reuse default and favorite ordering in run surfaces for a consistent assignment flow.",
+          "Replace the Lovable GitHub tutorial video with the latest product flow so repository onboarding is easier to understand.",
+          "Update the runtime, types, and documentation so desktop and Worker builds use Bun 1.4.0.",
+        ],
+      },
       {
         version: "1.2.145",
         date: "August 21, 2026",
@@ -1900,7 +1928,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-145">
+          <a href="#v1-2-146">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1922,7 +1950,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.145"
+                      entry.version === "1.2.146"
+                        ? "2026-08-21"
+                        : entry.version === "1.2.145"
                         ? "2026-08-21"
                         : entry.version === "1.2.144" ||
                       entry.version === "1.2.143" ||
