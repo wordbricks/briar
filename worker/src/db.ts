@@ -6,13 +6,10 @@ import {
   cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
   requiredWorkflowStages,
-  repositoryWorkflowBootstrap,
   workflowCheckpointAt,
   workflowWithAdditionalCheckpoints,
-  type AutoHuntQaStatus,
   type AutoHuntPersistedRunStatus,
   type AutoHuntRunStatus,
-  type AutoHuntSource,
   type DashboardStage,
   type AutoHuntWorkflow,
   type AutoHuntWorkflowCheckpoint,
@@ -51,7 +48,6 @@ import {
   type AgentSkillEffort,
   type AgentSkillInput,
   type AgentSkillKind,
-  type AgentSkillProvider,
   type AgentSkillRow,
 } from "./agent-skills";
 import { workflowSnapshotForRun } from "./workflow-policy";
@@ -63,9 +59,60 @@ import {
   type OrganizationRow,
 } from "./organization-repository";
 import type { ProjectRow } from "./project-repository";
+import { archiveCleanupQueueUpsertSql } from "./archive-cleanup-repository";
+import {
+  channelApprovalTablesAvailable,
+  isChannelApprovedIssue,
+} from "./channel-issue-approval-repository";
+import {
+  agentSkillExecutionApprovalTablesAvailable,
+  issueExecutionApprovalTablesAvailable,
+} from "./execution-approval-schema-repository";
+import {
+  type HuntEventInput,
+  type HuntEventRow,
+} from "./hunt-event-model";
+import {
+  normalizedUrls,
+  parseUrls,
+  parseWorkflow,
+  runIsFullAuto,
+  stableJson,
+} from "./hunt-run-codec";
+import {
+  EventKeyConflictError,
+  HuntClaimError,
+  HuntTransitionError,
+} from "./hunt-run-errors";
+import {
+  dashboardStageFor,
+  type HuntRunRow,
+  statusForDashboardStage,
+  workflowStageForDashboardStage,
+} from "./hunt-run-model";
+import { getHuntRunForProject } from "./hunt-run-repository";
+import {
+  type ClaimedProjectAgentTaskRow,
+  type ModelEffort,
+  type ProjectAgentProvider,
+  type ProjectAgentRow,
+  type ProjectAgentScheduleRow,
+  type ProjectAgentScheduleRunRow,
+  type ProjectAgentScheduleRunStatus,
+  type ProjectAgentSessionChangeRow,
+  type ProjectAgentSessionChangesPage,
+  type ProjectAgentSessionRow,
+  type ProjectAgentSessionSummaryRow,
+  type ProjectAgentTaskCompletionReceiptRow,
+  type ProjectAgentTaskJobRow,
+} from "./project-agent-model";
+import {
+  digestRunId,
+  scopedEvidenceKey,
+  scopedRunKey,
+} from "./run-identity";
+import { loadStageRevisionRequirements } from "./run-stage-revision-repository";
 
-type ProjectAgentProvider = AgentSkillProvider;
-type ModelEffort = AgentSkillEffort;
 
 export type AccountDeletionPlan = {
   blockedOrganizations: Array<{ id: string; name: string }>;
@@ -219,241 +266,6 @@ export type ProjectSettingsRow = {
   updated_at: string;
 };
 
-export type ProjectAgentRow = {
-  id: string;
-  organization_id: string;
-  project_id: string;
-  name: string;
-  avatar: string | null;
-  avatar_pet_json: string | null;
-  avatar_spritesheet_object_key: string | null;
-  provider: ProjectAgentProvider;
-  model: string | null;
-  effort: AgentSkillEffort | null;
-  description: string;
-  responsibility: string;
-  skill_markdown: string;
-  calendar_color: string;
-  created_at: string;
-  updated_at: string;
-  skills?: AgentSkillRow[];
-};
-
-export type ProjectAgentSessionRow = {
-  project_id: string;
-  id: string;
-  agent_id: string | null;
-  requested_by_user_id: string | null;
-  status: "running" | "completed" | "failed" | "skipped" | "interrupted";
-  session_type: "task" | "dispatch";
-  payload_json: string;
-  started_at: string;
-  completed_at: string | null;
-  updated_at: string;
-};
-
-export type ProjectAgentSessionSummaryRow = {
-  project_id: string;
-  session_id: string;
-  summary_json: string;
-  updated_at: string;
-  archived: number;
-};
-
-export type ProjectAgentSessionChangeRow = {
-  version: number;
-  session_id: string;
-  operation: "upsert" | "delete";
-};
-
-export type ProjectAgentSessionChangesPage = {
-  currentVersion: number;
-  changes: ProjectAgentSessionChangeRow[];
-  hasMore: boolean;
-  nextCursor: number;
-  expired: boolean;
-};
-
-export type ProjectAgentTaskJobRow = {
-  id: string;
-  project_id: string;
-  agent_id: string;
-  skill_id: string | null;
-  request: string;
-  request_id: string;
-  status: "queued" | "running" | "completed" | "failed";
-  preferred_worker_id: string;
-  claimed_worker_id: string | null;
-  claim_token_hash: string | null;
-  claimed_at: string | null;
-  lease_expires_at: string | null;
-  attempts: number;
-  planned_update_resume: number;
-  error: string | null;
-  created_at: string;
-  updated_at: string;
-  completed_at: string | null;
-  skill_execution_proposal_id?: string | null;
-  result_summary?: string | null;
-  result_conversation_id?: string | null;
-};
-
-export type ProjectAgentTaskCompletionReceiptRow = {
-  id: string;
-  organization_id: string;
-  project_id: string;
-  task_id: string;
-  skill_execution_proposal_id: string | null;
-  worker_id: string;
-  claim_token_hash: string;
-  outcome_status: "queued" | "completed" | "failed";
-  summary: string | null;
-  conversation_id: string | null;
-  error: string | null;
-  completed_at: string;
-  created_at: string;
-};
-
-export type ProjectAgentTaskCompletionResult = {
-  job: ProjectAgentTaskJobRow | null;
-  receipt: ProjectAgentTaskCompletionReceiptRow | null;
-  replayed: boolean;
-};
-
-export type ClaimedProjectAgentTaskRow = ProjectAgentTaskJobRow & {
-  agent_name: string;
-  agent_provider: ProjectAgentProvider;
-  agent_model: string | null;
-  agent_effort: AgentSkillEffort | null;
-  agent_responsibility: string;
-  agent_skill: string;
-  selected_skill_id: string;
-  selected_skill_name: string;
-  selected_skill_instructions: string;
-  agent_skills: AgentSkillRow[];
-};
-
-export type ProjectAgentScheduleRow = {
-  id: string;
-  project_id: string;
-  agent_id: string;
-  agent_name: string;
-  agent_provider: ProjectAgentProvider;
-  name: string;
-  recurrence: ProjectAgentScheduleRecurrence;
-  frequency: ProjectAgentScheduleRecurrence | null;
-  time_of_day: string;
-  day_of_week: number | null;
-  interval_value: number;
-  interval_unit: ProjectAgentScheduleIntervalUnit;
-  days_of_week: string | null;
-  notification_level: ProjectAgentScheduleNotificationLevel;
-  time_zone: string;
-  enabled: number;
-  next_run_at: string | null;
-  created_by_user_id: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type ProjectAgentScheduleRunStatus = "running" | "completed" | "failed";
-
-export type ProjectAgentScheduleRunRow = {
-  id: string;
-  project_id: string;
-  schedule_id: string;
-  schedule_name: string;
-  agent_id: string;
-  agent_name: string;
-  agent_provider: ProjectAgentProvider;
-  agent_model: string | null;
-  agent_effort: string | null;
-  agent_description: string;
-  agent_responsibility: string;
-  agent_skill_markdown: string;
-  agent_skills: AgentSkillRow[];
-  workflow_json: string;
-  status: ProjectAgentScheduleRunStatus;
-  scheduled_for: string;
-  lease_expires_at: string | null;
-  started_at: string;
-  completed_at: string | null;
-  result_summary: string | null;
-  structured_result_json: string | null;
-  error: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type HuntRunRow = {
-  id: string;
-  run_number: number;
-  source: AutoHuntSource;
-  source_key: string;
-  title: string;
-  stage: DashboardStage;
-  status: AutoHuntPersistedRunStatus;
-  workflow_stage: AutoHuntWorkflowStageId | null;
-  workflow_snapshot_json: string;
-  issue_checkpoints_json: string;
-  detail: string | null;
-  priority: number | null;
-  assignee_user_id: string | null;
-  created_by_user_id?: string | null;
-  subscribers_json?: string;
-  repository: string;
-  branch: string | null;
-  commit_sha: string | null;
-  tracker_provider: string | null;
-  tracker_issue_id: string | null;
-  tracker_issue_identifier: string | null;
-  tracker_issue_url: string | null;
-  tracker_issue_state: string | null;
-  issue_description: string | null;
-  result_summary: string | null;
-  structured_result_json: string | null;
-  execution_metrics_json: string | null;
-  pull_request_urls: string;
-  target_sha: string | null;
-  source_created_at: string | null;
-  staging_qa_status: AutoHuntQaStatus | null;
-  production_qa_status: AutoHuntQaStatus | null;
-  staging_qa_detail: string | null;
-  production_qa_detail: string | null;
-  context_json: string | null;
-  current_attempt: number;
-  current_revision: number;
-  claim_token_hash: string | null;
-  claimed_by: string | null;
-  claimed_at: string | null;
-  lease_expires_at: string | null;
-  claim_attempts: number;
-  planned_update_resume: number;
-  last_execution_id: string | null;
-  paused_at: string | null;
-  resume_requested_at: string | null;
-  waiting_checkpoint_key: string | null;
-  waiting_checkpoint_revision: number | null;
-  agent_id: string | null;
-  preferred_agent_provider: ProjectAgentProvider | null;
-  preferred_agent_model: string | null;
-  preferred_agent_effort: ModelEffort | null;
-  requested_agent_provider: ProjectAgentProvider | null;
-  requested_agent_model: string | null;
-  requested_agent_effort: ModelEffort | null;
-  requested_worker_id: string | null;
-  requested_by_user_id: string | null;
-  dispatch_mode: "any" | "specific" | null;
-  dispatch_request_id: string | null;
-  dispatched_at: string | null;
-  worker_id: string | null;
-  started_at: string;
-  updated_at: string;
-  completed_at: string | null;
-  last_event_at: string;
-  event_count: number;
-};
-
 export type OrganizationStatusTrayRunRow = Pick<
   HuntRunRow,
   | "id"
@@ -599,27 +411,6 @@ export type IssueDependencyMutationOutcome =
   | "cycle"
   | "ineligible"
   | "not_found";
-
-export type HuntEventRow = {
-  id: string;
-  run_id: string;
-  event_key: string;
-  attempt: number;
-  revision: number;
-  stage: DashboardStage;
-  status: AutoHuntPersistedRunStatus;
-  workflow_stage: AutoHuntWorkflowStageId | null;
-  detail: string | null;
-  actor: string;
-  branch: string | null;
-  commit_sha: string | null;
-  qa_status: AutoHuntQaStatus | null;
-  tracker_issue_state: string | null;
-  pull_request_urls: string;
-  target_sha: string | null;
-  occurred_at: string;
-  recorded_at: string;
-};
 
 export type RunEvidenceRow = {
   id: string;
@@ -952,50 +743,6 @@ export type IssueAttachmentInput = Omit<
   "run_id" | "project_id" | "created_at"
 >;
 
-export type TrackerInput = {
-  provider: string;
-  issueId: string | null;
-  identifier: string | null;
-  url: string | null;
-  state: string | null;
-} | null;
-
-export type HuntEventInput = {
-  source: AutoHuntSource;
-  sourceKey: string;
-  title: string;
-  stage: DashboardStage;
-  status?: AutoHuntPersistedRunStatus;
-  workflowStage?: AutoHuntWorkflowStageId | null;
-  eventKey: string;
-  occurredAt: string;
-  actor: string;
-  repository: string;
-  detail: string | null;
-  priority: number | null;
-  branch: string | null;
-  commitSha: string | null;
-  tracker: TrackerInput;
-  issueDescription: string | null;
-  assigneeUserId?: string | null;
-  issueCheckpoints?: AutoHuntWorkflowCheckpoint[];
-  fullAuto?: boolean;
-  resultSummary: string | null;
-  structuredResult: StructuredAgentResult | null;
-  pullRequestUrls: string[];
-  targetSha: string | null;
-  sourceCreatedAt: string | null;
-  qaStatus: "pending" | null;
-  stagingQaDetail: string | null;
-  productionQaDetail: string | null;
-  context: Record<string, unknown> | null;
-  postInsertIssueDescription?: string | null;
-  createdByUserId?: string | null;
-  preferredAgentProvider?: ProjectAgentProvider | null;
-  preferredAgentModel?: string | null;
-  preferredAgentEffort?: ModelEffort | null;
-};
-
 export type ProjectSettingsInput = {
   velenOrg: string | null;
   dataSource: string | null;
@@ -1007,14 +754,6 @@ export type ProjectSettingsInput = {
   githubRepository: string | null;
   workflow: AutoHuntWorkflow;
 };
-
-export class EventKeyConflictError extends Error {
-  constructor() {
-    super("Event key was reused with different run data");
-  }
-}
-export class HuntTransitionError extends Error {}
-export class HuntClaimError extends Error {}
 
 const DASHBOARD_CHANGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1_000;
 const DEFAULT_DASHBOARD_CHANGE_PRUNE_BATCH_SIZE = 25_000;
@@ -1060,20 +799,6 @@ export async function pruneExpiredDashboardChanges(
     reachedBatchLimit: deleted === batchSize,
   };
 }
-
-const stableJson = (value: unknown) => JSON.stringify(value);
-const parseWorkflow = (value: string | null | undefined) => {
-  if (!value) return cloneAutoHuntWorkflow();
-  return normalizeAutoHuntWorkflow(JSON.parse(value) as AutoHuntWorkflow);
-};
-const normalizedUrls = (urls: string[]) => [...new Set(urls)].sort();
-const parseUrls = (value: string | null | undefined) => {
-  if (!value) return [];
-  const parsed: unknown = JSON.parse(value);
-  return Array.isArray(parsed)
-    ? parsed.filter((item): item is string => typeof item === "string")
-    : [];
-};
 
 type WorkflowProgressIdentity = {
   attempt?: number;
@@ -4255,20 +3980,6 @@ export async function updateProjectScheduleTabEnabled(
     .run();
   return result.meta.changes > 0;
 }
-
-const archiveCleanupQueueUpsertSql = `
-  on conflict (bucket, object_key) do update set
-    project_id = excluded.project_id,
-    run_id = excluded.run_id,
-    queued_at = excluded.queued_at,
-    attempts = 0,
-    last_attempt_at = null,
-    last_error = null,
-    generation = briar_archive_cleanup_queue.generation + 1,
-    next_attempt_at = null,
-    dead_lettered_at = null,
-    alert_state = 'none',
-    alert_detail_json = null`;
 
 export async function deleteProject(
   db: D1Database,
@@ -8752,27 +8463,6 @@ export async function createIssueActionProposal(
     .first<IssueActionProposalRow>();
 }
 
-export async function issueExecutionApprovalTablesAvailable(db: D1Database) {
-  return Boolean(await db
-    .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table' and name = 'briar_issue_execution_proposals'`,
-    )
-    .first<{ available: number }>());
-}
-
-export async function agentSkillExecutionApprovalTablesAvailable(
-  db: D1Database,
-) {
-  return Boolean(await db
-    .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table'
-         and name = 'briar_agent_skill_execution_proposals'`,
-    )
-    .first<{ available: number }>());
-}
-
 export async function listIssueActionProposals(
   db: D1Database,
   projectId: string,
@@ -10301,74 +9991,6 @@ export async function issueProjectAgentToken(
   return result.meta.changes > 0;
 }
 
-const digestRunId = async (
-  projectId: string,
-  source: AutoHuntSource,
-  sourceKey: string,
-) => {
-  const digest = new Uint8Array(
-    await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(`${projectId}\u0000${source}\u0000${sourceKey}`),
-    ),
-  );
-  const bytes = digest.slice(0, 16);
-  bytes[6] = (bytes[6] & 0x0f) | 0x50;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = [...bytes]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-};
-
-const scopedRunKey = async (
-  key: string,
-  attempt: number,
-  revision: number,
-) => {
-  if (attempt === 1 && revision === 1) return key;
-  const digest = new Uint8Array(
-    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key)),
-  );
-  const fingerprint = [...digest.slice(0, 8)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-  const suffix = `:attempt-${attempt}:revision-${revision}:${fingerprint}`;
-  return `${key.slice(0, 300 - suffix.length)}${suffix}`;
-};
-
-const scopedEvidenceKey = async (key: string, revision: number) => {
-  if (revision === 1) return key;
-  const digest = new Uint8Array(
-    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key)),
-  );
-  const fingerprint = [...digest.slice(0, 8)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-  const suffix = `:revision-${revision}:${fingerprint}`;
-  return `${key.slice(0, 300 - suffix.length)}${suffix}`;
-};
-
-const loadStageRevisionRequirements = async (
-  db: D1Database,
-  run: HuntRunRow,
-) => {
-  const result = await db
-    .prepare(
-      `select workflow_stage, required_revision
-       from briar_run_stage_revisions
-       where run_id = ? and attempt = ?`,
-    )
-    .bind(run.id, run.current_attempt)
-    .all<{ workflow_stage: string; required_revision: number }>();
-  return new Map(
-    result.results.map((item) => [
-      item.workflow_stage,
-      item.required_revision,
-    ]),
-  );
-};
-
 const sameEvent = (row: HuntEventRow, input: HuntEventInput) =>
   row.stage === input.stage &&
   row.status === input.status &&
@@ -10531,51 +10153,6 @@ const assertStageTransition = async (
       `Workflow cannot regress from rank ${floorRank} to ${nextRank}`,
     );
   }
-};
-
-const statusForDashboardStage = (
-  stage: DashboardStage,
-): AutoHuntPersistedRunStatus => {
-  if (stage === "queued") return "queued";
-  if (["blocked", "failed", "completed", "cancelled"].includes(stage)) {
-    return stage as AutoHuntPersistedRunStatus;
-  }
-  return "running";
-};
-
-const workflowStageForDashboardStage = (
-  stage: DashboardStage,
-): AutoHuntWorkflowStageId | null => {
-  if (
-    [
-      "analyzing",
-      "implementing",
-      "pr_open",
-      "staging_qa",
-      "production_qa",
-    ].includes(stage)
-  ) {
-    return stage as AutoHuntWorkflowStageId;
-  }
-  return null;
-};
-
-const dashboardStageFor = (
-  status: AutoHuntPersistedRunStatus,
-  workflowStage: AutoHuntWorkflowStageId | null,
-): DashboardStage => {
-  if (status === "backlog") return "queued";
-  if (status !== "running") return status;
-  return workflowStage &&
-    [
-      "analyzing",
-      "implementing",
-      "pr_open",
-      "staging_qa",
-      "production_qa",
-    ].includes(workflowStage)
-    ? (workflowStage as DashboardStage)
-    : "implementing";
 };
 
 export async function recordHuntEvent(
@@ -12269,21 +11846,6 @@ export async function getRunEvidenceImage(
     .first<RunEvidenceImageRow>();
 }
 
-export async function listRunStageRevisions(
-  db: D1Database,
-  projectId: string,
-  runId: string,
-) {
-  const run = await getHuntRunForProject(db, projectId, runId);
-  if (!run) return null;
-  const requirements = await loadStageRevisionRequirements(db, run);
-  return {
-    attempt: run.current_attempt,
-    revision: run.current_revision,
-    requirements,
-  };
-}
-
 export type HuntReworkOutcome =
   | "reworked"
   | "already_reworked"
@@ -13203,17 +12765,6 @@ export async function importLinearHuntRuns(
   return { imported, skipped, failed };
 }
 
-export async function getHuntRunForProject(
-  db: D1Database,
-  projectId: string,
-  runId: string,
-) {
-  return db
-    .prepare(`select * from briar_hunt_runs where id = ? and project_id = ?`)
-    .bind(runId, projectId)
-    .first<HuntRunRow>();
-}
-
 export async function updateIssue(
   db: D1Database,
   projectId: string,
@@ -13313,21 +12864,6 @@ export async function updateIssueExecutionPreferences(
     )
     .first<HuntRunRow>();
 }
-
-const runIsFullAuto = (run: Pick<HuntRunRow, "context_json">) => {
-  if (!run.context_json) return false;
-  try {
-    const context: unknown = JSON.parse(run.context_json);
-    return Boolean(
-      context &&
-        typeof context === "object" &&
-        !Array.isArray(context) &&
-        (context as Record<string, unknown>).fullAuto === true,
-    );
-  } catch {
-    return false;
-  }
-};
 
 export async function updateIssueCheckpoints(
   db: D1Database,
@@ -13844,78 +13380,6 @@ const repairTransferredIssueRelations = async (
   input: Parameters<typeof transferredIssueRelationStatements>[1],
 ) => db.batch(await transferredIssueRelationStatements(db, input));
 
-export const channelApprovalTablesAvailable = async (db: D1Database) => {
-  const result = await db
-    .prepare(
-      `select count(*) as table_count from sqlite_master
-       where type = 'table'
-         and name in (
-           'briar_channel_action_proposals',
-           'briar_channel_issue_approval_audit'
-         )`,
-    )
-    .first<{ table_count: number }>();
-  return result?.table_count === 2;
-};
-
-export const isChannelApprovedIssue = async (
-  db: D1Database,
-  run: Pick<HuntRunRow, "id" | "source_key">,
-) => {
-  if (await channelApprovalTablesAvailable(db)) {
-    return Boolean(await db
-      .prepare(
-        `select 1 as approved
-         from briar_channel_issue_approval_audit approval
-         where approval.run_id = ? and approval.issue_source_key = ?
-           and approval.result_verification in ('atomic', 'legacy_authorized')
-         limit 1`,
-      )
-      .bind(run.id, run.source_key)
-      .first<{ approved: number }>());
-  }
-  const proposalTables = await db.prepare(
-    `select name from sqlite_master
-     where type = 'table'
-       and name in (
-         'briar_channel_action_proposals', 'briar_issue_action_proposals'
-       )`,
-  ).all<{ name: string }>();
-  const available = new Set(proposalTables.results.map((row) => row.name));
-  // The new Worker may briefly run before migration 0090 if an operator uses
-  // the wrong rollout order. Recognize the exact pre-migration accepted shape
-  // so a queued transfer still drops back to backlog instead of carrying the
-  // source project's execution approval into the target project.
-  if (available.has("briar_channel_action_proposals")) {
-    const channel = await db
-      .prepare(
-        `select 1 as approved
-         from briar_channel_action_proposals proposal
-         where proposal.result_run_id = ? and proposal.status = 'accepted'
-           and proposal.action_type = 'request_issue_create'
-           and ? = 'briar-channel-proposal:' || proposal.id
-         limit 1`,
-      )
-      .bind(run.id, run.source_key)
-      .first<{ approved: number }>();
-    if (channel) return true;
-  }
-  if (available.has("briar_issue_action_proposals")) {
-    return Boolean(await db
-      .prepare(
-        `select 1 as approved
-         from briar_issue_action_proposals proposal
-         where proposal.result_run_id = ? and proposal.status = 'accepted'
-           and proposal.action_type = 'request_issue_create'
-           and ? = 'briar-conversation-proposal:' || proposal.id
-         limit 1`,
-      )
-      .bind(run.id, run.source_key)
-      .first<{ approved: number }>());
-  }
-  return false;
-};
-
 const channelIssueTransferRecovery = async (
   db: D1Database,
   input: {
@@ -14254,3 +13718,48 @@ export async function transferIssue(
 
   return "transferred";
 }
+
+export {
+  channelApprovalTablesAvailable,
+  isChannelApprovedIssue,
+} from "./channel-issue-approval-repository";
+
+export {
+  issueExecutionApprovalTablesAvailable,
+  agentSkillExecutionApprovalTablesAvailable,
+} from "./execution-approval-schema-repository";
+
+export type {
+  HuntEventRow,
+  TrackerInput,
+  HuntEventInput,
+} from "./hunt-event-model";
+
+
+export {
+  EventKeyConflictError,
+  HuntTransitionError,
+  HuntClaimError,
+} from "./hunt-run-errors";
+
+export type { HuntRunRow } from "./hunt-run-model";
+
+export { getHuntRunForProject } from "./hunt-run-repository";
+
+export type {
+  ProjectAgentRow,
+  ProjectAgentSessionRow,
+  ProjectAgentSessionSummaryRow,
+  ProjectAgentSessionChangeRow,
+  ProjectAgentSessionChangesPage,
+  ProjectAgentTaskJobRow,
+  ProjectAgentTaskCompletionReceiptRow,
+  ProjectAgentTaskCompletionResult,
+  ClaimedProjectAgentTaskRow,
+  ProjectAgentScheduleRow,
+  ProjectAgentScheduleRunStatus,
+  ProjectAgentScheduleRunRow,
+} from "./project-agent-model";
+
+
+export { listRunStageRevisions } from "./run-stage-revision-repository";
