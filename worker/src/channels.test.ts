@@ -2717,6 +2717,124 @@ describe("organization channels", () => {
     expect(again).toHaveLength(2);
   });
 
+  it("creates idempotent direct messages and implicitly invokes a sole Agent", async () => {
+    const agentId = "aa000000-0000-4000-8000-000000000120";
+    await createOrganizationAgent(db, {
+      id: agentId,
+      organizationId,
+      name: "Direct Falcon",
+      provider: "claude",
+      model: null,
+      responsibility: "Reply to direct messages",
+      effort: null,
+      createdAt: at(20),
+    });
+    const apiEnv = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "channels-context-test-secret-channels-context-test",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const directMessagesEndpoint =
+      `https://briar-api.example/organizations/${organizationId}/dms`;
+    const createRequest = () => new Request(directMessagesEndpoint, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${ownerSessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ memberIds: [], agentIds: [agentId.toUpperCase()] }),
+    });
+
+    const created = await apiWorker.fetch(createRequest(), apiEnv);
+    expect(created.status).toBe(201);
+    const createdBody = await created.json() as {
+      channel: {
+        id: string;
+        kind: string;
+        visibility: string;
+        dmParticipants: Array<{ type: string; id: string; name: string }>;
+      };
+    };
+    expect(createdBody.channel).toMatchObject({
+      kind: "dm",
+      visibility: "private",
+    });
+    expect(createdBody.channel.dmParticipants).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "user", id: ownerId }),
+      expect.objectContaining({ type: "agent", id: agentId, name: "Direct Falcon" }),
+    ]));
+
+    const repeated = await apiWorker.fetch(createRequest(), apiEnv);
+    expect(repeated.status).toBe(200);
+    expect((await repeated.json() as { channel: { id: string } }).channel.id)
+      .toBe(createdBody.channel.id);
+
+    const message = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/messages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ body: "Hello without a mention" }),
+      },
+    ), apiEnv);
+    expect(message.status).toBe(201);
+    const messageBody = await message.json() as {
+      message: { mentionedAgentIds: string[] };
+      agentReplies: Array<{ agentId: string }>;
+    };
+    expect(messageBody.message.mentionedAgentIds).toEqual([]);
+    expect(messageBody.agentReplies).toHaveLength(1);
+    expect(messageBody.agentReplies[0]?.agentId).toBe(agentId);
+
+    const expanded = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/members/${outsiderId}`,
+      {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ role: "member" }),
+      },
+    ), apiEnv);
+    expect(expanded.status).toBe(200);
+    const recreatedDirect = await apiWorker.fetch(createRequest(), apiEnv);
+    expect(recreatedDirect.status).toBe(201);
+    expect(
+      (await recreatedDirect.json() as { channel: { id: string } }).channel.id,
+    ).not.toBe(createdBody.channel.id);
+
+    const group = await apiWorker.fetch(new Request(directMessagesEndpoint, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${ownerSessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ memberIds: [outsiderId], agentIds: [agentId] }),
+    }), apiEnv);
+    expect(group.status).toBe(201);
+    const groupId = (await group.json() as { channel: { id: string } }).channel.id;
+    const groupMessage = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${groupId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ body: "Hello group" }),
+      },
+    ), apiEnv);
+    expect(groupMessage.status).toBe(201);
+    expect((await groupMessage.json() as { agentReplies: unknown[] }).agentReplies)
+      .toEqual([]);
+  });
+
   it("accepts only the sender's organization device and copies it to every mentioned Agent job", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000107";
     const firstAgentId = "aa000000-0000-4000-8000-000000000107";

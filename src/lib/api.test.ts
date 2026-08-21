@@ -12,6 +12,7 @@ import {
   completeProjectAgentScheduleRun,
   completeIssueResultReview,
   createChannel,
+  createDirectMessage,
   createChannelWebhook,
   createIssue,
   createIssueMessage,
@@ -2259,6 +2260,29 @@ describe("API errors", () => {
 });
 
 describe("channel message API", () => {
+  it("creates a direct message with member and Agent participants", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      channel: {},
+    }), { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createDirectMessage("token", "org-1", {
+      memberIds: ["user-2"],
+      agentIds: ["agent-1"],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/organizations/org-1/dms"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          memberIds: ["user-2"],
+          agentIds: ["agent-1"],
+        }),
+      }),
+    );
+  });
+
   it("sends the selected visibility when creating a channel", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       channel: {},

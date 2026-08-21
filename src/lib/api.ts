@@ -1421,6 +1421,18 @@ export async function createChannel(
   );
 }
 
+export async function createDirectMessage(
+  token: string,
+  organizationId: string,
+  input: { memberIds: string[]; agentIds: string[] },
+) {
+  return request<{ channel: ChannelSummary }>(
+    `/organizations/${organizationId}/dms`,
+    token,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
 export async function loadChannel(
   token: string,
   organizationId: string,

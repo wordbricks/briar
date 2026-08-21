@@ -4,6 +4,7 @@ import {
   type ChannelAgentProvider as AgentProvider,
   type ChannelAgentReply,
   type ChannelExecutionProposal,
+  type ChannelKind,
   type ChannelMessage,
   type ChannelMessageBlock,
   type ChannelMessageAttachment,
@@ -14,6 +15,7 @@ import {
   type ChannelThreadSubscriber,
   type ChannelVisibility,
   type ChannelWebhook,
+  type DirectMessageParticipant,
 } from "../../src/lib/channels-contract";
 import { isWorkerEmoji } from "../../src/lib/worker-icon-validation";
 import type { AgentSkillEffort, AgentSkillKind } from "./agent-skills";
@@ -29,6 +31,8 @@ import {
 export type ChannelRow = {
   id: string;
   organization_id: string;
+  kind: ChannelKind;
+  dm_key: string | null;
   slug: string;
   name: string;
   topic: string | null;
@@ -41,6 +45,8 @@ export type ChannelRow = {
   created_at: string;
   updated_at: string;
   last_message_at: string | null;
+  last_message_preview: string | null;
+  dm_participants_json: string | null;
   last_read_at: string | null;
   last_unread_message_at: string | null;
 };
@@ -242,7 +248,8 @@ const liveChannelReplyRuntime = (job: string) => `coalesce((
 ), 0) = 1`;
 
 const channelSelectColumns = `
-  select channel.id, channel.organization_id, channel.slug, channel.name,
+  select channel.id, channel.organization_id, channel.kind, channel.dm_key,
+         channel.slug, channel.name,
          channel.topic, channel.visibility, channel.default_project_id,
          channel.archived_at,
          (select count(*) from briar_channel_members member
@@ -252,7 +259,35 @@ const channelSelectColumns = `
          channel.created_by_user_id,
          channel.created_at, channel.updated_at,
          (select max(message.created_at) from briar_channel_messages message
-          where message.channel_id = channel.id) as last_message_at`;
+          where message.channel_id = channel.id) as last_message_at,
+         (select message.body from briar_channel_messages message
+          where message.channel_id = channel.id
+          order by message.created_at desc, message.id desc limit 1)
+           as last_message_preview,
+         case when channel.kind = 'dm' then (
+           select json_group_array(json_object(
+             'type', participant.type,
+             'id', participant.id,
+             'name', participant.name,
+             'image', participant.image
+           ))
+           from (
+             select 'user' as type, member.user_id as id,
+                    account.name as name, account.image as image,
+                    member.created_at as joined_at
+             from briar_channel_members member
+             join "user" account on account.id = member.user_id
+             where member.channel_id = channel.id
+             union all
+             select 'agent' as type, roster.agent_id as id,
+                    agent.name as name, agent.avatar as image,
+                    roster.created_at as joined_at
+             from briar_channel_agents roster
+             join briar_project_agents agent on agent.id = roster.agent_id
+             where roster.channel_id = channel.id
+             order by joined_at, type, id
+           ) participant
+         ) else null end as dm_participants_json`;
 
 const channelSelect = `${channelSelectColumns},
          null as last_read_at,
@@ -483,6 +518,7 @@ const channelHasUnreadFromRow = (row: ChannelRow) => Boolean(
 export const channelJson = (row: ChannelRow): ChannelSummary => ({
   id: row.id,
   organizationId: row.organization_id,
+  kind: row.kind,
   slug: row.slug,
   name: row.name,
   topic: row.topic,
@@ -495,8 +531,12 @@ export const channelJson = (row: ChannelRow): ChannelSummary => ({
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   lastMessageAt: row.last_message_at,
+  lastMessagePreview: row.last_message_preview,
   lastReadAt: row.last_read_at,
   hasUnread: channelHasUnreadFromRow(row),
+  dmParticipants: row.dm_participants_json
+    ? JSON.parse(row.dm_participants_json) as DirectMessageParticipant[]
+    : undefined,
 });
 
 export const channelReplyJson = (
@@ -787,26 +827,67 @@ export async function createChannel(
   input: {
     id: string;
     organizationId: string;
+    kind?: ChannelKind;
+    dmKey?: string | null;
     slug: string;
     name: string;
     topic: string | null;
     visibility: ChannelVisibility;
     defaultProjectId: string | null;
     createdByUserId: string;
+    memberIds?: string[];
+    agentIds?: string[];
     createdAt: string;
   },
 ) {
-  await db.batch([
-    db
-      .prepare(
+  const memberIds = [...new Set(input.memberIds ?? [])].filter(
+    (userId) => userId !== input.createdByUserId,
+  );
+  const agentIds = [...new Set(input.agentIds ?? [])];
+  const supportsDirectMessages = Boolean(await db.prepare(
+    `select 1 as available from pragma_table_info('briar_channels')
+     where name = 'kind'`,
+  ).first<{ available: number }>());
+  if (!supportsDirectMessages) {
+    await db.batch([
+      db.prepare(
         `insert into briar_channels (
            id, organization_id, slug, name, topic, visibility,
            default_project_id, created_by_user_id, created_at, updated_at
          ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        input.id,
+        input.organizationId,
+        input.slug,
+        input.name,
+        input.topic,
+        input.visibility,
+        input.defaultProjectId,
+        input.createdByUserId,
+        input.createdAt,
+        input.createdAt,
+      ),
+      db.prepare(
+        `insert into briar_channel_members (
+           channel_id, user_id, role, created_at
+         ) values (?, ?, 'owner', ?)`,
+      ).bind(input.id, input.createdByUserId, input.createdAt),
+    ]);
+    return null;
+  }
+  await db.batch([
+    db
+      .prepare(
+        `insert into briar_channels (
+           id, organization_id, kind, dm_key, slug, name, topic, visibility,
+           default_project_id, created_by_user_id, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         input.id,
         input.organizationId,
+        input.kind ?? "channel",
+        input.dmKey ?? null,
         input.slug,
         input.name,
         input.topic,
@@ -823,8 +904,38 @@ export async function createChannel(
          ) values (?, ?, 'owner', ?)`,
       )
       .bind(input.id, input.createdByUserId, input.createdAt),
+    ...memberIds.map((userId) =>
+      db.prepare(
+        `insert into briar_channel_members (
+           channel_id, user_id, role, created_at
+         ) values (?, ?, 'member', ?)`,
+      ).bind(input.id, userId, input.createdAt)
+    ),
+    ...agentIds.map((agentId) =>
+      db.prepare(
+        `insert into briar_channel_agents (
+           channel_id, agent_id, added_by_user_id, created_at
+         ) values (?, ?, ?, ?)`,
+      ).bind(input.id, agentId, input.createdByUserId, input.createdAt)
+    ),
   ]);
   return getChannel(db, input.organizationId, input.id, input.createdByUserId);
+}
+
+export async function getDirectMessageByKey(
+  db: D1Database,
+  organizationId: string,
+  dmKey: string,
+  userId: string,
+) {
+  return db
+    .prepare(
+      `${channelSelectForUser}
+       where channel.organization_id = ? and channel.kind = 'dm'
+         and channel.dm_key = ? and ${visibleToUser}`,
+    )
+    .bind(userId, userId, organizationId, dmKey, userId)
+    .first<ChannelRow>();
 }
 
 export async function updateChannel(
@@ -982,27 +1093,57 @@ export async function addChannelMember(
     createdAt: string;
   },
 ) {
-  await db
-    .prepare(
+  await db.batch([
+    db.prepare(
       `insert into briar_channel_members (channel_id, user_id, role, created_at)
        values (?, ?, ?, ?)
        on conflict (channel_id, user_id) do update set role = excluded.role`,
     )
-    .bind(input.channelId, input.userId, input.role, input.createdAt)
-    .run();
+      .bind(input.channelId, input.userId, input.role, input.createdAt),
+    db.prepare(
+      `update briar_channels
+       set updated_at = ?,
+           dm_key = case
+             when kind = 'dm' and (
+               (select count(*) from briar_channel_members
+                where channel_id = briar_channels.id) +
+               (select count(*) from briar_channel_agents
+                where channel_id = briar_channels.id)
+             ) <> 2 then null
+             else dm_key
+           end
+       where id = ?`,
+    ).bind(input.createdAt, input.channelId),
+  ]);
 }
 
 export async function removeChannelMember(
   db: D1Database,
   channelId: string,
   userId: string,
+  removedAt = new Date().toISOString(),
 ) {
-  const result = await db
-    .prepare(
+  const results = await db.batch([
+    db.prepare(
       `delete from briar_channel_members where channel_id = ? and user_id = ?`,
     )
-    .bind(channelId, userId)
-    .run();
+      .bind(channelId, userId),
+    db.prepare(
+      `update briar_channels
+       set updated_at = ?,
+           dm_key = case
+             when kind = 'dm' and (
+               (select count(*) from briar_channel_members
+                where channel_id = briar_channels.id) +
+               (select count(*) from briar_channel_agents
+                where channel_id = briar_channels.id)
+             ) <> 2 then null
+             else dm_key
+           end
+       where id = ?`,
+    ).bind(removedAt, channelId),
+  ]);
+  const result = results[0];
   return (result.meta.changes ?? 0) > 0;
 }
 
@@ -1053,20 +1194,33 @@ export async function addChannelAgent(
     createdAt: string;
   },
 ) {
-  await db
-    .prepare(
+  await db.batch([
+    db.prepare(
       `insert into briar_channel_agents (
          channel_id, agent_id, added_by_user_id, created_at
        ) values (?, ?, ?, ?)
        on conflict (channel_id, agent_id) do nothing`,
-    )
-    .bind(
+    ).bind(
       input.channelId,
       input.agentId,
       input.addedByUserId,
       input.createdAt,
-    )
-    .run();
+    ),
+    db.prepare(
+      `update briar_channels
+       set updated_at = ?,
+           dm_key = case
+             when kind = 'dm' and (
+               (select count(*) from briar_channel_members
+                where channel_id = briar_channels.id) +
+               (select count(*) from briar_channel_agents
+                where channel_id = briar_channels.id)
+             ) <> 2 then null
+             else dm_key
+           end
+       where id = ?`,
+    ).bind(input.createdAt, input.channelId),
+  ]);
 }
 
 export async function removeChannelAgent(
@@ -1088,6 +1242,20 @@ export async function removeChannelAgent(
     db.prepare(
       `delete from briar_channel_agents where channel_id = ? and agent_id = ?`,
     ).bind(channelId, agentId),
+    db.prepare(
+      `update briar_channels
+       set updated_at = ?,
+           dm_key = case
+             when kind = 'dm' and (
+               (select count(*) from briar_channel_members
+                where channel_id = briar_channels.id) +
+               (select count(*) from briar_channel_agents
+                where channel_id = briar_channels.id)
+             ) <> 2 then null
+             else dm_key
+           end
+       where id = ?`,
+    ).bind(removedAt, channelId),
   ]);
   const result = results[1];
   return (result.meta.changes ?? 0) > 0;

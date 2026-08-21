@@ -6,6 +6,7 @@ import {
   Hash,
   Headphones,
   Lock,
+  MessageCircle,
   MessageSquare,
   MoreHorizontal,
   Paperclip,
@@ -84,6 +85,7 @@ import {
   type ChannelSummary,
   type ChannelWebhook,
 } from "../lib/channels-contract";
+import { directMessageDisplayName } from "../lib/direct-messages";
 import {
   channelHasUnread,
   laterTimestamp,
@@ -238,6 +240,7 @@ type ChannelsProps = {
   initialSettingsChannelId?: string | null;
   onInitialSettingsHandled?: () => void;
   onCreateAgent?: () => void;
+  surface?: "channel" | "dm";
   inboxDetail?: boolean;
   onInboxDetailClose?: () => void;
   requestedMessage?: {
@@ -397,6 +400,7 @@ export function Channels({
   inboxDetail = false,
   onInboxDetailClose,
   onCreateAgent,
+  surface = "channel",
 }: ChannelsProps) {
   const { t, localeTag } = useI18n();
   const { toast } = useToast();
@@ -593,6 +597,9 @@ export function Channels({
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
     [channels, activeChannelId],
   );
+  const activeChannelName = activeChannel && surface === "dm"
+    ? directMessageDisplayName(activeChannel, currentUserId)
+    : activeChannel?.name ?? "";
   const showRequestedThreadOnly = Boolean(
     inboxDetail &&
       requestedMessage &&
@@ -1553,7 +1560,9 @@ export function Channels({
         const hasAgentMention = mentions.some(
           (mention) => mention.type === "agent",
         );
-        const preferredDeviceId = hasAgentMention
+        const implicitlyInvokesDirectAgent =
+          activeChannel?.kind === "dm" && members.length === 1 && agents.length === 1;
+        const preferredDeviceId = hasAgentMention || implicitlyInvokesDirectAgent
           ? await currentExecutionWorkerDeviceId(organizationId)
           : null;
         const result = await sendChannelMessage(token, organizationId, activeChannelId, {
@@ -1635,6 +1644,8 @@ export function Channels({
     },
     [
       activeChannelId,
+      activeChannel?.kind,
+      agents.length,
       captureChannelSurface,
       channelSurfaceIsCurrent,
       currentUserId,
@@ -2117,6 +2128,10 @@ export function Channels({
   );
 
   const memberCount = Math.max(activeChannel?.memberCount ?? 0, members.length);
+  const participantCount = memberCount + Math.max(
+    activeChannel?.agentCount ?? 0,
+    agents.length,
+  );
 
   return (
     <ChannelMessageImageCacheProvider cache={imageCache}>
@@ -2139,15 +2154,17 @@ export function Channels({
           <>
             <header className="channel-header" data-tauri-drag-region>
               <div className="channel-header-title">
-                {activeChannel.visibility === "private" ? (
+                {surface === "dm" ? (
+                  <MessageCircle size={16} aria-hidden="true" />
+                ) : activeChannel.visibility === "private" ? (
                   <Lock size={16} aria-hidden="true" />
                 ) : (
                   <Hash size={16} aria-hidden="true" />
                 )}
-                <h2>{activeChannel.name}</h2>
+                <h2>{activeChannelName}</h2>
               </div>
               <div className="channel-header-actions">
-                <button
+                {surface === "channel" ? <button
                   type="button"
                   className="channel-header-icon"
                   aria-label={t("channel.webhooks")}
@@ -2155,25 +2172,25 @@ export function Channels({
                   onClick={openWebhooks}
                 >
                   <Webhook size={16} aria-hidden="true" />
-                </button>
+                </button> : null}
                 <button
                   type="button"
                   className="channel-header-icon channel-header-members"
-                  aria-label={t("channel.headerMembers", { count: memberCount })}
+                  aria-label={t("channel.headerMembers", { count: participantCount })}
                   onClick={() => openInvite()}
                 >
                   <Users size={16} aria-hidden="true" />
-                  <span>{memberCount}</span>
+                  <span>{participantCount}</span>
                 </button>
-                <button
+                {surface === "channel" ? <button
                   type="button"
                   className="channel-header-icon"
                   aria-label={t("channel.headerHuddle")}
                   title={t("channel.headerHuddle")}
                 >
                   <Headphones size={16} aria-hidden="true" />
-                </button>
-                <button
+                </button> : null}
+                {surface === "channel" ? <button
                   type="button"
                   className="channel-header-icon"
                   aria-label={t("channel.headerMore")}
@@ -2181,7 +2198,7 @@ export function Channels({
                   onClick={openSettings}
                 >
                   <MoreHorizontal size={16} aria-hidden="true" />
-                </button>
+                </button> : null}
               </div>
             </header>
 
@@ -2204,11 +2221,15 @@ export function Channels({
                 <ChannelMessageSkeleton label={t("channel.loadingMessages")} />
               ) : (
                 <>
-                  <ChannelWelcome
-                    channel={activeChannel}
-                    onCreateAgent={onCreateAgent}
-                    onAddPeople={() => openInvite()}
-                  />
+                  {surface === "dm" ? (
+                    <DirectMessageWelcome name={activeChannelName} />
+                  ) : (
+                    <ChannelWelcome
+                      channel={activeChannel}
+                      onCreateAgent={onCreateAgent}
+                      onAddPeople={() => openInvite()}
+                    />
+                  )}
                   {loadingEarlierMessages ? (
                     <div className="channel-message-page-loader" role="status">
                       <Spinner aria-hidden="true" size={15} />
@@ -2302,8 +2323,13 @@ export function Channels({
               busy={busy || channelLoading}
               members={members}
               currentUserId={currentUserId}
-              channelName={activeChannel.name}
+              channelName={activeChannelName}
               onInvite={() => openInvite()}
+              placeholder={
+                surface === "dm"
+                  ? t("dm.messagePlaceholder", { name: activeChannelName })
+                  : undefined
+              }
               onSend={(body, mentions, attachments, references) =>
                 void send(body, mentions, null, attachments, references)
               }
@@ -2443,7 +2469,7 @@ export function Channels({
             busy={busy}
             members={members}
             currentUserId={currentUserId}
-            channelName={activeChannel.name}
+            channelName={activeChannelName}
             onInvite={() => openInvite()}
             placeholder={t("channel.threadPlaceholder")}
             onSend={(body, mentions, attachments, references) =>
@@ -2466,7 +2492,7 @@ export function Channels({
         </div>
       ) : null}
 
-      {settingsOpen && activeChannel ? (
+      {surface === "channel" && settingsOpen && activeChannel ? (
         <ChannelSettingsDialog
           agents={agents}
           channel={activeChannel}
@@ -2503,7 +2529,7 @@ export function Channels({
           }}
         />
       ) : null}
-      {webhooksOpen && activeChannel ? (
+      {surface === "channel" && webhooksOpen && activeChannel ? (
         <ChannelWebhooksDialog
           channel={activeChannel}
           error={webhooksError}
@@ -2740,6 +2766,22 @@ function ChannelWelcome({
           <span>{t("channel.addPeopleHint")}</span>
         </button>
       </div>
+    </div>
+  );
+}
+
+function DirectMessageWelcome({ name }: { name: string }) {
+  const { t } = useI18n();
+  return (
+    <div className="channel-welcome dm-welcome">
+      <div className="channel-welcome-icon" aria-hidden="true">
+        <MessageCircle size={28} />
+      </div>
+      <h3>{name}</h3>
+      <p className="channel-welcome-lead">
+        {t("dm.welcome", { name })}
+      </p>
+      <p className="channel-welcome-topic">{t("dm.welcomeDescription")}</p>
     </div>
   );
 }

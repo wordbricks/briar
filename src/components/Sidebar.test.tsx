@@ -865,6 +865,18 @@ describe("Sidebar", () => {
     expect(markup).toContain('aria-label="읽지 않은 메시지 2개"');
   });
 
+  it("places DMs above Inbox and exposes unread direct messages", () => {
+    const markup = renderToStaticMarkup(
+      <Sidebar {...sidebarProps} activePage="dms" unreadDmCount={3} />,
+    );
+
+    expect(markup.indexOf('href="#dms"')).toBeLessThan(
+      markup.indexOf('href="#inbox"'),
+    );
+    expect(markup).toContain('aria-current="page"');
+    expect(markup).toContain('aria-label="읽지 않은 DM 3개"');
+  });
+
   it("shows running sessions beneath Agents and opens their details", async () => {
     const onAgentSessionOpen = vi.fn();
     const runningSession: AutoHuntSession = {

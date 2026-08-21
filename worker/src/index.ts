@@ -648,6 +648,7 @@ import {
   getChannelAgentSkillExecutionProposal,
   getChannelAgentReplyJob,
   getChannelById,
+  getDirectMessageByKey,
   getClaimedChannelReplyAttachment,
   getActiveOrganizationChannelReplyContextClaim,
   getChannelMessage,
@@ -744,6 +745,7 @@ import {
 } from "./organization-agent-context";
 import {
   channelInputSchema,
+  directMessageInputSchema,
   channelReadInputSchema,
   channelIssueProposalPayloadSchema,
   channelExecutionProposalAcceptInputSchema,
@@ -818,6 +820,7 @@ const decodeChannelReplyCompleteInput = decodeRequestSync(
 );
 const decodeChannelMessageInput = decodeRequestSync(channelMessageInputSchema);
 const decodeChannelInput = decodeRequestSync(channelInputSchema);
+const decodeDirectMessageInput = decodeRequestSync(directMessageInputSchema);
 const decodeChannelReadInput = decodeRequestSync(channelReadInputSchema);
 const decodeChannelUpdateInput = decodeRequestSync(channelUpdateInputSchema);
 const decodeChannelMemberInput = decodeRequestSync(channelMemberInputSchema);
@@ -2920,6 +2923,9 @@ async function requireChannelWebhookManagement(
     channelId,
     userId,
   );
+  if (channel.kind === "dm") {
+    throw new HttpError(400, "Webhooks are not available in direct messages");
+  }
   const organizationRole = await getOrganizationRole(
     db,
     organizationId,
@@ -6810,6 +6816,100 @@ async function route(
   const organizationChannelsMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels$/u,
   );
+
+  const organizationDirectMessagesMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/dms$/u,
+  );
+  if (organizationDirectMessagesMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationDirectMessagesMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!role) throw new HttpError(404, "Organization not found");
+    const input = decodeDirectMessageInput(await readJson(request));
+    const memberIds = [...new Set(input.memberIds)].filter(
+      (userId) => userId !== session.user.id,
+    );
+    const agentIds = [...new Set(input.agentIds)];
+    if (memberIds.length + agentIds.length === 0) {
+      throw new HttpError(400, "At least one other participant is required");
+    }
+
+    const [organizationMembers, organizationAgents] = await Promise.all([
+      listOrganizationMembers(db, organizationId),
+      listOrganizationAgents(db, organizationId),
+    ]);
+    const membersById = new Map(
+      organizationMembers.map((member) => [member.user_id, member]),
+    );
+    const agentsById = new Map(
+      organizationAgents.map((agent) => [agent.id, agent]),
+    );
+    for (const userId of memberIds) {
+      if (!membersById.has(userId)) {
+        throw new HttpError(404, "Organization member not found");
+      }
+    }
+    for (const agentId of agentIds) {
+      if (!agentsById.has(agentId)) {
+        throw new HttpError(404, "Organization Agent not found");
+      }
+    }
+
+    const dmKey = memberIds.length + agentIds.length === 1
+      ? memberIds.length === 1
+        ? `users:${JSON.stringify([session.user.id, memberIds[0]!].sort())}`
+        : `agent:${JSON.stringify([session.user.id, agentIds[0]!])}`
+      : null;
+    if (dmKey) {
+      const existing = await getDirectMessageByKey(
+        db,
+        organizationId,
+        dmKey,
+        session.user.id,
+      );
+      if (existing) return json({ channel: channelJson(existing) });
+    }
+
+    const participantNames = [
+      ...memberIds.map((userId) => membersById.get(userId)!.name),
+      ...agentIds.map((agentId) => agentsById.get(agentId)!.name),
+    ];
+    const channelId = crypto.randomUUID();
+    const name = participantNames.join(", ").slice(0, 100);
+    let channel;
+    try {
+      channel = await createChannel(db, {
+        id: channelId,
+        organizationId,
+        kind: "dm",
+        dmKey,
+        slug: channelSlugFromName(`dm-${channelId}`, channelId),
+        name,
+        topic: null,
+        visibility: "private",
+        defaultProjectId: null,
+        createdByUserId: session.user.id,
+        memberIds,
+        agentIds,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      if (dmKey && message.includes("unique")) {
+        channel = await getDirectMessageByKey(
+          db,
+          organizationId,
+          dmKey,
+          session.user.id,
+        );
+      } else {
+        throw error;
+      }
+    }
+    if (!channel) throw new HttpError(500, "Direct message was not created");
+    return json({ channel: channelJson(channel) }, 201);
+  }
+
   if (organizationChannelsMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const organizationId = organizationChannelsMatch[1];
@@ -6935,13 +7035,19 @@ async function route(
   }
   if (organizationChannelMatch && request.method === "PATCH") {
     const session = await requireSession(auth, request);
-    await requireChannelAccess(
+    const currentChannel = await requireChannelAccess(
       db,
       organizationChannelMatch[1],
       organizationChannelMatch[2],
       session.user.id,
     );
     const input = decodeChannelUpdateInput(await readJson(request));
+    if (
+      currentChannel.kind === "dm" &&
+      (input.visibility === "public" || input.defaultProjectId)
+    ) {
+      throw new HttpError(400, "Direct messages must remain private and organization-scoped");
+    }
     if (input.defaultProjectId) {
       const project = await getProject(
         db,
@@ -7322,7 +7428,17 @@ async function route(
       db,
       await listChannelAgents(db, channel.id),
     );
-    const mentionedAgents = rawInput.mentionedAgentIds.map((agentId) => {
+    const implicitDirectAgent =
+      channel.kind === "dm" &&
+        channel.member_count === 1 &&
+        roster.length === 1 &&
+        rawInput.mentionedAgentIds.length === 0
+        ? roster[0]
+        : null;
+    const invokedAgentIds = implicitDirectAgent
+      ? [implicitDirectAgent.id]
+      : rawInput.mentionedAgentIds;
+    const mentionedAgents = invokedAgentIds.map((agentId) => {
       const agent = roster.find((candidate) => candidate.id === agentId);
       if (!agent) {
         throw new HttpError(400, "Mentioned Agent is not in this channel");

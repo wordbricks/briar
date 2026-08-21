@@ -14,6 +14,7 @@ import {
   Plus,
   Settings,
   Languages,
+  MessageCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -48,6 +49,7 @@ type SidebarPage =
   | "lobby"
   | "agents"
   | "channels"
+  | "dms"
   | "schedule"
   | "inbox"
   | "project-settings"
@@ -73,6 +75,7 @@ export function Sidebar({
   onLobbyOpen,
   onScheduleOpen,
   onInboxOpen,
+  onDmsOpen = () => {},
   onChannelCreate,
   onChannelDelete,
   onChannelOpen,
@@ -94,6 +97,7 @@ export function Sidebar({
   sessions,
   token,
   unreadInboxCount,
+  unreadDmCount = 0,
   user,
 }: {
   activePage: SidebarPage;
@@ -111,6 +115,7 @@ export function Sidebar({
   onLobbyOpen: () => void;
   onScheduleOpen: () => void;
   onInboxOpen: () => void;
+  onDmsOpen?: () => void;
   onChannelCreate?: (
     name: string,
     visibility: ChannelVisibility,
@@ -135,6 +140,7 @@ export function Sidebar({
   sessions: AutoHuntSession[];
   token: string | null;
   unreadInboxCount: number;
+  unreadDmCount?: number;
   user: SessionUser;
 }) {
   const { locale, setLocale, t } = useI18n();
@@ -484,6 +490,24 @@ export function Sidebar({
       )}
 
       <nav aria-label={t("sidebar.mainMenu")} className="sidebar-primary-nav">
+        <a
+          aria-current={activePage === "dms" ? "page" : undefined}
+          className={activePage === "dms" ? "active" : ""}
+          href="#dms"
+          onClick={(event) => {
+            event.preventDefault();
+            onDmsOpen();
+          }}
+        >
+          <MessageCircle size={16} strokeWidth={1.7} />
+          <span>{t("sidebar.dms")}</span>
+          {unreadDmCount > 0 ? (
+            <i
+              aria-label={t("dm.unreadCount", { count: unreadDmCount })}
+              className="sidebar-unread-dot"
+            />
+          ) : null}
+        </a>
         <a
           aria-current={activePage === "inbox" ? "page" : undefined}
           className={activePage === "inbox" ? "active" : ""}

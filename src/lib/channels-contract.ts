@@ -29,6 +29,9 @@ export type ChannelAgentSkillKind = (typeof channelAgentSkillKinds)[number];
 export const channelVisibilities = ["public", "private"] as const;
 export type ChannelVisibility = (typeof channelVisibilities)[number];
 
+export const channelKinds = ["channel", "dm"] as const;
+export type ChannelKind = (typeof channelKinds)[number];
+
 export const channelActionTypes = [
   "request_issue_create",
   "request_plan_document",
@@ -351,6 +354,13 @@ export function channelSlugFromName(name: string, channelId: string) {
   );
 }
 
+const canonicalUuidSchema = Uuid.pipe(
+  Schema.decode({
+    decode: SchemaGetter.transform((value) => value.toLowerCase()),
+    encode: SchemaGetter.transform((value) => value.toLowerCase()),
+  }),
+);
+
 export const channelInputSchema = strict(Schema.Struct({
   name: channelNameSchema,
   slug: Schema.optional(channelSlugSchema),
@@ -359,6 +369,28 @@ export const channelInputSchema = strict(Schema.Struct({
   defaultProjectId: nullableDefault(Uuid),
 }));
 
+export const directMessageInputSchema = strict(Schema.Struct({
+  memberIds: defaultedWith(
+    mutableArray(
+      Schema.String.check(Schema.isLengthBetween(1, 64)),
+    ).check(Schema.isMaxLength(20)),
+    () => [],
+  ),
+  agentIds: defaultedWith(
+    mutableArray(canonicalUuidSchema).check(Schema.isMaxLength(8)),
+    () => [],
+  ),
+})).check(
+  Schema.makeFilter((input) =>
+    input.memberIds.length + input.agentIds.length > 0 ||
+    "At least one direct message participant is required"
+  ),
+  Schema.makeFilter((input) =>
+    input.memberIds.length + input.agentIds.length <= 20 ||
+    "A direct message may contain at most 20 participants"
+  ),
+);
+
 export const channelUpdateInputSchema = strict(Schema.Struct({
   name: Schema.optional(channelNameSchema),
   topic: Schema.optional(Schema.NullOr(channelTopicSchema)),
@@ -366,13 +398,6 @@ export const channelUpdateInputSchema = strict(Schema.Struct({
   defaultProjectId: Schema.optional(Schema.NullOr(Uuid)),
   archived: Schema.optional(Schema.Boolean),
 }));
-
-const canonicalUuidSchema = Uuid.pipe(
-  Schema.decode({
-    decode: SchemaGetter.transform((value) => value.toLowerCase()),
-    encode: SchemaGetter.transform((value) => value.toLowerCase()),
-  }),
-);
 
 export const channelMessageInputSchema = strict(Schema.Struct({
   body: channelMessageBodySchema,
@@ -482,6 +507,8 @@ export const channelProposalAcceptInputSchema = strict(Schema.Struct({
 export type ChannelSummary = {
   id: string;
   organizationId: string;
+  /** Missing only on cached responses from clients predating direct messages. */
+  kind?: ChannelKind;
   slug: string;
   name: string;
   topic: string | null;
@@ -494,8 +521,17 @@ export type ChannelSummary = {
   createdAt: string;
   updatedAt: string;
   lastMessageAt?: string | null;
+  lastMessagePreview?: string | null;
   lastReadAt?: string | null;
   hasUnread?: boolean;
+  dmParticipants?: DirectMessageParticipant[];
+};
+
+export type DirectMessageParticipant = {
+  type: "user" | "agent";
+  id: string;
+  name: string;
+  image: string | null;
 };
 
 export const channelReadInputSchema = strict(Schema.Struct({
