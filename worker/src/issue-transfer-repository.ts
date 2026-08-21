@@ -1,0 +1,379 @@
+import {
+  workflowWithAdditionalCheckpoints,
+  type AutoHuntRunStatus,
+  type AutoHuntWorkflowCheckpoint,
+} from "../../src/lib/auto-hunt-contract";
+
+import {
+  channelApprovalTablesAvailable,
+  isChannelApprovedIssue,
+} from "./channel-issue-approval-repository";
+import {
+  parseWorkflow,
+  runIsFullAuto,
+  stableJson,
+} from "./hunt-run-codec";
+import { type HuntRunRow } from "./hunt-run-model";
+import { getHuntRunForProject } from "./hunt-run-repository";
+import {
+  repairTransferredIssueRelations,
+  transferredIssueRelationStatements,
+} from "./issue-transfer-relations";
+import { getProjectSettings } from "./project-settings-repository";
+
+export type TransferIssueOutcome =
+  | "transferred"
+  | "not_found"
+  | "active"
+  | "same_project"
+  | "source_key_conflict"
+  | "archive_in_progress"
+  | "proposal_approval_in_progress"
+  | "execution_approval_boundary";
+
+const isActivelyClaimedRun = (run: HuntRunRow, observedAt: string) =>
+  run.status === "running" ||
+  (
+    run.status === "queued" &&
+    run.lease_expires_at != null &&
+    run.lease_expires_at > observedAt
+  );
+
+const channelIssueTransferRecovery = async (
+  db: D1Database,
+  input: {
+    sourceProjectId: string;
+    targetProjectId: string;
+    run: Pick<HuntRunRow, "id" | "source_key">;
+  },
+) => {
+  if (!(await channelApprovalTablesAvailable(db))) return null;
+  const approval = await db
+    .prepare(
+      `select approval.project_id
+       from briar_channel_issue_approval_audit approval
+       where approval.run_id = ? and approval.issue_source_key = ?
+         and approval.result_verification in ('atomic', 'legacy_authorized')
+       limit 1`,
+    )
+    .bind(
+      input.run.id,
+      input.run.source_key,
+    )
+    .first<{ project_id: string }>();
+  if (!approval) return null;
+  if (approval.project_id === input.sourceProjectId) return "repair" as const;
+  const sourceTombstone = await db
+    .prepare(
+      `select 1 as transferred
+       from briar_dashboard_changes
+       where project_id = ? and entity_type = 'run' and entity_id = ?
+         and operation = 'delete'
+       limit 1`,
+    )
+    .bind(input.sourceProjectId, input.run.id)
+    .first<{ transferred: number }>();
+  if (sourceTombstone) return "complete" as const;
+  const durableTransfer = await db
+    .prepare(
+      `select 1 as transferred
+       from briar_channel_issue_transfer_reconciliation transfer
+       where transfer.run_id = ? and transfer.source_project_id = ?
+         and transfer.target_project_id = ?
+       limit 1`,
+    )
+    .bind(
+      input.run.id,
+      input.sourceProjectId,
+      input.targetProjectId,
+    )
+    .first<{ transferred: number }>();
+  if (durableTransfer) return "repair" as const;
+  // If an older transfer crashed after moving the run but before its relation
+  // batch, a durable source-project dispatch still proves the A -> B provenance
+  // needed to finish the tombstone and child-row repair.
+  const sourceDispatch = await db
+    .prepare(
+      `select 1 as dispatched
+       from briar_execution_audit_events execution
+       where execution.run_id = ? and execution.project_id = ?
+         and execution.action in ('dispatched', 'reassigned')
+         and execution.request_id is not null
+       limit 1`,
+    )
+    .bind(input.run.id, input.sourceProjectId)
+    .first<{ dispatched: number }>();
+  return sourceDispatch ? "repair" as const : null;
+};
+
+/**
+ * Move an issue (hunt run) and its project-scoped children to another project
+ * in the same organization. Active/leased runs cannot transfer. Source-project
+ * dashboard clients receive an explicit delete tombstone; the run UPDATE trigger
+ * upserts the issue into the target project.
+ */
+export async function transferIssue(
+  db: D1Database,
+  input: {
+    sourceProjectId: string;
+    targetProjectId: string;
+    targetProjectName: string;
+    runId: string;
+    observedAt: string;
+  },
+): Promise<TransferIssueOutcome> {
+  if (input.sourceProjectId === input.targetProjectId) {
+    return "same_project";
+  }
+
+  const run = await getHuntRunForProject(
+    db,
+    input.sourceProjectId,
+    input.runId,
+  );
+  if (!run) {
+    const alreadyMoved = await getHuntRunForProject(
+      db,
+      input.targetProjectId,
+      input.runId,
+    );
+    if (!alreadyMoved) return "not_found";
+    // A target row alone is not transfer provenance: it may have always
+    // belonged to that project. Only a channel approval whose immutable audit
+    // points back to the requested source may repair a partial transfer.
+    const recovery = await channelIssueTransferRecovery(db, {
+      sourceProjectId: input.sourceProjectId,
+      targetProjectId: input.targetProjectId,
+      run: alreadyMoved,
+    });
+    if (!recovery) return "not_found";
+    if (recovery === "repair") {
+      await repairTransferredIssueRelations(db, {
+        ...input,
+        resetExecutionApproval: true,
+      });
+    }
+    return "transferred";
+  }
+  if (isActivelyClaimedRun(run, input.observedAt)) return "active";
+  const verifiedArchive = await db
+    .prepare(
+      `select 1 as archiving from briar_log_archives
+       where run_id = ? and status = 'verified'
+         and archive_kind <> 'execution_audit'
+       limit 1`,
+    )
+    .bind(input.runId)
+    .first<{ archiving: number }>();
+  if (verifiedArchive) return "archive_in_progress";
+  const channelApprovedIssue = await isChannelApprovedIssue(db, run);
+  const executionProposalTable = await db
+    .prepare(
+      `select 1 as available from sqlite_master
+       where type = 'table' and name = 'briar_issue_execution_proposals'`,
+    )
+    .first<{ available: number }>();
+  const conversationalExecutionApproved = Boolean(
+    executionProposalTable && run.dispatch_request_id && await db
+      .prepare(
+        `select 1 as approved
+         where exists (
+           select 1 from briar_issue_execution_proposals proposal
+           where proposal.target_run_id = ? and proposal.project_id = ?
+             and proposal.dispatch_request_id = ?
+         ) or exists (
+           select 1 from briar_issue_execution_approval_audit approval
+           where approval.run_id = ? and approval.project_id = ?
+             and approval.dispatch_request_id = ?
+         )`,
+      )
+      .bind(
+        run.id,
+        input.sourceProjectId,
+        run.dispatch_request_id,
+        run.id,
+        input.sourceProjectId,
+        run.dispatch_request_id,
+      )
+      .first<{ approved: number }>(),
+  );
+  const executionApprovedIssue =
+    channelApprovedIssue || conversationalExecutionApproved;
+  // A terminal result is historical state, so do not silently turn it into a
+  // target-project execution candidate. Rework needs a separate approval-aware
+  // flow instead of carrying the source project's execution authority across.
+  if (
+    executionApprovedIssue &&
+    (["completed", "cancelled"] as AutoHuntRunStatus[]).includes(run.status)
+  ) {
+    return "execution_approval_boundary";
+  }
+
+  const conflict = await db
+    .prepare(
+      `select id from briar_hunt_runs
+       where project_id = ? and source = ? and source_key = ?
+       limit 1`,
+    )
+    .bind(input.targetProjectId, run.source, run.source_key)
+    .first<{ id: string }>();
+  if (conflict) return "source_key_conflict";
+
+  const resetExecutionApproval =
+    (["queued", "blocked", "failed"] as AutoHuntRunStatus[]).includes(
+      run.status,
+    ) && executionApprovedIssue;
+  const targetSettings = await getProjectSettings(db, input.targetProjectId);
+  const adoptTargetWorkflow =
+    run.status === "backlog" || run.status === "queued" ||
+    resetExecutionApproval;
+  const fullAuto = runIsFullAuto(run);
+  const targetBaseWorkflow = parseWorkflow(targetSettings?.workflow_json ?? null);
+  const targetStageIds = new Set(targetBaseWorkflow.stages.map((stage) => stage.id));
+  const targetBoundaries = new Set(
+    targetBaseWorkflow.execution.checkpoints.map(
+      (checkpoint) => `${checkpoint.stage}:${checkpoint.position}`,
+    ),
+  );
+  const compatibleIssueCheckpoints = adoptTargetWorkflow && !fullAuto
+    ? (JSON.parse(run.issue_checkpoints_json || "[]") as AutoHuntWorkflowCheckpoint[])
+        .filter(
+          (checkpoint) =>
+            targetStageIds.has(checkpoint.stage) &&
+            !targetBoundaries.has(`${checkpoint.stage}:${checkpoint.position}`),
+        )
+    : [];
+  const targetWorkflowJson = adoptTargetWorkflow
+    ? stableJson(
+        fullAuto
+          ? { ...targetBaseWorkflow, execution: { checkpoints: [] } }
+          : workflowWithAdditionalCheckpoints(
+              targetBaseWorkflow,
+              compatibleIssueCheckpoints,
+            ),
+      )
+    : run.workflow_snapshot_json;
+  const targetRepository = adoptTargetWorkflow
+    ? (targetSettings?.github_repository ?? input.targetProjectName)
+    : run.repository;
+  const refreshWorkflow = adoptTargetWorkflow ? 1 : 0;
+  // Move the run, every project-scoped child, proposal, and the source
+  // dashboard tombstone in one D1 batch transaction. The target-project
+  // predicates on each relation also make a raced no-op update harmless.
+  const moveStatement = db
+    .prepare(
+      `update briar_hunt_runs
+       set project_id = ?,
+           status = case
+             when ? = 1 and status in ('queued', 'blocked', 'failed')
+               then 'backlog' else status end,
+           stage = case
+             when ? = 1 and status in ('queued', 'blocked', 'failed')
+               then 'queued' else stage end,
+           workflow_stage = case
+             when ? = 1 and status in ('queued', 'blocked', 'failed')
+               then null else workflow_stage end,
+           repository = case when ? = 1 then ? else repository end,
+           workflow_snapshot_json = case when ? = 1 then ? else workflow_snapshot_json end,
+           issue_checkpoints_json = case when ? = 1 then ? else issue_checkpoints_json end,
+           agent_id = null,
+           worker_id = null,
+           requested_worker_id = null,
+           claim_token_hash = null,
+           claimed_by = null,
+           claimed_at = null,
+           lease_expires_at = null,
+           claim_attempts = 0,
+           last_execution_id = null,
+           dispatch_mode = null,
+           dispatch_request_id = null,
+           dispatched_at = null,
+           requested_by_user_id = null,
+           requested_agent_provider = null,
+           requested_agent_model = null,
+           requested_agent_effort = null,
+           paused_at = case when ? = 1 then null else paused_at end,
+           resume_requested_at = case
+             when ? = 1 then null else resume_requested_at end,
+           completed_at = case when ? = 1 then null else completed_at end,
+           updated_at = ?
+       where id = ? and project_id = ?
+         and status <> 'running'
+         and not (
+           status = 'queued'
+           and lease_expires_at is not null
+           and lease_expires_at > ?
+         )
+       returning id`,
+    )
+    .bind(
+      input.targetProjectId,
+      resetExecutionApproval ? 1 : 0,
+      resetExecutionApproval ? 1 : 0,
+      resetExecutionApproval ? 1 : 0,
+      refreshWorkflow,
+      targetRepository,
+      refreshWorkflow,
+      targetWorkflowJson,
+      refreshWorkflow,
+      stableJson(compatibleIssueCheckpoints),
+      resetExecutionApproval ? 1 : 0,
+      resetExecutionApproval ? 1 : 0,
+      resetExecutionApproval ? 1 : 0,
+      input.observedAt,
+      input.runId,
+      input.sourceProjectId,
+      input.observedAt,
+    );
+  let transferResults: D1Result<unknown>[];
+  try {
+    transferResults = await db.batch([
+      moveStatement,
+      ...await transferredIssueRelationStatements(db, {
+        ...input,
+        resetExecutionApproval,
+      }),
+    ]);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("verified run archive prevents transfer")
+    ) {
+      return "archive_in_progress";
+    }
+    if (
+      error instanceof Error &&
+      error.message.includes("conversation proposal acceptance in progress")
+    ) {
+      return "proposal_approval_in_progress";
+    }
+    throw error;
+  }
+  const movedRun = transferResults[0].results?.[0] as
+    | { id: string }
+    | undefined;
+
+  if (!movedRun) {
+    const stillThere = await getHuntRunForProject(
+      db,
+      input.sourceProjectId,
+      input.runId,
+    );
+    if (!stillThere) {
+      const alreadyMoved = await getHuntRunForProject(
+        db,
+        input.targetProjectId,
+        input.runId,
+      );
+      if (!alreadyMoved) return "not_found";
+      // This invocation observed the run in the source before another caller
+      // atomically completed the same transfer.
+    } else {
+      return isActivelyClaimedRun(stillThere, input.observedAt)
+        ? "active"
+        : "not_found";
+    }
+  }
+
+  return "transferred";
+}
