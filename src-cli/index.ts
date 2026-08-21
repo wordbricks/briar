@@ -3332,6 +3332,11 @@ async function mergeQueueDoctorCommand() {
 }
 
 async function mergeQueueEnqueueCommand() {
+  if (!has("--break-glass")) {
+    throw new Error(
+      "Manual enqueue is break-glass only; pass --break-glass after operator approval",
+    );
+  }
   const config = await loadConfig();
   const project = await currentProject(config);
   assertCanonicalMergeWaitCheckpoint(configuredWorkflow(project));
@@ -3470,6 +3475,14 @@ async function runClaimedMergeGroupValidation(input: {
       input.reportCheckpoint({ workspacePath: worktree.path });
       assertValidationWorktreeClean(runGit, worktree.path);
       let failureDetail: string | null = null;
+      let validationArtifact: {
+        image: string;
+        exitCode: number;
+        deadlineMs: number;
+        logSha256: string;
+        logTruncated: boolean;
+      } | null = null;
+      let validationLog: string | null = null;
       try {
         const profile = await prepareTrustedMergeGroupProfile(
           runGit,
@@ -3482,18 +3495,37 @@ async function runClaimedMergeGroupValidation(input: {
         const result = await runFixedMergeGroupValidation({
           cwd: worktree.path,
           profilePath: profile.profilePath,
+          bunConfigPath: profile.bunConfigPath,
+          vitestConfigPath: profile.vitestConfigPath,
           scratchPath: profile.scratchPath,
           bundlePath: profile.bundlePath,
           headSha: job.headSha,
           runtime,
           signal,
+          containerName: `briar-merge-group-${project.id}-${workerId}`,
         });
         passed = result.passed;
+        validationLog = result.log;
+        validationArtifact = {
+          image: runtime.image,
+          exitCode: result.exitCode,
+          deadlineMs: 50 * 60_000,
+          logSha256: result.logSha256,
+          logTruncated: result.logTruncated,
+        };
         if (!passed) failureDetail = `Trusted isolated CI exited ${result.exitCode}`;
       } catch (error) {
         if (!(error instanceof MergeGroupCiDefinitionChangedError)) throw error;
         passed = false;
         failureDetail = error.message;
+        validationLog = error.message;
+        validationArtifact = {
+          image: "trusted-base-definition-fence",
+          exitCode: 1,
+          deadlineMs: 50 * 60_000,
+          logSha256: Bun.CryptoHasher.hash("sha256", error.message, "hex"),
+          logTruncated: false,
+        };
       }
       if (signal.aborted) {
         throw signal.reason ?? new Error("Merge-group validation aborted");
@@ -3503,6 +3535,18 @@ async function runClaimedMergeGroupValidation(input: {
       await operation("validation", {
         headSha: job.headSha,
         passed,
+        log: validationLog ?? "(no validation output)",
+        artifact: validationArtifact ?? {
+          image: "unavailable",
+          exitCode: passed ? 0 : 1,
+          deadlineMs: 50 * 60_000,
+          logSha256: Bun.CryptoHasher.hash(
+            "sha256",
+            validationLog ?? "(no validation output)",
+            "hex",
+          ),
+          logTruncated: false,
+        },
         ...(passed ? {} : { detail: failureDetail }),
       });
     }
@@ -4442,7 +4486,7 @@ const usage = `Briar CLI
     [--parent-message-id <root-message-uuid>]
   briar workflow show
   briar merge-queue doctor [--base-branch <branch>] [--inactive-preflight]
-  briar merge-queue enqueue --pull-request <GitHub URL>
+  briar merge-queue enqueue --break-glass --pull-request <GitHub URL>
     [--base-branch <branch>]
   briar merge-queue jobs
   briar merge-queue retry --job <uuid>

@@ -2185,12 +2185,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       await db.prepare(
         `insert into merge_group_validation_jobs (
            id, project_id, installation_id, repository_id, repository,
-           base_ref, head_ref, head_sha, base_sha, tail_pull_request_number,
+           base_ref, head_ref, head_sha, base_sha, delivery_id,
+           tail_pull_request_number,
            tail_position, authority_checked_at, eligible_worker_id, state,
            claimed_worker_id, claim_token_hash, claimed_at, lease_expires_at,
            queued_at, started_at, created_at, updated_at
          ) values (?, ?, 1, 1, 'example/repository', 'refs/heads/main',
-           'refs/heads/gh-readonly-queue/main/pr-1-aaaaaaaa', ?, ?, 1, 0, ?, ?,
+           'refs/heads/gh-readonly-queue/main/pr-1-aaaaaaaa', ?, ?,
+           'direct-task-capacity-delivery', 1, 0, ?, ?,
            'running', ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         validationId,

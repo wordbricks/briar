@@ -23,6 +23,8 @@ export const encryptedEnvPolicies: Readonly<Record<string, EncryptedEnvPolicy>> 
       "GITHUB_APP_CLIENT_ID",
       "GITHUB_APP_CLIENT_SECRET",
       "GITHUB_APP_SLUG",
+      "GITHUB_APP_ID",
+      "GITHUB_APP_PRIVATE_KEY_PKCS8",
       "GITHUB_CALLBACK_ORIGIN",
       "GITHUB_WEBHOOK_SECRET",
     ],

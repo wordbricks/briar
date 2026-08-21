@@ -23,6 +23,7 @@ import {
 import {
   assertCanonicalMergeWaitCheckpoint,
   hasCanonicalMergeWaitCheckpoint,
+  MERGE_GROUP_CI_AUDITED_IMAGE,
   MERGE_GROUP_CI_CAPABILITY,
   MERGE_GROUP_CI_PROTOCOL,
 } from "../../src/lib/merge-group-validation-contract";
@@ -400,22 +401,23 @@ import {
   verifyGitHubWebhook,
 } from "./github";
 import {
+  attestGitHubAppInstallation,
   createGitHubInstallationToken,
   publishGitHubAppCommitStatus,
   StaleGitHubMergeGroupError,
-  verifyAuthoritativeMergeGroup,
+  verifySealedMergeGroup,
   type GitHubAppCredentials,
 } from "./github-app";
 import {
   claimNextMergeGroupValidationJob,
   completeMergeGroupStatusPublication,
-  enqueueMergeGroupValidationJob,
   fenceMergeGroupStatusPublication,
   getMergeGroupCiProfile,
   listMergeGroupValidationJobs,
   mergeGroupWorkerCapabilitySql,
   mergeGroupValidationProject,
   nextMergeGroupStatusContext,
+  recordPendingMergeGroupValidationJob,
   recordMergeGroupPublicationFailure,
   recordMergeGroupStatusReceipt,
   recordMergeGroupValidation,
@@ -425,6 +427,13 @@ import {
   supersedeMergeGroupValidationJob,
   updateMergeGroupCiProfile,
 } from "./merge-group-validation";
+import {
+  generationMembers,
+  registerRunMergeQueueAdmission,
+  type MergeQueueGenerationRow,
+} from "./merge-queue-coordinator";
+import { processMergeQueueCoordinator } from "./merge-queue-service";
+import { reworkTerminalMergeQueueGeneration } from "./merge-queue-recovery";
 import {
   assertStoredCheckpointPoliciesCompatible,
   checkpointPolicyJson,
@@ -3449,6 +3458,75 @@ function githubAppCredentials(env: Env): GitHubAppCredentials {
   return { appId, privateKeyPkcs8 };
 }
 
+function scheduleMergeQueueCoordinator(
+  env: Env,
+  context?: ExecutionContext,
+) {
+  const processing = Promise.resolve().then(async () => {
+    const enabled = await env.DB.prepare(
+      `select 1 as enabled from briar_project_settings
+       where merge_group_ci_enabled = 1 limit 1`,
+    ).first<number>("enabled");
+    if (enabled !== 1) return null;
+    return processMergeQueueCoordinator({
+      db: env.DB,
+      credentials: githubAppCredentials(env),
+    });
+  }).catch((error) => {
+    console.error(JSON.stringify({
+      message: "Merge queue coordinator pass failed",
+      error: error instanceof Error ? error.message : String(error),
+    }));
+  });
+  if (context) context.waitUntil(processing);
+  return processing;
+}
+
+async function projectGithubAppAttestation(
+  db: D1Database,
+  env: Env,
+  projectId: string,
+  repository: string | null,
+) {
+  if (!repository) return null;
+  const installation = await db.prepare(
+    `select connection.installation_id
+     from briar_projects project
+     join briar_github_connections connection
+       on connection.organization_id = project.organization_id
+      and connection.status = 'connected'
+     join briar_github_connection_repositories repository
+       on repository.installation_id = connection.installation_id
+      and lower(repository.full_name) = ?
+     where project.id = ?
+     order by connection.updated_at desc
+     limit 1`,
+  ).bind(repository.toLowerCase(), projectId)
+    .first<{ installation_id: number }>();
+  if (!installation) return null;
+  try {
+    const attestation = await attestGitHubAppInstallation({
+      credentials: githubAppCredentials(env),
+      repository,
+      expectedInstallationId: installation.installation_id,
+    });
+    return {
+      ready: true as const,
+      ...attestation,
+      attestedAt: new Date().toISOString(),
+    };
+  } catch {
+    return {
+      ready: false as const,
+      installationId: installation.installation_id,
+      appId: null,
+      permissions: null,
+      events: null,
+      attestedAt: new Date().toISOString(),
+    };
+  }
+}
+
 const staleMergeGroupAuthorityError = (error: unknown) =>
   error instanceof StaleGitHubMergeGroupError;
 
@@ -3847,7 +3925,11 @@ async function readVerifiedGithubBody(request: Request, env: Env) {
   return bytes;
 }
 
-async function handleGithubWebhookRequest(request: Request, env: Env) {
+async function handleGithubWebhookRequest(
+  request: Request,
+  env: Env,
+  context?: ExecutionContext,
+) {
   const rawBody = await readVerifiedGithubBody(request, env);
   const headers = parseGitHubWebhookHeaders(request.headers);
   let payload: unknown;
@@ -3970,47 +4052,23 @@ async function handleGithubWebhookRequest(request: Request, env: Env) {
         if (!project) {
           reason = "repository_unconnected";
         } else {
-          const token = await createGitHubInstallationToken({
-            credentials: githubAppCredentials(env),
+          // Durable authority_pending is committed before App auth, REST,
+          // GraphQL, queue convergence, or Worker readiness is consulted.
+          const job = await recordPendingMergeGroupValidationJob(env.DB, {
+            projectId: project.id,
             installationId: event.installationId,
             repositoryId: event.repositoryId,
-            permissions: {
-              contents: "read",
-              metadata: "read",
-              merge_queues: "read",
-            },
+            repository: event.repositoryFullName,
+            baseRef: event.baseRef,
+            headRef: event.headRef,
+            headSha: event.headSha,
+            baseSha: event.baseSha,
+            deliveryId: event.deliveryId,
+            eligibleWorkerId: project.merge_group_ci_worker_id,
+            receivedAt: claimedAt,
           });
-          try {
-            const authority = await verifyAuthoritativeMergeGroup({
-              accessToken: token.token,
-              repository: event.repositoryFullName,
-              baseRef: event.baseRef,
-              baseSha: event.baseSha,
-              headRef: event.headRef,
-              headSha: event.headSha,
-            });
-            const authorityCheckedAt = new Date().toISOString();
-            const job = await enqueueMergeGroupValidationJob(env.DB, {
-              projectId: project.id,
-              installationId: event.installationId,
-              repositoryId: event.repositoryId,
-              repository: event.repositoryFullName,
-              baseRef: event.baseRef,
-              headRef: event.headRef,
-              headSha: event.headSha,
-              baseSha: event.baseSha,
-              tailPullRequestNumber: authority.tailPullRequestNumber,
-              tailPosition: authority.tailPosition,
-              authorityCheckedAt,
-              eligibleWorkerId: project.merge_group_ci_worker_id,
-              queuedAt: claimedAt,
-            });
-            jobId = job?.state === "superseded" ? null : (job?.id ?? null);
-            if (!jobId) reason = "stale_queue_snapshot";
-          } catch (error) {
-            if (!staleMergeGroupAuthorityError(error)) throw error;
-            reason = "non_current_merge_group";
-          }
+          jobId = job?.id ?? null;
+          if (!jobId) reason = "durable_intake_failed";
         }
       }
       await completeGithubDelivery(
@@ -4019,6 +4077,7 @@ async function handleGithubWebhookRequest(request: Request, env: Env) {
         claimedAt,
         new Date().toISOString(),
       );
+      if (jobId) scheduleMergeQueueCoordinator(env, context);
       return json({
         ok: true,
         event: event.event,
@@ -11738,6 +11797,8 @@ async function route(
     if (project.member_role !== "owner" && project.member_role !== "admin") {
       throw new HttpError(403, "Organization admin access required");
     }
+    const previousProfile = await getMergeGroupCiProfile(db, project.id);
+    if (!previousProfile) throw new HttpError(404, "Project settings not found");
     if (request.method === "PUT") {
       const input = decodeMergeGroupCiProfileInput(await readJson(request));
       if (input.enabled) {
@@ -11746,7 +11807,18 @@ async function route(
           policy.workflow,
           policy.projectMandatory,
         ));
-        githubAppCredentials(env);
+        const attestation = await projectGithubAppAttestation(
+          db,
+          env,
+          project.id,
+          previousProfile.github_repository,
+        );
+        if (!attestation?.ready) {
+          throw new HttpError(
+            409,
+            "GitHub App installation permissions and events are not attested",
+          );
+        }
       }
       const updated = await updateMergeGroupCiProfile(db, project.id, {
         ...input,
@@ -11787,22 +11859,28 @@ async function route(
       mergeGroupCapability.isolation === "container" &&
       mergeGroupCapability.network === "none" &&
       mergeGroupCapability.uid === 65532 &&
-      typeof mergeGroupCapability.image === "string" &&
-      /^[a-z0-9./_-]+@sha256:[0-9a-f]{64}$/u.test(mergeGroupCapability.image);
+      mergeGroupCapability.image === MERGE_GROUP_CI_AUDITED_IMAGE;
     const appId = Number(env.GITHUB_APP_ID);
     const policy = await loadWorkflowCheckpointPolicy(db, project.id);
     const workflowReady = hasCanonicalMergeWaitCheckpoint(
       workflowWithAdditionalCheckpoints(policy.workflow, policy.projectMandatory),
+    );
+    const appAttestation = await projectGithubAppAttestation(
+      db,
+      env,
+      project.id,
+      profile.github_repository,
     );
     return json({
       enabled: profile.merge_group_ci_enabled === 1,
       baseRef: profile.merge_group_ci_base_ref,
       workerId: profile.merge_group_ci_worker_id,
       repository: profile.github_repository,
-      fixedProfile: "briar/merge-group-ci/v2",
+      fixedProfile: "briar/merge-group-ci/v3",
       workerReady,
       workflowReady,
       appId: Number.isSafeInteger(appId) && appId > 0 ? appId : null,
+      appAttestation,
     });
   }
   if (workerRegistrationMatch && request.method === "POST") {
@@ -12881,6 +12959,8 @@ async function route(
         headSha: input.headSha,
         passed: input.passed,
         detail: input.detail,
+        log: input.log,
+        artifact: input.artifact,
       });
     } else if (operation === "publication") {
       const input = decodeMergeGroupPublicationInput(raw);
@@ -12905,13 +12985,29 @@ async function route(
             statuses: "write",
           },
         });
-        await verifyAuthoritativeMergeGroup({
+        if (!fence.generation_id) {
+          throw new StaleGitHubMergeGroupError(
+            "Merge-group job is not bound to a sealed generation",
+          );
+        }
+        const generation = await db.prepare(
+          `select * from merge_queue_generations
+           where id = ? and state = 'validating' and validation_job_id = ?`,
+        ).bind(fence.generation_id, fence.id)
+          .first<MergeQueueGenerationRow>();
+        if (!generation) {
+          throw new StaleGitHubMergeGroupError(
+            "Sealed generation is no longer current",
+          );
+        }
+        await verifySealedMergeGroup({
           accessToken: token.token,
           repository: fence.repository,
           baseRef: fence.base_ref,
           baseSha: fence.base_sha,
           headRef: fence.head_ref,
           headSha: fence.head_sha,
+          expectedMembers: generationMembers(generation),
         });
         const receipt = await publishGitHubAppCommitStatus({
           accessToken: token.token,
@@ -12942,6 +13038,16 @@ async function route(
             detail: error instanceof Error ? error.message : String(error),
           });
           if (!result) throw new HttpError(409, "Merge-group stale fence changed");
+          if (result.generation_id) {
+            await reworkTerminalMergeQueueGeneration(db, {
+              generationId: result.generation_id,
+              jobId: result.id,
+              observedAt,
+              code: "publication_queue_changed",
+              detail: error instanceof Error ? error.message : String(error),
+              superseded: true,
+            });
+          }
           return json({ job: result, superseded: true });
         }
         const retrySeconds = Math.min(300, 2 ** Math.min(fence.publication_attempts, 8));
@@ -12953,6 +13059,15 @@ async function route(
           detail: error instanceof Error ? error.message : String(error),
         });
         if (!result) throw new HttpError(409, "Merge-group publication retry fence changed");
+        if (result.error_code === "publication_exhausted" && result.generation_id) {
+          await reworkTerminalMergeQueueGeneration(db, {
+            generationId: result.generation_id,
+            jobId: result.id,
+            observedAt,
+            code: "publication_exhausted",
+            detail: result.error_detail ?? "Status publication retry was exhausted",
+          });
+        }
         return json({
           job: result,
           retry: result.error_code === "publication_retry",
@@ -12972,12 +13087,50 @@ async function route(
         ...await fenceFor(input),
         headSha: input.headSha,
       });
+      if (result?.generation_id) {
+        await db.prepare(
+          `update merge_queue_generations
+           set state = ?, error_code = case when ? then null else 'ci_failed' end,
+               error_detail = case when ? then null
+                 else 'The exact sealed merge-group failed deterministic CI' end,
+               updated_at = ?
+           where id = ? and state = 'validating'
+             and validation_job_id = ?`,
+        ).bind(
+          result.validation_outcome === "passed" ? "published" : "failed",
+          result.validation_outcome === "passed" ? 1 : 0,
+          result.validation_outcome === "passed" ? 1 : 0,
+          observedAt,
+          result.generation_id,
+          result.id,
+        ).run();
+        if (result.validation_outcome === "failed") {
+          await reworkTerminalMergeQueueGeneration(db, {
+            generationId: result.generation_id,
+            jobId: result.id,
+            observedAt,
+            code: "ci_failed",
+            detail: result.error_detail ??
+              "The exact sealed merge-group failed deterministic CI",
+          });
+        }
+      }
     } else if (operation === "supersede") {
       const input = decodeMergeGroupSupersedeInput(raw);
       result = await supersedeMergeGroupValidationJob(db, {
         ...await fenceFor(input),
         detail: input.detail,
       });
+      if (result?.generation_id) {
+        await reworkTerminalMergeQueueGeneration(db, {
+          generationId: result.generation_id,
+          jobId: result.id,
+          observedAt,
+          code: "executor_superseded",
+          detail: input.detail,
+          superseded: true,
+        });
+      }
     } else {
       const input = decodeMergeGroupReleaseInput(raw);
       if (
@@ -12991,6 +13144,18 @@ async function route(
         reason: input.reason,
         detail: input.detail,
       });
+      if (
+        result?.generation_id &&
+        ["infra_exhausted", "lease_exhausted"].includes(result.error_code ?? "")
+      ) {
+        await reworkTerminalMergeQueueGeneration(db, {
+          generationId: result.generation_id,
+          jobId: result.id,
+          observedAt,
+          code: result.error_code!,
+          detail: result.error_detail ?? "Validation infrastructure retry was exhausted",
+        });
+      }
     }
     if (!result) {
       throw new HttpError(409, "Merge-group claim fence changed");
@@ -14842,6 +15007,23 @@ async function route(
       if (result.outcome === "not_found") {
         throw new HttpError(404, "Run not found", "RUN_NOT_FOUND");
       }
+      let mergeQueueAdmission: { registered: number } | null = null;
+      if (
+        agentStageLifecycleMatch[3] === "complete" &&
+        agentStageLifecycleMatch[2] === "ci_qa" &&
+        ["completed", "already_completed"].includes(result.outcome) &&
+        result.attempt !== null && result.revision !== null
+      ) {
+        const registered = await registerRunMergeQueueAdmission(db, {
+          projectId,
+          runId: agentStageLifecycleMatch[1],
+          attempt: result.attempt,
+          revision: result.revision,
+          requestedAt: new Date().toISOString(),
+        });
+        mergeQueueAdmission = { registered };
+        if (registered > 0) scheduleMergeQueueCoordinator(env, context);
+      }
       const githubAutoResume =
         result.outcome === "paused" &&
           result.checkpoint?.stage === "pr_open" &&
@@ -14856,6 +15038,7 @@ async function route(
         runId: agentStageLifecycleMatch[1],
         requestId: input.requestId,
         ...result,
+        ...(mergeQueueAdmission ? { mergeQueueAdmission } : {}),
         ...(githubAutoResume ? { githubAutoResume } : {}),
       });
     } catch (error) {
@@ -15260,6 +15443,7 @@ export async function handleScheduledTask(
 ): Promise<void> {
   const observedAt = new Date(controller.scheduledTime).toISOString();
   if (controller.cron === GITHUB_RECONCILIATION_CRON) {
+    scheduleMergeQueueCoordinator(env, ctx);
     ctx.waitUntil((async () => {
       try {
         const github = await dependencies.reconcileGithubMergedRuns(env.DB);
@@ -15478,7 +15662,7 @@ export default {
     }
     if (url.pathname === "/github/webhooks" && request.method === "POST") {
       try {
-        const response = await handleGithubWebhookRequest(request, env);
+        const response = await handleGithubWebhookRequest(request, env, ctx);
         scheduleInboxRealtimeFlush(env, env.DB, ctx);
         return response;
       } catch (error) {

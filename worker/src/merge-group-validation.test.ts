@@ -1,15 +1,25 @@
 import { createHash, createHmac, generateKeyPairSync } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { MERGE_GROUP_STATUS_CONTEXTS } from "../../src/lib/merge-group-validation-contract";
+import {
+  MERGE_GROUP_CI_AUDITED_IMAGE,
+  MERGE_GROUP_STATUS_CONTEXTS,
+} from "../../src/lib/merge-group-validation-contract";
 import worker from "./index";
+import {
+  collectReadyMergeQueueGeneration,
+  generationMembers,
+} from "./merge-queue-coordinator";
+import { reworkTerminalMergeQueueGeneration } from "./merge-queue-recovery";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
+  claimNextMergeGroupAuthorityJob,
   claimNextMergeGroupValidationJob,
   completeMergeGroupStatusPublication,
   enqueueMergeGroupValidationJob,
   fenceMergeGroupStatusPublication,
   mergeGroupValidationProject,
   recordMergeGroupPublicationFailure,
+  recordPendingMergeGroupValidationJob,
   recordMergeGroupValidation,
   recordMergeGroupStatusReceipt,
   releaseMergeGroupValidationClaim,
@@ -29,6 +39,15 @@ const baseTime = Date.parse("2026-08-20T00:00:00.000Z");
 const at = (seconds: number) => new Date(baseTime + seconds * 1_000).toISOString();
 const sha = (character: string) => character.repeat(40);
 const tokenHash = (character: string) => character.repeat(64);
+const mergeGroupCapabilityJson = JSON.stringify({
+  merge_group_ci: {
+    protocol: 3,
+    isolation: "container",
+    network: "none",
+    uid: 65532,
+    image: MERGE_GROUP_CI_AUDITED_IMAGE,
+  },
+});
 
 describe("merge-group exact-SHA validation jobs", () => {
   let fixture: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
@@ -98,14 +117,14 @@ describe("merge-group exact-SHA validation jobs", () => {
            versions_json, capabilities_json, state, last_heartbeat_at,
            created_at, updated_at
          ) values (?, ?, ?, ?, ?, 'codex', '{}',
-                   '{"merge_group_ci":{"protocol":2,"isolation":"container","network":"none","uid":65532,"image":"ghcr.io/wordbricks/ci@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}',
-                   'online', ?, ?, ?)`,
+                   ?, 'online', ?, ?, ?)`,
       ).bind(
         workerId,
         projectId,
         index === 0 ? deviceA : deviceB,
         `worker-${index}`,
         tokenHash(index === 0 ? "b" : "c"),
+        mergeGroupCapabilityJson,
         at(0),
         at(0),
         at(0),
@@ -211,7 +230,7 @@ describe("merge-group exact-SHA validation jobs", () => {
     });
     await db.prepare(
       `update briar_execution_workers
-       set capabilities_json = '{"merge_group_ci":{"protocol":2,"isolation":"container","network":"none","uid":65532,"image":"ghcr.io/wordbricks/ci:mutable"}}'
+       set capabilities_json = '{"merge_group_ci":{"protocol":3,"isolation":"container","network":"none","uid":65532,"image":"ghcr.io/wordbricks/ci:mutable"}}'
        where id = ?`,
     ).bind(workerA).run();
 
@@ -239,9 +258,9 @@ describe("merge-group exact-SHA validation jobs", () => {
     await db.batch([
       db.prepare(
         `update briar_execution_workers
-         set capabilities_json = '{"merge_group_ci":{"protocol":2,"isolation":"container","network":"none","uid":65532,"image":"ghcr.io/wordbricks/ci@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}'
+         set capabilities_json = ?
          where id = ?`,
-      ).bind(workerA),
+      ).bind(mergeGroupCapabilityJson, workerA),
       db.prepare("delete from merge_group_validation_jobs where id = ?").bind(job!.id),
     ]);
   });
@@ -270,6 +289,71 @@ describe("merge-group exact-SHA validation jobs", () => {
       `select count(*) as count from merge_group_validation_jobs
        where head_sha = ?`,
     ).bind(sha("1")).first<number>("count")).resolves.toBe(1);
+  });
+
+  it("records an early signed tail without spending authority attempts before sealing", async () => {
+    const laneRepositoryId = repositoryId + 501;
+    const generationId = "77777777-7777-4777-8777-777777777777";
+    await db.prepare(
+      `insert into merge_queue_generations (
+         id, project_id, installation_id, repository_id, repository,
+         base_ref, owner_worker_id, state, expected_members_json,
+         collection_started_at, collection_deadline_at, created_at, updated_at
+       ) values (?, ?, ?, ?, 'wordbricks/early-tail', 'refs/heads/main', ?,
+                 'collecting', '[]', ?, ?, ?, ?)`,
+    ).bind(
+      generationId,
+      projectId,
+      installationId,
+      laneRepositoryId,
+      workerA,
+      at(1),
+      at(301),
+      at(1),
+      at(1),
+    ).run();
+    const pending = await recordPendingMergeGroupValidationJob(db, {
+      projectId,
+      installationId,
+      repositoryId: laneRepositoryId,
+      repository: "wordbricks/early-tail",
+      baseRef: "refs/heads/main",
+      headRef: `refs/heads/gh-readonly-queue/main/pr-501-${sha("5").slice(0, 8)}`,
+      headSha: sha("5"),
+      baseSha: sha("a"),
+      deliveryId: "early-tail-delivery",
+      eligibleWorkerId: workerA,
+      receivedAt: at(2),
+    });
+    await expect(claimNextMergeGroupAuthorityJob(db, at(3))).resolves.toBeNull();
+    await expect(db.prepare(
+      `select state, authority_attempts from merge_group_validation_jobs
+       where id = ?`,
+    ).bind(pending!.id).first()).resolves.toEqual({
+      state: "authority_pending",
+      authority_attempts: 0,
+    });
+
+    await db.prepare(
+      `update merge_queue_generations set state = 'awaiting_tail', updated_at = ?
+       where id = ?`,
+    ).bind(at(301), generationId).run();
+    await expect(claimNextMergeGroupAuthorityJob(db, at(302))).resolves.toMatchObject({
+      id: pending!.id,
+      state: "authority_pending",
+      authority_attempts: 1,
+    });
+    await db.batch([
+      db.prepare(
+        `update merge_group_validation_jobs
+         set state = 'superseded', next_authority_at = null,
+             superseded_at = ?, updated_at = ? where id = ?`,
+      ).bind(at(303), at(303), pending!.id),
+      db.prepare(
+        `update merge_queue_generations set state = 'superseded', updated_at = ?
+         where id = ?`,
+      ).bind(at(303), generationId),
+    ]);
   });
 
   it("allows one of five concurrent claimers and fences a lease takeover", async () => {
@@ -517,6 +601,11 @@ describe("merge-group exact-SHA validation jobs", () => {
   it("never revives an out-of-order old head after the live queue fence supersedes it", async () => {
     await enqueue(sha("3"), at(20), at(20), 2);
     const old = await enqueue(sha("2"), at(21), at(21), 1);
+    await db.prepare(
+      `update merge_group_validation_jobs
+       set state = 'superseded', superseded_at = ?, updated_at = ?
+       where id = ?`,
+    ).bind(at(21), at(21), old!.id).run();
     const current = await claimNextMergeGroupValidationJob(db, projectId, {
       workerId: workerA,
       claimTokenHash: tokenHash("4"),
@@ -553,6 +642,7 @@ describe("merge-group exact-SHA validation jobs", () => {
       authenticatedAt: at(24),
       headSha: current!.head_sha,
     });
+    await enqueue(sha("2"), at(25), at(25), 1);
     const oldClaim = await claimNextMergeGroupValidationJob(db, projectId, {
       workerId: workerA,
       claimTokenHash: tokenHash("5"),
@@ -632,6 +722,120 @@ describe("merge-group exact-SHA validation jobs", () => {
     ).bind(at(36), at(36), claim!.id).run();
   });
 
+  it("durably reworks every paused exact member after a terminal queue failure", async () => {
+    const runId = "77777777-7777-4777-8777-777777777777";
+    const generationId = "88888888-8888-4888-8888-888888888888";
+    const jobId = "99999999-9999-4999-8999-999999999999";
+    const workflow = JSON.stringify({
+      version: 2,
+      requirements: [],
+      stages: [
+        { id: "ci_qa", label: "Signoff", required: true, evidence: [] },
+        { id: "merged", label: "Merge", required: true, evidence: [] },
+      ],
+      execution: {
+        checkpoints: [{
+          key: "issue-before-merged",
+          stage: "merged",
+          position: "before",
+        }],
+      },
+      completion: { requiredStages: ["ci_qa", "merged"] },
+    });
+    const member = {
+      projectId,
+      runId,
+      attempt: 1,
+      revision: 1,
+      installationId,
+      repositoryId,
+      repository: "wordbricks/briar",
+      pullRequestId: 1_196,
+      pullRequestNodeId: "PR_terminal_rework",
+      pullRequestNumber: 1_196,
+      headSha: sha("c"),
+      baseSha: sha("a"),
+      readyAt: at(700),
+    };
+    await db.batch([
+      db.prepare(
+        `insert into briar_hunt_runs (
+           id, project_id, source, source_key, title, stage, status,
+           workflow_stage, workflow_snapshot_json, issue_checkpoints_json,
+           detail, repository, commit_sha, paused_at, waiting_checkpoint_key,
+           waiting_checkpoint_revision, started_at, last_event_at, created_at,
+           updated_at
+         ) values (?, ?, 'issue', 'terminal-rework', 'Terminal rework',
+                   'implementing', 'running', 'merged', ?, '[]', null,
+                   'wordbricks/briar', ?, ?, 'issue-before-merged', 1,
+                   ?, ?, ?, ?)`,
+      ).bind(
+        runId,
+        projectId,
+        workflow,
+        member.headSha,
+        at(701),
+        at(700),
+        at(701),
+        at(700),
+        at(701),
+      ),
+      db.prepare(
+        `insert into merge_queue_generations (
+           id, project_id, installation_id, repository_id, repository,
+           base_ref, owner_worker_id, state, expected_members_json,
+           enqueue_cursor, collection_started_at, collection_deadline_at,
+           sealed_at, enqueued_at, matched_head_ref, matched_head_sha,
+           validation_job_id, created_at, updated_at
+         ) values (?, ?, ?, ?, 'wordbricks/briar', 'refs/heads/main', ?,
+                   'validating', ?, 1, ?, ?, ?, ?,
+                   'refs/heads/gh-readonly-queue/main/pr-1196-cccccccc', ?, ?, ?, ?)`,
+      ).bind(
+        generationId,
+        projectId,
+        installationId,
+        repositoryId,
+        workerA,
+        JSON.stringify([member]),
+        at(700),
+        at(1_000),
+        at(700),
+        at(700),
+        member.headSha,
+        jobId,
+        at(700),
+        at(700),
+      ),
+    ]);
+
+    await expect(reworkTerminalMergeQueueGeneration(db, {
+      generationId,
+      jobId,
+      code: "publication_exhausted",
+      detail: "The App status API remained unavailable; retry is recorded on the job.",
+      observedAt: at(702),
+    })).resolves.toEqual({ generation: true, reworked: 1 });
+    await expect(db.prepare(
+      `select status, workflow_stage, current_revision, paused_at
+       from briar_hunt_runs where id = ?`,
+    ).bind(runId).first()).resolves.toMatchObject({
+      status: "queued",
+      workflow_stage: "ci_qa",
+      current_revision: 2,
+      paused_at: null,
+    });
+    await expect(db.prepare(
+      `select state, error_code from merge_queue_generations where id = ?`,
+    ).bind(generationId).first()).resolves.toEqual({
+      state: "failed",
+      error_code: "publication_exhausted",
+    });
+    await expect(db.prepare(
+      `select detail from briar_hunt_events
+       where run_id = ? and event_key like 'workflow:rework:%'`,
+    ).bind(runId).first<string>("detail")).resolves.toContain(jobId);
+  });
+
   it("requires an administrator retry after bounded infrastructure exhaustion", async () => {
     const queued = await enqueueMergeGroupValidationJob(db, {
       projectId,
@@ -695,7 +899,7 @@ describe("merge-group exact-SHA validation jobs", () => {
     ).bind(at(221), at(221), queued!.id).run();
   });
 
-  it("revives the same immutable SHA when GitHub gives it a newer live ref", async () => {
+  it("never revives a terminal SHA because a later delivery has a new ref", async () => {
     const common = {
       projectId,
       installationId,
@@ -714,14 +918,11 @@ describe("merge-group exact-SHA validation jobs", () => {
       authorityCheckedAt: at(230),
       queuedAt: at(230),
     });
-    const replacement = await enqueueMergeGroupValidationJob(db, {
-      ...common,
-      headRef: "refs/heads/gh-readonly-queue/main/pr-33-ffffffff",
-      headSha: sha("f"),
-      tailPullRequestNumber: 33,
-      authorityCheckedAt: at(231),
-      queuedAt: at(231),
-    });
+    await db.prepare(
+      `update merge_group_validation_jobs
+       set state = 'superseded', superseded_at = ?, updated_at = ?
+       where id = ?`,
+    ).bind(at(231), at(231), original!.id).run();
     await expect(db.prepare(
       "select state from merge_group_validation_jobs where id = ?",
     ).bind(original!.id).first<string>("state")).resolves.toBe("superseded");
@@ -736,14 +937,111 @@ describe("merge-group exact-SHA validation jobs", () => {
     });
     expect(revived).toMatchObject({
       id: original!.id,
-      state: "queued",
-      head_ref: "refs/heads/gh-readonly-queue/main/pr-34-eeeeeeee",
-      tail_pull_request_number: 34,
-      superseded_at: null,
+      state: "superseded",
+      head_ref: "refs/heads/gh-readonly-queue/main/pr-32-eeeeeeee",
+      tail_pull_request_number: 32,
+      superseded_at: at(231),
     });
+  });
+
+  it("atomically seals five exact ready PRs and leaves a late PR for the next generation", async () => {
+    const readyAt = at(300);
+    for (let index = 1; index <= 6; index += 1) {
+      const runId = `90000000-0000-4000-8000-${index.toString().padStart(12, "0")}`;
+      const prHead = index.toString(16).repeat(40);
+      await db.batch([
+        db.prepare(
+          `insert into briar_hunt_runs (
+             id, project_id, source, source_key, title, stage, status,
+             workflow_stage, workflow_snapshot_json, issue_checkpoints_json,
+             detail, repository, branch, commit_sha, started_at,
+             last_event_at, created_at, updated_at
+           ) values (?, ?, 'issue', ?, ?, 'implementing', 'running',
+                     'merged', '{"version":2,"requirements":[],"stages":[],"execution":{"checkpoints":[]},"completion":{"requiredStages":[]}}',
+                     '[]', null, 'wordbricks/briar', null, ?, ?, ?, ?, ?)`,
+        ).bind(
+          runId,
+          projectId,
+          `coordinator-${index}`,
+          `Coordinator ${index}`,
+          prHead,
+          readyAt,
+          readyAt,
+          readyAt,
+          readyAt,
+        ),
+        db.prepare(
+          `insert into briar_run_pull_requests (
+             project_id, run_id, attempt, revision, revision_started_at, url,
+             installation_id, repository_id, repository, pull_request_id,
+             pull_request_node_id, pull_request_number, state, draft,
+             head_sha, base_sha, opened_at, provider_updated_at,
+             last_delivery_id, created_at, updated_at,
+             merge_queue_admission_state, merge_queue_ready_at
+           ) values (?, ?, 1, 1, ?, ?, ?, ?, 'wordbricks/briar', ?, ?, ?,
+                     'open', 0, ?, ?, ?, ?, ?, ?, ?, 'ready', ?)`,
+        ).bind(
+          projectId,
+          runId,
+          readyAt,
+          `https://github.com/wordbricks/briar/pull/${100 + index}`,
+          installationId,
+          repositoryId,
+          1_000 + index,
+          `PR_node_${index}`,
+          100 + index,
+          prHead,
+          sha("a"),
+          readyAt,
+          readyAt,
+          `delivery-${index}`,
+          readyAt,
+          readyAt,
+          index <= 5 ? readyAt : at(301),
+        ),
+      ]);
+    }
+    const races = await Promise.all(Array.from({ length: 5 }, () =>
+      collectReadyMergeQueueGeneration(db, {
+        projectId,
+        repositoryId,
+        observedAt: readyAt,
+      })
+    ));
+    const sealed = races.find((generation) => generation?.state === "enqueuing") ??
+      await db.prepare(
+        `select * from merge_queue_generations where repository_id = ?`,
+      ).bind(repositoryId).first<never>();
+    expect(sealed).not.toBeNull();
+    expect(generationMembers(sealed!)).toHaveLength(5);
     await expect(db.prepare(
-      "select state from merge_group_validation_jobs where id = ?",
-    ).bind(replacement!.id).first<string>("state")).resolves.toBe("superseded");
+      `select count(*) as count from merge_queue_generations
+       where repository_id = ? and state in (
+         'collecting', 'sealing', 'enqueuing', 'awaiting_tail', 'validating'
+       )`,
+    ).bind(repositoryId).first<number>("count")).resolves.toBe(1);
+    await expect(db.prepare(
+      `select merge_queue_generation_id from briar_run_pull_requests
+       where pull_request_number = 106`,
+    ).first<string>("merge_queue_generation_id")).resolves.toBeNull();
+
+    await db.prepare(
+      `update merge_queue_generations set state = 'published', updated_at = ?
+       where id = ?`,
+    ).bind(at(302), Reflect.get(sealed!, "id")).run();
+    const collecting = await collectReadyMergeQueueGeneration(db, {
+      projectId,
+      repositoryId,
+      observedAt: at(302),
+    });
+    expect(collecting?.state).toBe("collecting");
+    const single = await collectReadyMergeQueueGeneration(db, {
+      projectId,
+      repositoryId,
+      observedAt: at(602),
+    });
+    expect(single?.state).toBe("enqueuing");
+    expect(generationMembers(single!)).toHaveLength(1);
   });
 
   it("enqueues only connected checks_requested deliveries and deduplicates by SHA", async () => {

@@ -1,13 +1,22 @@
 import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
+import imagePolicy from "../config/merge-group-ci-image.json";
+import {
+  MERGE_GROUP_CI_AUDITED_IMAGE,
+  MERGE_GROUP_CI_AUDITED_IMAGE_DIGEST,
+  MERGE_GROUP_CI_AUDITED_IMAGE_REPOSITORY,
+} from "../src/lib/merge-group-validation-contract";
 import {
   fetchExactMergeGroupHead,
+  assertTrustedCandidateConfiguration,
   MERGE_GROUP_STATUS_CONTEXTS,
   MERGE_GROUP_VALIDATION_COMMAND,
   mergeGroupContainerRuntime,
+  MergeGroupCiDefinitionChangedError,
   prepareTrustedMergeGroupProfile,
   runFixedMergeGroupValidation,
   StaleMergeGroupError,
@@ -38,13 +47,42 @@ describe("fixed merge-group executor", () => {
       ready: false,
     });
     expect(mergeGroupContainerRuntime({
-      BRIAR_MERGE_GROUP_CI_IMAGE: `ghcr.io/wordbricks/briar-ci@sha256:${"a".repeat(64)}`,
+      BRIAR_MERGE_GROUP_CI_IMAGE: MERGE_GROUP_CI_AUDITED_IMAGE,
       GH_TOKEN: "must-not-be-forwarded",
     }, () => "/usr/bin/docker", () => true)).toEqual({
       ready: true,
       executable: "/usr/bin/docker",
-      image: `ghcr.io/wordbricks/briar-ci@sha256:${"a".repeat(64)}`,
+      image: MERGE_GROUP_CI_AUDITED_IMAGE,
     });
+    expect(mergeGroupContainerRuntime({
+      BRIAR_MERGE_GROUP_CI_IMAGE:
+        `ghcr.io/wordbricks/briar-merge-group-ci@sha256:${"a".repeat(64)}`,
+    }, () => "/usr/bin/docker", () => true)).toMatchObject({ ready: false });
+  });
+
+  it("binds runtime readiness to the independently reproduced OCI policy", async () => {
+    expect(imagePolicy).toMatchObject({
+      protocol: 3,
+      repository: MERGE_GROUP_CI_AUDITED_IMAGE_REPOSITORY,
+      manifestDigest: MERGE_GROUP_CI_AUDITED_IMAGE_DIGEST,
+      platform: {
+        os: "linux",
+        architecture: "arm64",
+        manifestDigest:
+          "sha256:2d231cd43fc8254ab7080227b3d262ab9a2fa87377f9fdf7ca8f847009ce8bc7",
+      },
+      reproduction: {
+        independentBuilds: 2,
+        matchingManifestDigests: true,
+      },
+      rollout: { published: false, enabled: false },
+    });
+    expect(`${imagePolicy.repository}@${imagePolicy.manifestDigest}`)
+      .toBe(MERGE_GROUP_CI_AUDITED_IMAGE);
+    expect(createHash("sha256").update(await readFile("bun.lock")).digest("hex"))
+      .toBe(imagePolicy.build.bunLockSha256);
+    expect(createHash("sha256").update(await readFile("src-tauri/Cargo.lock")).digest("hex"))
+      .toBe(imagePolicy.build.cargoLockSha256);
   });
 
   it("fetches the signed ref to a private ref and verifies exact head and ancestry", () => {
@@ -102,7 +140,11 @@ describe("fixed merge-group executor", () => {
   });
 
   it("rejects candidate-owned CI entrypoint changes and loads the signed base copy", async () => {
-    const changed = vi.fn(() => ({ exitCode: 1, stdout: "", stderr: "" }));
+    const changed = vi.fn((args: string[]) => ({
+      exitCode: args.includes("--name-only") ? 0 : 1,
+      stdout: "",
+      stderr: "",
+    }));
     await expect(prepareTrustedMergeGroupProfile(changed, "/repo", job))
       .rejects.toThrow(/changes the trusted/iu);
 
@@ -123,6 +165,33 @@ describe("fixed merge-group executor", () => {
     ], { cwd: "/repo", timeoutMs: 120_000 });
   });
 
+  it.each([
+    "vitest.config.ts",
+    "vitest.workspace.js",
+    "bunfig.toml",
+    ".env",
+    ".env.test",
+    ".npmrc",
+    ".yarnrc.yml",
+    "tools/preload.ts",
+    "node_modules/vitest/index.js",
+  ])("rejects auto-loaded candidate control file %s", (path) => {
+    expect(() => assertTrustedCandidateConfiguration([path])).toThrow(
+      MergeGroupCiDefinitionChangedError,
+    );
+  });
+
+  it.each([
+    ["process.exit(0)", "vitest.config.ts"],
+    ["passWithNoTests", "vitest.workspace.ts"],
+    ["Bun preload", "bunfig.toml"],
+    ["NODE_OPTIONS loader", ".env.test"],
+  ])("blocks an adversarial %s override before execution", (_attack, path) => {
+    expect(() => assertTrustedCandidateConfiguration([path])).toThrow(
+      MergeGroupCiDefinitionChangedError,
+    );
+  });
+
   it("terminates the entire POSIX process group", () => {
     const kill = vi.spyOn(process, "kill").mockReturnValue(true);
     try {
@@ -141,6 +210,7 @@ describe("fixed merge-group executor", () => {
     const environmentFile = join(root, "environment.txt");
     const argumentFile = join(root, "arguments.txt");
     await writeFile(executable, `#!/bin/bash
+[[ "$1" == "rm" ]] && exit 0
 env >${JSON.stringify(environmentFile)}
 printf '%s\\n' "$@" >${JSON.stringify(argumentFile)}
 `);
@@ -148,20 +218,30 @@ printf '%s\\n' "$@" >${JSON.stringify(argumentFile)}
     vi.stubEnv("BRIAR_WORKER_TOKEN", "worker-secret");
     vi.stubEnv("GH_TOKEN", "github-secret");
     vi.stubEnv("CARGO_HOME", "/private/cargo");
+    vi.stubEnv("NODE_OPTIONS", "--require=/candidate/process-exit-zero.js");
     try {
       await expect(runFixedMergeGroupValidation({
         cwd: root,
         profilePath: executable,
+        bunConfigPath: executable,
+        vitestConfigPath: executable,
         scratchPath: root,
         bundlePath: executable,
         headSha: job.headSha,
         runtime: { executable, image: `example.invalid/ci@sha256:${"a".repeat(64)}` },
         signal: new AbortController().signal,
-      })).resolves.toEqual({ passed: true, exitCode: 0 });
+      })).resolves.toMatchObject({
+        passed: true,
+        exitCode: 0,
+        logSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+        logTruncated: false,
+      });
       const environment = await readFile(environmentFile, "utf8");
       expect(environment).not.toContain("BRIAR_WORKER_TOKEN");
       expect(environment).not.toContain("GH_TOKEN");
       expect(environment).not.toContain("CARGO_HOME");
+      expect(environment).not.toContain("NODE_OPTIONS");
+      expect(environment).not.toContain("process-exit-zero");
       expect(environment).toContain(`HOME=${root}`);
       const dockerArguments = await readFile(argumentFile, "utf8");
       expect(dockerArguments).toContain("--network=none");
@@ -171,6 +251,10 @@ printf '%s\\n' "$@" >${JSON.stringify(argumentFile)}
       expect(dockerArguments).toContain("--user=65532:65532");
       expect(dockerArguments).toContain("--tmpfs=/scratch:rw,nosuid,nodev,size=12g,uid=65532,gid=65532");
       expect(dockerArguments).toContain("--pids-limit=1024");
+      expect(dockerArguments).toContain("--memory=16g");
+      expect(dockerArguments).toContain("--memory-swap=16g");
+      expect(dockerArguments).toContain("--cpus=4");
+      expect(dockerArguments).toContain("--ulimit=nofile=4096:4096");
       expect(dockerArguments).toContain("--env=HOME=/scratch/home");
       expect(dockerArguments).toContain("--env=BUN_INSTALL_CACHE_DIR=/opt/briar/bun-cache");
       expect(dockerArguments).toContain("--env=CARGO_HOME=/opt/briar/cargo");
@@ -189,6 +273,7 @@ printf '%s\\n' "$@" >${JSON.stringify(argumentFile)}
     const executable = join(root, "fake-docker.sh");
     const pidFile = join(root, "descendant.pid");
     await writeFile(executable, `#!/bin/bash
+[[ "$1" == "rm" ]] && exit 0
 trap '' TERM
 bash -c 'trap "" TERM; while :; do sleep 1; done' &
 echo $! >${JSON.stringify(pidFile)}
@@ -199,6 +284,8 @@ while :; do sleep 1; done
     const running = runFixedMergeGroupValidation({
       cwd: root,
       profilePath: executable,
+      bunConfigPath: executable,
+      vitestConfigPath: executable,
       scratchPath: root,
       bundlePath: executable,
       headSha: job.headSha,

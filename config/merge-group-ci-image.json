@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "protocol": 3,
+  "repository": "ghcr.io/wordbricks/briar-merge-group-ci",
+  "manifestDigest": "sha256:00fe9667e314d8b388aba1e4f27ceb5b08ba9672060d5c804f7cafc98238196c",
+  "platform": {
+    "os": "linux",
+    "architecture": "arm64",
+    "manifestDigest": "sha256:2d231cd43fc8254ab7080227b3d262ab9a2fa87377f9fdf7ca8f847009ce8bc7",
+    "sizeBytes": 2729063737
+  },
+  "build": {
+    "sourceDateEpoch": 1787270400,
+    "debianSnapshot": "20260820T000000Z",
+    "rustBase": "docker.io/library/rust:1.96.0-bookworm@sha256:5e2214abe154fe26e39f64488952e5c991eeed1d6d6da7cc8381ae83927f0cfc",
+    "bunVersion": "1.4.0",
+    "nodeVersion": "22.23.2",
+    "nodeLinuxArm64Sha256": "fff4078c5def658577f92c88db7db3bc0072924bfb93fe52c1e744a54e94abb8",
+    "nodeLinuxX64Sha256": "d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307",
+    "cargoAuditVersion": "0.22.2",
+    "gitleaksVersion": "8.30.1",
+    "rustSecAdvisoryDbCommit": "42ead52aed439b170e1b8c8f9eab6735a93061d7",
+    "bunLockSha256": "06962c7eb1798551b044bb07b2cb8eaccf40a27b70d11bd13f93d36bf85ba641",
+    "cargoLockSha256": "0fb05a6a3414bfb28e48c4f4a73220781e7e1b54246d126eb56152ef610a6155"
+  },
+  "audit": {
+    "bunHighOrCriticalVulnerabilities": 0,
+    "bunIgnoredAdvisories": ["GHSA-f88m-g3jw-g9cj"],
+    "rustSecAllowedWarnings": 17
+  },
+  "reproduction": {
+    "independentBuilds": 2,
+    "matchingManifestDigests": true,
+    "verifiedAt": "2026-08-21T01:29:16.000Z"
+  },
+  "rollout": {
+    "published": false,
+    "enabled": false
+  }
+}

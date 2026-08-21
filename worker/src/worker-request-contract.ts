@@ -67,6 +67,16 @@ export const MergeGroupValidationInput = strictSchema(Schema.Struct({
   ...MergeGroupClaimFence,
   passed: Schema.Boolean,
   detail: Schema.optional(Schema.NullOr(trimmedText(1, 4_000))),
+  log: trimmedText(1, 262_144),
+  artifact: strictSchema(Schema.Struct({
+    image: trimmedText(1, 512),
+    exitCode: integerBetween(0, 255),
+    deadlineMs: integerBetween(1, 3_600_000),
+    logSha256: Schema.String.check(
+      Schema.isPattern(/^[0-9a-f]{64}$/u),
+    ),
+    logTruncated: Schema.Boolean,
+  })),
 }));
 export const MergeGroupPublicationInput = strictSchema(Schema.Struct({
   ...MergeGroupClaimFence,

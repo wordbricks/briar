@@ -10,7 +10,7 @@ public: true
 default_permissions:
   administration: read
   contents: read
-  merge_queues: read
+  merge_queues: write
   pull_requests: read
   statuses: write
 default_events:

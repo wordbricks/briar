@@ -1,0 +1,6 @@
+[install]
+frozenLockfile = true
+offline = true
+
+[run]
+shell = "system"

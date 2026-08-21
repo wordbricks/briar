@@ -1,0 +1,13 @@
+*
+!.dockerignore
+!package.json
+!bun.lock
+!src-tauri
+!src-tauri/Cargo.toml
+!src-tauri/Cargo.lock
+!src-tauri/build.rs
+!src-tauri/src
+!src-tauri/src/lib.rs
+!containers
+!containers/merge-group-ci
+!containers/merge-group-ci/Dockerfile

@@ -14,6 +14,8 @@ const OPTIONAL_SECRET_GROUPS = [
     "GITHUB_APP_CLIENT_ID",
     "GITHUB_APP_CLIENT_SECRET",
     "GITHUB_APP_SLUG",
+    "GITHUB_APP_ID",
+    "GITHUB_APP_PRIVATE_KEY_PKCS8",
     "GITHUB_CALLBACK_ORIGIN",
     "GITHUB_WEBHOOK_SECRET",
   ],
@@ -27,7 +29,7 @@ const OPTIONAL_SECRET_GROUPS = [
 
 type Mode = "check" | "deploy" | "dev";
 
-function readSecrets(): Record<string, string> {
+export function readWorkerSecrets(): Record<string, string> {
   const secrets = Object.fromEntries(
     REQUIRED_SECRETS.map((name) => {
       const value = process.env[name]?.trim();
@@ -86,7 +88,7 @@ async function main(): Promise<void> {
     throw new Error("Usage: with-worker-secrets.ts <check|deploy|dev>");
   }
 
-  const secrets = readSecrets();
+  const secrets = readWorkerSecrets();
   if (mode === "check") {
     console.log(
       `Validated ${Object.keys(secrets).length} encrypted Worker secrets.`,

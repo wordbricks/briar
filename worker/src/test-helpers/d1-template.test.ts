@@ -15,6 +15,8 @@ import {
 } from "./d1";
 
 const databases: IsolatedTestDatabase[] = [];
+const isolatedTemplateTimeout =
+  process.env.BRIAR_TRUSTED_MERGE_GROUP_CI === "1" ? 180_000 : undefined;
 
 afterAll(async () => {
   await Promise.all(databases.splice(0).map((database) => database.dispose()));
@@ -61,7 +63,7 @@ describe("D1 test template isolation", () => {
        ) order by name`,
     ).all()).resolves.toMatchObject({ results: [] });
     await Promise.all([first.dispose(), second.dispose()]);
-  }, 30_000);
+  }, isolatedTemplateTimeout ?? 30_000);
 
   it("keeps the source read-only and removes suite clones on disposal", async () => {
     const template = await prepareD1TestTemplate();
@@ -85,7 +87,7 @@ describe("D1 test template isolation", () => {
 
     await expect(access(persistencePath)).rejects.toMatchObject({ code: "ENOENT" });
     await expect(readFile(templateFile)).resolves.toEqual(sourceBefore);
-  });
+  }, isolatedTemplateTimeout ?? 15_000);
 
   it.runIf(process.env.BRIAR_D1_TEST_CACHE_RECOVERY === "1")(
     "detects a corrupted cache entry and atomically regenerates it",
@@ -115,6 +117,6 @@ describe("D1 test template isolation", () => {
       );
       expect((await stat(regeneratedFile)).mode & 0o222).toBe(0);
     },
-    60_000,
+    isolatedTemplateTimeout ?? 60_000,
   );
 });

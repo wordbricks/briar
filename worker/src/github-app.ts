@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema";
-import { MERGE_GROUP_MAX_ENTRIES_TO_MERGE } from "../../src/lib/merge-group-validation-contract";
+import type { MergeQueueMember } from "./merge-queue-coordinator";
 import { schemaDecodeOptions } from "./schema-codecs";
 
 const encoder = new TextEncoder();
@@ -43,6 +43,71 @@ const MergeQueueTailResponse = Schema.Struct({
     })),
   }),
 });
+const MergeQueuePageResponse = Schema.Struct({
+  data: Schema.Struct({
+    repository: Schema.NullOr(Schema.Struct({
+      mergeQueue: Schema.NullOr(Schema.Struct({
+        entries: Schema.Struct({
+          nodes: Schema.Array(Schema.Struct({
+            id: Schema.NonEmptyString,
+            position: NonNegativeInteger,
+            enqueuedAt: Schema.NonEmptyString,
+            state: Schema.Literals([
+              "QUEUED",
+              "AWAITING_CHECKS",
+              "MERGEABLE",
+              "UNMERGEABLE",
+              "LOCKED",
+            ]),
+            headCommit: Schema.NullOr(Schema.Struct({ oid: GitObjectSha })),
+            pullRequest: Schema.NullOr(Schema.Struct({
+              id: Schema.NonEmptyString,
+              databaseId: PositiveInteger,
+              number: PositiveInteger,
+              headRefOid: GitObjectSha,
+            })),
+          })),
+          pageInfo: Schema.Struct({
+            hasNextPage: Schema.Boolean,
+            endCursor: Schema.NullOr(Schema.NonEmptyString),
+          }),
+        }),
+      })),
+    })),
+  }),
+});
+const PullRequestResponse = Schema.Struct({
+  data: Schema.Struct({
+    repository: Schema.NullOr(Schema.Struct({
+      pullRequest: Schema.NullOr(Schema.Struct({
+        id: Schema.NonEmptyString,
+        databaseId: PositiveInteger,
+        number: PositiveInteger,
+        state: Schema.Literal("OPEN"),
+        isDraft: Schema.Boolean,
+        headRefOid: GitObjectSha,
+        baseRefOid: GitObjectSha,
+        baseRefName: Schema.NonEmptyString,
+        mergeQueueEntry: Schema.NullOr(Schema.Struct({
+          id: Schema.NonEmptyString,
+        })),
+      })),
+    })),
+  }),
+});
+const EnqueuePullRequestResponse = Schema.Struct({
+  data: Schema.Struct({
+    enqueuePullRequest: Schema.Struct({
+      mergeQueueEntry: Schema.Struct({ id: Schema.NonEmptyString }),
+    }),
+  }),
+});
+const GitHubAppInstallationResponse = Schema.Struct({
+  id: PositiveInteger,
+  app_id: PositiveInteger,
+  permissions: Schema.Record(Schema.String, Schema.String),
+  events: Schema.Array(Schema.String),
+});
 const CommitStatusReceipt = Schema.Struct({
   id: PositiveInteger,
   context: Schema.NonEmptyString,
@@ -61,6 +126,22 @@ const decodeInstallationToken = Schema.decodeUnknownSync(
 const decodeGitRef = Schema.decodeUnknownSync(GitRefResponse, schemaDecodeOptions);
 const decodeMergeQueueTail = Schema.decodeUnknownSync(
   MergeQueueTailResponse,
+  schemaDecodeOptions,
+);
+const decodeMergeQueuePage = Schema.decodeUnknownSync(
+  MergeQueuePageResponse,
+  schemaDecodeOptions,
+);
+const decodePullRequest = Schema.decodeUnknownSync(
+  PullRequestResponse,
+  schemaDecodeOptions,
+);
+const decodeEnqueuePullRequest = Schema.decodeUnknownSync(
+  EnqueuePullRequestResponse,
+  schemaDecodeOptions,
+);
+const decodeGitHubAppInstallation = Schema.decodeUnknownSync(
+  GitHubAppInstallationResponse,
   schemaDecodeOptions,
 );
 const decodeCommitStatusReceipt = Schema.decodeUnknownSync(
@@ -124,6 +205,23 @@ export async function createGitHubAppJwt(
 
 type GitHubFetch = typeof fetch;
 
+export class GitHubAppRequestError extends Error {
+  readonly status: number | null;
+
+  constructor(message: string, status: number | null = null) {
+    super(message);
+    this.name = "GitHubAppRequestError";
+    this.status = status;
+  }
+}
+
+export function transientGitHubAppError(error: unknown) {
+  return error instanceof GitHubAppRequestError &&
+    (error.status === null || error.status === 408 || error.status === 409 ||
+      error.status === 425 || error.status === 429 ||
+      (error.status !== null && error.status >= 500));
+}
+
 async function githubJson(
   fetcher: GitHubFetch,
   url: string,
@@ -137,7 +235,7 @@ async function githubJson(
       signal: AbortSignal.timeout(10_000),
     });
   } catch (error) {
-    throw new Error(
+    throw new GitHubAppRequestError(
       `${label} infrastructure request failed: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
@@ -148,9 +246,10 @@ async function githubJson(
     body = null;
   }
   if (!response.ok) {
-    const error = new Error(`${label} failed with HTTP ${response.status}`);
-    Reflect.set(error, "status", response.status);
-    throw error;
+    throw new GitHubAppRequestError(
+      `${label} failed with HTTP ${response.status}`,
+      response.status,
+    );
   }
   return body;
 }
@@ -191,6 +290,16 @@ export type AuthoritativeMergeGroup = {
   tailPullRequestNumber: number;
   tailPosition: number;
   tailEnqueuedAt: string;
+};
+
+export type GitHubPullRequestReadback = {
+  id: string;
+  databaseId: number;
+  number: number;
+  headSha: string;
+  baseSha: string;
+  baseBranch: string;
+  queueEntryId: string | null;
 };
 
 export class StaleGitHubMergeGroupError extends Error {
@@ -236,7 +345,7 @@ export async function verifyAuthoritativeMergeGroup(input: {
       "GitHub merge-group ref",
     );
   } catch (error) {
-    if (error instanceof Error && Reflect.get(error, "status") === 404) {
+    if (error instanceof GitHubAppRequestError && error.status === 404) {
       throw new StaleGitHubMergeGroupError("Merge-group live ref no longer exists");
     }
     throw error;
@@ -260,7 +369,7 @@ export async function verifyAuthoritativeMergeGroup(input: {
             owner,
             name,
             branch: input.baseRef.replace(/^refs\/heads\//u, ""),
-            limit: MERGE_GROUP_MAX_ENTRIES_TO_MERGE,
+            limit: 100,
           },
         }),
       },
@@ -296,6 +405,309 @@ export async function verifyAuthoritativeMergeGroup(input: {
   };
 }
 
+const repositoryParts = (repository: string) => {
+  const [owner, name, extra] = repository.split("/");
+  if (!owner || !name || extra) throw new Error("GitHub repository is invalid");
+  return { owner, name };
+};
+
+async function inspectPullRequestWithApp(input: {
+  accessToken: string;
+  repository: string;
+  pullRequestNumber: number;
+  fetcher: GitHubFetch;
+}): Promise<GitHubPullRequestReadback> {
+  const { owner, name } = repositoryParts(input.repository);
+  const response = decodePullRequest(await githubJson(
+    input.fetcher,
+    "https://api.github.com/graphql",
+    {
+      method: "POST",
+      headers: githubHeaders(input.accessToken),
+      body: JSON.stringify({
+        query: `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id databaseId number state isDraft headRefOid baseRefOid baseRefName mergeQueueEntry{id}}}}`,
+        variables: {
+          owner,
+          name,
+          number: input.pullRequestNumber,
+        },
+      }),
+    },
+    "GitHub pull request readback",
+  ));
+  const pullRequest = response.data.repository?.pullRequest;
+  if (!pullRequest) throw new StaleGitHubMergeGroupError("Pull request no longer exists");
+  if (pullRequest.isDraft) {
+    throw new StaleGitHubMergeGroupError("Draft pull request cannot enter the merge queue");
+  }
+  return {
+    id: pullRequest.id,
+    databaseId: pullRequest.databaseId,
+    number: pullRequest.number,
+    headSha: pullRequest.headRefOid,
+    baseSha: pullRequest.baseRefOid,
+    baseBranch: pullRequest.baseRefName,
+    queueEntryId: pullRequest.mergeQueueEntry?.id ?? null,
+  };
+}
+
+export async function verifyExactPullRequestWithApp(input: {
+  accessToken: string;
+  member: MergeQueueMember;
+  fetcher?: GitHubFetch;
+}) {
+  const pullRequest = await inspectPullRequestWithApp({
+    accessToken: input.accessToken,
+    repository: input.member.repository,
+    pullRequestNumber: input.member.pullRequestNumber,
+    fetcher: input.fetcher ?? fetch,
+  });
+  if (
+    pullRequest.id !== input.member.pullRequestNodeId ||
+    pullRequest.databaseId !== input.member.pullRequestId ||
+    pullRequest.number !== input.member.pullRequestNumber ||
+    pullRequest.headSha !== input.member.headSha ||
+    pullRequest.baseSha !== input.member.baseSha ||
+    pullRequest.baseBranch !== "main"
+  ) {
+    throw new StaleGitHubMergeGroupError(
+      "Pull request identity, exact head, or exact base changed after signoff",
+    );
+  }
+  return pullRequest;
+}
+
+export async function enqueueExactPullRequestWithApp(input: {
+  accessToken: string;
+  member: MergeQueueMember;
+  fetcher?: GitHubFetch;
+}) {
+  const fetcher = input.fetcher ?? fetch;
+  const before = await verifyExactPullRequestWithApp({
+    accessToken: input.accessToken,
+    member: input.member,
+    fetcher,
+  });
+  let queueEntryId = before.queueEntryId;
+  if (!queueEntryId) {
+    const response = decodeEnqueuePullRequest(await githubJson(
+      fetcher,
+      "https://api.github.com/graphql",
+      {
+        method: "POST",
+        headers: githubHeaders(input.accessToken),
+        body: JSON.stringify({
+          query: `mutation($pullRequestId:ID!,$expectedHeadOid:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$pullRequestId,expectedHeadOid:$expectedHeadOid,jump:false}){mergeQueueEntry{id}}}`,
+          variables: {
+            pullRequestId: input.member.pullRequestNodeId,
+            expectedHeadOid: input.member.headSha,
+          },
+        }),
+      },
+      "GitHub exact-head enqueue",
+    ));
+    queueEntryId = response.data.enqueuePullRequest.mergeQueueEntry.id;
+  }
+  const after = await verifyExactPullRequestWithApp({
+    accessToken: input.accessToken,
+    member: input.member,
+    fetcher,
+  });
+  if (after.queueEntryId !== queueEntryId) {
+    throw new StaleGitHubMergeGroupError(
+      "GitHub enqueue readback did not preserve the exact queue entry",
+    );
+  }
+  return { ...after, queueEntryId };
+}
+
+export type AuthoritativeQueueEntry = {
+  id: string;
+  position: number;
+  state: "QUEUED" | "AWAITING_CHECKS" | "MERGEABLE" | "UNMERGEABLE" | "LOCKED";
+  headSha: string;
+  pullRequestId: string;
+  pullRequestDatabaseId: number;
+  pullRequestNumber: number;
+  pullRequestHeadSha: string;
+};
+
+export async function listAuthoritativeMergeQueue(input: {
+  accessToken: string;
+  repository: string;
+  baseRef: string;
+  fetcher?: GitHubFetch;
+}) {
+  const fetcher = input.fetcher ?? fetch;
+  const { owner, name } = repositoryParts(input.repository);
+  const entries: AuthoritativeQueueEntry[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 100; page += 1) {
+    const response = decodeMergeQueuePage(await githubJson(
+      fetcher,
+      "https://api.github.com/graphql",
+      {
+        method: "POST",
+        headers: githubHeaders(input.accessToken),
+        body: JSON.stringify({
+          query: `query($owner:String!,$name:String!,$branch:String!,$cursor:String){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){entries(first:100,after:$cursor){nodes{id position enqueuedAt state headCommit{oid} pullRequest{id databaseId number headRefOid}}pageInfo{hasNextPage endCursor}}}}}`,
+          variables: {
+            owner,
+            name,
+            branch: input.baseRef.replace(/^refs\/heads\//u, ""),
+            cursor,
+          },
+        }),
+      },
+      "GitHub merge queue page",
+    ));
+    const connection = response.data.repository?.mergeQueue?.entries;
+    if (!connection) return [];
+    for (const entry of connection.nodes) {
+      if (!entry.pullRequest || !entry.headCommit) continue;
+      entries.push({
+        id: entry.id,
+        position: entry.position,
+        state: entry.state,
+        headSha: entry.headCommit.oid,
+        pullRequestId: entry.pullRequest.id,
+        pullRequestDatabaseId: entry.pullRequest.databaseId,
+        pullRequestNumber: entry.pullRequest.number,
+        pullRequestHeadSha: entry.pullRequest.headRefOid,
+      });
+    }
+    if (!connection.pageInfo.hasNextPage) return entries;
+    if (!connection.pageInfo.endCursor) {
+      throw new GitHubAppRequestError("GitHub merge queue pagination lost its cursor");
+    }
+    cursor = connection.pageInfo.endCursor;
+  }
+  throw new GitHubAppRequestError("GitHub merge queue exceeded the pagination bound");
+}
+
+export async function verifySealedMergeGroup(input: {
+  accessToken: string;
+  repository: string;
+  baseRef: string;
+  baseSha: string;
+  headRef: string;
+  headSha: string;
+  expectedMembers: readonly MergeQueueMember[];
+  fetcher?: GitHubFetch;
+}) {
+  if (input.expectedMembers.length < 1 || input.expectedMembers.length > 5) {
+    throw new StaleGitHubMergeGroupError("Sealed generation size is invalid");
+  }
+  const fetcher = input.fetcher ?? fetch;
+  const headers = githubHeaders(input.accessToken);
+  const [headRef, baseRef, entries] = await Promise.all([
+    githubJson(
+      fetcher,
+      `https://api.github.com/repos/${input.repository}/git/ref/${input.headRef.replace(/^refs\//u, "")}`,
+      { headers },
+      "GitHub merge-group ref",
+    ),
+    githubJson(
+      fetcher,
+      `https://api.github.com/repos/${input.repository}/git/ref/${input.baseRef.replace(/^refs\//u, "")}`,
+      { headers },
+      "GitHub base ref",
+    ),
+    listAuthoritativeMergeQueue({
+      accessToken: input.accessToken,
+      repository: input.repository,
+      baseRef: input.baseRef,
+      fetcher,
+    }),
+  ]);
+  if (decodeGitRef(headRef).object.sha !== input.headSha) {
+    throw new StaleGitHubMergeGroupError("Signed merge-group ref changed");
+  }
+  if (decodeGitRef(baseRef).object.sha !== input.baseSha) {
+    throw new StaleGitHubMergeGroupError("Base moved before validation authority was established");
+  }
+  const awaiting = entries
+    .filter((entry) => entry.state === "AWAITING_CHECKS")
+    .sort((left, right) => left.position - right.position);
+  if (awaiting.length !== input.expectedMembers.length) {
+    throw new StaleGitHubMergeGroupError(
+      "The active build window contains an external or late queue entry",
+    );
+  }
+  for (const [index, member] of input.expectedMembers.entries()) {
+    const entry = awaiting[index];
+    if (
+      !entry || entry.pullRequestId !== member.pullRequestNodeId ||
+      entry.pullRequestDatabaseId !== member.pullRequestId ||
+      entry.pullRequestNumber !== member.pullRequestNumber ||
+      entry.pullRequestHeadSha !== member.headSha ||
+      (index > 0 && entry.position !== awaiting[index - 1]!.position + 1)
+    ) {
+      throw new StaleGitHubMergeGroupError(
+        "The sealed PR/head set is not the exact consecutive active window",
+      );
+    }
+  }
+  const tail = input.expectedMembers.at(-1)!;
+  const authoritativeTail = awaiting.at(-1)!;
+  const signedTail = tailPullRequestFromRef(input.headRef, input.baseRef);
+  if (
+    !signedTail || signedTail.pullRequestNumber !== tail.pullRequestNumber ||
+    !tail.headSha.startsWith(signedTail.headCommitPrefix) ||
+    authoritativeTail.headSha !== input.headSha
+  ) {
+    throw new StaleGitHubMergeGroupError(
+      "Signed cumulative tail does not match the sealed generation tail",
+    );
+  }
+  return { entries: awaiting, tail };
+}
+
+export async function attestGitHubAppInstallation(input: {
+  credentials: GitHubAppCredentials;
+  repository: string;
+  expectedInstallationId: number;
+  fetcher?: GitHubFetch;
+  now?: number;
+}) {
+  const fetcher = input.fetcher ?? fetch;
+  const jwt = await createGitHubAppJwt(input.credentials, input.now);
+  const installation = decodeGitHubAppInstallation(await githubJson(
+    fetcher,
+    `https://api.github.com/repos/${input.repository}/installation`,
+    { headers: githubHeaders(jwt) },
+    "GitHub App installation attestation",
+  ));
+  if (installation.id !== input.expectedInstallationId ||
+      installation.app_id !== input.credentials.appId) {
+    throw new Error("GitHub App installation identity does not match Briar");
+  }
+  const expectedPermissions = {
+    administration: "read",
+    contents: "read",
+    merge_queues: "write",
+    metadata: "read",
+    pull_requests: "read",
+    statuses: "write",
+  } as const;
+  for (const [permission, level] of Object.entries(expectedPermissions)) {
+    if (installation.permissions[permission] !== level) {
+      throw new Error(`GitHub App permission ${permission} must be ${level}`);
+    }
+  }
+  for (const event of ["merge_group", "pull_request"]) {
+    if (!installation.events.includes(event)) {
+      throw new Error(`GitHub App must subscribe to ${event}`);
+    }
+  }
+  return {
+    installationId: installation.id,
+    appId: installation.app_id,
+    permissions: installation.permissions,
+    events: installation.events,
+  };
+}
+
 export async function publishGitHubAppCommitStatus(input: {
   accessToken: string;
   repository: string;
@@ -303,6 +715,7 @@ export async function publishGitHubAppCommitStatus(input: {
   context: string;
   passed: boolean;
   targetUrl: string;
+  description?: string;
   fetcher?: GitHubFetch;
 }) {
   return decodeCommitStatusReceipt(await githubJson(
@@ -314,7 +727,8 @@ export async function publishGitHubAppCommitStatus(input: {
       body: JSON.stringify({
         state: input.passed ? "success" : "failure",
         context: input.context,
-        description: `Briar isolated merge-group validation ${input.passed ? "passed" : "failed"}`,
+        description: input.description ??
+          `Briar isolated merge-group validation ${input.passed ? "passed" : "failed"}`,
         target_url: input.targetUrl,
       }),
     },

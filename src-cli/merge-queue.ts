@@ -165,6 +165,14 @@ export type MergeGroupDoctorProfile = {
   workflowReady: boolean;
   appId: number | null;
   fixedProfile: string;
+  appAttestation: {
+    ready: boolean;
+    installationId: number;
+    appId: number | null;
+    permissions: Record<string, string> | null;
+    events: string[] | null;
+    attestedAt: string;
+  } | null;
 };
 
 const object = (value: unknown, label: string): Record<string, unknown> => {
@@ -200,19 +208,6 @@ export function assertExactMainMergeQueueRuleset(
       detail: object(rawDetails.get(Number(id)), "GitHub ruleset detail"),
     }];
   });
-  if (branchRulesets.length !== 1) {
-    throw new Error(
-      "Exactly one effective branch ruleset is allowed for fail-closed verification",
-    );
-  }
-  const enforcement = branchRulesets[0]!.summary.enforcement;
-  if (
-    (activation === "active" && enforcement !== "active") ||
-    (activation === "inactive" && enforcement === "active") ||
-    !["active", "evaluate", "disabled"].includes(String(enforcement))
-  ) {
-    throw new Error(`The exact-main ruleset must be ${activation}`);
-  }
   const exact = branchRulesets.flatMap(({ detail }) => {
     const conditions = object(detail.conditions, "GitHub ruleset conditions");
     const refName = object(conditions.ref_name, "GitHub ruleset ref condition");
@@ -222,9 +217,37 @@ export function assertExactMainMergeQueueRuleset(
       : [];
   });
   if (exact.length !== 1) {
-    throw new Error("Exactly one active ruleset must target only the main branch");
+    throw new Error("Exactly one ruleset must target only the main branch");
   }
   const ruleset = exact[0]!;
+  const exactSummary = branchRulesets.find(({ detail }) => detail === ruleset)!
+    .summary;
+  const enforcement = exactSummary.enforcement;
+  if (
+    (activation === "active" && enforcement !== "active") ||
+    (activation === "inactive" && enforcement === "active") ||
+    !["active", "evaluate", "disabled"].includes(String(enforcement))
+  ) {
+    throw new Error(`The exact-main ruleset must be ${activation}`);
+  }
+  for (const candidate of branchRulesets) {
+    if (candidate.detail === ruleset || candidate.summary.enforcement !== "active") {
+      continue;
+    }
+    const conditions = object(candidate.detail.conditions, "GitHub ruleset conditions");
+    const refName = object(conditions.ref_name, "GitHub ruleset ref condition");
+    const include = Array.isArray(refName.include) ? refName.include : [];
+    const exclude = Array.isArray(refName.exclude) ? refName.exclude : [];
+    const definitelyDifferent = include.length > 0 && include.every((pattern) =>
+      typeof pattern === "string" && pattern.startsWith("refs/heads/") &&
+      !pattern.includes("*") && pattern !== exactRef
+    );
+    const definitelyExcluded = exclude.includes(exactRef) ||
+      exclude.includes("~DEFAULT_BRANCH") || exclude.includes("~ALL");
+    if (!definitelyDifferent && !definitelyExcluded) {
+      throw new Error("Another active ruleset can overlap the effective main policy");
+    }
+  }
   if (!Array.isArray(ruleset.bypass_actors) || ruleset.bypass_actors.length > 0) {
     throw new Error("The main ruleset must not allow bypass actors");
   }
@@ -232,8 +255,17 @@ export function assertExactMainMergeQueueRuleset(
   const rules = ruleset.rules.map((rule) => object(rule, "GitHub rule"));
   const mergeQueue = rules.filter((rule) => rule.type === "merge_queue");
   const statusChecks = rules.filter((rule) => rule.type === "required_status_checks");
-  if (mergeQueue.length !== 1 || statusChecks.length !== 1) {
-    throw new Error("The main ruleset requires one merge queue and one status-check rule");
+  const pullRequest = rules.filter((rule) => rule.type === "pull_request");
+  const deletion = rules.filter((rule) => rule.type === "deletion");
+  const nonFastForward = rules.filter((rule) => rule.type === "non_fast_forward");
+  if (
+    mergeQueue.length !== 1 || statusChecks.length !== 1 ||
+    pullRequest.length !== 1 || deletion.length !== 1 ||
+    nonFastForward.length !== 1
+  ) {
+    throw new Error(
+      "The main ruleset must require the merge queue and block direct push, deletion, and force-push",
+    );
   }
   const queue = object(mergeQueue[0]!.parameters, "Merge queue parameters");
   const profile = MERGE_QUEUE_RULESET_PROFILE;
@@ -277,6 +309,50 @@ export function assertExactMainMergeQueueRuleset(
   return { rulesetId: Number(ruleset.id), contexts };
 }
 
+export function assertEffectiveMainRules(
+  rawRules: unknown,
+  expectedAppId: number,
+) {
+  if (!Array.isArray(rawRules)) {
+    throw new Error("GitHub effective main rules were invalid");
+  }
+  const rules = rawRules.map((rule) => object(rule, "GitHub effective rule"));
+  const exactTypes = [
+    "merge_queue",
+    "required_status_checks",
+    "pull_request",
+    "deletion",
+    "non_fast_forward",
+  ];
+  for (const type of exactTypes) {
+    if (rules.filter((rule) => rule.type === type).length !== 1) {
+      throw new Error(`Effective main rules require exactly one ${type} rule`);
+    }
+  }
+  const status = object(
+    rules.find((rule) => rule.type === "required_status_checks")!.parameters,
+    "Effective status-check parameters",
+  );
+  if (status.strict_required_status_checks_policy !== false ||
+      !Array.isArray(status.required_status_checks)) {
+    throw new Error("Effective main status checks must use strict=false");
+  }
+  const contexts = status.required_status_checks.map((item) => {
+    const check = object(item, "Effective required status check");
+    if (check.integration_id !== expectedAppId) {
+      throw new Error("Effective contexts must be bound to the Briar GitHub App");
+    }
+    return check.context;
+  });
+  if (!exactStringArray(
+    [...contexts].sort(),
+    [...MERGE_GROUP_STATUS_CONTEXTS].sort(),
+  )) {
+    throw new Error("Effective main contexts do not match Briar's fixed profile");
+  }
+  return { contexts };
+}
+
 export function doctorMergeQueue(
   command: CommandRunner,
   input: {
@@ -294,7 +370,9 @@ export function doctorMergeQueue(
     !input.profile.workerReady ||
     !input.profile.workflowReady ||
     input.profile.appId === null ||
-    input.profile.fixedProfile !== "briar/merge-group-ci/v2"
+    !input.profile.appAttestation?.ready ||
+    input.profile.appAttestation.appId !== input.profile.appId ||
+    input.profile.fixedProfile !== "briar/merge-group-ci/v3"
   ) {
     throw new Error(
       "Briar requires an exact-main profile, canonical merge-wait workflow, configured App, and ready isolated Worker",
@@ -332,40 +410,19 @@ export function doctorMergeQueue(
     input.profile.appId,
     activation,
   );
-  const installationResponse = command([
-    "gh",
-    "api",
-    `repos/${input.repository}/installation`,
-  ]);
-  if (installationResponse.exitCode !== 0) {
-    throw new Error("GitHub App installation could not be read");
-  }
-  const installation = object(
-    parseJson(installationResponse.stdout, "GitHub App installation"),
-    "GitHub App installation",
-  );
-  if (installation.app_id !== input.profile.appId) {
-    throw new Error("The connected repository is installed under a different GitHub App");
-  }
-  const permissions = object(installation.permissions, "GitHub App permissions");
-  const expectedPermissions = {
-    administration: "read",
-    contents: "read",
-    merge_queues: "read",
-    pull_requests: "read",
-    statuses: "write",
-  } as const;
-  for (const [permission, expected] of Object.entries(expectedPermissions)) {
-    if (permissions[permission] !== expected) {
-      throw new Error(`GitHub App permission ${permission} must be ${expected}`);
+  if (activation === "active") {
+    const effective = command([
+      "gh",
+      "api",
+      `repos/${input.repository}/rules/branches/${encodeURIComponent(input.baseBranch)}`,
+    ]);
+    if (effective.exitCode !== 0) {
+      throw new Error("GitHub effective main rules could not be read");
     }
-  }
-  const events = installation.events;
-  if (
-    !Array.isArray(events) ||
-    !["merge_group", "pull_request"].every((event) => events.includes(event))
-  ) {
-    throw new Error("GitHub App event subscriptions require merge_group and pull_request");
+    assertEffectiveMainRules(
+      parseJson(effective.stdout, "GitHub effective main rules"),
+      input.profile.appId,
+    );
   }
   const classic = command([
     "gh",

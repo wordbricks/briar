@@ -8,13 +8,38 @@ if [[ "${BRIAR_TRUSTED_MERGE_GROUP_CI:-}" == "1" ]]; then
   export CARGO_NET_OFFLINE=true
   [[ -n "${BRIAR_CI_WORKSPACE_ROOT:-}" &&
     -n "${BRIAR_CI_REPOSITORY_BUNDLE:-}" &&
+    -r "${BRIAR_CI_BUN_CONFIG:-}" &&
+    -r "${BRIAR_CI_VITEST_CONFIG:-}" &&
+    "${BUN_INSTALL_CACHE_DIR:-}" == "/opt/briar/bun-cache" &&
+    "${CARGO_HOME:-}" == "/opt/briar/cargo" &&
+    "${RUSTUP_HOME:-}" == "/opt/briar/rustup" &&
     "${BRIAR_CI_HEAD_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || {
     echo "[local-ci] Missing isolated workspace root." >&2
     exit 75
   }
+  runtime_cache_root="/scratch/runtime-cache"
+  mkdir -p "$runtime_cache_root/bun" \
+    "$runtime_cache_root/cargo" "$runtime_cache_root/rustup" \
+    "$runtime_cache_root/home" "$runtime_cache_root/tmp"
+  cp -a /opt/briar/bun-cache/. "$runtime_cache_root/bun/"
+  cp -a /opt/briar/cargo/. "$runtime_cache_root/cargo/"
+  cp -a /opt/briar/rustup/. "$runtime_cache_root/rustup/"
+  chmod -R u+w "$runtime_cache_root/bun" \
+    "$runtime_cache_root/cargo" "$runtime_cache_root/rustup"
+  export BUN_INSTALL_CACHE_DIR="$runtime_cache_root/bun"
+  export CARGO_HOME="$runtime_cache_root/cargo"
+  export RUSTUP_HOME="$runtime_cache_root/rustup"
+  export HOME="$runtime_cache_root/home"
+  export TMPDIR="$runtime_cache_root/tmp"
   workspace_root="$BRIAR_CI_WORKSPACE_ROOT"
-  git clone --no-checkout "$BRIAR_CI_REPOSITORY_BUNDLE" "$workspace_root" || {
-    echo "[local-ci] Infrastructure: trusted Git bundle could not be cloned." >&2
+  mkdir -p "$workspace_root"
+  git -C "$workspace_root" init --quiet || {
+    echo "[local-ci] Infrastructure: isolated Git repository could not be initialized." >&2
+    exit 75
+  }
+  git -C "$workspace_root" fetch --no-tags \
+    "$BRIAR_CI_REPOSITORY_BUNDLE" "$BRIAR_CI_HEAD_SHA" || {
+    echo "[local-ci] Infrastructure: exact commit could not be fetched from the trusted Git bundle." >&2
     exit 75
   }
   git -C "$workspace_root" reset --hard "$BRIAR_CI_HEAD_SHA" >/dev/null || {
@@ -26,7 +51,33 @@ else
 fi
 cd "$workspace_root"
 
+bun() {
+  if $isolated_merge_group; then
+    case "${1:-}" in
+      run)
+        shift
+        command bun run --no-env-file \
+          --config="$BRIAR_CI_BUN_CONFIG" "$@"
+        ;;
+      install)
+        shift
+        command bun install --config="$BRIAR_CI_BUN_CONFIG" "$@"
+        ;;
+      --version)
+        command bun --version
+        ;;
+      *)
+        echo "[local-ci] Unapproved Bun invocation in trusted CI." >&2
+        return 75
+        ;;
+    esac
+  else
+    command bun "$@"
+  fi
+}
+
 readonly rust_toolchain="1.96.0"
+readonly node_version="v22.23.2"
 readonly cargo_audit_version="0.22.2"
 readonly gitleaks_version="8.30.1"
 readonly all_contexts=("app-worker" "d1-migrations" "rust" "security")
@@ -115,7 +166,16 @@ run_app_worker() {
   # Keep Miniflare and Node worker fan-out within the executor's fixed memory
   # budget. Unbounded host-core parallelism can turn fixture startup into a
   # timeout even when every suite passes in isolation.
-  bun run test -- --maxWorkers=1
+  if $isolated_merge_group; then
+    node ./node_modules/vitest/vitest.mjs run \
+      --config "$BRIAR_CI_VITEST_CONFIG" \
+      --exclude worker/src/migrations.test.ts \
+      --exclude worker/src/db.test.ts \
+      --reporter=dot --silent=passed-only \
+      --maxWorkers=1
+  else
+    bun run test -- --maxWorkers=1
+  fi
   bash -n \
     scripts/import-apple-signing-assets.sh \
     scripts/release-ios.sh \
@@ -146,7 +206,18 @@ run_d1_migrations() {
 
   bun run d1:migrate:local -- --persist-to "$d1_state_dir"
   set +e
-  bun run test:d1:migrations >"$migration_log" 2>&1
+  if $isolated_merge_group; then
+    BRIAR_D1_TEST_CACHE_RECOVERY=1 \
+      node ./node_modules/vitest/vitest.mjs run \
+      --config "$BRIAR_CI_VITEST_CONFIG" \
+      --no-file-parallelism \
+      --reporter=dot --silent=passed-only \
+      worker/src/migrations.test.ts worker/src/db.test.ts \
+      worker/src/test-helpers/d1-template.test.ts \
+      >"$migration_log" 2>&1
+  else
+    bun run test:d1:migrations >"$migration_log" 2>&1
+  fi
   migration_status="$?"
   set -e
   cat "$migration_log"
@@ -313,6 +384,11 @@ fi
 
 require_command bun "Install Bun before running local CI."
 require_command rustup "Install rustup before running the Rust checks."
+if $isolated_merge_group; then
+  require_command node "Install the pinned Node runtime in the executor image."
+  [[ "$(node --version)" == "$node_version" ]] ||
+    infra_fail "Expected Node ${node_version} in the executor image."
+fi
 
 if includes_context security; then
   require_command cargo-audit \
@@ -327,7 +403,16 @@ if $should_signoff; then
     fail "Install gh-signoff first: gh extension install basecamp/gh-signoff"
 fi
 
-if ! bun install --frozen-lockfile; then
+if $isolated_merge_group; then
+  # Bun 1.4 has no install --offline flag. The container network namespace is
+  # absent, while this explicit scratch cache is seeded from the audited image;
+  # a missing package therefore fails as infrastructure instead of fetching.
+  install_command=(bun install --frozen-lockfile \
+    --cache-dir="$BUN_INSTALL_CACHE_DIR" --no-progress)
+else
+  install_command=(bun install --frozen-lockfile)
+fi
+if ! "${install_command[@]}"; then
   $isolated_merge_group && infra_fail "Dependencies are absent from the pinned executor cache."
   exit 1
 fi

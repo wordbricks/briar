@@ -16,7 +16,21 @@ const doctorProfile = {
   workerReady: true,
   workflowReady: true,
   appId,
-  fixedProfile: "briar/merge-group-ci/v2",
+  fixedProfile: "briar/merge-group-ci/v3",
+  appAttestation: {
+    ready: true,
+    installationId: 8001,
+    appId,
+    permissions: {
+      administration: "read",
+      contents: "read",
+      merge_queues: "write",
+      pull_requests: "read",
+      statuses: "write",
+    },
+    events: ["merge_group", "pull_request"],
+    attestedAt: "2026-08-21T00:00:00.000Z",
+  },
 };
 const pullRequest = (entry: string | null = null) => ({
   data: {
@@ -66,6 +80,13 @@ const ruleset = (overrides: Record<string, unknown> = {}) => ({
         { context: "signoff/security", integration_id: appId },
       ],
     },
+  }, {
+    type: "pull_request",
+    parameters: {},
+  }, {
+    type: "deletion",
+  }, {
+    type: "non_fast_forward",
   }],
   ...overrides,
 });
@@ -148,26 +169,26 @@ describe("merge-queue doctor", () => {
   it.each([
     ["strict=true", () => {
       const value = ruleset();
-      Reflect.set(Reflect.get(value.rules[1], "parameters"),
+      Reflect.set(Reflect.get(value.rules[1] as object, "parameters"),
         "strict_required_status_checks_policy", true);
       return value;
     }],
     ["ALLGREEN", () => {
       const value = ruleset();
-      Reflect.set(Reflect.get(value.rules[0], "parameters"),
+      Reflect.set(Reflect.get(value.rules[0] as object, "parameters"),
         "grouping_strategy", "ALLGREEN");
       return value;
     }],
     ["wrong contexts", () => {
       const value = ruleset();
-      Reflect.set(Reflect.get(value.rules[1], "parameters"),
+      Reflect.set(Reflect.get(value.rules[1] as object, "parameters"),
         "required_status_checks", [{ context: "ci/forged" }]);
       return value;
     }],
     ["bypass", () => ruleset({ bypass_actors: [{ actor_type: "OrganizationAdmin" }] })],
     ["group limits", () => {
       const value = ruleset();
-      Reflect.set(Reflect.get(value.rules[0], "parameters"),
+      Reflect.set(Reflect.get(value.rules[0] as object, "parameters"),
         "max_entries_to_build", 2);
       return value;
     }],
@@ -180,40 +201,14 @@ describe("merge-queue doctor", () => {
     )).toThrow();
   });
 
-  it("fails when the GitHub App has not been reapproved for status write", () => {
-    const command: CommandRunner = (args) => {
-      if (args[2]?.includes("rulesets?")) {
-        return {
-          exitCode: 0,
-          stdout: JSON.stringify([{ id: 7, target: "branch", enforcement: "active" }]),
-          stderr: "",
-        };
-      }
-      if (args[2]?.endsWith("rulesets/7")) {
-        return { exitCode: 0, stdout: JSON.stringify(ruleset()), stderr: "" };
-      }
-      if (args[2]?.endsWith("/installation")) return {
-        exitCode: 0,
-        stdout: JSON.stringify({
-          app_id: appId,
-          permissions: {
-            administration: "read",
-            contents: "read",
-            merge_queues: "read",
-            pull_requests: "read",
-            statuses: "read",
-          },
-          events: ["merge_group", "pull_request"],
-        }),
-        stderr: "",
-      };
-      return { exitCode: 1, stdout: "", stderr: "HTTP 404" };
-    };
-    expect(() => doctorMergeQueue(command, {
+  it("fails before local gh calls when server App attestation is absent", () => {
+    expect(() => doctorMergeQueue(() => {
+      throw new Error("local gh must not inspect the App installation");
+    }, {
       repository: "wordbricks/briar",
       baseBranch: "main",
-      profile: doctorProfile,
-    })).toThrow(/statuses must be write/u);
+      profile: { ...doctorProfile, appAttestation: null },
+    })).toThrow(/configured App/u);
   });
 
   it("rejects classic strict=true even when the ruleset is correct", () => {
@@ -228,6 +223,13 @@ describe("merge-queue doctor", () => {
       if (args[2]?.endsWith("rulesets/7")) {
         return { exitCode: 0, stdout: JSON.stringify(ruleset()), stderr: "" };
       }
+      if (args[2]?.includes("rules/branches/main")) {
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify(ruleset().rules),
+          stderr: "",
+        };
+      }
       if (args[2]?.includes("required_status_checks")) {
         return {
           exitCode: 0,
@@ -235,21 +237,6 @@ describe("merge-queue doctor", () => {
           stderr: "",
         };
       }
-      if (args[2]?.endsWith("/installation")) return {
-        exitCode: 0,
-        stdout: JSON.stringify({
-          app_id: appId,
-          permissions: {
-            administration: "read",
-            contents: "read",
-            merge_queues: "read",
-            pull_requests: "read",
-            statuses: "write",
-          },
-          events: ["merge_group", "pull_request"],
-        }),
-        stderr: "",
-      };
       return { exitCode: 1, stdout: "", stderr: "unexpected" };
     };
     expect(() => doctorMergeQueue(command, {
@@ -268,7 +255,7 @@ describe("merge-queue doctor", () => {
       new Map([[7, ruleset()], [8, ruleset({ id: 8 })]]),
       "main",
       appId,
-    )).toThrow(/effective branch ruleset/u);
+    )).toThrow(/Exactly one ruleset/u);
   });
 
   it("supports a fail-closed inactive preflight before activation", () => {

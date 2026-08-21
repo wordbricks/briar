@@ -40,7 +40,8 @@ describe("merge-group security regression", () => {
       "migrations/0122_merge_group_executor_cleanup.sql",
       "utf8",
     );
-    expect(migration.match(/create table/gu)).toHaveLength(1);
+    expect(migration.match(/create table/gu)).toHaveLength(2);
+    expect(migration).toContain("create table merge_queue_generations");
     expect(migration).toContain("create table merge_group_validation_jobs");
     expect(migration).toContain("drop table if exists briar_repository_merge_policies");
     expect(migration).toContain("drop table if exists briar_merge_batches");

@@ -1,16 +1,26 @@
 import type { AutoHuntWorkflow } from "./auto-hunt-contract";
 
 export const MERGE_GROUP_CI_CAPABILITY = "merge_group_ci";
-export const MERGE_GROUP_CI_PROTOCOL = 2;
+export const MERGE_GROUP_CI_PROTOCOL = 3;
+export const MERGE_GROUP_CI_AUDITED_IMAGE_REPOSITORY =
+  "ghcr.io/wordbricks/briar-merge-group-ci";
+export const MERGE_GROUP_CI_AUDITED_IMAGE_DIGEST =
+  "sha256:00fe9667e314d8b388aba1e4f27ceb5b08ba9672060d5c804f7cafc98238196c";
+export const MERGE_GROUP_CI_AUDITED_IMAGE =
+  `${MERGE_GROUP_CI_AUDITED_IMAGE_REPOSITORY}@${MERGE_GROUP_CI_AUDITED_IMAGE_DIGEST}` as const;
 export const MERGE_GROUP_VALIDATION_COMMAND = [
   "docker",
   "run",
   "--network=none",
 ] as const;
 export const MERGE_GROUP_VALIDATION_PROFILE_PATH = "scripts/ci-local.sh";
+export const MERGE_GROUP_BUN_CONFIG_PATH = "config/merge-group-bunfig.toml";
+export const MERGE_GROUP_VITEST_CONFIG_PATH =
+  "config/merge-group-vitest.config.ts";
 export const MERGE_GROUP_VALIDATION_DEFINITION_PATHS = [
   "package.json",
   "bun.lock",
+  ".dockerignore",
   "tsconfig.json",
   "worker/tsconfig.json",
   "vite.config.ts",
@@ -19,6 +29,11 @@ export const MERGE_GROUP_VALIDATION_DEFINITION_PATHS = [
   "src-tauri/Cargo.lock",
   ".gitleaks.toml",
   MERGE_GROUP_VALIDATION_PROFILE_PATH,
+  MERGE_GROUP_BUN_CONFIG_PATH,
+  MERGE_GROUP_VITEST_CONFIG_PATH,
+  "containers/merge-group-ci/Dockerfile",
+  "containers/merge-group-ci/build.sh",
+  "config/merge-group-ci-image.json",
   "scripts/audit-dependencies.sh",
   "scripts/audit-rust-dependencies.sh",
   "scripts/generate-skill-guides.ts",

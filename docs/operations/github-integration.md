@@ -32,7 +32,7 @@ available to GitHub accounts outside the account that owns the App. Configure:
 - Repository permission: **Contents — Read-only**
 - Repository permission: **Commit statuses — Read and write**
 - Repository permission: **Pull requests — Read-only**
-- Repository permission: **Merge queues — Read-only**
+- Repository permission: **Merge queues — Read and write**
 - Subscribe to events: **Pull request** and **Merge group**
 
 [`config/github-app-manifest.yaml`](../../config/github-app-manifest.yaml)
@@ -173,11 +173,16 @@ without that checkpoint.
   scheduled reconciliation sweep retries any merged run left paused by a
   transient database failure.
 - Only a signed `merge_group.checks_requested` delivery can create an
-  exact-SHA validation job. Other merge-group actions and repositories not
-  connected to the installation create no job. Collection is default-off and
-  restricted to the configured `refs/heads/main` lane and designated isolated
-  Worker.
-- The installation must be reapproved after adding Merge queues read,
+  exact-SHA authority-pending job. The row is durable before GitHub reads or
+  Worker readiness checks; bounded reconciliation later matches it to an exact
+  sealed generation. Other merge-group actions and repositories not connected
+  to the installation create no job. Collection is default-off and restricted
+  to the configured `refs/heads/main` lane and designated isolated Worker.
+- Completing current-revision `ci_qa` automatically revalidates immutable
+  linked PR identity/head/base, publishes the four App-bound admission
+  contexts to the PR head, and enters the repository's five-minute sealed
+  cohort. The manual enqueue CLI is break-glass only.
+- The installation must be reapproved after adding Merge queues write,
   Contents read, Administration read, Commit statuses write, and the Merge
   group event. `briar merge-queue doctor` checks the effective parent rules,
   exact App-bound contexts, event subscriptions, and Worker readiness before
