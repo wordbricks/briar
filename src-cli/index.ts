@@ -4153,7 +4153,7 @@ async function configureMergeQueueCommand() {
   ));
   const quietWindowMs = mergeQueueIntegerOption(
     "--quiet-window-ms",
-    current?.quietWindowMs ?? 30_000,
+    current?.quietWindowMs ?? 300_000,
     1_000,
     300_000,
   );
