@@ -1,4 +1,7 @@
 import {
+  autoHuntPersistedRunStatuses,
+  autoHuntQaStatuses,
+  dashboardStages,
   type AutoHuntQaStatus,
   type AutoHuntPersistedRunStatus,
   type AutoHuntSource,
@@ -7,32 +10,36 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../../src/lib/agent-result";
+import * as Schema from "effect/Schema";
 
 import {
   type ModelEffort,
   type ProjectAgentProvider,
 } from "./project-agent-model";
 
-export type HuntEventRow = {
-  id: string;
-  run_id: string;
-  event_key: string;
-  attempt: number;
-  revision: number;
-  stage: DashboardStage;
-  status: AutoHuntPersistedRunStatus;
-  workflow_stage: AutoHuntWorkflowStageId | null;
-  detail: string | null;
-  actor: string;
-  branch: string | null;
-  commit_sha: string | null;
-  qa_status: AutoHuntQaStatus | null;
-  tracker_issue_state: string | null;
-  pull_request_urls: string;
-  target_sha: string | null;
-  occurred_at: string;
-  recorded_at: string;
-};
+export const HuntEventRow = Schema.Struct({
+  id: Schema.mutableKey(Schema.String),
+  run_id: Schema.mutableKey(Schema.String),
+  event_key: Schema.mutableKey(Schema.String),
+  attempt: Schema.mutableKey(Schema.Int),
+  revision: Schema.mutableKey(Schema.Int),
+  stage: Schema.mutableKey(Schema.Literals(dashboardStages)),
+  status: Schema.mutableKey(Schema.Literals(autoHuntPersistedRunStatuses)),
+  workflow_stage: Schema.mutableKey(Schema.NullOr(Schema.String)),
+  detail: Schema.mutableKey(Schema.NullOr(Schema.String)),
+  actor: Schema.mutableKey(Schema.String),
+  branch: Schema.mutableKey(Schema.NullOr(Schema.String)),
+  commit_sha: Schema.mutableKey(Schema.NullOr(Schema.String)),
+  qa_status: Schema.mutableKey(
+    Schema.NullOr(Schema.Literals(autoHuntQaStatuses)),
+  ),
+  tracker_issue_state: Schema.mutableKey(Schema.NullOr(Schema.String)),
+  pull_request_urls: Schema.mutableKey(Schema.String),
+  target_sha: Schema.mutableKey(Schema.NullOr(Schema.String)),
+  occurred_at: Schema.mutableKey(Schema.String),
+  recorded_at: Schema.mutableKey(Schema.String),
+});
+export type HuntEventRow = typeof HuntEventRow.Type;
 
 export type TrackerInput = {
   provider: string;
