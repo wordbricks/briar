@@ -473,4 +473,3 @@ export {
   syncCompletedWorktreeRecordsFromDashboard,
   worktreeMaintain,
 };
-

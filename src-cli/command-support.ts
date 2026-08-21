@@ -404,4 +404,3 @@ export {
   activeClaimWorktree,
   currentProject,
 };
-
