@@ -10,6 +10,7 @@ import { agentProviders } from "../src/lib/agent-provider";
 import { autoHuntSources } from "../src/lib/auto-hunt-contract";
 import { IsoDateTimeWithOffset } from "../src/lib/date-time-schema";
 import { OrganizationAgentContextDescriptor } from "../src/lib/organization-agent-context-contract";
+import { MERGE_GROUP_CI_CONTEXTS } from "../src/lib/merge-group-validation-contract";
 import { WorkflowConfig, WorkflowStageId } from "./config-contract";
 
 const rejectExcessProperties = {
@@ -239,6 +240,204 @@ export const ClaimedProjectAgentTask = Schema.Struct({
 export type ClaimedProjectAgentTask = typeof ClaimedProjectAgentTask.Type;
 export const decodeClaimedProjectAgentTask = Schema.decodeUnknownSync(
   ClaimedProjectAgentTask,
+);
+
+const GitObjectId = Schema.String.check(
+  Schema.isPattern(/^[0-9a-f]{40}$/u),
+);
+const GithubRepositoryName = Schema.String.check(
+  Schema.isPattern(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u),
+);
+const MergeGroupRef = Schema.String.check(
+  Schema.isPattern(
+    /^refs\/heads\/gh-readonly-queue\/main\/[A-Za-z0-9._/-]+$/u,
+  ),
+);
+const MergeGroupContext = Schema.Literals(MERGE_GROUP_CI_CONTEXTS);
+const MergeBatchValidationResult = strict(Schema.Struct({
+  context: MergeGroupContext,
+  passed: Schema.Boolean,
+  exitCode: Schema.Int.check(
+    Schema.isGreaterThanOrEqualTo(0),
+    Schema.isLessThanOrEqualTo(255),
+  ),
+  failureCode: Schema.NullOr(
+    Schema.Literals(["ci_failed", "output_limit"]),
+  ),
+  log: Schema.String.check(Schema.isMaxLength(64 * 1_024)),
+  logSha256: Schema.String.check(
+    Schema.isPattern(/^[0-9a-f]{64}$/u),
+  ),
+  logTruncated: Schema.Boolean,
+}));
+
+const MergeBatchMember = strict(Schema.Struct({
+  id: Uuid,
+  ordinal: PositiveInteger,
+  runId: Uuid,
+  attempt: PositiveInteger,
+  revision: PositiveInteger,
+  pullRequestId: PositiveInteger,
+  pullRequestNodeId: Schema.NonEmptyString,
+  pullRequestNumber: PositiveInteger,
+  pullRequestUrl: Schema.NonEmptyString,
+  headSha: GitObjectId,
+  baseSha: GitObjectId,
+  queueEntryId: Schema.NullOr(Schema.NonEmptyString),
+  state: Schema.Literals([
+    "ready",
+    "frozen",
+    "enqueued",
+    "merged",
+    "dequeued",
+    "failed",
+  ]),
+}));
+
+const PendingMergeGroupHead = strict(Schema.Struct({
+  deliveryId: Schema.NonEmptyString,
+  headRef: MergeGroupRef,
+  headSha: GitObjectId,
+  baseSha: GitObjectId,
+  tailPullRequestNumber: PositiveInteger,
+  receivedAt: IsoDateTimeWithOffset,
+}));
+
+const ClaimedMergeBatchInput = strict(Schema.Struct({
+  workType: Schema.Literal("mergeBatch"),
+  workId: Uuid,
+  runId: Uuid,
+  sourceKey: Schema.NonEmptyString,
+  title: Schema.NonEmptyString,
+  projectId: Uuid,
+  repositoryId: PositiveInteger,
+  repository: GithubRepositoryName,
+  baseBranch: Schema.Literal("main"),
+  phase: Schema.Literals([
+    "enqueue",
+    "tail_authority",
+    "validate",
+    "publish",
+    "drain",
+  ]),
+  claimToken: Schema.String.check(
+    Schema.isPattern(/^briar_merge_claim_[0-9a-f]{64}$/u),
+  ),
+  claimedAt: IsoDateTimeWithOffset,
+  leaseExpiresAt: IsoDateTimeWithOffset,
+  claimAttempts: PositiveInteger,
+  batch: strict(Schema.Struct({
+    id: Uuid,
+    state: Schema.Literals([
+      "frozen",
+      "enqueueing",
+      "waiting_tail",
+      "validating",
+      "publishing",
+      "draining",
+    ]),
+    finalDeliveryId: Schema.NullOr(Schema.String),
+    mergeGroupRef: Schema.NullOr(MergeGroupRef),
+    mergeGroupSha: Schema.NullOr(GitObjectId),
+    mergeGroupBaseSha: Schema.NullOr(GitObjectId),
+    validationResults: Schema.NullOr(mutableArray(MergeBatchValidationResult)),
+    validatedAt: Schema.NullOr(IsoDateTimeWithOffset),
+    publishedAt: Schema.NullOr(IsoDateTimeWithOffset),
+    failureCode: Schema.NullOr(Schema.String),
+    failureDetail: Schema.NullOr(Schema.String),
+  })),
+  members: mutableArray(MergeBatchMember).check(
+    Schema.isLengthBetween(1, 5),
+  ),
+  pendingHeads: mutableArray(PendingMergeGroupHead),
+})).check(
+  Schema.makeFilter((claim) => {
+    const issues: Array<Schema.FilterIssue> = [];
+    if (claim.workId !== claim.runId || claim.workId !== claim.batch.id) {
+      issues.push({
+        path: ["workId"],
+        issue: "Merge batch work, run, and batch identities must match",
+      });
+    }
+    const expectedState = {
+      enqueue: "enqueueing",
+      tail_authority: "waiting_tail",
+      validate: "validating",
+      publish: "publishing",
+      drain: "draining",
+    } as const;
+    if (claim.batch.state !== expectedState[claim.phase]) {
+      issues.push({
+        path: ["batch", "state"],
+        issue: "Merge batch state does not match its claimed phase",
+      });
+    }
+    if (
+      ["validate", "publish", "drain"].includes(claim.phase) &&
+      (!claim.batch.finalDeliveryId || !claim.batch.mergeGroupRef ||
+        !claim.batch.mergeGroupSha || !claim.batch.mergeGroupBaseSha)
+    ) {
+      issues.push({
+        path: ["batch", "mergeGroupSha"],
+        issue: "Merge batch phase requires complete signed authority",
+      });
+    }
+    if (
+      ["publish", "drain"].includes(claim.phase) &&
+      claim.batch.validationResults === null
+    ) {
+      issues.push({
+        path: ["batch", "validationResults"],
+        issue: "Merge batch phase requires a durable validation proof",
+      });
+    }
+    const memberIds = new Set<string>();
+    const pullRequestNumbers = new Set<number>();
+    for (const [index, member] of claim.members.entries()) {
+      if (member.ordinal !== index + 1) {
+        issues.push({
+          path: ["members", index, "ordinal"],
+          issue: "Merge batch members must have exact consecutive ordinals",
+        });
+      }
+      if (memberIds.has(member.id)) {
+        issues.push({
+          path: ["members", index, "id"],
+          issue: "Merge batch member identities must be unique",
+        });
+      }
+      if (pullRequestNumbers.has(member.pullRequestNumber)) {
+        issues.push({
+          path: ["members", index, "pullRequestNumber"],
+          issue: "Merge batch pull request numbers must be unique",
+        });
+      }
+      memberIds.add(member.id);
+      pullRequestNumbers.add(member.pullRequestNumber);
+    }
+    if (claim.batch.validationResults !== null) {
+      const contexts = new Set(
+        claim.batch.validationResults.map((result) => result.context),
+      );
+      if (
+        claim.batch.validationResults.length !== MERGE_GROUP_CI_CONTEXTS.length ||
+        contexts.size !== MERGE_GROUP_CI_CONTEXTS.length ||
+        !MERGE_GROUP_CI_CONTEXTS.every((context) => contexts.has(context))
+      ) {
+        issues.push({
+          path: ["batch", "validationResults"],
+          issue: "Merge batch validation proof must contain every context exactly once",
+        });
+      }
+    }
+    return issues;
+  }),
+);
+
+export const ClaimedMergeBatch = ClaimedMergeBatchInput;
+export type ClaimedMergeBatch = typeof ClaimedMergeBatch.Type;
+export const decodeClaimedMergeBatch = Schema.decodeUnknownSync(
+  ClaimedMergeBatch,
 );
 
 const ChannelActivityCredential = strict(Schema.Struct({
