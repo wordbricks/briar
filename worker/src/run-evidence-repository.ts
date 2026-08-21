@@ -1,0 +1,590 @@
+import {
+  githubPullRequestEvidenceIdentity,
+  type GithubPullRequestEvidenceIdentity,
+  githubPullRequestUrlTarget,
+} from "./github-pull-request-repository";
+import {
+  parseWorkflow,
+  stableJson,
+} from "./hunt-run-codec";
+import {
+  EventKeyConflictError,
+  HuntTransitionError,
+} from "./hunt-run-errors";
+import { getHuntRunForProject } from "./hunt-run-repository";
+import { scopedEvidenceKey } from "./run-identity";
+
+export type RunEvidenceRow = {
+  id: string;
+  run_id: string;
+  attempt: number;
+  revision: number;
+  evidence_key: string;
+  workflow_stage: string;
+  evidence_type: string;
+  status: "pending" | "passed" | "failed" | "skipped";
+  detail: string | null;
+  command: string | null;
+  url: string | null;
+  metadata_json: string | null;
+  actor: string;
+  observed_at: string;
+  recorded_at: string;
+  github_association_started_at?: string | null;
+};
+
+export type RunEvidenceImageRow = {
+  id: string;
+  project_id: string;
+  run_id: string;
+  evidence_id: string;
+  object_key: string;
+  filename: string;
+  content_type: string;
+  byte_size: number;
+  sha256: string;
+  position: number;
+  created_at: string;
+};
+
+export type RunEvidenceImageInput = Omit<
+  RunEvidenceImageRow,
+  "project_id" | "run_id" | "evidence_id" | "created_at"
+>;
+
+export async function recordRunEvidence(
+  db: D1Database,
+  projectId: string,
+  input: {
+    runId: string;
+    evidenceKey: string;
+    stage: string;
+    type: string;
+    status: RunEvidenceRow["status"];
+    detail: string | null;
+    command: string | null;
+    url: string | null;
+    metadata: Record<string, unknown> | null;
+    actor: string;
+    observedAt: string;
+  },
+  fence?: { claimTokenHash: string; authenticatedAt: string },
+) {
+  const run = await getHuntRunForProject(db, projectId, input.runId);
+  if (!run) return null;
+  const runFenceSql = `
+    and run.current_attempt = ? and run.current_revision = ?
+    and run.status = ? and run.workflow_stage is ?
+    and run.paused_at is ? and run.resume_requested_at is ?
+    ${
+    fence
+      ? "and run.claim_token_hash = ? and run.lease_expires_at > ?"
+      : "and run.claim_token_hash is ? and run.lease_expires_at is ?"
+  }`;
+  const runFenceBindings = (checkedAt: string) => [
+    run.current_attempt,
+    run.current_revision,
+    run.status,
+    run.workflow_stage ?? null,
+    run.paused_at ?? null,
+    run.resume_requested_at ?? null,
+    fence?.claimTokenHash ?? run.claim_token_hash ?? null,
+    fence ? checkedAt : run.lease_expires_at ?? null,
+  ];
+  const workflow = parseWorkflow(run.workflow_snapshot_json);
+  const evidenceStageRank = workflow.stages.findIndex(
+    (stage) => stage.id === input.stage,
+  );
+  if (evidenceStageRank < 0) {
+    throw new HuntTransitionError(
+      `Workflow stage is not configured for this run: ${input.stage}`,
+    );
+  }
+  if (run.paused_at && input.stage !== run.workflow_stage) {
+    throw new HuntTransitionError(
+      "Run is paused; resume it before recording later-stage evidence",
+    );
+  }
+  let verifiedGithubPullRequest: {
+    target: { repository: string; number: number };
+    identity: GithubPullRequestEvidenceIdentity;
+  } | null = null;
+  if (
+    input.type === "pull_request" &&
+    ["pending", "passed"].includes(input.status)
+  ) {
+    const target = input.url ? githubPullRequestUrlTarget(input.url) : null;
+    const settings = await db
+      .prepare(
+        `select github_repository
+         from briar_project_settings
+         where project_id = ?`,
+      )
+      .bind(projectId)
+      .first<{ github_repository: string | null }>();
+    const configuredRepository = settings?.github_repository
+      ?.trim()
+      .toLowerCase();
+    if (configuredRepository) {
+      if (!target || configuredRepository !== target.repository) {
+        throw new HuntTransitionError(
+          `Pull request evidence must use the project's configured GitHub repository: ${configuredRepository}`,
+        );
+      }
+      const identity = githubPullRequestEvidenceIdentity(
+        input.metadata,
+        target,
+      );
+      if (!identity) {
+        throw new HuntTransitionError(
+          "GitHub pull request evidence for the configured repository requires immutable repository and PR identity metadata; update and use the bundled Briar CLI",
+        );
+      }
+      verifiedGithubPullRequest = { target, identity };
+    }
+  }
+  const metadataJson = input.metadata ? stableJson(input.metadata) : null;
+  const storedEvidenceKey = await scopedEvidenceKey(
+    input.evidenceKey,
+    run.current_revision,
+  );
+  const existing = await db
+    .prepare(
+      `select * from briar_run_evidence
+       where run_id = ? and attempt = ? and evidence_key = ?`,
+    )
+    .bind(run.id, run.current_attempt, storedEvidenceKey)
+    .first<RunEvidenceRow>();
+  const revisionStartedAtSql = `coalesce((
+    select min(max(event.recorded_at, event.occurred_at))
+    from briar_hunt_events event
+    where event.run_id = run.id
+      and event.attempt = run.current_attempt
+      and event.revision = run.current_revision
+  ), run.created_at)`;
+  const linkPullRequest = async (
+    url: string | null,
+    recordedAt: string,
+    associationStartedAt: string,
+  ) => {
+    if (
+      input.type !== "pull_request" ||
+      !url ||
+      !["pending", "passed"].includes(input.status)
+    ) {
+      return;
+    }
+    const checkedAt = new Date().toISOString();
+    const statements: D1PreparedStatement[] = [
+      db.prepare(
+        `update briar_hunt_runs as run
+         set pull_request_urls = json_insert(pull_request_urls, '$[#]', ?),
+             updated_at = max(updated_at, ?)
+         where run.id = ? and run.project_id = ?
+           and not exists (
+             select 1 from json_each(run.pull_request_urls)
+             where value = ?
+           )
+           ${runFenceSql}`,
+      ).bind(
+        url,
+        recordedAt,
+        run.id,
+        projectId,
+        url,
+        ...runFenceBindings(checkedAt),
+      ),
+    ];
+    if (verifiedGithubPullRequest) {
+      const { target, identity } = verifiedGithubPullRequest;
+      const canonicalUrl =
+        `https://github.com/${target.repository}/pull/${target.number}`;
+      statements.push(db.prepare(
+        `insert into briar_run_pull_requests (
+           project_id, run_id, attempt, revision, revision_started_at, url,
+           installation_id, repository_id, repository,
+           pull_request_id, pull_request_node_id, pull_request_number,
+           state, draft, head_sha, base_sha, base_branch, merge_commit_sha,
+           opened_at, closed_at, merged_at, provider_updated_at,
+           last_delivery_id, created_at, updated_at
+         )
+         select run.project_id, run.id, run.current_attempt,
+                run.current_revision,
+                ${revisionStartedAtSql},
+                ?, snapshot.installation_id,
+                ?, ?, ?, ?, ?,
+                coalesce(snapshot.state, 'unknown'), snapshot.draft,
+                snapshot.head_sha, snapshot.base_sha, snapshot.base_branch,
+                snapshot.merge_commit_sha, snapshot.opened_at,
+                snapshot.closed_at, snapshot.merged_at,
+                snapshot.provider_updated_at, snapshot.last_delivery_id,
+                ?, ?
+         from briar_hunt_runs run
+         left join briar_github_pull_requests snapshot
+           on snapshot.repository_id = ?
+          and snapshot.pull_request_number = ?
+          and snapshot.pull_request_id = ?
+          and snapshot.pull_request_node_id = ?
+         and snapshot.repository = ?
+         and unixepoch(snapshot.provider_updated_at) >=
+            unixepoch(${revisionStartedAtSql})
+          and (
+            snapshot.installation_id is null
+            or not exists (
+              select 1 from briar_github_connections connection
+              where connection.installation_id = snapshot.installation_id
+            )
+            or exists (
+              select 1
+              from briar_github_connections connection
+              join briar_projects project
+                on project.organization_id = connection.organization_id
+              where connection.installation_id = snapshot.installation_id
+                and connection.status = 'connected'
+                and project.id = run.project_id
+            )
+          )
+          and (
+            (
+              snapshot.state in ('open', 'closed')
+              and snapshot.merged_at is null
+            )
+            or (
+              snapshot.state = 'merged'
+              and snapshot.merged_at is not null
+              and snapshot.updated_at >= ?
+              and unixepoch(snapshot.merged_at) >= unixepoch(?)
+              and exists (
+                select 1 from json_each(snapshot.briar_issue_links_json) issue
+                where json_extract(issue.value, '$.projectId') = run.project_id
+                  and json_extract(issue.value, '$.runId') = run.id
+              )
+            )
+          )
+         where run.id = ? and run.project_id = ?
+           ${runFenceSql}
+         on conflict(
+           run_id, attempt, revision, repository_id, pull_request_number
+         ) do update set
+           url = excluded.url,
+           installation_id = excluded.installation_id,
+           repository = excluded.repository,
+           pull_request_id = excluded.pull_request_id,
+           pull_request_node_id = excluded.pull_request_node_id,
+           state = excluded.state,
+           draft = excluded.draft,
+           head_sha = excluded.head_sha,
+           base_sha = excluded.base_sha,
+           base_branch = excluded.base_branch,
+           merge_commit_sha = excluded.merge_commit_sha,
+           opened_at = excluded.opened_at,
+           closed_at = excluded.closed_at,
+           merged_at = excluded.merged_at,
+           provider_updated_at = excluded.provider_updated_at,
+           last_delivery_id = excluded.last_delivery_id,
+           updated_at = excluded.updated_at
+         where briar_run_pull_requests.state = 'unknown'
+           and excluded.last_delivery_id is not null`,
+      ).bind(
+        canonicalUrl,
+        identity.repositoryId,
+        identity.repository,
+        identity.pullRequestId,
+        identity.pullRequestNodeId,
+        identity.pullRequestNumber,
+        associationStartedAt,
+        recordedAt,
+        identity.repositoryId,
+        identity.pullRequestNumber,
+        identity.pullRequestId,
+        identity.pullRequestNodeId,
+        identity.repository,
+        associationStartedAt,
+        associationStartedAt,
+        run.id,
+        projectId,
+        ...runFenceBindings(checkedAt),
+      ));
+    }
+    await db.batch(statements);
+    const fencedRun = await db
+      .prepare(
+        `select 1 as active from briar_hunt_runs run
+         where run.id = ? and run.project_id = ?
+           ${runFenceSql}`,
+      )
+      .bind(
+        run.id,
+        projectId,
+        ...runFenceBindings(new Date().toISOString()),
+      )
+      .first<{ active: number }>();
+    if (!fencedRun) {
+      throw new HuntTransitionError(
+        "Run claim or revision changed while recording pull request evidence",
+      );
+    }
+    if (verifiedGithubPullRequest) {
+      const { identity } = verifiedGithubPullRequest;
+      const linked = await db
+        .prepare(
+          `select 1 as linked from briar_run_pull_requests
+           where project_id = ? and run_id = ? and attempt = ? and revision = ?
+             and repository_id = ? and pull_request_number = ?`,
+        )
+        .bind(
+          projectId,
+          run.id,
+          run.current_attempt,
+          run.current_revision,
+          identity.repositoryId,
+          identity.pullRequestNumber,
+        )
+        .first<{ linked: number }>();
+      if (!linked) {
+        throw new HuntTransitionError(
+          "Run claim or revision changed while recording pull request evidence",
+        );
+      }
+    }
+  };
+  if (existing) {
+    const same =
+      existing.workflow_stage === input.stage &&
+      existing.evidence_type === input.type &&
+      existing.status === input.status &&
+      existing.detail === input.detail &&
+      existing.command === input.command &&
+      existing.url === input.url &&
+      existing.metadata_json === metadataJson &&
+      existing.actor === input.actor &&
+      existing.observed_at === input.observedAt;
+    if (!same) throw new EventKeyConflictError();
+    await linkPullRequest(
+      existing.url,
+      existing.recorded_at,
+      existing.github_association_started_at ?? existing.recorded_at,
+    );
+    return existing;
+  }
+  const recordedAt = new Date().toISOString();
+  const githubAssociationStartedAt = input.type === "pull_request" &&
+      input.url && ["pending", "passed"].includes(input.status)
+    ? fence?.authenticatedAt ?? recordedAt
+    : null;
+  const evidence: RunEvidenceRow = {
+    id: crypto.randomUUID(),
+    run_id: run.id,
+    attempt: run.current_attempt,
+    revision: run.current_revision,
+    evidence_key: storedEvidenceKey,
+    workflow_stage: input.stage,
+    evidence_type: input.type,
+    status: input.status,
+    detail: input.detail,
+    command: input.command,
+    url: input.url,
+    metadata_json: metadataJson,
+    actor: input.actor,
+    observed_at: input.observedAt,
+    recorded_at: recordedAt,
+    github_association_started_at: githubAssociationStartedAt,
+  };
+  const inserted = await db
+    .prepare(
+      `insert into briar_run_evidence (
+         id, project_id, run_id, attempt, revision, evidence_key, workflow_stage,
+         evidence_type, status, detail, command, url, metadata_json,
+         actor, observed_at, recorded_at, github_association_started_at
+       )
+       select ?, run.project_id, run.id, run.current_attempt,
+              run.current_revision, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       from briar_hunt_runs run
+       where run.id = ? and run.project_id = ?
+         ${runFenceSql}`,
+    )
+    .bind(
+      evidence.id,
+      evidence.evidence_key,
+      evidence.workflow_stage,
+      evidence.evidence_type,
+      evidence.status,
+      evidence.detail,
+      evidence.command,
+      evidence.url,
+      evidence.metadata_json,
+      evidence.actor,
+      evidence.observed_at,
+      evidence.recorded_at,
+      evidence.github_association_started_at,
+      run.id,
+      projectId,
+      ...runFenceBindings(evidence.recorded_at),
+    )
+    .run();
+  if ((inserted.meta.changes ?? 0) === 0) {
+    throw new HuntTransitionError(
+      "Run claim or revision changed while recording evidence",
+    );
+  }
+  await linkPullRequest(
+    evidence.url,
+    evidence.recorded_at,
+    evidence.github_association_started_at ?? evidence.recorded_at,
+  );
+  return evidence;
+}
+
+export async function listRunEvidence(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) {
+  const run = await getHuntRunForProject(db, projectId, runId);
+  if (!run) return null;
+  const result = await db
+    .prepare(
+      `select * from briar_run_evidence
+       where project_id = ? and run_id = ? and attempt = ?
+       order by observed_at, recorded_at, id`,
+    )
+    .bind(projectId, runId, run.current_attempt)
+    .all<RunEvidenceRow>();
+  return result.results ?? [];
+}
+
+export async function listRunEvidenceImages(
+  db: D1Database,
+  projectId: string,
+  runId?: string,
+) {
+  if (!runId) {
+    const result = await db
+      .prepare(
+        `select image.*
+         from briar_run_evidence_images image
+         join briar_hunt_runs run
+           on run.id = image.run_id and run.project_id = image.project_id
+         where image.project_id = ?
+         order by image.run_id, image.evidence_id, image.position, image.id`,
+      )
+      .bind(projectId)
+      .all<RunEvidenceImageRow>();
+    return result.results ?? [];
+  }
+  const run = await getHuntRunForProject(db, projectId, runId);
+  if (!run) return null;
+  const result = await db
+    .prepare(
+      `select image.*
+       from briar_run_evidence_images image
+       join briar_run_evidence evidence on evidence.id = image.evidence_id
+       where image.project_id = ? and image.run_id = ?
+         and evidence.attempt = ?
+       order by evidence.observed_at, evidence.recorded_at, evidence.id,
+                image.position, image.id`,
+    )
+    .bind(projectId, runId, run.current_attempt)
+    .all<RunEvidenceImageRow>();
+  return result.results ?? [];
+}
+
+export async function listAllRunEvidenceImages(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+) {
+  const run = await getHuntRunForProject(db, projectId, runId);
+  if (!run) return null;
+  const result = await db
+    .prepare(
+      `select * from briar_run_evidence_images
+       where project_id = ? and run_id = ?
+       order by evidence_id, position, id`,
+    )
+    .bind(projectId, runId)
+    .all<RunEvidenceImageRow>();
+  return result.results ?? [];
+}
+
+export async function listEvidenceImagesForEvidence(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  evidenceId: string,
+) {
+  const result = await db
+    .prepare(
+      `select image.*
+       from briar_run_evidence_images image
+       join briar_hunt_runs run
+         on run.id = image.run_id and run.project_id = image.project_id
+       where image.project_id = ? and image.run_id = ? and image.evidence_id = ?
+       order by image.position, image.id`,
+    )
+    .bind(projectId, runId, evidenceId)
+    .all<RunEvidenceImageRow>();
+  return result.results ?? [];
+}
+
+export async function createRunEvidenceImages(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  evidenceId: string,
+  images: RunEvidenceImageInput[],
+) {
+  const evidence = await db
+    .prepare(
+      `select id from briar_run_evidence
+       where id = ? and project_id = ? and run_id = ?`,
+    )
+    .bind(evidenceId, projectId, runId)
+    .first<{ id: string }>();
+  if (!evidence) return null;
+  if (images.length === 0) return [];
+  const createdAt = new Date().toISOString();
+  await db.batch(
+    images.map((image) =>
+      db
+        .prepare(
+          `insert into briar_run_evidence_images (
+             id, project_id, run_id, evidence_id, object_key, filename,
+             content_type, byte_size, sha256, position, created_at
+           ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          image.id,
+          projectId,
+          runId,
+          evidenceId,
+          image.object_key,
+          image.filename,
+          image.content_type,
+          image.byte_size,
+          image.sha256,
+          image.position,
+          createdAt,
+        ),
+    ),
+  );
+  return listEvidenceImagesForEvidence(db, projectId, runId, evidenceId);
+}
+
+export async function getRunEvidenceImage(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  imageId: string,
+) {
+  return db
+    .prepare(
+      `select image.*
+       from briar_run_evidence_images image
+       join briar_hunt_runs run
+         on run.id = image.run_id and run.project_id = image.project_id
+       where image.id = ? and image.project_id = ? and image.run_id = ?`,
+    )
+    .bind(imageId, projectId, runId)
+    .first<RunEvidenceImageRow>();
+}

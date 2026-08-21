@@ -53,6 +53,7 @@ import {
   deleteProjectAgentSchedule,
   deleteProject,
   enqueueIssueAgentReply,
+  EventKeyConflictError,
   findProjectIdByAgentTokenHash,
   getProject,
   getProjectSettings,
@@ -1053,6 +1054,45 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
   afterAll(async () => {
     await miniflare.dispose();
+  });
+
+  it("compares normalized persisted event fields for idempotent replays", async () => {
+    const sourceKey = "event-equivalence";
+    const firstPullRequest = "https://github.com/example/repository/pull/41";
+    const secondPullRequest = "https://github.com/example/repository/pull/42";
+    await setStoredWorkflow(db, projectId, releaseWorkflow);
+    const input = event("queued", 78.5, {
+      sourceKey,
+      eventKey: `${sourceKey}:backlog:intake`,
+      title: "Original title",
+      status: "backlog",
+      priority: 2,
+      branch: null,
+      commitSha: null,
+      pullRequestUrls: [secondPullRequest, firstPullRequest],
+    });
+    const runId = await recordHuntEvent(db, projectId, input);
+
+    await expect(
+      recordHuntEvent(db, projectId, {
+        ...input,
+        title: "Updated title outside the event replay payload",
+        priority: 4,
+        context: { replay: true },
+        pullRequestUrls: [
+          firstPullRequest,
+          secondPullRequest,
+          firstPullRequest,
+        ],
+      }),
+    ).resolves.toBe(runId);
+
+    await expect(
+      recordHuntEvent(db, projectId, {
+        ...input,
+        detail: "The same event key now has different persisted data",
+      }),
+    ).rejects.toBeInstanceOf(EventKeyConflictError);
   });
 
   it("preserves the issue creator from intake across later events", async () => {

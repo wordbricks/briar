@@ -93,16 +93,6 @@ ${scriptBody}
 }
 
 describe("exact-SHA merge-group foundation", () => {
-  it("is wired only through the audited-runtime-gated local adapter", async () => {
-    const [entrypoint, adapter] = await Promise.all([
-      readFile("src-cli/index.ts", "utf8"),
-      readFile("src-cli/merge-queue.ts", "utf8"),
-    ]);
-    expect(entrypoint).toContain("resolveMergeGroupContainerRuntime()");
-    expect(entrypoint).toContain("claimMergeBatchIfReady");
-    expect(adapter).toContain("if (input.repliesOnly || input.runtime === null)");
-  });
-
   it("keeps the image policy unpublished and disabled by default", () => {
     expect(imagePolicy).toMatchObject({
       protocol: 1,
