@@ -89,6 +89,10 @@ const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
     deleted: 0,
     reachedBatchLimit: false,
   })),
+  reconcileEnabledMergeQueueRuns: vi.fn(async () => ({
+    runs: 0,
+    registered: 0,
+  })),
   reconcileGithubMergedRuns: vi.fn(async () => ({
     examined: 0,
     resumed: 0,
@@ -385,6 +389,9 @@ describe("Worker HTTP contract", () => {
     await Promise.all(minute.pending);
     expect(minuteDependencies.reconcileGithubMergedRuns).toHaveBeenCalledOnce();
     expect(
+      minuteDependencies.reconcileEnabledMergeQueueRuns,
+    ).toHaveBeenCalledOnce();
+    expect(
       minuteDependencies.pruneExpiredDashboardChanges,
     ).not.toHaveBeenCalled();
     expect(minuteDependencies.archiveCompletedLogs).not.toHaveBeenCalled();
@@ -406,6 +413,9 @@ describe("Worker HTTP contract", () => {
     expect(sweepDependencies.processArchiveCleanupQueue).toHaveBeenCalledOnce();
     expect(sweepDependencies.processSlackRevocationQueue).toHaveBeenCalledOnce();
     expect(sweepDependencies.reconcileGithubMergedRuns).toHaveBeenCalledOnce();
+    expect(
+      sweepDependencies.reconcileEnabledMergeQueueRuns,
+    ).not.toHaveBeenCalled();
 
     const unknownDependencies = createScheduledTaskDependencies();
     const unknown = scheduledContext();
@@ -424,6 +434,9 @@ describe("Worker HTTP contract", () => {
         unknownDependencies.pruneExpiredDashboardChanges,
       ).not.toHaveBeenCalled();
       expect(unknownDependencies.reconcileGithubMergedRuns).not.toHaveBeenCalled();
+      expect(
+        unknownDependencies.reconcileEnabledMergeQueueRuns,
+      ).not.toHaveBeenCalled();
     } finally {
       consoleError.mockRestore();
     }

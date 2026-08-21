@@ -4968,9 +4968,21 @@ export async function claimNextProjectAgentTask(
                   from briar_project_agent_task_jobs active_task
                   join briar_execution_workers holder
                     on holder.id = active_task.claimed_worker_id
-                  where holder.device_id = selected_device.id
+                 where holder.device_id = selected_device.id
                     and active_task.status = 'running'
                     and active_task.lease_expires_at > ?)
+                 +
+                 (select count(*)
+                  from briar_merge_batches active_batch
+                  join briar_execution_workers holder
+                    on holder.id = active_batch.claimed_worker_id
+                  where holder.device_id = selected_device.id
+                    and active_batch.claim_token_hash is not null
+                    and active_batch.lease_expires_at > ?
+                    and active_batch.state in (
+                      'enqueueing', 'waiting_tail', 'validating',
+                      'publishing', 'draining'
+                    ))
                ) < selected_device.max_concurrent_sessions
            )
            and job.attempts < 3
@@ -4993,6 +5005,7 @@ export async function claimNextProjectAgentTask(
       input.workerId,
       ...input.agentProviders,
       input.workerId,
+      input.claimedAt,
       input.claimedAt,
       input.claimedAt,
       input.claimedAt,
@@ -10090,6 +10103,18 @@ export async function claimNextQueuedHuntRun(
               where holder.device_id = ?
                 and active_task.status = 'running'
                 and active_task.lease_expires_at > ?)
+             +
+             (select count(*)
+              from briar_merge_batches active_batch
+              join briar_execution_workers holder
+                on holder.id = active_batch.claimed_worker_id
+              where holder.device_id = ?
+                and active_batch.claim_token_hash is not null
+                and active_batch.lease_expires_at > ?
+                and active_batch.state in (
+                  'enqueueing', 'waiting_tail', 'validating',
+                  'publishing', 'draining'
+                ))
              ) < coalesce((
                select device.max_concurrent_sessions
                from briar_execution_worker_devices device
@@ -10134,6 +10159,8 @@ export async function claimNextQueuedHuntRun(
       allowedProviders?.includes("opencode") ? 1 : 0,
       allowedProviders?.includes("openrouter") ? 1 : 0,
       input.workerDeviceId ?? null,
+      input.workerDeviceId ?? null,
+      input.claimedAt,
       input.workerDeviceId ?? null,
       input.claimedAt,
       input.workerDeviceId ?? null,
@@ -11245,6 +11272,38 @@ async function hasBlockedGithubConnectionForRun(
   return Boolean(row);
 }
 
+async function hasIncompleteMergeBatchForRun(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  attempt: number,
+  revision: number,
+) {
+  const row = await db.prepare(
+    `select 1 as pending
+     from briar_run_pull_requests link
+     join briar_merge_batch_candidates candidate
+       on candidate.repository_id = link.repository_id
+      and candidate.base_branch = coalesce(link.base_branch, 'main')
+      and candidate.pull_request_number = link.pull_request_number
+      and candidate.frozen_head_sha = link.head_sha
+     join briar_merge_batches batch on batch.id = candidate.batch_id
+     where link.project_id = ? and link.run_id = ?
+       and link.attempt = ? and link.revision = ?
+       and batch.state in (
+         'frozen', 'enqueueing', 'waiting_tail', 'validating',
+         'publishing', 'awaiting_merge', 'blocked', 'draining'
+       )
+     limit 1`,
+  ).bind(
+    projectId,
+    runId,
+    attempt,
+    revision,
+  ).first<{ pending: number }>();
+  return Boolean(row);
+}
+
 export async function resumeRunAfterGithubMerge(
   db: D1Database,
   projectId: string,
@@ -11255,6 +11314,17 @@ export async function resumeRunAfterGithubMerge(
   if (!run) return { outcome: "not_found" as const };
   if (run.resume_requested_at) {
     return { outcome: "already_resumed" as const };
+  }
+  if (
+    await hasIncompleteMergeBatchForRun(
+      db,
+      projectId,
+      run.id,
+      run.current_attempt,
+      run.current_revision,
+    )
+  ) {
+    return { outcome: "not_ready" as const };
   }
   if (
     await hasBlockedGithubConnectionForRun(
