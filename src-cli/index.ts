@@ -96,6 +96,16 @@ import {
   type WorkerExecutionCheckpoint,
 } from "./worker";
 import {
+  claimMergeBatchIfReady,
+  executeClaimedMergeBatch,
+  inspectMergeQueueDoctor,
+  mergeQueueProfileFromResponse,
+  releaseMergeBatchClaim,
+  renewMergeBatchClaim,
+  type MergeBatchApi,
+} from "./merge-queue";
+import { resolveMergeGroupContainerRuntime } from "./merge-group-validation";
+import {
   supportsRemoteWorkerUpdates,
   workerUpdateDeepLink,
   type WorkerUpdateDirective,
@@ -188,6 +198,7 @@ import {
 import {
   decodeClaimedChannelReply,
   decodeClaimedIssueReply,
+  decodeClaimedMergeBatch,
   decodeClaimedProjectAgentTask,
   decodeClaimedRun,
   decodeDetachedAgentEffortOption,
@@ -3347,12 +3358,29 @@ async function workerCommand() {
   }
 
   const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
+  const mergeGroupRuntimeResolution = resolveMergeGroupContainerRuntime();
+  const mergeGroupRuntime = mergeGroupRuntimeResolution.ready
+    ? mergeGroupRuntimeResolution
+    : null;
+  const mergeBatchApi: MergeBatchApi = <T = unknown>(
+    path: string,
+    init: { method: "POST"; body: string },
+  ) => request<T>(config.apiUrl, path, workerToken, init);
   let lastWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastAnalysisWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastTriggeredUpdateId: string | null = null;
   const result = await runWorkerLoop(
     {
       claim: async (_options) => {
+        const mergeBatch = await claimMergeBatchIfReady({
+          api: mergeBatchApi,
+          projectId: project.id,
+          workerId,
+          claimedBy: label,
+          repliesOnly: _options?.repliesOnly === true,
+          runtime: mergeGroupRuntime,
+        });
+        if (mergeBatch) return { work: mergeBatch };
         // The combined API claim is ordered by reply queues first and applies
         // the regular-session limit atomically to issue/task queues. The loop
         // still passes its local reply-only hint without adding a wire-field,
@@ -3380,7 +3408,9 @@ async function workerCommand() {
         const workType = typeof claim.work === "object" && claim.work !== null
           ? Reflect.get(claim.work, "workType")
           : undefined;
-        const work = workType === "issueReply"
+        const work = workType === "mergeBatch"
+          ? decodeClaimedMergeBatch(claim.work)
+          : workType === "issueReply"
           ? decodeClaimedIssueReply(claim.work)
           : workType === "projectAgentTask"
             ? decodeClaimedProjectAgentTask(claim.work)
@@ -3390,6 +3420,14 @@ async function workerCommand() {
         return { work };
       },
       renewLease: async (issue) => {
+        if (issue.workType === "mergeBatch") {
+          await renewMergeBatchClaim(
+            mergeBatchApi,
+            decodeClaimedMergeBatch(issue),
+            workerId,
+          );
+          return;
+        }
         if (issue.workType === "projectAgentTask") {
           const task = decodeClaimedProjectAgentTask(issue);
           await request(
@@ -3667,6 +3705,23 @@ async function workerCommand() {
         };
       },
       handoff: async (issue, requestId, checkpoint) => {
+        if (issue.workType === "mergeBatch") {
+          try {
+            await releaseMergeBatchClaim(
+              mergeBatchApi,
+              decodeClaimedMergeBatch(issue),
+              workerId,
+            );
+          } catch (error) {
+            // A phase may have completed and atomically released just as the
+            // planned update aborted it. A missing old lease is already the
+            // safe handoff outcome.
+            if (!(error instanceof HttpRequestError) || error.status !== 409) {
+              throw error;
+            }
+          }
+          return;
+        }
         const workType = issue.workType ?? "issue";
         const workId = issue.workId ?? issue.runId;
         await request(
@@ -3691,6 +3746,22 @@ async function workerCommand() {
         );
       },
       runIssue: async (issue, signal, reportCheckpoint) => {
+        if (issue.workType === "mergeBatch") {
+          if (!mergeGroupRuntime) {
+            throw new Error(
+              "Merge batch was claimed without an audited local container runtime",
+            );
+          }
+          await executeClaimedMergeBatch({
+            claim: decodeClaimedMergeBatch(issue),
+            workerId,
+            repositoryPath: project.repositoryPath,
+            runtime: mergeGroupRuntime,
+            signal,
+            api: mergeBatchApi,
+          });
+          return;
+        }
         if (issue.workType === "projectAgentTask") {
           const task = decodeClaimedProjectAgentTask(issue);
           await runProjectAgentTaskCompletionFlow({
@@ -4034,6 +4105,106 @@ async function showSkillGuide() {
   );
 }
 
+async function mergeQueueCommandProject(config: Config) {
+  const projectId = value("--project");
+  const project = projectId
+    ? config.projects.find((candidate) => candidate.id === projectId)
+    : await currentProject(config);
+  if (!project) {
+    throw new Error("이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다.");
+  }
+  if (!config.userToken) {
+    throw new Error("`briar login`으로 먼저 로그인하세요.");
+  }
+  return { project, userToken: config.userToken };
+}
+
+function mergeQueueIntegerOption(
+  name: string,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+) {
+  const raw = value(name);
+  if (raw === undefined) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
+    throw new Error(`${name} must be an integer from ${minimum} to ${maximum}`);
+  }
+  return parsed;
+}
+
+async function configureMergeQueueCommand() {
+  if (has("--enable") === has("--disable")) {
+    throw new Error("Choose exactly one of --enable or --disable");
+  }
+  if (
+    has("--disable") &&
+    (value("--quiet-window-ms") !== undefined ||
+      value("--max-batch-size") !== undefined)
+  ) {
+    throw new Error("Queue sizing options are only valid with --enable");
+  }
+  const config = await loadConfig();
+  const { project, userToken } = await mergeQueueCommandProject(config);
+  const current = mergeQueueProfileFromResponse(await request<unknown>(
+    config.apiUrl,
+    `/projects/${project.id}/merge-queue-profile`,
+    userToken,
+  ));
+  const quietWindowMs = mergeQueueIntegerOption(
+    "--quiet-window-ms",
+    current?.quietWindowMs ?? 30_000,
+    1_000,
+    300_000,
+  );
+  const maxBatchSize = mergeQueueIntegerOption(
+    "--max-batch-size",
+    current?.maxBatchSize ?? 5,
+    2,
+    5,
+  );
+  const profile = mergeQueueProfileFromResponse(await request<unknown>(
+    config.apiUrl,
+    `/projects/${project.id}/merge-queue-profile`,
+    userToken,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        enabled: has("--enable"),
+        quietWindowMs,
+        maxBatchSize,
+      }),
+    },
+  ));
+  console.log(JSON.stringify({ profile }, null, 2));
+}
+
+async function mergeQueueDoctorCommand() {
+  const config = await loadConfig();
+  const { project, userToken } = await mergeQueueCommandProject(config);
+  const profile = mergeQueueProfileFromResponse(await request<unknown>(
+    config.apiUrl,
+    `/projects/${project.id}/merge-queue-profile`,
+    userToken,
+  ));
+  const result = inspectMergeQueueDoctor({
+    profile,
+    repositoryPath: project.repositoryPath,
+    runtime: resolveMergeGroupContainerRuntime(),
+  });
+  if (has("--json")) {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    for (const check of result.checks) {
+      console.log(`${check.ok ? "ok" : "fail"} ${check.name}: ${check.detail}`);
+    }
+  }
+  if (!result.ok) {
+    throw new Error("Merge queue doctor found a fail-closed readiness problem");
+  }
+}
+
 const usage = `Briar CLI
 
   briar login
@@ -4093,6 +4264,9 @@ const usage = `Briar CLI
   briar worker restart-services
   briar worker install-service [--project <uuid>] [--briar-binary <path>] [--runtime-binary <path> --cli-script <path>]
   briar worker uninstall-service [--project <uuid>]
+  briar merge-queue configure [--project <uuid>] <--enable|--disable>
+    [--quiet-window-ms <1000-300000>] [--max-batch-size <2-5>]
+  briar merge-queue doctor [--project <uuid>] [--json]
 
 Environment:
   BRIAR_API_URL       Cloudflare Worker URL
@@ -4197,6 +4371,12 @@ async function main() {
   }
   if (args[0] === "worker" && args[1] === "uninstall-service") {
     return workerService("uninstall");
+  }
+  if (args[0] === "merge-queue" && args[1] === "configure") {
+    return configureMergeQueueCommand();
+  }
+  if (args[0] === "merge-queue" && args[1] === "doctor") {
+    return mergeQueueDoctorCommand();
   }
   if (args[0] === "worker") return workerCommand();
   throw new Error(`Unknown command: ${args.join(" ")}`);

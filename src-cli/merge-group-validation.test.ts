@@ -93,16 +93,14 @@ ${scriptBody}
 }
 
 describe("exact-SHA merge-group foundation", () => {
-  it("is not wired into a production Worker or CLI entrypoint", async () => {
-    const entrypoints = await Promise.all([
+  it("is wired only through the audited-runtime-gated local adapter", async () => {
+    const [entrypoint, adapter] = await Promise.all([
       readFile("src-cli/index.ts", "utf8"),
-      readFile("worker/src/index.ts", "utf8"),
-      readFile("src-cli/worker-claim-contract.ts", "utf8"),
+      readFile("src-cli/merge-queue.ts", "utf8"),
     ]);
-    for (const source of entrypoints) {
-      expect(source).not.toContain("merge-group-validation");
-      expect(source).not.toContain("merge_group_ci");
-    }
+    expect(entrypoint).toContain("resolveMergeGroupContainerRuntime()");
+    expect(entrypoint).toContain("claimMergeBatchIfReady");
+    expect(adapter).toContain("if (input.repliesOnly || input.runtime === null)");
   });
 
   it("keeps the image policy unpublished and disabled by default", () => {
