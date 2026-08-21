@@ -10,7 +10,9 @@ import {
   loadInboxReadStates,
   saveInboxReadStates,
 } from "../lib/api";
-import { useInbox } from "./useInbox";
+import { sendInboxNotification } from "../lib/inbox-notifications";
+import { buildCurrentInboxMessages, useInbox } from "./useInbox";
+import { useInboxNotifications } from "./useInboxNotifications";
 import type {
   RealtimeNotification,
   RealtimeTransport,
@@ -21,10 +23,15 @@ vi.mock("../lib/api", () => ({
   loadInboxReadStates: vi.fn(),
   saveInboxReadStates: vi.fn(),
 }));
+vi.mock("../lib/inbox-notifications", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../lib/inbox-notifications")>(),
+  sendInboxNotification: vi.fn().mockResolvedValue(true),
+}));
 
 const mockedLoadInboxFeed = vi.mocked(loadInboxFeed);
 const mockedLoadInboxReadStates = vi.mocked(loadInboxReadStates);
 const mockedSaveInboxReadStates = vi.mocked(saveInboxReadStates);
+const mockedSendInboxNotification = vi.mocked(sendInboxNotification);
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -70,6 +77,7 @@ function dashboardAt(revision: number): DashboardPayload {
 
 type HarnessProps = {
   dashboard: DashboardPayload;
+  organizationId?: string | null;
   projects?: Project[];
   realtime?: RealtimeTransport | null;
   token: string;
@@ -82,6 +90,7 @@ let container: HTMLDivElement;
 
 function Harness({
   dashboard,
+  organizationId: providedOrganizationId,
   projects: providedProjects,
   realtime = null,
   token,
@@ -92,14 +101,26 @@ function Harness({
     () => providedProjects ?? [dashboard.project],
     [dashboard.project, providedProjects],
   );
+  const organizationId = providedOrganizationId === undefined
+    ? (dashboard.project.organizationId ?? null)
+    : providedOrganizationId;
   inbox = useInbox(
     userId,
-    dashboard.project.organizationId ?? null,
+    organizationId,
     dashboard,
     sessions,
     projects,
     token,
     realtime,
+  );
+  useInboxNotifications(
+    userId,
+    organizationId,
+    inbox.messages,
+    inbox.notificationBaselineId,
+    null,
+    null,
+    inbox.initialSyncComplete,
   );
   return null;
 }
@@ -142,6 +163,7 @@ describe("useInbox read-state synchronization", () => {
     });
     mockedLoadInboxReadStates.mockReset().mockResolvedValue({});
     mockedSaveInboxReadStates.mockReset().mockResolvedValue({});
+    mockedSendInboxNotification.mockReset().mockResolvedValue(true);
     container = document.createElement("div");
     root = createRoot(container);
   });
@@ -200,6 +222,160 @@ describe("useInbox read-state synchronization", () => {
     expect(inbox.notificationBaselineId).toBe(
       `user-a:${dashboard.project.organizationId}`,
     );
+  });
+
+  it.each([
+    { cache: "empty", stale: false },
+    { cache: "stale", stale: true },
+  ])(
+    "keeps an $cache restart quiet until feed and read state are synchronized",
+    async ({ stale }) => {
+      const dashboard = dashboardAt(1);
+      const authoritativeMessage = buildCurrentInboxMessages(
+        dashboard,
+        [],
+        [dashboard.project],
+        "user-a",
+      )[0]!;
+      if (stale) {
+        const staleDashboard = dashboardAt(0);
+        const staleMessage = buildCurrentInboxMessages(
+          staleDashboard,
+          [],
+          [staleDashboard.project],
+          "user-a",
+        )[0]!;
+        window.localStorage.setItem(
+          "briar.inbox.v1:user-a",
+          JSON.stringify({
+            messages: [staleMessage],
+            readVersions: { [staleMessage.id]: staleMessage.version },
+          }),
+        );
+      }
+      window.localStorage.setItem(
+        "briar.settings.inbox-notifications.v1",
+        JSON.stringify({
+          urgent: true,
+          action_required: true,
+          important: true,
+          activity: true,
+        }),
+      );
+      const feed = deferred<Awaited<ReturnType<typeof loadInboxFeed>>>();
+      const readStates = deferred<Record<string, string>>();
+      mockedLoadInboxFeed.mockReturnValueOnce(feed.promise);
+      mockedLoadInboxReadStates.mockReturnValueOnce(readStates.promise);
+
+      await renderHarness({
+        dashboard,
+        token: "token-a",
+        userId: "user-a",
+      });
+
+      expect(inbox.initialSyncComplete).toBe(false);
+      expect(inbox.messages[0]).toMatchObject({
+        id: authoritativeMessage.id,
+        isUnread: false,
+      });
+      expect(inbox.unreadCount).toBe(0);
+      expect(mockedSendInboxNotification).not.toHaveBeenCalled();
+
+      feed.resolve({
+        state: { etag: 'W/"organization-inbox:restart"' },
+        notModified: false,
+        messages: [authoritativeMessage],
+      });
+      await flushPromises();
+
+      expect(inbox.initialSyncComplete).toBe(false);
+      expect(inbox.messages[0]?.isUnread).toBe(false);
+      expect(inbox.unreadCount).toBe(0);
+      expect(mockedSendInboxNotification).not.toHaveBeenCalled();
+
+      readStates.resolve({
+        [authoritativeMessage.id]: authoritativeMessage.version,
+      });
+      await flushPromises();
+
+      expect(inbox.initialSyncComplete).toBe(true);
+      expect(inbox.messages[0]?.isUnread).toBe(false);
+      expect(inbox.unreadCount).toBe(0);
+      expect(mockedSendInboxNotification).not.toHaveBeenCalled();
+
+      const updatedDashboard = dashboardAt(2);
+      const updatedMessage = buildCurrentInboxMessages(
+        updatedDashboard,
+        [],
+        [updatedDashboard.project],
+        "user-a",
+      )[0]!;
+      await renderHarness({
+        dashboard: updatedDashboard,
+        token: "token-a",
+        userId: "user-a",
+      });
+      await flushPromises();
+
+      expect(inbox.messages[0]).toMatchObject({
+        id: updatedMessage.id,
+        version: updatedMessage.version,
+        isUnread: true,
+      });
+      expect(inbox.unreadCount).toBe(1);
+      expect(mockedSendInboxNotification).toHaveBeenCalledTimes(1);
+      expect(mockedSendInboxNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: updatedMessage.id,
+          version: updatedMessage.version,
+        }),
+        expect.any(String),
+      );
+
+      await renderHarness({
+        dashboard: updatedDashboard,
+        token: "token-a",
+        userId: "user-a",
+      });
+      await flushPromises();
+      expect(mockedSendInboxNotification).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("does not reuse the notification gate across organizations", async () => {
+    const dashboard = dashboardAt(1);
+    await renderHarness({
+      dashboard,
+      token: "token-a",
+      userId: "user-a",
+    });
+    await flushPromises();
+    expect(inbox.initialSyncComplete).toBe(true);
+
+    const organizationId = "33333333-3333-4333-8333-333333333333";
+    const nextFeed = deferred<Awaited<ReturnType<typeof loadInboxFeed>>>();
+    mockedLoadInboxFeed.mockReturnValueOnce(nextFeed.promise);
+    await renderHarness({
+      dashboard,
+      organizationId,
+      token: "token-a",
+      userId: "user-a",
+    });
+
+    expect(inbox.initialSyncComplete).toBe(false);
+    expect(inbox.notificationBaselineId).toBe("user-a:local");
+    expect(inbox.unreadCount).toBe(0);
+
+    nextFeed.resolve({
+      state: { etag: 'W/"organization-inbox:other"' },
+      notModified: false,
+      messages: [],
+    });
+    await flushPromises();
+
+    expect(inbox.initialSyncComplete).toBe(true);
+    expect(inbox.notificationBaselineId).toBe(`user-a:${organizationId}`);
+    expect(mockedSendInboxNotification).not.toHaveBeenCalled();
   });
 
   it("coalesces shared WebSocket Inbox versions into one conditional refresh", async () => {

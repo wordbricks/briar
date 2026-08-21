@@ -173,6 +173,16 @@ type InboxReadSyncGeneration = {
   syncRequested: boolean;
 };
 
+type InboxReadSyncIdentity = Pick<
+  InboxReadSyncGeneration,
+  "storageKey" | "token" | "userId"
+>;
+
+type InboxFeedSyncIdentity = {
+  scope: string;
+  token: string;
+};
+
 const emptyStorage = (): InboxStorage => ({ messages: [], readVersions: {} });
 
 export function buildCurrentInboxMessages(
@@ -627,8 +637,11 @@ export function useInbox(
     storageKey,
     ...readInboxStorage(storageKey),
   }));
-  const [notificationFeedScope, setNotificationFeedScope] = useState<
-    string | null
+  const [readSyncIdentity, setReadSyncIdentity] = useState<
+    InboxReadSyncIdentity | null
+  >(null);
+  const [notificationFeedIdentity, setNotificationFeedIdentity] = useState<
+    InboxFeedSyncIdentity | null
   >(null);
   const readSyncGenerationRef = useRef<InboxReadSyncGeneration | null>(null);
   const nextReadSyncGenerationIdRef = useRef(0);
@@ -663,6 +676,11 @@ export function useInbox(
         const next = { messages: current.messages, readVersions };
         writeInboxStorage(generation.storageKey, next);
         return { storageKey: generation.storageKey, ...next };
+      });
+      setReadSyncIdentity({
+        storageKey: generation.storageKey,
+        token: generation.token,
+        userId: generation.userId,
       });
     },
     [],
@@ -867,6 +885,13 @@ export function useInbox(
       storageKey,
       ...readInboxStorage(storageKey),
     });
+    setReadSyncIdentity((current) =>
+      current?.storageKey === storageKey &&
+        current.token === token &&
+        current.userId === userId
+        ? current
+        : null
+    );
 
     if (!token || !userId) return;
     const generation: InboxReadSyncGeneration = {
@@ -945,7 +970,7 @@ export function useInbox(
 
   useEffect(() => {
     if (!token || !userId || !organizationId) {
-      setNotificationFeedScope(null);
+      setNotificationFeedIdentity(null);
       return;
     }
 
@@ -953,8 +978,8 @@ export function useInbox(
     if (feedSyncStateRef.current?.scope !== feedScope) {
       feedSyncStateRef.current = { scope: feedScope, state: null };
     }
-    setNotificationFeedScope((current) =>
-      current === feedScope ? current : null,
+    setNotificationFeedIdentity((current) =>
+      current?.scope === feedScope && current.token === token ? current : null,
     );
     const abort = new AbortController();
     let disposed = false;
@@ -1026,10 +1051,10 @@ export function useInbox(
             return { storageKey, ...next };
           });
         }
-        // Changing this key resets the OS-notification baseline on the first
-        // authoritative feed load, so existing messages from other projects do
-        // not arrive as a burst. Later feed refreshes keep the same baseline.
-        setNotificationFeedScope(feedScope);
+        // The first authoritative feed and account read-state response jointly
+        // unlock unread markers, app badges, and OS notification change
+        // detection. Later feed refreshes keep the same scoped baseline.
+        setNotificationFeedIdentity({ scope: feedScope, token });
       } catch {
         // Preserve the local Inbox cache while offline; reconnect and resume
         // events from startDashboardPolling retry the authoritative feed.
@@ -1086,6 +1111,20 @@ export function useInbox(
     };
   }, [organizationId, projects, realtime, storageKey, token, userId]);
 
+  const feedScope = userId && organizationId
+    ? `${userId}:${organizationId}`
+    : null;
+  const initialSyncComplete = Boolean(
+    token &&
+      userId &&
+      organizationId &&
+      readSyncIdentity?.storageKey === storageKey &&
+      readSyncIdentity.token === token &&
+      readSyncIdentity.userId === userId &&
+      notificationFeedIdentity?.scope === feedScope &&
+      notificationFeedIdentity.token === token,
+  );
+
   const messages = useMemo<InboxMessageWithReadState[]>(
     () =>
       state.storageKey === storageKey
@@ -1095,10 +1134,12 @@ export function useInbox(
             organizationId,
           ).map((message) => ({
               ...message,
-              isUnread: isInboxMessageUnread(message, state.readVersions),
+              isUnread:
+                initialSyncComplete &&
+                isInboxMessageUnread(message, state.readVersions),
             }))
         : [],
-    [organizationId, projects, state, storageKey],
+    [initialSyncComplete, organizationId, projects, state, storageKey],
   );
 
   const markRead = useCallback(
@@ -1181,12 +1222,15 @@ export function useInbox(
   }, [organizationId, projects, queueReadStatePush, storageKey]);
 
   return {
+    initialSyncComplete,
     messages,
     markAllRead,
     markIssueRead,
     markRead,
     notificationBaselineId:
-      notificationFeedScope ?? `${userId ?? "signed-out"}:local`,
+      notificationFeedIdentity?.scope === feedScope
+        ? notificationFeedIdentity.scope
+        : `${userId ?? "signed-out"}:local`,
     unreadCount: messages.filter(
       (message) =>
         message.isUnread && classifyInboxMessage(message) !== "activity",
