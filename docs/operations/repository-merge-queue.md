@@ -1,110 +1,143 @@
-# Repository merge queue delivery
+# Repository merge queue coordinator
 
-## Authority and scope
+Briar keeps issue development parallel and serializes only delivery to
+`main`. Ready pull requests enter one repository lane, form an immutable
+cohort, and are queued in their original form through GitHub's native merge
+queue. The designated local Worker validates only the final cumulative
+merge-group SHA. The lane remains occupied until signed GitHub webhooks confirm
+that every original pull request merged.
 
-GitHub's **Require merge queue** rule is the only authoritative gate on the
-protected base branch. Briar never treats a D1 row, an in-memory mutex, or a
-Worker lease as a lock on `main`, and the coordinator never passes `--admin`.
+This feature is default-off. Applying its migration does not change a GitHub
+repository, enable a project profile, publish an OCI image, or activate a
+ruleset.
 
-Briar's repository policy applies to one immutable GitHub repository ID and
-base branch. Issue implementation claims remain concurrent. After an issue's
-ordinary `ci_qa` stage passes once, its current attempt, revision, pull request
-identity, and head SHA become a delivery candidate. The issue claim is released
-until GitHub merges that original pull request.
+## Invariants
 
-For each repository/base pair, D1 permits exactly one active batch. Candidates
-are collected for the configured quiet window and sorted by:
+The coordinator enforces these boundaries:
 
-1. explicit issue priority (P1 first, then P2-P4, then no priority);
-2. `readyAt`;
-3. immutable run ID.
+- issue agents continue to claim, branch, and open pull requests in parallel;
+- one enabled Briar project owns each immutable `(repository ID, main)` lane;
+- `ci_qa` completion and the current exact PR identity make a candidate ready;
+- a force-push, draft change, close, base retarget, or run revision change
+  invalidates a mutable candidate and blocks an already-frozen cohort;
+- one transaction freezes at most five candidates with stable ordinals;
+- enqueue uses GitHub GraphQL `expectedHeadOid` and `jump: false`, followed by
+  an exact identity readback;
+- signed `merge_group.checks_requested` deliveries are durable input, but
+  arrival order is never authority;
+- intermediate cumulative heads are ignored; the Worker selects only a signed
+  final-tail SHA whose fully paginated queue entries exactly match the cohort;
+- the exact queue ref and protected `main` ref are fetched into private refs,
+  verified by SHA, and passed credential-free to the isolated executor;
+- validation proof is stored before status publication, so a publication retry
+  never reruns CI;
+- statuses are posted to the claimed SHA as `signoff/app-worker`,
+  `signoff/d1-migrations`, `signoff/rust`, and `signoff/security`;
+- Briar never directly resumes member runs. The existing signed-PR path resumes
+  them only after the batch itself is complete.
 
-The cohort is frozen atomically. A later candidate has no batch ID and is moved
-to the next batch only after the active batch reaches a terminal state.
+GitHub's Require merge queue rule and branch protection are the authoritative
+`main` gate. The D1 lane serializes Briar delivery; it cannot prevent a GitHub
+administrator from changing repository rules or using an explicit bypass.
+Configure no bypass actors and restrict repository administration accordingly.
 
-## Rollout order
+## Required GitHub policy
 
-Do not change the production ruleset as part of a coordinator application
-deployment. Roll out in this order:
+Before enabling a Briar profile, create one repository-level branch ruleset
+that targets only `refs/heads/main` and verify all of the following:
 
-1. Deploy migration `0121_repository_merge_batches.sql`, the API, and the new
-   CLI/Workers. Keep the repository merge policy disabled.
-2. In GitHub repository settings, add **Require merge queue** to the ruleset
-   targeting the base branch. Keep the four required status contexts:
-   `signoff/app-worker`, `signoff/d1-migrations`, `signoff/rust`, and
-   `signoff/security`. Configure the queue's grouping limits so the intended
-   Briar cohort can be represented by one GitHub merge group.
-3. On every selected Worker, verify `gh auth status --hostname github.com`.
-   The account must be able to read rules/PRs, enqueue PRs, fetch queue refs,
-   and create commit statuses. It does not need admin bypass.
-4. Activate the Briar policy from the connected repository:
+- enforcement is active and there are no bypass actors;
+- pull requests are required;
+- deletion and non-fast-forward updates are blocked;
+- merge queue is required with `HEADGREEN` grouping and `SQUASH` merge;
+- `max_entries_to_build` and `max_entries_to_merge` are at least the Briar
+  profile's maximum batch size (at most five);
+- the four `signoff/*` contexts above are required;
+- required status checks use `strict_required_status_checks_policy: false`.
 
-   ```sh
-   briar merge-queue configure \
-     --repository owner/name \
-     --base-branch main \
-     --quiet-window-ms 30000
-   ```
+Disabling strict branch updates is intentional. The merge queue builds a
+cumulative commit against the current protected base, so individual pull
+requests do not need to rerun the same CI merely because another pull request
+merged first.
 
-   Activation first reads the live branch rules and fails closed unless the
-   native queue rule is present. The command does not modify GitHub settings.
-5. Run `briar project doctor`. An enabled policy must report
-   `mergeQueue.healthy: true`. A disabled policy reports no queue health and
-   leaves the legacy delivery path unchanged.
+The Briar GitHub App needs Pull requests read, Merge queues read, and the Pull
+request and Merge group webhook subscriptions. It remains read-only. The local
+Worker's existing `gh` credential performs enqueue, queue readback, dequeue,
+and exact-SHA status publication.
 
-To stop admitting new batches without changing GitHub protection, run the same
-configure command with `--disable`. An already frozen batch retains its durable
-state for diagnosis; disabling is not a destructive dequeue.
+## Safe rollout
 
-## Validation lifecycle
+Do not activate the production ruleset as part of a code deployment or pull
+request review. Roll out in this order during an explicit maintenance window:
 
-Immediately before each enqueue, the Worker reads the live pull request and
-requires the same immutable PR node ID and frozen head SHA; open, non-draft
-state; the configured base branch; and GitHub's `MERGEABLE` state.
+1. Apply the Briar migrations with every merge-queue profile absent or
+   disabled.
+2. Publish an independently reproduced OCI executor digest and update both the
+   audited manifest and compiled digest in one reviewed change. Until then the
+   Worker refuses merge-batch claims.
+3. Add the GitHub App permission and event subscription, then confirm signed
+   Merge group deliveries reach Briar.
+4. Create the exact-main ruleset inactive or in evaluation mode and inspect its
+   full JSON, including bypass actors and required check sources.
+5. Confirm the designated local Worker has the audited image, repository
+   checkout, authenticated `gh`, and one free regular execution slot.
+6. Configure the profile disabled, activate the GitHub ruleset, and run the
+   fail-closed doctor. It checks the effective rules even while the profile is
+   disabled, so no batch can be claimed during this preflight.
+7. Enable the project profile last. Start with a canary window and two pull
+   requests; candidates arriving after the cohort freezes wait for the next
+   batch.
 
-The GraphQL enqueue mutation always includes `expectedHeadOid`. On retry, the
-coordinator first reads `mergeQueueEntry`; an already-enqueued PR is recorded
-without issuing a duplicate mutation. Stale, conflicting, closed, draft, or
-wrong-base PRs fail closed and stay intact.
+```sh
+briar merge-queue configure --disable
+briar merge-queue doctor --json
+briar merge-queue configure --enable \
+  --quiet-window-ms 30000 --max-batch-size 5
+```
 
-After enqueue, the Worker finds a `gh-readonly-queue` ref whose exact commit
-contains every frozen member head. It fetches that ref and creates a detached
-Briar-managed worktree under the project's `merge-groups` directory. The
-connected checkout and every issue worktree remain untouched, while
-`.worktreeinclude` inputs are copied with the standard safe-copy rules.
+`doctor` is read-only. It validates the audited local runtime, local `gh`
+authentication, immutable repository identity, effective exact-main active
+rulesets, no bypass actors, `HEADGREEN`/`SQUASH` queue capacity, branch
+protections, the exact four status contexts, and `strict=false`. It never
+creates or edits GitHub rulesets.
 
-The policy's validation command (default `bun run ci:local`) runs once in that
-exact synthetic checkout. Before publishing, the Worker rechecks the worktree
-`HEAD`, GitHub's live merge-group ref, and the D1 lease/stored SHA. Only then
-are the four statuses posted to that exact synthetic SHA. GitHub still moves
-each original PR to `merged:true`; the existing signed `pull_request` webhook
-binding resumes each matching current-revision run independently at `merged`.
+The profile API is owner/admin-only:
 
-## Failure and recovery
+```text
+GET /projects/<project-id>/merge-queue-profile
+PUT /projects/<project-id>/merge-queue-profile
+{
+  "enabled": false,
+  "quietWindowMs": 30000,
+  "maxBatchSize": 5
+}
+```
 
-- **Worker crash or lease expiry:** the batch, frozen ordering, queue entry IDs,
-  and member heads remain in D1. After the 15-minute lease expires, a Worker
-  reclaims the same batch and detects existing queue entries.
-- **Planned Worker update:** the coordinator has no provider conversation to
-  transfer. Renewal stops, and lease expiry hands the same frozen batch to an
-  updated Worker. Issue worktrees and evidence remain untouched.
-- **Partial enqueue or dequeue:** a live PR with no queue entry is enqueued
-  again with its original expected head; a live mismatch fails closed.
-- **CI or GitHub failure:** the batch becomes `failed` or `blocked`; original
-  PRs, issue worktrees, and evidence are preserved. Correct the cause, then run
-  `briar merge-queue retry --batch <uuid>`. Retry is refused if any member's
-  attempt or revision is no longer current.
-- **Conflict or stale revision:** do not force or dequeue unrelated PRs. Rework
-  the issue normally; its new revision becomes a later candidate.
+The server derives the immutable repository identity from the connected
+project and GitHub installation. It does not accept a shell command, status
+context list, repository ID, or base branch from the request.
 
-## Limits
+## State and recovery
 
-Native merge queue can run admission checks on each PR and a separate check on
-its synthetic merge group. This design does not claim that all repository CI
-runs only once. It removes repeated signoff caused by `main` drift, while
-running the frozen cohort's full validation once on the exact synthetic SHA.
+The normal lane is:
 
-GitHub controls final group composition and order. If repository queue limits
-split a Briar cohort, the coordinator refuses to validate a ref that lacks any
-frozen head. Adjust GitHub grouping or the Briar quiet window instead of
-weakening the SHA fence.
+```text
+collecting → frozen → enqueueing → waiting_tail
+           → validating → publishing → awaiting_merge → completed
+```
+
+A deterministic CI failure publishes failure for the same cumulative SHA,
+finishes all four durable status results even if GitHub removes the queue ref,
+drains the original queue entries, and leaves the lane `blocked` for operator
+review. Infrastructure failures release the fenced lease for retry;
+they do not publish a false failure. A stale Worker cannot renew, record proof,
+publish completion, or release a claim after its lease expires.
+
+Never clear a blocked lane by editing D1 directly. First inspect the exact
+cohort and GitHub queue, remove or repair its original entries, and rework the
+member runs so new exact heads produce a new cohort.
+
+For rollback, stop new profile claims first, drain or resolve the active cohort,
+confirm the GitHub queue is empty, restore the previous protected-branch
+policy, and only then disable the Require merge queue ruleset. The API refuses
+to disable or retarget a profile while an active batch holds its lane.

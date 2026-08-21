@@ -65,7 +65,7 @@ type CreateIsolatedTestDatabaseOptions = {
   miniflareOptions?: MiniflareOptions;
 };
 
-const TEMPLATE_FORMAT_VERSION = 1;
+const TEMPLATE_FORMAT_VERSION = 2;
 const TEMPLATE_DATABASE_ID = "briar-d1-test-template";
 const TEMPLATE_BINDING_CONFIG = {
   binding: "DB",
@@ -79,6 +79,7 @@ const LOCK_OWNER_FILE = "owner.json";
 const LOCK_STALE_MS = 10 * 60_000;
 const LOCK_WAIT_MS = 5 * 60_000;
 const LOCK_POLL_MS = 100;
+const D1_SQL_BATCH_SIZE = 100;
 
 const metrics = {
   databaseClones: 0,
@@ -632,10 +633,134 @@ export async function cleanD1TestTemplates() {
   console.info(`[d1-test] removed template cache: ${root}`);
 }
 
-export async function executeD1Sql(db: D1Database, sql: string) {
-  for (const statement of unstable_splitSqlQuery(sql)) {
-    if (statement.trim()) await db.prepare(statement).run();
+function splitD1Sql(sql: string) {
+  return unstable_splitSqlQuery(sql).filter((statement) => statement.trim());
+}
+
+function sqlWithoutLeadingComments(statement: string) {
+  return statement.replace(
+    /^(?:\s+|--[^\r\n]*(?:\r?\n|$)|\/\*[\s\S]*?\*\/)+/u,
+    "",
+  );
+}
+
+function deferForeignKeysSetting(statement: string) {
+  const match = sqlWithoutLeadingComments(statement).match(
+    /^pragma\s+(?:\w+\.)?defer_foreign_keys\s*=\s*(on|off|true|false|yes|no|1|0)\b/iu,
+  );
+  if (!match) return null;
+  return /^(?:on|true|yes|1)$/iu.test(match[1]!) ? "on" : "off";
+}
+
+function isD1BatchBarrier(statement: string) {
+  return /^(?:pragma|begin|commit|end|rollback|savepoint|release|vacuum|attach|detach)\b/iu.test(
+    sqlWithoutLeadingComments(statement),
+  );
+}
+
+function hasUnsafeDeferredForeignKeysRegion(statements: readonly string[]) {
+  let deferred = false;
+  for (const statement of statements) {
+    const setting = deferForeignKeysSetting(statement);
+    if (setting === "on") {
+      if (deferred) return true;
+      deferred = true;
+      continue;
+    }
+    if (setting === "off") {
+      if (!deferred) return true;
+      deferred = false;
+      continue;
+    }
+    if (deferred && isD1BatchBarrier(statement)) return true;
   }
+  return deferred;
+}
+
+async function executeD1StatementsSequentially(
+  db: D1Database,
+  statements: readonly string[],
+) {
+  for (const statement of statements) await db.prepare(statement).run();
+}
+
+async function executeD1Batch(
+  db: D1Database,
+  statements: readonly string[],
+) {
+  if (statements.length === 0) return;
+  try {
+    await db.batch(statements.map((statement) => db.prepare(statement)));
+  } catch {
+    // D1 batches are transactions. Replaying a rolled-back failed batch keeps
+    // executeD1Sql's historical partial-success boundary: statements before
+    // the failing statement remain committed, and later statements do not run.
+    await executeD1StatementsSequentially(db, statements);
+  }
+}
+
+type D1StatementQueue = {
+  pending: string[];
+};
+
+async function flushD1StatementQueue(db: D1Database, queue: D1StatementQueue) {
+  if (queue.pending.length === 0) return;
+  const statements = queue.pending.splice(0);
+  await executeD1Batch(db, statements);
+}
+
+async function queueD1Statements(
+  db: D1Database,
+  queue: D1StatementQueue,
+  statements: readonly string[],
+) {
+  if (hasUnsafeDeferredForeignKeysRegion(statements)) {
+    await flushD1StatementQueue(db, queue);
+    await executeD1StatementsSequentially(db, statements);
+    return;
+  }
+
+  for (let index = 0; index < statements.length; index += 1) {
+    const statement = statements[index]!;
+    const deferSetting = deferForeignKeysSetting(statement);
+    if (deferSetting === "on") {
+      await flushD1StatementQueue(db, queue);
+      const deferredStatements = [statement];
+      let deferOffStatement: string;
+      while (true) {
+        index += 1;
+        const nextStatement = statements[index]!;
+        if (deferForeignKeysSetting(nextStatement) === "off") {
+          deferOffStatement = nextStatement;
+          break;
+        }
+        deferredStatements.push(nextStatement);
+      }
+      // defer_foreign_keys resets at COMMIT, so this region must not be split
+      // across the normal chunk boundary. Keep the OFF statement outside the
+      // transaction so COMMIT still checks for unresolved foreign keys.
+      await executeD1Batch(db, deferredStatements);
+      await db.prepare(deferOffStatement).run();
+      continue;
+    }
+
+    if (isD1BatchBarrier(statement)) {
+      await flushD1StatementQueue(db, queue);
+      await db.prepare(statement).run();
+      continue;
+    }
+
+    queue.pending.push(statement);
+    if (queue.pending.length === D1_SQL_BATCH_SIZE) {
+      await flushD1StatementQueue(db, queue);
+    }
+  }
+}
+
+export async function executeD1Sql(db: D1Database, sql: string) {
+  const queue: D1StatementQueue = { pending: [] };
+  await queueD1Statements(db, queue, splitD1Sql(sql));
+  await flushD1StatementQueue(db, queue);
 }
 
 export async function applyD1Migrations(
@@ -648,9 +773,18 @@ export async function applyD1Migrations(
     : await migrationFiles())
     .filter((name) => !options.through || name.localeCompare(options.through) <= 0);
 
+  const queue: D1StatementQueue = { pending: [] };
   for (const file of files) {
     if (excluded.has(file)) continue;
-    const sql = await readFile(resolve("migrations", file), "utf8");
-    await executeD1Sql(db, sql);
+    let statements: string[];
+    try {
+      const sql = await readFile(resolve("migrations", file), "utf8");
+      statements = splitD1Sql(sql);
+    } catch (error) {
+      await flushD1StatementQueue(db, queue);
+      throw error;
+    }
+    await queueD1Statements(db, queue, statements);
   }
+  await flushD1StatementQueue(db, queue);
 }

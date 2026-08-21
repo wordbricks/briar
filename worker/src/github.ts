@@ -4,6 +4,7 @@ import {
   decodeGitHubInstallationRepositoriesWebhookPayload,
   decodeGitHubInstallationWebhookPayload,
   decodeGitHubIssuesWebhookPayload,
+  decodeGitHubMergeGroupWebhookPayload,
   decodeGitHubOAuthErrorResponseOption,
   decodeGitHubOAuthTokenOption,
   decodeGitHubPingWebhookPayload,
@@ -26,6 +27,19 @@ export type BriarIssueLink = {
 };
 
 export type GitHubPullRequestState = "open" | "closed" | "merged";
+
+export function mergeQueueTailPullRequestNumber(
+  headRef: string,
+  baseRef: string,
+) {
+  if (baseRef !== "refs/heads/main") return null;
+  const match = headRef.match(
+    /^refs\/heads\/gh-readonly-queue\/main\/pr-([1-9][0-9]*)-[A-Za-z0-9._-]+$/u,
+  );
+  if (!match) return null;
+  const number = Number(match[1]);
+  return Number.isSafeInteger(number) ? number : null;
+}
 
 export const githubOAuthStateTtlMs = 10 * 60_000;
 
@@ -381,6 +395,9 @@ export function parseGitHubWebhook(
       headSha: pullRequest.head.sha,
       baseSha: pullRequest.base.sha,
       baseBranch: pullRequest.base.ref,
+      baseBranchChanged:
+        parsed.changes?.base?.ref?.from !== undefined &&
+        parsed.changes.base.ref.from !== pullRequest.base.ref,
       mergeCommitSha: pullRequest.merge_commit_sha,
       body: pullRequest.body,
       briarIssueLinks: extractBriarIssueLinks(pullRequest.body),
@@ -388,6 +405,18 @@ export function parseGitHubWebhook(
       closedAt: normalizeNullableGitHubTimestamp(pullRequest.closed_at),
       createdAt: normalizeGitHubTimestamp(pullRequest.created_at),
       providerUpdatedAt: normalizeGitHubTimestamp(pullRequest.updated_at),
+    };
+  }
+
+  if (headers.event === "merge_group") {
+    const parsed = decodeGitHubMergeGroupWebhookPayload(payload);
+    return {
+      ...commonWebhookFields(headers, parsed),
+      event: "merge_group" as const,
+      headSha: parsed.merge_group.head_sha,
+      headRef: parsed.merge_group.head_ref,
+      baseSha: parsed.merge_group.base_sha,
+      baseRef: parsed.merge_group.base_ref,
     };
   }
 

@@ -358,6 +358,47 @@ describe("briar worker loop", () => {
     ]));
   });
 
+  it("uses normal slots but serializes successive phases of one merge batch", async () => {
+    const mergeBatch = (phase: string, token: string): ClaimedIssue => ({
+      ...issue(`merge-${phase}`),
+      workType: "mergeBatch",
+      workId: "merge-batch-1",
+      runId: "merge-batch-1",
+      claimToken: token,
+    });
+    const queue = [
+      mergeBatch("enqueue", "briar_merge_claim_one"),
+      mergeBatch("validate", "briar_merge_claim_two"),
+    ];
+    let inFlight = 0;
+    let maximumInFlight = 0;
+    let releaseFirst = () => {};
+    const test = harness([], {
+      claim: async (options) => options?.repliesOnly ? null : queue.shift() ?? null,
+      heartbeat: async () => {
+        if (queue.length === 0) releaseFirst();
+      },
+      runIssue: async (claimed) => {
+        inFlight += 1;
+        maximumInFlight = Math.max(maximumInFlight, inFlight);
+        if (claimed.claimToken.endsWith("one")) {
+          await new Promise<void>((resolve) => {
+            releaseFirst = resolve;
+          });
+        }
+        inFlight -= 1;
+      },
+    });
+
+    const result = await runWorkerLoop(test.dependencies, {
+      maxIssues: 2,
+      maxConcurrentSessions: 2,
+    });
+
+    expect(result.processed).toBe(2);
+    expect(maximumInFlight).toBe(1);
+  });
+
   it("adopts a device concurrency change from heartbeat", async () => {
     let inFlight = 0;
     let observedMaximum = 0;

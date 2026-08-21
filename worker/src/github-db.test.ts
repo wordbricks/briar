@@ -225,6 +225,7 @@ describe("GitHub pull request D1 integration", () => {
       draft: false,
       headSha: "a".repeat(40),
       baseSha: "b".repeat(40),
+      baseBranch: "main",
       mergeCommitSha: state === "merged" ? "c".repeat(40) : null,
       openedAt: "2029-12-31T00:00:00.000Z",
       closedAt: closed ? providerUpdatedAt : null,
@@ -367,6 +368,24 @@ describe("GitHub pull request D1 integration", () => {
     await expect(
       getHuntRunForProject(db, scenario.projectId, scenario.runId),
     ).resolves.toMatchObject({ pull_request_urls: JSON.stringify([pullRequest.url]) });
+  });
+
+  it("copies the signed base branch when evidence binds an existing snapshot", async () => {
+    const scenario = await createScenario();
+    const number = ++pullRequestNumber;
+    const url = `https://github.com/${repository}/pull/${number}`;
+    await syncGithubPullRequest(db, pullRequestEvent({ number, url }, "open", {
+      baseBranch: "release",
+      baseSha: "d".repeat(40),
+    }));
+
+    const pullRequest = await addPullRequestEvidence(scenario, number);
+    await expect(pullRequestRow(scenario, pullRequest.url)).resolves
+      .toMatchObject({
+        state: "open",
+        base_sha: "d".repeat(40),
+        base_branch: "release",
+      });
   });
 
   it("rejects new URL-only evidence before storing a false success", async () => {
@@ -1570,6 +1589,99 @@ describe("GitHub pull request D1 integration", () => {
       resume_requested_at: finalMerge.mergedAt,
       waiting_checkpoint_key: null,
     });
+  });
+
+  it("keeps every run sharing a merged member paused until its batch completes", async () => {
+    const scenario = await createScenario();
+    const sharedScenario = await createScenario();
+    const pullRequest = await addPullRequestEvidence(scenario);
+    await addPullRequestEvidence(sharedScenario, pullRequest.number);
+    await pauseAtConfiguredCheckpoint(scenario);
+    await pauseAtConfiguredCheckpoint(sharedScenario);
+    const batchId = crypto.randomUUID();
+    const candidateId = crypto.randomUUID();
+    const createdAt = nextTime();
+    await db.batch([
+      db.prepare(
+        `insert into briar_merge_batches (
+           id, project_id, repository_id, repository, base_branch, state,
+           quiet_until, frozen_at, created_at, updated_at
+         ) values (?, ?, 9001, ?, 'main', 'awaiting_merge', ?, ?, ?, ?)`,
+      ).bind(
+        batchId,
+        scenario.projectId,
+        repository,
+        createdAt,
+        createdAt,
+        createdAt,
+        createdAt,
+      ),
+      db.prepare(
+        `insert into briar_merge_batch_candidates (
+           id, project_id, batch_id, run_id, attempt, revision,
+           repository_id, repository, base_branch, pull_request_id,
+           pull_request_node_id, pull_request_number, pull_request_url,
+           frozen_head_sha, frozen_base_sha, ready_at, ordinal, state,
+           queue_entry_id, enqueued_at, created_at, updated_at
+         ) values (?, ?, ?, ?, 1, 1, 9001, ?, 'main', ?, ?, ?, ?, ?, ?, ?, 1,
+                   'enqueued', ?, ?, ?, ?)`,
+      ).bind(
+        candidateId,
+        scenario.projectId,
+        batchId,
+        scenario.runId,
+        repository,
+        10_000 + pullRequest.number,
+        `PR_node_${pullRequest.number}`,
+        pullRequest.number,
+        pullRequest.url,
+        "a".repeat(40),
+        "b".repeat(40),
+        createdAt,
+        `queue-entry-${pullRequest.number}`,
+        createdAt,
+        createdAt,
+        createdAt,
+      ),
+    ]);
+
+    const merge = pullRequestEvent(pullRequest, "merged", {
+      linkedIssues: [
+        { projectId: scenario.projectId, runId: scenario.runId },
+        { projectId: sharedScenario.projectId, runId: sharedScenario.runId },
+      ],
+    });
+    await expect(syncGithubPullRequest(db, merge)).resolves.toMatchObject({
+      resumedRunCount: 0,
+      resumeOutcomes: expect.arrayContaining([
+        { runId: scenario.runId, outcome: "not_ready" },
+        { runId: sharedScenario.runId, outcome: "not_ready" },
+      ]),
+    });
+    for (const current of [scenario, sharedScenario]) {
+      await expect(
+        getHuntRunForProject(db, current.projectId, current.runId),
+      ).resolves.toMatchObject({
+        resume_requested_at: null,
+        waiting_checkpoint_key: current.checkpoint.key,
+      });
+    }
+
+    await db.prepare(
+      `update briar_merge_batches
+       set state = 'completed', completed_at = ?, updated_at = ? where id = ?`,
+    ).bind(nextTime(), nextTime(), batchId).run();
+    await expect(reconcileGithubMergedRuns(db)).resolves.toMatchObject({
+      resumed: 2,
+    });
+    for (const current of [scenario, sharedScenario]) {
+      await expect(
+        getHuntRunForProject(db, current.projectId, current.runId),
+      ).resolves.toMatchObject({
+        resume_requested_at: merge.mergedAt,
+        waiting_checkpoint_key: null,
+      });
+    }
   });
 
   it("keeps a revision with legacy unbound PR evidence on manual review", async () => {

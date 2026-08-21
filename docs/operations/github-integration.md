@@ -27,12 +27,24 @@ available to GitHub accounts outside the account that owns the App. Configure:
   starts the PKCE-protected authorization step after the setup callback.
 - Webhook URL: `https://<worker-host>/github/webhooks`
 - Webhook secret: the value of `BRIAR_GITHUB_WEBHOOK_SECRET`
-- Repository permission: **Pull requests — Read-only**
-- Subscribe to event: **Pull request**
+- Repository permissions:
+  - **Pull requests — Read-only**
+  - **Merge queues — Read-only**
+- Subscribe to events:
+  - **Pull request**
+  - **Merge group**
 
 Record the App's **Client ID**, generate a **Client secret**, and record the App
 slug from `https://github.com/apps/<app-slug>`. The App does not need Contents
-write access, an App private key, or a long-lived user or installation token.
+or Commit statuses write access, an App private key, or a long-lived user or
+installation token. Signed webhooks are inbound authority only; the designated
+local Worker uses its existing `gh` login for exact-head enqueue and status
+publication.
+
+Existing installations may require an organization owner to approve the added
+Merge queues permission and event subscription before native batching can be
+enabled. Ordinary pull-request synchronization continues to work while the
+merge-queue profile remains disabled.
 
 GitHub sends a signed `ping` delivery when the webhook is saved. A successful
 configuration receives an HTTP 200 response from Briar.
@@ -93,12 +105,6 @@ readiness. The local `gh` login is still required for a worker to push branches
 and create or inspect pull requests; the GitHub App connection supplies signed
 inbound events.
 
-The same separation applies to repository merge coordination. The App remains
-pull-request read-only; a selected Worker's authenticated `gh` performs exact-
-head queue admission and status publication without administrator bypass. The
-native queue setup is described in
-[`repository-merge-queue.md`](repository-merge-queue.md).
-
 ## 4. Link a project and pull request
 
 The Briar project must have a GitHub repository in `owner/repository` form. The
@@ -137,16 +143,15 @@ For a current run revision with multiple linked PRs, Briar waits until all of
 them are merged. Links from an earlier attempt or revision cannot approve a
 newer checkpoint.
 
-Merge batches retain each original PR as the immutable run identity. Briar does
-not create an aggregate PR: once GitHub's queue merges an original PR, the same
-signed webhook path updates its stored link and resumes that current revision.
-
 ## State and retry behavior
 
 - `opened`, `reopened`, draft, and ordinary updates store the current open state.
 - `closed` with `merged: false` stores closed state and leaves review paused.
 - Only `pull_request`, `action: closed`, and `merged: true` stores merged state
   and evaluates automatic resume.
+- A run whose current revision belongs to an active Briar merge batch remains
+  paused until every original PR in that batch has a signed merged delivery.
+  The existing one-minute reconciliation resumes it after the batch completes.
 - Merge state is stored before resume is attempted. If PR evidence is already
   linked and merge arrives before the run reaches its checkpoint, checkpoint
   creation immediately reconciles the stored state.

@@ -12,6 +12,7 @@ import { decodeRequestSync } from "./request-schema";
 
 export const GitHubWebhookEvent = Schema.Literals([
   "pull_request",
+  "merge_group",
   "issues",
   "ping",
   "installation",
@@ -33,6 +34,15 @@ const GitHubSender = Schema.Struct({
 const GitHubInstallation = Schema.Struct({
   id: PositiveSafeInteger,
 });
+
+const GitHubCommitSha = Schema.String.check(
+  Schema.isPattern(/^[0-9a-f]{40}$/u),
+);
+
+const GitHubRef = Schema.Trim.check(
+  Schema.isLengthBetween(12, 500),
+  Schema.isPattern(/^refs\/heads\/[A-Za-z0-9._/-]+$/u),
+);
 
 export const GitHubInstallationWebhookPayload = Schema.Struct({
   action: trimmedText(1, 100),
@@ -90,6 +100,26 @@ export const GitHubPullRequestWebhookPayload = Schema.Struct({
     closed_at: NullableGitHubTimestamp,
     created_at: IsoDateTimeWithOffset,
     updated_at: IsoDateTimeWithOffset,
+  }),
+  changes: Schema.optional(Schema.Struct({
+    base: Schema.optional(Schema.Struct({
+      ref: Schema.optional(Schema.Struct({
+        from: trimmedText(1, 255),
+      })),
+    })),
+  })),
+});
+
+export const GitHubMergeGroupWebhookPayload = Schema.Struct({
+  action: trimmedText(1, 100),
+  installation: GitHubInstallation,
+  repository: GitHubRepository,
+  sender: GitHubSender,
+  merge_group: Schema.Struct({
+    head_sha: GitHubCommitSha,
+    head_ref: GitHubRef,
+    base_sha: GitHubCommitSha,
+    base_ref: GitHubRef,
   }),
 });
 
@@ -211,6 +241,9 @@ export const decodeGitHubAppAuthorizationWebhookPayload =
   );
 export const decodeGitHubPullRequestWebhookPayload = decodeRequestSync(
   GitHubPullRequestWebhookPayload,
+);
+export const decodeGitHubMergeGroupWebhookPayload = decodeRequestSync(
+  GitHubMergeGroupWebhookPayload,
 );
 export const decodeGitHubIssuesWebhookPayload = decodeRequestSync(
   GitHubIssuesWebhookPayload,

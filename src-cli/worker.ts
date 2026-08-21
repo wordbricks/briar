@@ -271,10 +271,14 @@ export async function runWorkerLoop(
   let activeSlotCount = 0;
   let updateDirective: WorkerLoopUpdateDirective | null = null;
   const serialTails = new Map<string, Promise<void>>();
-  const executionKey = (issue: ClaimedIssue) =>
-    issue.workId ?? issue.executionId ?? `${issue.runId}:${issue.claimToken}`;
+  const executionKey = (issue: ClaimedIssue) => issue.workType === "mergeBatch"
+    ? `${issue.runId}:${issue.claimToken}`
+    : issue.workId ?? issue.executionId ?? `${issue.runId}:${issue.claimToken}`;
   const serialKey = (issue: ClaimedIssue) =>
-    !issue.workType || issue.workType === "issue" ? issue.runId : null;
+    !issue.workType || issue.workType === "issue" ||
+        issue.workType === "mergeBatch"
+      ? issue.runId
+      : null;
 
   const applyHeartbeat = (
     heartbeat:
