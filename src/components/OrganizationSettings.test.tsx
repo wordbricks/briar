@@ -21,7 +21,7 @@ vi.mock("../lib/api", () => ({
   createOrganizationAgent: vi.fn(),
   createOrganizationInvitation: vi.fn(),
   deleteOrganizationAgent: vi.fn(),
-  disableOrganizationExecutionWorker: vi.fn(),
+  deleteOrganizationExecutionWorker: vi.fn(),
   listOrganizationAgents: vi.fn(),
   loadOrganizationExecutionWorkers: vi.fn(),
   loadOrganizationInvitations: vi.fn(),

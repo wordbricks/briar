@@ -1345,7 +1345,7 @@ describe("organization channels", () => {
     });
   });
 
-  it("lets any organization device claim an organization Agent reply", async () => {
+  it("keeps a claimed organization Agent reply in the trigger thread", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000004";
     await createChannel(db, {
       id: channelId,
@@ -1426,7 +1426,7 @@ describe("organization channels", () => {
     await createChannelMessage(db, {
       id: agentReplyId,
       channelId,
-      parentMessageId: null,
+      parentMessageId: triggerId,
       authorUserId: null,
       authorAgentId: agent!.id,
       authorAgentName: agent!.name,
@@ -1574,7 +1574,7 @@ describe("organization channels", () => {
     expect(claimPayload.work.snapshot.messages).toHaveLength(2);
     expect(claimPayload.work.snapshot.messages[1]).toMatchObject({
       id: agentReplyId,
-      parentMessageId: null,
+      parentMessageId: triggerId,
       author: { type: "agent", id: agent!.id, name: "Honey" },
       body: "I can write that plan.",
     });
@@ -1766,12 +1766,15 @@ describe("organization channels", () => {
 
     const reply = await getChannelMessage(db, channelId, claimed!.reply_message_id);
     expect(reply?.author).toMatchObject({ type: "agent", name: "Honey" });
-    expect(reply?.parentMessageId).toBeNull();
-    await expect(listChannelRootMessages(db, channelId)).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: claimed!.reply_message_id }),
-      ]),
-    );
+    expect(reply?.parentMessageId).toBe(triggerId);
+    expect(
+      (await listChannelThreadMessages(db, channelId, triggerId)).map(
+        (message) => message.id,
+      ),
+    ).toContain(claimed!.reply_message_id);
+    expect(
+      (await listChannelRootMessages(db, channelId)).map((message) => message.id),
+    ).not.toContain(claimed!.reply_message_id);
     // A plan document with no project stays organization-wide until a member
     // decides where the work belongs.
     expect(reply?.document).toMatchObject({

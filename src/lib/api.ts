@@ -553,7 +553,7 @@ export async function requestOrganizationExecutionWorkerUpdate(
   );
 }
 
-export async function disableOrganizationExecutionWorker(
+export async function deleteOrganizationExecutionWorker(
   token: string,
   organizationId: string,
   deviceId: string,
