@@ -676,6 +676,177 @@ final class ChannelsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testOpeningDirectMessageMergesThreadRepliesIntoTimeline() async throws {
+        var directMessage = summary(id: channelID, name: "Developer")
+        directMessage.kind = .directMessage
+        let root = message(
+            id: rootID,
+            channelID: channelID,
+            body: "hi",
+            replyCount: 1,
+            lastReplyAt: Date(timeIntervalSince1970: 1_700_000_020)
+        )
+        let reply = message(
+            id: replyID,
+            channelID: channelID,
+            parentMessageID: rootID,
+            body: "Agent answer",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_020),
+            authorKind: .agent
+        )
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let threadPath = MobileAPIContract.Endpoint.channelMessages(
+            organizationID: organizationID,
+            channelID: channelID,
+            parentMessageID: rootID
+        )
+        let api = ChannelPollingAPI(routes: [
+            listPath: [try encoded(ChannelsResponse(channels: [directMessage], cursor: 10))],
+            detailPath: [try encoded(ChannelDetailResponse(
+                channel: directMessage,
+                members: [],
+                agents: [],
+                messages: [root]
+            ))],
+            threadPath: [try encoded(ChannelMessagesResponse(messages: [root, reply]))],
+        ])
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+
+        store.select(organizationID: organizationID, token: "token")
+        await waitForRequests(api, path: listPath, count: 1)
+        await store.openChannel(channelID)
+
+        XCTAssertEqual(store.messages.map(\.id), [rootID, replyID])
+        XCTAssertEqual(store.messages.last?.body, "Agent answer")
+        XCTAssertTrue(store.thread.isEmpty)
+        let threadRequestCount = await api.requestCount(for: threadPath)
+        XCTAssertEqual(threadRequestCount, 1)
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testRegularChannelsKeepRepliesOutOfTheRootTimeline() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let root = message(
+            id: rootID,
+            channelID: channelID,
+            body: "Question",
+            replyCount: 1
+        )
+        let reply = message(
+            id: replyID,
+            channelID: channelID,
+            parentMessageID: rootID,
+            body: "Threaded answer"
+        )
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let threadPath = MobileAPIContract.Endpoint.channelMessages(
+            organizationID: organizationID,
+            channelID: channelID,
+            parentMessageID: rootID
+        )
+        let api = ChannelPollingAPI(routes: [
+            listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+            detailPath: [try encoded(ChannelDetailResponse(
+                channel: channel,
+                members: [],
+                agents: [],
+                messages: [root]
+            ))],
+            threadPath: [try encoded(ChannelMessagesResponse(messages: [root, reply]))],
+        ])
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+
+        store.select(organizationID: organizationID, token: "token")
+        await waitForRequests(api, path: listPath, count: 1)
+        await store.openChannel(channelID)
+
+        XCTAssertEqual(store.messages.map(\.id), [rootID])
+        let threadRequestCount = await api.requestCount(for: threadPath)
+        XCTAssertEqual(threadRequestCount, 0)
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testDirectMessageDeltaJoinsRepliesToLoadedRootsOnly() async throws {
+        var directMessage = summary(id: channelID, name: "Developer")
+        directMessage.kind = .directMessage
+        let root = message(id: rootID, channelID: channelID, body: "hi")
+        let updatedRoot = message(
+            id: rootID,
+            channelID: channelID,
+            body: "hi",
+            replyCount: 1,
+            lastReplyAt: Date(timeIntervalSince1970: 1_700_000_020)
+        )
+        let reply = message(
+            id: replyID,
+            channelID: channelID,
+            parentMessageID: rootID,
+            body: "Inline answer",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_020),
+            authorKind: .agent
+        )
+        let orphanParentID = UUID(uuidString: "99999999-9999-4999-8999-999999999999")!
+        let orphanReply = message(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            channelID: channelID,
+            parentMessageID: orphanParentID,
+            body: "Off-screen answer",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_025),
+            authorKind: .agent
+        )
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let deltaPath = MobileAPIContract.Endpoint.channelChanges(
+            organizationID: organizationID,
+            cursor: 10
+        )
+        let api = ChannelPollingAPI(routes: [
+            listPath: [try encoded(ChannelsResponse(channels: [directMessage], cursor: 10))],
+            detailPath: [try encoded(ChannelDetailResponse(
+                channel: directMessage,
+                members: [],
+                agents: [],
+                messages: [root]
+            ))],
+            deltaPath: [try encoded(ChannelDeltaResponse(
+                cursor: 11,
+                hasMore: false,
+                channels: [],
+                removedChannelIds: [],
+                messages: [updatedRoot, reply, orphanReply],
+                removedMessageIds: []
+            ))],
+        ])
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+
+        store.select(organizationID: organizationID, token: "token")
+        await waitForRequests(api, path: listPath, count: 1)
+        await store.openChannel(channelID)
+        await store.refreshChanges()
+
+        XCTAssertEqual(store.messages.map(\.id), [rootID, replyID])
+        XCTAssertEqual(store.messages.first?.replyCount, 1)
+        XCTAssertFalse(store.messages.contains(where: { $0.id == orphanReply.id }))
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
     func testPollingStopsInBackgroundAndRestartsImmediatelyWhenActive() async throws {
         let channel = summary(id: channelID, name: "Briar")
         let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)

@@ -190,8 +190,13 @@ struct ChannelMessagesView: View {
             workers: workers,
             onSkillSessionMaterialized: onSkillSessionMaterialized,
             onSkillSessionOpen: onSkillSessionOpen,
-            onOpenThread: { selectedThreadMessage = $0 },
-            showsThreadSummary: true
+            // Direct messages flow as one continuous conversation, so replies
+            // render inline instead of collapsing into a thread summary and
+            // long-press thread actions stay unavailable.
+            onOpenThread: currentChannel.isDirectMessage
+                ? nil
+                : { selectedThreadMessage = $0 },
+            showsThreadSummary: !currentChannel.isDirectMessage
         )
         .navigationTitle(displayTitle)
         .navigationBarTitleDisplayMode(.inline)
