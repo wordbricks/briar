@@ -7,6 +7,7 @@ StartLimitBurst=60
 
 [Service]
 Type=oneshot
+RemainAfterExit=yes
 ExecStart=/opt/briar/bin/briar-managed-enroll
 Restart=on-failure
 RestartSec=10

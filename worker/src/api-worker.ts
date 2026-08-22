@@ -483,6 +483,8 @@ import {
   decodeWorkerUpdateRequestId,
 } from "./worker-update-contract";
 import { ManagedComputerServiceError } from "./managed-computer-service";
+import { managedComputerByDeviceId } from "./managed-computer-repository";
+import { endManagedComputerRemoteSessionsAndDisconnect } from "./managed-computer-remote-service";
 import {
   ingestAgentTranscript,
   listAgentTranscriptSegments,
@@ -5567,13 +5569,29 @@ async function route(
         "Worker owner or organization admin access required",
       );
     }
-    if (
-      !(await deleteExecutionWorker(
-        db,
-        device.id,
-        new Date().toISOString(),
-      ))
-    ) {
+    const managedComputer = await managedComputerByDeviceId(db, device.id);
+    const observedAt = new Date().toISOString();
+    let deleted: boolean;
+    try {
+      deleted = await deleteExecutionWorker(db, device.id, observedAt);
+    } catch (error) {
+      if (managedComputer) {
+        await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
+          managedComputerId: managedComputer.id,
+          reason: "worker_credential_revoked",
+          observedAt,
+        });
+      }
+      throw error;
+    }
+    if (managedComputer) {
+      await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
+        managedComputerId: managedComputer.id,
+        reason: "worker_credential_revoked",
+        observedAt,
+      });
+    }
+    if (!deleted) {
       throw new HttpError(404, "Worker not found");
     }
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -9118,12 +9136,25 @@ async function route(
     ) {
       throw new HttpError(403, "Worker owner or organization admin access required");
     }
+    const managedComputer = await managedComputerByDeviceId(db, device.id);
+    const remainingBindings = await db.prepare(
+      `select count(*) binding_count from briar_execution_workers
+       where device_id = ?`,
+    ).bind(device.id).first<{ binding_count: number }>();
+    const observedAt = new Date().toISOString();
     await unbindExecutionWorker(
       db,
       device.id,
       projectId,
-      new Date().toISOString(),
+      observedAt,
     );
+    if (managedComputer && (remainingBindings?.binding_count ?? 0) <= 1) {
+      await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
+        managedComputerId: managedComputer.id,
+        reason: "worker_credential_revoked",
+        observedAt,
+      });
+    }
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
@@ -12625,7 +12656,12 @@ export default {
       return handleSlackOAuthCallback(request, env);
     }
     try {
-      const auth = createAuth(env, url.origin, ctx);
+      const authOrigin = url.protocol === "wss:"
+        ? `https://${url.host}`
+        : url.protocol === "ws:"
+          ? `http://${url.host}`
+          : url.origin;
+      const auth = createAuth(env, authOrigin, ctx);
       const response = await route(
         request,
         auth,

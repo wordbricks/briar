@@ -1,3 +1,5 @@
+import { remoteDesktopCapturesKeyboard } from "./remote-desktop-focus";
+
 export type KeybindingId = "sidebarToggle";
 
 export type Shortcut = {
@@ -178,7 +180,10 @@ export function installKeybindingShortcuts(
   onShortcut: (id: KeybindingId) => void,
 ): () => void {
   const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.isComposing || getRecordingKeybinding()) return;
+    if (
+      event.isComposing || getRecordingKeybinding() ||
+      remoteDesktopCapturesKeyboard()
+    ) return;
     const keybindings = loadKeybindings();
     for (const id of keybindingIds) {
       if (matchesShortcut(event, keybindings[id])) {

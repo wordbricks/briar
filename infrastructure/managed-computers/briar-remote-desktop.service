@@ -1,0 +1,26 @@
+[Unit]
+Description=Briar managed computer loopback remote desktop
+After=network-online.target
+Wants=network-online.target
+After=briar-managed-enroll.service
+Requires=briar-managed-enroll.service
+
+[Service]
+Type=simple
+User=briar
+Group=briar
+Environment=HOME=/home/briar
+Environment=BRIAR_REMOTE_DISPLAY_PORT=5901
+Environment=BRIAR_REMOTE_DISPLAY_GEOMETRY=1280x720
+WorkingDirectory=/home/briar
+ExecStart=/opt/briar/bin/briar-remote-desktop
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/briar /tmp
+
+[Install]
+WantedBy=multi-user.target

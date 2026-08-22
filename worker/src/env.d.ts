@@ -11,6 +11,15 @@ interface Env {
   GITHUB_CALLBACK_ORIGIN?: string;
   /** Emergency switch for new managed-computer applications. */
   MANAGED_COMPUTER_APPLICATIONS_ENABLED?: string;
+  /** Separate emergency switch for end-user remote desktop sessions. */
+  MANAGED_COMPUTER_REMOTE_DESKTOP_ENABLED?: string;
+  /** Comma-separated web origins allowed to create and connect sessions. */
+  MANAGED_COMPUTER_REMOTE_DESKTOP_ALLOWED_ORIGINS?: string;
+  MANAGED_COMPUTER_REMOTE_DESKTOP_TOKEN_TTL_SECONDS?: string;
+  MANAGED_COMPUTER_REMOTE_DESKTOP_MAX_SESSION_MINUTES?: string;
+  MANAGED_COMPUTER_REMOTE_DESKTOP_ORGANIZATION_SESSION_LIMIT?: string;
+  MANAGED_COMPUTER_REMOTE_DESKTOP_FLEET_SESSION_LIMIT?: string;
+  MANAGED_COMPUTER_REMOTE_DESKTOP_RATE_LIMIT?: string;
   /** Server-only pilot promotion code; never exposed by product metadata. */
   MANAGED_COMPUTER_PROMOTION_CODE?: string;
   MANAGED_COMPUTER_ORGANIZATION_LIMIT?: string;
@@ -37,4 +46,7 @@ interface Env {
     managedComputerId: string;
     provisioningJobId: string;
   }>;
+  MANAGED_COMPUTER_REMOTE: DurableObjectNamespace<
+    import("./managed-computer-remote-relay").ManagedComputerRemoteSessionHub
+  >;
 }

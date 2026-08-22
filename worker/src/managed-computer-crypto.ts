@@ -16,6 +16,11 @@ function base64Url(bytes: Uint8Array) {
     .replace(/=+$/u, "");
 }
 
+export function randomManagedComputerRemoteToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return `briar_remote_${base64Url(bytes)}`;
+}
+
 export async function hmacBase64Url(secret: string, value: string) {
   const key = await crypto.subtle.importKey(
     "raw",
