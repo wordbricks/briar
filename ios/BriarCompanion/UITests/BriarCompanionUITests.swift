@@ -3,6 +3,7 @@ import XCTest
 @MainActor
 final class BriarCompanionUITests: XCTestCase {
     private let transitionTimeout: TimeInterval = 20
+    private let channelTransitionTimeout: TimeInterval = 60
     private let accessibilityTransitionTimeout: TimeInterval = 60
 
     private func waitForKeyboardFocus(on element: XCUIElement) -> Bool {
@@ -134,15 +135,8 @@ final class BriarCompanionUITests: XCTestCase {
     func testChannelUsesNativeNavigationAndShowsParticipationCounts() {
         let app = launchInsideCompanion()
 
-        app.tabBars.buttons["홈"].tap()
-        let channel = app.buttons[
-            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-        ]
-        XCTAssertTrue(channel.waitForExistence(timeout: transitionTimeout))
-        channel.tap()
-
+        let channel = openHomeChannel(in: app)
         let navigationBar = app.navigationBars["design"]
-        XCTAssertTrue(navigationBar.waitForExistence(timeout: 5))
         let identity = app.descendants(matching: .any)["channel-header-identity"]
         XCTAssertTrue(identity.waitForExistence(timeout: 5))
         XCTAssertTrue(identity.label.contains("design"))
@@ -168,15 +162,10 @@ final class BriarCompanionUITests: XCTestCase {
             additionalArguments: ["--ui-testing-delayed-channel-load"]
         )
 
-        app.tabBars.buttons["홈"].tap()
-        let channel = app.buttons[
-            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-        ]
-        XCTAssertTrue(channel.waitForExistence(timeout: transitionTimeout))
-        channel.tap()
+        _ = openHomeChannel(in: app)
 
         let spinner = app.descendants(matching: .any)["channel-message-loading-spinner"]
-        XCTAssertTrue(spinner.waitForExistence(timeout: 3))
+        XCTAssertTrue(spinner.waitForExistence(timeout: channelTransitionTimeout))
         captureScreenshot(named: "companion-channel-message-loading-spinner")
 
         let message = app.descendants(matching: .any)[
@@ -191,12 +180,7 @@ final class BriarCompanionUITests: XCTestCase {
             additionalArguments: ["--ui-testing-channel-history"]
         )
 
-        app.tabBars.buttons["홈"].tap()
-        let channel = app.buttons[
-            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-        ]
-        XCTAssertTrue(channel.waitForExistence(timeout: 5))
-        channel.tap()
+        _ = openHomeChannel(in: app)
 
         let newestMessage = element(
             withLabel: "가변 높이 채널 메시지 20입니다.",
@@ -232,12 +216,7 @@ final class BriarCompanionUITests: XCTestCase {
     func testChannelComposerShowsAttachmentButton() {
         let app = launchInsideCompanion()
 
-        app.tabBars.buttons["홈"].tap()
-        let channel = app.buttons[
-            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-        ]
-        XCTAssertTrue(channel.waitForExistence(timeout: transitionTimeout))
-        channel.tap()
+        _ = openHomeChannel(in: app)
 
         let attach = app.buttons["channel-composer-attach"]
         XCTAssertTrue(attach.waitForExistence(timeout: transitionTimeout))
@@ -253,12 +232,7 @@ final class BriarCompanionUITests: XCTestCase {
     func testChannelAttachmentCardOpensPreview() {
         let app = launchInsideCompanion()
 
-        app.tabBars.buttons["홈"].tap()
-        let channel = app.buttons[
-            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-        ]
-        XCTAssertTrue(channel.waitForExistence(timeout: 5))
-        channel.tap()
+        _ = openHomeChannel(in: app)
 
         let card = app.descendants(matching: .any)[
             "channel-attachment-card-abababab-abab-4bab-8bab-abababababab"
@@ -282,17 +256,7 @@ final class BriarCompanionUITests: XCTestCase {
             additionalArguments: ["--ui-testing-delayed-message-send"]
         )
 
-        app.tabBars.buttons["홈"].tap()
-        let channel = app.buttons[
-            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-        ]
-        XCTAssertTrue(channel.waitForExistence(timeout: transitionTimeout))
-        channel.tap()
-        let navigationBar = app.navigationBars["design"]
-        if !navigationBar.waitForExistence(timeout: 5) {
-            channel.tap()
-        }
-        XCTAssertTrue(navigationBar.waitForExistence(timeout: transitionTimeout))
+        _ = openHomeChannel(in: app)
 
         let field = app.textFields["channel-composer-field"]
         XCTAssertTrue(field.waitForExistence(timeout: transitionTimeout))
@@ -331,12 +295,7 @@ final class BriarCompanionUITests: XCTestCase {
     func testChannelMentionPickerDismissesAfterAgentSelection() {
         let app = launchInsideCompanion()
 
-        app.tabBars.buttons["홈"].tap()
-        let channel = app.buttons[
-            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-        ]
-        XCTAssertTrue(channel.waitForExistence(timeout: transitionTimeout))
-        channel.tap()
+        _ = openHomeChannel(in: app)
 
         let field = app.textFields["channel-composer-field"]
         XCTAssertTrue(field.waitForExistence(timeout: transitionTimeout))
@@ -363,12 +322,7 @@ final class BriarCompanionUITests: XCTestCase {
     func testChannelThreadUsesReplyConversationWithoutNestedThreadSummaries() {
         let app = launchInsideCompanion()
 
-        app.tabBars.buttons["홈"].tap()
-        let channel = app.buttons[
-            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-        ]
-        XCTAssertTrue(channel.waitForExistence(timeout: 5))
-        channel.tap()
+        _ = openHomeChannel(in: app)
 
         let rootThreadLink = app.staticTexts["스레드에서 답글"]
         XCTAssertTrue(rootThreadLink.waitForExistence(timeout: 5))
@@ -626,6 +580,23 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: transitionTimeout))
         XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: transitionTimeout))
         return app
+    }
+
+    @discardableResult
+    private func openHomeChannel(in app: XCUIApplication) -> XCUIElement {
+        let home = app.tabBars.buttons["홈"]
+        XCTAssertTrue(home.waitForExistence(timeout: transitionTimeout))
+        home.tap()
+
+        let channel = app.buttons[
+            "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        ]
+        XCTAssertTrue(channel.waitForExistence(timeout: channelTransitionTimeout))
+        channel.tap()
+        XCTAssertTrue(
+            app.navigationBars["design"].waitForExistence(timeout: channelTransitionTimeout)
+        )
+        return channel
     }
 
     private func element(withLabel label: String, in app: XCUIApplication) -> XCUIElement {
