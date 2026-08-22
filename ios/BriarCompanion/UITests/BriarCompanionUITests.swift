@@ -324,12 +324,14 @@ final class BriarCompanionUITests: XCTestCase {
 
         _ = openHomeChannel(in: app)
 
-        let rootMessage = app.descendants(matching: .any)[
-            "channel-message-dddddddd-dddd-4ddd-8ddd-dddddddddddd"
-        ]
+        let rootMessageMatches = app.textViews
+            .matching(identifier: "channel-message-dddddddd-dddd-4ddd-8ddd-dddddddddddd")
+        XCTAssertGreaterThan(rootMessageMatches.count, 0)
+        let rootMessage = rootMessageMatches.element(boundBy: 0)
         XCTAssertTrue(rootMessage.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["스레드에서 답글"].exists)
-        rootMessage.press(forDuration: 0.7)
+        rootMessage.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.7)
 
         let startThread = app.buttons["channel-start-thread-action"]
         XCTAssertTrue(startThread.waitForExistence(timeout: 5))

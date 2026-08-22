@@ -937,10 +937,14 @@ private struct ChannelMessageRow: View {
                     .padding(.top, 4)
                 }
         }
-        .onLongPressGesture(minimumDuration: 0.45) {
-            guard !isOptimistic, onOpenThread != nil else { return }
-            showingThreadActions = true
-        }
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            LongPressGesture(minimumDuration: 0.45)
+                .onEnded { _ in
+                    guard !isOptimistic, onOpenThread != nil else { return }
+                    showingThreadActions = true
+                }
+        )
         .sheet(isPresented: $showingThreadActions) {
             ChannelMessageActionsSheet(locale: locale) {
                 showingThreadActions = false
