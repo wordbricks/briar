@@ -45,6 +45,89 @@ final class ChannelsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadsRecipientsAndCreatesDirectMessageWithCanonicalIDs() async throws {
+        let agentID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+        let member = OrganizationMember(
+            userId: "member-1",
+            name: "Alex",
+            email: "alex@example.com",
+            image: nil,
+            role: "member",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let agent = ChannelAgentSummary(
+            agentId: agentID,
+            name: "Honey",
+            avatar: nil,
+            provider: "codex",
+            model: nil,
+            projectId: nil,
+            description: "Product helper",
+            responsibility: "Help with product work",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        var directMessage = summary(id: channelID, name: "Alex, Honey")
+        directMessage.kind = .directMessage
+        directMessage.dmParticipants = [
+            DirectMessageParticipant(
+                type: .user,
+                id: member.userId,
+                name: member.name,
+                image: member.image
+            ),
+            DirectMessageParticipant(
+                type: .agent,
+                id: agentID.uuidString.lowercased(),
+                name: agent.name,
+                image: agent.avatar
+            ),
+        ]
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let membersPath = MobileAPIContract.Endpoint.organizationMembers(
+            organizationID: organizationID
+        )
+        let agentsPath = MobileAPIContract.Endpoint.organizationAgents(
+            organizationID: organizationID
+        )
+        let directMessagesPath = MobileAPIContract.Endpoint.directMessages(
+            organizationID: organizationID
+        )
+        let api = ChannelPollingAPI(routes: [
+            listPath: [try encoded(ChannelsResponse(channels: [], cursor: 10))],
+            membersPath: [try encoded(DirectMessageRecipientsResponse(members: [member]))],
+            agentsPath: [try encoded(OrganizationAgentsResponse(agents: [agent]))],
+            directMessagesPath: [try encoded(CreateDirectMessageResponse(
+                channel: directMessage
+            ))],
+        ])
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+        store.select(organizationID: organizationID, token: "token")
+        await waitForRequests(api, path: listPath, count: 1)
+
+        let recipients = try await store.loadDirectMessageRecipients()
+        let created = try await store.createDirectMessage(
+            memberIDs: [member.userId],
+            agentIDs: [agentID]
+        )
+
+        XCTAssertEqual(recipients.members.map(\.userId), [member.userId])
+        XCTAssertEqual(recipients.agents.map(\.agentId), [agentID])
+        XCTAssertEqual(created.id, channelID)
+        XCTAssertEqual(store.channels.map(\.id), [channelID])
+        let recordedBodyData = await api.lastJSONBody(for: directMessagesPath)
+        let bodyData = try XCTUnwrap(recordedBodyData)
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
+        )
+        XCTAssertEqual(body["memberIds"] as? [String], [member.userId])
+        XCTAssertEqual(
+            body["agentIds"] as? [String],
+            [agentID.uuidString.lowercased()]
+        )
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
     func testOpenChannelReplacesTheCatalogSummaryWithCanonicalDetailState() async throws {
         let listed = summary(id: channelID, name: "Briar")
         let archivedAt = Date(timeIntervalSince1970: 1_700_000_100)

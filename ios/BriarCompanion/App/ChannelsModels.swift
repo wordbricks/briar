@@ -14,13 +14,63 @@ struct ChannelSummary: Codable, Hashable, Identifiable, Sendable {
     let agentCount: Int
     let createdAt: Date
     let updatedAt: Date
+    /// Older channel snapshots predate direct messages, so a missing value is
+    /// treated as a regular channel by the presentation helpers below.
+    var kind: Kind? = nil
     var lastMessageAt: Date? = nil
+    var lastMessagePreview: String? = nil
     var lastReadAt: Date? = nil
     var hasUnread: Bool? = nil
+    var dmParticipants: [DirectMessageParticipant]? = nil
+
+    enum Kind: String, Codable, Hashable, Sendable {
+        case channel
+        case directMessage = "dm"
+    }
 
     enum Visibility: String, Codable, Hashable, Sendable {
         case org = "public"
         case restricted = "private"
+    }
+
+    var isDirectMessage: Bool { kind == .directMessage }
+
+    func directMessageParticipants(excluding currentUserID: String?) -> [DirectMessageParticipant] {
+        (dmParticipants ?? []).filter { participant in
+            participant.type != .user || participant.id != currentUserID
+        }
+    }
+
+    func directMessageDisplayName(currentUserID: String?) -> String {
+        let names = directMessageParticipants(excluding: currentUserID).map(\.name)
+        return names.isEmpty ? name : names.joined(separator: ", ")
+    }
+}
+
+struct DirectMessageParticipant: Codable, Hashable, Identifiable, Sendable {
+    enum Kind: String, Codable, Hashable, Sendable {
+        case user
+        case agent
+    }
+
+    let type: Kind
+    let id: String
+    let name: String
+    let image: String?
+}
+
+enum DirectMessageOrdering {
+    static func byMostRecent(_ channels: [ChannelSummary]) -> [ChannelSummary] {
+        channels
+            .filter { $0.isDirectMessage && $0.archivedAt == nil }
+            .sorted { left, right in
+                let leftActivity = left.lastMessageAt ?? left.createdAt
+                let rightActivity = right.lastMessageAt ?? right.createdAt
+                if leftActivity == rightActivity {
+                    return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
+                }
+                return leftActivity > rightActivity
+            }
     }
 }
 
@@ -517,6 +567,23 @@ struct ChannelsResponse: Codable, Sendable {
     let cursor: Int?
 }
 
+struct DirectMessageRecipientsResponse: Codable, Sendable {
+    let members: [OrganizationMember]
+}
+
+struct OrganizationAgentsResponse: Codable, Sendable {
+    let agents: [ChannelAgentSummary]
+}
+
+struct CreateDirectMessageRequest: Encodable, Sendable {
+    let memberIds: [String]
+    let agentIds: [String]
+}
+
+struct CreateDirectMessageResponse: Codable, Sendable {
+    let channel: ChannelSummary
+}
+
 struct ChannelAgentReply: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let agentId: UUID
@@ -983,7 +1050,7 @@ enum ChannelGrouping {
     ) -> [ChannelGroup] {
         var common: [ChannelSummary] = []
         var byProject: [UUID: [ChannelSummary]] = [:]
-        for channel in channels where channel.archivedAt == nil {
+        for channel in channels where channel.archivedAt == nil && !channel.isDirectMessage {
             guard let projectID = channel.defaultProjectId else {
                 common.append(channel)
                 continue

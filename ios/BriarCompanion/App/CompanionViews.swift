@@ -6,6 +6,10 @@ func issueProposalAcceptanceSystemImage(
     type == .create ? "plus.circle.fill" : "play.fill"
 }
 
+private enum CompanionDirectMessagesRoute: Hashable {
+    case session(String)
+}
+
 struct CompanionShellView: View {
     @AppStorage("companion-appearance") private var appearance = CompanionAppearance.system.rawValue
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
@@ -13,6 +17,7 @@ struct CompanionShellView: View {
     @State private var showingSettings = false
     @State private var taskPath = NavigationPath()
     @State private var homePath = NavigationPath()
+    @State private var directMessagesPath = NavigationPath()
     @State private var pendingIssueResolutionCount = 0
 
     @ObservedObject var navigation: CompanionNavigationModel
@@ -107,20 +112,65 @@ struct CompanionShellView: View {
             .tabItem { Label(L10n.text("Tasks", locale: companionLocale), systemImage: "checklist") }
             .tag(CompanionNavigationModel.Tab.tasks)
 
-            AgentsHomeView(
-                agents: agents,
-                navigation: navigation,
-                project: project,
-                token: token,
-                api: api,
-                snapshot: snapshot,
-                issueConversationView: issueConversationView,
-                refreshDashboard: refresh,
-                toolbarContent: { companionToolbar(showsProjectMenu: true) }
-            )
-            .tabItem { Label(L10n.text("Agents", locale: companionLocale), systemImage: "cpu") }
-            .tag(CompanionNavigationModel.Tab.agents)
-            .badge(agents.sessions.filter { $0.status == .running }.count)
+            NavigationStack(path: $directMessagesPath) {
+                DirectMessagesHomeView(
+                    channels: channels,
+                    currentUserID: user?.id,
+                    projects: projects,
+                    providers: snapshot?.organizationProviders ?? [],
+                    workers: snapshot?.workers ?? [],
+                    onIssueOpen: { projectID, runID, sourceIsCurrent in
+                        await navigation.openIssueWhenAvailable(
+                            projectID: projectID,
+                            runID: runID,
+                            ensureAvailable: { targetProjectID, targetRunID in
+                                await ensureIssueAvailable(targetProjectID, targetRunID)
+                            },
+                            sourceIsCurrent: sourceIsCurrent
+                        )
+                    },
+                    onSkillSessionMaterialized: { agents.materialize($0) },
+                    onSkillSessionOpen: { projectID, sessionID in
+                        navigation.open(.session(projectID: projectID, sessionID: sessionID))
+                    },
+                    onChannelCreated: { directMessagesPath.append($0) }
+                )
+                .toolbar { companionToolbar(showsProjectMenu: true) }
+                .navigationDestination(for: CompanionDirectMessagesRoute.self) { route in
+                    switch route {
+                    case let .session(id):
+                        if let session = agents.session(id: id) {
+                            SessionDetailView(
+                                session: session,
+                                agent: session.agentId.flatMap { agents.agent(id: $0) },
+                                projectAgents: agents.agents.filter {
+                                    $0.projectId == project.id
+                                },
+                                project: project,
+                                token: token,
+                                api: api,
+                                snapshot: snapshot,
+                                issueConversationView: issueConversationView,
+                                refreshDashboard: refresh,
+                                onSkillSessionMaterialized: { agents.materialize($0) },
+                                onSkillSessionOpen: { projectID, sessionID in
+                                    navigation.open(
+                                        .session(projectID: projectID, sessionID: sessionID)
+                                    )
+                                }
+                            )
+                        } else {
+                            ContentUnavailableView(
+                                L10n.text("세션을 찾을 수 없음"),
+                                systemImage: "list.bullet.rectangle"
+                            )
+                        }
+                    }
+                }
+            }
+            .tabItem { Label("DMs", systemImage: "bubble.left.and.bubble.right") }
+            .tag(CompanionNavigationModel.Tab.directMessages)
+            .badge(channels.channels.filter { $0.isDirectMessage && $0.hasUnread == true }.count)
 
             NavigationStack {
                 InboxHomeView(
@@ -166,6 +216,7 @@ struct CompanionShellView: View {
         }
         .onChange(of: project.id) { _, _ in
             taskPath = NavigationPath()
+            directMessagesPath = NavigationPath()
         }
         .onChange(of: snapshot) { _, _ in
             guard navigation.pendingIssueID != nil else { return }
@@ -184,6 +235,19 @@ struct CompanionShellView: View {
             guard navigation.pendingProjectID == nil ||
                     navigation.pendingProjectID == project.id else { return }
             await openPendingChannel()
+        }
+        .onChange(of: navigation.pathSessionToken) { _, _ in
+            guard navigation.pendingProjectID == project.id else { return }
+            if let sessionID = navigation.consumePendingSession() {
+                directMessagesPath.append(CompanionDirectMessagesRoute.session(sessionID))
+            }
+        }
+        .task(id: "\(project.id.uuidString):\(navigation.pathSessionToken)") {
+            guard navigation.pendingProjectID == project.id else { return }
+            if let sessionID = navigation.pendingSessionID {
+                _ = navigation.consumePendingSession()
+                directMessagesPath.append(CompanionDirectMessagesRoute.session(sessionID))
+            }
         }
     }
 
@@ -257,8 +321,15 @@ struct CompanionShellView: View {
         guard let channel = channels.channels.first(where: { $0.id == target.channelID }) else {
             return
         }
-        homePath = NavigationPath()
-        homePath.append(channel)
+        if channel.isDirectMessage {
+            navigation.selectedTab = .directMessages
+            directMessagesPath = NavigationPath()
+            directMessagesPath.append(channel)
+        } else {
+            navigation.selectedTab = .home
+            homePath = NavigationPath()
+            homePath.append(channel)
+        }
         await channels.openChannel(target.channelID)
         guard let root = await channels.loadRootMessageForNavigation(
             channelID: target.channelID,
@@ -266,7 +337,11 @@ struct CompanionShellView: View {
         ) else {
             return
         }
-        homePath.append(root)
+        if channel.isDirectMessage {
+            directMessagesPath.append(root)
+        } else {
+            homePath.append(root)
+        }
     }
 
     @ToolbarContentBuilder

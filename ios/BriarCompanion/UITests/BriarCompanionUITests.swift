@@ -58,7 +58,7 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(login.waitForExistence(timeout: 5))
         login.tap()
         XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: 5))
-        for tab in ["Home", "Tasks", "Agents", "Inbox"] {
+        for tab in ["Home", "Tasks", "DMs", "Inbox"] {
             XCTAssertTrue(app.tabBars.buttons[tab].exists, "The English \(tab) tab should be visible.")
         }
 
@@ -104,14 +104,20 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-attention-filter")
     }
 
-    func testAgentsHeaderMatchesPrimaryTabs() {
+    func testDirectMessagesTabShowsRecentConversationList() {
         let app = launchInsideCompanion()
 
-        app.tabBars.buttons["Agents"].tap()
-        XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["DMs"].tap()
+        XCTAssertTrue(app.navigationBars["DMs"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["account-menu"].exists)
-        captureScreenshot(named: "companion-agents-header")
+        XCTAssertTrue(app.buttons[
+            "dm-row-12121212-1212-4212-8212-121212121212"
+        ].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Honey"].exists)
+        XCTAssertTrue(app.staticTexts["iOS DM 화면 시안을 준비했습니다."].exists)
+        XCTAssertTrue(app.buttons["new-dm-button"].exists)
+        captureScreenshot(named: "companion-direct-messages")
     }
 
     func testChannelUsesNativeNavigationAndShowsParticipationCounts() {
@@ -451,53 +457,16 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-task-list-accessibility-xxxl")
     }
 
-    func testAgentsInboxAndSettingsSurface() {
+    func testDirectMessagesInboxAndSettingsSurface() {
         let app = launchInsideCompanion()
 
-        XCTAssertTrue(app.tabBars.buttons["Agents"].waitForExistence(timeout: 5))
-        app.tabBars.buttons["Agents"].tap()
-        XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
-        captureScreenshot(named: "companion-agents")
-
-        let agentRow = app.descendants(matching: .any)[
-            "agent-row-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-        ]
-        XCTAssertTrue(agentRow.waitForExistence(timeout: 5))
-        agentRow.tap()
-        XCTAssertTrue(app.navigationBars["Issue processing agent"].waitForExistence(timeout: 5))
-        let runButton = app.buttons["agent-run-button"]
-        XCTAssertTrue(runButton.waitForExistence(timeout: 5))
-        captureScreenshot(named: "companion-agent-run")
-        runButton.tap()
-
-        let skillPicker = app.descendants(matching: .any)["agent-run-skill-picker"]
-        let submitRun = app.buttons["agent-run-submit"]
-        XCTAssertTrue(skillPicker.waitForExistence(timeout: 5))
-        XCTAssertTrue(submitRun.waitForExistence(timeout: 5))
-        XCTAssertFalse(submitRun.isEnabled)
-
-        skillPicker.tap()
-        let releaseSkill = app.descendants(matching: .any)[
-            "agent-run-skill-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-        ]
-        XCTAssertTrue(releaseSkill.waitForExistence(timeout: 5))
-        releaseSkill.tap()
-
-        let requestEditor = app.textViews["agent-run-request"]
-        XCTAssertTrue(requestEditor.waitForExistence(timeout: 5))
-        XCTAssertEqual(requestEditor.value as? String, "Release the iOS app.")
-        // The request editor has its own scroll view; scroll the surrounding
-        // execution form so the worker picker below it becomes visible.
-        app.swipeUp()
-        let workerPicker = app.descendants(matching: .any)["agent-run-worker-picker"]
-        XCTAssertTrue(workerPicker.waitForExistence(timeout: 5))
-        XCTAssertEqual(workerPicker.value as? String, "Release Mac")
-        XCTAssertTrue(submitRun.isEnabled)
-        app.buttons["취소"].tap()
-        XCTAssertTrue(skillPicker.waitForNonExistence(timeout: 5))
-
-        app.navigationBars["Issue processing agent"].buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["DMs"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["DMs"].tap()
+        XCTAssertTrue(app.navigationBars["DMs"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons[
+            "dm-row-12121212-1212-4212-8212-121212121212"
+        ].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-direct-messages-list")
 
         app.tabBars.buttons["Inbox"].tap()
         XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 5))

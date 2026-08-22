@@ -757,6 +757,18 @@ final class MobileAPIContractTests: XCTestCase {
         let organizationID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
         let channelID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
         XCTAssertEqual(
+            MobileAPIContract.Endpoint.directMessages(organizationID: organizationID),
+            "/organizations/22222222-2222-4222-8222-222222222222/dms"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.organizationMembers(organizationID: organizationID),
+            "/organizations/22222222-2222-4222-8222-222222222222/members"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.organizationAgents(organizationID: organizationID),
+            "/organizations/22222222-2222-4222-8222-222222222222/agents"
+        )
+        XCTAssertEqual(
             MobileAPIContract.Endpoint.channelChanges(
                 organizationID: organizationID,
                 cursor: 12
