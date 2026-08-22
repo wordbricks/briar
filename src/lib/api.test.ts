@@ -2207,7 +2207,8 @@ describe("API errors", () => {
           skills: [
             {
               name: "릴리스 점검",
-              instructions: "릴리스 상태를 점검합니다.",
+              description: "릴리스 상태 점검 요청에 사용합니다.",
+              body: "릴리스 상태를 점검합니다.",
               provider: "claude",
               model: "sonnet",
               effort: null,

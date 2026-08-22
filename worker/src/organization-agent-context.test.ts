@@ -330,9 +330,10 @@ beforeAll(async () => {
     ),
     db.prepare(
       `insert into briar_agent_skills (
-         id, agent_id, name, instructions, provider, model, effort, kind,
+         id, agent_id, name, description, body, provider, model, effort, kind,
          position, created_at, updated_at
-       ) values (?, ?, 'Inspect', 'Inspect project state.', 'codex',
+       ) values (?, ?, 'Inspect', 'Use for project state inspection.',
+                 'Inspect project state.', 'codex',
                  'gpt-5.6-sol', 'high', 'custom', 0, ?, ?)`,
     ).bind(skillId, agentId, projectCreatedAt, projectCreatedAt),
   ]);
@@ -771,7 +772,8 @@ describe("Organization Agent context pages", () => {
     expect(details.results[0].data).toEqual([
       expect.objectContaining({
         id: skillId,
-        instructions: "Inspect project state.",
+        description: "Use for project state inspection.",
+        body: "Inspect project state.",
       }),
     ]);
     expect(details.results[1].data).toEqual([

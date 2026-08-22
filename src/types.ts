@@ -701,7 +701,8 @@ export type ProjectAgentSkill = {
   id: string;
   agentId: string;
   name: string;
-  instructions: string;
+  description: string;
+  body: string;
   provider: AgentProvider;
   model: string | null;
   effort: ModelEffort | null;
@@ -714,7 +715,8 @@ export type ProjectAgentSkill = {
 export type ProjectAgentSkillInput = Pick<
   ProjectAgentSkill,
   | "name"
-  | "instructions"
+  | "description"
+  | "body"
   | "provider"
   | "model"
   | "effort"

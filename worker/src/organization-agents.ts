@@ -123,7 +123,8 @@ export async function createOrganizationAgent(
     input.skills ?? [],
     {
       name: input.name,
-      instructions: input.responsibility,
+      description: input.description?.trim() || input.responsibility.slice(0, 1000),
+      body: input.responsibility,
       provider: input.provider,
       model: input.model,
       effort: input.effort,
@@ -182,7 +183,8 @@ export async function updateOrganizationAgent(
       input.skills,
       {
         name: input.name,
-        instructions: input.responsibility,
+        description: input.description?.trim() || input.responsibility.slice(0, 1000),
+        body: input.responsibility,
         provider: input.provider,
         model: input.model,
         effort: input.effort,
@@ -200,7 +202,8 @@ export async function updateOrganizationAgent(
     );
   } else {
     const legacySkill = soleAgentSkillRowFromLegacy(existing.skills ?? [], {
-        instructions: input.responsibility,
+        description: input.description?.trim() || input.responsibility.slice(0, 1000),
+        body: input.responsibility,
         provider: input.provider,
         model: input.model,
         effort: input.effort,

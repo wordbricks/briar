@@ -76,7 +76,8 @@ import { decodeTranscriptRequest } from "./transcript-request";
 import { slackCreateIssueShortcutCallbackId } from "./slack";
 import {
   agentResponsibilityMaxLength,
-  agentSkillInstructionsMaxLength,
+  agentSkillBodyMaxLength,
+  agentSkillDescriptionMaxLength,
   agentSkillsMaxCount,
 } from "../../src/lib/agent-limits";
 
@@ -366,7 +367,8 @@ describe("Worker HTTP contract", () => {
   it("enforces the expanded Agent responsibility and Skill limits", () => {
     const skill = (index: number) => ({
       name: `Skill ${index}`,
-      instructions: "x".repeat(agentSkillInstructionsMaxLength),
+      description: "x".repeat(agentSkillDescriptionMaxLength),
+      body: "x".repeat(agentSkillBodyMaxLength),
       provider: "codex" as const,
       model: null,
       effort: null,
@@ -601,7 +603,7 @@ describe("Worker HTTP contract", () => {
   it("projects active Skill instructions through the legacy Agent field", () => {
     expect(
       legacyAgentSkillInstructions(
-        { instructions: "Perform the iOS release." },
+        { body: "Perform the iOS release." },
         "Legacy Agent instructions",
       ),
     ).toBe("Perform the iOS release.");

@@ -584,7 +584,7 @@ export function ProjectAgents({
                               {agent.skills.slice(0, 3).map((skill) => (
                                 <li
                                   key={skill.id}
-                                  title={skill.instructions}
+                                  title={skill.description}
                                 >
                                   {skill.name}
                                 </li>
@@ -972,7 +972,7 @@ export function ProjectAgentDialog({
                             <strong>{includedSkill.name}</strong>
                             <small>
                               {t("agents.templateInstructionsCount", {
-                                count: includedSkill.instructions.length,
+                                count: includedSkill.body.length,
                               })}
                             </small>
                           </span>

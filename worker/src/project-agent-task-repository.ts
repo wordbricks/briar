@@ -21,7 +21,7 @@ export async function createProjectAgentTaskJob(
     agentId: string;
     skill: Pick<
       AgentSkillRow,
-      "id" | "instructions" | "provider" | "model" | "effort"
+      "id" | "body" | "provider" | "model" | "effort"
     >;
     request: string;
     requestId: string;
@@ -38,7 +38,7 @@ export async function createProjectAgentTaskJob(
        select ?, ?, ?, skill.id, ?, ?, 'queued', ?, ?, ?
        from briar_agent_skills skill
        where skill.id = ? and skill.agent_id = ?
-         and skill.instructions is ?
+         and skill.body is ?
          and skill.provider is ?
          and skill.model is ?
          and skill.effort is ?`,
@@ -54,7 +54,7 @@ export async function createProjectAgentTaskJob(
       input.createdAt,
       input.skill.id,
       input.agentId,
-      input.skill.instructions,
+      input.skill.body,
       input.skill.provider,
       input.skill.model,
       input.skill.effort,
@@ -247,8 +247,11 @@ export async function claimNextProjectAgentTask(
   if (claimed.skill_execution_proposal_id) {
     const approval = await db
       .prepare(
-        `select approval.*
+        `select approval.*, skill.description as skill_description
          from briar_agent_skill_execution_approval_audit approval
+         join briar_agent_skills skill
+           on skill.id = approval.skill_id
+          and skill.agent_id = approval.agent_id
          where approval.proposal_id = ? and approval.project_id = ?
            and approval.result_session_id = ?
            and approval.agent_id = ? and approval.skill_id = ?
@@ -268,6 +271,7 @@ export async function claimNextProjectAgentTask(
         agent_responsibility: string;
         skill_id: string;
         skill_name: string;
+        skill_description: string;
         skill_instructions: string;
         skill_kind: AgentSkillKind;
         provider: ProjectAgentProvider;
@@ -284,7 +288,8 @@ export async function claimNextProjectAgentTask(
       id: approval.skill_id,
       agent_id: claimed.agent_id,
       name: approval.skill_name,
-      instructions: approval.skill_instructions,
+      description: approval.skill_description,
+      body: approval.skill_instructions,
       provider: approval.provider,
       model: approval.model,
       effort: approval.effort,
@@ -313,10 +318,10 @@ export async function claimNextProjectAgentTask(
       `select job.*, agent.name as agent_name, skill.provider as agent_provider,
               skill.model as agent_model, skill.effort as agent_effort,
               agent.responsibility as agent_responsibility,
-              skill.instructions as agent_skill,
+              skill.body as agent_skill,
               skill.id as selected_skill_id,
               skill.name as selected_skill_name,
-              skill.instructions as selected_skill_instructions
+              skill.body as selected_skill_instructions
        from briar_project_agent_task_jobs job
        join briar_project_agents agent on agent.id = job.agent_id
        join briar_agent_skills skill

@@ -1,7 +1,8 @@
 import type { ModelEffort } from "../../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../../src/lib/agent-provider";
 import {
-  agentSkillInstructionsMaxLength,
+  agentSkillBodyMaxLength,
+  agentSkillDescriptionMaxLength,
   agentSkillsMaxCount,
 } from "../../src/lib/agent-limits";
 
@@ -12,7 +13,8 @@ export type AgentSkillKind = "issue_processing" | "custom";
 export type AgentSkillInput = {
   id?: string;
   name: string;
-  instructions: string;
+  description: string;
+  body: string;
   provider: AgentSkillProvider;
   model: string | null;
   effort: AgentSkillEffort | null;
@@ -24,7 +26,8 @@ export type AgentSkillRow = {
   id: string;
   agent_id: string;
   name: string;
-  instructions: string;
+  description: string;
+  body: string;
   provider: AgentSkillProvider;
   model: string | null;
   effort: AgentSkillEffort | null;
@@ -37,7 +40,8 @@ export type AgentSkillRow = {
 
 export type AgentSkillFallback = {
   name: string;
-  instructions: string;
+  description: string;
+  body: string;
   provider: AgentSkillProvider;
   model: string | null;
   effort: AgentSkillEffort | null;
@@ -80,7 +84,8 @@ export function normalizedAgentSkillRows(
   const ids = new Set<string>();
   return requested.map((skill, index) => {
     const normalizedName = skill.name.trim();
-    const normalizedInstructions = skill.instructions.trim();
+    const normalizedDescription = skill.description.trim();
+    const normalizedBody = skill.body.trim();
     const normalizedModel = skill.model?.trim() || null;
     const nameKey = normalizedName.toLocaleLowerCase("en-US");
     if (!normalizedName || normalizedName.length > 100) {
@@ -89,22 +94,31 @@ export function normalizedAgentSkillRows(
     if (names.has(nameKey)) {
       throw new Error("Agent Skill names must be unique within an Agent");
     }
+    if (
+      !normalizedDescription ||
+      normalizedDescription.length > agentSkillDescriptionMaxLength
+    ) {
+      throw new Error(
+        `Agent Skill description must contain 1 to ${agentSkillDescriptionMaxLength} characters`,
+      );
+    }
     names.add(nameKey);
     const id = skill.id ?? crypto.randomUUID();
     if (ids.has(id)) {
       throw new Error("Agent Skill IDs must be unique within an Agent");
     }
     ids.add(id);
-    if (normalizedInstructions.length > agentSkillInstructionsMaxLength) {
+    if (!normalizedBody || normalizedBody.length > agentSkillBodyMaxLength) {
       throw new Error(
-        `Agent Skill instructions cannot exceed ${agentSkillInstructionsMaxLength} characters`,
+        `Agent Skill body must contain 1 to ${agentSkillBodyMaxLength} characters`,
       );
     }
     return {
       id,
       agent_id: agentId,
       name: normalizedName,
-      instructions: normalizedInstructions,
+      description: normalizedDescription,
+      body: normalizedBody,
       provider: skill.provider,
       model: normalizedModel,
       effort: skill.effort,
@@ -121,12 +135,13 @@ function upsertAgentSkillStatement(db: D1Database, skill: AgentSkillRow) {
   return db
     .prepare(
       `insert into briar_agent_skills (
-         id, agent_id, name, instructions, provider, model, effort, kind,
+         id, agent_id, name, description, body, provider, model, effort, kind,
          is_default, position, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        on conflict (id) do update set
          name = excluded.name,
-         instructions = excluded.instructions,
+         description = excluded.description,
+         body = excluded.body,
          provider = excluded.provider,
          model = excluded.model,
          effort = excluded.effort,
@@ -140,7 +155,8 @@ function upsertAgentSkillStatement(db: D1Database, skill: AgentSkillRow) {
       skill.id,
       skill.agent_id,
       skill.name,
-      skill.instructions,
+      skill.description,
+      skill.body,
       skill.provider,
       skill.model,
       skill.effort,
@@ -174,14 +190,14 @@ const activeDirectAgentSkillJobPredicate = (skillAlias: string) => `
 const agentSkillRuntimeChanged = (
   current: Pick<
     AgentSkillRow,
-    "instructions" | "provider" | "model" | "effort"
+    "body" | "provider" | "model" | "effort"
   >,
   requested: Pick<
     AgentSkillRow,
-    "instructions" | "provider" | "model" | "effort"
+    "body" | "provider" | "model" | "effort"
   >,
 ) =>
-  current.instructions !== requested.instructions ||
+  current.body !== requested.body ||
   current.provider !== requested.provider ||
   current.model !== requested.model ||
   current.effort !== requested.effort;
@@ -231,7 +247,7 @@ export async function assertAgentSkillReplacementAllowed(
 
   const active = await db
     .prepare(
-      `select skill.id, skill.name, skill.instructions, skill.provider,
+      `select skill.id, skill.name, skill.body, skill.provider,
               skill.model, skill.effort
        from briar_agent_skills skill
        where skill.agent_id = ? and skill.id in (${placeholders})
@@ -242,7 +258,7 @@ export async function assertAgentSkillReplacementAllowed(
     .all<
       Pick<
         AgentSkillRow,
-        "id" | "name" | "instructions" | "provider" | "model" | "effort"
+        "id" | "name" | "body" | "provider" | "model" | "effort"
       >
     >();
   const requestedById = new Map(skills.map((skill) => [skill.id, skill]));
@@ -252,7 +268,7 @@ export async function assertAgentSkillReplacementAllowed(
   });
   if (changed) {
     throw new AgentSkillConflictError(
-      `Agent Skill "${changed.name}" cannot change instructions or execution settings while queued or running direct Agent work still references it`,
+      `Agent Skill "${changed.name}" cannot change body or execution settings while queued or running direct Agent work still references it`,
     );
   }
 }
@@ -265,7 +281,7 @@ function guardActiveDirectAgentSkillRuntimeStatement(
   const requestedRuntimeJson = JSON.stringify(
     skills.map((skill) => ({
       id: skill.id,
-      instructions: skill.instructions,
+      body: skill.body,
       provider: skill.provider,
       model: skill.model,
       effort: skill.effort,
@@ -275,18 +291,18 @@ function guardActiveDirectAgentSkillRuntimeStatement(
     .prepare(
       `with requested as (
          select json_extract(value, '$.id') as id,
-                json_extract(value, '$.instructions') as instructions,
+                json_extract(value, '$.body') as body,
                 json_extract(value, '$.provider') as provider,
                 json_extract(value, '$.model') as model,
                 json_extract(value, '$.effort') as effort
          from json_each(?)
        )
        insert into briar_agent_skills (
-         id, agent_id, name, instructions, provider, model, effort, kind,
+         id, agent_id, name, description, body, provider, model, effort, kind,
          is_default, position, created_at, updated_at
        )
-       select skill.id, skill.agent_id, skill.name, skill.instructions,
-              skill.provider, skill.model, skill.effort, skill.kind,
+       select skill.id, skill.agent_id, skill.name, skill.description,
+              skill.body, skill.provider, skill.model, skill.effort, skill.kind,
               skill.is_default, skill.position, skill.created_at,
               skill.updated_at
        from briar_agent_skills skill
@@ -294,7 +310,7 @@ function guardActiveDirectAgentSkillRuntimeStatement(
        where skill.agent_id = ?
          and (${activeDirectAgentSkillJobPredicate("skill")})
          and (
-           skill.instructions is not requested.instructions
+           skill.body is not requested.body
            or skill.provider is not requested.provider
            or skill.model is not requested.model
            or skill.effort is not requested.effort
@@ -333,11 +349,11 @@ export function replaceAgentSkillStatements(
       db
         .prepare(
           `insert into briar_agent_skills (
-             id, agent_id, name, instructions, provider, model, effort, kind,
+             id, agent_id, name, description, body, provider, model, effort, kind,
              is_default, position, created_at, updated_at
            )
-           select skill.id, skill.agent_id, skill.name, skill.instructions,
-                  skill.provider, skill.model, skill.effort, skill.kind,
+           select skill.id, skill.agent_id, skill.name, skill.description,
+                  skill.body, skill.provider, skill.model, skill.effort, skill.kind,
                   skill.is_default, skill.position, skill.created_at,
                   skill.updated_at
            from briar_agent_skills skill
@@ -356,10 +372,10 @@ export function replaceAgentSkillStatements(
     db
       .prepare(
         `insert into briar_agent_skills (
-           id, agent_id, name, instructions, provider, model, effort, kind,
+           id, agent_id, name, description, body, provider, model, effort, kind,
            is_default, position, created_at, updated_at
          )
-         select id, agent_id, name, instructions, provider, model, effort, kind,
+         select id, agent_id, name, description, body, provider, model, effort, kind,
                 is_default, position, created_at, updated_at
          from briar_agent_skills
          where id in (${placeholders}) and agent_id != ?
@@ -378,11 +394,11 @@ export function replaceAgentSkillStatements(
     db
       .prepare(
         `insert into briar_agent_skills (
-           id, agent_id, name, instructions, provider, model, effort, kind,
+           id, agent_id, name, description, body, provider, model, effort, kind,
            is_default, position, created_at, updated_at
          )
-         select skill.id, skill.agent_id, skill.name, skill.instructions,
-                skill.provider, skill.model, skill.effort, skill.kind,
+         select skill.id, skill.agent_id, skill.name, skill.description,
+                skill.body, skill.provider, skill.model, skill.effort, skill.kind,
                 skill.is_default, skill.position, skill.created_at,
                 skill.updated_at
          from briar_agent_skills skill
@@ -416,15 +432,16 @@ export function insertAgentSkillStatement(
   return db
     .prepare(
       `insert into briar_agent_skills (
-         id, agent_id, name, instructions, provider, model, effort, kind,
+         id, agent_id, name, description, body, provider, model, effort, kind,
          is_default, position, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       skill.id,
       skill.agent_id,
       skill.name,
-      skill.instructions,
+      skill.description,
+      skill.body,
       skill.provider,
       skill.model,
       skill.effort,
@@ -445,7 +462,8 @@ export function insertAgentSkillStatement(
 export function soleAgentSkillRowFromLegacy(
   skills: readonly AgentSkillRow[],
   input: {
-    instructions: string;
+    description: string;
+    body: string;
     provider: AgentSkillProvider;
     model: string | null;
     effort: AgentSkillEffort | null;
@@ -455,7 +473,8 @@ export function soleAgentSkillRowFromLegacy(
   if (skills.length !== 1) return null;
   return {
     ...skills[0],
-    instructions: input.instructions.trim(),
+    description: input.description.trim(),
+    body: input.body.trim(),
     provider: input.provider,
     model: input.model?.trim() || null,
     effort: input.effort,
@@ -476,7 +495,7 @@ export async function listAgentSkills(
     const placeholders = chunk.map(() => "?").join(", ");
     const result = await db
       .prepare(
-        `select id, agent_id, name, instructions, provider, model, effort, kind,
+        `select id, agent_id, name, description, body, provider, model, effort, kind,
                 is_default, position, created_at, updated_at
          from briar_agent_skills
          where agent_id in (${placeholders})
@@ -505,7 +524,7 @@ export async function getAgentSkill(
   if (skillId) {
     return db
       .prepare(
-        `select id, agent_id, name, instructions, provider, model, effort, kind,
+        `select id, agent_id, name, description, body, provider, model, effort, kind,
                 is_default, position, created_at, updated_at
          from briar_agent_skills
          where agent_id = ? and id = ?
@@ -516,7 +535,7 @@ export async function getAgentSkill(
   }
   const result = await db
     .prepare(
-      `select id, agent_id, name, instructions, provider, model, effort, kind,
+      `select id, agent_id, name, description, body, provider, model, effort, kind,
               is_default, position, created_at, updated_at
        from briar_agent_skills
        where agent_id = ?
@@ -549,7 +568,10 @@ export const agentSkillJson = (skill: AgentSkillRow) => ({
   id: skill.id,
   agentId: skill.agent_id,
   name: skill.name,
-  instructions: skill.instructions,
+  description: skill.description,
+  body: skill.body,
+  // Rolling/native compatibility only. New clients persist description/body.
+  instructions: skill.body,
   provider: skill.provider,
   model: skill.model,
   effort: skill.effort,
@@ -565,23 +587,3 @@ export const agentSkillJson = (skill: AgentSkillRow) => ({
 export const issueProcessingAgentSkillRow = (
   skills: readonly AgentSkillRow[],
 ) => skills.find((skill) => skill.kind === "issue_processing") ?? null;
-
-/**
- * A channel invocation can name one of the Agent's saved Skills in plain
- * language. Prefer the longest matching name so a specific Skill such as
- * "iOS release" wins over a broader "release" Skill. When no Skill is named,
- * the Agent receives its whole roster and chooses within its responsibility.
- */
-export function agentSkillForMessage(
-  skills: readonly AgentSkillRow[],
-  message: string,
-) {
-  const normalizedMessage = message.normalize("NFKC").toLocaleLowerCase();
-  return [...skills]
-    .sort((left, right) => right.name.length - left.name.length)
-    .find((skill) =>
-      normalizedMessage.includes(
-        skill.name.normalize("NFKC").toLocaleLowerCase(),
-      ),
-    ) ?? null;
-}

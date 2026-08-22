@@ -203,7 +203,7 @@ export async function completeIssueAgentReplyOutput(
                and agent.responsibility =
                  job.selected_agent_responsibility_snapshot
                and skill.name = job.selected_skill_name_snapshot
-               and skill.instructions =
+               and skill.body =
                  job.selected_skill_instructions_snapshot
                and skill.kind = job.selected_skill_kind_snapshot
                and skill.provider = job.selected_skill_provider_snapshot
@@ -438,7 +438,7 @@ export async function completeIssueAgentReplyOutput(
        and agent.name = job.selected_agent_name_snapshot
        and agent.responsibility = job.selected_agent_responsibility_snapshot
        and skill.name = job.selected_skill_name_snapshot
-       and skill.instructions = job.selected_skill_instructions_snapshot
+       and skill.body = job.selected_skill_instructions_snapshot
        and skill.kind = job.selected_skill_kind_snapshot
        and skill.provider = job.selected_skill_provider_snapshot
        and skill.model is job.selected_skill_model_snapshot

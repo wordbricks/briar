@@ -11,6 +11,11 @@ import {
   type DetachedAgent,
   type DetachedDelegationTarget,
 } from "./agent-runner";
+import {
+  cleanupDetachedAgentSkillCatalog,
+  materializeDetachedAgentSkillCatalog,
+  type DetachedAgentSkillCatalog,
+} from "./agent-skill-discovery";
 
 export type DetachedProviderTurnResult = {
   exitCode: number | null;
@@ -21,7 +26,7 @@ export type DetachedProviderTurnResult = {
   conversationId: string | null;
 };
 
-export async function runDetachedProviderTurn(input: {
+export type DetachedProviderTurnInput = {
   agent: DetachedAgent;
   prompt: string;
   workspacePath: string;
@@ -36,7 +41,11 @@ export async function runDetachedProviderTurn(input: {
   signal: AbortSignal;
   onPayload?: (payload: unknown, rawLine: string) => void | Promise<void>;
   onConversationId?: (conversationId: string) => void | Promise<void>;
-}): Promise<DetachedProviderTurnResult> {
+};
+
+export async function runDetachedProviderTurn(
+  input: DetachedProviderTurnInput,
+): Promise<DetachedProviderTurnResult> {
   if (input.signal.aborted) {
     throw input.signal.reason instanceof Error
       ? input.signal.reason
@@ -62,6 +71,27 @@ export async function runDetachedProviderTurn(input: {
       `${provider} runner bundle is missing; run \`bun run agent:build\``,
     );
   }
+  const skillCatalog = await materializeDetachedAgentSkillCatalog(input.agent, {
+    temporaryParentPath: input.workspacePath,
+  });
+  try {
+    return await executeDetachedProviderTurn(
+      input,
+      runnerPath,
+      agentBinary,
+      skillCatalog,
+    );
+  } finally {
+    await cleanupDetachedAgentSkillCatalog(skillCatalog);
+  }
+}
+
+async function executeDetachedProviderTurn(
+  input: DetachedProviderTurnInput,
+  runnerPath: string,
+  agentBinary: string,
+  skillCatalog: DetachedAgentSkillCatalog | null,
+) {
   const runnerRequest = detachedProviderRequest({
     agent: input.agent,
     prompt: input.prompt,
@@ -73,6 +103,7 @@ export async function runDetachedProviderTurn(input: {
     organizationContextManifestPath:
       input.organizationContextManifestPath ?? null,
     delegationTargets: input.delegationTargets,
+    skillCatalog,
     outputSchema: input.outputSchema ?? null,
     agentBinary,
   }).request;
