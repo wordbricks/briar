@@ -7,7 +7,6 @@ import {
   autoHuntPersistedRunStatuses,
   autoHuntRequirementKinds,
   autoHuntSources,
-  canonicalizeCheckpointSet,
   cloneAutoHuntWorkflow,
   isRepositoryWorkflowPending,
   normalizeAutoHuntWorkflow,
@@ -30,7 +29,6 @@ import {
 } from "../../src/lib/agent-limits";
 import {
   defaultProjectAgentCalendarColor,
-  normalizeProjectAgentLocale,
 } from "../../src/lib/project-agent";
 import {
   isValidProjectAgentScheduleTimeZone,
@@ -88,7 +86,9 @@ import { requireSession } from "./session-auth";
 import { handleAccountRoute } from "./account-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
 import { handleOrganizationRoute } from "./organization-routes";
+import { handleProjectCoreRoute } from "./project-core-routes";
 import { handleProjectLinearRoute } from "./project-linear-routes";
+import { handleProjectSettingsRoute } from "./project-settings-routes";
 import { handlePublicRoute } from "./public-routes";
 import { projectJson } from "./project-json";
 import { projectAgentJson } from "./project-agent-json";
@@ -108,7 +108,6 @@ import {
   prepareStoredAttachments,
   uploadStoredAttachments,
 } from "./attachment-storage";
-import { decodeMobileProjectsResponse } from "./mobile-contract";
 import {
   getDashboardSyncCursor,
   listDashboardChanges,
@@ -116,19 +115,16 @@ import {
 import {
   getOrganizationRole,
   listOrganizationMembers,
-  listOrganizations,
 } from "./organization-repository";
 import { canManageOrganization } from "./organization-access";
 import { organizationMemberJson } from "./organization-json";
 import { issueSubscribers } from "./issue-subscribers";
 import {
   listOrganizationProjects,
-  listProjects,
   type ProjectRow,
 } from "./project-repository";
 import {
   backfillArchivedProjectAgentSessionSummaries,
-  collectStorageMetrics,
   getArchivedEvidenceImage,
   getArchivedProjectAgentSession,
   listArchivedExecutionAuditEvents,
@@ -164,10 +160,8 @@ import {
   issueAttachmentObjectKeysInUse,
   issueExecutionApprovalTablesAvailable,
   createRunEvidenceImages,
-  createOrganization,
   createProjectAgent,
   createProjectAgentTaskJob,
-  createProject,
   createSlackOAuthState,
   claimSlackEvent,
   deleteSlackInstallation,
@@ -178,7 +172,6 @@ import {
   deleteIssue,
   transferIssue,
   deleteIssueDependency,
-  deleteProject,
   EventKeyConflictError,
   enqueueIssueAgentReply,
   failIssueAgentReply,
@@ -200,7 +193,6 @@ import {
   getGithubConnectionForOrganization,
   getSlackInstallation,
   getProject,
-  getProjectRunChildMismatch,
   getProjectSettings,
   getProjectAgentSession,
   getProjectAgentSessionSyncCursor,
@@ -246,7 +238,6 @@ import {
   listProjectAgentSessionSummaries,
   listSlackInstallations,
   moveHuntRun,
-  issueProjectAgentToken,
   recoverHuntRun,
   completeWorkflowStageLifecycle,
   reworkHuntRun,
@@ -269,13 +260,7 @@ import {
   releaseGithubDelivery,
   releaseSlackEvent,
   updateProjectAgent,
-  updateProjectSettings,
-  updateProjectMandatoryCheckpoints,
-  updateUserWorkflowCheckpointDefaults,
   deleteIssueAttachments,
-  updateProjectIcon,
-  updateProjectIssueKeyPrefix,
-  updateProjectScheduleTabEnabled,
   updateIssueWithAttachmentMetadata,
   updateIssueCheckpoints,
   updateIssueExecutionPreferences,
@@ -346,20 +331,12 @@ import {
   decodeMergeBatchLeaseInput,
   decodeMergeBatchPublicationInput,
   decodeMergeBatchValidationInput,
-  decodeMergeQueueProfileUpdate,
 } from "./merge-queue-contract";
-import {
-  configureMergeQueueProfile,
-  getMergeQueueProfile,
-  type MergeQueueProfileRow,
-} from "./merge-queue-profile";
 import {
   reconcileMergeQueuePullRequest,
 } from "./merge-queue-reconcile";
 import {
-  assertStoredCheckpointPoliciesCompatible,
   checkpointPolicyJson,
-  isStoredWorkflowUnchanged,
   loadWorkflowCheckpointPolicy,
 } from "./workflow-policy";
 import {
@@ -414,7 +391,6 @@ import {
   updateExecutionWorkerConcurrency,
   updateExecutionWorkerIcon,
   updateExecutionWorkerLabel,
-  updateProjectExecutionWorkerPolicy,
   userOwnsExecutionWorkerDevice,
 } from "./workers";
 import {
@@ -445,14 +421,9 @@ import {
   decodeProjectAgentTaskCompletion,
   decodeProjectAgentTaskInput,
   decodeProjectAgentTaskLease,
-  decodeProjectIconInput,
-  decodeProjectInput,
-  decodeProjectIssueKeyPrefixInput,
-  decodeProjectTabsInput,
   decodeProjectTransferInput,
 } from "./project-request-contract";
 import {
-  decodeCheckpointPolicyInput,
   decodeIssueCheckpointsInput,
   decodeMoveRunInput,
   decodePausedRunReworkInput,
@@ -465,7 +436,6 @@ import {
   decodeRunReworkInput,
   decodeRequestIdInput,
   decodeWorkflowStageLifecycleInput,
-  parseProjectSettingsInput,
   ProjectWorkflowInputError,
 } from "./run-request-contract";
 import {
@@ -477,7 +447,6 @@ import {
 import {
   decodeClaimInput,
   decodeDispatchRun,
-  decodeExecutionWorkerPolicy,
   decodeIssueReplyClaimInput,
   decodeLeaseRenew,
   decodeWorkerBind,
@@ -690,7 +659,6 @@ import {
 import { handleScheduledTask } from "./scheduled-task";
 import {
   dashboardStageForProgress,
-  maxProjectIconRequestBytes,
   readChannelMessageRequest,
   readChannelReplyCompleteRequest,
   readIssueMessageRequest,
@@ -2911,19 +2879,6 @@ async function handleGithubOAuthCallback(request: Request, env: Env) {
     );
   }
 }
-const mergeQueueProfileJson = (row: MergeQueueProfileRow | null) => row
-  ? {
-      projectId: row.project_id,
-      repositoryId: row.repository_id,
-      repository: row.repository,
-      baseBranch: row.base_branch,
-      enabled: row.enabled === 1,
-      quietWindowMs: row.quiet_window_ms,
-      maxBatchSize: row.max_batch_size,
-      updatedAt: row.updated_at,
-    }
-  : null;
-
 const mergeBatchWorkJson = (
   claim: NonNullable<Awaited<ReturnType<typeof claimNextMergeBatch>>>,
   claimToken: string,
@@ -5628,423 +5583,24 @@ async function route(
     return json({ installation: slackInstallationJson(installation) });
   }
 
-  if (pathname === "/projects" && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const projects = await listProjects(db, session.user.id);
-    return json(decodeMobileProjectsResponse({
-      projects: projects.map(projectJson),
-    }));
-  }
+  const projectCoreResponse = await handleProjectCoreRoute({
+    request,
+    url,
+    auth,
+    db,
+    attachmentsBucket,
+    env,
+    context,
+  });
+  if (projectCoreResponse !== undefined) return projectCoreResponse;
 
-  if (pathname === "/projects" && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const input = decodeProjectInput(await readJson(request));
-    let organizations = await listOrganizations(db, session.user.id);
-    if (organizations.length === 0) {
-      const organization = await createOrganization(db, {
-        name:
-          session.user.name?.trim() ||
-          session.user.email.split("@")[0]?.trim() ||
-          "Briar",
-        handle: `organization-${crypto.randomUUID().replaceAll("-", "")}`,
-        ownerUserId: session.user.id,
-      });
-      organizations = [organization];
-    }
-    const organization =
-      organizations.find(
-        (candidate) => candidate.id === input.organizationId,
-      ) ?? (input.organizationId ? null : organizations[0]);
-    if (!organization || !canManageOrganization(organization.role)) {
-      throw new HttpError(403, "Organization admin access required");
-    }
-    const agentToken = `briar_agent_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
-    const tokenHash = await sha256(agentToken);
-    const project = await createProject(db, {
-      ownerUserId: session.user.id,
-      organizationId: organization.id,
-      name: input.name,
-      agentTokenHash: tokenHash,
-      locale: normalizeProjectAgentLocale(
-        request.headers.get("accept-language"),
-      ),
-    });
-    project.organization_name = organization.name;
-    project.member_role = organization.role;
-    return json({ project: projectJson(project), agentToken }, 201);
-  }
-
-  const projectMatch = pathname.match(/^\/projects\/([0-9a-f-]+)$/u);
-  if (projectMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, projectMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (project.member_role !== "owner") {
-      throw new HttpError(403, "Organization owner access required");
-    }
-    if (await getProjectRunChildMismatch(db, project.id)) {
-      throw new HttpError(
-        409,
-        "Project transfer reconciliation is required before deletion",
-        "PROJECT_TRANSFER_RECONCILIATION_REQUIRED",
-      );
-    }
-    const observedAt = new Date().toISOString();
-    let deleted = false;
-    try {
-      deleted = await deleteProject(
-        db,
-        project.id,
-        session.user.id,
-        observedAt,
-      );
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        (
-          error.message.includes("project has stranded transferred issue data") ||
-          error.message.includes("quarantined transcript")
-        )
-      ) {
-        throw new HttpError(
-          409,
-          "Project transfer reconciliation is required before deletion",
-          "PROJECT_TRANSFER_RECONCILIATION_REQUIRED",
-        );
-      }
-      throw error;
-    }
-    if (!deleted) {
-      throw new HttpError(404, "Project not found");
-    }
-    return responseWithPostCommitCleanup(
-      new Response(null, { status: 204, headers: corsHeaders }),
-      {
-        context,
-        operation: "project_delete",
-        observedAt,
-        tasks: [{
-          queue: "archive",
-          run: () => processArchiveCleanupQueue(
-            db,
-            env.ARCHIVES,
-            attachmentsBucket,
-            observedAt,
-            1_000,
-          ),
-        }],
-      },
-    );
-  }
-
-  const projectIconMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/icon$/u,
-  );
-  if (projectIconMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, projectIconMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
-    }
-    const input = decodeProjectIconInput(
-      await readJson(request, maxProjectIconRequestBytes),
-    );
-    if (!(await updateProjectIcon(db, project.id, input.icon))) {
-      throw new HttpError(404, "Project not found");
-    }
-    return json({ project: projectJson({ ...project, icon: input.icon }) });
-  }
-
-  const projectIssueKeyPrefixMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/issue-key-prefix$/u,
-  );
-  if (projectIssueKeyPrefixMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectIssueKeyPrefixMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
-    }
-    const input = decodeProjectIssueKeyPrefixInput(
-      await readJson(request),
-    );
-    if (
-      !(await updateProjectIssueKeyPrefix(
-        db,
-        project.id,
-        input.issueKeyPrefix,
-      ))
-    ) {
-      throw new HttpError(404, "Project not found");
-    }
-    return json({
-      project: projectJson({
-        ...project,
-        issue_key_prefix: input.issueKeyPrefix,
-      }),
-    });
-  }
-
-  const projectTabsMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/tabs$/u,
-  );
-  if (projectTabsMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectTabsMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
-    }
-    const input = decodeProjectTabsInput(await readJson(request));
-    if (
-      !(await updateProjectScheduleTabEnabled(
-        db,
-        project.id,
-        input.schedule,
-      ))
-    ) {
-      throw new HttpError(404, "Project not found");
-    }
-    return json({
-      project: projectJson({
-        ...project,
-        schedule_tab_enabled: input.schedule ? 1 : 0,
-      }),
-    });
-  }
-
-  const settingsMatch = pathname.match(/^\/projects\/([0-9a-f-]+)\/settings$/u);
-  const mergeQueueProfileMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/merge-queue-profile$/u,
-  );
-  if (
-    mergeQueueProfileMatch &&
-    (request.method === "GET" || request.method === "PUT")
-  ) {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      mergeQueueProfileMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const current = await getMergeQueueProfile(db, project.id);
-    if (request.method === "GET") {
-      return json({ profile: mergeQueueProfileJson(current) });
-    }
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
-    }
-    const input = decodeMergeQueueProfileUpdate(await readJson(request));
-    const settings = await getProjectSettings(db, project.id);
-    const repositoryName = settings?.github_repository?.trim().toLowerCase();
-    if (!repositoryName) {
-      throw new HttpError(
-        409,
-        "Connect one GitHub repository before configuring its merge queue",
-      );
-    }
-    const connection = await getGithubConnectionForOrganization(
-      db,
-      project.organization_id,
-    );
-    if (!connection) {
-      throw new HttpError(409, "GitHub integration is not connected");
-    }
-    const repository = (await listGithubConnectionRepositories(
-      db,
-      connection.installation_id,
-    )).find((candidate) =>
-      candidate.full_name.toLowerCase() === repositoryName
-    );
-    if (!repository) {
-      throw new HttpError(
-        409,
-        "The configured repository is not included in the GitHub installation",
-      );
-    }
-    const configured = await configureMergeQueueProfile(db, {
-      projectId: project.id,
-      repositoryId: repository.repository_id,
-      repository: repository.full_name,
-      enabled: input.enabled,
-      quietWindowMs: input.quietWindowMs,
-      maxBatchSize: input.maxBatchSize,
-      observedAt: new Date().toISOString(),
-    });
-    if (configured.outcome === "active_batch") {
-      throw new HttpError(
-        409,
-        "Drain the active merge batch before changing or disabling its lane",
-      );
-    }
-    if (configured.outcome === "lane_owned") {
-      throw new HttpError(
-        409,
-        "Another Briar project already owns this repository/main lane",
-      );
-    }
-    return json({ profile: mergeQueueProfileJson(configured.profile) });
-  }
-  const checkpointPolicyMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/checkpoint-policy$/u,
-  );
-  if (checkpointPolicyMatch && ["GET", "PUT"].includes(request.method)) {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, checkpointPolicyMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (request.method === "GET") {
-      return json({
-        checkpointPolicy: checkpointPolicyJson(
-          await loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
-        ),
-      });
-    }
-    const input = decodeCheckpointPolicyInput(await readJson(request));
-    if (input.scope === "project" && !canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
-    }
-    const current = await loadWorkflowCheckpointPolicy(
-      db,
-      project.id,
-      session.user.id,
-    );
-    const checkpoints = canonicalizeCheckpointSet(
-      current.workflow,
-      input.checkpoints,
-      input.scope,
-    );
-    const updated = input.scope === "project"
-      ? await updateProjectMandatoryCheckpoints(
-          db,
-          project.id,
-          checkpoints,
-          input.expectedRevision,
-        )
-      : await updateUserWorkflowCheckpointDefaults(
-          db,
-          project.id,
-          session.user.id,
-          checkpoints,
-          input.expectedRevision,
-        );
-    if (!updated) {
-      throw new HttpError(
-        409,
-        "Checkpoint policy changed; reload before saving",
-        "CHECKPOINT_POLICY_CONFLICT",
-      );
-    }
-    return json({
-      checkpointPolicy: checkpointPolicyJson(
-        await loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
-      ),
-    });
-  }
-  const storageMetricsMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/storage-metrics$/u,
-  );
-  if (storageMetricsMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, storageMetricsMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
-    }
-    return json({ metrics: await collectStorageMetrics(db, project.id) });
-  }
-  if (settingsMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, settingsMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const [settings, policy] = await Promise.all([
-      getProjectSettings(db, project.id),
-      loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
-    ]);
-    return json({
-      settings: settingsJson(settings, checkpointPolicyJson(policy)),
-    });
-  }
-  if (settingsMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, settingsMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
-    }
-    const input = parseProjectSettingsInput(await readJson(request));
-    const currentSettings = await getProjectSettings(db, project.id);
-    if (
-      !isStoredWorkflowUnchanged(
-        currentSettings?.workflow_json,
-        input.workflow,
-      )
-    ) {
-      await assertStoredCheckpointPoliciesCompatible(
-        db,
-        project.id,
-        input.workflow,
-      );
-    }
-    const settings = await updateProjectSettings(db, project.id, {
-      velenOrg: input.velenOrg ?? null,
-      dataSource: input.dataSource ?? null,
-      linear: input.linear,
-      githubRepository: input.githubRepository ?? null,
-      workflow: input.workflow,
-    });
-    const policy = await loadWorkflowCheckpointPolicy(
-      db,
-      project.id,
-      session.user.id,
-    );
-    return json({ settings: settingsJson(settings, checkpointPolicyJson(policy)) });
-  }
-
-  const executionPolicyMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/execution-policy$/u,
-  );
-  if (executionPolicyMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      executionPolicyMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    return json({
-      policy: await getProjectExecutionWorkerPolicy(db, project.id),
-    });
-  }
-  if (executionPolicyMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      executionPolicyMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
-    }
-    const input = decodeExecutionWorkerPolicy(await readJson(request));
-    const policy = await updateProjectExecutionWorkerPolicy(db, project.id, {
-      ...input,
-      updatedByUserId: session.user.id,
-      observedAt: new Date().toISOString(),
-    });
-    return json({ policy });
-  }
-
+  const projectSettingsResponse = await handleProjectSettingsRoute({
+    request,
+    url,
+    auth,
+    db,
+  });
+  if (projectSettingsResponse !== undefined) return projectSettingsResponse;
   const projectAgentsMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/agents$/u,
   );
@@ -6651,26 +6207,6 @@ async function route(
     db,
   });
   if (projectLinearResponse !== undefined) return projectLinearResponse;
-
-  const agentTokenMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/agent-token$/u,
-  );
-  if (agentTokenMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(db, agentTokenMatch[1], session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const agentToken = `briar_agent_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
-    const issued = await issueProjectAgentToken(
-      db,
-      project.id,
-      session.user.id,
-      await sha256(agentToken),
-    );
-    if (!issued) {
-      throw new HttpError(403, "Repository connection permission denied");
-    }
-    return json({ agentToken });
-  }
 
   const statusTrayRunsMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/status-tray\/runs$/u,
