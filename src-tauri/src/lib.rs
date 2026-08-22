@@ -1313,6 +1313,23 @@ fn provider_model_entry(
     }
 }
 
+fn provider_model_entry_with_fallback(
+    result: Result<Vec<AgentProviderModel>, String>,
+    fallback: Result<Vec<AgentProviderModel>, String>,
+    default_efforts: Vec<AgentProviderEffort>,
+    allow_custom_models: bool,
+) -> AgentProviderModelCatalogEntry {
+    match result {
+        Err(error) => AgentProviderModelCatalogEntry {
+            models: fallback.unwrap_or_default(),
+            default_efforts,
+            allow_custom_models,
+            error: Some(error),
+        },
+        result => provider_model_entry(result, default_efforts, allow_custom_models),
+    }
+}
+
 fn parse_grok_models(output: &str) -> Vec<AgentProviderModel> {
     output
         .lines()
@@ -1386,6 +1403,104 @@ fn parse_opencode_models_verbose(output: &str) -> Vec<AgentProviderModel> {
         }
     }
     models
+}
+
+fn parse_opencode_cached_models(contents: &str) -> Result<Vec<AgentProviderModel>, String> {
+    let catalog: serde_json::Value = serde_json::from_str(contents)
+        .map_err(|error| format!("OpenCode 모델 캐시가 올바르지 않습니다: {error}"))?;
+    let models = catalog
+        .get("opencode")
+        .and_then(|provider| provider.get("models"))
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| "OpenCode 모델 캐시에 opencode.models가 없습니다.".to_string())?;
+    let mut output = models
+        .iter()
+        .filter_map(|(key, value)| {
+            if value
+                .get("status")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|status| status != "active")
+            {
+                return None;
+            }
+            let cost = value.get("cost")?;
+            if cost.get("input").and_then(serde_json::Value::as_f64) != Some(0.0)
+                || cost.get("output").and_then(serde_json::Value::as_f64) != Some(0.0)
+            {
+                return None;
+            }
+            let id = value
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(key)
+                .trim();
+            if id.is_empty() || id.len() > 200 || id.chars().any(char::is_whitespace) {
+                return None;
+            }
+            let label = value
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(id);
+            let mut efforts = Vec::new();
+            for option in value
+                .get("reasoning_options")
+                .and_then(serde_json::Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                if efforts.len() >= 20 {
+                    break;
+                }
+                if option.get("type").and_then(serde_json::Value::as_str) != Some("effort") {
+                    continue;
+                }
+                for effort in option
+                    .get("values")
+                    .and_then(serde_json::Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(serde_json::Value::as_str)
+                    .filter(|effort| !effort.is_empty() && effort.len() <= 50)
+                {
+                    if efforts.len() >= 20 {
+                        break;
+                    }
+                    if efforts
+                        .iter()
+                        .any(|candidate: &AgentProviderEffort| candidate.id == effort)
+                    {
+                        continue;
+                    }
+                    efforts.push(AgentProviderEffort {
+                        id: effort.to_string(),
+                        label: effort.to_string(),
+                        description: None,
+                        is_default: false,
+                    });
+                }
+            }
+            Some(AgentProviderModel {
+                id: format!("opencode/{id}"),
+                label: label.to_string(),
+                is_default: false,
+                default_effort_id: None,
+                efforts,
+            })
+        })
+        .take(500)
+        .collect::<Vec<_>>();
+    output.sort_by(|left, right| left.label.cmp(&right.label).then(left.id.cmp(&right.id)));
+    Ok(output)
+}
+
+fn opencode_cached_models(home: &Path) -> Result<Vec<AgentProviderModel>, String> {
+    let cache_root = std::env::var_os("XDG_CACHE_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".cache"));
+    let path = cache_root.join("opencode/models.json");
+    let contents = fs::read_to_string(&path)
+        .map_err(|error| format!("OpenCode 모델 캐시를 읽지 못했습니다: {error}"))?;
+    parse_opencode_cached_models(&contents)
 }
 
 fn parse_claude_efforts(output: &str) -> Vec<AgentProviderEffort> {
@@ -1801,7 +1916,12 @@ fn load_agent_provider_models_sync(home: &Path, config_path: &Path) -> AgentProv
         cursor: provider_model_entry(Ok(Vec::new()), Vec::new(), true),
         grok: provider_model_entry(grok, Vec::new(), false),
         agy: provider_model_entry(agy, agy_efforts, false),
-        opencode: provider_model_entry(opencode, Vec::new(), true),
+        opencode: provider_model_entry_with_fallback(
+            opencode,
+            opencode_cached_models(home),
+            Vec::new(),
+            true,
+        ),
         openrouter: provider_model_entry(openrouter, Vec::new(), true),
     }
 }
@@ -8950,6 +9070,55 @@ mod tests {
         assert_eq!(
             models.into_iter().map(|model| model.id).collect::<Vec<_>>(),
             vec!["openai/gpt-5.6-sol", "anthropic/claude-sonnet-4-6"]
+        );
+    }
+
+    #[test]
+    fn falls_back_to_active_free_opencode_models_from_the_local_cache() {
+        let fallback = parse_opencode_cached_models(
+            r#"{
+                "opencode": {
+                    "models": {
+                        "free-model": {
+                            "id": "free-model",
+                            "name": "Free model",
+                            "cost": {"input": 0, "output": 0},
+                            "reasoning_options": [
+                                {"type": "effort", "values": ["low", "high"]}
+                            ]
+                        },
+                        "paid-model": {
+                            "name": "Paid model",
+                            "cost": {"input": 1, "output": 2}
+                        },
+                        "retired-model": {
+                            "name": "Retired model",
+                            "status": "deprecated",
+                            "cost": {"input": 0, "output": 0}
+                        }
+                    }
+                }
+            }"#,
+        )
+        .expect("the OpenCode cache should parse");
+        let entry = provider_model_entry_with_fallback(
+            Err("live catalog unavailable".to_string()),
+            Ok(fallback),
+            Vec::new(),
+            true,
+        );
+
+        assert_eq!(entry.error.as_deref(), Some("live catalog unavailable"));
+        assert_eq!(entry.models.len(), 1);
+        assert_eq!(entry.models[0].id, "opencode/free-model");
+        assert_eq!(entry.models[0].label, "Free model");
+        assert_eq!(
+            entry.models[0]
+                .efforts
+                .iter()
+                .map(|effort| effort.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["low", "high"]
         );
     }
 
