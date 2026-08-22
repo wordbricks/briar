@@ -45,11 +45,11 @@ Repository paths and third-party credentials never enter D1.
 
 | Area | State | Location |
 | --- | --- | --- |
-| Org device, project binding, credential schema, and run attribution | done | `migrations/0013_execution_workers.sql`, `migrations/0034_execution_worker_credentials.sql` |
-| Worker register, heartbeat, lease, transcript, and read APIs | done | `worker/src/workers.ts`, `worker/src/index.ts` |
-| Stalled-run reaper and claim concurrency guards | done | `worker/src/workers.ts` |
-| Worker loop and service installer | done | `src-cli/worker.ts`, Tauri organization Worker settings |
-| Detached coding-agent launch | done | `src-cli/agent-runner.ts`, `runClaimedIssue` in `src-cli/index.ts` |
+| Org device, project binding, credential schema, and run attribution | done | `apps/briar/migrations/0013_execution_workers.sql`, `apps/briar/migrations/0034_execution_worker_credentials.sql` |
+| Worker register, heartbeat, lease, transcript, and read APIs | done | `apps/briar/worker/src/workers.ts`, `apps/briar/worker/src/index.ts` |
+| Stalled-run reaper and claim concurrency guards | done | `apps/briar/worker/src/workers.ts` |
+| Worker loop and service installer | done | `apps/briar/src-cli/worker.ts`, Tauri organization Worker settings |
+| Detached coding-agent launch | done | `apps/briar/src-cli/agent-runner.ts`, `runClaimedIssue` in `apps/briar/src-cli/index.ts` |
 | Worker discovery and observation UI | done | dashboard readiness strip and dispatch dialog |
 | Worker enrollment, credential rotation/revocation, and scoped runtime auth | done | API, schema, CLI |
 | Targeted dispatch and reassignment | done | migration 0035, API, CLI claim filter, renderer |
@@ -166,7 +166,7 @@ contain no agent token and use restrictive permissions.
 ## Agent launcher
 
 The desktop launcher remains provider-specific in Rust, while detached workers
-use the bundled runners in `src-agent/`. All four supported providers now use
+use the bundled runners in `apps/briar/src-agent/`. All four supported providers now use
 the same detached runner envelope; detached Codex specifically uses the same
 App Server JSON-RPC handshake, normalized Agent events, approval decisions,
 and terminal result handling as the desktop Codex backend. Transcript upload

@@ -21,7 +21,7 @@ account-level disaster-recovery backup.
 
 Active runs, active project-agent sessions, incomplete conversation threads,
 and recent records are never selected. The code-owned policy table in
-`worker/src/archive.ts` is authoritative; update this document and the tests in
+`apps/briar/worker/src/archive.ts` is authoritative; update this document and the tests in
 the same change when a retention decision changes.
 
 ## Archive format and safety properties
@@ -125,7 +125,7 @@ Maintain both layers:
 
 1. Use D1 Time Travel for short-term operational recovery and create a bookmark
    before every remote schema migration.
-2. Export D1 regularly with `wrangler d1 export briar-db --remote` and store the
+2. Export D1 regularly with `bun --cwd apps/briar wrangler d1 export briar-db --remote` and store the
    encrypted export outside the production account according to the company
    backup policy.
 3. Protect the private R2 bucket with least-privilege credentials. Inventory
