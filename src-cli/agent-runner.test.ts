@@ -848,6 +848,20 @@ describe("detached Agent runner", () => {
     });
   });
 
+  it("lets issue conversations operate on a shared live worktree", () => {
+    const prompt = detachedIssueReplyPrompt({
+      agent,
+      snapshot: { messages: [] },
+      userMessage: "Fix the failing test in the current worktree.",
+      workspaceAvailable: true,
+      workspaceShared: true,
+    });
+
+    expect(prompt).toContain("same shell, network, browser, and filesystem permissions");
+    expect(prompt).toContain("Changes affect the live issue worktree");
+    expect(prompt).not.toContain("This is a read-only conversation");
+  });
+
   it("parses a proposed completed-run revision without executing it", () => {
     expect(parseDetachedIssueReplyResult(JSON.stringify({
       reply: "D를 D′로 바꾸는 개정을 제안했습니다. 수락이 필요합니다.",

@@ -20,6 +20,7 @@ import {
   enqueueIssueAgentReply,
   getHuntRunForProject,
   getIssueExecutionProposal,
+  listIssueAttachments,
   listIssueExecutionProposals,
   recordHuntEvent,
   renewIssueAgentReplyLease,
@@ -695,6 +696,73 @@ describe("conversational issue execution approval", () => {
     ).bind(seeded.replyMessageId).first()).resolves.toEqual({ count: 1 });
     expect(await getHuntRunForProject(db, projectAId, seeded.runId))
       .toMatchObject({ status: "backlog", dispatch_request_id: null });
+  });
+
+  it("stores an Issue Agent reply image with its message", async () => {
+    const seeded = await seedClaimedIssueReply();
+    const form = new FormData();
+    form.append("complete", JSON.stringify({
+      projectId: projectAId,
+      workerId: "execution-any-worker",
+      claimToken: seeded.claimToken,
+      body: "생성한 목업을 첨부했습니다.",
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+    }));
+    form.append(
+      "attachments",
+      new File([new Uint8Array([137, 80, 78, 71])], "mockup.png", {
+        type: "image/png",
+      }),
+    );
+
+    const response = await worker.fetch(
+      new Request(
+        `https://briar.example/issue-reply-claims/${seeded.jobId}/complete`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${executionWorkerCredential}`,
+            "Content-Length": "2048",
+          },
+          body: form,
+        },
+      ),
+      env(),
+    );
+    expect(response.status).toBe(200);
+    const payload = await response.json<{
+      message: {
+        id: string;
+        body: string;
+        attachments: Array<{
+          id: string;
+          filename: string;
+          contentType: string;
+          byteSize: number;
+        }>;
+      };
+    }>();
+    expect(payload.message).toMatchObject({
+      id: seeded.replyMessageId,
+      body: expect.stringContaining("briar-attachment://"),
+      attachments: [{
+        filename: "mockup.png",
+        contentType: "image/png",
+        byteSize: 4,
+      }],
+    });
+
+    const stored = await listIssueAttachments(db, projectAId, seeded.runId);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({
+      id: payload.message.attachments[0]?.id,
+      filename: "mockup.png",
+      content_type: "image/png",
+      byte_size: 4,
+    });
+    expect(await attachments.get(stored[0]!.object_key)).not.toBeNull();
   });
 
   it("rejects expired and superseded Issue Agent leases without stale output", async () => {

@@ -66,6 +66,7 @@ import {
 import {
   canonicalizeIssueAttachmentReferences,
   isIssueAttachmentReference,
+  issueAttachmentMarkdown,
   issueAttachmentReferences,
 } from "../../src/lib/issue-markdown";
 import {
@@ -1944,42 +1945,65 @@ export async function readRunEvidenceRequest(request: Request) {
   return { input: decodeRunEvidenceInput(input), images };
 }
 
-export async function readChannelReplyCompleteRequest(request: Request) {
+async function readReplyCompleteRequest<Input>(
+  request: Request,
+  input: {
+    decode: (value: unknown) => Input;
+    replyLabel: string;
+  },
+) {
   const form = await readBoundedMultipartForm(
     request,
     maxIssueMultipartBytes,
-    "Channel reply images exceed the 25MB total limit",
+    `${input.replyLabel} images exceed the 25MB total limit`,
   );
   if (!form) {
     return {
-      input: decodeChannelReplyCompleteInput(await readJson(request)),
+      input: input.decode(await readJson(request)),
       attachments: [] as File[],
     };
   }
   const payload = form.get("complete");
   if (typeof payload !== "string") {
-    throw new HttpError(400, "Multipart channel reply JSON is required");
+    throw new HttpError(400, `Multipart ${input.replyLabel.toLowerCase()} JSON is required`);
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(payload);
   } catch {
-    throw new HttpError(400, "Invalid multipart channel reply JSON");
+    throw new HttpError(400, `Invalid multipart ${input.replyLabel.toLowerCase()} JSON`);
   }
   const attachments = readMultipartFiles(
     form,
     "attachments",
-    "Channel reply attachments must be files",
+    `${input.replyLabel} attachments must be files`,
     validateIssueAttachments,
   );
   if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
-    throw new HttpError(400, "Channel reply attachments must be images");
+    throw new HttpError(400, `${input.replyLabel} attachments must be images`);
   }
-  const input = decodeChannelReplyCompleteInput(parsed);
-  if (input.error && attachments.length > 0) {
+  const decoded = input.decode(parsed);
+  if (
+    typeof decoded === "object" && decoded !== null &&
+    "error" in decoded && decoded.error && attachments.length > 0
+  ) {
     throw new HttpError(400, "A failed reply cannot include images");
   }
-  return { input, attachments };
+  return { input: decoded, attachments };
+}
+
+export function readChannelReplyCompleteRequest(request: Request) {
+  return readReplyCompleteRequest(request, {
+    decode: decodeChannelReplyCompleteInput,
+    replyLabel: "Channel reply",
+  });
+}
+
+export function readIssueReplyCompleteRequest(request: Request) {
+  return readReplyCompleteRequest(request, {
+    decode: decodeIssueAgentReplyCompletion,
+    replyLabel: "Issue reply",
+  });
 }
 
 const maxProjectIconDataUrlLength = 400_000;
@@ -14497,9 +14521,7 @@ async function route(
       return json({ leaseExpiresAt: renewed.lease_expires_at, activity });
     }
 
-    const input = decodeIssueAgentReplyCompletion(
-      await readJson(request),
-    );
+    const { input, attachments } = await readIssueReplyCompleteRequest(request);
     if (
       (input.executionProposal ||
         (input.proposedAction?.type === "request_issue_create" &&
@@ -14570,24 +14592,68 @@ async function route(
       );
     }
 
+    const storedAttachments = prepareStoredAttachments(attachments, () => {
+      const id = crypto.randomUUID();
+      return {
+        id,
+        object_key: `issue-attachments/${input.projectId}/${job.run_id}/${id}`,
+      };
+    });
     const completedAt = new Date().toISOString();
-    const completed = await completeIssueAgentReplyOutput(
-      db,
-      input.projectId,
-      job.id,
-      {
-        workerId: worker.binding.id,
-        claimTokenHash,
-        completedAt,
-        output: {
-          body: input.body!,
-          proposedAction: input.proposedAction ?? null,
-          executionProposal: Boolean(input.executionProposal),
-          skillExecutionProposal: Boolean(input.skillExecutionProposal),
+    const replyBody = [
+      input.body!,
+      ...storedAttachments.map((attachment) =>
+        issueAttachmentMarkdown(attachment.id, attachment.filename)
+      ),
+    ].filter(Boolean).join("\n\n");
+    const uploadedKeys: string[] = [];
+    const discardUploadedReplyImages = () =>
+      deleteUnreferencedUploadedIssueObjects(
+        db,
+        attachmentsBucket,
+        uploadedKeys,
+      );
+    let completed: Awaited<ReturnType<typeof completeIssueAgentReplyOutput>> =
+      null;
+    try {
+      await uploadStoredAttachments(
+        attachmentsBucket,
+        storedAttachments,
+        uploadedKeys,
+        (attachment) => ({
+          attachmentId: attachment.id,
+          projectId: input.projectId,
+          runId: job.run_id,
+          messageId: job.reply_message_id,
+        }),
+      );
+      completed = await completeIssueAgentReplyOutput(
+        db,
+        input.projectId,
+        job.id,
+        {
+          workerId: worker.binding.id,
+          claimTokenHash,
+          completedAt,
+          output: {
+            body: replyBody,
+            proposedAction: input.proposedAction ?? null,
+            executionProposal: Boolean(input.executionProposal),
+            skillExecutionProposal: Boolean(input.skillExecutionProposal),
+            attachments: storedAttachments.map(
+              ({ file: _file, ...attachment }) => attachment,
+            ),
+          },
         },
-      },
-    );
-    if (!completed) throw new HttpError(409, "Reply claim is no longer active");
+      );
+    } catch (error) {
+      await discardUploadedReplyImages().catch(() => undefined);
+      throw error;
+    }
+    if (!completed) {
+      await discardUploadedReplyImages().catch(() => undefined);
+      throw new HttpError(409, "Reply claim is no longer active");
+    }
     scheduleProjectRealtimePublish(env, db, input.projectId, context);
     scheduleIssueActivityClear(
       env,
@@ -14640,7 +14706,12 @@ async function route(
       agentReply: issueAgentReplyJson(completed),
       message: issueMessageJson(
         reply,
-        [],
+        storedAttachments.map(({ file: _file, ...attachment }) => ({
+          ...attachment,
+          project_id: input.projectId,
+          run_id: job.run_id,
+          created_at: completedAt,
+        })),
         proposal,
         executionProposal,
         skillExecutionProposal,

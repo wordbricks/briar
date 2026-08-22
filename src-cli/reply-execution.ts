@@ -16,7 +16,6 @@ import {
   detachedProjectAgentPrompt,
   detachedPayloadDirection,
   detachedTranscriptPayload,
-  parseDetachedIssueReplyResult,
   parseDetachedJsonResult,
   shouldPersistDetachedTranscriptPayload,
   type DetachedAgent,
@@ -48,6 +47,13 @@ import {
   collectChannelReplyAttachments,
   parseChannelReplyAgentResult,
 } from "./channel-reply-attachments";
+import {
+  collectIssueReplyAttachments,
+  issueReplyCompleteRequestBody,
+  parseIssueReplyAgentResult,
+} from "./issue-reply-attachments";
+import { ReplyGeneratedImageCollector } from "./reply-generated-images";
+import { validateReplyAttachments } from "./reply-attachments";
 import {
   channelReplyImageDirectory,
   cleanupChannelReplyImages,
@@ -454,14 +460,14 @@ async function runClaimedIssueReply(
     });
     let conversationId: string | null = issue.handoffContext?.conversationId ?? null;
     if (conversationId) reportCheckpoint?.({ conversationId });
+    const generatedImages = new ReplyGeneratedImageCollector();
     const turn = await (async () => {
       try {
         return await runDetachedProviderTurn({
           agent,
           prompt,
           workspacePath,
-          fullAccess: false,
-          readOnly: true,
+          fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
           attachments,
           conversationId,
           outputSchema: detachedIssueReplyOutputSchema,
@@ -479,6 +485,7 @@ async function runClaimedIssueReply(
           },
           onPayload: async (payload, line) => {
             activityPublisher.observePayload(payload);
+            generatedImages.observePayload(payload);
             sequence += 1;
             const direction = detachedPayloadDirection(payload);
             const bounded = detachedTranscriptPayload(payload, line);
@@ -499,10 +506,18 @@ async function runClaimedIssueReply(
     })();
     assertDetachedProviderTurnSucceeded(turn);
     if (!turn.resultText) throw new Error("Agent returned an empty issue reply");
-    const result = parseDetachedIssueReplyResult(turn.resultText, {
+    const parsedResult = parseIssueReplyAgentResult(turn.resultText, {
       allowSkillExecutionProposal: issue.skillExecutionTarget !== null,
     });
+    const result = parsedResult.result;
     if (!result.reply) throw new Error("Agent returned an empty issue reply");
+    const replyImages = validateReplyAttachments([
+      ...await collectIssueReplyAttachments({
+        workspacePath,
+        paths: parsedResult.attachmentPaths,
+      }),
+      ...generatedImages.files(),
+    ], "Issue reply");
     // Private downloaded images must be removed before the durable reply
     // succeeds. Worktree cache bookkeeping is best-effort in the outer cleanup.
     await cleanupContext();
@@ -512,14 +527,12 @@ async function runClaimedIssueReply(
       workerToken,
       {
         method: "POST",
-        body: JSON.stringify({
+        body: issueReplyCompleteRequestBody({
           projectId: project.id,
           workerId: registered.workerId,
           claimToken: issue.claimToken,
-          body: result.reply,
-          proposedAction: result.proposedAction,
-          executionProposal: result.executionProposal,
-          skillExecutionProposal: result.skillExecutionProposal,
+          result,
+          attachments: replyImages,
         }),
       },
     );
@@ -731,6 +744,7 @@ async function runClaimedChannelReply(
     let result: ReturnType<typeof parseChannelReplyAgentResult>["result"] | null =
       null;
     let attachmentPaths: string[] = [];
+    const generatedImages = new ReplyGeneratedImageCollector();
     while (!result) {
       const turn = await runDetachedProviderTurn({
         agent,
@@ -761,6 +775,7 @@ async function runClaimedChannelReply(
         },
         onPayload: (payload) => {
           activityPublisher.observePayload(payload);
+          generatedImages.observePayload(payload);
         },
       });
       assertDetachedProviderTurnSucceeded(turn);
@@ -836,10 +851,13 @@ async function runClaimedChannelReply(
     }
     // Read reply images before the disposable workspace disappears. Private
     // inbound context must still be gone before the durable reply completes.
-    const replyImages = await collectChannelReplyAttachments({
-      workspacePath,
-      paths: attachmentPaths,
-    });
+    const replyImages = validateReplyAttachments([
+      ...await collectChannelReplyAttachments({
+        workspacePath,
+        paths: attachmentPaths,
+      }),
+      ...generatedImages.files(),
+    ], "Channel reply");
     await cleanupContext();
     await request(
       config.apiUrl,
