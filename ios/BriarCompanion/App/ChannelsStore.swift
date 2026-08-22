@@ -339,13 +339,14 @@ final class ChannelsStore: ObservableObject {
               !memberIDs.isEmpty || !agentIDs.isEmpty else {
             throw MobileAPIError.invalidRequest
         }
-        let response: CreateDirectMessageResponse = try await api.post(
+        let response: CreateDirectMessageResponse = try await api.send(
             MobileAPIContract.Endpoint.directMessages(organizationID: organizationID),
+            method: "POST",
+            token: token,
             body: CreateDirectMessageRequest(
                 memberIds: memberIDs,
                 agentIds: agentIDs.map { $0.uuidString.lowercased() }
             ),
-            token: token,
             as: CreateDirectMessageResponse.self
         )
         upsertChannel(response.channel)

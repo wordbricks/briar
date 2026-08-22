@@ -39,7 +39,7 @@ struct DirectMessagesHomeView: View {
             guard let participant = channel
                 .directMessageParticipants(excluding: currentUserID)
                 .first(where: { $0.type == .agent })
-                ?? channel.directMessageParticipants(excluding: currentUserID).first()
+                ?? channel.directMessageParticipants(excluding: currentUserID).first
             else { continue }
             let key = "\(participant.type.rawValue):\(participant.id)"
             guard participantIDs.insert(key).inserted else { continue }

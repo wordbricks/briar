@@ -1009,3 +1009,68 @@ PR #1160, which changes only web spinner CSS and its test. The native iOS inputs
 are identical to the release source; the changed spinner tests also passed.
 App Store Connect accepted the build as `VALID` and automatically made it
 available to the all-builds internal group.
+
+## 2026-08-23 — 1.2.150 (2)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.150`
+- App Store Connect build: `2`
+- App Store Connect build ID: `431363e2-1b9c-4002-bbbd-f3fec0ce885a`
+- Latest main commit: `aac0db7b`
+- Release source commit: `a8baecb95e5d4af59cb5e6bcd8b61955d5781d73`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `f121be03e3b56676d450a1624b48246002625f4ddd7b72e2607597202f9674c3`
+
+This release includes the latest main line-art Briar branding and app icon.
+The exact release source passed the shared API contract, Swift unit and 18
+iPhone UI tests, iPad accessibility and largest Dynamic Type layout testing,
+Production analyze and build checks, session/download/log security checks, and
+the Tauri iOS simulator and Android ARM64 regression builds. Archive identity,
+App Store provisioning, distribution signature, production entitlements, and
+the exported IPA signature were verified before upload.
+
+After the native gate completed, main advanced through `969327c8` and
+`aac0db7b`. Those commits change only the desktop changelog and trusted CI
+file-mode validation; they do not change the native iOS inputs or uploaded
+IPA. The final release PR includes both commits.
+
+## 2026-08-23 — 1.2.150 (3)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.150`
+- App Store Connect build: `3`
+- App Store Connect build ID: `8d5c683d-3b09-434b-be57-5b4d72d981c1`
+- Latest main commit: `e0ccd3ec6897b23c512d2f611ea67fe08ec02e87`
+- Release source commit: `55e7cc2a30e758e7dbe9e989ba912cb0bd36d97a`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Automatic tester notification: enabled
+- IPA SHA-256: `d75889cd47dc00df12235a9b652d923a23977d661f924c86eef742c9bb819651`
+
+This release includes the latest main channel-thread interaction: long-press
+a root channel message, choose `스레드 시작`, and open its reply conversation.
+The release source also makes that gesture high priority over attachment and
+other nested controls, and selects the message body deterministically in the
+native UI test. The complete gate passed the shared mobile contract, Swift
+unit and 18 iPhone UI tests, iPad accessibility and largest Dynamic Type
+layout testing, Production analyze and build checks, session/download/log
+security checks, and the Tauri iOS simulator and Android ARM64 regression
+builds. Archive identity, App Store provisioning, distribution signature,
+production entitlements, exported IPA signature, and the IPA checksum were
+verified before upload.
+
+App Store Connect accepted the build as `VALID` and placed it in internal
+TestFlight testing.
+
+After the upload, `main` advanced through `9c4ec1d9` (the worker route-family
+refactor in PR #1237). That worker-only change is included in the release PR;
+it does not change the native iOS inputs or the uploaded IPA.
