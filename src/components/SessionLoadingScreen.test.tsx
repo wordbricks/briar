@@ -19,13 +19,23 @@ describe("SessionLoadingScreen", () => {
     expect(status?.textContent).toContain("로그인 정보를 확인하는 중입니다");
 
     const logo = status?.querySelector<HTMLElement>(".session-loading-logo");
-    const image = logo?.querySelector<HTMLImageElement>("img");
-    expect(image?.getAttribute("aria-hidden")).toBe("true");
-    expect(image?.getAttribute("alt")).toBe("");
-    expect(image?.src).toContain("briar-outline-gray.png");
-    expect(logo?.style.getPropertyValue("--session-loading-logo")).toContain(
-      "briar-outline-gray.png",
+    const lightImage = logo?.querySelector<HTMLImageElement>(
+      ".session-loading-logo-light",
     );
+    const darkImage = logo?.querySelector<HTMLImageElement>(
+      ".session-loading-logo-dark",
+    );
+    expect(lightImage?.getAttribute("aria-hidden")).toBe("true");
+    expect(lightImage?.getAttribute("alt")).toBe("");
+    expect(lightImage?.src).toContain("briar-mark-light.png");
+    expect(darkImage?.getAttribute("alt")).toBe("");
+    expect(darkImage?.src).toContain("briar-mark-dark.png");
+    expect(
+      logo?.style.getPropertyValue("--session-loading-logo-light"),
+    ).toContain("briar-mark-light.png");
+    expect(
+      logo?.style.getPropertyValue("--session-loading-logo-dark"),
+    ).toContain("briar-mark-dark.png");
 
     await act(async () => root.unmount());
   });
