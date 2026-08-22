@@ -90,6 +90,19 @@ import { handleManagedComputerRoute } from "./managed-computer-routes";
 import { handleOrganizationRoute } from "./organization-routes";
 import { handleProjectLinearRoute } from "./project-linear-routes";
 import { handlePublicRoute } from "./public-routes";
+import { projectJson } from "./project-json";
+import { projectAgentJson } from "./project-agent-json";
+import {
+  projectAgentSessionJson,
+  projectAgentSessionSummaryJson,
+  projectAgentSessionSyncEtag,
+  projectAgentSessionSyncJson,
+} from "./project-agent-session-json";
+import {
+  projectAgentTaskSessionEvent,
+  syncProjectAgentTaskSession,
+} from "./project-agent-task-session";
+import { settingsJson } from "./project-settings-json";
 import {
   contentDisposition,
   prepareStoredAttachments,
@@ -290,8 +303,6 @@ import {
   type IssueResultReviewRow,
   type IssueDependencyRow,
   type ProjectAgentRow,
-  type ProjectAgentSessionRow,
-  type ProjectSettingsRow,
   type OrganizationStatusTrayRunRow,
   type OrganizationUsageRunRow,
   type ProjectUsageTotalRow,
@@ -1605,180 +1616,6 @@ async function requireProjectAccess(
   }
 }
 
-function projectJson(row: ProjectRow) {
-  return {
-    id: row.id,
-    name: row.name,
-    issueKeyPrefix: row.issue_key_prefix,
-    scheduleTabEnabled: row.schedule_tab_enabled !== 0,
-    icon: row.icon,
-    organizationId: row.organization_id,
-    organizationName: row.organization_name,
-    role: row.member_role,
-    createdAt: row.created_at,
-  };
-}
-
-const projectAgentJson = (row: ProjectAgentRow) => {
-  return {
-    id: row.id,
-    projectId: row.project_id,
-    name: row.name,
-    avatar: row.avatar,
-    codexPet: row.avatar_pet_json
-      ? {
-          ...(JSON.parse(row.avatar_pet_json) as StoredCodexPet),
-          spriteSheetUrl: row.avatar_spritesheet_object_key
-            ? `/projects/${row.project_id}/agents/${row.id}/spritesheet`
-            : null,
-        }
-      : null,
-    provider: row.provider,
-    model: row.model,
-    effort: row.effort,
-    description: row.description,
-    responsibility: row.responsibility,
-    skill: row.skill_markdown,
-    skills: (row.skills ?? []).map(agentSkillJson),
-    calendarColor: row.calendar_color,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-};
-
-const projectAgentSessionJson = (row: {
-  project_id: string;
-  id: string;
-  requested_by_user_id: string | null;
-  payload_json: string;
-}) => ({
-  id: row.id,
-  projectId: row.project_id,
-  ...(JSON.parse(row.payload_json) as Record<string, unknown>),
-  requestedByUserId: row.requested_by_user_id,
-  workspaceRoot: null,
-  dispatchEvents: [],
-  workers: [],
-  detailLoaded: true,
-});
-
-const projectAgentSessionSummaryJson = (row: {
-  project_id: string;
-  session_id: string;
-  summary_json: string;
-  archived: number;
-}) => {
-  const summary = JSON.parse(row.summary_json) as Record<string, unknown>;
-  // `inboxVersion` is an internal projection used by the organization feed;
-  // keep the existing public Agent-session contract unchanged.
-  delete summary.inboxVersion;
-  return {
-    id: row.session_id,
-    projectId: row.project_id,
-    ...summary,
-    followUps: [],
-    conversationId: null,
-    workspaceRoot: null,
-    summary: null,
-    error: null,
-    events: [],
-    dispatchEvents: [],
-    workers: [],
-    archived: row.archived === 1,
-    detailLoaded: false,
-  };
-};
-
-const projectAgentSessionSyncEtag = (projectId: string, cursor: number) =>
-  `"project-agent-sessions:${projectId}:${cursor}"`;
-
-const projectAgentSessionSyncJson = (
-  body: unknown,
-  etag: string,
-  status = 200,
-) =>
-  Response.json(body, {
-    status,
-    headers: {
-      ...corsHeaders,
-      "Cache-Control": "private, no-cache",
-      ETag: etag,
-    },
-  });
-
-const projectAgentTaskSessionEvent = (
-  type: "started" | "completed" | "failed",
-  occurredAt: string,
-) => ({
-  id: crypto.randomUUID(),
-  type,
-  occurredAt,
-});
-
-async function syncProjectAgentTaskSession(
-  db: D1Database,
-  job: {
-    id: string;
-    project_id: string;
-    agent_id: string;
-    status: "queued" | "running" | "completed" | "failed";
-    claimed_worker_id: string | null;
-    preferred_worker_id: string;
-    updated_at: string;
-    completed_at: string | null;
-    error: string | null;
-  },
-  input: {
-    summary?: string | null;
-    conversationId?: string | null;
-    error?: string | null;
-  } = {},
-) {
-  const current = await getProjectAgentSession(db, job.project_id, job.id);
-  if (!current) return null;
-  let payload: Record<string, unknown>;
-  try {
-    payload = JSON.parse(current.payload_json) as Record<string, unknown>;
-  } catch {
-    payload = {};
-  }
-  const currentEvents = Array.isArray(payload.events) ? payload.events : [];
-  const terminal = job.status === "completed" || job.status === "failed";
-  const nextPayload = {
-    ...payload,
-    status: job.status === "queued" || job.status === "running"
-      ? "running"
-      : job.status,
-    requestedWorkerId: payload.requestedWorkerId ?? job.preferred_worker_id,
-    workerId: job.claimed_worker_id ?? payload.workerId ?? job.preferred_worker_id,
-    conversationId: input.conversationId ?? payload.conversationId ?? null,
-    summary: input.summary ?? payload.summary ?? null,
-    error: terminal ? (input.error ?? job.error ?? null) : null,
-    completedAt: terminal ? job.completed_at : null,
-    updatedAt: job.updated_at,
-    events: [
-      ...currentEvents,
-      projectAgentTaskSessionEvent(
-        terminal ? (job.status === "completed" ? "completed" : "failed") : "started",
-        job.updated_at,
-      ),
-    ],
-  };
-  const updated = await upsertProjectAgentSession(db, {
-    project_id: current.project_id,
-    id: current.id,
-    agent_id: current.agent_id,
-    requested_by_user_id: current.requested_by_user_id,
-    status: nextPayload.status as ProjectAgentSessionRow["status"],
-    session_type: current.session_type,
-    payload_json: JSON.stringify(nextPayload),
-    started_at: current.started_at,
-    completed_at: nextPayload.completedAt as string | null,
-    updated_at: job.updated_at,
-  }, job.updated_at);
-  return updated ? projectAgentSessionJson(updated) : null;
-}
-
 const slackInstallationJson = (
   row: Awaited<ReturnType<typeof listSlackInstallations>>[number],
 ) => ({
@@ -3074,24 +2911,6 @@ async function handleGithubOAuthCallback(request: Request, env: Env) {
     );
   }
 }
-const settingsJson = (
-  row: ProjectSettingsRow | null,
-  checkpointPolicy?: ReturnType<typeof checkpointPolicyJson>,
-) => ({
-  velenOrg: row?.velen_org ?? null,
-  dataSource: row?.data_source ?? null,
-  linear: {
-    enabled: row?.linear_enabled === 1,
-    source: row?.linear_source ?? null,
-    teamKey: row?.linear_team_key ?? null,
-  },
-  githubRepository: row?.github_repository ?? null,
-  workflow: row?.workflow_json
-    ? normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json))
-    : cloneAutoHuntWorkflow(),
-  ...(checkpointPolicy ? { checkpointPolicy } : {}),
-});
-
 const mergeQueueProfileJson = (row: MergeQueueProfileRow | null) => row
   ? {
       projectId: row.project_id,
