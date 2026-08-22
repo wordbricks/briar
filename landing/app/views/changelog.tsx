@@ -30,6 +30,21 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.147",
+        date: "2026년 8월 22일",
+        title: "조직 협업과 관리형 컴퓨터 파일럿을 더 안전하게 확장합니다",
+        summary:
+          "조직 DM과 관리형 컴퓨터 프로모션 파일럿을 추가하고, Worker·CLI 실행 경계를 분리해 알림·채널·병합 흐름의 안정성을 높였습니다.",
+        items: [
+          "조직 구성원끼리 일대일 Direct Message를 시작하고, 채널·첨부 파일·실시간 업데이트·Agent 답글 흐름을 재사용하면서도 별도의 비공개 대화로 관리합니다.",
+          "GETBRIAR 프로모션으로 관리형 컴퓨터 파일럿 신청·권한·AWS 프로비저닝·등록·상태·수명 주기를 서버 검증과 idempotency로 안전하게 연결합니다.",
+          "관리형 컴퓨터를 고정된 AWS Launch Template, 암호화된 볼륨, 인바운드 없는 네트워크, SSM 전용 접근으로 제한하고 조직·fleet 한도와 만료·drain·종료를 지원합니다.",
+          "CLI와 Worker의 데이터베이스·도메인 저장소 경계를 Effect로 분리해 명령 트리와 SQL 입력 검증을 더 명확하게 유지합니다.",
+          "채널 thread 구독 알림, Inbox 초기 동기화, Project Agent 실행 로그 복구, 5분 merge cohort를 보강해 늦은 이벤트와 병합 흐름을 안정적으로 처리합니다.",
+          "공통 Spinner와 채널 제안 카드 레이아웃을 정리해 loading·status UI를 일관되게 표시합니다.",
+        ],
+      },
+      {
         version: "1.2.146",
         date: "2026년 8월 21일",
         title: "제공자 설정과 저장소 전달 흐름을 더 안정적으로 연결합니다",
@@ -933,6 +948,21 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.147",
+        date: "August 22, 2026",
+        title: "Expand organization collaboration and the managed-computer pilot safely",
+        summary:
+          "Add organization direct messages and a promotional managed-computer pilot, while splitting Worker and CLI boundaries to make alerts, channels, and merge delivery more reliable.",
+        items: [
+          "Add one-to-one Direct Messages for organization members, reusing channel attachments, realtime updates, and Agent replies while keeping each conversation private and distinct.",
+          "Connect the GETBRIAR promotion to server-validated managed-computer requests, entitlements, AWS provisioning, enrollment, state transitions, and lifecycle handling with idempotency.",
+          "Constrain managed computers to a fixed AWS Launch Template, encrypted volumes, no inbound network access, SSM-only operations, organization and fleet limits, expiry, draining, and termination.",
+          "Split the CLI and Worker database and domain repository boundaries with Effect so the command tree and SQL input validation remain explicit.",
+          "Restore subscribed channel-thread notifications and Project Agent execution logs, gate Inbox alerts until initial sync, and stabilize five-minute merge cohorts and late-event delivery.",
+          "Unify the shared Spinner and channel proposal-card layout so loading and status surfaces remain consistent.",
+        ],
+      },
       {
         version: "1.2.146",
         date: "August 21, 2026",
@@ -1928,7 +1958,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-146">
+          <a href="#v1-2-147">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1950,7 +1980,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.146"
+                      entry.version === "1.2.147"
+                        ? "2026-08-22"
+                        : entry.version === "1.2.146"
                         ? "2026-08-21"
                         : entry.version === "1.2.145"
                         ? "2026-08-21"
