@@ -16,10 +16,12 @@ record every decision in the incident timeline.
 ## Detect and triage
 
 1. Check `/health`, Cloudflare Workers Logs, traces, request/error metrics, and
-   the latest GitHub deployment. Observability is enabled in `wrangler.jsonc`.
+   the latest GitHub deployment. Observability is enabled in
+   `apps/briar/wrangler.jsonc`.
 2. Compare `latest.json` with the signed GitHub Release, `SHA256SUMS`, SBOM, and
    provenance subjects. Treat any digest/signature mismatch as severity 1.
-3. Use `wrangler tail --status error` for a bounded live sample. Never log auth,
+3. Use `bun --cwd apps/briar wrangler tail --status error` for a bounded live
+   sample. Never log auth,
    agent, claim, Apple, Cloudflare, or updater private tokens.
 4. Confirm whether the fault is desktop-only, update distribution, Worker, D1,
    or an external identity provider before changing state.
@@ -31,7 +33,8 @@ record every decision in the incident timeline.
   automatic binary rollback. Keep the retained DMG for manual rollback.
 - Bad versioned object: do not overwrite it. Remove promotion from
   `latest.json`, build a new patch version, and preserve evidence.
-- Worker regression: use `wrangler rollback` to the verified deployment, then
+- Worker regression: use `bun --cwd apps/briar wrangler rollback` to the
+  verified deployment, then
   confirm `/health`, auth, project dashboard, and update endpoints.
 - Channel issue approval regression: migration 0090 is a paired, forward-only
   Worker/D1 rollout. Do not roll back the Worker independently; follow

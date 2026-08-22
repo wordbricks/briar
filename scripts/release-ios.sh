@@ -191,7 +191,7 @@ common_build_settings=(
 if [[ "$implementation" == "native" ]]; then
   bun run ios:native:project
   xcodebuild \
-    -project ios/BriarCompanion/BriarCompanion.xcodeproj \
+    -project apps/briar/ios/BriarCompanion/BriarCompanion.xcodeproj \
     -scheme BriarCompanion-Production \
     -configuration Production \
     -destination 'generic/platform=iOS' \
@@ -201,10 +201,10 @@ if [[ "$implementation" == "native" ]]; then
     clean archive
 else
   bun run build
-  mkdir -p src-tauri/gen/apple/assets
-  rsync -a --delete dist/ src-tauri/gen/apple/assets/
+  mkdir -p apps/briar/src-tauri/gen/apple/assets
+  rsync -a --delete apps/briar/dist/ apps/briar/src-tauri/gen/apple/assets/
   xcodebuild \
-    -project src-tauri/gen/apple/briar.xcodeproj \
+    -project apps/briar/src-tauri/gen/apple/briar.xcodeproj \
     -scheme briar_iOS \
     -configuration release \
     -destination 'generic/platform=iOS' \

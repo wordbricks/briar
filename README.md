@@ -1,4 +1,4 @@
-<picture><source media="(prefers-color-scheme: dark)" srcset="./src/assets/brand/briar-logo-dark.png" /><img src="./src/assets/brand/briar-logo-light.png" alt="Briar logo" width="72" /></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="./apps/briar/src/assets/brand/briar-logo-dark.png" /><img src="./apps/briar/src/assets/brand/briar-logo-light.png" alt="Briar logo" width="72" /></picture>
 
 # Briar
 
@@ -8,7 +8,7 @@ Briar is a cloud-coordinated, local-execution Agent Development Environment for 
 
 It turns issues into structured runs, gives each run an isolated Git worktree, and keeps progress, evidence, conversations, and human review in one place. Use Codex, Claude, Grok, or OpenCode through the accounts and local CLIs you already have.
 
-[![Briar issue-to-complete demo](./landing/public/briar-issue-to-complete-demo.gif)](./landing/public/briar-issue-to-complete-demo.mp4)
+[![Briar issue-to-complete demo](./apps/landing/public/briar-issue-to-complete-demo.gif)](./apps/landing/public/briar-issue-to-complete-demo.mp4)
 
 ## What it does
 
@@ -43,7 +43,7 @@ Requirements: Bun 1.4.0, Rust 1.96.0, the Tauri system prerequisites, Wrangler 4
 ```sh
 bun install
 bun run worker:types
-bun tauri dev
+bun run tauri -- dev
 ```
 
 Without a Worker URL, the app opens its built-in demo dashboard. To run the desktop app, local Worker, and local D1 database together, add the private key file required to decrypt the development environment and run:
@@ -52,13 +52,18 @@ Without a Worker URL, the app opens its built-in demo dashboard. To run the desk
 bun run dev:all
 ```
 
+The product app, API Worker, CLI, and native shells live in `apps/briar`; the
+public site lives in `apps/landing`; and shared data packages live under
+`packages/`. Root build and verification commands use Turborepo to run the
+relevant workspace tasks.
+
 Useful checks:
 
 For the fastest pre-PR validation, run `bun run check`.
 
 ```sh
 bun run check
-bun test
+bun run test
 bun run ci:local
 ```
 

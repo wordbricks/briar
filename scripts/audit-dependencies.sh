@@ -13,7 +13,9 @@ if [[ "${BRIAR_TRUSTED_MERGE_GROUP_CI:-}" == "1" ]]; then
   }
   echo "Verified bun.lock against the audit baked into the OCI image."
 else
-  # Temporary exception documented in docs/operations/security-exceptions.md.
-  # Keep this GHSA visible here so dependency updates can remove it deliberately.
-  bun audit --audit-level high --ignore GHSA-f88m-g3jw-g9cj
+  # Temporary exceptions documented in docs/operations/security-exceptions.md.
+  # Keep each GHSA visible here so dependency updates can remove it deliberately.
+  bun audit --audit-level high \
+    --ignore GHSA-w3rx-r6r6-pgpr \
+    --ignore GHSA-5p2g-fcmc-qvqq
 fi

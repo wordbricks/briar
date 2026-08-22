@@ -1,4 +1,4 @@
-<picture><source media="(prefers-color-scheme: dark)" srcset="./src/assets/brand/briar-logo-dark.png" /><img src="./src/assets/brand/briar-logo-light.png" alt="Briar logo" width="72" /></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="./apps/briar/src/assets/brand/briar-logo-dark.png" /><img src="./apps/briar/src/assets/brand/briar-logo-light.png" alt="Briar logo" width="72" /></picture>
 
 # Briar
 
@@ -6,7 +6,7 @@
 
 Briar 是一个由云端协调、在本地执行的 Agent Development Environment，帮助你把编码 Agent 的工作从 issue 推进到 PR。
 
-[![Briar issue-to-complete demo](./landing/public/briar-issue-to-complete-demo.gif)](./landing/public/briar-issue-to-complete-demo.mp4)
+[![Briar issue-to-complete demo](./apps/landing/public/briar-issue-to-complete-demo.gif)](./apps/landing/public/briar-issue-to-complete-demo.mp4)
 
 ## Briar 能做什么
 
@@ -41,7 +41,7 @@ Briar 在连接项目时会安装并同步 CLI 和工作流技能。Velen、Line
 ```sh
 bun install
 bun run worker:types
-bun tauri dev
+bun run tauri -- dev
 ```
 
 没有 Worker URL 时，应用会打开内置的演示仪表盘。要同时运行桌面应用、本地 Worker 和本地 D1 数据库，请添加解密开发环境所需的私钥文件，然后运行：
@@ -50,11 +50,15 @@ bun tauri dev
 bun run dev:all
 ```
 
+产品应用、API Worker、CLI 和原生壳位于 `apps/briar`，公开网站位于
+`apps/landing`，共享数据包位于 `packages/`。根目录的构建和验证命令使用
+Turborepo 运行相关 workspace task。
+
 常用检查：
 
 ```sh
 bun run check
-bun test
+bun run test
 bun run ci:local
 ```
 

@@ -6,13 +6,13 @@ Status: implemented (1~4단계). Updated 2026-08-06.
 
 | 영역 | 상태 | 위치 |
 | --- | --- | --- |
-| 에이전트 조직 스코프 승격, 핸들 | done | `migrations/0071_organization_agents.sql`, `worker/src/organization-agents.ts` |
-| 채널·메시지·스레드·멘션·답글 잡·제안 | done | `migrations/0073_organization_channels.sql`, `worker/src/channels.ts` |
-| 조직 스코프 변경 피드 | done | `migrations/0074_channel_delta_sync.sql` |
-| 채널 API와 조직 스코프 클레임 평면 | done | `worker/src/index.ts` |
-| 워커 러너 `channelReply` | done | `src-cli/index.ts`, `src-cli/agent-runner.ts` |
-| 데스크탑 채널 화면과 멘션 픽커 | done | `src/components/Channels.tsx`, `src/lib/channel-mentions.ts` |
-| 모바일 Home 탭(공유 웹 셸 + iOS 네이티브) | done | `src/components/CompanionChannels.tsx`, `ios/BriarCompanion/App/Channels*.swift` |
+| 에이전트 조직 스코프 승격, 핸들 | done | `apps/briar/migrations/0071_organization_agents.sql`, `apps/briar/worker/src/organization-agents.ts` |
+| 채널·메시지·스레드·멘션·답글 잡·제안 | done | `apps/briar/migrations/0073_organization_channels.sql`, `apps/briar/worker/src/channels.ts` |
+| 조직 스코프 변경 피드 | done | `apps/briar/migrations/0074_channel_delta_sync.sql` |
+| 채널 API와 조직 스코프 클레임 평면 | done | `apps/briar/worker/src/index.ts` |
+| 워커 러너 `channelReply` | done | `apps/briar/src-cli/index.ts`, `apps/briar/src-cli/agent-runner.ts` |
+| 데스크탑 채널 화면과 멘션 픽커 | done | `apps/briar/src/components/Channels.tsx`, `apps/briar/src/lib/channel-mentions.ts` |
+| 모바일 Home 탭(공유 웹 셸 + iOS 네이티브) | done | `apps/briar/src/components/CompanionChannels.tsx`, `apps/briar/ios/BriarCompanion/App/Channels*.swift` |
 
 구현하면서 설계와 달라졌거나 미룬 것:
 
@@ -20,7 +20,7 @@ Status: implemented (1~4단계). Updated 2026-08-06.
   프로바이더 헬스는 요청이 함께 보내는 프로젝트 바인딩(`workerId`)에서 읽는다.
   디바이스 단위 프로바이더 저장소를 새로 만들지 않기 위한 선택이며, 잡 단위
   자격 검사(조직 에이전트는 조직만, 프로젝트 에이전트는 바인딩까지)는 설계대로다.
-- **Ideas 기능은 폐기됐다**(`migrations/0075_remove_ideas.sql`). 계획서는
+- **Ideas 기능은 폐기됐다**(`apps/briar/migrations/0075_remove_ideas.sql`). 계획서는
   이제 `briar_channel_message_documents`가 제목·마크다운·대상 프로젝트를
   직접 들고 있으며 채널 밖에 독립적으로 존재하지 않는다. 계획서를 여러 이슈로
   한 번에 쪼개는 경로는 함께 사라졌고, 채널에서의 이슈 생성은 에이전트의
@@ -68,14 +68,14 @@ flowchart LR
 
 | 자산 | 위치 | 채널에서의 쓰임 |
 | --- | --- | --- |
-| 스레드 구조(`parent_message_id`) | `migrations/0010_issue_messages.sql` | 채널 메시지 스레드에 동일 패턴 적용 |
-| 구조화 멘션 저장 | `migrations/0041_issue_message_mentions.sql` | 유저 멘션 테이블을 그대로 복제 |
-| 에이전트 답글 큐(클레임·리스·재시도) | `migrations/0044_issue_agent_reply_jobs.sql`, `POST /issue-reply-claims` | 채널 전용 잡 테이블과 조직 스코프 클레임으로 확장 |
-| 조직 스코프 디바이스 신원 | `migrations/0034_execution_worker_credentials.sql` | 프로젝트 없는 에이전트 실행의 기반 |
-| 액션 제안(사람이 수락해야 적용) | `migrations/0068_issue_action_proposals.sql` | 채널에서 이슈 생성 제안에 동일 패턴 적용 |
-| 계정 스코프 읽음 상태 | `migrations/0063_inbox_read_states.sql` | 채널 멘션·스레드 답글을 기존 Inbox에 합류 |
-| 델타 동기화 트리거 | `migrations/0049_dashboard_delta_sync.sql` | 조직 스코프 변경 피드의 원형 |
-| 대화 UI | `src/components/HuntDashboard.tsx` `IssueConversation`, `IssueMessageItem`, `MessageComposer` | 공용 컴포넌트로 추출 후 양쪽에서 사용 |
+| 스레드 구조(`parent_message_id`) | `apps/briar/migrations/0010_issue_messages.sql` | 채널 메시지 스레드에 동일 패턴 적용 |
+| 구조화 멘션 저장 | `apps/briar/migrations/0041_issue_message_mentions.sql` | 유저 멘션 테이블을 그대로 복제 |
+| 에이전트 답글 큐(클레임·리스·재시도) | `apps/briar/migrations/0044_issue_agent_reply_jobs.sql`, `POST /issue-reply-claims` | 채널 전용 잡 테이블과 조직 스코프 클레임으로 확장 |
+| 조직 스코프 디바이스 신원 | `apps/briar/migrations/0034_execution_worker_credentials.sql` | 프로젝트 없는 에이전트 실행의 기반 |
+| 액션 제안(사람이 수락해야 적용) | `apps/briar/migrations/0068_issue_action_proposals.sql` | 채널에서 이슈 생성 제안에 동일 패턴 적용 |
+| 계정 스코프 읽음 상태 | `apps/briar/migrations/0063_inbox_read_states.sql` | 채널 멘션·스레드 답글을 기존 Inbox에 합류 |
+| 델타 동기화 트리거 | `apps/briar/migrations/0049_dashboard_delta_sync.sql` | 조직 스코프 변경 피드의 원형 |
+| 대화 UI | `apps/briar/src/components/HuntDashboard.tsx` `IssueConversation`, `IssueMessageItem`, `MessageComposer` | 공용 컴포넌트로 추출 후 양쪽에서 사용 |
 
 이슈 메시지 테이블을 일반화하지 않고 채널용 테이블을 새로 만든다. 이슈
 메시지는 `run_id`에 강하게 묶여 있고(아카이브, 워크플로우 이벤트, 첨부
@@ -120,7 +120,7 @@ create table briar_project_agents_new (
 ```
 
 SQLite는 컬럼의 NOT NULL을 제거할 수 없어 테이블 재생성이 필요하다.
-`migrations/0055_agent_provider_opencode.sql:152`가 이미 같은 테이블을
+`apps/briar/migrations/0055_agent_provider_opencode.sql:152`가 이미 같은 테이블을
 동일한 create-copy-drop-rename 패턴으로 재생성했으므로 관례 안에 있다.
 
 영향 범위는 좁다. `briar_project_agents`를 참조하는 FK는
@@ -417,7 +417,7 @@ create table briar_channel_changes (
 디바이스의 프로젝트 바인딩일 뿐이다. 따라서 프로젝트 없는 에이전트도 실행할
 자리가 이미 있다.
 
-`requireWorkerProjectBinding`(`worker/src/index.ts:2317`) 옆에
+`requireWorkerProjectBinding`(`apps/briar/worker/src/index.ts:2317`) 옆에
 `requireWorkerOrganization`을 추가한다. 디바이스 크리덴셜을 검증하고 디바이스
 조직만 확인하며 프로젝트 바인딩은 요구하지 않는다.
 
@@ -429,7 +429,7 @@ create table briar_channel_changes (
 | `project_id is not null` (프로젝트 에이전트) | 위 조건 + 해당 프로젝트에 enabled 바인딩 + 프로젝트 실행 정책 통과 |
 
 두 경우 모두 에이전트의 `provider`를 디바이스가 지원해야 한다. 동시성 제한은
-`migrations/0036_execution_worker_concurrency.sql`이 디바이스 단위로 두고
+`apps/briar/migrations/0036_execution_worker_concurrency.sql`이 디바이스 단위로 두고
 있으므로 그대로 적용된다.
 
 ### 작업 공간
@@ -483,9 +483,9 @@ MVP는 기존 BYO 머신 모델을 유지한다.
 | POST | `/channel-reply-claims` | 워커 평면. `organizationId` + 디바이스 크리덴셜 |
 | POST | `/channel-reply-claims/{id}/lease`, `.../complete` | 리스·완료 |
 
-`wrangler.jsonc`의 `run_worker_first`에 `/channel-reply-claims*`를 추가해야
+`apps/briar/wrangler.jsonc`의 `run_worker_first`에 `/channel-reply-claims*`를 추가해야
 한다. `/organizations*`는 이미 있어 채널 읽기·쓰기 경로는 커버된다.
-`src-cli/worker.ts`의 `workType` 유니온에 `"channelReply"`를 추가하고,
+`apps/briar/src-cli/worker.ts`의 `workType` 유니온에 `"channelReply"`를 추가하고,
 워커 폴링 루프에 조직 스코프 클레임 대상을 하나 더 둔다.
 
 ## 실시간 동기화
@@ -507,7 +507,7 @@ MVP에 넣으면 검증 전에 비용이 커진다. 다만 "채팅이 느리다"
 
 - **컴포넌트 추출**: `IssueConversation`(`HuntDashboard.tsx:6870`),
   `IssueMessageItem`(`:7148`), `MessageComposer`(`:7370`)를
-  `src/components/conversation/`로 옮기고 데이터 소스를 props로 주입한다.
+  `apps/briar/src/components/conversation/`로 옮기고 데이터 소스를 props로 주입한다.
   7951줄 모놀리스에서 떼어내는 이 작업이 프론트엔드 최대 비용이며, 동작
   변경 없는 순수 리팩터로 먼저 끝낸다.
 - **조직 에이전트 관리 UI**: 기존 `ProjectAgents`/`ProjectAgentDetail`이
@@ -517,7 +517,7 @@ MVP에 넣으면 검증 전에 비용이 커진다. 다만 "채팅이 느리다"
 - **Inbox**: `useInbox.ts`의 항목 종류에 `"channel"` 추가. 읽음 상태는
   `briar_inbox_read_states`가 계정 스코프라 메시지 ID만 넣으면 된다.
 - **모바일**: `AGENTS.md` 규칙상 iOS와 Android를 함께 변경해야 한다.
-  `worker/src/mobile-contract.ts`에 채널 스키마를 추가하고 MVP 모바일 범위는
+  `apps/briar/worker/src/mobile-contract.ts`에 채널 스키마를 추가하고 MVP 모바일 범위는
   읽기 + 스레드 답글 + 멘션으로 잡는다.
 
 ## 단계
@@ -563,10 +563,10 @@ MVP에 넣으면 검증 전에 비용이 커진다. 다만 "채팅이 느리다"
 
 ## 검증
 
-- 마이그레이션: `worker/src/migrations.test.ts` 패턴으로 스키마와 백필 검증.
-- DB 계층: `worker/src/db.test.ts` 패턴으로 멘션 검증, 조직/프로젝트 잡의
+- 마이그레이션: `apps/briar/worker/src/migrations.test.ts` 패턴으로 스키마와 백필 검증.
+- DB 계층: `apps/briar/worker/src/db.test.ts` 패턴으로 멘션 검증, 조직/프로젝트 잡의
   클레임 자격 분기, 제안 수락 멱등성.
-- 라우트: `worker/src/index.test.ts` 패턴으로 권한(비멤버 private 접근),
+- 라우트: `apps/briar/worker/src/index.test.ts` 패턴으로 권한(비멤버 private 접근),
   멘션 검증 실패, 디바이스 크리덴셜 클레임, 프로젝트 바인딩 없는 디바이스가
   프로젝트 에이전트 잡을 못 가져가는지.
 - 클라이언트: 추출한 대화 컴포넌트의 기존 테스트가 이슈·채널 양쪽에서 통과.

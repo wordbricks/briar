@@ -60,7 +60,7 @@ set +a
 
 if [[ "$force" != true && -z "$(git status --porcelain --untracked-files=all)" ]]; then
   set +e
-  bun run src-cli/release-impact.ts --base-ref "v${BRIAR_PREVIOUS_VERSION}"
+  bun run apps/briar/src-cli/release-impact.ts --base-ref "v${BRIAR_PREVIOUS_VERSION}"
   impact_status=$?
   set -e
   case "$impact_status" in

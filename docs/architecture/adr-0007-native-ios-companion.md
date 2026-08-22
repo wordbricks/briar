@@ -9,9 +9,9 @@
 
 ## 결정
 
-1. `src-tauri/gen/apple`과 `src-tauri/gen/android`는 기존 Companion 릴리스 경로로 계속 유지한다. 이 ADR에서는 해당 앱의 bundle/application ID, scheme, 빌드 설정을 바꾸지 않는다.
-2. 새 iOS 코드는 `ios/BriarCompanion`의 독립 Xcode 프로젝트로 둔다. 개발 앱은 `app.briar.companion.native.dev`, scheme은 `BriarCompanion-Dev`를 사용한다. 따라서 기존 `app.briar.companion` 앱과 같은 시뮬레이터에 동시에 설치할 수 있다.
-3. 네이티브 앱이 사용하는 서버 경계는 `contracts/mobile/companion.openapi.yaml`에 OpenAPI 3.1 subset으로 명시한다. 첫 subset은 서비스 상태, device authorization 시작/폴링, 현재 사용자, 프로젝트 목록만 포함한다.
+1. `apps/briar/src-tauri/gen/apple`과 `apps/briar/src-tauri/gen/android`는 기존 Companion 릴리스 경로로 계속 유지한다. 이 ADR에서는 해당 앱의 bundle/application ID, scheme, 빌드 설정을 바꾸지 않는다.
+2. 새 iOS 코드는 `apps/briar/ios/BriarCompanion`의 독립 Xcode 프로젝트로 둔다. 개발 앱은 `app.briar.companion.native.dev`, scheme은 `BriarCompanion-Dev`를 사용한다. 따라서 기존 `app.briar.companion` 앱과 같은 시뮬레이터에 동시에 설치할 수 있다.
+3. 네이티브 앱이 사용하는 서버 경계는 `packages/mobile-contracts/companion.openapi.yaml`에 OpenAPI 3.1 subset으로 명시한다. 첫 subset은 서비스 상태, device authorization 시작/폴링, 현재 사용자, 프로젝트 목록만 포함한다.
 4. iOS는 `briar-mobile`, Android는 `briar-android` client ID를 사용하되 응답 모델과 오류 의미는 공유한다. Worker fixture와 계약 테스트가 두 client ID, endpoint, 응답 필수 필드를 함께 검증한다.
 5. API 계약은 추가 방식으로 확장한다. 기존 필드 삭제·이름 변경·의미 변경은 새 계약 버전과 명시적 이행 계획 없이는 허용하지 않는다. 알 수 없는 응답 필드는 모바일 클라이언트가 무시한다.
 6. 모바일 플랫폼 빌드는 필수 `app-worker` signoff와 분리한다. Worker 모바일 계약은 일반 테스트에서 계속 검증하고, 새 SwiftUI App/Unit/UI Test와 기존 Tauri iOS/Android 빌드는 명시적인 `bun run mobile:ci`에서 검사한다.

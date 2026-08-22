@@ -3,7 +3,7 @@ set -euo pipefail
 
 workspace_root="$(cd "$(dirname "$0")/.." && pwd -P)"
 release_env="$workspace_root/config/release.env"
-frontend_root="$workspace_root/dist"
+frontend_root="$workspace_root/apps/briar/dist"
 
 set -a
 # shellcheck disable=SC1090 -- path is resolved from this repository.

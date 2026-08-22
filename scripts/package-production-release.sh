@@ -6,10 +6,10 @@ set -a
 # shellcheck disable=SC1091 -- fixed repository path.
 source "$workspace_root/config/release.env"
 set +a
-bundle_root="${BRIAR_RELEASE_CARGO_TARGET_DIR:-${CARGO_TARGET_DIR:-$workspace_root/src-tauri/target}}/release/bundle"
+bundle_root="${BRIAR_RELEASE_CARGO_TARGET_DIR:-${CARGO_TARGET_DIR:-$workspace_root/apps/briar/src-tauri/target}}/release/bundle"
 artifact_root="$workspace_root/release-artifacts"
 app_path="$bundle_root/macos/Briar.app"
-version="$(bun -e "import config from './src-tauri/tauri.conf.json'; console.log(config.version)" --cwd "$workspace_root")"
+version="$(bun -e "import config from './apps/briar/src-tauri/tauri.conf.json'; console.log(config.version)" --cwd "$workspace_root")"
 base_url="${BRIAR_RELEASE_BASE_URL:?BRIAR_RELEASE_BASE_URL is required}"
 syft_bin="${SYFT_BIN:-syft}"
 
@@ -32,13 +32,13 @@ dmg_path="$(find "$artifact_root" -maxdepth 1 -type f -name 'Briar_*_aarch64.dmg
 xcrun stapler validate "$dmg_path"
 
 "$syft_bin" "dir:$app_path" -o "spdx-json=$artifact_root/briar.spdx.json"
-bun run "$workspace_root/src-cli/production-release.ts" metadata \
+bun run "$workspace_root/apps/briar/src-cli/production-release.ts" metadata \
   --root "$artifact_root" \
   --version "$version" \
   --base-url "$base_url"
 
-bun run tauri signer sign "$artifact_root/provenance.intoto.jsonl"
-bun run tauri signer sign "$artifact_root/briar.spdx.json"
+bun --cwd apps/briar tauri signer sign "$artifact_root/provenance.intoto.jsonl"
+bun --cwd apps/briar tauri signer sign "$artifact_root/briar.spdx.json"
 
 (
   cd "$artifact_root"

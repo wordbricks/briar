@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 
 export type IOSImplementation = "tauri" | "native";
 export type IOSReleaseChannel = "internal" | "production";
@@ -21,6 +21,11 @@ export type IOSReleaseConfig = {
 
 const implementations = new Set<IOSImplementation>(["tauri", "native"]);
 const semanticVersion = /^\d+\.\d+\.\d+$/;
+const repositoryRoot = resolve(import.meta.dir, "..");
+
+function resolveRepositoryPath(path: string) {
+  return isAbsolute(path) ? path : resolve(repositoryRoot, path);
+}
 
 const fail = (message: string): never => {
   throw new Error(`[ios-release-config] ${message}`);
@@ -121,16 +126,24 @@ function argumentValue(args: string[], name: string) {
 
 export function main(args = process.argv.slice(2)) {
   const command = args[0];
-  const configPath = resolve(
+  const configPath = resolveRepositoryPath(
     argumentValue(args, "--config") ?? process.env.BRIAR_IOS_RELEASE_CONFIG ?? "config/ios-release.json",
   );
   const config = readConfig(configPath);
 
   if (command === "verify") {
-    if (!existsSync(resolve("ios/BriarCompanion/App/SessionStore.swift"))) {
+    if (
+      !existsSync(
+        resolveRepositoryPath("apps/briar/ios/BriarCompanion/App/SessionStore.swift"),
+      )
+    ) {
       fail("Native session migration source is missing.");
     }
-    if (!existsSync(resolve("src-tauri/gen/apple/project.yml"))) {
+    if (
+      !existsSync(
+        resolveRepositoryPath("apps/briar/src-tauri/gen/apple/project.yml"),
+      )
+    ) {
       fail("Tauri iOS rollback source is missing.");
     }
     process.stdout.write(`${JSON.stringify(config)}\n`);

@@ -1,10 +1,16 @@
 node_modules
+.turbo
 dist
 dist-cli
 dist-agent
 dist-worker
+apps/briar/dist
+apps/briar/dist-cli
+apps/briar/dist-agent
+apps/briar/dist-worker
 release-artifacts
 src-tauri/binaries/bun-*
+apps/briar/src-tauri/binaries/bun-*
 .env
 .env.local
 .env.tmp
@@ -16,3 +22,4 @@ src-tauri/binaries/bun-*
 .wrangler
 *.cpuprofile
 src-tauri/target
+apps/briar/src-tauri/target

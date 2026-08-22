@@ -91,9 +91,12 @@ RUN rustup component add --toolchain 1.96.0 rustfmt clippy
 
 WORKDIR /opt/briar/cache-source
 COPY package.json bun.lock ./
-COPY src-tauri/Cargo.toml src-tauri/Cargo.lock ./src-tauri/
-COPY src-tauri/build.rs ./src-tauri/build.rs
-COPY src-tauri/src/lib.rs ./src-tauri/src/lib.rs
+COPY apps/briar/package.json ./apps/briar/package.json
+COPY apps/landing/package.json ./apps/landing/package.json
+COPY packages/mobile-contracts/package.json ./packages/mobile-contracts/package.json
+COPY apps/briar/src-tauri/Cargo.toml apps/briar/src-tauri/Cargo.lock ./apps/briar/src-tauri/
+COPY apps/briar/src-tauri/build.rs ./apps/briar/src-tauri/build.rs
+COPY apps/briar/src-tauri/src/lib.rs ./apps/briar/src-tauri/src/lib.rs
 
 RUN bun --version | grep -Fx "${BUN_VERSION}" \
   && node --version | grep -Fx "v${NODE_VERSION}" \
@@ -103,7 +106,7 @@ RUN bun --version | grep -Fx "${BUN_VERSION}" \
   && bun install --frozen-lockfile --ignore-scripts \
   && bun audit --audit-level high --ignore GHSA-f88m-g3jw-g9cj \
   && sha256sum bun.lock > /opt/briar/audited-bun-lock.sha256 \
-  && cargo fetch --locked --manifest-path src-tauri/Cargo.toml
+  && cargo fetch --locked --manifest-path apps/briar/src-tauri/Cargo.toml
 
 RUN git init --quiet /opt/briar/cargo/advisory-db \
   && git -C /opt/briar/cargo/advisory-db remote add origin \
@@ -115,7 +118,7 @@ RUN git init --quiet /opt/briar/cargo/advisory-db \
   && rm -f /opt/briar/cargo/advisory-db/.git/FETCH_HEAD \
   && git -C /opt/briar/cargo/advisory-db reflog expire --expire=now --all \
   && git -C /opt/briar/cargo/advisory-db gc --prune=now \
-  && cargo audit --no-fetch --stale --file src-tauri/Cargo.lock
+  && cargo audit --no-fetch --stale --file apps/briar/src-tauri/Cargo.lock
 
 RUN chmod -R a+rX /opt/briar \
   && find /opt/briar -type d -exec chmod a-w {} + \

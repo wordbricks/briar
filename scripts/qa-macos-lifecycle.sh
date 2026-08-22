@@ -85,7 +85,7 @@ verify_artifact_directory() {
   fi
   (cd "$directory" && shasum -a 256 --check SHA256SUMS)
   if [[ -f "$directory/release-manifest.json" ]]; then
-    bun run "$workspace_root/src-cli/release-manifest.ts" verify --root "$directory"
+    bun run "$workspace_root/apps/briar/src-cli/release-manifest.ts" verify --root "$directory"
   elif [[ "$require_manifest" == "true" ]]; then
     echo "Candidate is missing release-manifest.json." >&2
     exit 1

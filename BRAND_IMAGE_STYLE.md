@@ -7,9 +7,9 @@ distinctive.
 
 Reference images:
 
-- Dark: [`src/assets/onboarding-eve-issue.png`](src/assets/onboarding-eve-issue.png)
-- Dark portrait: [`src/assets/onboarding-prerequisites.png`](src/assets/onboarding-prerequisites.png)
-- Light portrait: [`src/assets/onboarding-prerequisites-light.png`](src/assets/onboarding-prerequisites-light.png)
+- Dark: [`apps/briar/src/assets/onboarding-eve-issue.png`](apps/briar/src/assets/onboarding-eve-issue.png)
+- Dark portrait: [`apps/briar/src/assets/onboarding-prerequisites.png`](apps/briar/src/assets/onboarding-prerequisites.png)
+- Light portrait: [`apps/briar/src/assets/onboarding-prerequisites-light.png`](apps/briar/src/assets/onboarding-prerequisites-light.png)
 
 ## Core Idea
 
