@@ -1426,7 +1426,7 @@ describe("organization channels", () => {
     await createChannelMessage(db, {
       id: agentReplyId,
       channelId,
-      parentMessageId: triggerId,
+      parentMessageId: null,
       authorUserId: null,
       authorAgentId: agent!.id,
       authorAgentName: agent!.name,
@@ -1574,7 +1574,7 @@ describe("organization channels", () => {
     expect(claimPayload.work.snapshot.messages).toHaveLength(2);
     expect(claimPayload.work.snapshot.messages[1]).toMatchObject({
       id: agentReplyId,
-      parentMessageId: triggerId,
+      parentMessageId: null,
       author: { type: "agent", id: agent!.id, name: "Honey" },
       body: "I can write that plan.",
     });
@@ -1766,6 +1766,12 @@ describe("organization channels", () => {
 
     const reply = await getChannelMessage(db, channelId, claimed!.reply_message_id);
     expect(reply?.author).toMatchObject({ type: "agent", name: "Honey" });
+    expect(reply?.parentMessageId).toBeNull();
+    await expect(listChannelRootMessages(db, channelId)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: claimed!.reply_message_id }),
+      ]),
+    );
     // A plan document with no project stays organization-wide until a member
     // decides where the work belongs.
     expect(reply?.document).toMatchObject({
@@ -1829,11 +1835,25 @@ describe("organization channels", () => {
       addedByUserId: ownerId,
       createdAt: at(70),
     });
+    const threadRootId = "f0000000-0000-4000-8000-000000000069";
+    await createChannelMessage(db, {
+      id: threadRootId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Show me modal examples",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(70),
+    });
     const triggerId = "f0000000-0000-4000-8000-000000000070";
     await createChannelMessage(db, {
       id: triggerId,
       channelId,
-      parentMessageId: null,
+      parentMessageId: threadRootId,
       authorUserId: ownerId,
       authorAgentId: null,
       authorAgentName: null,
@@ -1847,7 +1867,7 @@ describe("organization channels", () => {
       organizationId,
       channelId,
       triggerMessageId: triggerId,
-      parentMessageId: triggerId,
+      parentMessageId: threadRootId,
       agents: [{ id: agent!.id, projectId: null, provider: "claude" }],
       createdAt: at(71),
     });
@@ -1902,6 +1922,15 @@ describe("organization channels", () => {
       channelId,
       claimed!.reply_message_id,
     );
+    expect(reply?.parentMessageId).toBe(threadRootId);
+    expect(
+      (await listChannelThreadMessages(db, channelId, threadRootId)).map(
+        (message) => message.id,
+      ),
+    ).toContain(claimed!.reply_message_id);
+    expect(
+      (await listChannelRootMessages(db, channelId)).map((message) => message.id),
+    ).not.toContain(claimed!.reply_message_id);
     expect(reply?.attachments).toEqual([{
       id: attachmentId,
       filename: "screenshot.png",
