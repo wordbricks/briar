@@ -801,7 +801,7 @@ export function detachedIssueReplyPrompt(input: {
   return [
     `You are ${input.agent.name}. A user mentioned you in an issue conversation. Answer that user directly and concisely.`,
     input.workspaceAvailable && input.workspaceShared
-      ? "The existing issue-processing worktree is available and is shared with the Worker currently handling this issue. Inspect its live, including uncommitted, files to answer accurately. This is a read-only conversation: do not edit files, create commits, install dependencies, or run mutating commands."
+      ? "The existing issue-processing worktree is available and is shared with the Worker currently handling this issue. It has the same shell, network, browser, and filesystem permissions as the project Worker. Inspect its live, including uncommitted, files and use the commands or tools needed to complete the user's request accurately. Changes affect the live issue worktree."
       : input.workspaceAvailable
         ? "A disposable project worktree is available with the same shell, network, browser, and filesystem permissions as a project Worker. Inspect it and run the commands or tools needed to answer accurately. Local worktree changes are discarded after this reply."
       : "The issue's worktree is unavailable. Answer from the durable server snapshot and the connected repository context that is available; clearly qualify anything the snapshot cannot establish.",
