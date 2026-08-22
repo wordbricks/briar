@@ -27,6 +27,7 @@ import {
   countExecutionWorkerDeviceSessions,
   completeExecutionWorkerUpdates,
   countLeasedRuns,
+  deleteExecutionWorker,
   disableExecutionWorker,
   dispatchHuntRun,
   executionWorkerBindingForProject,
@@ -1938,6 +1939,84 @@ describe("detached execution workers", () => {
     expect((await listExecutionWorkers(db, projectId, atMinute(6)))[0].state).toBe(
       "disabled",
     );
+  });
+
+  it("permanently deletes an idle Worker and its pending update", async () => {
+    const registered = await register("deleted");
+    await bindExecutionWorkerProject(db, secondProjectId, {
+      id: "worker-deleted-second-project",
+      organizationId: projectId,
+      ownerUserId: "owner",
+      deviceIdentityHash: fingerprint("deleted"),
+      agentProvider: "codex",
+      versions: { briar: "1.2.69" },
+      observedAt: atMinute(2),
+    });
+    await requestExecutionWorkerUpdate(db, {
+      id: "77777777-7777-4777-8777-777777777779",
+      organizationId: projectId,
+      deviceId: registered.device.id,
+      requestedByUserId: "owner",
+      targetVersion: "1.2.84",
+      requestedAt: atMinute(3),
+    });
+
+    await expect(
+      deleteExecutionWorker(db, registered.device.id, atMinute(4)),
+    ).resolves.toBe(true);
+    await expect(
+      authenticateExecutionWorker(
+        db,
+        fingerprint("token-deleted"),
+        atMinute(5),
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      executionWorkerBindingForProject(db, registered.device.id, projectId),
+    ).resolves.toBeNull();
+    await expect(
+      executionWorkerBindingForProject(
+        db,
+        registered.device.id,
+        secondProjectId,
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      pendingExecutionWorkerUpdate(db, registered.device.id),
+    ).resolves.toBeNull();
+    await expect(
+      listOrganizationExecutionWorkers(db, projectId, atMinute(5)),
+    ).resolves.toEqual([]);
+  });
+
+  it("disables but does not delete a Worker with an active session", async () => {
+    const registered = await register("delete-active");
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("delete-active", 2),
+    );
+    await claimNextQueuedHuntRun(db, projectId, {
+      runId,
+      claimTokenHash: fingerprint("delete-active-claim"),
+      claimedBy: registered.worker.label,
+      claimedAt: atMinute(3),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(3)),
+      workerId: registered.worker.id,
+      workerDeviceId: registered.device.id,
+    });
+
+    await expect(
+      deleteExecutionWorker(db, registered.device.id, atMinute(4)),
+    ).rejects.toThrow("active sessions");
+    await expect(
+      listOrganizationExecutionWorkers(db, projectId, atMinute(4)),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        deviceId: registered.device.id,
+        state: "disabled",
+      }),
+    ]);
   });
 
   it("reports a worker as stale once heartbeats stop", async () => {

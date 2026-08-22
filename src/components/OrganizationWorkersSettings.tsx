@@ -13,11 +13,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { SettingsAlert, SettingsPageHeader } from "@/components/settings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import {
-  disableOrganizationExecutionWorker,
+  deleteOrganizationExecutionWorker,
   loadOrganizationExecutionWorkers,
   requestOrganizationExecutionWorkerUpdate,
   updateOrganizationExecutionWorkerConcurrency,
@@ -104,6 +112,8 @@ export function OrganizationWorkersSettings({
   const [loading, setLoading] = useState(true);
   const [savingProjectId, setSavingProjectId] = useState<string | null>(null);
   const [savingDeviceId, setSavingDeviceId] = useState<string | null>(null);
+  const [deleteCandidate, setDeleteCandidate] =
+    useState<OrganizationExecutionWorker | null>(null);
   const [editingIconDeviceId, setEditingIconDeviceId] = useState<string | null>(
     null,
   );
@@ -171,14 +181,9 @@ export function OrganizationWorkersSettings({
     }
   };
 
-  const disableDevice = async (device: OrganizationExecutionWorker) => {
-    if (
-      !window.confirm(
-        t("organization.workersDisableConfirm", { name: device.label }),
-      )
-    ) {
-      return;
-    }
+  const deleteDevice = async () => {
+    const device = deleteCandidate;
+    if (!device) return;
     setSavingDeviceId(device.deviceId);
     setError(null);
     try {
@@ -186,18 +191,15 @@ export function OrganizationWorkersSettings({
         for (const status of localStatuses.filter(
           (candidate) => candidate.registered,
         )) {
-          await configureLocalExecutionWorker(
-            status.projectId,
-            token,
-            false,
-          );
+          await configureLocalExecutionWorker(status.projectId, token, false);
         }
       }
-      await disableOrganizationExecutionWorker(
+      await deleteOrganizationExecutionWorker(
         token,
         organization.id,
         device.deviceId,
       );
+      setDeleteCandidate(null);
       await refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -549,12 +551,15 @@ export function OrganizationWorkersSettings({
                           value={String(worker.maxConcurrentSessions)}
                         />
                         <Button
-                          aria-label={t("organization.workersDisable", {
+                          aria-label={t("organization.workersDelete", {
                             name: worker.label,
                           })}
                           className="text-muted-foreground hover:text-destructive"
                           disabled={savingDeviceId === worker.deviceId}
-                          onClick={() => void disableDevice(worker)}
+                          onClick={() => {
+                            setError(null);
+                            setDeleteCandidate(worker);
+                          }}
                           size="icon-sm"
                           type="button"
                           variant="ghost"
@@ -732,6 +737,59 @@ export function OrganizationWorkersSettings({
           </div>
         )}
       </section>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !savingDeviceId) setDeleteCandidate(null);
+        }}
+        open={deleteCandidate !== null}
+      >
+        <DialogContent className="sm:max-w-md" showClose={!savingDeviceId}>
+          <DialogHeader>
+            <div className="mb-2 grid size-10 place-items-center rounded-xl bg-destructive/10 text-destructive">
+              <Trash2 aria-hidden="true" size={20} strokeWidth={1.8} />
+            </div>
+            <DialogTitle>
+              {deleteCandidate
+                ? t("organization.workersDelete", {
+                    name: deleteCandidate.label,
+                  })
+                : null}
+            </DialogTitle>
+            <DialogDescription>
+              {deleteCandidate
+                ? t("organization.workersDeleteConfirm", {
+                    name: deleteCandidate.label,
+                  })
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          {error ? (
+            <p className="text-xs text-destructive" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              disabled={Boolean(savingDeviceId)}
+              onClick={() => setDeleteCandidate(null)}
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              disabled={Boolean(savingDeviceId)}
+              onClick={() => void deleteDevice()}
+              type="button"
+              variant="destructive"
+            >
+              {savingDeviceId ? <Spinner size={15} /> : <Trash2 size={15} />}
+              {t("organization.workersDeleteAction")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

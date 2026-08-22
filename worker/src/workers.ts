@@ -1363,6 +1363,47 @@ export async function disableExecutionWorker(
   return (results[0]?.meta.changes ?? 0) > 0;
 }
 
+/**
+ * Permanently remove an idle organization Worker and its project bindings.
+ *
+ * Disable first so a concurrent request cannot claim new work while deletion
+ * waits for already-issued leases to drain. Device foreign keys cascade the
+ * credential, project bindings, update requests, and update handoffs; durable
+ * run and audit references use `on delete set null` and remain readable.
+ */
+export async function deleteExecutionWorker(
+  db: D1Database,
+  deviceId: string,
+  observedAt: string,
+) {
+  if (!(await disableExecutionWorker(db, deviceId, observedAt))) return false;
+  if ((await countExecutionWorkerDeviceSessions(db, deviceId, observedAt)) > 0) {
+    throw new WorkerConflictError(
+      "Worker has active sessions; wait for them to finish before deleting it",
+    );
+  }
+  const deleted = await db
+    .prepare(
+      `delete from briar_execution_worker_devices
+       where id = ?
+         and not exists (${executionWorkerDeviceSessionsQuery})`,
+    )
+    .bind(
+      deviceId,
+      ...executionWorkerDeviceSessionBindings(deviceId, observedAt),
+    )
+    .run();
+  if (deleted.meta.changes > 0) return true;
+  const existing = await db
+    .prepare(`select 1 from briar_execution_worker_devices where id = ?`)
+    .bind(deviceId)
+    .first<number>();
+  if (!existing) return false;
+  throw new WorkerConflictError(
+    "Worker has active sessions; wait for them to finish before deleting it",
+  );
+}
+
 /** Remove one project binding; revoke the device only after its last binding. */
 export async function unbindExecutionWorker(
   db: D1Database,
@@ -2691,15 +2732,7 @@ export async function listExecutionAuditEvents(
   return result.results ?? [];
 }
 
-/** Return all live Worker leases on one device, including reply work. */
-export async function countExecutionWorkerDeviceSessions(
-  db: D1Database,
-  deviceId: string,
-  observedAt: string,
-) {
-  const row = await db
-    .prepare(
-      `select count(*) as active_sessions from (
+const executionWorkerDeviceSessionsQuery = `
          select run.id
          from briar_hunt_runs run
          join briar_execution_workers worker on worker.id = run.worker_id
@@ -2742,20 +2775,36 @@ export async function countExecutionWorkerDeviceSessions(
            on worker.id = reply.claimed_worker_id
          where worker.device_id = ? and reply.status = 'running'
            and reply.lease_expires_at > ?
-       ) active_work`,
+`;
+
+const executionWorkerDeviceSessionBindings = (
+  deviceId: string,
+  observedAt: string,
+) => [
+  deviceId,
+  observedAt,
+  deviceId,
+  observedAt,
+  deviceId,
+  observedAt,
+  deviceId,
+  observedAt,
+  deviceId,
+  observedAt,
+];
+
+/** Return all live Worker leases on one device, including reply work. */
+export async function countExecutionWorkerDeviceSessions(
+  db: D1Database,
+  deviceId: string,
+  observedAt: string,
+) {
+  const row = await db
+    .prepare(
+      `select count(*) as active_sessions
+       from (${executionWorkerDeviceSessionsQuery}) active_work`,
     )
-    .bind(
-      deviceId,
-      observedAt,
-      deviceId,
-      observedAt,
-      deviceId,
-      observedAt,
-      deviceId,
-      observedAt,
-      deviceId,
-      observedAt,
-    )
+    .bind(...executionWorkerDeviceSessionBindings(deviceId, observedAt))
     .first<{ active_sessions: number }>();
   return row?.active_sessions ?? 0;
 }
