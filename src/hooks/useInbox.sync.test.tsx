@@ -120,6 +120,7 @@ function Harness({
     inbox.notificationBaselineId,
     null,
     null,
+    null,
     inbox.initialSyncComplete,
   );
   return null;
@@ -408,6 +409,78 @@ describe("useInbox read-state synchronization", () => {
       });
       expect(mockedLoadInboxFeed).toHaveBeenCalledTimes(2);
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("refreshes subscribed thread notifications while the app is hidden", async () => {
+    vi.useFakeTimers();
+    const realtime = new FakeRealtimeTransport();
+    let hidden: { mockRestore(): void } | null = null;
+    let visibility: { mockRestore(): void } | null = null;
+    try {
+      window.localStorage.setItem(
+        "briar.settings.inbox-notifications.v1",
+        JSON.stringify({
+          urgent: false,
+          action_required: true,
+          important: false,
+          activity: false,
+        }),
+      );
+      await renderHarness({
+        dashboard: dashboardAt(1),
+        realtime,
+        token: "token-a",
+        userId: "user-a",
+      });
+      await flushPromises();
+      expect(realtime.start).toHaveBeenCalledOnce();
+      hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+      visibility = vi.spyOn(document, "visibilityState", "get")
+        .mockReturnValue("hidden");
+
+      mockedLoadInboxFeed.mockResolvedValueOnce({
+        state: { etag: 'W/"organization-inbox:org:2"' },
+        notModified: false,
+        messages: [{
+          id: "channel:subscribed-thread-reply",
+          kind: "channel",
+          projectId: demoDashboard.project.id,
+          projectName: demoDashboard.project.name,
+          targetId: "channel-product",
+          channelId: "channel-product",
+          channelName: "product",
+          messageId: "subscribed-thread-reply",
+          rootMessageId: "webhook-root",
+          title: "product",
+          occurredAt: "2026-08-11T00:00:02.000Z",
+          version: "subscribed-thread-reply",
+          body: "Agent reply for this thread",
+          authorName: "Developer",
+          authorImage: null,
+          reason: "subscription",
+        }],
+      });
+
+      realtime.emit({ topic: "inbox", version: 2 });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      await flushPromises();
+
+      expect(realtime.stop).not.toHaveBeenCalled();
+      expect(mockedLoadInboxFeed).toHaveBeenCalledTimes(2);
+      expect(mockedSendInboxNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "channel:subscribed-thread-reply",
+          reason: "subscription",
+        }),
+        expect.any(String),
+      );
+    } finally {
+      hidden?.mockRestore();
+      visibility?.mockRestore();
       vi.useRealTimers();
     }
   });

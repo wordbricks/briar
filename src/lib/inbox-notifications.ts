@@ -429,7 +429,7 @@ export async function sendInboxNotification(
     if (!(await isPermissionGranted())) return false;
     const id = inboxNotificationId(message.id);
     storeNotificationTarget(id, target);
-    sendNotification({
+    await sendNotification({
       id,
       title,
       body,

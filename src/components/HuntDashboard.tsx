@@ -5290,18 +5290,62 @@ export function RunPage({
       <span>{executionIdentityText}</span>
     </span>
   ) : null;
+  const executionCostModels = executionCostEstimate?.models ?? [];
+  const executionTokenBreakdownRows = executionMetrics
+    ? (
+        [
+          executionMetrics.inputTokens != null
+            ? {
+                key: "input",
+                label: t("run.metricsInputTokens"),
+                value: formatExecutionTokens(
+                  executionMetrics.inputTokens,
+                  localeTag,
+                ),
+              }
+            : null,
+          executionMetrics.outputTokens != null
+            ? {
+                key: "output",
+                label: t("run.metricsOutputTokens"),
+                value: formatExecutionTokens(
+                  executionMetrics.outputTokens,
+                  localeTag,
+                ),
+              }
+            : null,
+          cacheTokens > 0
+            ? {
+                key: "cache",
+                label: t("run.metricsCacheTokens"),
+                value: formatExecutionTokens(cacheTokens, localeTag),
+              }
+            : null,
+          (executionMetrics.reasoningOutputTokens ?? 0) > 0
+            ? {
+                key: "reasoning",
+                label: t("run.metricsReasoningTokens"),
+                value: formatExecutionTokens(
+                  executionMetrics.reasoningOutputTokens!,
+                  localeTag,
+                ),
+              }
+            : null,
+        ] as const
+      ).filter((row): row is NonNullable<typeof row> => row !== null)
+    : [];
   const executionMetricsPanel =
     executionMetrics || executionProvider || executionWorker ? (
-    <>
+    <TooltipProvider delayDuration={200}>
     <dl className="run-result-metrics" aria-label={t("run.resultMetrics")}>
       {executionMetrics ? (
-        <div>
+        <div className="run-metric">
           <dt>{t("run.metricsDuration")}</dt>
           <dd>{formatExecutionDuration(executionMetrics.durationMs)}</dd>
         </div>
       ) : null}
       {executionProvider ? (
-        <div>
+        <div className="run-metric">
           <dt>{t("run.metricsProvider")}</dt>
           <dd className="run-result-metrics-provider">
             <AgentProviderIcon provider={executionProvider} size={13} />
@@ -5310,7 +5354,7 @@ export function RunPage({
         </div>
       ) : null}
       {executionProvider && executionModelText ? (
-        <div>
+        <div className="run-metric">
           <dt>{t("run.metricsModel")}</dt>
           <dd title={executionModels.join(" · ")}>
             {executionModelText}
@@ -5318,7 +5362,7 @@ export function RunPage({
         </div>
       ) : null}
       {executionWorker ? (
-        <div>
+        <div className="run-metric">
           <dt>{t("run.metricsWorker")}</dt>
           <dd className="run-result-metrics-provider">
             <WorkerIcon icon={executionWorker.icon} size={14} />
@@ -5328,143 +5372,106 @@ export function RunPage({
       ) : null}
       {executionMetrics ? (
         executionMetrics.totalTokens === null ? (
-          <div>
+          <div className="run-metric">
             <dt>{t("run.metricsTotalTokens")}</dt>
             <dd>{t("run.metricsTokensUnavailable")}</dd>
           </div>
         ) : (
-          <div>
-            <dt>{t("run.metricsTotalTokens")}</dt>
-            <dd title={new Intl.NumberFormat(localeTag).format(executionMetrics.totalTokens)}>
-              {formatExecutionTokens(executionMetrics.totalTokens, localeTag)}
-            </dd>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                aria-label={`${t("run.metricsTotalTokens")} ${formatExecutionTokens(executionMetrics.totalTokens, localeTag)}`}
+                className="run-metric run-metric-hover"
+                tabIndex={0}
+              >
+                <dt>{t("run.metricsTotalTokens")}</dt>
+                <dd>
+                  {formatExecutionTokens(executionMetrics.totalTokens, localeTag)}
+                </dd>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="run-result-metrics-tooltip">
+              <ul>
+                {executionTokenBreakdownRows.map((row) => (
+                  <li key={row.key}>
+                    <span>{row.label}</span>
+                    <strong>{row.value}</strong>
+                  </li>
+                ))}
+              </ul>
+            </TooltipContent>
+          </Tooltip>
         )
       ) : null}
-      {executionMetrics?.inputTokens != null ? (
-        <div>
-          <dt>{t("run.metricsInputTokens")}</dt>
-          <dd>{formatExecutionTokens(executionMetrics.inputTokens, localeTag)}</dd>
-        </div>
-      ) : null}
-      {executionMetrics?.outputTokens != null ? (
-        <div>
-          <dt>{t("run.metricsOutputTokens")}</dt>
-          <dd>{formatExecutionTokens(executionMetrics.outputTokens, localeTag)}</dd>
-        </div>
-      ) : null}
-      {executionMetrics && cacheTokens > 0 ? (
-        <div>
-          <dt>{t("run.metricsCacheTokens")}</dt>
-          <dd>{formatExecutionTokens(cacheTokens, localeTag)}</dd>
-        </div>
-      ) : null}
-      {executionMetrics && (executionMetrics.reasoningOutputTokens ?? 0) > 0 ? (
-        <div>
-          <dt>{t("run.metricsReasoningTokens")}</dt>
-          <dd>
-            {formatExecutionTokens(
-              executionMetrics.reasoningOutputTokens!,
-              localeTag,
-            )}
-          </dd>
-        </div>
-      ) : null}
       {executionCostEstimate && executionCostEstimate.pricedUsageRecords > 0 ? (
-        <div className="run-result-metrics-cost">
-          <dt>
-            {executionCostEstimate.status === "estimated"
-              ? t("run.metricsEstimatedCost")
-              : t("run.metricsPartialEstimatedCost")}
-          </dt>
-          <dd>
-            {executionCostEstimate.status === "partial" ? "≥ " : ""}
-            {formatExecutionUsdTicks(
-              executionCostEstimate.estimatedUsdTicks ??
-                executionCostEstimate.pricedUsdTicks,
-              localeTag,
-            )}
-          </dd>
-        </div>
+        (() => {
+          const costChip = (
+            <div
+              className={`run-metric run-result-metrics-cost${executionCostModels.length > 0 ? " run-metric-hover" : ""}`}
+              tabIndex={executionCostModels.length > 0 ? 0 : undefined}
+            >
+              <dt>
+                {executionCostEstimate.status === "estimated"
+                  ? t("run.metricsEstimatedCost")
+                  : t("run.metricsPartialEstimatedCost")}
+              </dt>
+              <dd>
+                {executionCostEstimate.status === "partial" ? "≥ " : ""}
+                {formatExecutionUsdTicks(
+                  executionCostEstimate.estimatedUsdTicks ??
+                    executionCostEstimate.pricedUsdTicks,
+                  localeTag,
+                )}
+              </dd>
+            </div>
+          );
+          if (executionCostModels.length === 0) return costChip;
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>{costChip}</TooltipTrigger>
+              <TooltipContent className="run-result-metrics-tooltip">
+                {executionCostModels.map((model) => (
+                  <div
+                    className="run-result-metrics-tooltip-model"
+                    key={`${model.pricingKey}:${model.model}`}
+                    title={model.pricingKey}
+                  >
+                    <span className="run-result-metrics-tooltip-model-name">
+                      {model.model}
+                    </span>
+                    <span className="run-result-metrics-tooltip-model-rates">
+                      <span>
+                        {t("run.inputRate")}{" "}
+                        <strong>
+                          {t("run.ratePerMillion", {
+                            price: formatRatePerMillion(
+                              model.inputCostPerToken,
+                              localeTag,
+                            ),
+                          })}
+                        </strong>
+                      </span>
+                      <span>
+                        {t("run.outputRate")}{" "}
+                        <strong>
+                          {t("run.ratePerMillion", {
+                            price: formatRatePerMillion(
+                              model.outputCostPerToken,
+                              localeTag,
+                            ),
+                          })}
+                        </strong>
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </TooltipContent>
+            </Tooltip>
+          );
+        })()
       ) : null}
     </dl>
-    {executionCostEstimate ? (
-      <section className="run-cost-estimate" aria-label={t("run.currentModelRates")}>
-        <div className="run-cost-estimate-heading">
-          <strong>{t("run.currentModelRates")}</strong>
-          <span>
-            {executionCostEstimate.pricing.status === "unavailable"
-              ? t("usage.pricingUnavailable")
-              : t(
-                  executionCostEstimate.pricing.status === "live"
-                    ? "usage.pricingLive"
-                    : "usage.pricingCached",
-                  {
-                    time: executionCostEstimate.pricing.fetchedAt
-                      ? new Intl.DateTimeFormat(localeTag, {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        }).format(
-                          new Date(executionCostEstimate.pricing.fetchedAt),
-                        )
-                      : t("usage.pricingTimeUnknown"),
-                  },
-                )}
-          </span>
-        </div>
-        {executionCostEstimate.models.length > 0 ? (
-          <div className="run-cost-estimate-models">
-            {executionCostEstimate.models.map((model) => (
-              <div className="run-cost-estimate-model" key={`${model.pricingKey}:${model.model}`}>
-                <span className="run-cost-estimate-model-name" title={model.pricingKey}>
-                  {model.model}
-                </span>
-                <span>
-                  {t("run.inputRate")}{" "}
-                  <strong>
-                    {t("run.ratePerMillion", {
-                      price: formatRatePerMillion(
-                        model.inputCostPerToken,
-                        localeTag,
-                      ),
-                    })}
-                  </strong>
-                </span>
-                <span>
-                  {t("run.outputRate")}{" "}
-                  <strong>
-                    {t("run.ratePerMillion", {
-                      price: formatRatePerMillion(
-                        model.outputCostPerToken,
-                        localeTag,
-                      ),
-                    })}
-                  </strong>
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p>
-            {executionCostEstimate.reason === "pricingUnavailable"
-              ? t("usage.costUnavailableNote")
-              : executionCostEstimate.reason === "usageUnavailable"
-                ? t("run.costEstimateUsageUnavailable")
-                : executionCostEstimate.reason === "tokenBreakdownUnavailable"
-                  ? t("run.costEstimateBreakdownUnavailable")
-                  : t("run.costEstimateUnavailable")}
-          </p>
-        )}
-        {executionCostEstimate.status !== "unavailable" ? (
-          <small>
-            {executionCostEstimate.status === "partial"
-              ? t("run.costEstimatePartial")
-              : t("run.costEstimateCacheNote")}
-          </small>
-        ) : null}
-      </section>
-    ) : null}
-  </>
+    </TooltipProvider>
   ) : null;
   const blockerReason =
     run.structuredResult?.summary?.trim() ||

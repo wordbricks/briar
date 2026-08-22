@@ -18,6 +18,7 @@ import worker, {
   projectMutationProject,
   projectScheduleClaimMutation,
   readChannelReplyCompleteRequest,
+  readIssueReplyCompleteRequest,
   readIssueRequest,
   readRunEvidenceRequest,
   readTranscriptRequest,
@@ -98,6 +99,10 @@ const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
     resumed: 0,
     alreadyResumed: 0,
     deferred: 0,
+  })),
+  reconcileManagedComputers: vi.fn(async () => ({
+    skipped: true as const,
+    reason: "not_configured" as const,
   })),
 });
 
@@ -1690,6 +1695,58 @@ describe("Worker HTTP contract", () => {
     );
     expect(parsed.attachments).toEqual([]);
     expect(parsed.input.result).toMatchObject({ body: "Answer" });
+  });
+
+  it("parses issue reply images from the shared multipart completion contract", async () => {
+    const complete = {
+      projectId: "11111111-1111-4111-8111-111111111111",
+      workerId: "worker-1",
+      claimToken: `briar_reply_claim_${"a".repeat(64)}`,
+      body: "Here is the generated mockup.",
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+    };
+    const form = new FormData();
+    form.append("complete", JSON.stringify(complete));
+    form.append(
+      "attachments",
+      new File([new Uint8Array([137, 80, 78, 71])], "mockup.png", {
+        type: "image/png",
+      }),
+    );
+
+    const parsed = await readIssueReplyCompleteRequest(
+      new Request("https://briar-api.example/issue-reply-claims/job/complete", {
+        method: "POST",
+        headers: { "Content-Length": "2048" },
+        body: form,
+      }),
+    );
+
+    expect(parsed.input).toMatchObject(complete);
+    expect(parsed.attachments).toHaveLength(1);
+    expect(parsed.attachments[0]).toMatchObject({
+      name: "mockup.png",
+      type: "image/png",
+    });
+  });
+
+  it("keeps JSON issue reply completion compatible without images", async () => {
+    const parsed = await readIssueReplyCompleteRequest(
+      new Request("https://briar-api.example/issue-reply-claims/job/complete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          projectId: "11111111-1111-4111-8111-111111111111",
+          workerId: "worker-1",
+          claimToken: `briar_reply_claim_${"b".repeat(64)}`,
+          body: "Answer",
+        }),
+      }),
+    );
+    expect(parsed.attachments).toEqual([]);
+    expect(parsed.input.body).toBe("Answer");
   });
 
   it("rejects a failed channel reply that also includes images", async () => {

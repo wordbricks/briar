@@ -2,6 +2,20 @@
  * Vitest setup for Node 25+ environments where experimental localStorage can
  * shadow jsdom's Storage implementation (clear/setItem become non-functions).
  */
+import { vi } from "vitest";
+
+vi.mock("cloudflare:workers", () => ({
+  WorkflowEntrypoint: class<Environment> {
+    protected env: Environment;
+    protected ctx: unknown;
+
+    constructor(ctx: unknown, env: Environment) {
+      this.ctx = ctx;
+      this.env = env;
+    }
+  },
+}));
+
 function createMemoryStorage(): Storage {
   const values = new Map<string, string>();
   return {

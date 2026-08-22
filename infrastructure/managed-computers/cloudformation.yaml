@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Briar managed-computer pilot launch template and least-privilege provisioner policy
+
+Parameters:
+  AmiId:
+    Type: AWS::EC2::Image::Id
+    Description: Versioned AMI containing Briar CLI, Bun, supported agent CLIs, SSM Agent, and the managed enrollment service.
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet with outbound HTTPS through NAT or VPC endpoints.
+  InstanceType:
+    Type: String
+    Default: m7i.large
+  VolumeSizeGiB:
+    Type: Number
+    Default: 100
+    MinValue: 30
+  ProvisionerPrincipalArn:
+    Type: String
+    Description: IAM principal used only by the Cloudflare Worker provisioner.
+
+Resources:
+  ManagedComputerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Briar managed computers - no inbound access
+      VpcId: !Ref VpcId
+      SecurityGroupIngress: []
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS for SSM, Briar API, repositories, and model providers
+      Tags:
+        - Key: briar-managed
+          Value: "true"
+
+  ManagedComputerInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: briar-managed
+          Value: "true"
+
+  ManagedComputerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref ManagedComputerInstanceRole
+
+  ManagedComputerLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: briar-managed-computer-pilot
+      VersionDescription: briar-managed-computer-pilot-v1
+      LaunchTemplateData:
+        ImageId: !Ref AmiId
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile:
+          Arn: !GetAtt ManagedComputerInstanceProfile.Arn
+        MetadataOptions:
+          HttpEndpoint: enabled
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
+          InstanceMetadataTags: disabled
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: false
+            DeleteOnTermination: true
+            DeviceIndex: 0
+            Groups:
+              - !Ref ManagedComputerSecurityGroup
+            SubnetId: !Ref SubnetId
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              DeleteOnTermination: true
+              Encrypted: true
+              VolumeSize: !Ref VolumeSizeGiB
+              VolumeType: gp3
+        Monitoring:
+          Enabled: true
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: briar-managed
+                Value: "true"
+          - ResourceType: volume
+            Tags:
+              - Key: briar-managed
+                Value: "true"
+
+  ManagedComputerProvisionerPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Create and manage only tagged Briar pilot computers from the approved launch template.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: UseOnlyApprovedLaunchTemplate
+            Effect: Allow
+            Action: ec2:RunInstances
+            Resource: !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:launch-template/${ManagedComputerLaunchTemplate}
+          - Sid: CreateTaggedInstancesAndVolumes
+            Effect: Allow
+            Action: ec2:RunInstances
+            Resource:
+              - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/*
+              - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:volume/*
+            Condition:
+              StringEquals:
+                aws:RequestTag/briar-managed: "true"
+              ArnEquals:
+                ec2:LaunchTemplate: !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:launch-template/${ManagedComputerLaunchTemplate}
+          - Sid: UseOnlyTemplateNetworkAndImageResources
+            Effect: Allow
+            Action: ec2:RunInstances
+            Resource:
+              - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*
+              - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:security-group/${ManagedComputerSecurityGroup}
+              - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${SubnetId}
+              - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}::image/${AmiId}
+              - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}::snapshot/*
+            Condition:
+              ArnEquals:
+                ec2:LaunchTemplate: !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:launch-template/${ManagedComputerLaunchTemplate}
+          - Sid: TagOnlyBriarLaunchResources
+            Effect: Allow
+            Action: ec2:CreateTags
+            Resource:
+              - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/*
+              - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:volume/*
+            Condition:
+              StringEquals:
+                ec2:CreateAction: RunInstances
+                aws:RequestTag/briar-managed: "true"
+              ForAllValues:StringEquals:
+                aws:TagKeys:
+                  - briar-managed
+                  - briar-organization
+                  - briar-managed-computer
+                  - briar-campaign
+          - Sid: InspectFleet
+            Effect: Allow
+            Action:
+              - ec2:DescribeInstances
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeVolumes
+              - ssm:DescribeInstanceInformation
+            Resource: "*"
+          - Sid: StopOrTerminateTaggedFleet
+            Effect: Allow
+            Action:
+              - ec2:StopInstances
+              - ec2:TerminateInstances
+            Resource: !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/*
+            Condition:
+              StringEquals:
+                ec2:ResourceTag/briar-managed: "true"
+          - Sid: PassOnlyManagedComputerRole
+            Effect: Allow
+            Action: iam:PassRole
+            Resource: !GetAtt ManagedComputerInstanceRole.Arn
+            Condition:
+              StringEquals:
+                iam:PassedToService: ec2.amazonaws.com
+
+Outputs:
+  LaunchTemplateId:
+    Value: !Ref ManagedComputerLaunchTemplate
+  LaunchTemplateVersion:
+    Value: !GetAtt ManagedComputerLaunchTemplate.LatestVersionNumber
+    Description: Pin this numeric version in MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_VERSION; never use $Latest.
+  InstanceProfileArn:
+    Value: !GetAtt ManagedComputerInstanceProfile.Arn
+  SecurityGroupId:
+    Value: !Ref ManagedComputerSecurityGroup
+  ProvisionerPolicyArn:
+    Value: !Ref ManagedComputerProvisionerPolicy
+  ProvisionerPrincipalToReview:
+    Value: !Ref ProvisionerPrincipalArn
+    Description: Attach ProvisionerPolicyArn only to this reviewed principal.

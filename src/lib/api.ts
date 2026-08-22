@@ -82,6 +82,8 @@ import type {
   DashboardDeltaPayload,
   ExecutionWorker,
   OrganizationExecutionWorker,
+  ManagedComputer,
+  ManagedComputerProduct,
   ProjectExecutionWorkerPolicy,
   HuntRunPlacement,
   HuntEvent,
@@ -459,6 +461,82 @@ export async function loadOrganizationExecutionWorkers(
   }>(`/organizations/${organizationId}/workers`, token);
 }
 
+export async function loadManagedComputerProduct(
+  token: string,
+  organizationId: string,
+) {
+  return request<ManagedComputerProduct>(
+    `/organizations/${organizationId}/managed-computers/product`,
+    token,
+  );
+}
+
+export async function loadManagedComputers(
+  token: string,
+  organizationId: string,
+) {
+  return request<{ computers: ManagedComputer[]; generatedAt: string }>(
+    `/organizations/${organizationId}/managed-computers`,
+    token,
+  );
+}
+
+export async function validateManagedComputerPromotion(
+  token: string,
+  organizationId: string,
+  code: string,
+) {
+  return request<{
+    valid: boolean;
+    eligible: boolean;
+    totalCents: number;
+    currency: "USD";
+    applicationsEnabled: boolean;
+    limitReason: "user" | "organization" | "fleet" | null;
+  }>(
+    `/organizations/${organizationId}/managed-computers/promotion/validate`,
+    token,
+    { method: "POST", body: JSON.stringify({ code }) },
+  );
+}
+
+export async function applyForManagedComputer(
+  token: string,
+  organizationId: string,
+  input: { code: string; requestId: string },
+) {
+  return request<{
+    computer: ManagedComputer;
+    duplicate: boolean;
+    entitlement: {
+      source: "free_promotion";
+      totalCents: 0;
+      currency: "USD";
+    };
+  }>(`/organizations/${organizationId}/managed-computers`, token, {
+    method: "POST",
+    headers: { "Idempotency-Key": input.requestId },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function retryManagedComputer(
+  token: string,
+  organizationId: string,
+  managedComputerId: string,
+  requestId: string,
+) {
+  return request<{ computer: ManagedComputer; duplicate: boolean }>(
+    `/organizations/${organizationId}/managed-computers/${managedComputerId}/retry`,
+    token,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": requestId },
+      body: JSON.stringify({ requestId }),
+    },
+  );
+}
+
 export async function requestOrganizationExecutionWorkerUpdate(
   token: string,
   organizationId: string,
@@ -475,7 +553,7 @@ export async function requestOrganizationExecutionWorkerUpdate(
   );
 }
 
-export async function disableOrganizationExecutionWorker(
+export async function deleteOrganizationExecutionWorker(
   token: string,
   organizationId: string,
   deviceId: string,

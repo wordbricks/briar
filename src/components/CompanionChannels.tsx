@@ -209,7 +209,10 @@ type CompanionChannelsProps = {
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
   channelInboxSyncSignal?: string;
-  onViewingChannelChange?: (channelId: string | null) => void;
+  onViewingChannelChange?: (
+    channelId: string | null,
+    threadRootMessageId: string | null,
+  ) => void;
   requestedChannelId?: string | null;
   onRequestedChannelOpen?: () => void;
   requestedMessage?: {
@@ -418,9 +421,9 @@ export function CompanionChannels({
   }, [channel, resolvedChannelCache, thread, threadParentId]);
 
   useEffect(() => {
-    onViewingChannelChange?.(channel?.id ?? null);
-    return () => onViewingChannelChange?.(null);
-  }, [channel?.id, onViewingChannelChange]);
+    onViewingChannelChange?.(channel?.id ?? null, threadParentId);
+    return () => onViewingChannelChange?.(null, null);
+  }, [channel?.id, onViewingChannelChange, threadParentId]);
 
   useLayoutEffect(() => {
     if (!channel || threadParentId || !shouldScrollChannelToEnd.current) return;

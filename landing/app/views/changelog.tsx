@@ -30,6 +30,46 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.149",
+        date: "2026년 8월 22일",
+        title: "이슈 답글과 OpenCode 모델 fallback을 더 유연하게 지원합니다",
+        summary:
+          "이슈 대화의 공유 작업공간 권한을 실제 요청 해결에 맞게 확장하고, OpenCode 실시간 모델 목록이 unavailable한 상황에서도 사용 가능한 로컬 모델을 계속 보여줍니다.",
+        items: [
+          "이슈 답글 Agent가 공유 작업공간에서 shell·network·browser·filesystem 권한을 사용하고, 프로젝트에 설정된 full-access sandbox 정책을 실행에 반영합니다.",
+          "OpenCode 실시간 모델 카탈로그를 가져오지 못해도 로컬 캐시의 활성 무료 모델과 reasoning effort를 fallback으로 복원해 선택할 수 있도록 합니다.",
+          "모델 목록 fallback 안내를 내장 모델 목록이 아닌 실제 사용 가능한 대체 모델을 표시한다는 의미로 다듬습니다.",
+        ],
+      },
+      {
+        version: "1.2.148",
+        date: "2026년 8월 22일",
+        title: "조직 DM과 Agent 답글을 하나의 대화 흐름으로 연결합니다",
+        summary:
+          "DM Agent의 프로젝트 맥락을 더 선명하게 보여주고, 일반 채널과 DM의 Agent 답글을 main timeline에 맞춰 이전 대화와 자연스럽게 이어집니다.",
+        items: [
+          "DM 수신자 검색과 목록에서 Agent가 연결된 프로젝트 이름을 함께 보여주고 프로젝트 이름으로도 빠르게 찾을 수 있습니다.",
+          "일반 채널과 DM의 Agent 답글을 트리거 메시지와 같은 main timeline에 기록하고, 명시적인 thread 답글만 해당 thread 안에 유지합니다.",
+          "기존에 잘못된 위치에 저장된 완료된 Agent 답글을 트리거 메시지의 timeline 규칙에 맞게 자동으로 보정하는 D1 마이그레이션을 추가합니다.",
+          "채널 답글 실행과 legacy 데이터 보정이 중복 적용되어도 안전하도록 Worker·D1 회귀 테스트를 보강합니다.",
+        ],
+      },
+      {
+        version: "1.2.147",
+        date: "2026년 8월 22일",
+        title: "조직 협업과 관리형 컴퓨터 파일럿을 더 안전하게 확장합니다",
+        summary:
+          "조직 DM과 관리형 컴퓨터 프로모션 파일럿을 추가하고, Worker·CLI 실행 경계를 분리해 알림·채널·병합 흐름의 안정성을 높였습니다.",
+        items: [
+          "조직 구성원끼리 일대일 Direct Message를 시작하고, 채널·첨부 파일·실시간 업데이트·Agent 답글 흐름을 재사용하면서도 별도의 비공개 대화로 관리합니다.",
+          "GETBRIAR 프로모션으로 관리형 컴퓨터 파일럿 신청·권한·AWS 프로비저닝·등록·상태·수명 주기를 서버 검증과 idempotency로 안전하게 연결합니다.",
+          "관리형 컴퓨터를 고정된 AWS Launch Template, 암호화된 볼륨, 인바운드 없는 네트워크, SSM 전용 접근으로 제한하고 조직·fleet 한도와 만료·drain·종료를 지원합니다.",
+          "CLI와 Worker의 데이터베이스·도메인 저장소 경계를 Effect로 분리해 명령 트리와 SQL 입력 검증을 더 명확하게 유지합니다.",
+          "채널 thread 구독 알림, Inbox 초기 동기화, Project Agent 실행 로그 복구, 5분 merge cohort를 보강해 늦은 이벤트와 병합 흐름을 안정적으로 처리합니다.",
+          "공통 Spinner와 채널 제안 카드 레이아웃을 정리해 loading·status UI를 일관되게 표시합니다.",
+        ],
+      },
+      {
         version: "1.2.146",
         date: "2026년 8월 21일",
         title: "제공자 설정과 저장소 전달 흐름을 더 안정적으로 연결합니다",
@@ -933,6 +973,46 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.149",
+        date: "August 22, 2026",
+        title: "Make issue replies and OpenCode model fallback more flexible",
+        summary:
+          "Give issue conversations the workspace access needed to complete user requests and keep available local OpenCode models visible when the live catalog is unavailable.",
+        items: [
+          "Let issue-reply Agents use the shared worktree's shell, network, browser, and filesystem permissions, while honoring the project's configured full-access sandbox policy.",
+          "Restore active free models and reasoning efforts from the local OpenCode cache when the live model catalog cannot be loaded, so they remain selectable.",
+          "Clarify the localized fallback message so it describes available fallback models instead of implying that only bundled models are shown.",
+        ],
+      },
+      {
+        version: "1.2.148",
+        date: "August 22, 2026",
+        title: "Connect organization DMs and Agent replies into one conversation flow",
+        summary:
+          "Show clearer project context for DM Agents and align Agent replies in ordinary channels and DMs with the main timeline so existing conversations continue naturally.",
+        items: [
+          "Show each Agent's connected project name in the DM recipient search and list, and let people find an Agent by project name.",
+          "Write Agent replies for ordinary channels and DMs to the main timeline beside their trigger message, while keeping only explicit thread replies inside that thread.",
+          "Add a D1 migration that repairs completed legacy Agent replies to follow the timeline rule derived from their trigger message.",
+          "Expand Worker and D1 regression coverage so channel reply completion and legacy data repair remain safe when applied repeatedly.",
+        ],
+      },
+      {
+        version: "1.2.147",
+        date: "August 22, 2026",
+        title: "Expand organization collaboration and the managed-computer pilot safely",
+        summary:
+          "Add organization direct messages and a promotional managed-computer pilot, while splitting Worker and CLI boundaries to make alerts, channels, and merge delivery more reliable.",
+        items: [
+          "Add one-to-one Direct Messages for organization members, reusing channel attachments, realtime updates, and Agent replies while keeping each conversation private and distinct.",
+          "Connect the GETBRIAR promotion to server-validated managed-computer requests, entitlements, AWS provisioning, enrollment, state transitions, and lifecycle handling with idempotency.",
+          "Constrain managed computers to a fixed AWS Launch Template, encrypted volumes, no inbound network access, SSM-only operations, organization and fleet limits, expiry, draining, and termination.",
+          "Split the CLI and Worker database and domain repository boundaries with Effect so the command tree and SQL input validation remain explicit.",
+          "Restore subscribed channel-thread notifications and Project Agent execution logs, gate Inbox alerts until initial sync, and stabilize five-minute merge cohorts and late-event delivery.",
+          "Unify the shared Spinner and channel proposal-card layout so loading and status surfaces remain consistent.",
+        ],
+      },
       {
         version: "1.2.146",
         date: "August 21, 2026",
@@ -1928,7 +2008,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-146">
+          <a href="#v1-2-149">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1950,7 +2030,13 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.146"
+                      entry.version === "1.2.149"
+                        ? "2026-08-22"
+                        : entry.version === "1.2.148"
+                        ? "2026-08-22"
+                        : entry.version === "1.2.147"
+                        ? "2026-08-22"
+                        : entry.version === "1.2.146"
                         ? "2026-08-21"
                         : entry.version === "1.2.145"
                         ? "2026-08-21"

@@ -1,7 +1,18 @@
 import XCTest
+import UserNotifications
 @testable import BriarCompanion
 
 final class AgentsInboxSystemTests: XCTestCase {
+    @MainActor
+    func testLocalNotificationsRegisterForegroundPresentationDelegate() {
+        let service = LocalNotificationService()
+
+        XCTAssertTrue(
+            UNUserNotificationCenter.current().delegate is InboxNotificationForegroundDelegate
+        )
+        _ = service
+    }
+
     @MainActor
     func testIssueConversationTrackerRefreshesOnlyTheVisibleIssue() async {
         let tracker = IssueConversationViewTracker()
@@ -905,7 +916,7 @@ final class AgentsInboxSystemTests: XCTestCase {
                         image: "https://example.com/taylor.png",
                         provider: nil
                     ),
-                    reason: "thread_reply",
+                    reason: "subscription",
                     createdAt: Date(timeIntervalSince1970: 1_700_000_125)
                 ),
             ],
@@ -1018,16 +1029,24 @@ final class AgentsInboxSystemTests: XCTestCase {
             InboxNotificationPresentation(title: "Taylor in #product", body: "Thread reply")
         )
         let channelID = try XCTUnwrap(UUID(uuidString: channelReply.targetId))
-        XCTAssertFalse(
+        XCTAssertTrue(
             LocalNotificationService.shouldDeliver(
                 channelReply,
                 viewingChannelID: channelID
             )
         )
+        XCTAssertFalse(
+            LocalNotificationService.shouldDeliver(
+                channelReply,
+                viewingChannelID: channelID,
+                viewingChannelThreadID: channelReply.rootMessageId
+            )
+        )
         XCTAssertTrue(
             LocalNotificationService.shouldDeliver(
                 channelReply,
-                viewingChannelID: UUID()
+                viewingChannelID: channelID,
+                viewingChannelThreadID: UUID()
             )
         )
         XCTAssertTrue(
@@ -1083,7 +1102,7 @@ final class AgentsInboxSystemTests: XCTestCase {
             let defaults = UserDefaults(suiteName: suiteName)!
             defer { defaults.removePersistentDomain(forName: suiteName) }
             let store = InboxStore(defaults: defaults)
-            store.configure(token: nil, userID: "fixture-user")
+            store.configure(token: nil, userID: "u1")
             store.update(snapshot: snapshot, sessions: [session], project: project)
             XCTAssertEqual(store.unreadCount, 4)
             // Store keeps a single chronological list for the mobile feed.
@@ -1103,7 +1122,7 @@ final class AgentsInboxSystemTests: XCTestCase {
 
             // Account-scoped local cache survives store recreation for the same user.
             let restored = InboxStore(defaults: defaults)
-            restored.configure(token: nil, userID: "fixture-user")
+            restored.configure(token: nil, userID: "u1")
             restored.update(snapshot: snapshot, sessions: [session], project: project)
             XCTAssertEqual(restored.unreadCount, 0)
         }

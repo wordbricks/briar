@@ -252,7 +252,7 @@ describe("WorkerStatusBar", () => {
     );
     expect(update).not.toBeNull();
     expect(update?.disabled).toBe(false);
-    expect(update?.getAttribute("aria-label")).toBe("Janet's Mac Worker 업데이트");
+    expect(update?.getAttribute("aria-label")).toBe("Janet's Mac 컴퓨터 업데이트");
 
     await act(async () => root.unmount());
   });

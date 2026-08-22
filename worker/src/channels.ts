@@ -3160,7 +3160,7 @@ export async function completeChannelReply(
            id, channel_id, parent_message_id, author_user_id, author_agent_id,
            author_agent_name, author_agent_provider, body, created_at, updated_at
          )
-         select ?, ?, ?, null, ?, ?, ?, ?, ?, ?
+         select ?, ?, claim.parent_message_id, null, ?, ?, ?, ?, ?, ?
          from briar_channel_agent_reply_jobs claim
          where claim.id = ? and claim.claimed_device_id = ?
            and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
@@ -3169,7 +3169,6 @@ export async function completeChannelReply(
       .bind(
         job.reply_message_id,
         job.channel_id,
-        job.parent_message_id,
         job.agent_id,
         input.agentName,
         input.agentProvider,

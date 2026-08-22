@@ -584,6 +584,56 @@ export type OrganizationExecutionWorker = {
   }>;
 };
 
+export type ManagedComputerState =
+  | "requested"
+  | "provisioning"
+  | "bootstrapping"
+  | "needs_setup"
+  | "ready"
+  | "failed"
+  | "draining"
+  | "stopped"
+  | "terminated";
+
+export type ManagedComputer = {
+  id: string;
+  organizationId: string;
+  requesterUserId: string;
+  state: ManagedComputerState;
+  region: string;
+  instanceId: string | null;
+  volumeId: string | null;
+  deviceId: string | null;
+  error: { code: string; message: string } | null;
+  retryCount: number;
+  retryAvailable: boolean;
+  createdAt: string;
+  expiresAt: string;
+  updatedAt: string;
+};
+
+export type ManagedComputerProduct = {
+  product: {
+    currency: "USD";
+    monthlyPriceCents: number;
+    quantity: 1;
+    specification: {
+      instanceType: string;
+      vcpu: number;
+      memoryGiB: number;
+      volumeGiB: number;
+      maxConcurrentRuns: 1;
+      region: string | null;
+    };
+    modelApiCostsIncluded: false;
+  };
+  applicationsEnabled: boolean;
+  configurationReady: boolean;
+  canApply: boolean;
+  organizationLimit: number;
+  fleetLimit: number;
+};
+
 export type HuntRunPlacement = {
   status: Exclude<HuntStatus, "paused">;
   workflowStage: AutoHuntWorkflowStageId | null;

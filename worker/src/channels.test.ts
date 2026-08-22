@@ -393,6 +393,8 @@ describe("organization channels", () => {
     const rootId = "e2000000-0000-4000-8000-000000000010";
     const replyId = "e2000000-0000-4000-8000-000000000011";
     const laterReplyId = "e2000000-0000-4000-8000-000000000012";
+    const participantNotificationId =
+      "e2000000-0000-4000-8000-000000000013";
     await createChannel(db, {
       id: channelId,
       organizationId,
@@ -478,6 +480,28 @@ describe("organization channels", () => {
       listChannelConversationNotifications(db, organizationId, outsiderId),
     ).resolves.not.toEqual(expect.arrayContaining([
       expect.objectContaining({ id: laterReplyId }),
+    ]));
+
+    await createChannelMessage(db, {
+      id: participantNotificationId,
+      channelId,
+      parentMessageId: rootId,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "A reply for the participating subscriber",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(45),
+    });
+    await expect(
+      listChannelConversationNotifications(db, organizationId, outsiderId),
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: participantNotificationId,
+        notification_reason: "subscription",
+      }),
     ]));
   });
 
@@ -1321,7 +1345,7 @@ describe("organization channels", () => {
     });
   });
 
-  it("lets any organization device claim an organization Agent reply", async () => {
+  it("keeps a claimed organization Agent reply in the trigger thread", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000004";
     await createChannel(db, {
       id: channelId,
@@ -1742,6 +1766,15 @@ describe("organization channels", () => {
 
     const reply = await getChannelMessage(db, channelId, claimed!.reply_message_id);
     expect(reply?.author).toMatchObject({ type: "agent", name: "Honey" });
+    expect(reply?.parentMessageId).toBe(triggerId);
+    expect(
+      (await listChannelThreadMessages(db, channelId, triggerId)).map(
+        (message) => message.id,
+      ),
+    ).toContain(claimed!.reply_message_id);
+    expect(
+      (await listChannelRootMessages(db, channelId)).map((message) => message.id),
+    ).not.toContain(claimed!.reply_message_id);
     // A plan document with no project stays organization-wide until a member
     // decides where the work belongs.
     expect(reply?.document).toMatchObject({
@@ -1805,11 +1838,25 @@ describe("organization channels", () => {
       addedByUserId: ownerId,
       createdAt: at(70),
     });
+    const threadRootId = "f0000000-0000-4000-8000-000000000069";
+    await createChannelMessage(db, {
+      id: threadRootId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Show me modal examples",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(70),
+    });
     const triggerId = "f0000000-0000-4000-8000-000000000070";
     await createChannelMessage(db, {
       id: triggerId,
       channelId,
-      parentMessageId: null,
+      parentMessageId: threadRootId,
       authorUserId: ownerId,
       authorAgentId: null,
       authorAgentName: null,
@@ -1823,7 +1870,7 @@ describe("organization channels", () => {
       organizationId,
       channelId,
       triggerMessageId: triggerId,
-      parentMessageId: triggerId,
+      parentMessageId: threadRootId,
       agents: [{ id: agent!.id, projectId: null, provider: "claude" }],
       createdAt: at(71),
     });
@@ -1878,6 +1925,15 @@ describe("organization channels", () => {
       channelId,
       claimed!.reply_message_id,
     );
+    expect(reply?.parentMessageId).toBe(threadRootId);
+    expect(
+      (await listChannelThreadMessages(db, channelId, threadRootId)).map(
+        (message) => message.id,
+      ),
+    ).toContain(claimed!.reply_message_id);
+    expect(
+      (await listChannelRootMessages(db, channelId)).map((message) => message.id),
+    ).not.toContain(claimed!.reply_message_id);
     expect(reply?.attachments).toEqual([{
       id: attachmentId,
       filename: "screenshot.png",

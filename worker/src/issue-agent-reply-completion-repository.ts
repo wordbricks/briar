@@ -2,6 +2,7 @@ import {
   agentSkillExecutionApprovalTablesAvailable,
   issueExecutionApprovalTablesAvailable,
 } from "./execution-approval-schema-repository";
+import { type IssueAttachmentInput } from "./issue-attachment-repository";
 import { type IssueAgentReplyJobRow } from "./issue-agent-reply-repository";
 
 export type IssueAgentReplyCompletionOutput = {
@@ -24,6 +25,7 @@ export type IssueAgentReplyCompletionOutput = {
     | null;
   executionProposal: boolean;
   skillExecutionProposal?: boolean;
+  attachments?: IssueAttachmentInput[];
 };
 
 /**
@@ -262,6 +264,26 @@ export async function completeIssueAgentReplyOutput(
       ...claimBindings,
     ),
   ];
+
+  for (const attachment of input.output.attachments ?? []) {
+    statements.push(db.prepare(
+      `insert into briar_issue_attachments (
+         id, run_id, project_id, object_key, filename, content_type,
+         byte_size, created_at
+       )
+       select ?, job.run_id, job.project_id, ?, ?, ?, ?, ?
+       from briar_issue_agent_reply_jobs job
+       where ${completedClaim("job")}`,
+    ).bind(
+      attachment.id,
+      attachment.object_key,
+      attachment.filename,
+      attachment.content_type,
+      attachment.byte_size,
+      input.completedAt,
+      ...claimBindings,
+    ));
+  }
 
   if (rework) {
     statements.push(db.prepare(
