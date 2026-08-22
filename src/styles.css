@@ -1655,24 +1655,28 @@ body { overflow: hidden; font-synthesis: none; }
 .completed-issue-card-heading strong { color:var(--foreground); font-size:var(--text-xs); }
 .completed-issue-card-heading > small { min-width:0; margin-left:auto; color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; }
 .completed-issue-card-heading > small > .run-execution-identity { max-width:34ch; }
-.run-result-metrics { margin:12px 0 0; display:flex; flex-wrap:wrap; gap:7px; }
-.run-result-metrics > div { min-width:92px; padding:8px 10px; display:grid; gap:3px; border:1px solid var(--border); border-radius:8px; background:color-mix(in srgb,var(--card) 82%,transparent); }
-.run-result-metrics dt { color:var(--muted-foreground); font-size:var(--text-3xs); font-weight:650; }
-.run-result-metrics dd { margin:0; color:var(--foreground); font:650 var(--text-xs) "DM Mono",monospace; }
-.run-result-metrics-provider { display:inline-flex; align-items:center; gap:6px; font-family:inherit; }
+.run-result-metrics { max-width:100%; margin:10px 0 0; display:flex; align-items:center; flex-wrap:nowrap; gap:0; overflow-x:auto; scrollbar-width:none; }
+.run-result-metrics::-webkit-scrollbar { display:none; }
+.run-result-metrics > div { display:inline-flex; min-width:max-content; align-items:center; gap:6px; padding:2px 12px; }
+.run-result-metrics > div:first-child { padding-left:0; }
+.run-result-metrics > div + div { border-left:1px solid var(--border); }
+.run-result-metrics dt { color:var(--muted-foreground); font-size:var(--text-3xs); font-weight:650; white-space:nowrap; }
+.run-result-metrics dd { margin:0; color:var(--foreground); font:650 var(--text-xs) "DM Mono",monospace; white-space:nowrap; }
+.run-result-metrics-provider { display:inline-flex; align-items:center; gap:5px; font-family:inherit; }
 .run-result-metrics-provider span { font:650 var(--text-xs) "DM Mono",monospace; }
-.run-result-metrics-cost { border-color:color-mix(in srgb,var(--primary) 38%,var(--border))!important; background:color-mix(in srgb,var(--primary) 7%,var(--card))!important; }
 .run-result-metrics-cost dd { color:var(--primary); }
-.run-cost-estimate { margin-top:8px; padding:10px 12px; display:grid; gap:8px; border:1px solid var(--border); border-radius:9px; background:color-mix(in srgb,var(--card) 82%,transparent); }
-.run-cost-estimate-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.run-cost-estimate-heading strong { font-size:var(--text-xs); }
-.run-cost-estimate-heading > span,.run-cost-estimate small { color:var(--muted-foreground); font-size:var(--text-3xs); }
-.run-cost-estimate-models { display:grid; gap:6px; }
-.run-cost-estimate-model { display:grid; grid-template-columns:minmax(120px,1fr) auto auto; align-items:center; gap:14px; color:var(--muted-foreground); font-size:var(--text-2xs); }
-.run-cost-estimate-model strong { color:var(--foreground); font:650 var(--text-2xs) "DM Mono",monospace; }
-.run-cost-estimate-model-name { overflow:hidden; color:var(--foreground); font:650 var(--text-xs) "DM Mono",monospace; text-overflow:ellipsis; white-space:nowrap; }
-.run-cost-estimate p { margin:0; color:var(--muted-foreground); font-size:var(--text-xs); }
-@media (max-width:700px) { .run-cost-estimate-model { grid-template-columns:1fr 1fr; } .run-cost-estimate-model-name { grid-column:1/-1; } .run-cost-estimate-heading { align-items:flex-start; flex-direction:column; gap:3px; } }
+.run-metric-hover { cursor:help; }
+.run-metric-hover dd { text-decoration:underline dotted; text-decoration-color:color-mix(in srgb,var(--muted-foreground) 70%,transparent); text-underline-offset:3px; }
+.run-metric-hover:focus-visible { outline:2px solid var(--ring); outline-offset:3px; border-radius:6px; }
+.run-result-metrics-tooltip { display:grid; gap:8px; padding:9px 11px; }
+.run-result-metrics-tooltip ul { margin:0; padding:0; display:grid; gap:4px; list-style:none; }
+.run-result-metrics-tooltip li { display:flex; align-items:center; justify-content:space-between; gap:18px; }
+.run-result-metrics-tooltip li span { opacity:.72; }
+.run-result-metrics-tooltip li strong { font:650 var(--text-2xs) "DM Mono",monospace; }
+.run-result-metrics-tooltip-model { display:grid; gap:2px; }
+.run-result-metrics-tooltip-model-name { overflow:hidden; font-weight:650; text-overflow:ellipsis; white-space:nowrap; }
+.run-result-metrics-tooltip-model-rates { display:flex; gap:10px; opacity:.85; }
+.run-result-metrics-tooltip-model-rates strong { font:650 var(--text-2xs) "DM Mono",monospace; }
 .run-execution-identity { min-width:0; display:inline-flex; align-items:center; gap:6px; color:var(--muted-foreground); }
 .run-execution-identity > span:last-child { min-width:0; overflow:hidden; font-weight:550; text-overflow:ellipsis; white-space:nowrap; }
 .run-property .run-execution-identity { margin-top:4px; font-size:var(--text-2xs); }
