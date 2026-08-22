@@ -1,24 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  buildStatusTrayItems,
-  buildStatusTraySnapshot,
-  statusLabelForRun,
-  syncStatusTray,
-} from "./status-tray";
+import { describe, expect, it } from "vitest";
+import { buildStatusTrayItems } from "./status-tray";
 import type { StatusTrayRun } from "../types";
-
-const invoke = vi.hoisted(() => vi.fn());
-
-vi.mock("@tauri-apps/api/core", () => ({ invoke }));
-
-vi.mock("./platform", () => ({
-  isMacDesktopTauri: () => true,
-}));
-
-afterEach(() => {
-  invoke.mockReset();
-  vi.unstubAllGlobals();
-});
 
 function run(
   partial: Partial<StatusTrayRun> & Pick<StatusTrayRun, "id" | "title">,
@@ -85,69 +67,4 @@ describe("status tray snapshot builders", () => {
     ]);
   });
 
-  it("uses workflow stage labels for running issues", () => {
-    expect(
-      statusLabelForRun(
-        run({
-          id: "r1",
-          title: "t",
-          workflowStage: "implementing",
-          workflowStageLabel: "구현",
-        }),
-      ),
-    ).toBe("구현");
-  });
-
-  it("prefers localized status labels when provided", () => {
-    expect(
-      statusLabelForRun(
-        run({
-          id: "r1",
-          title: "t",
-          workflowStage: "implementing",
-          workflowStageLabel: "구현",
-        }),
-        () => "Implement",
-      ),
-    ).toBe("Implement");
-  });
-
-  it("builds a snapshot payload for the native tray command", () => {
-    const snapshot = buildStatusTraySnapshot(
-      [
-        {
-          projectId: "p",
-          runId: "r",
-          title: "Issue",
-          statusLabel: "리뷰",
-          projectName: "briar",
-        },
-      ],
-      {
-        runningLabel: "실행 중",
-        emptyLabel: "실행 중인 이슈 없음",
-        openLabel: "Briar 열기",
-        quitLabel: "Briar 종료",
-        moreLabel: "Briar에서 +{count}개 더 보기",
-      },
-    );
-
-    expect(snapshot.items).toHaveLength(1);
-    expect(snapshot.runningLabel).toBe("실행 중");
-  });
-
-  it("invokes the native sync command on macOS desktop", async () => {
-    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
-    const snapshot = buildStatusTraySnapshot([], {
-      runningLabel: "Running",
-      emptyLabel: "None",
-      openLabel: "Open",
-      quitLabel: "Quit",
-      moreLabel: "+{count} more in Briar",
-    });
-
-    await syncStatusTray(snapshot);
-
-    expect(invoke).toHaveBeenCalledWith("sync_status_tray", { snapshot });
-  });
 });

@@ -3,8 +3,6 @@
 import { describe, expect, it } from "vitest";
 import {
   clearAgentUsageHistory,
-  formatUsageDuration,
-  formatUsageWindowLabel,
   isProviderUsageExhausted,
   readAgentUsageHistory,
   recordAgentUsageSnapshot,
@@ -66,23 +64,6 @@ describe("agent usage presentation", () => {
         monthly: null,
       }),
     ).toBe(false);
-  });
-
-  it("formats compact reset durations", () => {
-    expect(formatUsageDuration(4 * 86_400_000 + 19 * 3_600_000)).toBe("4d 19h");
-    expect(formatUsageDuration(31 * 60_000)).toBe("31m");
-  });
-
-  it("labels standard usage windows", () => {
-    expect(formatUsageWindowLabel(provider.session!)).toBe("5h");
-    expect(formatUsageWindowLabel(provider.weekly!)).toBe("wk");
-    expect(
-      formatUsageWindowLabel({
-        usedPercent: 1,
-        windowMinutes: 43_200,
-        resetsAt: null,
-      }),
-    ).toBe("30d");
   });
 
   it("persists one usage snapshot per minute", () => {

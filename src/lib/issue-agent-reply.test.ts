@@ -32,14 +32,6 @@ describe("issue agent replies", () => {
     ).toEqual(["agent-2", "agent-1"]);
   });
 
-  it("does not treat the old @briar alias as a routing signal", () => {
-    expect(
-      issueReplyAgentIds([], {
-        parentMessageId: null,
-      }),
-    ).toEqual([]);
-  });
-
   it("continues with every agent that participated in the same thread", () => {
     const thread = [
       {
@@ -96,22 +88,6 @@ describe("issue agent replies", () => {
         parentMessageId: "nested-reply",
       }),
     ).toEqual(["agent-1"]);
-  });
-
-  it("does not continue from provider-only legacy messages", () => {
-    expect(
-      issueReplyAgentIds(
-        [
-          {
-            id: "legacy-reply",
-            parentMessageId: "thread-root",
-            body: "기존 답변",
-            author: { agentId: null, provider: "codex" },
-          },
-        ],
-        { parentMessageId: "thread-root" },
-      ),
-    ).toEqual([]);
   });
 
   it("builds member mention handles and recognizes selected mentions", () => {

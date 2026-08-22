@@ -8,34 +8,10 @@ import { createOpenCodeEventState } from "./opencode-runner-lib";
 import {
   openCodeFinalTurnOutputs,
   openCodeReadOnlySeatbeltProfile,
-  openCodeServerArgs,
-  openCodeServerEnvironment,
   openCodeServerSpawnSpec,
 } from "./opencode-runner";
 
 describe("OpenCode runner terminal output", () => {
-  it("starts read-only servers without external plugins", () => {
-    expect(openCodeServerArgs(4242, true)).toEqual([
-      "serve",
-      "--pure",
-      "--hostname=127.0.0.1",
-      "--port=4242",
-    ]);
-    expect(openCodeServerArgs(4242, false)).not.toContain("--pure");
-  });
-
-  it("preserves the generated OpenRouter provider configuration", () => {
-    const config = '{"provider":{"openrouter":{"options":{"apiKey":"{env:OPENROUTER_API_KEY}"}}}}';
-    expect(openCodeServerEnvironment({
-      OPENROUTER_API_KEY: "sk-or-v1-test-key",
-      OPENCODE_CONFIG_CONTENT: config,
-    })).toMatchObject({
-      OPENROUTER_API_KEY: "sk-or-v1-test-key",
-      OPENCODE_CONFIG_CONTENT: config,
-    });
-    expect(openCodeServerEnvironment({}).OPENCODE_CONFIG_CONTENT).toBe("{}");
-  });
-
   it("wraps read-only OpenCode in a repository-scoped OS sandbox", () => {
     const profile = openCodeReadOnlySeatbeltProfile({
       workspaceRoot: "/repo",

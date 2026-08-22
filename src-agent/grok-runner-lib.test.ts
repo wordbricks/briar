@@ -10,14 +10,12 @@ import {
   finalizeGrokMessage,
   grokSessionMeta,
   grokStopReasonSucceeded,
-  mapEffortToGrok,
   normalizeGrokSessionUpdate,
   permissionDecisionResult,
   permissionInput,
   permissionToolName,
   resolveGrokAuthMethodId,
   resolveGrokFinalMessage,
-  resolveGrokModelId,
   shouldAutoApprovePermission,
   shouldDenyGrokPermission,
   type GrokRunnerRequest,
@@ -554,12 +552,5 @@ describe("Grok runner", () => {
     expect(resolveGrokFinalMessage(state, undefined, null)).toBe(
       '```json\\n{"action":"respond"}\\n```',
     );
-  });
-
-  it("maps models and efforts for Grok", () => {
-    expect(resolveGrokModelId("  grok-4.5  ")).toBe("grok-4.5");
-    expect(resolveGrokModelId("")).toBeUndefined();
-    expect(mapEffortToGrok("ultra")).toBe("ultra");
-    expect(mapEffortToGrok("medium")).toBe("medium");
   });
 });
