@@ -4,7 +4,7 @@ useDefault = true
 [[allowlists]]
 description = "Cargo registry checksums are public package integrity hashes"
 targetRules = ["generic-api-key"]
-paths = ['''(^|/)apps/briar/src-tauri/Cargo\.lock$''']
+paths = ['''(^|/)(apps/briar/)?src-tauri/Cargo\.lock$''']
 
 [[allowlists]]
 description = "Apple App Store Connect issuer IDs are public release identifiers"
