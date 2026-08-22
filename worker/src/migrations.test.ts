@@ -190,6 +190,78 @@ async function createPreWebhookChannelMessage(
 }
 
 describe("D1 migrations", () => {
+  it("moves legacy Agent replies to the trigger message timeline", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-channel-agent-main-timeline-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await db.prepare(
+        `create table briar_channel_messages (
+           id text primary key not null,
+           channel_id text not null,
+           parent_message_id text
+         )`,
+      ).run();
+      await db.prepare(
+        `create table briar_channel_agent_reply_jobs (
+           id text primary key not null,
+           channel_id text not null,
+           trigger_message_id text not null,
+           reply_message_id text not null,
+           status text not null
+         )`,
+      ).run();
+      await db.batch([
+        db.prepare(
+          `insert into briar_channel_messages values
+             ('root-trigger', 'channel-1', null),
+             ('legacy-root-reply', 'channel-1', 'root-trigger'),
+             ('thread-root', 'channel-1', null),
+             ('thread-trigger', 'channel-1', 'thread-root'),
+             ('legacy-thread-reply', 'channel-1', 'thread-root'),
+             ('unrelated-message', 'channel-1', 'root-trigger'),
+             ('failed-reply', 'channel-1', 'root-trigger')`,
+        ),
+        db.prepare(
+          `insert into briar_channel_agent_reply_jobs values
+             ('root-job', 'channel-1', 'root-trigger',
+              'legacy-root-reply', 'completed'),
+             ('thread-job', 'channel-1', 'thread-trigger',
+              'legacy-thread-reply', 'completed'),
+             ('failed-job', 'channel-1', 'root-trigger',
+              'failed-reply', 'failed')`,
+        ),
+      ]);
+
+      const sql = await readFile(
+        resolve("migrations/0126_channel_agent_main_timeline.sql"),
+        "utf8",
+      );
+      await executeD1Sql(db, sql);
+      await executeD1Sql(db, sql);
+
+      const rows = await db.prepare(
+        `select id, parent_message_id
+         from briar_channel_messages
+         order by id`,
+      ).all<{ id: string; parent_message_id: string | null }>();
+      expect(rows.results).toEqual([
+        { id: "failed-reply", parent_message_id: "root-trigger" },
+        { id: "legacy-root-reply", parent_message_id: null },
+        { id: "legacy-thread-reply", parent_message_id: "thread-root" },
+        { id: "root-trigger", parent_message_id: null },
+        { id: "thread-root", parent_message_id: null },
+        { id: "thread-trigger", parent_message_id: "thread-root" },
+        { id: "unrelated-message", parent_message_id: "root-trigger" },
+      ]);
+    } finally {
+      await miniflare.dispose();
+    }
+  });
+
   it("adds immutable Agent Session requesters and schedule creators", async () => {
     const database = await createIsolatedTestDatabase({
       suite: "session-requester-migration",
