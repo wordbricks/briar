@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.149",
+        date: "2026년 8월 22일",
+        title: "이슈 답글과 OpenCode 모델 fallback을 더 유연하게 지원합니다",
+        summary:
+          "이슈 대화의 공유 작업공간 권한을 실제 요청 해결에 맞게 확장하고, OpenCode 실시간 모델 목록이 unavailable한 상황에서도 사용 가능한 로컬 모델을 계속 보여줍니다.",
+        items: [
+          "이슈 답글 Agent가 공유 작업공간에서 shell·network·browser·filesystem 권한을 사용하고, 프로젝트에 설정된 full-access sandbox 정책을 실행에 반영합니다.",
+          "OpenCode 실시간 모델 카탈로그를 가져오지 못해도 로컬 캐시의 활성 무료 모델과 reasoning effort를 fallback으로 복원해 선택할 수 있도록 합니다.",
+          "모델 목록 fallback 안내를 내장 모델 목록이 아닌 실제 사용 가능한 대체 모델을 표시한다는 의미로 다듬습니다.",
+        ],
+      },
+      {
         version: "1.2.148",
         date: "2026년 8월 22일",
         title: "조직 DM과 Agent 답글을 하나의 대화 흐름으로 연결합니다",
@@ -961,6 +973,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.149",
+        date: "August 22, 2026",
+        title: "Make issue replies and OpenCode model fallback more flexible",
+        summary:
+          "Give issue conversations the workspace access needed to complete user requests and keep available local OpenCode models visible when the live catalog is unavailable.",
+        items: [
+          "Let issue-reply Agents use the shared worktree's shell, network, browser, and filesystem permissions, while honoring the project's configured full-access sandbox policy.",
+          "Restore active free models and reasoning efforts from the local OpenCode cache when the live model catalog cannot be loaded, so they remain selectable.",
+          "Clarify the localized fallback message so it describes available fallback models instead of implying that only bundled models are shown.",
+        ],
+      },
       {
         version: "1.2.148",
         date: "August 22, 2026",
@@ -1984,7 +2008,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-148">
+          <a href="#v1-2-149">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2006,7 +2030,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.148"
+                      entry.version === "1.2.149"
+                        ? "2026-08-22"
+                        : entry.version === "1.2.148"
                         ? "2026-08-22"
                         : entry.version === "1.2.147"
                         ? "2026-08-22"
