@@ -7869,14 +7869,131 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("grok-4.5");
     expect(markup).toContain("전체 토큰");
     expect(markup).toContain("1,250");
-    expect(markup).toContain("캐시");
-    expect(markup).toContain("추론");
     expect(markup).toContain("추정 API 비용");
-    expect(markup).toContain("현재 모델 단가");
-    expect(markup).toContain("$1.00 / 100만 토큰");
-    expect(markup).toContain("$4.00 / 100만 토큰");
-    expect(markup).toContain("캐시 토큰은 가격표의 전용 단가");
+    expect(markup).not.toContain("현재 모델 단가");
+    expect(markup).not.toContain("$1.00 / 100만 토큰");
+    expect(markup).not.toContain("$4.00 / 100만 토큰");
+    expect(markup).not.toContain('class="run-cost-estimate"');
+    const metricsMarkup = markup.slice(
+      markup.indexOf('class="run-result-metrics"'),
+      markup.indexOf("</dl>"),
+    );
+    expect(metricsMarkup).not.toContain(">입력<");
+    expect(metricsMarkup).not.toContain(">출력<");
+    expect(metricsMarkup).not.toContain(">캐시<");
+    expect(metricsMarkup).not.toContain(">추론<");
     expect(markup).not.toContain('class="issue-description-markdown"');
+  });
+
+  it("reveals token breakdown and model rates only on hover in the result metrics", async () => {
+    const completedRun = {
+      ...demoDashboard.runs[0],
+      status: "completed" as const,
+      resultSummary: "호버 상세 정보를 확인합니다.",
+      executionMetrics: {
+        inputTokens: 1_000,
+        outputTokens: 250,
+        cacheReadTokens: 800,
+        cacheWriteTokens: null,
+        reasoningOutputTokens: 100,
+        totalTokens: 1_250,
+        durationMs: 90_000,
+      },
+      preferredProvider: null,
+      preferredModel: null,
+      requestedProvider: "grok" as const,
+      requestedModel: "grok-4.5",
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <TooltipProvider delayDuration={0}>
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={completedRun}
+          executionCostEstimate={{
+            pricing: {
+              status: "live",
+              source: "https://example.com/pricing.json",
+              fetchedAt: "2026-08-13T00:00:00.000Z",
+              knownModels: 1,
+            },
+            status: "estimated",
+            reason: null,
+            usageRecords: 1,
+            pricedUsageRecords: 1,
+            providerReportedModels: ["grok-4.5"],
+            estimatedUsdTicks: 1_345_000,
+            pricedUsdTicks: 1_345_000,
+            models: [
+              {
+                pricingKey: "xai/grok-4-5",
+                modelProvider: "xai",
+                model: "grok-4.5",
+                inputCostPerToken: 1e-6,
+                outputCostPerToken: 4e-6,
+                cacheReadCostPerToken: 0.1e-6,
+                cacheWriteCostPerToken: 1.25e-6,
+                estimatedUsdTicks: 1_345_000,
+              },
+            ],
+          }}
+        />
+      </TooltipProvider>,
+    ));
+
+    const totalTokensChip = container.querySelector<HTMLElement>(
+      ".run-result-metrics .run-metric-hover",
+    );
+    expect(totalTokensChip?.textContent).toContain("전체 토큰");
+    await act(async () => {
+      totalTokensChip?.focus();
+      totalTokensChip?.dispatchEvent(
+        new PointerEvent("pointermove", { bubbles: true }),
+      );
+    });
+    let tooltip = document.body.querySelector<HTMLElement>('[role="tooltip"]');
+    expect(tooltip?.textContent).toContain("입력1,000");
+    expect(tooltip?.textContent).toContain("출력250");
+    expect(tooltip?.textContent).toContain("캐시800");
+    expect(tooltip?.textContent).toContain("추론100");
+    expect(tooltip?.textContent).not.toContain("/ 100만 토큰");
+
+    await act(async () => {
+      totalTokensChip?.blur();
+      document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    });
+
+    const costChip = [
+      ...container.querySelectorAll<HTMLElement>(".run-result-metrics .run-metric"),
+    ].find((chip) => chip.textContent?.includes("추정 API 비용"));
+    expect(costChip).toBeTruthy();
+    await act(async () => {
+      costChip?.focus();
+      costChip?.dispatchEvent(
+        new PointerEvent("pointermove", { bubbles: true }),
+      );
+    });
+    tooltip = document.body.querySelector<HTMLElement>('[role="tooltip"]');
+    expect(tooltip?.textContent).toContain("grok-4.5");
+    expect(tooltip?.textContent).toContain("$1.00 / 100만 토큰");
+    expect(tooltip?.textContent).toContain("$4.00 / 100만 토큰");
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 
   it("prioritizes verified deployment evidence for completed-issue manual QA", async () => {
@@ -8220,8 +8337,9 @@ describe("HuntDashboard", () => {
     expect(markup).toContain("Grok");
     expect(markup).toContain("모델");
     expect(markup).toContain("grok-4.5-build");
-    expect(markup).toContain("$2.00 / 100만 토큰");
-    expect(markup).toContain("$10.00 / 100만 토큰");
+    expect(markup).not.toContain("$2.00 / 100만 토큰");
+    expect(markup).not.toContain("$10.00 / 100만 토큰");
+    expect(markup).not.toContain('class="run-cost-estimate"');
   });
 
   it("shows result reviewers in the result and properties panels and records the current member", async () => {
