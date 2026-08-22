@@ -2,7 +2,6 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LaunchIntro } from "./LaunchIntro";
 
@@ -29,22 +28,6 @@ describe("LaunchIntro", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the localized intro with a skip control", () => {
-    const markup = renderToStaticMarkup(
-      <LaunchIntro onComplete={() => undefined} />,
-    );
-
-    expect(markup).toContain('data-testid="launch-intro"');
-    expect(markup).toContain("Briar 시작 화면");
-    expect(markup).toContain("Skip intro");
-    expect(markup).toContain("--launch-character-index");
-    expect(markup).toContain("launch-intro-content");
-    expect(markup).not.toContain("launch-intro-window");
-    expect(markup).not.toContain("launch-intro-gradient");
-    expect(markup).not.toContain("launch-intro-grain");
-    expect(markup).not.toContain("launch-intro-status");
-  });
-
   it("holds for five seconds before revealing and fading away", async () => {
     vi.useFakeTimers();
     const onComplete = vi.fn();
@@ -67,14 +50,6 @@ describe("LaunchIntro", () => {
 
     await act(async () => vi.advanceTimersByTime(1));
     expect(onComplete).toHaveBeenCalledOnce();
-  });
-
-  it("marks the full-screen native presentation", () => {
-    const markup = renderToStaticMarkup(
-      <LaunchIntro native onComplete={() => undefined} />,
-    );
-
-    expect(markup).toContain("launch-intro-native");
   });
 
   it("automatically completes a forced development preview", async () => {

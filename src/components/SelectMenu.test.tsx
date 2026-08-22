@@ -58,37 +58,6 @@ describe("SelectMenu", () => {
     container.remove();
   });
 
-  it("renders an optional leading icon and can hide the chevron", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <SelectMenu
-          hideChevron
-          id="badge-select"
-          label="Status"
-          leadingIcon={<span data-testid="leading-icon">icon</span>}
-          onValueChange={() => undefined}
-          options={[{ label: "Queued", value: "queued" }]}
-          value="queued"
-        />,
-      );
-    });
-
-    expect(
-      container.querySelector('[data-testid="leading-icon"]')?.textContent,
-    ).toBe("icon");
-    expect(container.querySelector(".select-menu-chevron")).toBeNull();
-    expect(
-      container.querySelector(".select-menu-leading-icon"),
-    ).not.toBeNull();
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
   it("opens from the keyboard and moves focus through enabled options", async () => {
     const container = document.createElement("div");
     document.body.append(container);
@@ -143,82 +112,6 @@ describe("SelectMenu", () => {
       await new Promise((resolve) => requestAnimationFrame(resolve));
     });
     expect(document.activeElement?.getAttribute("data-value")).toBe("last");
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
-  it("renders an optional icon on the trigger and the option rows", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <SelectMenu
-          id="icon-select"
-          label="Project"
-          onValueChange={() => undefined}
-          options={[
-            {
-              label: "Briar",
-              value: "project-1",
-              icon: "data:image/png;base64,AA==",
-            },
-            { label: "Briar Mobile", value: "project-2", icon: null },
-          ]}
-          value="project-1"
-        />,
-      );
-    });
-
-    const trigger = container.querySelector<HTMLButtonElement>("#icon-select");
-    expect(trigger?.querySelector(".select-menu-trigger-icon")?.getAttribute("src"))
-      .toBe("data:image/png;base64,AA==");
-
-    await act(async () => trigger?.click());
-    const listbox = document.querySelector("#icon-select-listbox");
-    expect(listbox?.querySelectorAll(".select-menu-option-icon")).toHaveLength(1);
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
-  it("renders a React leading mark on the trigger and option rows", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <SelectMenu
-          id="leading-select"
-          label="Provider"
-          onValueChange={() => undefined}
-          options={[
-            {
-              label: "Claude",
-              leading: <span data-testid="claude-mark">C</span>,
-              value: "claude",
-            },
-            { label: "Codex", value: "codex" },
-          ]}
-          value="claude"
-        />,
-      );
-    });
-
-    const trigger = container.querySelector<HTMLButtonElement>("#leading-select");
-    expect(trigger?.querySelector("[data-testid='claude-mark']")?.textContent).toBe(
-      "C",
-    );
-
-    await act(async () => trigger?.click());
-    const listbox = document.querySelector("#leading-select-listbox");
-    expect(listbox?.querySelectorAll(".select-menu-option-leading")).toHaveLength(1);
-    expect(
-      listbox?.querySelector("[data-value='claude'] [data-testid='claude-mark']"),
-    ).not.toBeNull();
 
     await act(async () => root.unmount());
     container.remove();

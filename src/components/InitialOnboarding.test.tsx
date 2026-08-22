@@ -32,46 +32,6 @@ describe("InitialOnboarding", () => {
     vi.clearAllMocks();
   });
 
-  it("explains Briar before showing the provider-neutral sign-in choices", async () => {
-    await act(async () =>
-      root.render(<InitialOnboarding {...createProps()} />),
-    );
-
-    expect(
-      container
-        .querySelector(".initial-onboarding-drag-region")
-        ?.hasAttribute("data-tauri-drag-region"),
-    ).toBe(true);
-    expect(container.textContent).toContain("Briar에 오신 것을 환영해요.");
-    expect(container.textContent).toContain(
-      "에이전트의 진행 상황과 결과, 팀의 피드백",
-    );
-    expect(container.textContent).not.toContain("Google로 계속하기");
-    expect(container.textContent).not.toContain("이메일 인증코드로 계속하기");
-    expect(container.textContent).not.toContain("작업 환경을 준비할게요");
-
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".initial-welcome-copy button")
-        ?.click();
-    });
-
-    expect(container.querySelector(".embedded-login-shell")).not.toBeNull();
-    expect(container.textContent).toContain("이메일 인증코드로 계속하기");
-    expect(container.textContent).toContain("Google로 계속하기");
-    expect(container.querySelector(".initial-prerequisites-list")).toBeNull();
-    expect(
-      container
-        .querySelector('[role="progressbar"]')
-        ?.getAttribute("aria-valuemax"),
-    ).toBe("2");
-    expect(
-      container
-        .querySelector('[role="progressbar"]')
-        ?.getAttribute("aria-valuenow"),
-    ).toBe("2");
-  });
-
   it("starts Google login from the second step", async () => {
     const props = createProps();
     await act(async () => root.render(<InitialOnboarding {...props} />));

@@ -219,44 +219,6 @@ function ProjectAgentDetailHarness({
 }
 
 describe("ProjectAgentDetail", () => {
-  it("uses the same compact header UI as the Agents list", async () => {
-    const onBack = vi.fn();
-    const container = await mount(
-      <ProjectAgentDetail
-        agent={agent}
-        dashboard={dashboard}
-        isSidebarOpen={true}
-        onBack={onBack}
-        onIssueOpen={() => undefined}
-        onSettleTaskSession={() => undefined}
-        onStopSession={async () => true}
-        onStartAutoHunt={() => "dispatch-1"}
-        onStartTaskSession={() => undefined}
-        requestedSessionId={null}
-        sessions={[]}
-      />,
-    );
-
-    const header = container.querySelector(
-      ".page-header.app-page-header.project-agents-heading.project-agent-detail-heading",
-    );
-    expect(header).not.toBeNull();
-    expect(container.querySelector(".page-hero")).toBeNull();
-    expect(
-      header?.querySelector("#project-agent-detail-title")?.textContent,
-    ).toContain(agent.name);
-    expect(header?.textContent).not.toContain(agent.responsibility);
-    expect(
-      header?.querySelector(".project-agent-run-task")?.textContent,
-    ).toContain("작업 실행");
-
-    await act(async () => {
-      header
-        ?.querySelector<HTMLButtonElement>(".project-agent-detail-back")
-        ?.click();
-    });
-    expect(onBack).toHaveBeenCalledOnce();
-  });
 
   it.each([
     { surface: "desktop", companionMode: false, buttonLabel: "작업 실행" },

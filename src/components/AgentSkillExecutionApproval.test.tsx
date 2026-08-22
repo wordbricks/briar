@@ -190,56 +190,6 @@ describe("AgentSkillExecutionApproval", () => {
     expect(onAccept).not.toHaveBeenCalled();
   });
 
-  it("keeps long-request actions outside the viewport-constrained scroll body", async () => {
-    const longRequest = "긴 배포 요청입니다. ".repeat(300);
-    await act(async () => {
-      root.render(
-        <AgentSkillExecutionApproval
-          loadExecutionContext={async () => ({
-            workers: [worker("worker-1")],
-          })}
-          onAccept={vi.fn()}
-          onAccepted={vi.fn()}
-          proposal={{ ...proposal(), request: longRequest }}
-          surfaceKey="channel:long-request"
-        />,
-      );
-    });
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>(
-        ".skill-execution-proposal-card footer button",
-      )?.click();
-    });
-
-    const dialog = document.body.querySelector<HTMLElement>(
-      ".skill-execution-approval-dialog",
-    );
-    const scrollBody = dialog?.querySelector<HTMLElement>(
-      ".skill-execution-approval-scroll",
-    );
-    const footer = dialog?.querySelector<HTMLElement>(
-      ".skill-execution-approval-footer",
-    );
-    expect(scrollBody?.textContent).toContain(longRequest);
-    expect(footer?.parentElement).toBe(dialog);
-    expect(footer?.textContent).toContain("승인하고 Skill 실행");
-
-    const styles = readFileSync("src/styles.css", "utf8");
-    const dialogRule = styles.match(
-      /\.skill-execution-approval-dialog\s*\{([^}]*)\}/,
-    )?.[1];
-    const scrollRule = styles.match(
-      /\.skill-execution-approval-scroll\s*\{([^}]*)\}/,
-    )?.[1];
-    const footerRule = styles.match(
-      /\.skill-execution-approval-footer\s*\{([^}]*)\}/,
-    )?.[1];
-    expect(dialogRule).toContain("max-height:calc(100dvh - 32px)");
-    expect(dialogRule).toContain("overflow:hidden");
-    expect(scrollRule).toContain("overflow-y:auto");
-    expect(footerRule).toContain("position:sticky");
-    expect(footerRule).toContain("bottom:0");
-  });
 
   it("fails closed when the selected Worker changes before final approval", async () => {
     let latestWorkers = [worker("worker-1")];

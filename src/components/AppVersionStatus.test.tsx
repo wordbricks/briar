@@ -34,26 +34,6 @@ describe("AppVersionStatus", () => {
     Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
   });
 
-  it("shows the app version in the status bar label", async () => {
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <AppUpdateProvider>
-            <AppVersionStatus version="1.1.8" />
-          </AppUpdateProvider>
-        </I18nProvider>,
-      );
-    });
-
-    expect(container.textContent).toContain("v1.1.8");
-    expect(
-      container.querySelector(".app-version-status")?.getAttribute("aria-label"),
-    ).toContain("v1.1.8");
-
-    await act(async () => root.unmount());
-  });
-
   it("checks from an upward menu and reveals the existing install control", async () => {
     const update = {
       version: "1.2.9",

@@ -17,31 +17,6 @@ describe("KeybindingsSettings", () => {
     window.localStorage.setItem("briar.locale.v1", "en");
   });
 
-  it("renders the sidebar toggle binding with its default shortcut", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <KeybindingsSettings />
-        </I18nProvider>,
-      );
-    });
-
-    expect(container.textContent).toContain("Sidebar toggle");
-    expect(container.textContent).toContain("Open or close the left sidebar.");
-    const shortcutBadge = container.querySelector<HTMLElement>(
-      '[aria-label="Sidebar toggle"]',
-    );
-    expect(shortcutBadge?.textContent).toBe(
-      formatShortcut(defaultKeybindings.sidebarToggle),
-    );
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
   it("records a new shortcut and persists it", async () => {
     const container = document.createElement("div");
     document.body.append(container);

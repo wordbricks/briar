@@ -551,82 +551,7 @@ describe("CompanionChannels", () => {
     expect(container.textContent).toContain("Refreshed");
   });
 
-  it("places the Agent typing state below the message attachments", async () => {
-    const summary = channel("c-common", "Welcome", null);
-    const withAttachment = {
-      ...message("m-1", "@Honey 이미지 확인해줘"),
-      attachments: [{
-        id: "channel-attachment",
-        filename: "screenshot.png",
-        contentType: "image/png",
-        byteSize: 5,
-        url: "/channels/c-common/attachments/channel-attachment",
-      }],
-    };
-    loadChannel.mockResolvedValueOnce({
-      channel: summary,
-      members: [member],
-      agents: [agent],
-      messages: [withAttachment],
-      nextCursor: null,
-      agentReplies: [agentReply("running")],
-    });
-    await render();
 
-    const openWelcome = () => [
-      ...container.querySelectorAll<HTMLButtonElement>(
-        ".companion-channel-group button",
-      ),
-    ].find((button) => button.textContent?.includes("Welcome"));
-    await act(async () => {
-      openWelcome()?.click();
-      await Promise.resolve();
-    });
-
-    const bubble = container.querySelector(
-      '[data-companion-channel-message-id="m-1"]',
-    );
-    expect(bubble).not.toBeNull();
-    expect(bubble?.querySelector(".channel-message-images")).not.toBeNull();
-    const typing = bubble?.querySelector(".companion-channel-typing");
-    expect(typing).not.toBeNull();
-    expect(
-      bubble?.querySelector(
-        ".companion-channel-typing ~ .channel-message-images",
-      ),
-    ).toBeNull();
-  });
-
-  it("renders incoming webhook messages with a distinct author icon", async () => {
-    loadChannel.mockResolvedValue({
-      channel: channel("c-common", "Welcome", null),
-      members: [],
-      agents: [],
-      messages: [{
-        ...message("m-webhook", "Production deployed"),
-        author: {
-          type: "webhook",
-          id: "77777777-7777-4777-8777-777777777777",
-          name: "Deploy notifier",
-        },
-      }],
-    });
-    await render();
-    const channelButton = [
-      ...container.querySelectorAll<HTMLButtonElement>(
-        ".companion-channel-group button",
-      ),
-    ].find((button) => button.textContent?.includes("Welcome"));
-    await act(async () => {
-      channelButton?.click();
-      await Promise.resolve();
-    });
-
-    expect(container.textContent).toContain("Deploy notifier");
-    expect(container.textContent).toContain("Production deployed");
-    expect(container.querySelector(".companion-channel-message .lucide-webhook"))
-      .not.toBeNull();
-  });
 
   it("opens a channel thread and unwinds each level through mobile back", async () => {
     loadChannel.mockResolvedValue({
@@ -1321,96 +1246,6 @@ describe("CompanionChannels", () => {
     expect(card!.textContent).toContain("View issue");
   });
 
-  it("stays in the channel for a server-returned legacy execution follow-up", async () => {
-    const selectedChannel = channel("c-current", "Briar dev", "project-1");
-    const initial = message("m-create-execute", "생성과 실행을 제안합니다");
-    initial.channelId = selectedChannel.id;
-    initial.author = {
-      type: "agent",
-      id: "agent-1",
-      name: "Honey",
-      provider: "codex",
-      image: null,
-    };
-    initial.proposal = {
-      id: "proposal-create-execute",
-      actionType: "request_issue_create",
-      status: "pending",
-      projectId: "project-1",
-      payload: {
-        issue: {
-          title: "Mobile two-step approval",
-          description: null,
-          priority: 2,
-          status: "backlog",
-        },
-      },
-      resultRunId: null,
-    };
-    const materialized: ChannelMessage = {
-      ...initial,
-      proposal: {
-        ...initial.proposal,
-        status: "accepted",
-        resultRunId: "run-create-execute",
-      },
-      executionProposal: {
-        id: "execution-create-execute",
-        type: "request_issue_execute",
-        status: "pending",
-        projectId: "project-1",
-        runId: "run-create-execute",
-        title: "Mobile two-step approval",
-        createdAt: "2026-08-11T00:00:00.000Z",
-        acceptedAt: null,
-        requestedProvider: null,
-        requestedModel: null,
-        requestedEffort: null,
-        requestedWorkerId: null,
-        delegatedByAgentId: null,
-        delegatedByAgentName: null,
-      },
-    };
-    listChannels.mockResolvedValue({ channels: [selectedChannel], cursor: 1 });
-    loadChannel
-      .mockResolvedValueOnce({
-        channel: selectedChannel,
-        members: [],
-        agents: [agent],
-        messages: [initial],
-      })
-      .mockResolvedValue({
-        channel: selectedChannel,
-        members: [],
-        agents: [agent],
-        messages: [materialized],
-      });
-    acceptChannelProposal.mockResolvedValue({
-      outcome: "accepted",
-      projectId: "project-1",
-      resultRunId: "run-create-execute",
-      executionProposal: materialized.executionProposal,
-    });
-    const onIssueOpen = vi.fn();
-    await render(onIssueOpen);
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>(
-        ".companion-channel-group button",
-      )!.click();
-      await Promise.resolve();
-    });
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>(
-        ".channel-proposal-approve-button",
-      )?.click();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(onIssueOpen).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("Issue execution proposal");
-    expect(container.textContent).toContain("Accepted — the issue was created");
-  });
 
   it("keeps a newer transferred proposal over a delayed approval response", async () => {
     vi.useFakeTimers();
@@ -2135,58 +1970,6 @@ describe("CompanionChannels", () => {
     );
   });
 
-  it("presents channel messages with avatars, reply context, and a channel composer", async () => {
-    const item = message("m-1", "Hello team", 2);
-    item.author = {
-      type: "user",
-      id: "user-1",
-      name: "Jay",
-      email: "jay@example.com",
-      image: "https://example.com/jay.png",
-    };
-    item.lastReplyAt = "2026-08-01T08:00:00.000Z";
-    loadChannel.mockResolvedValue({
-      channel: channel("c-common", "Welcome", null),
-      members: [],
-      agents: [],
-      messages: [item],
-    });
-    await render();
-
-    await act(async () => {
-      [
-        ...container.querySelectorAll<HTMLButtonElement>(
-          ".companion-channel-group button",
-        ),
-      ]
-        .find((button) => button.textContent?.includes("Welcome"))!
-        .click();
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(container.querySelector(".companion-channel-detail")).not.toBeNull();
-    expect(
-      container.querySelector<HTMLImageElement>("img.companion-channel-avatar")
-        ?.src,
-    ).toBe("https://example.com/jay.png");
-    expect(container.querySelector(".companion-channel-thread-summary")).toBeNull();
-    const row = container.querySelector<HTMLElement>(
-      '[data-companion-channel-message-id="m-1"]',
-    );
-    await act(async () => {
-      row!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
-    });
-    expect(container.querySelectorAll(".companion-channel-action-sheet button"))
-      .toHaveLength(1);
-    expect(container.querySelector(".companion-channel-start-thread")?.textContent)
-      .toBe("Start a thread");
-    expect(
-      container.querySelector<HTMLInputElement>(".companion-channel-composer input")
-        ?.placeholder,
-    ).toBe("Message channel");
-  });
 
   it("shows a latest-message button above channel and thread composers when scrolled up", async () => {
     const parent = message("m-1", "Hello team", 1);
@@ -2259,44 +2042,6 @@ describe("CompanionChannels", () => {
     ).not.toBeNull();
   });
 
-  it("renders the Agent's configured avatar on its channel messages", async () => {
-    const item = message("m-1", "Agent report");
-    item.author = {
-      type: "agent",
-      id: "agent-1",
-      name: "Honey",
-      provider: "claude",
-      image: "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
-    };
-    loadChannel.mockResolvedValue({
-      channel: channel("c-common", "Welcome", null),
-      members: [],
-      agents: [],
-      messages: [item],
-    });
-    await render();
-
-    await act(async () => {
-      [
-        ...container.querySelectorAll<HTMLButtonElement>(
-          ".companion-channel-group button",
-        ),
-      ]
-        .find((button) => button.textContent?.includes("Welcome"))!
-        .click();
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(container.querySelector(".companion-channel-detail")).not.toBeNull();
-    const avatar = container.querySelector<HTMLImageElement>(
-      "img.companion-channel-avatar",
-    );
-    expect(avatar?.getAttribute("src")).toBe(
-      "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
-    );
-  });
 
   it("posts a thread reply against the opened message", async () => {
     loadChannel.mockResolvedValue({

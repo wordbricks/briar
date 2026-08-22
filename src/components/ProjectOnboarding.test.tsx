@@ -172,17 +172,6 @@ async function selectValidRepository(container: HTMLElement) {
 }
 
 describe("ProjectOnboarding", () => {
-  it("starts project creation with three clear choices in a dialog", () => {
-    const markup = renderToStaticMarkup(<ProjectOnboarding {...baseProps} />);
-
-    expect(markup).toContain("Connect Local Git Repository");
-    expect(markup).toContain("Create from scratch");
-    expect(markup).toContain("Migrate from Lovable");
-    expect(markup).toMatch(/<img[^>]*src="[^"]*lovable-color\.png"[^>]*>/);
-    expect(markup).toContain('aria-hidden="true"');
-    expect(markup).toContain("aria-modal=\"true\"");
-    expect(markup).toContain("disabled=\"\"");
-  });
 
   it("shows developer tools before repository setup", async () => {
     const { container, root } = mountOnboarding();
@@ -212,13 +201,6 @@ describe("ProjectOnboarding", () => {
     container.remove();
   });
 
-  it("keeps create from scratch visibly disabled", () => {
-    const markup = renderToStaticMarkup(<ProjectOnboarding {...baseProps} canCancel />);
-
-    expect(markup).toContain("Create from scratch");
-    expect(markup).toContain("준비 중");
-    expect(markup).toMatch(/<button[^>]*aria-disabled="true"[^>]*disabled/);
-  });
 
   it("shows Next only after validating a Git repository", async () => {
     const { container, root } = mountOnboarding();

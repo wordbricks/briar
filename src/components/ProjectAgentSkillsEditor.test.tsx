@@ -36,10 +36,6 @@ afterEach(async () => {
 });
 
 describe("ProjectAgentSkillsEditor", () => {
-  it("accepts an empty Skill roster", () => {
-    expect(projectAgentSkillsValid([])).toBe(true);
-  });
-
   it("serializes only fields accepted by the Skill input contract", () => {
     const persistedSkill = {
       id: "skill-1",

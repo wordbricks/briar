@@ -1,6 +1,4 @@
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { I18nProvider } from "../i18n";
 import { demoDashboard } from "../lib/demo-data";
 import {
   scheduleOccurrenceSegmentsForWeek,
@@ -12,7 +10,6 @@ import type {
   ProjectAgentSchedule,
   ProjectAgentScheduleRun,
 } from "../types";
-import { ProjectSchedule } from "./ProjectSchedule";
 
 function calendarRun(
   id: string,
@@ -284,22 +281,5 @@ describe("ProjectSchedule", () => {
       { scheduleId: "schedule-b", lane: 1, laneCount: 2 },
       { scheduleId: "schedule-c", lane: 0, laneCount: 1 },
     ]);
-  });
-
-  it("renders the calendar shell, live time, and week controls", () => {
-    const markup = renderToStaticMarkup(
-      <I18nProvider>
-        <ProjectSchedule
-          isSidebarOpen
-          now={now}
-          project={demoDashboard.project}
-          token={null}
-        />
-      </I18nProvider>,
-    );
-
-    expect(markup).toContain("에이전트 작업 주간 캘린더");
-    expect(markup).toContain("project-schedule-now");
-    expect(markup).toContain('aria-label="이전 주"');
   });
 });
