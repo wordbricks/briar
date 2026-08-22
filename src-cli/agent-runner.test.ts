@@ -63,6 +63,18 @@ const agent = {
 };
 
 describe("detached Agent runner", () => {
+  it("directs saved Project Agents to the isolated worktree", () => {
+    const prompt = detachedProjectAgentPrompt({
+      agent,
+      request: "Run the saved Skill",
+      workspacePath: "/worktrees/project/task",
+    });
+
+    expect(prompt).toContain("prepared isolated project worktree");
+    expect(prompt).toContain("Do not inspect or modify the connected shared checkout");
+    expect(prompt).not.toContain("Work directly in the connected project repository");
+  });
+
   it("builds a structured blocked handoff for an exhausted OpenCode free tier", () => {
     const block = detachedProviderBlockFromPayload({
       type: "blocked",
