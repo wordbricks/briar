@@ -13,7 +13,10 @@ html.launch-intro-document body,
 html.launch-intro-document #root { background:transparent !important; }
 body { overflow: hidden; font-synthesis: none; }
 .brand { min-width:0; display:inline-flex; align-items:center; gap:9px; line-height:1; }
-.brand-mark { width:24px; height:24px; flex:0 0 24px; display:block; border-radius:6px; filter:drop-shadow(0 0 9px rgba(96,70,184,.18)); }
+.brand-mark { width:24px; height:24px; flex:0 0 24px; display:block; border-radius:6px; object-fit:contain; }
+.brand-mark-dark { display:none; }
+.dark .brand-mark-light { display:none; }
+.dark .brand-mark-dark { display:block; }
 .brand-name { font-size:var(--text-xl); font-weight:700; line-height:1; letter-spacing:-.7px; }
 .visually-hidden { width:1px; height:1px; position:absolute; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }
 .desktop-app-frame { width:100%; height:100%; min-height:0; display:flex; flex-direction:column; background:var(--background); }
@@ -2832,6 +2835,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .session-loading-screen { width:100%; height:100%; min-height:100dvh; position:relative; display:grid; place-items:center; overflow:hidden; background:var(--background); }
 .session-loading-logo { width:clamp(50.6667px,4.6667vw,60px); aspect-ratio:1; position:relative; isolation:isolate; }
 .session-loading-logo img { width:100%; height:100%; display:block; object-fit:contain; }
+.session-loading-logo-dark { display:none; }
+.dark .session-loading-logo-light { display:none; }
+.dark .session-loading-logo-dark { display:block; }
 .session-loading-logo::after { content:""; position:absolute; z-index:1; inset:0; pointer-events:none; background:linear-gradient(
     105deg,
     transparent 28%,
@@ -2839,7 +2845,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
     rgba(255, 255, 255, 0.98) 50%,
     rgba(255, 255, 255, 0.18) 61%,
     transparent 72%
-  ); background-size:260% 100%; background-position:180% 0; -webkit-mask-image:var(--session-loading-logo); mask-image:var(--session-loading-logo); -webkit-mask-position:center; mask-position:center; -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; -webkit-mask-size:contain; mask-size:contain; will-change:background-position; animation:session-logo-shimmer 1.9s ease-in-out infinite; }
+  ); background-size:260% 100%; background-position:180% 0; -webkit-mask-image:var(--session-loading-logo-light); mask-image:var(--session-loading-logo-light); -webkit-mask-position:center; mask-position:center; -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; -webkit-mask-size:contain; mask-size:contain; will-change:background-position; animation:session-logo-shimmer 1.9s ease-in-out infinite; }
+.dark .session-loading-logo::after { -webkit-mask-image:var(--session-loading-logo-dark); mask-image:var(--session-loading-logo-dark); }
+.dark .session-loading-logo img { opacity:.62; }
 @keyframes session-logo-shimmer { 0%,16% { background-position:180% 0; } 84%,100% { background-position:-80% 0; } }
 .companion-login-shell { width:100%; max-width:100%; height:100%; min-width:0; min-height:100dvh; place-items:stretch; overflow-x:hidden; overflow-y:auto; overscroll-behavior-x:none; background:var(--card); }
 .companion-login-shell .login-glow { max-width:100%; pointer-events:none; }

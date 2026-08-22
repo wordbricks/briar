@@ -1,5 +1,5 @@
 import { useEffect, type CSSProperties } from "react";
-import briarIconUrl from "../assets/app-icons/aubergine-riso.png";
+import briarMarkDarkUrl from "../assets/brand/briar-mark-dark.png";
 import { useI18n } from "../i18n";
 
 const INTRO_HOLD_MS = 5_000;
@@ -74,7 +74,7 @@ export function LaunchIntro({
 
       <div className="launch-intro-content" aria-hidden="true">
         <div className="launch-intro-brand">
-          <img src={briarIconUrl} alt="" />
+          <img src={briarMarkDarkUrl} alt="" />
           <span>briar</span>
         </div>
         <div className="launch-intro-copy">

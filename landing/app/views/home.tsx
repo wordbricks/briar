@@ -454,7 +454,7 @@ export default async function HomeView({ locale }: { locale: Locale }) {
 
       <section className="final-cta shell">
         <div className="cta-mark">
-          <img src="/briar-app-icon.png" alt="" />
+          <img src="/briar-mark-light.png" alt="" />
         </div>
         <span className="section-index">{c.final.eyebrow}</span>
         <h2>
