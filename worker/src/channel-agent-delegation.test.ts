@@ -190,7 +190,8 @@ describe("Organization Agent channel delegation", () => {
       calendarColor: "#6f5a7e",
       skills: [{
         name: "Repository questions",
-        instructions: "Inspect the repository and answer read-only questions.",
+        description: "Use for read-only repository questions.",
+        body: "Inspect the repository and answer read-only questions.",
         provider: "claude",
         model: null,
         effort: null,
@@ -357,7 +358,7 @@ describe("Organization Agent channel delegation", () => {
       organization_id: organizationId,
       channel_id: channelId,
       project_id: projectId,
-      skill_id: projectAgent.skills[0].id,
+      skill_id: null,
       status: "queued",
       agent_provider: "claude",
       delegated_by_reply_job_id: parent.id,
@@ -429,7 +430,7 @@ describe("Organization Agent channel delegation", () => {
     });
   });
 
-  it("lets only the delegated Project Agent propose its selected saved Skill", async () => {
+  it("lets the delegated Project Agent discover from its full Skill roster", async () => {
     const request = "Repository questions: run the saved repository workflow.";
     const parent = await queueOrganizationReply(request);
     const parentClaim = await claim(otherWorkerId);
@@ -495,13 +496,13 @@ describe("Organization Agent channel delegation", () => {
     expect(childClaim.work).toMatchObject({
       workId: child.id,
       projectId,
-      activeSkill: { id: projectAgent.skills[0].id },
-      skillExecutionTarget: {
-        projectId,
-        agentId: projectAgent.id,
-        skillId: projectAgent.skills[0].id,
-        skillName: projectAgent.skills[0].name,
-        request,
+      activeSkill: null,
+      skillExecutionTarget: null,
+      agent: {
+        skills: [{
+          id: projectAgent.skills[0].id,
+          name: projectAgent.skills[0].name,
+        }],
       },
       delegation: {
         delegatedByReplyId: parent.id,
@@ -517,13 +518,11 @@ describe("Organization Agent channel delegation", () => {
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
         result: {
-          body: "The saved Skill requires explicit Worker approval.",
+          body: "I discovered and followed the relevant saved Skill.",
           document: null,
           issueProposal: null,
           executionProposal: null,
-          skillExecutionProposal: {
-            type: "request_agent_skill_execute",
-          },
+          skillExecutionProposal: null,
           delegation: null,
         },
       }),
@@ -532,20 +531,7 @@ describe("Organization Agent channel delegation", () => {
     expect(childCompleted.status).toBe(200);
     await expect(childCompleted.json()).resolves.toMatchObject({
       message: {
-        skillExecutionProposal: {
-          type: "request_agent_skill_execute",
-          status: "pending",
-          projectId,
-          agentId: projectAgent.id,
-          agentName: projectAgent.name,
-          skillId: projectAgent.skills[0].id,
-          skillName: projectAgent.skills[0].name,
-          request,
-          delegatedByAgentId: organizationAgent.id,
-          delegatedByAgentName: organizationAgent.name,
-          requestedWorkerId: null,
-          resultSessionId: null,
-        },
+        skillExecutionProposal: null,
       },
     });
     await expect(db.prepare(
@@ -553,14 +539,7 @@ describe("Organization Agent channel delegation", () => {
               delegated_by_agent_name, requested_worker_id, result_session_id
        from briar_agent_skill_execution_proposals
        where source_reply_job_id = ?`,
-    ).bind(child.id).first()).resolves.toEqual({
-      status: "pending",
-      delegated_by_reply_job_id: parent.id,
-      delegated_by_agent_id: organizationAgent.id,
-      delegated_by_agent_name: organizationAgent.name,
-      requested_worker_id: null,
-      result_session_id: null,
-    });
+    ).bind(child.id).first()).resolves.toBeNull();
   });
 
   it("requires Organization delegation and preserves it on a Project Agent execution card", async () => {
@@ -943,14 +922,15 @@ describe("Organization Agent channel delegation", () => {
     ).resolves.toMatchObject({ status: "completed" });
   });
 
-  it("fails a delegated child instead of falling back after its selected Skill is deleted", async () => {
+  it("does not pin a delegated discovery turn to a Skill deleted before claim", async () => {
     const skill = await db.prepare(
       `select * from briar_agent_skills where id = ?`,
     ).bind(projectAgent.skills[0].id).first<{
       id: string;
       agent_id: string;
       name: string;
-      instructions: string;
+      description: string;
+      body: string;
       provider: string;
       model: string | null;
       effort: string | null;
@@ -964,33 +944,49 @@ describe("Organization Agent channel delegation", () => {
       "Repository questions: inspect the authentication module.",
     );
     expect(child).toMatchObject({
-      skill_id: skill!.id,
-      selected_skill_id_snapshot: skill!.id,
+      skill_id: null,
+      selected_skill_id_snapshot: null,
       agent_provider: "claude",
     });
 
     await db.prepare(`delete from briar_agent_skills where id = ?`)
       .bind(skill!.id).run();
-    await expect(claim(projectWorkerId)).resolves.toEqual({ work: null });
-    await expect(
-      getChannelAgentReplyJob(db, organizationId, child.id),
-    ).resolves.toMatchObject({
-      status: "failed",
-      skill_id: null,
-      selected_skill_id_snapshot: skill!.id,
-      error: "Agent provider or selected Skill changed before reply execution.",
+    const childClaim = await claim(projectWorkerId);
+    expect(childClaim.work).toMatchObject({
+      workId: child.id,
+      provider: "claude",
+      activeSkill: null,
+      agent: { skills: [] },
     });
+    const completed = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+        organizationId,
+        workerId: projectWorkerId,
+        claimToken: String(childClaim.work?.claimToken),
+        result: {
+          body: "The saved Skill was removed before this turn.",
+          document: null,
+          issueProposal: null,
+          executionProposal: null,
+          skillExecutionProposal: null,
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(completed.status).toBe(200);
 
     await db.prepare(
       `insert into briar_agent_skills (
-         id, agent_id, name, instructions, provider, model, effort, kind,
+         id, agent_id, name, description, body, provider, model, effort, kind,
          is_default, position, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       skill!.id,
       skill!.agent_id,
       skill!.name,
-      skill!.instructions,
+      skill!.description,
+      skill!.body,
       skill!.provider,
       skill!.model,
       skill!.effort,
@@ -1002,13 +998,13 @@ describe("Organization Agent channel delegation", () => {
     ).run();
   });
 
-  it("fails a delegated child when its selected Skill provider changes", async () => {
+  it("uses the Agent runtime when a discoverable Skill provider changes", async () => {
     const child = await queueDelegatedChild(
       "Repository questions: inspect the authorization module.",
     );
     expect(child).toMatchObject({
-      skill_id: projectAgent.skills[0].id,
-      selected_skill_id_snapshot: projectAgent.skills[0].id,
+      skill_id: null,
+      selected_skill_id_snapshot: null,
       agent_provider: "claude",
     });
 
@@ -1016,13 +1012,32 @@ describe("Organization Agent channel delegation", () => {
       `update briar_agent_skills set provider = 'codex', updated_at = ?
        where id = ?`,
     ).bind(new Date().toISOString(), projectAgent.skills[0].id).run();
-    await expect(claim(projectWorkerId)).resolves.toEqual({ work: null });
-    await expect(
-      getChannelAgentReplyJob(db, organizationId, child.id),
-    ).resolves.toMatchObject({
-      status: "failed",
-      error: "Agent provider or selected Skill changed before reply execution.",
+    const childClaim = await claim(projectWorkerId);
+    expect(childClaim.work).toMatchObject({
+      workId: child.id,
+      provider: "claude",
+      activeSkill: null,
+      agent: {
+        skills: [{ id: projectAgent.skills[0].id, provider: "codex" }],
+      },
     });
+    const completed = await apiWorker.fetch(
+      workerRequest(`/channel-reply-claims/${child.id}/complete`, {
+        organizationId,
+        workerId: projectWorkerId,
+        claimToken: String(childClaim.work?.claimToken),
+        result: {
+          body: "I discovered the Skill while using the Agent runtime.",
+          document: null,
+          issueProposal: null,
+          executionProposal: null,
+          skillExecutionProposal: null,
+          delegation: null,
+        },
+      }),
+      env(),
+    );
+    expect(completed.status).toBe(200);
     await db.prepare(
       `update briar_agent_skills set provider = 'claude', updated_at = ?
        where id = ?`,

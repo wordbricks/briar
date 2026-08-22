@@ -177,7 +177,7 @@ export function ProfileDialog({
                   {profile.skills.map((skill) => (
                     <li key={skill.id}>
                       <strong>{skill.name}</strong>
-                      {skill.instructions ? <span>{skill.instructions}</span> : null}
+                      {skill.description ? <span>{skill.description}</span> : null}
                     </li>
                   ))}
                 </ul>

@@ -2158,7 +2158,7 @@ export async function enqueueChannelAgentReplies(
        case when current_skill.id is null then null else current_agent.name end,
        case when current_skill.id is null then null
          else current_agent.responsibility end,
-       current_skill.name, current_skill.instructions, current_skill.kind,
+       current_skill.name, current_skill.body, current_skill.kind,
        current_skill.provider,
        current_skill.model, current_skill.effort,
        case when current_skill.id is null then null else trigger_message.body end`
@@ -2324,7 +2324,7 @@ export async function claimNextChannelAgentReply(
                  ${job}.selected_agent_responsibility_snapshot
                and snapshot_skill.id = ${job}.selected_skill_id_snapshot
                and snapshot_skill.name = ${job}.selected_skill_name_snapshot
-               and snapshot_skill.instructions =
+               and snapshot_skill.body =
                  ${job}.selected_skill_instructions_snapshot
                and snapshot_skill.kind = ${job}.selected_skill_kind_snapshot
                and snapshot_skill.provider =
@@ -3054,7 +3054,7 @@ export async function completeChannelReply(
              and snapshot_skill.id = briar_channel_agent_reply_jobs.skill_id
              and snapshot_skill.name =
                briar_channel_agent_reply_jobs.selected_skill_name_snapshot
-             and snapshot_skill.instructions =
+             and snapshot_skill.body =
                briar_channel_agent_reply_jobs
                  .selected_skill_instructions_snapshot
              and snapshot_skill.kind =
@@ -3428,7 +3428,7 @@ export async function completeChannelReply(
              and agent.responsibility =
                job.selected_agent_responsibility_snapshot
              and skill.name = job.selected_skill_name_snapshot
-             and skill.instructions = job.selected_skill_instructions_snapshot
+             and skill.body = job.selected_skill_instructions_snapshot
              and skill.kind = job.selected_skill_kind_snapshot
              and skill.provider = job.selected_skill_provider_snapshot
              and skill.model is job.selected_skill_model_snapshot
@@ -3468,7 +3468,7 @@ export async function completeChannelReply(
          case when target_skill.id is null then null else target.name end,
          case when target_skill.id is null then null
            else target.responsibility end,
-         target_skill.name, target_skill.instructions, target_skill.kind,
+         target_skill.name, target_skill.body, target_skill.kind,
          target_skill.provider,
          target_skill.model, target_skill.effort,
          case when target_skill.id is null then null else ? end`

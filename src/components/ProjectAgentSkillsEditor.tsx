@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import {
-  agentSkillInstructionsMaxLength,
+  agentSkillBodyMaxLength,
+  agentSkillDescriptionMaxLength,
   agentSkillsMaxCount,
 } from "../lib/agent-limits";
 import {
@@ -31,7 +32,8 @@ export function projectAgentSkillInputs(
   const next = skills.map((skill, position) => ({
     ...(skill.id ? { id: skill.id } : {}),
     name: skill.name,
-    instructions: skill.instructions,
+    description: skill.description,
+    body: skill.body,
     provider: skill.provider,
     model: skill.model,
     effort: skill.effort,
@@ -53,8 +55,10 @@ export function projectAgentSkillsValid(
     skills.every(
       (skill) =>
         skill.name.trim() &&
-        skill.instructions.trim() &&
-        skill.instructions.length <= agentSkillInstructionsMaxLength,
+        skill.description.trim() &&
+        skill.description.length <= agentSkillDescriptionMaxLength &&
+        skill.body.trim() &&
+        skill.body.length <= agentSkillBodyMaxLength,
     )
   );
 }
@@ -97,7 +101,8 @@ export function ProjectAgentSkillsEditor({
       {
         id: crypto.randomUUID(),
         name: "",
-        instructions: "",
+        description: "",
+        body: "",
         provider: defaultProvider,
         model: defaultModel,
         effort: defaultEffort,
@@ -213,23 +218,41 @@ export function ProjectAgentSkillsEditor({
 
                   <div className="project-agent-settings-field">
                     <Label
-                      htmlFor={`project-agent-skill-instructions-${index}`}
+                      htmlFor={`project-agent-skill-description-${index}`}
                     >
-                      {t("agents.skillInstructions")}
+                      {t("agents.skillDescription")}
                     </Label>
                     <Textarea
                       disabled={disabled}
-                      id={`project-agent-skill-instructions-${index}`}
-                      maxLength={agentSkillInstructionsMaxLength}
+                      id={`project-agent-skill-description-${index}`}
+                      maxLength={agentSkillDescriptionMaxLength}
                       onChange={(event) =>
                         updateSkill(index, {
-                          instructions: event.target.value,
+                          description: event.target.value,
                         })
                       }
-                      placeholder={t("agents.skillInstructionsPlaceholder")}
+                      placeholder={t("agents.skillDescriptionPlaceholder")}
                       required
-                      rows={4}
-                      value={skill.instructions}
+                      rows={2}
+                      value={skill.description}
+                    />
+                  </div>
+
+                  <div className="project-agent-settings-field">
+                    <Label htmlFor={`project-agent-skill-body-${index}`}>
+                      {t("agents.skillBody")}
+                    </Label>
+                    <Textarea
+                      disabled={disabled}
+                      id={`project-agent-skill-body-${index}`}
+                      maxLength={agentSkillBodyMaxLength}
+                      onChange={(event) =>
+                        updateSkill(index, { body: event.target.value })
+                      }
+                      placeholder={t("agents.skillBodyPlaceholder")}
+                      required
+                      rows={6}
+                      value={skill.body}
                     />
                   </div>
 

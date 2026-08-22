@@ -1371,7 +1371,8 @@ describe("organization channels", () => {
         {
           id: "ab000000-0000-4000-8000-000000000001",
           name: "Writing",
-          instructions: "Write concise channel responses.",
+          description: "Use for concise channel responses.",
+          body: "Write concise channel responses.",
           provider: "claude",
           model: null,
           effort: null,
@@ -1381,7 +1382,8 @@ describe("organization channels", () => {
         {
           id: "ab000000-0000-4000-8000-000000000002",
           name: "Product planning",
-          instructions: "Create implementation plans.",
+          description: "Use for product planning requests.",
+          body: "Create implementation plans.",
           provider: "grok",
           model: null,
           effort: "high",
@@ -2783,6 +2785,17 @@ describe("organization channels", () => {
       model: null,
       responsibility: "Reply to direct messages",
       effort: null,
+      skills: [{
+        id: "ab000000-0000-4000-8000-000000000120",
+        name: "Direct response",
+        description: "Use for direct questions that need a concise answer.",
+        body: "Reply concisely.",
+        provider: "claude",
+        model: null,
+        effort: null,
+        kind: "custom",
+        position: 0,
+      }],
       createdAt: at(20),
     });
     const apiEnv = {
@@ -2835,17 +2848,22 @@ describe("organization channels", () => {
           authorization: `Bearer ${ownerSessionToken}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ body: "Hello without a mention" }),
+        body: JSON.stringify({ body: "Direct response without a mention" }),
       },
     ), apiEnv);
     expect(message.status).toBe(201);
     const messageBody = await message.json() as {
       message: { mentionedAgentIds: string[] };
-      agentReplies: Array<{ agentId: string }>;
+      agentReplies: Array<{ id: string; agentId: string }>;
     };
     expect(messageBody.message.mentionedAgentIds).toEqual([]);
     expect(messageBody.agentReplies).toHaveLength(1);
     expect(messageBody.agentReplies[0]?.agentId).toBe(agentId);
+    await expect(getChannelAgentReplyJob(
+      db,
+      organizationId,
+      messageBody.agentReplies[0]!.id,
+    )).resolves.toMatchObject({ skill_id: null, agent_provider: "claude" });
 
     const expanded = await apiWorker.fetch(new Request(
       `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/members/${outsiderId}`,
@@ -2889,6 +2907,31 @@ describe("organization channels", () => {
     expect(groupMessage.status).toBe(201);
     expect((await groupMessage.json() as { agentReplies: unknown[] }).agentReplies)
       .toEqual([]);
+
+    const mentionedMessage = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${groupId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          body: "Please use Direct response here",
+          mentionedAgentIds: [agentId],
+        }),
+      },
+    ), apiEnv);
+    expect(mentionedMessage.status).toBe(201);
+    const mentionedBody = await mentionedMessage.json() as {
+      agentReplies: Array<{ id: string; agentId: string }>;
+    };
+    expect(mentionedBody.agentReplies).toHaveLength(1);
+    await expect(getChannelAgentReplyJob(
+      db,
+      organizationId,
+      mentionedBody.agentReplies[0]!.id,
+    )).resolves.toMatchObject({ skill_id: null, agent_provider: "claude" });
   });
 
   it("accepts only the sender's organization device and copies it to every mentioned Agent job", async () => {

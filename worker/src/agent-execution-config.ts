@@ -52,9 +52,8 @@ export function issueReplyExecutionConfig(input: {
 }
 
 export function legacyAgentSkillInstructions(
-  activeSkill: { instructions: string } | null | undefined,
+  activeSkill: { body: string } | null | undefined,
   fallback: string,
 ) {
-  return activeSkill?.instructions ?? fallback;
+  return activeSkill?.body ?? fallback;
 }
-

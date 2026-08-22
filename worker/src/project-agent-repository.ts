@@ -103,7 +103,8 @@ export async function createProjectAgent(
     input.skills ?? [],
     {
       name: input.name,
-      instructions: input.responsibility,
+      description: input.description?.trim() || input.responsibility.slice(0, 1000),
+      body: input.responsibility,
       provider: input.provider,
       model: input.model,
       effort: input.effort,
@@ -201,7 +202,8 @@ export async function updateProjectAgent(
       input.skills,
       {
         name: input.name,
-        instructions: input.responsibility,
+        description: input.description?.trim() || input.responsibility.slice(0, 1000),
+        body: input.responsibility,
         provider: input.provider,
         model: input.model,
         effort: input.effort,
@@ -219,7 +221,8 @@ export async function updateProjectAgent(
     );
   } else {
     const legacySkill = soleAgentSkillRowFromLegacy(existing.skills, {
-        instructions: input.responsibility,
+        description: input.description?.trim() || input.responsibility.slice(0, 1000),
+        body: input.responsibility,
         provider: input.provider,
         model: input.model,
         effort: input.effort,

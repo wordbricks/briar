@@ -203,9 +203,10 @@ describe("project Agent routes", () => {
     await expect(
       db.prepare(
         `insert into briar_agent_skills (
-           id, agent_id, name, instructions, provider, model, effort, kind,
+           id, agent_id, name, description, body, provider, model, effort, kind,
            is_default, position, created_at, updated_at
-         ) values (?, ?, 'Boundary Skill 6', '', 'codex', null, null,
+         ) values (?, ?, 'Boundary Skill 6', 'Boundary description', '',
+                   'codex', null, null,
                    'custom', 0, 5, ?, ?)`,
       ).bind(crypto.randomUUID(), created.agent.id, now, now).run(),
     ).rejects.toThrow(/at most 5 Skills/u);
