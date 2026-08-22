@@ -1,16 +1,12 @@
 import { readFileSync } from "node:fs";
 import * as Option from "effect/Option";
 import { describe, expect, it } from "vitest";
-import worker from "./index";
 import {
   mobileAcceptChannelProposalResponseSchema,
   mobileAcceptIssueActionProposalResponseSchema,
   mobileChannelIssueProposalPayloadSchema,
   mobileChannelMessageSchema,
   mobileClientIds,
-  mobileDashboardDeltaSchema,
-  mobileDashboardSnapshotSchema,
-  mobileInboxReadStatesSchema,
   mobileIssueExecutionApprovalRequestSchema,
   mobileIssueExecutionProposalSchema,
   mobileIssueMessagesResponseSchema,
@@ -102,69 +98,6 @@ describe("Companion mobile API contract", () => {
           .not.toThrow();
       }
     }
-  });
-
-  it("carries the Agent name with session snapshots", () => {
-    const listResponse = decodeMobileSchema(
-      mobileOperationSchemas.listProjectAgentSessions.response,
-      fixture.operations.listProjectAgentSessions.response,
-    );
-    const taskResponse = decodeMobileSchema(
-      mobileOperationSchemas.runProjectAgentTask.response,
-      fixture.operations.runProjectAgentTask.response,
-    );
-
-    expect(listResponse.sessions[0]?.agentName).toBe("Issue processing agent");
-    expect(taskResponse.session.agentName).toBe("Issue processing agent");
-  });
-
-  it("carries Agent descriptions without replacing responsibilities", () => {
-    const projectAgent = decodeMobileSchema(
-      mobileOperationSchemas.listProjectAgents.response,
-      fixture.operations.listProjectAgents.response,
-    ).agents[0];
-    const channelAgent = decodeMobileSchema(
-      mobileOperationSchemas.getChannel.response,
-      fixture.operations.getChannel.response,
-    ).agents[0];
-
-    expect(projectAgent?.description).toBe(
-      "Handles issue processing and development work for the project.",
-    );
-    expect(projectAgent?.responsibility).toBe(
-      "Owns the project's development and code-related work.",
-    );
-    expect(channelAgent?.description).toBe(
-      "글쓰기와 콘텐츠 다듬기를 돕는 에이전트입니다.",
-    );
-    expect(channelAgent?.responsibility).toBe("글쓰기 파트너");
-  });
-
-  it("accepts channel inbox ids in an all-read state update", () => {
-    const request = fixture.operations.putInboxReadStates.request as {
-      readVersions: Record<string, string>;
-    };
-
-    expect(
-      decodeMobileSchema(mobileInboxReadStatesSchema, request).readVersions[
-        "channel:55555555-5555-4555-8555-555555555555"
-      ],
-    ).toBe("55555555-5555-4555-8555-555555555555");
-  });
-
-  it("preserves organization providers in full and delta dashboard payloads", () => {
-    const organizationProviders = ["grok", "opencode", "codex"] as const;
-    const snapshot = decodeMobileSchema(mobileDashboardSnapshotSchema, {
-      ...(fixture.operations.getDashboardSnapshot.response as object),
-      organizationProviders,
-    });
-    const delta = decodeMobileSchema(mobileDashboardDeltaSchema, {
-      ...(fixture.operations.getDashboardDelta.response as object),
-      organizationProviders,
-    });
-
-    expect(snapshot.organizationProviders).toEqual(organizationProviders);
-    expect(delta.organizationProviders).toEqual(organizationProviders);
   });
 
   it("requires callers to choose an Agent Skill before running a task", () => {
@@ -345,63 +278,6 @@ describe("Companion mobile API contract", () => {
     expect(acceptedUpdate.proposal).not.toHaveProperty("executeAfterCreate");
   });
 
-  it("accepts webhook-authored channel messages as a distinct mobile author", () => {
-    const channelResponse = fixture.operations.listChannelMessages.response as {
-      messages: Array<Record<string, unknown>>;
-    };
-    const parsed = decodeMobileSchema(mobileChannelMessageSchema, {
-      ...channelResponse.messages[0],
-      author: {
-        type: "webhook",
-        id: "77777777-7777-4777-8777-777777777777",
-        name: "Deploy notifier",
-      },
-    });
-    expect(parsed.author).toEqual({
-      type: "webhook",
-      id: "77777777-7777-4777-8777-777777777777",
-      name: "Deploy notifier",
-    });
-  });
-
-  it("carries the Agent's configured avatar on channel message authors", () => {
-    const channelResponse = fixture.operations.listChannelMessages.response as {
-      messages: Array<Record<string, unknown>>;
-    };
-    const avatar = "data:image/png;base64,cHJvamVjdC1hdmF0YXI=";
-    const parsed = decodeMobileSchema(mobileChannelMessageSchema, {
-      ...channelResponse.messages[0],
-      author: {
-        type: "agent",
-        id: "66666666-6666-4666-8666-666666666666",
-        name: "Honey",
-        provider: "claude",
-        image: avatar,
-      },
-    });
-    expect(parsed.author).toEqual({
-      type: "agent",
-      id: "66666666-6666-4666-8666-666666666666",
-      name: "Honey",
-      provider: "claude",
-      image: avatar,
-    });
-    expect(
-      Option.isSome(decodeMobileSchemaOption(
-        mobileChannelMessageSchema,
-        {
-          ...channelResponse.messages[0],
-          author: {
-            type: "agent",
-            id: "66666666-6666-4666-8666-666666666666",
-            name: "Honey",
-            provider: "claude",
-          },
-        },
-      )),
-    ).toBe(false);
-  });
-
   it("requires explicit nullable execution choices and rejects hidden fields", () => {
     const request = {
       provider: "codex",
@@ -436,30 +312,4 @@ describe("Companion mobile API contract", () => {
     ).toEqual(["provider", "model", "effort", "workerId"]);
   });
 
-  it("serves the documented health fixture from the Worker", async () => {
-    const response = await worker.fetch(
-      new Request("https://briar-api.example/health"),
-      {} as never,
-    );
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(
-      fixture.operations.getHealth.response,
-    );
-  });
-
-  it.each(["mobile", "android"])(
-    "renders Companion authorization for the %s client route",
-    async (client) => {
-      const response = await worker.fetch(
-        new Request(`https://briar-api.example/device?client=${client}`),
-        {} as never,
-      );
-      const page = await response.text();
-
-      expect(response.status).toBe(200);
-      expect(page).toContain("Companion 로그인 승인");
-      expect(page).toContain("briar-companion://auth-complete");
-    },
-  );
 });

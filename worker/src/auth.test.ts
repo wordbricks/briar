@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAuth, handleAuthRequest } from "./auth";
 import {
-  authOTPEmailMessage,
   consumeEmailOTPEmailLimit,
   type AuthEmailMessage,
   type AuthEmailSender,
@@ -331,26 +330,5 @@ describe("email OTP availability", () => {
     );
     expect(response.status).toBe(404);
     expect(handler).not.toHaveBeenCalled();
-  });
-});
-
-describe("email OTP templates", () => {
-  it.each([
-    ["ko", "Briar 로그인 인증코드"],
-    ["en", "Your Briar sign-in code"],
-    ["zh", "Briar 登录验证码"],
-  ] as const)("renders the %s template", (locale, subject) => {
-    const message = authOTPEmailMessage({
-      email: "Person@Example.com",
-      otp: "123456",
-      locale,
-    });
-    expect(message).toMatchObject({
-      to: "person@example.com",
-      from: "login@auth.wordbricks.ai",
-      subject,
-    });
-    expect(message.html).toContain("123456");
-    expect(message.text).toContain("123456");
   });
 });

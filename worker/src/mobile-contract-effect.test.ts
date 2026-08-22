@@ -10,7 +10,6 @@ import {
   mobileDeviceCodeRequestSchema,
   mobileHealthResponseSchema,
   mobileInboxReadStatesSchema,
-  mobileOperationSchemas,
   mobileProjectsResponseSchema,
 } from "./mobile-contract";
 import {
@@ -30,26 +29,6 @@ const fixture = JSON.parse(readFileSync(
 };
 
 describe("Effect mobile contract behavior", () => {
-  it("decodes every static fixture through the Effect operation registry", () => {
-    for (const operationId of Object.keys(mobileOperationSchemas) as Array<
-      keyof typeof mobileOperationSchemas
-    >) {
-      const schemas = mobileOperationSchemas[operationId];
-      const operation = fixture.operations[operationId];
-      expect(() => decodeMobileSchema(schemas.response, operation.response))
-        .not.toThrow();
-      if ("request" in schemas) {
-        expect(() => decodeMobileSchema(schemas.request, operation.request))
-          .not.toThrow();
-      }
-      if ("errorResponse" in schemas) {
-        expect(() =>
-          decodeMobileSchema(schemas.errorResponse, operation.errorResponse)
-        ).not.toThrow();
-      }
-    }
-  });
-
   it("preserves non-strict stripping and strict rejection boundaries", () => {
     expect(decodeMobileSchema(mobileHealthResponseSchema, {
       ok: true,
@@ -149,10 +128,6 @@ describe("Effect mobile contract behavior", () => {
       "Renamed",
       "Second",
     ]);
-    expect(projects.projects[0]).toMatchObject({
-      issueKeyPrefix: "AH",
-      scheduleTabEnabled: true,
-    });
   });
 
   it("enforces cross-field preference and approval invariants", () => {

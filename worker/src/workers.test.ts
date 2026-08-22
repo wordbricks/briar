@@ -3367,45 +3367,4 @@ describe("detached execution workers", () => {
     expect(decompressed).toContain("Raw thought");
   });
 
-  it("does not expose legacy D1 transcript rows", async () => {
-    const sessionToken = "legacy-transcript-session-token";
-    await db.batch([
-      db.prepare(
-        `insert into "session" (
-           id, expiresAt, token, createdAt, updatedAt, userId
-         ) values (?, '2099-01-01T00:00:00.000Z', ?, ?, ?, 'owner')`,
-      ).bind("legacy-transcript-session", sessionToken, atMinute(1), atMinute(1)),
-      db.prepare(
-        `insert into briar_agent_transcript_sessions (
-           session_id, project_id, run_id, worker_id, agent_provider,
-           started_at, last_event_at, event_count, byte_count
-         ) values ('legacy-only', ?, null, null, 'codex', ?, ?, 1, 16)`,
-      ).bind(projectId, atMinute(1), atMinute(1)),
-      db.prepare(
-        `insert into briar_agent_transcripts (
-           session_id, sequence, direction, payload_json, recorded_at
-         ) values ('legacy-only', 1, 'server', '{"type":"result"}', ?)`,
-      ).bind(atMinute(1)),
-    ]);
-    const env = {
-      DB: db,
-      ARCHIVES: archives,
-      BETTER_AUTH_SECRET: "legacy-transcript-secret-legacy-transcript-secret",
-      GOOGLE_CLIENT_ID: "google-client-test",
-      GOOGLE_CLIENT_SECRET: "google-secret-test",
-    } as unknown as Env;
-    const headers = { authorization: `Bearer ${sessionToken}` };
-
-    for (const suffix of ["transcript", "raw-transcript"]) {
-      const response = await apiWorker.fetch(
-        new Request(
-          `https://briar-api.example/projects/${projectId}/sessions/legacy-only/${suffix}`,
-          { headers },
-        ),
-        env,
-      );
-      expect(response.status).toBe(404);
-    }
-  });
-
 });

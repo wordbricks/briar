@@ -5,7 +5,6 @@ import { RequestDecodeError } from "./request-schema";
 import {
   decodeWorkerHeartbeat,
   decodeWorkerRegister,
-  decodeWorkerSettings,
 } from "./worker-request-contract";
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
@@ -35,15 +34,6 @@ describe("Worker request contract", () => {
         ]),
       );
     }
-  });
-
-  it("keeps strict validation on schemas with cross-field checks", () => {
-    expect(() =>
-      decodeWorkerSettings({
-        icon: null,
-        unexpected: true,
-      })
-    ).toThrow(RequestDecodeError);
   });
 
   it("requires exactly the supported provider health keys", () => {

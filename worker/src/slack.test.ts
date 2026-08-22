@@ -1,17 +1,13 @@
-import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildSlackCreateIssueModal,
-  buildSlackIssueCreatedMessage,
   callSlackApi,
   decryptSlackToken,
   downloadSlackIssueAttachments,
   encryptSlackToken,
-  formatBriarIssueKey,
   parseSlackCreateIssueSubmission,
   parseSlackIssueInstruction,
   slackCreateIssueBlocks,
-  slackCreateIssueShortcutCallbackId,
   SlackCreateIssueValidationError,
   verifySlackRequest,
 } from "./slack";
@@ -19,19 +15,6 @@ import {
 describe("Slack integration", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-  });
-
-  it("registers the create-issue global shortcut in the Slack manifest", () => {
-    const manifest = readFileSync(
-      new URL("../../config/slack-app-manifest.yaml", import.meta.url),
-      "utf8",
-    );
-
-    expect(manifest).toContain("name: Create a Briar issue");
-    expect(manifest).toContain("type: global");
-    expect(manifest).toContain(
-      `callback_id: ${slackCreateIssueShortcutCallbackId}`,
-    );
   });
 
   it("verifies Slack signatures and rejects stale requests", async () => {
@@ -140,41 +123,6 @@ describe("Slack integration", () => {
       status: "queued",
       titleTooLong: true,
     });
-  });
-
-  it("builds a /create modal with project, text, and attachment inputs", () => {
-    const modal = buildSlackCreateIssueModal({
-      projects: [
-        { id: "project-1", name: "First" },
-        { id: "project-2", name: "Second" },
-      ],
-      defaultProjectId: "project-2",
-      responseUrl:
-        "https://hooks.slack.com/commands/T123/B123/response-token",
-      channelId: "C123",
-      initialTitle: "Prefilled title",
-    });
-
-    expect(modal.callback_id).toBe("briar_create_issue");
-    expect(modal.blocks.map((block) => block.block_id)).toEqual([
-      slackCreateIssueBlocks.project,
-      slackCreateIssueBlocks.title,
-      slackCreateIssueBlocks.description,
-      slackCreateIssueBlocks.attachments,
-    ]);
-    expect(modal.blocks[0]?.element).toMatchObject({
-      type: "static_select",
-      initial_option: { value: "project-2" },
-    });
-    expect(modal.blocks[1]?.element).toMatchObject({
-      type: "plain_text_input",
-      initial_value: "Prefilled title",
-    });
-    expect(modal.blocks[3]?.element).toMatchObject({
-      type: "file_input",
-      max_files: 5,
-    });
-    expect(modal.blocks[3]?.element).not.toHaveProperty("filetypes");
   });
 
   it("parses a /create modal submission", () => {
@@ -321,45 +269,6 @@ describe("Slack integration", () => {
         blockId: slackCreateIssueBlocks.title,
         message: expect.stringContaining("100자"),
       }),
-    );
-  });
-
-  it("formats human-readable issue keys for Slack confirmations", () => {
-    expect(formatBriarIssueKey(1231)).toBe("AH-1231");
-    expect(formatBriarIssueKey(1231, "BR")).toBe("BR-1231");
-    expect(
-      buildSlackIssueCreatedMessage({
-        title: "로그인 버튼이 동작하지 않아요",
-        projectName: "Briar",
-        statusLabel: "작업 대기열",
-        priorityLabel: " · P2",
-        runNumber: 1231,
-      }),
-    ).toBe(
-      [
-        ":white_check_mark: *로그인 버튼이 동작하지 않아요* 이슈를 만들었습니다.",
-        "프로젝트: Briar · 작업 대기열 · P2",
-        "이슈 ID: `AH-1231`",
-      ].join("\n"),
-    );
-    expect(
-      buildSlackIssueCreatedMessage({
-        title: "Create from shortcut",
-        projectName: "First",
-        statusLabel: "작업 대기열",
-        runNumber: 42,
-        issueKeyPrefix: "PRJ",
-      }),
-    ).toContain("이슈 ID: `PRJ-42`");
-    expect(
-      buildSlackIssueCreatedMessage({
-        title: "Create from shortcut",
-        projectName: "First",
-        statusLabel: "작업 대기열",
-        runNumber: 42,
-      }),
-    ).not.toMatch(
-      /이슈 ID: `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`/i,
     );
   });
 

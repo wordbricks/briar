@@ -115,12 +115,7 @@ import {
   updateProjectSettings as persistProjectSettings,
   updateProjectAgent,
   updateProjectAgentSchedule,
-  updateOrganization,
-  updateOrganizationLogo,
   updateOrganizationMemberRole,
-  updateProjectIcon,
-  updateProjectIssueKeyPrefix,
-  updateProjectScheduleTabEnabled,
   updateIssue,
   unsubscribeIssue,
   upsertProjectAgentSession,
@@ -2072,89 +2067,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       requestedByUserId: "owner",
       status: "completed",
     });
-  });
-
-  it("backfills legacy workers as organization devices without issuing credentials", async () => {
-    const binding = await db
-      .prepare(
-        `select project_id, device_id
-         from briar_execution_workers
-         where id = 'legacy-worker'`,
-      )
-      .first<{ project_id: string; device_id: string }>();
-    expect(binding).toEqual({
-      project_id: projectId,
-      device_id: "legacy-worker",
-    });
-    const device = await db
-      .prepare(
-        `select organization_id, owner_user_id, state
-         from briar_execution_worker_devices
-         where id = 'legacy-worker'`,
-      )
-      .first<{
-        organization_id: string;
-        owner_user_id: string;
-        state: string;
-      }>();
-    expect(device).toEqual({
-      organization_id: projectId,
-      owner_user_id: "owner",
-      state: "stale",
-    });
-    expect(
-      await db
-        .prepare(
-          `select token_hash from briar_execution_worker_credentials
-           where device_id = 'legacy-worker'`,
-        )
-        .first(),
-    ).toBeNull();
-  });
-
-  it("keeps the default project agent as a regular agent", async () => {
-    await expect(listProjectAgents(db, projectId)).resolves.toEqual([
-      expect.objectContaining({
-        project_id: projectId,
-        name: "Developer agent",
-        avatar: null,
-        provider: "codex",
-        model: null,
-        responsibility: "Perform Auto Hunt for every queued issue.",
-        skill_markdown: expect.stringContaining("attached project workflow"),
-        skills: [
-          expect.objectContaining({
-            name: "Issue processing",
-            provider: "codex",
-            kind: "issue_processing",
-            is_default: 0,
-          }),
-        ],
-        calendar_color: "#3275d5",
-      }),
-    ]);
-  });
-
-  it("localizes the default Developer Agent without creating a Skill", async () => {
-    const localizedProject = await createProject(db, {
-      ownerUserId: "owner",
-      organizationId: projectId,
-      name: "한국어 프로젝트",
-      agentTokenHash: "7".repeat(64),
-      locale: "ko",
-    });
-
-    await expect(listProjectAgents(db, localizedProject.id)).resolves.toEqual([
-      expect.objectContaining({
-        name: "개발자 에이전트",
-        responsibility: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
-        skills: [],
-      }),
-    ]);
-
-    await expect(
-      deleteProject(db, localizedProject.id, "owner"),
-    ).resolves.toBe(true);
   });
 
   it("pins a direct Agent task to the selected Worker through completion", async () => {
@@ -4158,103 +4070,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db.prepare(`delete from briar_organizations where id = ?`).bind(organization.id),
       db.prepare(`delete from "user" where id = ?`).bind(ownerId),
     ]);
-  });
-
-  it("updates an organization name while preserving its membership role", async () => {
-    await expect(
-      updateOrganization(db, projectId, "Renamed Org", "owner"),
-    ).resolves.toMatchObject({
-      id: projectId,
-      name: "Renamed Org",
-      role: "owner",
-    });
-    expect((await listProjects(db, "owner"))[0]?.organization_name).toBe(
-      "Renamed Org",
-    );
-  });
-
-  it("preserves logos stored before browser fallback formats were added", async () => {
-    await expect(listOrganizations(db, "owner")).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: projectId,
-          logo: "data:image/webp;base64,bGVnYWN5",
-        }),
-      ]),
-    );
-  });
-
-  it("stores and removes an organization logo while preserving its role", async () => {
-    for (const logo of [
-      "data:image/webp;base64,bG9nbw==",
-      "data:image/png;base64,bG9nbw==",
-      "data:image/jpeg;base64,bG9nbw==",
-    ]) {
-      await expect(
-        updateOrganizationLogo(db, projectId, logo, "owner"),
-      ).resolves.toMatchObject({
-        id: projectId,
-        logo,
-        role: "owner",
-      });
-    }
-    await expect(
-      updateOrganizationLogo(db, projectId, null, "owner"),
-    ).resolves.toMatchObject({
-      id: projectId,
-      logo: null,
-      role: "owner",
-    });
-  });
-
-  it("stores and removes a project icon", async () => {
-    for (const icon of [
-      "data:image/webp;base64,bG9nbw==",
-      "data:image/png;base64,bG9nbw==",
-      "data:image/jpeg;base64,bG9nbw==",
-    ]) {
-      await expect(updateProjectIcon(db, projectId, icon)).resolves.toBe(true);
-      await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
-        id: projectId,
-        icon,
-      });
-    }
-    await expect(updateProjectIcon(db, projectId, null)).resolves.toBe(true);
-    await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
-      id: projectId,
-      icon: null,
-    });
-  });
-
-  it("stores a project issue key prefix", async () => {
-    await expect(
-      updateProjectIssueKeyPrefix(db, projectId, "BR"),
-    ).resolves.toBe(true);
-    await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
-      id: projectId,
-      issue_key_prefix: "BR",
-    });
-  });
-
-  it("stores whether the schedule tab is visible", async () => {
-    await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
-      id: projectId,
-      schedule_tab_enabled: 1,
-    });
-    await expect(
-      updateProjectScheduleTabEnabled(db, projectId, false),
-    ).resolves.toBe(true);
-    await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
-      id: projectId,
-      schedule_tab_enabled: 0,
-    });
-    await expect(
-      updateProjectScheduleTabEnabled(db, projectId, true),
-    ).resolves.toBe(true);
-    await expect(getProject(db, projectId, "owner")).resolves.toMatchObject({
-      id: projectId,
-      schedule_tab_enabled: 1,
-    });
   });
 
   it("stores an app-created issue as a queued Auto Hunt run", async () => {

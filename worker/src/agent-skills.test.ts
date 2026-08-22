@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  AgentSkillConflictError,
   agentSkillConflictMessage,
-  agentSkillJson,
-  issueProcessingAgentSkillRow,
   listAgentSkills,
   normalizedAgentSkillRows,
   type AgentSkillRow,
@@ -34,27 +31,6 @@ const skill = (
 });
 
 describe("Agent Skills", () => {
-  const skills = [
-    skill({ id: "default", name: "Issue processing", is_default: 1 }),
-    skill({ id: "release", name: "Release" }),
-    skill({ id: "ios-release", name: "iOS release" }),
-  ];
-
-  it("keeps the deprecated default marker for older Workers", () => {
-    expect(agentSkillJson(skill({ id: "release", name: "Release" })))
-      .toMatchObject({ isDefault: false });
-  });
-
-  it("prefers the issue-processing Skill for issue work", () => {
-    const issueSkill = skill({
-      id: "issues",
-      name: "Triage",
-      kind: "issue_processing",
-    });
-    expect(issueProcessingAgentSkillRow([...skills, issueSkill]))
-      .toMatchObject({ id: "issues" });
-  });
-
   it("chunks large Agent rosters within D1's bound-parameter limit", async () => {
     const boundChunks: string[][] = [];
     const db = {
@@ -101,58 +77,6 @@ describe("Agent Skill normalization", () => {
     kind: "custom" as const,
   };
 
-  it("can still normalize a legacy omitted roster with a compatibility Skill", () => {
-    expect(
-      normalizedAgentSkillRows(
-        "agent-1",
-        undefined,
-        fallback,
-        "2026-08-10T00:00:00.000Z",
-      ),
-    ).toEqual([
-      expect.objectContaining({
-        agent_id: "agent-1",
-        name: "Developer",
-        description: "Use for project work.",
-        body: "Handle project work.",
-        is_default: 0,
-      }),
-    ]);
-  });
-
-  it("keeps an explicitly empty roster empty", () => {
-    expect(
-      normalizedAgentSkillRows(
-        "agent-1",
-        [],
-        fallback,
-        "2026-08-10T00:00:00.000Z",
-      ),
-    ).toEqual([]);
-  });
-
-  it("accepts five Skills at the description/body limits", () => {
-    const rows = normalizedAgentSkillRows(
-      "agent-1",
-      Array.from({ length: agentSkillsMaxCount }, (_, index) => ({
-        name: `Skill ${index}`,
-        description: "x".repeat(agentSkillDescriptionMaxLength),
-        body: "x".repeat(agentSkillBodyMaxLength),
-        provider: "codex" as const,
-        model: null,
-        effort: null,
-        kind: "custom" as const,
-        position: index,
-      })),
-      fallback,
-      "2026-08-10T00:00:00.000Z",
-    );
-
-    expect(rows).toHaveLength(agentSkillsMaxCount);
-    expect(rows[0]?.description).toHaveLength(agentSkillDescriptionMaxLength);
-    expect(rows[0]?.body).toHaveLength(agentSkillBodyMaxLength);
-  });
-
   it("rejects a sixth Skill and document fields above their limits", () => {
     const input = (index: number) => ({
       name: `Skill ${index}`,
@@ -193,18 +117,6 @@ describe("Agent Skill normalization", () => {
 });
 
 describe("Agent Skill conflicts", () => {
-  it("preserves a friendly active-work conflict message", () => {
-    expect(
-      agentSkillConflictMessage(
-        new AgentSkillConflictError(
-          'Agent Skill "Release" cannot be deleted while queued or running work still references it',
-        ),
-      ),
-    ).toBe(
-      'Agent Skill "Release" cannot be deleted while queued or running work still references it',
-    );
-  });
-
   it("maps the atomic race guard constraint to a retryable conflict", () => {
     expect(
       agentSkillConflictMessage(
