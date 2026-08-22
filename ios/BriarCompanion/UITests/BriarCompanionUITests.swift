@@ -19,7 +19,7 @@ final class BriarCompanionUITests: XCTestCase {
         // Project selection is skipped on load; the last used project is
         // auto-selected (first project of the first organization on first use).
         let projectMenu = app.buttons["project-menu"]
-        XCTAssertTrue(projectMenu.waitForExistence(timeout: 5))
+        XCTAssertTrue(projectMenu.waitForExistence(timeout: transitionTimeout))
         XCTAssertTrue(app.navigationBars["Tasks"].exists)
         projectMenu.tap()
         let alternateProject = app.buttons[
