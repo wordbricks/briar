@@ -308,7 +308,12 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         let payload: String
         if path.hasSuffix("/channels") && method == "GET" {
             payload = ##"""
-            {"channels":[{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","organizationId":"22222222-2222-4222-8222-222222222222","slug":"design","name":"design","topic":"Mobile product design","visibility":"public","defaultProjectId":"11111111-1111-4111-8111-111111111111","archivedAt":null,"memberCount":4,"agentCount":3,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"}]}
+            {"channels":[
+              {"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","organizationId":"22222222-2222-4222-8222-222222222222","kind":"channel","slug":"design","name":"design","topic":"Mobile product design","visibility":"public","defaultProjectId":"11111111-1111-4111-8111-111111111111","archivedAt":null,"memberCount":4,"agentCount":3,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},
+              {"id":"12121212-1212-4212-8212-121212121212","organizationId":"22222222-2222-4222-8222-222222222222","kind":"dm","slug":"dm-honey","name":"Honey","topic":null,"visibility":"private","defaultProjectId":null,"archivedAt":null,"memberCount":1,"agentCount":1,"createdAt":"2026-08-22T07:40:00Z","updatedAt":"2026-08-22T09:24:00Z","lastMessageAt":"2026-08-22T09:24:00Z","lastMessagePreview":"iOS DM 화면 시안을 준비했습니다.","lastReadAt":"2026-08-22T09:00:00Z","hasUnread":true,"dmParticipants":[{"type":"user","id":"fixture-user","name":"Briar User","image":null},{"type":"agent","id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","image":null}]},
+              {"id":"13131313-1313-4313-8313-131313131313","organizationId":"22222222-2222-4222-8222-222222222222","kind":"dm","slug":"dm-growth","name":"Growth Marketer","topic":null,"visibility":"private","defaultProjectId":null,"archivedAt":null,"memberCount":1,"agentCount":1,"createdAt":"2026-08-21T02:00:00Z","updatedAt":"2026-08-22T08:12:00Z","lastMessageAt":"2026-08-22T08:12:00Z","lastMessagePreview":"A/B 카피 두 가지를 검토해 주세요.","lastReadAt":"2026-08-22T08:12:00Z","hasUnread":false,"dmParticipants":[{"type":"user","id":"fixture-user","name":"Briar User","image":null},{"type":"agent","id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","name":"Growth Marketer","image":null}]},
+              {"id":"14141414-1414-4414-8414-141414141414","organizationId":"22222222-2222-4222-8222-222222222222","kind":"dm","slug":"dm-support","name":"Customer Support","topic":null,"visibility":"private","defaultProjectId":null,"archivedAt":null,"memberCount":1,"agentCount":1,"createdAt":"2026-08-20T01:00:00Z","updatedAt":"2026-08-21T06:45:00Z","lastMessageAt":"2026-08-21T06:45:00Z","lastMessagePreview":"문의 12건을 해결했고 2건을 전달했습니다.","lastReadAt":"2026-08-21T06:45:00Z","hasUnread":false,"dmParticipants":[{"type":"user","id":"fixture-user","name":"Briar User","image":null},{"type":"agent","id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","name":"Customer Support","image":null}]}
+            ]}
             """##
         } else if path.hasSuffix(
             "/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc?limit=20"
@@ -405,6 +410,18 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         } else if path.hasSuffix("/agent-tasks") && method == "POST" {
             payload = ##"""
             {"session":{"id":"session-direct-1","projectId":"11111111-1111-4111-8111-111111111111","dispatchGroupId":"session-direct-1","agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","agentName":"Briar Agent","sessionType":"task","trigger":"manual","scheduleId":null,"scheduleRunId":null,"parentSessionId":null,"request":"Summarize the current repository status.","status":"running","issues":[],"startedAt":"2026-08-02T01:10:00Z","completedAt":null,"conversationId":null,"workspaceRoot":null,"requestedWorkerId":"worker-1","workerId":"worker-1","summary":null,"error":null,"events":[{"id":"event-direct-1","type":"started","occurredAt":"2026-08-02T01:10:00Z"}],"dispatchEvents":[],"workers":[],"updatedAt":"2026-08-02T01:10:00Z"}}
+            """##
+        } else if path.hasSuffix("/members") && method == "GET" {
+            payload = ##"""
+            {"members":[{"userId":"fixture-user","name":"Briar User","email":"user@example.com","image":null,"role":"owner","createdAt":"2026-08-02T01:00:00Z"},{"userId":"teammate-user","name":"Alex Kim","email":"alex@example.com","image":null,"role":"member","createdAt":"2026-08-02T01:00:00Z"}]}
+            """##
+        } else if path.hasSuffix("/agents") && path.contains("/organizations/") {
+            payload = ##"""
+            {"agents":[{"agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","avatar":null,"provider":"codex","model":"gpt-5.4","projectId":null,"description":"제품 작업을 돕는 Organization Agent","responsibility":"제품 작업 지원","createdAt":"2026-08-02T01:00:00Z"}],"canManage":true}
+            """##
+        } else if path.hasSuffix("/dms") && method == "POST" {
+            payload = ##"""
+            {"channel":{"id":"15151515-1515-4515-8515-151515151515","organizationId":"22222222-2222-4222-8222-222222222222","kind":"dm","slug":"dm-new","name":"Honey","topic":null,"visibility":"private","defaultProjectId":null,"archivedAt":null,"memberCount":1,"agentCount":1,"createdAt":"2026-08-22T09:30:00Z","updatedAt":"2026-08-22T09:30:00Z","lastMessageAt":null,"lastMessagePreview":null,"lastReadAt":null,"hasUnread":false,"dmParticipants":[{"type":"user","id":"fixture-user","name":"Briar User","image":null},{"type":"agent","id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","image":null}]}}
             """##
         } else if path.contains("/agents") {
             payload = ##"""

@@ -244,7 +244,8 @@ const projectAgentContextJson = (
     .map((skill) => ({
       id: skill.id,
       name: skill.name,
-      instructions: skill.instructions,
+      description: skill.description,
+      body: skill.body,
       provider: skill.provider,
       model: skill.model,
       effort: skill.effort,
@@ -1289,7 +1290,7 @@ async function organizationAgentContextSkillDetails(
   input: ProjectContextPageInput & { ids: string[] },
 ) {
   const result = await db.prepare(
-    `select skill.id, skill.name, skill.instructions, skill.provider,
+    `select skill.id, skill.name, skill.description, skill.body, skill.provider,
             skill.model, skill.effort, skill.kind, skill.position,
             skill.updated_at
      from briar_agent_skills skill
@@ -1306,7 +1307,8 @@ async function organizationAgentContextSkillDetails(
   ).all<{
     id: string;
     name: string;
-    instructions: string;
+    description: string;
+    body: string;
     provider: string;
     model: string | null;
     effort: string | null;
@@ -1318,7 +1320,8 @@ async function organizationAgentContextSkillDetails(
     result.results.map((skill) => ({
       id: skill.id,
       name: skill.name,
-      instructions: skill.instructions,
+      description: skill.description,
+      body: skill.body,
       provider: skill.provider,
       model: skill.model,
       effort: skill.effort,

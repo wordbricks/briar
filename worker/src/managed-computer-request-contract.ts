@@ -15,6 +15,11 @@ export const ManagedComputerRetry = strictSchema(Schema.Struct({
   requestId: UuidString,
 }));
 
+export const ManagedComputerRemoteSessionRequest = strictSchema(Schema.Struct({
+  requestId: UuidString,
+  reconnectSessionId: Schema.optional(UuidString),
+}));
+
 export const InstanceIdentityDocument = strictSchema(Schema.Struct({
   accountId: Schema.String.check(Schema.isPattern(/^\d{12}$/u)),
   architecture: trimmedText(1, 40),
@@ -55,6 +60,9 @@ export const decodeManagedComputerApplication = decodeRequestSync(
 );
 export const decodeManagedComputerRetry = decodeRequestSync(
   ManagedComputerRetry,
+);
+export const decodeManagedComputerRemoteSessionRequest = decodeRequestSync(
+  ManagedComputerRemoteSessionRequest,
 );
 export const decodeManagedComputerEnrollment = decodeRequestSync(
   ManagedComputerEnrollment,

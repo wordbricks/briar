@@ -79,6 +79,10 @@
       {
         "name": "CHANNEL_ACTIVITY_REALTIME",
         "class_name": "ChannelActivityHub"
+      },
+      {
+        "name": "MANAGED_COMPUTER_REMOTE",
+        "class_name": "ManagedComputerRemoteSessionHub"
       }
     ]
   },
@@ -98,6 +102,10 @@
       "storage": "sqlite"
     },
     "ChannelActivityHub": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "ManagedComputerRemoteSessionHub": {
       "type": "durable-object",
       "storage": "sqlite"
     }
@@ -133,7 +141,11 @@
       "SLACK_CLIENT_ID",
       "SLACK_CLIENT_SECRET",
       "SLACK_SIGNING_SECRET",
-      "SLACK_TOKEN_ENCRYPTION_KEY"
+      "SLACK_TOKEN_ENCRYPTION_KEY",
+      "MANAGED_COMPUTER_PROMOTION_CODE",
+      "MANAGED_COMPUTER_ENROLLMENT_SECRET",
+      "MANAGED_COMPUTER_AWS_ACCESS_KEY_ID",
+      "MANAGED_COMPUTER_AWS_SECRET_ACCESS_KEY"
     ]
   },
   "observability": {

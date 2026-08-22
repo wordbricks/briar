@@ -1,4 +1,4 @@
-<img src="./src/assets/app-icons/aubergine-riso.png" alt="Briar logo" width="72" />
+<picture><source media="(prefers-color-scheme: dark)" srcset="./src/assets/brand/briar-logo-dark.png" /><img src="./src/assets/brand/briar-logo-light.png" alt="Briar logo" width="72" /></picture>
 
 # Briar
 

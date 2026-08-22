@@ -17,7 +17,8 @@ type DefaultProjectAgentCopy = {
 
 export type DefaultProjectAgentSkillCopy = {
   name: string;
-  instructions: string;
+  description: string;
+  body: string;
 };
 
 export type ProjectAgentSkillInput = Pick<
@@ -62,15 +63,18 @@ const defaultProjectAgentSkillCopyByLocale: Record<
 > = {
   ko: {
     name: "이슈 처리",
-    instructions: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
+    description: "프로젝트의 이슈를 구현하고 검증해야 할 때 사용합니다.",
+    body: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
   },
   en: {
     name: "Issue processing",
-    instructions: "Owns the project's development and code-related work.",
+    description: "Use when a project issue needs to be implemented and verified.",
+    body: "Owns the project's development and code-related work.",
   },
   zh: {
     name: "问题处理",
-    instructions: "负责项目的开发和代码相关工作。",
+    description: "当需要实现并验证项目问题时使用。",
+    body: "负责项目的开发和代码相关工作。",
   },
 };
 
@@ -110,7 +114,8 @@ export function defaultProjectAgentSkill(input: {
     id: input.id,
     agentId: input.agentId,
     name: copy.name,
-    instructions: copy.instructions,
+    description: copy.description,
+    body: copy.body,
     provider: input.provider ?? "codex",
     model: input.model ?? null,
     effort: input.effort ?? null,
@@ -155,7 +160,9 @@ function projectAgentSkillRoster(
         skill.id === activeSkill?.id ? " (active)" : ""
       }
 
-${skill.instructions.trim()}`,
+${skill.description.trim()}
+
+${skill.body.trim()}`,
     )
     .join("\n\n");
   return `# ${agent.name.trim()}

@@ -40,7 +40,8 @@ const agent = {
     {
       id: "skill-issue",
       name: "Issue handling",
-      instructions: "Investigate, implement, and verify an assigned issue.",
+      description: "Use for assigned implementation issues.",
+      body: "Investigate, implement, and verify an assigned issue.",
       provider: "codex" as const,
       model: "gpt-5",
       effort: "high" as const,
@@ -50,7 +51,8 @@ const agent = {
     {
       id: "skill-desktop",
       name: "Desktop release",
-      instructions: "Prepare and validate the desktop release.",
+      description: "Use for desktop release requests.",
+      body: "Prepare and validate the desktop release.",
       provider: "claude" as const,
       model: "claude-sonnet",
       effort: "medium" as const,
@@ -61,6 +63,18 @@ const agent = {
 };
 
 describe("detached Agent runner", () => {
+  it("directs saved Project Agents to the isolated worktree", () => {
+    const prompt = detachedProjectAgentPrompt({
+      agent,
+      request: "Run the saved Skill",
+      workspacePath: "/worktrees/project/task",
+    });
+
+    expect(prompt).toContain("prepared isolated project worktree");
+    expect(prompt).toContain("Do not inspect or modify the connected shared checkout");
+    expect(prompt).not.toContain("Work directly in the connected project repository");
+  });
+
   it("builds a structured blocked handoff for an exhausted OpenCode free tier", () => {
     const block = detachedProviderBlockFromPayload({
       type: "blocked",
@@ -605,6 +619,62 @@ describe("detached Agent runner", () => {
     expect(legacyContext).toContain("Legacy skill");
     expect(legacyContext).toContain("Follow the legacy release checklist.");
     expect(legacyContext).toContain("No Skill was preselected");
+  });
+
+  it("uses frontmatter descriptions for Skill discovery and loads bodies on demand", () => {
+    const skillCatalog = {
+      rootPath: "/private/briar-agent-skills-42",
+      entries: [
+        {
+          skillId: "skill-issue",
+          name: "Issue handling",
+          description: "Use for issue investigation and implementation.",
+          path:
+            "/private/briar-agent-skills-42/issue-handling-1/SKILL.md",
+        },
+        {
+          skillId: "skill-desktop",
+          name: "Desktop release",
+          description: "Use for signing and publishing desktop releases.",
+          path:
+            "/private/briar-agent-skills-42/desktop-release-2/SKILL.md",
+        },
+      ],
+    };
+    const launch = detachedProviderRequest({
+      agent: { ...agent, activeSkill: null },
+      prompt: "Can you get the next desktop build ready?",
+      workspacePath: "/worktree",
+      fullAccess: false,
+      skillCatalog,
+      agentBinary: "/bin/codex",
+    });
+
+    expect(launch.request.instructions).toContain(
+      "Discover the one available Skill that best matches this invocation",
+    );
+    expect(launch.request.instructions).toContain(
+      "Use for signing and publishing desktop releases.",
+    );
+    expect(launch.request.instructions).toContain(
+      'SKILL.md: "/private/briar-agent-skills-42/desktop-release-2/SKILL.md"',
+    );
+    expect(launch.request.instructions).not.toContain(
+      "Prepare and validate the desktop release.",
+    );
+
+    const selected = detachedProviderRequest({
+      agent: { ...agent, activeSkill: agent.skills[1] },
+      prompt: "Release desktop",
+      workspacePath: "/worktree",
+      fullAccess: false,
+      skillCatalog,
+      agentBinary: "/bin/codex",
+    });
+    expect(selected.request.instructions).toContain("Desktop release (active)");
+    expect(selected.request.instructions).toContain(
+      "Before doing task work, read its complete SKILL.md",
+    );
   });
 
   it("continues the same provider conversation on a follow-up turn", () => {

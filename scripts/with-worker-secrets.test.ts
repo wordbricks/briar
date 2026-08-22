@@ -11,7 +11,7 @@ describe("Worker deployment", () => {
     ).resolves.toBe(0);
     expect(migrate).toHaveBeenCalledTimes(1);
     expect(runner.mock.calls).toEqual([
-      [["deploy", "--secrets-file", "/tmp/secrets.json"]],
+      [["deploy", "--keep-vars", "--secrets-file", "/tmp/secrets.json"]],
     ]);
   });
 

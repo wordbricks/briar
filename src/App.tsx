@@ -852,7 +852,7 @@ export function App() {
   >(null);
   const [dispatchRun, setDispatchRun] = useState<HuntRun | null>(null);
   const [companionPage, setCompanionPage] = useState<
-    "issues" | "agents" | "home" | "inbox" | "settings"
+    "issues" | "dms" | "home" | "inbox" | "settings"
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
@@ -907,8 +907,15 @@ export function App() {
       );
       setActiveChannelId(pendingBriarLink.channelId);
       markOrganizationChannelRead(pendingBriarLink.channelId);
-      if (briar.companionMode) setCompanionPage("home");
-      else {
+      if (briar.companionMode) {
+        setCompanionPage(
+          organizationChannels.find(
+              (channel) => channel.id === pendingBriarLink.channelId,
+            )?.kind === "dm"
+            ? "dms"
+            : "home",
+        );
+      } else {
         navigateToPage(
           organizationChannels.find(
               (channel) => channel.id === pendingBriarLink.channelId,
@@ -942,8 +949,8 @@ export function App() {
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(pendingBriarLink.sessionId);
-      setCompanionPage("agents");
-      navigateToPage("agents");
+      if (briar.companionMode) setCompanionPage("dms");
+      else navigateToPage("agents");
     }
     setPendingBriarLink(null);
   }, [
@@ -1006,8 +1013,15 @@ export function App() {
       });
       setActiveChannelId(pendingInboxNotificationTarget.targetId);
       markOrganizationChannelRead(pendingInboxNotificationTarget.targetId);
-      if (briar.companionMode) setCompanionPage("home");
-      else {
+      if (briar.companionMode) {
+        setCompanionPage(
+          organizationChannels.find(
+              (channel) => channel.id === pendingInboxNotificationTarget.targetId,
+            )?.kind === "dm"
+            ? "dms"
+            : "home",
+        );
+      } else {
         navigateToPage(
           organizationChannels.find(
               (channel) => channel.id === pendingInboxNotificationTarget.targetId,
@@ -1020,7 +1034,8 @@ export function App() {
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(pendingInboxNotificationTarget.targetId);
-      if (!briar.companionMode) navigateToPage("agents");
+      if (briar.companionMode) setCompanionPage("dms");
+      else navigateToPage("agents");
     }
     setPendingInboxNotificationTarget(null);
   }, [
@@ -2482,8 +2497,8 @@ export function App() {
               ? t("companion.navTasks")
               : companionPage === "inbox"
                 ? t("inbox.title")
-                : companionPage === "agents"
-                  ? t("companion.navAgents")
+                : companionPage === "dms"
+                  ? t("sidebar.dms")
                   : null
           }
           projects={briar.projects}
@@ -2542,13 +2557,14 @@ export function App() {
             />
             <CompanionBottomNavigation
               activeDestination="home"
-              onAgentsOpen={() => setCompanionPage("agents")}
+              onDmsOpen={() => setCompanionPage("dms")}
               onInboxOpen={() => setCompanionPage("inbox")}
               onHomeOpen={() => {}}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
                 setCompanionPage("issues");
               }}
+              unreadDmCount={unreadDirectMessageCount}
               unreadInboxCount={inbox.unreadCount}
             />
           </>
@@ -2569,56 +2585,54 @@ export function App() {
             />
             <CompanionBottomNavigation
               activeDestination="inbox"
-              onAgentsOpen={() => setCompanionPage("agents")}
+              onDmsOpen={() => setCompanionPage("dms")}
               onInboxOpen={() => {}}
               onHomeOpen={() => setCompanionPage("home")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
                 setCompanionPage("issues");
               }}
+              unreadDmCount={unreadDirectMessageCount}
               unreadInboxCount={inbox.unreadCount}
             />
           </>
-        ) : companionPage === "agents" && activeProject ? (
+        ) : companionPage === "dms" && briar.activeOrganizationId && briar.token ? (
           <>
-            <ProjectAgents
-              companionMode
-              dashboard={briar.dashboard}
-              error={briar.error}
-              isSidebarOpen
-              onIssueOpen={(runId) => {
-                setRequestedSessionId(null);
+            <DirectMessages
+              activeChannelId={activeChannelId}
+              channelCatalogCursor={
+                channelCatalogSnapshot?.organizationId === briar.activeOrganizationId
+                  ? channelCatalogSnapshot.cursor
+                  : null
+              }
+              channelInboxSyncSignal={channelInboxSyncSignal}
+              channels={organizationDirectMessages}
+              currentUserId={briar.user?.id ?? null}
+              onChannelSelect={setActiveChannelId}
+              onChannelsChange={setOrganizationChannels}
+              onIssueCreated={async (projectId, runId) => {
+                await briar.ensureProjectSelected(projectId);
                 setRequestedRunId(runId);
                 setCompanionStatus("all");
                 setCompanionPage("issues");
               }}
-              onRequestedSessionOpen={() => setRequestedSessionId(null)}
-              onSettleTaskSession={(sessionId, settlement) =>
-                autoHunt.settleTaskSession(sessionId, settlement)}
-              onStopSession={(sessionId) => autoHunt.stopSession(sessionId)}
-              onStart={startAgentAutoHunt}
-              onStartRemoteTask={briar.token ? startProjectAgentTask : undefined}
-              onStartTaskSession={(agent, session) => {
-                rememberIssueAgent(agent);
-                autoHunt.startTaskSession(activeProject.id, agent.id, {
-                  ...session,
-                  agentName: agent.name,
-                });
-              }}
-              project={activeProject}
-              requestedSessionId={requestedSessionId}
-              sessions={autoHunt.sessions}
+              onSkillSessionAccepted={autoHunt.adoptRemoteSession}
+              onViewingChannelChange={handleViewingChannelChange}
+              organizationId={briar.activeOrganizationId}
+              organizationName={activeOrganization?.name}
+              projects={activeOrganizationProjects}
               token={briar.token}
             />
             <CompanionBottomNavigation
-              activeDestination="agents"
-              onAgentsOpen={() => {}}
+              activeDestination="dms"
+              onDmsOpen={() => {}}
               onInboxOpen={() => setCompanionPage("inbox")}
               onHomeOpen={() => setCompanionPage("home")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
                 setCompanionPage("issues");
               }}
+              unreadDmCount={unreadDirectMessageCount}
               unreadInboxCount={inbox.unreadCount}
             />
           </>
@@ -2629,6 +2643,7 @@ export function App() {
             currentUserId={briar.user?.id ?? null}
             companionMode
             companionStatus={companionStatus}
+            companionUnreadDmCount={unreadDirectMessageCount}
             companionUnreadInboxCount={inbox.unreadCount}
             dashboard={briar.dashboard}
             error={quickProcessError ?? briar.error}
@@ -2641,7 +2656,7 @@ export function App() {
             requestedRunId={requestedRunId}
             requestedRunInitialTab={requestedRunInitialTab}
             isSidebarOpen
-            onCompanionAgentsOpen={() => setCompanionPage("agents")}
+            onCompanionDmsOpen={() => setCompanionPage("dms")}
             onCompanionInboxOpen={() => setCompanionPage("inbox")}
             onCompanionHomeOpen={() => setCompanionPage("home")}
             onCompanionStatusChange={(status) => {

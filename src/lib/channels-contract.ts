@@ -11,7 +11,8 @@ import { IsoDateTimeWithOffset } from "./date-time-schema";
 import {
   agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
-  agentSkillInstructionsMaxLength,
+  agentSkillBodyMaxLength,
+  agentSkillDescriptionMaxLength,
   agentSkillsMaxCount,
 } from "./agent-limits";
 
@@ -295,9 +296,16 @@ const ChannelAgentSkillKindSchema = Schema.Literals(channelAgentSkillKinds);
 const channelAgentSkillInputSourceSchema = strict(Schema.Struct({
   id: Schema.optional(Uuid),
   name: Schema.Trim.check(Schema.isLengthBetween(1, 100)),
-  instructions: defaulted(
-    Schema.Trim.check(Schema.isMaxLength(agentSkillInstructionsMaxLength)),
-    "",
+  description: Schema.optional(
+    Schema.Trim.check(Schema.isMaxLength(agentSkillDescriptionMaxLength)),
+  ),
+  body: Schema.optional(
+    Schema.Trim.check(Schema.isMaxLength(agentSkillBodyMaxLength)),
+  ),
+  // Accepted while older desktop builds still submit the former combined
+  // field. It is normalized into description/body and never persisted.
+  instructions: Schema.optional(
+    Schema.Trim.check(Schema.isMaxLength(agentSkillBodyMaxLength)),
   ),
   provider: AgentProviderSchema,
   model: nullableDefault(
@@ -314,7 +322,8 @@ const channelAgentSkillInputSourceSchema = strict(Schema.Struct({
 const channelAgentSkillInputTypeSchema = strict(Schema.Struct({
   id: Schema.optional(Uuid),
   name: Schema.String,
-  instructions: Schema.String,
+  description: Schema.String,
+  body: Schema.String,
   provider: AgentProviderSchema,
   model: Schema.NullOr(Schema.String),
   effort: Schema.NullOr(Schema.String),
@@ -327,8 +336,27 @@ export const channelAgentSkillInputSchema =
     Schema.decodeTo(
       channelAgentSkillInputTypeSchema,
       SchemaTransformation.transform({
-        decode: ({ isDefault: _legacyDefault, ...skill }) => skill,
-        encode: (skill) => skill,
+        decode: ({
+          body,
+          description,
+          instructions: legacyInstructions,
+          isDefault: _legacyDefault,
+          ...skill
+        }) => {
+          const normalizedBody = body || legacyInstructions || "";
+          return {
+            ...skill,
+            description: description ||
+              normalizedBody.slice(0, agentSkillDescriptionMaxLength) ||
+              skill.name,
+            body: normalizedBody,
+          };
+        },
+        encode: (skill) => ({
+          ...skill,
+          instructions: undefined,
+          isDefault: undefined,
+        }),
       }),
     ),
   );
@@ -561,7 +589,8 @@ export type ChannelAgentSkill = {
   id: string;
   agentId: string;
   name: string;
-  instructions: string;
+  description: string;
+  body: string;
   provider: ChannelAgentProvider;
   model: string | null;
   effort: ChannelAgentEffort | null;

@@ -202,6 +202,7 @@ describe("inspectWorkerProviderHealth", () => {
         which: (provider) => `/usr/local/bin/${provider}`,
         authenticated,
         usage,
+        openrouterApiKey: null,
       },
     );
 

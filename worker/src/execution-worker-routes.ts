@@ -2,6 +2,8 @@ import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import type { BriarAuth } from "./auth";
 import { sha256 } from "./crypto-digest";
 import { corsHeaders, HttpError, json } from "./http-response";
+import { managedComputerByDeviceId } from "./managed-computer-repository";
+import { endManagedComputerRemoteSessionsAndDisconnect } from "./managed-computer-remote-service";
 import { getProject } from "./project-command-repository";
 import { getProjectSettings } from "./project-settings-repository";
 import { readJson } from "./request-readers";
@@ -48,6 +50,7 @@ export type ExecutionWorkerRouteInput = {
   url: URL;
   auth: BriarAuth;
   db: D1Database;
+  env: Env;
   requireAgentProject: () => Promise<string>;
   requireWorkerCredential: () => Promise<{
     deviceId: string;
@@ -67,7 +70,7 @@ const bearerToken = (request: Request) => {
 export async function handleExecutionWorkerRoute(
   routeInput: ExecutionWorkerRouteInput,
 ): Promise<Response | undefined> {
-  const { request, url, auth, db } = routeInput;
+  const { request, url, auth, db, env } = routeInput;
   const { pathname } = url;
   const requireAgentProject = (_db: D1Database, _request: Request) =>
     routeInput.requireAgentProject();
@@ -210,12 +213,25 @@ export async function handleExecutionWorkerRoute(
     ) {
       throw new HttpError(403, "Worker owner or organization admin access required");
     }
+    const managedComputer = await managedComputerByDeviceId(db, device.id);
+    const remainingBindings = await db.prepare(
+      `select count(*) binding_count from briar_execution_workers
+       where device_id = ?`,
+    ).bind(device.id).first<{ binding_count: number }>();
+    const observedAt = new Date().toISOString();
     await unbindExecutionWorker(
       db,
       device.id,
       projectId,
-      new Date().toISOString(),
+      observedAt,
     );
+    if (managedComputer && (remainingBindings?.binding_count ?? 0) <= 1) {
+      await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
+        managedComputerId: managedComputer.id,
+        reason: "worker_credential_revoked",
+        observedAt,
+      });
+    }
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 

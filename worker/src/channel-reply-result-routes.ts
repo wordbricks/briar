@@ -1,6 +1,6 @@
 import type { AgentProvider } from "../../src/lib/agent-provider";
 import { channelReplyClaimTokenHeader } from "../../src/lib/channels-contract";
-import { agentSkillForMessage, hydrateAgentSkills } from "./agent-skills";
+import { hydrateAgentSkills } from "./agent-skills";
 import {
   prepareStoredAttachments,
   uploadStoredAttachments,
@@ -307,15 +307,11 @@ export async function handleChannelReplyResultRoute(
           "Delegation target is not an eligible Project Agent in this channel",
         );
       }
-      const selectedSkill = agentSkillForMessage(
-        target.skills,
-        result.delegation.request,
-      );
       delegation = {
         projectId: target.project_id,
         agentId: target.id,
-        skillId: selectedSkill?.id ?? null,
-        provider: selectedSkill?.provider ?? target.provider,
+        skillId: null,
+        provider: target.provider,
         request: result.delegation.request,
       };
     }

@@ -18,6 +18,10 @@ export const encryptedEnvPolicies: Readonly<Record<string, EncryptedEnvPolicy>> 
       "SLACK_CLIENT_SECRET",
       "SLACK_SIGNING_SECRET",
       "SLACK_TOKEN_ENCRYPTION_KEY",
+      "MANAGED_COMPUTER_PROMOTION_CODE",
+      "MANAGED_COMPUTER_ENROLLMENT_SECRET",
+      "MANAGED_COMPUTER_AWS_ACCESS_KEY_ID",
+      "MANAGED_COMPUTER_AWS_SECRET_ACCESS_KEY",
     ],
     optionalSecrets: [
       "GITHUB_APP_CLIENT_ID",
@@ -25,6 +29,7 @@ export const encryptedEnvPolicies: Readonly<Record<string, EncryptedEnvPolicy>> 
       "GITHUB_APP_SLUG",
       "GITHUB_CALLBACK_ORIGIN",
       "GITHUB_WEBHOOK_SECRET",
+      "MANAGED_COMPUTER_AWS_SESSION_TOKEN",
     ],
   },
   ".env.release": {

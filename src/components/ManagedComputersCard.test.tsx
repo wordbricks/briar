@@ -19,6 +19,10 @@ vi.mock("../lib/api", () => ({
   validateManagedComputerPromotion: vi.fn(),
 }));
 
+vi.mock("../lib/platform", () => ({
+  supportsManagedComputerRemoteDesktop: () => true,
+}));
+
 const product = {
   product: {
     currency: "USD" as const,
@@ -35,6 +39,7 @@ const product = {
     modelApiCostsIncluded: false as const,
   },
   applicationsEnabled: true,
+  remoteDesktopEnabled: false,
   configurationReady: true,
   canApply: true,
   organizationLimit: 1,
@@ -144,7 +149,7 @@ describe("ManagedComputersCard", () => {
     container.remove();
   });
 
-  it("explains the explicit secure setup flow without copying credentials", async () => {
+  it("does not expose the retired SSM setup flow while remote access is gated", async () => {
     vi.mocked(loadManagedComputers).mockResolvedValue({
       computers: [{
         id: "33333333-3333-4333-8333-333333333333",
@@ -172,10 +177,48 @@ describe("ManagedComputersCard", () => {
         <ManagedComputersCard organizationId="organization-1" token="token" />,
       );
     });
-    await act(async () => buttonWithText("설정 안내")?.click());
-    expect(document.body.textContent).toContain("AWS SSM Session Manager");
-    expect(document.body.textContent).toContain("다른 컴퓨터의 인증은 복사되지 않습니다");
-    expect(document.body.textContent).toContain("사용 가능");
+    expect(document.body.textContent).toContain("원격 화면 기능을 준비 중입니다");
+    expect(document.body.textContent).not.toContain("AWS SSM Session Manager");
+    expect(buttonWithText("화면 열기")).toBeUndefined();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("offers the remote screen for a setup computer when the feature is enabled", async () => {
+    vi.mocked(loadManagedComputerProduct).mockResolvedValue({
+      ...product,
+      remoteDesktopEnabled: true,
+    });
+    vi.mocked(loadManagedComputers).mockResolvedValue({
+      computers: [{
+        id: "33333333-3333-4333-8333-333333333333",
+        organizationId: "organization-1",
+        requesterUserId: "owner",
+        state: "needs_setup",
+        region: "us-east-1",
+        instanceId: "i-0123456789abcdef0",
+        volumeId: "vol-0123456789abcdef0",
+        deviceId: "managed-33333333-3333-4333-8333-333333333333",
+        error: null,
+        retryCount: 0,
+        retryAvailable: false,
+        createdAt: "2026-08-22T00:00:00.000Z",
+        expiresAt: "2026-09-21T00:00:00.000Z",
+        updatedAt: "2026-08-22T00:05:00.000Z",
+      }],
+      generatedAt: "2026-08-22T00:05:00.000Z",
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <ManagedComputersCard organizationId="organization-1" token="token" />,
+      );
+    });
+    expect(buttonWithText("화면 열기")).toBeDefined();
+    expect(container.textContent).toContain("기존 컴퓨터의 자격 증명은 복사되지 않습니다");
 
     await act(async () => root.unmount());
     container.remove();

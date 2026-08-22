@@ -191,6 +191,7 @@ describe("detached execution workers", () => {
         "0121_repository_merge_batches.sql",
         "0122_remove_repository_merge_batches.sql",
         "0123_native_merge_queue_coordinator.sql",
+        "0128_agent_skill_documents.sql",
       ],
     });
     await executeD1Sql(

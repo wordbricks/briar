@@ -1,11 +1,9 @@
 import { agentReplyParentMessageId, issueReplyAgentIds } from "../../src/lib/issue-reply-decision";
 import { canonicalizeIssueAttachmentReferences } from "../../src/lib/issue-markdown";
-import { agentSkillForMessage } from "./agent-skills";
 import { prepareStoredAttachments, uploadStoredAttachments } from "./attachment-storage";
 import type { BriarAuth } from "./auth";
 import { getDashboardSyncCursor, listDashboardChanges } from "./dashboard-change-repository";
 import {
-  agentSkillExecutionApprovalTablesAvailable,
   createIssueAttachments,
   createIssueMessage,
   deleteIssueAttachments,
@@ -351,12 +349,7 @@ export async function handleIssueConversationRoute(input: {
     }
     const agentReplies: IssueAgentReplyJobRow[] = [];
     if (targetAgents.size > 0) {
-      const skillExecutionAvailable =
-        await agentSkillExecutionApprovalTablesAvailable(db);
       for (const agent of targetAgents.values()) {
-        const selectedSkillId = skillExecutionAvailable
-          ? agentSkillForMessage(agent.skills, input.body)?.id ?? null
-          : null;
         const agentReply = await enqueueIssueAgentReply(db, {
           id: crypto.randomUUID(),
           projectId: project.id,
@@ -368,7 +361,7 @@ export async function handleIssueConversationRoute(input: {
           }),
           replyMessageId: crypto.randomUUID(),
           agentId: agent.id,
-          skillId: selectedSkillId,
+          skillId: null,
           // A live processing Worker is the only safe place to look for the
           // issue's uncommitted worktree. If the run has not been claimed yet,
           // keep the reply claimable and let the Worker answer from the

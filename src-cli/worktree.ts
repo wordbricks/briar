@@ -799,9 +799,10 @@ export async function allocateIssueWorktree(
 }
 
 /**
- * Create a short-lived detached checkout for a conversational Agent turn.
- * It has no branch, but otherwise receives the same `.worktreeinclude`
- * inputs as an execution worktree so it can run the project locally.
+ * Create a short-lived detached checkout for a conversational or direct saved
+ * Agent turn. It has no branch, but otherwise receives the same
+ * `.worktreeinclude` inputs as an execution worktree so it can run the project
+ * locally without exposing the connected checkout to Agent writes.
  */
 export async function allocateAnalysisWorktree(input: {
   repositoryPath: string;

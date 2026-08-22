@@ -7,6 +7,13 @@ identity_file="$state_dir/instance-identity.json"
 signature_file="$state_dir/instance-identity-signature"
 credential_file="$state_dir/worker-credential.json"
 
+if [[ ! -e "$config_file" && -s "$credential_file" ]]; then
+  if [[ "$(stat -c '%U:%G %a' "$credential_file")" != "root:briar 640" ]]; then
+    echo "Existing Briar credential has unsafe ownership or mode" >&2
+    exit 1
+  fi
+  exit 0
+fi
 test -r "$config_file"
 install -d -m 0700 "$state_dir"
 
@@ -24,6 +31,8 @@ curl --fail --silent --show-error \
 unset imds_token
 chmod 0600 "$config_file" "$identity_file" "$signature_file"
 
+# JavaScript template strings must reach Bun unchanged.
+# shellcheck disable=SC2016
 BRIAR_VERSION="${BRIAR_VERSION:-unknown}" /opt/briar/bin/bun --eval '
   const fs = require("node:fs");
   const state = "/var/lib/briar";
@@ -45,10 +54,17 @@ BRIAR_VERSION="${BRIAR_VERSION:-unknown}" /opt/briar/bin/bun --eval '
   );
   if (!response.ok) process.exit(response.status === 409 ? 75 : 1);
   const enrollment = await response.json();
-  fs.writeFileSync(`${state}/worker-credential.json`, JSON.stringify(enrollment), {
+  fs.writeFileSync(`${state}/worker-credential.json`, JSON.stringify({
+    ...enrollment,
+    managedComputerId: config.managedComputerId,
+    apiOrigin: config.apiOrigin,
+  }), {
     mode: 0o600,
   });
 '
 
+chown root:briar "$credential_file"
+chmod 0640 "$credential_file"
+chmod 0750 "$state_dir"
+
 rm -f "$config_file" "$identity_file" "$signature_file"
-systemctl enable --now briar-worker.service

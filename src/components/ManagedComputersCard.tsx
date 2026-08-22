@@ -4,6 +4,7 @@ import {
   Cloud,
   HardDrive,
   KeyRound,
+  MonitorUp,
   RefreshCw,
   ServerCog,
 } from "lucide-react";
@@ -18,6 +19,7 @@ import {
   validateManagedComputerPromotion,
 } from "../lib/api";
 import { ApiError } from "../lib/api/errors";
+import { supportsManagedComputerRemoteDesktop } from "../lib/platform";
 import type { ManagedComputer, ManagedComputerProduct } from "../types";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -32,6 +34,7 @@ import {
 import { Input } from "./ui/input";
 import { Spinner } from "./ui/spinner";
 import { Typography } from "./ui/typography";
+import { ManagedComputerRemoteDesktop } from "./ManagedComputerRemoteDesktop";
 
 type PromotionCheck = {
   valid: boolean;
@@ -46,13 +49,6 @@ const activeProvisioningStates = new Set<ManagedComputer["state"]>([
   "bootstrapping",
   "needs_setup",
 ]);
-
-const setupSteps = [
-  "managedComputer.setupStep1",
-  "managedComputer.setupStep2",
-  "managedComputer.setupStep3",
-  "managedComputer.setupStep4",
-] as const;
 
 const stateTone = (state: ManagedComputer["state"]) =>
   state === "ready"
@@ -96,7 +92,7 @@ export function ManagedComputersCard({
   const [promotion, setPromotion] = useState<PromotionCheck | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
-  const [setupComputer, setSetupComputer] = useState<ManagedComputer | null>(null);
+  const [remoteComputer, setRemoteComputer] = useState<ManagedComputer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
 
@@ -206,6 +202,7 @@ export function ManagedComputersCard({
   const specification = product?.product.specification;
   const purchaseDisabled =
     !product?.applicationsEnabled || !product.canApply || submitting;
+  const remoteDesktopSupported = supportsManagedComputerRemoteDesktop();
 
   return (
     <section className="mb-8 w-full max-w-[820px] overflow-hidden rounded-xl border border-border bg-card shadow-xs">
@@ -293,7 +290,9 @@ export function ManagedComputersCard({
                     </div>
                     <Typography className="mt-1" tone="muted" variant="caption">
                       {computer.state === "needs_setup"
-                        ? t("managedComputer.setupRequired")
+                        ? t(product?.remoteDesktopEnabled && remoteDesktopSupported
+                          ? "managedComputer.setupRequired"
+                          : "managedComputer.remote.unavailable")
                         : computer.state === "ready"
                           ? t("managedComputer.readyDescription")
                           : computer.state === "failed"
@@ -303,14 +302,16 @@ export function ManagedComputersCard({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {computer.state === "needs_setup" ? (
+                  {product?.remoteDesktopEnabled && remoteDesktopSupported &&
+                      ["needs_setup", "ready"].includes(computer.state) ? (
                     <Button
-                      onClick={() => setSetupComputer(computer)}
+                      onClick={() => setRemoteComputer(computer)}
                       size="sm"
                       type="button"
                       variant="outline"
                     >
-                      {t("managedComputer.setupGuide")}
+                      <MonitorUp size={14} />
+                      {t("managedComputer.remote.open")}
                     </Button>
                   ) : null}
                   {computer.retryAvailable ? (
@@ -455,39 +456,14 @@ export function ManagedComputersCard({
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        onOpenChange={(open) => {
-          if (!open) setSetupComputer(null);
-        }}
-        open={setupComputer !== null}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{t("managedComputer.setupGuideTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("managedComputer.setupGuideDescription")}
-            </DialogDescription>
-          </DialogHeader>
-          <ol className="grid gap-3 text-sm text-foreground">
-            {setupSteps.map((messageKey, index) => (
-              <li className="flex gap-3" key={messageKey}>
-                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                  {index + 1}
-                </span>
-                <span>{t(messageKey)}</span>
-              </li>
-            ))}
-          </ol>
-          <DialogFooter>
-            <Button
-              onClick={() => setSetupComputer(null)}
-              type="button"
-            >
-              {t("common.close")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {remoteComputer ? (
+        <ManagedComputerRemoteDesktop
+          computer={remoteComputer}
+          onClose={() => setRemoteComputer(null)}
+          organizationId={organizationId}
+          token={token}
+        />
+      ) : null}
     </section>
   );
 }

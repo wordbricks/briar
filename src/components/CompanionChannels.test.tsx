@@ -542,6 +542,52 @@ describe("CompanionChannels", () => {
     expect(container.textContent).toContain("Refreshed");
   });
 
+  it("places the Agent typing state below the message attachments", async () => {
+    const summary = channel("c-common", "Welcome", null);
+    const withAttachment = {
+      ...message("m-1", "@Honey 이미지 확인해줘"),
+      attachments: [{
+        id: "channel-attachment",
+        filename: "screenshot.png",
+        contentType: "image/png",
+        byteSize: 5,
+        url: "/channels/c-common/attachments/channel-attachment",
+      }],
+    };
+    loadChannel.mockResolvedValueOnce({
+      channel: summary,
+      members: [member],
+      agents: [agent],
+      messages: [withAttachment],
+      nextCursor: null,
+      agentReplies: [agentReply("running")],
+    });
+    await render();
+
+    const openWelcome = () => [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-group button",
+      ),
+    ].find((button) => button.textContent?.includes("Welcome"));
+    await act(async () => {
+      openWelcome()?.click();
+      await Promise.resolve();
+    });
+
+    const bubble = container.querySelector(
+      '[data-companion-channel-message-id="m-1"]',
+    );
+    expect(bubble).not.toBeNull();
+    expect(bubble?.querySelector(".channel-message-images")).not.toBeNull();
+    const typing = bubble?.querySelector(".companion-channel-typing");
+    expect(typing).not.toBeNull();
+    expect(
+      bubble?.querySelector(
+        ".companion-channel-typing ~ .channel-message-images",
+      ),
+    ).toBeNull();
+  });
+
   it("renders incoming webhook messages with a distinct author icon", async () => {
     loadChannel.mockResolvedValue({
       channel: channel("c-common", "Welcome", null),

@@ -153,7 +153,7 @@ final class CompanionNavigationModel: ObservableObject {
     enum Tab: Hashable {
         case home
         case tasks
-        case agents
+        case directMessages
         case inbox
     }
 
@@ -198,7 +198,7 @@ final class CompanionNavigationModel: ObservableObject {
             pendingChannelID = nil
             pendingChannelMessageID = nil
             pendingChannelRootMessageID = nil
-            selectedTab = .agents
+            selectedTab = .directMessages
             pathSessionToken &+= 1
         case let .channel(_, channelID, messageID, rootMessageID):
             pendingIssueID = nil

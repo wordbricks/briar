@@ -4,28 +4,31 @@ import { I18nProvider } from "../i18n";
 import { CompanionBottomNavigation } from "./CompanionBottomNavigation";
 
 describe("CompanionBottomNavigation", () => {
-  it("renders Home first and drops Ideas and Search", () => {
+  it("renders Home first and replaces Agents with DMs", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
         <CompanionBottomNavigation
           activeDestination="inbox"
           onCreate={() => undefined}
-          onAgentsOpen={() => undefined}
+          onDmsOpen={() => undefined}
           onInboxOpen={() => undefined}
           onHomeOpen={() => undefined}
           onStatusChange={() => undefined}
+          unreadDmCount={2}
           unreadInboxCount={3}
         />
       </I18nProvider>,
     );
 
     expect(markup).toContain("Inbox");
-    expect(markup).toContain("에이전트");
+    expect(markup).toContain("DMs");
+    expect(markup).not.toContain("에이전트");
     expect(markup).not.toContain("아이디어");
     expect(markup).toContain("홈");
     expect(markup).not.toContain("검색");
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain(">3<");
+    expect(markup).toContain(">2<");
     expect(markup).not.toContain(">Active<");
     expect(markup).not.toContain(">Alerts<");
     expect(markup).not.toContain(">Completed<");

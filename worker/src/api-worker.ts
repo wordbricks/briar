@@ -427,6 +427,7 @@ async function route(
     url,
     auth,
     db,
+    env,
     requireAgentProject: () => requireAgentProject(db, request),
     requireWorkerCredential: () => requireWorkerCredential(db, request),
     requireWorkerProjectBinding: (projectId) =>
@@ -606,7 +607,12 @@ export default {
     if (slackEventResponse !== undefined) return slackEventResponse;
 
     try {
-      const auth = createAuth(env, url.origin, ctx);
+      const authOrigin = url.protocol === "wss:"
+        ? `https://${url.host}`
+        : url.protocol === "ws:"
+          ? `http://${url.host}`
+          : url.origin;
+      const auth = createAuth(env, authOrigin, ctx);
       const response = await route(
         request,
         auth,

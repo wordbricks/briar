@@ -111,7 +111,8 @@ describe("CLI Worker claim contracts", () => {
     task.agent.skills.push({
       id: "skill-1",
       name: "Review",
-      instructions: "Review",
+      description: "Use for review requests.",
+      body: "Review",
       provider: "codex",
       model: null,
       effort: null,
@@ -119,5 +120,42 @@ describe("CLI Worker claim contracts", () => {
       position: 0,
     });
     expect(task.agent.skills).toHaveLength(1);
+  });
+
+  it("normalizes legacy claimed Skill instructions into document fields", () => {
+    const task = decodeClaimedProjectAgentTask({
+      workType: "projectAgentTask",
+      workId,
+      runId,
+      sourceKey: "agent-task:legacy-skill",
+      title: "Task",
+      claimToken: "briar_agent_task_claim_test",
+      claimAttempts: 1,
+      claimedAt,
+      leaseExpiresAt: "2026-08-20T08:15:00+00:00",
+      request: "Review this",
+      agent: {
+        id: "agent-1",
+        name: "Reviewer",
+        provider: "codex",
+        model: null,
+        responsibility: "Review",
+        skills: [{
+          id: "skill-legacy",
+          name: "Legacy review",
+          instructions: "Review with the legacy Worker contract.",
+          provider: "codex",
+          model: null,
+          effort: null,
+          kind: "custom",
+          position: 0,
+        }],
+      },
+    });
+
+    expect(task.agent.skills[0]).toMatchObject({
+      description: "Review with the legacy Worker contract.",
+      body: "Review with the legacy Worker contract.",
+    });
   });
 });

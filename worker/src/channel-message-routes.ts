@@ -5,7 +5,7 @@ import { agentReplyParentMessageId } from "../../src/lib/issue-reply-decision";
 import {
   channelReplyNoAvailableWorkerError,
 } from "../../src/lib/channels-contract";
-import { agentSkillForMessage, hydrateAgentSkills } from "./agent-skills";
+import { hydrateAgentSkills } from "./agent-skills";
 import type { BriarAuth } from "./auth";
 import {
   prepareStoredAttachments,
@@ -313,14 +313,12 @@ export async function handleChannelMessageRoute(
     };
     const invokedAgents = await Promise.all(
       mentionedAgents.map(async (agent) => {
-        const activeSkill = agentSkillForMessage(agent.skills, input.body);
-        const runtime = activeSkill ?? agent;
         const hasAvailableWorker = await hasAvailableChannelReplyWorker(db, {
           organizationId,
           projectId: agent.project_id,
-          provider: runtime.provider,
-          model: runtime.model,
-          effort: runtime.effort,
+          provider: agent.provider,
+          model: agent.model,
+          effort: agent.effort,
           observedAt: createdAt,
         });
         const unavailableReason:
@@ -328,7 +326,7 @@ export async function handleChannelMessageRoute(
           | null = hasAvailableWorker
             ? null
             : channelReplyNoAvailableWorkerError;
-        return { agent, activeSkill, unavailableReason };
+        return { agent, unavailableReason };
       }),
     );
     const uploadedKeys: string[] = [];
@@ -386,11 +384,11 @@ export async function handleChannelMessageRoute(
       channelId: channel.id,
       triggerMessageId: message.id,
       parentMessageId: agentReplyParentMessageId(message),
-      agents: invokedAgents.map(({ agent, activeSkill, unavailableReason }) => ({
+      agents: invokedAgents.map(({ agent, unavailableReason }) => ({
         id: agent.id,
         projectId: agent.project_id,
-        skillId: activeSkill?.id ?? null,
-        provider: activeSkill?.provider ?? agent.provider,
+        skillId: null,
+        provider: agent.provider,
         unavailableReason,
       })),
       preferredDeviceId: input.preferredDeviceId,

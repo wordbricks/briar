@@ -3,6 +3,8 @@ import type { BriarAuth } from "./auth";
 import { corsHeaders, HttpError, json } from "./http-response";
 import { canManageOrganization } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
+import { managedComputerByDeviceId } from "./managed-computer-repository";
+import { endManagedComputerRemoteSessionsAndDisconnect } from "./managed-computer-remote-service";
 import { readLatestVersion } from "./releases";
 import { readJson } from "./request-readers";
 import { requireSession } from "./session-auth";
@@ -183,13 +185,29 @@ export async function handleOrganizationWorkerRoute(
         "Worker owner or organization admin access required",
       );
     }
-    if (
-      !(await deleteExecutionWorker(
-        db,
-        device.id,
-        new Date().toISOString(),
-      ))
-    ) {
+    const managedComputer = await managedComputerByDeviceId(db, device.id);
+    const observedAt = new Date().toISOString();
+    let deleted: boolean;
+    try {
+      deleted = await deleteExecutionWorker(db, device.id, observedAt);
+    } catch (error) {
+      if (managedComputer) {
+        await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
+          managedComputerId: managedComputer.id,
+          reason: "worker_credential_revoked",
+          observedAt,
+        });
+      }
+      throw error;
+    }
+    if (managedComputer) {
+      await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
+        managedComputerId: managedComputer.id,
+        reason: "worker_credential_revoked",
+        observedAt,
+      });
+    }
+    if (!deleted) {
       throw new HttpError(404, "Worker not found");
     }
     return new Response(null, { status: 204, headers: corsHeaders });

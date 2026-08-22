@@ -152,7 +152,7 @@ export async function claimNextChannelReplyWork(
       ? {
           ...liveActiveSkill,
           name: job.selected_skill_name_snapshot!,
-          instructions: job.selected_skill_instructions_snapshot!,
+          body: job.selected_skill_instructions_snapshot!,
           provider: job.selected_skill_provider_snapshot!,
           model: job.selected_skill_model_snapshot ?? null,
           effort: job.selected_skill_effort_snapshot ?? null,

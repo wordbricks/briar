@@ -327,7 +327,8 @@ describe("conversational Agent Skill execution approval", () => {
     calendarColor: "#6f5a7e",
     skills: [{
       name: kind === "custom" ? "iOS deployment" : "Issue processing",
-      instructions: "Execute the exact approved release workflow.",
+      description: "Use for the approved release workflow.",
+      body: "Execute the exact approved release workflow.",
       provider: "codex",
       model: "gpt-5.6-sol",
       effort: "high",

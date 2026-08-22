@@ -91,7 +91,8 @@ describe("API response contracts", () => {
       id: "skill-1",
       agentId,
       name: "Build",
-      instructions: "Build.",
+      description: "Use for builds.",
+      body: "Build.",
       provider: "codex",
       model: null,
       effort: null,
@@ -101,6 +102,26 @@ describe("API response contracts", () => {
       updatedAt: "updated",
     });
     expect(second.skills).toEqual([]);
+
+    expect(decodeProjectAgentResponse({
+      ...input,
+      skills: [{
+        id: "skill-legacy",
+        agentId,
+        name: "Legacy build",
+        instructions: "Build with the legacy client.",
+        provider: "codex",
+        model: null,
+        effort: null,
+        kind: "custom",
+        position: 0,
+        createdAt: "created",
+        updatedAt: "updated",
+      }],
+    }).skills[0]).toMatchObject({
+      description: "Build with the legacy client.",
+      body: "Build with the legacy client.",
+    });
   });
 
   it("keeps remote session defaults and empty local-only collections", () => {

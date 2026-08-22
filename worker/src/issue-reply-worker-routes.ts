@@ -4,7 +4,6 @@ import { workLogEntryTranscriptEvent } from "./agent-worklog";
 import { readLatestWorkLogForRunWithArchive } from "./agent-worklog-service";
 import {
   agentSkillJson,
-  issueProcessingAgentSkillRow,
 } from "./agent-skills";
 import {
   prepareStoredAttachments,
@@ -206,7 +205,7 @@ export async function handleIssueReplyWorkerRoute(input: {
       ? {
           ...liveSelectedSkill,
           name: job.selected_skill_name_snapshot!,
-          instructions: job.selected_skill_instructions_snapshot!,
+          body: job.selected_skill_instructions_snapshot!,
           provider: job.selected_skill_provider_snapshot!,
           model: job.selected_skill_model_snapshot ?? null,
           effort: job.selected_skill_effort_snapshot ?? null,
@@ -225,9 +224,7 @@ export async function handleIssueReplyWorkerRoute(input: {
             : liveAgent.skills,
         }
       : null;
-    const activeSkill = selectedSkill ?? (agent
-      ? issueProcessingAgentSkillRow(agent.skills)
-      : null);
+    const activeSkill = selectedSkill;
     const replyExecution = issueReplyExecutionConfig({
       provider: job.agent_provider,
       preferred: {

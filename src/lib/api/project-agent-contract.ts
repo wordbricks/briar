@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import * as SchemaTransformation from "effect/SchemaTransformation";
 import { ModelEffort } from "../agent-provider-contract";
 import { agentProviders } from "../agent-provider";
 import { StructuredAgentResult } from "../agent-result";
@@ -26,11 +27,13 @@ const ProjectAgentCodexPetResponse = Schema.Struct({
   spriteSheetUrl: Schema.NullOr(Schema.String),
 });
 
-const ProjectAgentSkillResponse = Schema.Struct({
+const ProjectAgentSkillResponseSource = Schema.Struct({
   id: Schema.String,
   agentId: Schema.String,
   name: Schema.String,
-  instructions: Schema.String,
+  description: Schema.optional(Schema.String),
+  body: Schema.optional(Schema.String),
+  instructions: Schema.optional(Schema.String),
   provider: Schema.Literals(agentProviders),
   model: Schema.NullOr(Schema.String),
   effort: defaulted(Schema.NullOr(ModelEffort), null),
@@ -39,6 +42,40 @@ const ProjectAgentSkillResponse = Schema.Struct({
   createdAt: Schema.String,
   updatedAt: Schema.String,
 });
+
+const ProjectAgentSkillResponseType = Schema.Struct({
+  id: Schema.String,
+  agentId: Schema.String,
+  name: Schema.String,
+  description: Schema.String,
+  body: Schema.String,
+  provider: Schema.Literals(agentProviders),
+  model: Schema.NullOr(Schema.String),
+  effort: Schema.NullOr(ModelEffort),
+  kind: Schema.Literals(["issue_processing", "custom"]),
+  position: NonNegativeInteger,
+  createdAt: Schema.String,
+  updatedAt: Schema.String,
+});
+
+const ProjectAgentSkillResponse = ProjectAgentSkillResponseSource.pipe(
+  Schema.decodeTo(
+    ProjectAgentSkillResponseType,
+    SchemaTransformation.transform({
+      decode: ({ body, description, instructions, ...skill }) => {
+        const normalizedBody = body ?? instructions ?? "";
+        return {
+          ...skill,
+          description: description ||
+            normalizedBody.replace(/\s+/gu, " ").trim().slice(0, 1_000) ||
+            skill.name,
+          body: normalizedBody,
+        };
+      },
+      encode: (skill) => ({ ...skill, instructions: undefined }),
+    }),
+  ),
+);
 
 const ProjectAgentScheduleRunAgentResponse = Schema.Struct({
   id: UuidString,

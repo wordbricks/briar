@@ -7,6 +7,10 @@ const REQUIRED_SECRETS = [
   "BETTER_AUTH_SECRET",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
+  "MANAGED_COMPUTER_PROMOTION_CODE",
+  "MANAGED_COMPUTER_ENROLLMENT_SECRET",
+  "MANAGED_COMPUTER_AWS_ACCESS_KEY_ID",
+  "MANAGED_COMPUTER_AWS_SECRET_ACCESS_KEY",
 ] as const;
 
 const OPTIONAL_SECRET_GROUPS = [
@@ -23,6 +27,7 @@ const OPTIONAL_SECRET_GROUPS = [
     "SLACK_SIGNING_SECRET",
     "SLACK_TOKEN_ENCRYPTION_KEY",
   ],
+  ["MANAGED_COMPUTER_AWS_SESSION_TOKEN"],
 ] as const;
 
 type Mode = "check" | "deploy" | "dev";
@@ -77,7 +82,7 @@ export async function runWorkerDeploy(
 ): Promise<number> {
   const migrationExitCode = await migrate();
   if (migrationExitCode !== 0) return migrationExitCode;
-  return runner(["deploy", "--secrets-file", secretsPath]);
+  return runner(["deploy", "--keep-vars", "--secrets-file", secretsPath]);
 }
 
 async function main(): Promise<void> {

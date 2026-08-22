@@ -628,10 +628,36 @@ export type ManagedComputerProduct = {
     modelApiCostsIncluded: false;
   };
   applicationsEnabled: boolean;
+  remoteDesktopEnabled: boolean;
   configurationReady: boolean;
   canApply: boolean;
   organizationLimit: number;
   fleetLimit: number;
+};
+
+export type ManagedComputerRemoteSession = {
+  id: string;
+  managedComputerId: string;
+  state:
+    | "created"
+    | "connecting"
+    | "connected"
+    | "disconnected"
+    | "ended"
+    | "expired"
+    | "rejected";
+  connectionGeneration: number;
+  tokenExpiresAt: string;
+  maxExpiresAt: string;
+  connectedAt: string | null;
+  disconnectedAt: string | null;
+  endedAt: string | null;
+};
+
+export type ManagedComputerRemoteSessionTicket = {
+  session: ManagedComputerRemoteSession;
+  socket: { url: string; protocol: string };
+  reconnected: boolean;
 };
 
 export type HuntRunPlacement = {
@@ -675,7 +701,8 @@ export type ProjectAgentSkill = {
   id: string;
   agentId: string;
   name: string;
-  instructions: string;
+  description: string;
+  body: string;
   provider: AgentProvider;
   model: string | null;
   effort: ModelEffort | null;
@@ -688,7 +715,8 @@ export type ProjectAgentSkill = {
 export type ProjectAgentSkillInput = Pick<
   ProjectAgentSkill,
   | "name"
-  | "instructions"
+  | "description"
+  | "body"
   | "provider"
   | "model"
   | "effort"
