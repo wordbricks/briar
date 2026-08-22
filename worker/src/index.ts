@@ -797,6 +797,14 @@ import {
   readTranscriptRequest,
 } from "./request-readers";
 import {
+  appendChannelMessageBacklink,
+  approvedIssueCreation,
+  assertChannelProposalAuthorScope,
+  channelMessageShareUrl,
+  loadChannelCatalogSnapshot,
+  resolveChannelProposalTargetProjectId,
+} from "./channel-proposal-helpers";
+import {
   corsHeaders,
   HttpError,
   json,
@@ -848,6 +856,13 @@ export {
   readRunEvidenceRequest,
   readTranscriptRequest,
 } from "./request-readers";
+export {
+  approvedIssueCreation,
+  assertChannelProposalAuthorScope,
+  channelMessageShareUrl,
+  loadChannelCatalogSnapshot,
+  resolveChannelProposalTargetProjectId,
+} from "./channel-proposal-helpers";
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 const decodeChannelAgentActivityPublishInput = decodeRequestSync(
@@ -947,123 +962,6 @@ export const organizationUsageQuerySince = (
   new Date(
     now - (days + usageRangeFetchPaddingDays) * 24 * 60 * 60_000,
   ).toISOString();
-
-const canonicalProjectId = (value: string | null | undefined) =>
-  value ? value.toLowerCase() : null;
-
-export function resolveChannelProposalTargetProjectId(input: {
-  requestedProjectId: string | null | undefined;
-  proposedProjectId: string | null | undefined;
-  defaultProjectId: string | null | undefined;
-}) {
-  const proposedProjectId = canonicalProjectId(input.proposedProjectId);
-  const requestedProjectId = canonicalProjectId(input.requestedProjectId);
-  const defaultProjectId = canonicalProjectId(input.defaultProjectId);
-  // UUIDs are case-insensitive. Native iOS encodes UUID request fields in
-  // uppercase, while stored proposal project IDs are lowercase. Compare the
-  // canonical form so the same project is not rejected as a mismatch.
-  if (
-    proposedProjectId &&
-    requestedProjectId &&
-    proposedProjectId !== requestedProjectId
-  ) {
-    throw new HttpError(
-      400,
-      "The approved project must match the Agent proposal",
-    );
-  }
-  return proposedProjectId ??
-    requestedProjectId ??
-    defaultProjectId ??
-    null;
-}
-
-export function assertChannelProposalAuthorScope(input: {
-  channelOrganizationId: string;
-  proposedProjectId: string | null;
-  replyAuthorAgentId: string | null;
-  replyAuthorAgentOrganizationId: string | null;
-  replyAuthorAgentProjectId: string | null;
-}) {
-  if (
-    !input.replyAuthorAgentId ||
-    !input.replyAuthorAgentOrganizationId ||
-    input.replyAuthorAgentOrganizationId !== input.channelOrganizationId
-  ) {
-    throw new HttpError(
-      409,
-      "The Agent proposal scope can no longer be verified; request a new proposal",
-    );
-  }
-  if (
-    input.replyAuthorAgentProjectId !== null &&
-    input.replyAuthorAgentProjectId !== input.proposedProjectId
-  ) {
-    // Older workers could persist a null or cross-project target for a
-    // Project Agent. Never reinterpret what the member saw and approved.
-    throw new HttpError(
-      409,
-      "The Project Agent proposal scope is invalid; request a new proposal",
-    );
-  }
-}
-
-export function approvedIssueCreation<T extends Record<string, unknown>>(
-  issue: T,
-) {
-  return {
-    ...issue,
-    // Creating and executing are separate approvals. A creation proposal can
-    // never enter the worker queue, including proposals stored by older builds.
-    status: "backlog" as const,
-    checkpoints: [] as never[],
-  };
-}
-
-export function channelMessageShareUrl(input: {
-  origin: string;
-  organizationId: string;
-  channelId: string;
-  messageId: string;
-  rootMessageId?: string | null;
-}) {
-  const url = new URL(input.origin);
-  url.pathname =
-    `/open/channels/${encodeURIComponent(input.organizationId)}` +
-    `/${encodeURIComponent(input.channelId)}` +
-    `/${encodeURIComponent(input.messageId)}`;
-  url.search = "";
-  url.hash = "";
-  const rootMessageId = input.rootMessageId?.trim();
-  if (rootMessageId && rootMessageId !== input.messageId) {
-    url.searchParams.set("root", rootMessageId);
-  }
-  return url.toString();
-}
-
-function appendChannelMessageBacklink(
-  description: string | null,
-  channelMessageUrl: string,
-) {
-  const backlink = `[채널 메시지로 돌아가기](${channelMessageUrl})`;
-  const body = description?.trimEnd() ?? "";
-  return body ? `${body}\n\n${backlink}` : backlink;
-}
-
-/**
- * Read the change cursor before the channel catalog. If a channel mutation
- * lands between the two reads, the catalog already contains it and the older
- * cursor safely replays the same mutation. Reading in the opposite order can
- * return an old catalog with a new cursor and permanently skip that change.
- */
-export async function loadChannelCatalogSnapshot<T>(
-  readCursor: () => Promise<number>,
-  readChannels: () => Promise<T[]>,
-) {
-  const cursor = await readCursor();
-  const channels = await readChannels();
-  return { channels, cursor };
-}
 
 export function assertRunEventIdentityNotOverridden(input: {
   run: Pick<HuntRunRow, "source" | "source_key"> | null;
