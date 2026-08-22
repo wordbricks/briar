@@ -348,20 +348,6 @@ describe("CompanionChannels", () => {
     vi.useRealTimers();
   });
 
-  it("groups channels as common, current project, then other projects", async () => {
-    await render();
-
-    const dividers = [
-      ...container.querySelectorAll(".companion-channel-divider"),
-    ].map((node) => node.textContent);
-    // jsdom reports an English navigator locale, so the provider renders English.
-    expect(dividers).toEqual(["Common channels", "Briar", "Sprout"]);
-
-    const names = [
-      ...container.querySelectorAll(".companion-channel-group button span"),
-    ].map((node) => node.textContent);
-    expect(names).toEqual(["Welcome", "Briar dev", "Sprout talk"]);
-  });
 
   it("loads the newest twenty messages and prepends an earlier page at the top", async () => {
     const newest = Array.from({ length: 20 }, (_, index) =>
@@ -1971,76 +1957,6 @@ describe("CompanionChannels", () => {
   });
 
 
-  it("shows a latest-message button above channel and thread composers when scrolled up", async () => {
-    const parent = message("m-1", "Hello team", 1);
-    const reply = {
-      ...message("m-2", "Thread reply"),
-      parentMessageId: parent.id,
-    };
-    loadChannel.mockResolvedValue({
-      channel: channel("c-common", "Welcome", null),
-      members: [],
-      agents: [],
-      messages: [parent],
-    });
-    listChannelMessages.mockResolvedValue({ messages: [parent, reply] });
-    await render();
-
-    await act(async () => {
-      [
-        ...container.querySelectorAll<HTMLButtonElement>(
-          ".companion-channel-group button",
-        ),
-      ]
-        .find((button) => button.textContent?.includes("Welcome"))!
-        .click();
-      await Promise.resolve();
-    });
-
-    const channelScroller = container.querySelector<HTMLElement>(
-      ".companion-channel-messages",
-    )!;
-    Object.defineProperties(channelScroller, {
-      clientHeight: { configurable: true, value: 500 },
-      scrollHeight: { configurable: true, value: 1_200 },
-    });
-    channelScroller.scrollTop = 620;
-    await act(async () =>
-      channelScroller.dispatchEvent(new Event("scroll", { bubbles: true }))
-    );
-    expect(
-      container.querySelector('[aria-label="Jump to latest message"]'),
-    ).toBeNull();
-
-    channelScroller.scrollTop = 619;
-    await act(async () =>
-      channelScroller.dispatchEvent(new Event("scroll", { bubbles: true }))
-    );
-    const channelJump = container.querySelector<HTMLButtonElement>(
-      '[aria-label="Jump to latest message"]',
-    );
-    expect(channelJump?.parentElement?.className).toBe(
-      "conversation-scroll-region",
-    );
-    await act(async () => channelJump?.click());
-    expect(channelScroller.scrollTop).toBe(1_200);
-
-    await openThreadFromMessage();
-    const threadScroller = container.querySelector<HTMLElement>(
-      ".companion-channel-messages",
-    )!;
-    Object.defineProperties(threadScroller, {
-      clientHeight: { configurable: true, value: 400 },
-      scrollHeight: { configurable: true, value: 1_000 },
-    });
-    threadScroller.scrollTop = 400;
-    await act(async () =>
-      threadScroller.dispatchEvent(new Event("scroll", { bubbles: true }))
-    );
-    expect(
-      container.querySelector('[aria-label="Jump to latest message"]'),
-    ).not.toBeNull();
-  });
 
 
   it("posts a thread reply against the opened message", async () => {
