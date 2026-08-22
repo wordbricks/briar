@@ -29,6 +29,10 @@ export function isDesktopTauri() {
   );
 }
 
+export function supportsManagedComputerRemoteDesktop() {
+  return isWebApp() || isDesktopTauri();
+}
+
 export function isMacDesktopTauri() {
   if (!isDesktopTauri() || typeof navigator === "undefined") return false;
   return /\bMacintosh\b|\bMac OS X\b/iu.test(navigator.userAgent);

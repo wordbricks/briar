@@ -2,3 +2,6 @@ Briar
 Copyright 2026 Wordbricks
 
 This product includes software developed by Wordbricks.
+
+This product includes noVNC, licensed under MPL-2.0. See
+third-party/novnc-LICENSE.txt.

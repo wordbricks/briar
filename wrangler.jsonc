@@ -79,6 +79,10 @@
       {
         "name": "CHANNEL_ACTIVITY_REALTIME",
         "class_name": "ChannelActivityHub"
+      },
+      {
+        "name": "MANAGED_COMPUTER_REMOTE",
+        "class_name": "ManagedComputerRemoteSessionHub"
       }
     ]
   },
@@ -98,6 +102,10 @@
       "storage": "sqlite"
     },
     "ChannelActivityHub": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "ManagedComputerRemoteSessionHub": {
       "type": "durable-object",
       "storage": "sqlite"
     }

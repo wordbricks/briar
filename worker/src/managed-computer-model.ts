@@ -90,12 +90,28 @@ function positiveInteger(value: string | undefined, fallback: number) {
   return Option.getOrElse(decodePositiveInteger(value ?? ""), () => fallback);
 }
 
+function boundedPositiveInteger(
+  value: string | undefined,
+  fallback: number,
+  maximum: number,
+) {
+  const parsed = positiveInteger(value, fallback);
+  return parsed <= maximum ? parsed : fallback;
+}
+
 function booleanValue(value: string | undefined, fallback: boolean) {
   return Option.getOrElse(decodeBoolean(value ?? ""), () => fallback);
 }
 
 export type ManagedComputerConfig = {
   applicationsEnabled: boolean;
+  remoteDesktopEnabled: boolean;
+  remoteDesktopAllowedOrigins: readonly string[];
+  remoteDesktopTokenTtlSeconds: number;
+  remoteDesktopMaxSessionMinutes: number;
+  remoteDesktopOrganizationSessionLimit: number;
+  remoteDesktopFleetSessionLimit: number;
+  remoteDesktopRateLimit: number;
   campaignId: string;
   promotionCode: string | null;
   organizationLimit: number;
@@ -119,10 +135,62 @@ export type ManagedComputerConfig = {
 };
 
 export function managedComputerConfig(env: Env): ManagedComputerConfig {
+  const apiOrigin = env.MANAGED_COMPUTER_API_ORIGIN?.trim() || null;
+  const configuredRemoteOrigins =
+    env.MANAGED_COMPUTER_REMOTE_DESKTOP_ALLOWED_ORIGINS
+      ?.split(",")
+      .map((value) => value.trim())
+      .filter(Boolean) ?? [];
+  const apiOriginValue = apiOrigin
+    ? (() => {
+        try {
+          return new URL(apiOrigin).origin;
+        } catch {
+          return null;
+        }
+      })()
+    : null;
   return {
     applicationsEnabled: booleanValue(
       env.MANAGED_COMPUTER_APPLICATIONS_ENABLED,
       false,
+    ),
+    remoteDesktopEnabled: booleanValue(
+      env.MANAGED_COMPUTER_REMOTE_DESKTOP_ENABLED,
+      false,
+    ),
+    remoteDesktopAllowedOrigins: [
+      ...configuredRemoteOrigins,
+      ...(apiOriginValue ? [apiOriginValue] : []),
+      "https://briar.wordbricks.ai",
+      "tauri://localhost",
+      "http://tauri.localhost",
+      "https://tauri.localhost",
+    ].filter((value, index, values) => values.indexOf(value) === index),
+    remoteDesktopTokenTtlSeconds: boundedPositiveInteger(
+      env.MANAGED_COMPUTER_REMOTE_DESKTOP_TOKEN_TTL_SECONDS,
+      60,
+      300,
+    ),
+    remoteDesktopMaxSessionMinutes: boundedPositiveInteger(
+      env.MANAGED_COMPUTER_REMOTE_DESKTOP_MAX_SESSION_MINUTES,
+      60,
+      8 * 60,
+    ),
+    remoteDesktopOrganizationSessionLimit: boundedPositiveInteger(
+      env.MANAGED_COMPUTER_REMOTE_DESKTOP_ORGANIZATION_SESSION_LIMIT,
+      2,
+      50,
+    ),
+    remoteDesktopFleetSessionLimit: boundedPositiveInteger(
+      env.MANAGED_COMPUTER_REMOTE_DESKTOP_FLEET_SESSION_LIMIT,
+      20,
+      500,
+    ),
+    remoteDesktopRateLimit: boundedPositiveInteger(
+      env.MANAGED_COMPUTER_REMOTE_DESKTOP_RATE_LIMIT,
+      10,
+      100,
     ),
     campaignId: "getbriar-pilot",
     promotionCode: env.MANAGED_COMPUTER_PROMOTION_CODE?.trim() || null,
@@ -150,7 +218,7 @@ export function managedComputerConfig(env: Env): ManagedComputerConfig {
     volumeGiB: positiveInteger(env.MANAGED_COMPUTER_VOLUME_GIB, 100),
     vcpu: positiveInteger(env.MANAGED_COMPUTER_VCPU, 2),
     memoryGiB: positiveInteger(env.MANAGED_COMPUTER_MEMORY_GIB, 8),
-    apiOrigin: env.MANAGED_COMPUTER_API_ORIGIN?.trim() || null,
+    apiOrigin,
     enrollmentSecret:
       env.MANAGED_COMPUTER_ENROLLMENT_SECRET?.trim() || null,
     awsIdentityPublicKey:
@@ -216,6 +284,7 @@ export function managedComputerProduct(config: ManagedComputerConfig) {
     },
     applicationsEnabled:
       config.applicationsEnabled && managedComputerProvisioningConfigured(config),
+    remoteDesktopEnabled: config.remoteDesktopEnabled,
     organizationLimit: config.organizationLimit,
     fleetLimit: config.fleetLimit,
   };

@@ -77,7 +77,7 @@ export async function runWorkerDeploy(
 ): Promise<number> {
   const migrationExitCode = await migrate();
   if (migrationExitCode !== 0) return migrationExitCode;
-  return runner(["deploy", "--secrets-file", secretsPath]);
+  return runner(["deploy", "--keep-vars", "--secrets-file", secretsPath]);
 }
 
 async function main(): Promise<void> {

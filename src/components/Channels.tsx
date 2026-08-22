@@ -3735,13 +3735,13 @@ const MessageRow = memo(function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
+        <ChannelMessageImages attachments={message.attachments} token={token} />
         {showTypingState ? (
           <ChannelTypingState
             agentNames={typingAgentNames}
             activityByAgentName={typingActivityByAgentName}
           />
         ) : null}
-        <ChannelMessageImages attachments={message.attachments} token={token} />
 
         {message.document ? (
           <ChannelDocumentPreview

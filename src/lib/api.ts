@@ -84,6 +84,7 @@ import type {
   OrganizationExecutionWorker,
   ManagedComputer,
   ManagedComputerProduct,
+  ManagedComputerRemoteSessionTicket,
   ProjectExecutionWorkerPolicy,
   HuntRunPlacement,
   HuntEvent,
@@ -534,6 +535,36 @@ export async function retryManagedComputer(
       headers: { "Idempotency-Key": requestId },
       body: JSON.stringify({ requestId }),
     },
+  );
+}
+
+export async function createManagedComputerRemoteSession(
+  token: string,
+  organizationId: string,
+  managedComputerId: string,
+  input: { requestId: string; reconnectSessionId?: string },
+) {
+  return request<ManagedComputerRemoteSessionTicket>(
+    `/organizations/${organizationId}/managed-computers/${managedComputerId}/remote-sessions`,
+    token,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": input.requestId },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function endManagedComputerRemoteSession(
+  token: string,
+  organizationId: string,
+  managedComputerId: string,
+  remoteSessionId: string,
+) {
+  return request<void>(
+    `/organizations/${organizationId}/managed-computers/${managedComputerId}/remote-sessions/${remoteSessionId}`,
+    token,
+    { method: "DELETE" },
   );
 }
 

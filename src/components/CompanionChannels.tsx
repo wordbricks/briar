@@ -2134,6 +2134,11 @@ function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
+        <ChannelMessageImages
+          attachments={message.attachments}
+          interactive={!showThreadSummary}
+          token={token}
+        />
         {showTypingState ? (
           <ChannelTypingState
             agentNames={typingAgentNames}
@@ -2141,11 +2146,6 @@ function MessageRow({
             className="companion-channel-typing"
           />
         ) : null}
-        <ChannelMessageImages
-          attachments={message.attachments}
-          interactive={!showThreadSummary}
-          token={token}
-        />
         {message.document ? (
           <span className="companion-channel-document">
             <FileText size={13} />

@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$(id -u)" != "0" ]]; then
+  echo "install-remote-desktop must run as root in the AMI builder" >&2
+  exit 1
+fi
+
+source_dir="${1:-/opt/briar/source}"
+package_lock="${2:-$source_dir/remote-desktop-packages.lock}"
+agent_bundle="${3:-$source_dir/briar-remote-session-agent.js}"
+test -s "$package_lock"
+test -s "$agent_bundle"
+
+packages=()
+while IFS= read -r package; do
+  [[ -z "$package" || "$package" == \#* ]] && continue
+  if [[ ! "$package" =~ ^[a-z0-9][a-z0-9+.-]*=[^[:space:]]+$ ]]; then
+    echo "Package lock entry must use package=exact-version: $package" >&2
+    exit 1
+  fi
+  packages+=("$package")
+done < "$package_lock"
+if [[ "${#packages[@]}" == "0" ]]; then
+  echo "Package lock is empty" >&2
+  exit 1
+fi
+
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+  "${packages[@]}"
+
+if ! id briar >/dev/null 2>&1; then
+  useradd --create-home --shell /bin/bash briar
+fi
+install -d -o root -g root -m 0755 /opt/briar/bin
+install -d -o root -g briar -m 0750 /var/lib/briar
+install -o root -g root -m 0755 \
+  "$source_dir/briar-managed-enroll" \
+  "$source_dir/briar-remote-desktop" \
+  "$source_dir/resolve-remote-desktop-packages" \
+  "$source_dir/install-remote-desktop" \
+  "$source_dir/verify-remote-desktop" \
+  /opt/briar/bin/
+install -o root -g root -m 0644 \
+  "$source_dir/briar-managed-enroll.service" \
+  "$source_dir/briar-remote-desktop.service" \
+  "$source_dir/briar-remote-session-agent.service" \
+  /etc/systemd/system/
+install -o root -g root -m 0644 "$package_lock" \
+  /opt/briar/remote-desktop-packages.lock
+install -o root -g root -m 0644 "$agent_bundle" \
+  /opt/briar/bin/briar-remote-session-agent.js
+
+systemctl daemon-reload
+systemctl enable \
+  briar-managed-enroll.service \
+  briar-remote-desktop.service \
+  briar-remote-session-agent.service
+
+installed_lock="$(mktemp)"
+trap 'rm -f "$installed_lock"' EXIT
+for package in "${packages[@]}"; do
+  name="${package%%=*}"
+  dpkg-query --show --showformat='${binary:Package}=${Version}\n' "$name"
+done | LC_ALL=C sort > "$installed_lock"
+LC_ALL=C sort "$package_lock" | sed '/^\s*#/d; /^\s*$/d' | cmp - "$installed_lock"
+sha256sum /opt/briar/remote-desktop-packages.lock \
+  > /opt/briar/remote-desktop-packages.lock.sha256

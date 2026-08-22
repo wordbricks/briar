@@ -5,6 +5,15 @@
 import { vi } from "vitest";
 
 vi.mock("cloudflare:workers", () => ({
+  DurableObject: class<Environment> {
+    protected env: Environment;
+    protected ctx: unknown;
+
+    constructor(ctx: unknown, env: Environment) {
+      this.ctx = ctx;
+      this.env = env;
+    }
+  },
   WorkflowEntrypoint: class<Environment> {
     protected env: Environment;
     protected ctx: unknown;

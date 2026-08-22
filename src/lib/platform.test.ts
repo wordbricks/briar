@@ -4,6 +4,7 @@ import {
   isMobileCompanion,
   isDesktopTauri,
   isMacDesktopTauri,
+  supportsManagedComputerRemoteDesktop,
 } from "./platform";
 
 afterEach(() => {
@@ -20,6 +21,7 @@ describe("platform detection", () => {
     expect(isMobileCompanion()).toBe(true);
     expect(getMobilePlatform()).toBe("android");
     expect(isDesktopTauri()).toBe(false);
+    expect(supportsManagedComputerRemoteDesktop()).toBe(false);
   });
 
   it("detects an iOS WebView as the companion app", () => {
@@ -32,6 +34,7 @@ describe("platform detection", () => {
     expect(isMobileCompanion()).toBe(true);
     expect(getMobilePlatform()).toBe("ios");
     expect(isDesktopTauri()).toBe(false);
+    expect(supportsManagedComputerRemoteDesktop()).toBe(false);
   });
 
   it("keeps desktop Tauri features on desktop", () => {
@@ -42,6 +45,7 @@ describe("platform detection", () => {
     expect(getMobilePlatform()).toBeNull();
     expect(isDesktopTauri()).toBe(true);
     expect(isMacDesktopTauri()).toBe(true);
+    expect(supportsManagedComputerRemoteDesktop()).toBe(true);
   });
 
   it("does not enable the native intro for another desktop platform", () => {

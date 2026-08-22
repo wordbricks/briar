@@ -1,4 +1,5 @@
 import { isDesktopTauri } from "./platform";
+import { remoteDesktopCapturesKeyboard } from "./remote-desktop-focus";
 
 export const appZoomStorageKey = "briar.appZoom";
 export const appZoomSteps = [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4] as const;
@@ -76,6 +77,7 @@ export function installAppZoomShortcuts(
   void setZoom(appZoomSteps[zoomIndex]);
 
   const handleKeyDown = (event: KeyboardEvent) => {
+    if (remoteDesktopCapturesKeyboard()) return;
     const direction = zoomDirection(event);
     if (direction === 0) return;
 
