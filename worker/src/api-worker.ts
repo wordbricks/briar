@@ -87,21 +87,15 @@ import { handleAccountRoute } from "./account-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
 import { handleOrganizationRoute } from "./organization-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
+import { handleProjectAgentSessionRoute } from "./project-agent-session-routes";
+import { handleProjectAgentTaskRoute } from "./project-agent-task-routes";
 import { handleProjectCoreRoute } from "./project-core-routes";
 import { handleProjectLinearRoute } from "./project-linear-routes";
 import { handleProjectSettingsRoute } from "./project-settings-routes";
 import { handlePublicRoute } from "./public-routes";
 import { projectJson } from "./project-json";
-import {
-  projectAgentSessionJson,
-  projectAgentSessionSummaryJson,
-  projectAgentSessionSyncEtag,
-  projectAgentSessionSyncJson,
-} from "./project-agent-session-json";
-import {
-  projectAgentTaskSessionEvent,
-  syncProjectAgentTaskSession,
-} from "./project-agent-task-session";
+import { projectAgentSessionJson } from "./project-agent-session-json";
+import { syncProjectAgentTaskSession } from "./project-agent-task-session";
 import { settingsJson } from "./project-settings-json";
 import {
   contentDisposition,
@@ -124,12 +118,10 @@ import {
   type ProjectRow,
 } from "./project-repository";
 import {
-  backfillArchivedProjectAgentSessionSummaries,
   getArchivedEvidenceImage,
   getArchivedProjectAgentSession,
   listArchivedExecutionAuditEvents,
   listArchivedIssueMessages,
-  listArchivedProjectAgentSessions,
   listArchivedRunEvidence,
   listArchivedRunEvents,
   processArchiveCleanupQueue,
@@ -160,7 +152,6 @@ import {
   issueAttachmentObjectKeysInUse,
   issueExecutionApprovalTablesAvailable,
   createRunEvidenceImages,
-  createProjectAgentTaskJob,
   createSlackOAuthState,
   claimSlackEvent,
   deleteSlackInstallation,
@@ -175,7 +166,6 @@ import {
   failIssueAgentReply,
   findProjectIdByAgentTokenHash,
   getProjectAgent,
-  getProjectAgentScheduleCreatorId,
   getClaimedIssueAgentReply,
   getIssueActionProposal,
   getIssueExecutionProposal,
@@ -193,10 +183,7 @@ import {
   getProject,
   getProjectSettings,
   getProjectAgentSession,
-  getProjectAgentSessionSyncCursor,
-  projectAgentSessionIsApprovalOwned,
   getProjectAgentTaskJob,
-  getProjectAgentTaskJobByRequest,
   getHuntRunForProject,
   getRunExecutionAttempt,
   HuntClaimError,
@@ -230,9 +217,6 @@ import {
   listProjectUsageTotals,
   listProjectUsageRuns,
   listGithubConnectionRepositories,
-  listProjectAgentSessions,
-  listProjectAgentSessionChanges,
-  listProjectAgentSessionSummaries,
   listSlackInstallations,
   moveHuntRun,
   recoverHuntRun,
@@ -265,7 +249,6 @@ import {
   unsubscribeIssue,
   deleteIssueMessage,
   updateSlackInstallationProject,
-  upsertProjectAgentSession,
   upsertProjectAgentSessionSummary,
   upsertSlackInstallation,
   syncGithubPullRequest,
@@ -405,10 +388,8 @@ import {
   type IssueUpdateInput,
 } from "./issue-request-contract";
 import {
-  decodeProjectAgentSessionInput,
   decodeProjectAgentTaskClaimInput,
   decodeProjectAgentTaskCompletion,
-  decodeProjectAgentTaskInput,
   decodeProjectAgentTaskLease,
   decodeProjectTransferInput,
 } from "./project-request-contract";
@@ -5590,395 +5571,29 @@ async function route(
     db,
   });
   if (projectSettingsResponse !== undefined) return projectSettingsResponse;
-  const projectAgentSessionsMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/agent-sessions$/u,
-  );
-  const projectAgentSessionChangesMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/agent-sessions\/changes$/u,
-  );
-  const projectAgentTasksMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/agent-tasks$/u,
-  );
-  if (projectAgentTasksMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentTasksMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = decodeProjectAgentTaskInput(await readJson(request));
-    const existingJob = await getProjectAgentTaskJobByRequest(
-      db,
-      project.id,
-      input.requestId,
-    );
-    if (existingJob) {
-      const existingSession = await getProjectAgentSession(
-        db,
-        project.id,
-        existingJob.id,
-      );
-      if (!existingSession) {
-        throw new HttpError(409, "Agent task session is missing");
-      }
-      return json({ session: projectAgentSessionJson(existingSession) });
-    }
 
-    const agent = await getProjectAgent(db, project.id, input.agentId);
-    if (!agent) throw new HttpError(404, "Agent not found for this project");
-    if (!input.skillId && agent.skills.length !== 1) {
-      throw new HttpError(400, "Choose an Agent Skill before running the Agent");
-    }
-    const selectedSkill = await getAgentSkill(
-      db,
-      agent.id,
-      input.skillId ?? null,
-    );
-    if (!selectedSkill) {
-      throw new HttpError(404, "Agent Skill not found for this Agent");
-    }
-    const worker = await db
-      .prepare(
-        `select worker.*, device.max_concurrent_sessions
-         from briar_execution_workers worker
-         join briar_execution_worker_devices device on device.id = worker.device_id
-         where worker.id = ? and worker.project_id = ?
-           and device.organization_id = ?`,
-      )
-      .bind(input.workerId, project.id, project.organization_id)
-      .first<{
-        id: string;
-        agent_provider: AgentProvider;
-        capabilities_json: string;
-        state: "online" | "stale" | "disabled";
-        accepting_work: number;
-        readiness_state: "ready" | "busy" | "needs_attention";
-        last_heartbeat_at: string;
-        max_concurrent_sessions: number;
-      }>();
-    if (!worker) throw new HttpError(404, "Worker not found for this project");
-    const observedAt = new Date().toISOString();
-    if (
-      workerStateAt(worker.last_heartbeat_at, observedAt, worker.state) !== "online" ||
-      worker.accepting_work !== 1 ||
-      worker.readiness_state === "needs_attention"
-    ) {
-      throw new HttpError(409, "Worker is not ready to accept agent tasks");
-    }
-    if (!executionWorkerProviders(worker).includes(selectedSkill.provider)) {
-      throw new HttpError(
-        409,
-        `Worker does not support the ${selectedSkill.provider} provider`,
-      );
-    }
-    if (!(await isExecutionWorkerAllowedForProject(db, project.id, worker.id))) {
-      throw new HttpError(
-        409,
-        "Worker is not allowed by this project's execution policy",
-      );
-    }
-    const active = await db
-      .prepare(
-        `select
-           (select count(*)
-            from briar_hunt_runs run
-            where run.worker_id = ? and run.claim_token_hash is not null
-              and run.lease_expires_at > ?
-              and run.status not in ('backlog', 'completed', 'cancelled', 'blocked', 'failed'))
-           +
-           (select count(*)
-            from briar_project_agent_task_jobs task
-            where task.claimed_worker_id = ? and task.status = 'running'
-              and task.lease_expires_at > ?) as count`,
-      )
-      .bind(worker.id, observedAt, worker.id, observedAt)
-      .first<{ count: number }>();
-    if ((active?.count ?? 0) >= worker.max_concurrent_sessions) {
-      throw new HttpError(409, "Worker has no available execution slot");
-    }
+  const projectAgentTaskResponse = await handleProjectAgentTaskRoute({
+    request,
+    url,
+    auth,
+    db,
+    env,
+    context,
+  });
+  if (projectAgentTaskResponse !== undefined) return projectAgentTaskResponse;
 
-    const taskId = crypto.randomUUID();
-    let job;
-    try {
-      job = await createProjectAgentTaskJob(db, {
-        id: taskId,
-        projectId: project.id,
-        agentId: agent.id,
-        skill: selectedSkill,
-        request: input.request,
-        requestId: input.requestId,
-        workerId: worker.id,
-        createdAt: observedAt,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message.toLowerCase() : "";
-      if (!message.includes("unique")) throw error;
-      job = await getProjectAgentTaskJobByRequest(
-        db,
-        project.id,
-        input.requestId,
-      );
-    }
-    if (!job) throw new HttpError(409, "Agent task could not be queued");
-    const payload = {
-      dispatchGroupId: taskId,
-      agentId: agent.id,
-      agentName: agent.name,
-      skillId: selectedSkill.id,
-      sessionType: "task" as const,
-      trigger: "manual" as const,
-      scheduleId: null,
-      scheduleRunId: null,
-      parentSessionId: null,
-      request: input.request,
-      followUps: [],
-      status: "running" as const,
-      issues: [],
-      startedAt: observedAt,
-      completedAt: null,
-      conversationId: null,
-      requestedWorkerId: worker.id,
-      workerId: worker.id,
-      summary: null,
-      error: null,
-      events: [projectAgentTaskSessionEvent("started", observedAt)],
-      updatedAt: observedAt,
-    };
-    const createdSession = await upsertProjectAgentSession(db, {
-      project_id: project.id,
-      id: taskId,
-      agent_id: agent.id,
-      requested_by_user_id: session.user.id,
-      status: "running",
-      session_type: "task",
-      payload_json: JSON.stringify(payload),
-      started_at: observedAt,
-      completed_at: null,
-      updated_at: observedAt,
-    }, observedAt);
-    if (!createdSession) {
-      throw new HttpError(409, "Agent task session could not be created");
-    }
-    scheduleProjectAgentSessionRealtimePublish(
-      env,
-      db,
-      project.id,
-      context,
-    );
-    return json({ session: projectAgentSessionJson(createdSession) });
+  const projectAgentSessionResponse = await handleProjectAgentSessionRoute({
+    request,
+    url,
+    auth,
+    db,
+    env,
+    context,
+  });
+  if (projectAgentSessionResponse !== undefined) {
+    return projectAgentSessionResponse;
   }
-  if (projectAgentSessionChangesMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentSessionChangesMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const rawCursor = new URL(request.url).searchParams.get("cursor");
-    let cursor: number | null = null;
-    if (rawCursor !== null) {
-      if (!/^\d+$/u.test(rawCursor)) {
-        throw new HttpError(400, "A non-negative Agent session cursor is required");
-      }
-      cursor = Number(rawCursor);
-      if (!Number.isSafeInteger(cursor)) {
-        throw new HttpError(400, "Agent session cursor is outside the safe range");
-      }
-    } else {
-      // Historical archives predate the D1 summary projection. This bounded
-      // one-time backfill is the only list path that may read those legacy R2
-      // objects; later snapshots and every delta are D1-only.
-      await backfillArchivedProjectAgentSessionSummaries(
-        db,
-        env.ARCHIVES,
-        project.id,
-      );
-    }
 
-    const currentCursor = await getProjectAgentSessionSyncCursor(db, project.id);
-    const etag = projectAgentSessionSyncEtag(project.id, currentCursor);
-    if (
-      cursor === currentCursor &&
-      request.headers.get("if-none-match") === etag
-    ) {
-      return new Response(null, {
-        status: 304,
-        headers: {
-          ...corsHeaders,
-          "Cache-Control": "private, no-cache",
-          ETag: etag,
-        },
-      });
-    }
-
-    if (cursor === null) {
-      const summaries = await listProjectAgentSessionSummaries(db, project.id);
-      return projectAgentSessionSyncJson({
-        cursor: currentCursor,
-        hasMore: false,
-        reset: true,
-        sessions: summaries.map(projectAgentSessionSummaryJson),
-        deletedSessionIds: [],
-      }, etag);
-    }
-
-    const page = await listProjectAgentSessionChanges(db, project.id, cursor);
-    if (page.expired) {
-      return projectAgentSessionSyncJson({
-        code: "project_agent_session_cursor_expired",
-        message: "Agent session cursor expired; reload the summary snapshot",
-      }, etag, 410);
-    }
-    const changedSessionIds = [...new Set(
-      page.changes.map((change) => change.session_id),
-    )];
-    const summaries = await listProjectAgentSessionSummaries(
-      db,
-      project.id,
-      changedSessionIds,
-    );
-    const existingIds = new Set(summaries.map((summary) => summary.session_id));
-    return projectAgentSessionSyncJson({
-      cursor: page.nextCursor,
-      hasMore: page.hasMore,
-      reset: false,
-      sessions: summaries.map(projectAgentSessionSummaryJson),
-      deletedSessionIds: changedSessionIds.filter((id) => !existingIds.has(id)),
-    }, etag);
-  }
-  if (projectAgentSessionsMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentSessionsMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const [hotSessions, archivedSessions] = await Promise.all([
-      listProjectAgentSessions(db, project.id),
-      listArchivedProjectAgentSessions(db, env.ARCHIVES, project.id),
-    ]);
-    const sessions = [
-      ...new Map(
-        [...archivedSessions, ...hotSessions].map((item) => [item.id, item]),
-      ).values(),
-    ]
-      .sort((left, right) => right.updated_at.localeCompare(left.updated_at))
-      .slice(0, 200);
-    return json({ sessions: sessions.map(projectAgentSessionJson) });
-  }
-  const projectAgentSessionMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/agent-sessions\/([A-Za-z0-9_-]{1,128})$/u,
-  );
-  if (projectAgentSessionMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentSessionMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const hot = await getProjectAgentSession(
-      db,
-      project.id,
-      projectAgentSessionMatch[2],
-    );
-    if (hot) return privateNoStoreJson({ session: projectAgentSessionJson(hot) });
-    const archived = await getArchivedProjectAgentSession(
-      db,
-      env.ARCHIVES,
-      project.id,
-      projectAgentSessionMatch[2],
-    );
-    if (!archived) throw new HttpError(404, "Agent session not found");
-    return privateNoStoreJson({
-      session: {
-        ...projectAgentSessionJson(archived),
-        archived: true,
-      },
-    });
-  }
-  if (projectAgentSessionMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentSessionMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    if (
-      await agentSkillExecutionApprovalTablesAvailable(db) &&
-      await projectAgentSessionIsApprovalOwned(
-        db,
-        project.id,
-        projectAgentSessionMatch[2],
-      )
-    ) {
-      throw new HttpError(
-        409,
-        "Approved Agent Skill execution sessions are updated by their assigned Worker",
-        "AGENT_SKILL_EXECUTION_SESSION_SERVER_OWNED",
-      );
-    }
-    const input = decodeProjectAgentSessionInput(await readJson(request));
-    const observedAt = new Date().toISOString();
-    const existing = await getProjectAgentSession(
-      db,
-      project.id,
-      projectAgentSessionMatch[2],
-    ) ?? await getArchivedProjectAgentSession(
-      db,
-      env.ARCHIVES,
-      project.id,
-      projectAgentSessionMatch[2],
-    );
-    let requestedByUserId: string | null;
-    if (existing) {
-      requestedByUserId = existing.requested_by_user_id;
-    } else if (input.parentSessionId) {
-      const parent = await getProjectAgentSession(
-        db,
-        project.id,
-        input.parentSessionId,
-      ) ?? await getArchivedProjectAgentSession(
-        db,
-        env.ARCHIVES,
-        project.id,
-        input.parentSessionId,
-      );
-      requestedByUserId = parent?.requested_by_user_id ?? null;
-    } else if (input.trigger === "scheduled" && input.scheduleId) {
-      requestedByUserId = await getProjectAgentScheduleCreatorId(
-        db,
-        project.id,
-        input.scheduleId,
-      );
-    } else {
-      requestedByUserId = session.user.id;
-    }
-    const row = await upsertProjectAgentSession(db, {
-      project_id: project.id,
-      id: projectAgentSessionMatch[2],
-      agent_id: input.agentId,
-      requested_by_user_id: requestedByUserId,
-      status: input.status,
-      session_type: input.sessionType,
-      payload_json: JSON.stringify(input),
-      started_at: input.startedAt,
-      completed_at: input.completedAt,
-      updated_at: input.updatedAt,
-    }, observedAt);
-    if (!row) throw new HttpError(409, "Agent session could not be synchronized");
-    scheduleProjectAgentSessionRealtimePublish(
-      env,
-      db,
-      project.id,
-      context,
-    );
-    return json({ session: projectAgentSessionJson(row) });
-  }
   const projectAgentResponse = await handleProjectAgentRoute({
     request,
     url,
@@ -5987,6 +5602,7 @@ async function route(
     attachmentsBucket,
   });
   if (projectAgentResponse !== undefined) return projectAgentResponse;
+
   const projectAgentScheduleResponse =
     await handleProjectAgentScheduleRoute({
       request,
