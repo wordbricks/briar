@@ -499,6 +499,7 @@ export function HuntDashboard({
   agents = [],
   companionMode = false,
   companionStatus,
+  companionUnreadDmCount = 0,
   companionUnreadInboxCount = 0,
   conversationInboxSyncSignal,
   currentUserId = null,
@@ -541,7 +542,7 @@ export function HuntDashboard({
   onCancelRun,
   onUnassignRun,
   onResumeRun = async () => undefined,
-  onCompanionAgentsOpen,
+  onCompanionDmsOpen,
   onCompanionInboxOpen,
   onCompanionHomeOpen,
   onCompanionStatusChange,
@@ -565,6 +566,7 @@ export function HuntDashboard({
   agents?: ProjectAgent[];
   companionMode?: boolean;
   companionStatus?: CompanionStatusFilter;
+  companionUnreadDmCount?: number;
   companionUnreadInboxCount?: number;
   conversationInboxSyncSignal?: string;
   currentUserId?: string | null;
@@ -642,7 +644,7 @@ export function HuntDashboard({
   onCancelRun: (runId: string) => Promise<unknown>;
   onUnassignRun?: (runId: string) => Promise<unknown>;
   onResumeRun?: (runId: string) => Promise<unknown>;
-  onCompanionAgentsOpen?: () => void;
+  onCompanionDmsOpen?: () => void;
   onCompanionInboxOpen?: () => void;
   onCompanionHomeOpen?: () => void;
   onCompanionStatusChange?: (status: CompanionStatusFilter) => void;
@@ -2000,10 +2002,11 @@ export function HuntDashboard({
         <CompanionBottomNavigation
           activeDestination={status}
           onCreate={() => setIsIssueDialogOpen(true)}
-          onAgentsOpen={() => onCompanionAgentsOpen?.()}
+          onDmsOpen={() => onCompanionDmsOpen?.()}
           onInboxOpen={() => onCompanionInboxOpen?.()}
           onHomeOpen={() => onCompanionHomeOpen?.()}
           onStatusChange={setStatus}
+          unreadDmCount={companionUnreadDmCount}
           unreadInboxCount={companionUnreadInboxCount}
         />
       )}

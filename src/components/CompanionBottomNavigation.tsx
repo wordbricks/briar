@@ -1,4 +1,4 @@
-import { Bot, House, Inbox, ListTodo, Plus } from "lucide-react";
+import { House, Inbox, ListTodo, MessageCircle, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -12,25 +12,27 @@ export type CompanionStatusFilter =
 
 type CompanionDestination =
   | CompanionStatusFilter
-  | "agents"
+  | "dms"
   | "home"
   | "inbox";
 
 export function CompanionBottomNavigation({
   activeDestination,
   onCreate,
-  onAgentsOpen,
+  onDmsOpen,
   onHomeOpen,
   onInboxOpen,
   onStatusChange,
+  unreadDmCount,
   unreadInboxCount,
 }: {
   activeDestination: CompanionDestination;
   onCreate?: () => void;
-  onAgentsOpen: () => void;
+  onDmsOpen: () => void;
   onHomeOpen: () => void;
   onInboxOpen: () => void;
   onStatusChange: (status: CompanionStatusFilter) => void;
+  unreadDmCount: number;
   unreadInboxCount: number;
 }) {
   const { t } = useI18n();
@@ -42,7 +44,12 @@ export function CompanionBottomNavigation({
   }> = [
     { icon: House, label: t("companion.navHome"), value: "home" },
     { icon: ListTodo, label: t("companion.navTasks"), value: "all" },
-    { icon: Bot, label: t("companion.navAgents"), value: "agents" },
+    {
+      count: unreadDmCount,
+      icon: MessageCircle,
+      label: t("sidebar.dms"),
+      value: "dms",
+    },
     {
       count: unreadInboxCount,
       icon: Inbox,
@@ -72,7 +79,7 @@ export function CompanionBottomNavigation({
               )}
               key={destination.value}
               onClick={() => {
-                if (destination.value === "agents") onAgentsOpen();
+                if (destination.value === "dms") onDmsOpen();
                 else if (destination.value === "inbox") onInboxOpen();
                 else if (destination.value === "home") onHomeOpen();
                 else onStatusChange(destination.value);

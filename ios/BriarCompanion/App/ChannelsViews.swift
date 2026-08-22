@@ -161,6 +161,18 @@ struct ChannelMessagesView: View {
         channels.channels.first(where: { $0.id == channel.id }) ?? channel
     }
 
+    private var displayTitle: String {
+        currentChannel.isDirectMessage
+            ? currentChannel.directMessageDisplayName(currentUserID: currentUserID)
+            : currentChannel.name
+    }
+
+    private var navigationSubtitle: String {
+        currentChannel.isDirectMessage
+            ? L10n.text("비공개 대화", locale: locale)
+            : channelParticipationLabel(channel: currentChannel, locale: locale)
+    }
+
     var body: some View {
         ChannelConversationView(
             channels: channels,
@@ -179,14 +191,16 @@ struct ChannelMessagesView: View {
             onSkillSessionOpen: onSkillSessionOpen,
             showsThreadSummary: true
         )
-        .navigationTitle(currentChannel.name)
+        .navigationTitle(displayTitle)
         .navigationBarTitleDisplayMode(.inline)
-        .channelNavigationSubtitle(
-            channelParticipationLabel(channel: currentChannel, locale: locale)
-        )
+        .channelNavigationSubtitle(navigationSubtitle)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                ChannelNavigationTitle(channel: currentChannel, locale: locale)
+                ChannelNavigationTitle(
+                    channel: currentChannel,
+                    currentUserID: currentUserID,
+                    locale: locale
+                )
             }
         }
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -272,25 +286,40 @@ private extension View {
 
 private struct ChannelNavigationTitle: View {
     let channel: ChannelSummary
+    let currentUserID: String?
     let locale: CompanionLocale
+
+    private var title: String {
+        channel.isDirectMessage
+            ? channel.directMessageDisplayName(currentUserID: currentUserID)
+            : channel.name
+    }
+
+    private var subtitle: String {
+        channel.isDirectMessage
+            ? L10n.text("비공개 대화", locale: locale)
+            : channelParticipationLabel(channel: channel, locale: locale)
+    }
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: channel.visibility == .restricted ? "lock.fill" : "number")
+            Image(systemName: channel.isDirectMessage
+                ? "bubble.left.and.bubble.right.fill"
+                : channel.visibility == .restricted ? "lock.fill" : "number")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.primary)
                 .frame(width: 26)
 
             if #available(iOS 26.0, *) {
-                Text(channel.name)
+                Text(title)
                     .font(.subheadline.weight(.bold))
                     .lineLimit(1)
             } else {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(channel.name)
+                    Text(title)
                         .font(.subheadline.weight(.bold))
                         .lineLimit(1)
-                    Text(channelParticipationLabel(channel: channel, locale: locale))
+                    Text(subtitle)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -308,7 +337,7 @@ private struct ChannelNavigationTitle: View {
         .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(channel.name), \(channelParticipationLabel(channel: channel, locale: locale))"
+            "\(title), \(subtitle)"
         )
         .accessibilityIdentifier("channel-header-identity")
     }

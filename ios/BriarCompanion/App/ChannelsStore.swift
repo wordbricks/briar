@@ -310,6 +310,48 @@ final class ChannelsStore: ObservableObject {
         }
     }
 
+    func loadDirectMessageRecipients() async throws -> (
+        members: [OrganizationMember],
+        agents: [ChannelAgentSummary]
+    ) {
+        guard let organizationID, let token else {
+            throw MobileAPIError.invalidRequest
+        }
+        async let membersResponse: DirectMessageRecipientsResponse = api.get(
+            MobileAPIContract.Endpoint.organizationMembers(organizationID: organizationID),
+            token: token,
+            as: DirectMessageRecipientsResponse.self
+        )
+        async let agentsResponse: OrganizationAgentsResponse = api.get(
+            MobileAPIContract.Endpoint.organizationAgents(organizationID: organizationID),
+            token: token,
+            as: OrganizationAgentsResponse.self
+        )
+        let (loadedMembers, loadedAgents) = try await (membersResponse, agentsResponse)
+        return (loadedMembers.members, loadedAgents.agents)
+    }
+
+    func createDirectMessage(
+        memberIDs: [String],
+        agentIDs: [UUID]
+    ) async throws -> ChannelSummary {
+        guard let organizationID, let token,
+              !memberIDs.isEmpty || !agentIDs.isEmpty else {
+            throw MobileAPIError.invalidRequest
+        }
+        let response: CreateDirectMessageResponse = try await api.post(
+            MobileAPIContract.Endpoint.directMessages(organizationID: organizationID),
+            body: CreateDirectMessageRequest(
+                memberIds: memberIDs,
+                agentIds: agentIDs.map { $0.uuidString.lowercased() }
+            ),
+            token: token,
+            as: CreateDirectMessageResponse.self
+        )
+        upsertChannel(response.channel)
+        return response.channel
+    }
+
     func openChannel(_ channelID: UUID) async {
         guard let organizationID, let token else { return }
         cacheFocusedThread()

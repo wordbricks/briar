@@ -48,6 +48,18 @@ enum MobileAPIContract {
             "/organizations/\(organizationID.uuidString.lowercased())/channels"
         }
 
+        static func directMessages(organizationID: UUID) -> String {
+            "/organizations/\(organizationID.uuidString.lowercased())/dms"
+        }
+
+        static func organizationMembers(organizationID: UUID) -> String {
+            "/organizations/\(organizationID.uuidString.lowercased())/members"
+        }
+
+        static func organizationAgents(organizationID: UUID) -> String {
+            "/organizations/\(organizationID.uuidString.lowercased())/agents"
+        }
+
         static func channelChanges(organizationID: UUID, cursor: Int) -> String {
             "/organizations/\(organizationID.uuidString.lowercased())/channel-changes?since=\(cursor)"
         }
