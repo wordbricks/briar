@@ -52,8 +52,8 @@ describe("DirectMessages", () => {
         provider: "codex",
         model: null,
         effort: null,
-        projectId: null,
-        projectName: null,
+        projectId: "project-1",
+        projectName: "Falcon Project",
         description: "Research agent",
         responsibility: "Research",
         skills: [],
@@ -109,6 +109,7 @@ describe("DirectMessages", () => {
       ".dm-candidate-popover > button",
     )].find((button) => button.textContent?.includes("Falcon"));
     expect(falcon).toBeTruthy();
+    expect(falcon!.textContent).toContain("Falcon Project");
     await act(async () => falcon!.click());
     const start = container.querySelector<HTMLButtonElement>(".dm-start-button")!;
     expect(start.disabled).toBe(false);
@@ -120,5 +121,39 @@ describe("DirectMessages", () => {
     });
     expect(onChannelSelect).toHaveBeenCalledWith("dm-1");
     expect(onChannelsChange).toHaveBeenCalledOnce();
+  });
+
+  it("finds Project Agents by their project name", async () => {
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <DirectMessages
+            activeChannelId={null}
+            channels={[]}
+            currentUserId="user-1"
+            onChannelSelect={vi.fn()}
+            onChannelsChange={vi.fn()}
+            organizationId="org-1"
+            token="token"
+          />
+        </I18nProvider>,
+      );
+    });
+    await act(async () => Promise.resolve());
+
+    const search = container.querySelector<HTMLInputElement>(
+      ".dm-recipient-field input",
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")
+        ?.set?.call(search, "Falcon Project");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const results = container.querySelectorAll<HTMLButtonElement>(
+      ".dm-candidate-popover > button",
+    );
+    expect(results).toHaveLength(1);
+    expect(results[0]?.textContent).toContain("Falcon");
   });
 });
