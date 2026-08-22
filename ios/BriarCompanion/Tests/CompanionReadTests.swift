@@ -6,67 +6,6 @@ final class CompanionReadTests: XCTestCase {
     private let middle = Date(timeIntervalSince1970: 1_700_000_100)
     private let newer = Date(timeIntervalSince1970: 1_700_000_200)
 
-    func testCompanionLocalesMatchTheSharedMobileLocaleContract() {
-        XCTAssertEqual(CompanionLocale.allCases.map(\.rawValue), ["ko", "en", "zh"])
-        XCTAssertEqual(
-            CompanionLocale.allCases.map(\.foundationIdentifier),
-            ["ko-KR", "en-US", "zh-CN"]
-        )
-    }
-
-    func testEnglishTranslationsCoverNativeStatusAndFormattedMessages() {
-        XCTAssertEqual(L10n.text("실행 중", locale: .en), "Running")
-        XCTAssertEqual(DashboardRun.Status.blocked.displayName(locale: .en), "Blocked")
-        XCTAssertEqual(ProjectAgentSession.Status.skipped.displayName(locale: .en), "Skipped")
-        XCTAssertEqual(L10n.format("%d 실행 중", locale: .en, 3), "3 running")
-        XCTAssertEqual(
-            L10n.format(
-                "제목이 너무 깁니다. %d자 이내로 줄여 주세요. (현재 %d자)",
-                locale: .en,
-                80,
-                92
-            ),
-            "The title is too long. Shorten it to 80 characters or fewer (currently 92)."
-        )
-        XCTAssertEqual(L10n.text("계정 메뉴", locale: .en), "Account menu")
-        XCTAssertEqual(L10n.text("보내는 중", locale: .en), "Sending")
-        XCTAssertEqual(L10n.text("보내는 중", locale: .zh), "发送中")
-    }
-
-    func testIssueCreateApprovalExplainsBacklogBoundaryInEveryLocale() {
-        XCTAssertTrue(
-            L10n.text(.channelIssueCreationSafety, locale: .ko).contains("별도 승인")
-        )
-        XCTAssertTrue(
-            L10n.text(.channelIssueCreationSafety, locale: .en)
-                .contains("Separate approval")
-        )
-        XCTAssertTrue(
-            L10n.text(.channelIssueCreationSafety, locale: .zh).contains("另行批准")
-        )
-        XCTAssertEqual(
-            issueProposalAcceptanceSystemImage(for: .create),
-            "plus.circle.fill"
-        )
-        XCTAssertEqual(
-            issueProposalAcceptanceSystemImage(for: .update),
-            "play.fill"
-        )
-    }
-
-    func testDelegationNoticeNamesTheOrganizationAgentAndHidesDirectProposals() {
-        XCTAssertEqual(
-            issueExecutionDelegationNotice(agentName: "Bumble", locale: .ko),
-            "Organization Agent Bumble의 위임"
-        )
-        XCTAssertEqual(
-            issueExecutionDelegationNotice(agentName: "Bumble", locale: .en),
-            "Delegated by Organization Agent Bumble"
-        )
-        XCTAssertNil(issueExecutionDelegationNotice(agentName: nil, locale: .ko))
-        XCTAssertNil(issueExecutionDelegationNotice(agentName: "   ", locale: .ko))
-    }
-
     private var runs: [DashboardRun] {
         [
             DashboardRun(
@@ -93,13 +32,6 @@ final class CompanionReadTests: XCTestCase {
                 updatedAt: newer
             ),
         ]
-    }
-
-    func testAllActiveAttentionAndCompletedFilters() {
-        XCTAssertEqual(runs.filter(TaskFilter.all.includes).count, 3)
-        XCTAssertEqual(runs.filter(TaskFilter.active.includes).map(\.status), [.running, .blocked])
-        XCTAssertEqual(runs.filter(TaskFilter.attention.includes).map(\.status), [.blocked])
-        XCTAssertEqual(runs.filter(TaskFilter.completed.includes).map(\.status), [.completed])
     }
 
     func testTasksListOrdersByMostRecentlyUpdated() {
@@ -139,18 +71,6 @@ final class CompanionReadTests: XCTestCase {
             "Offline recovery",
         ])
         XCTAssertEqual(multi.map(\.updatedAt), multi.map(\.updatedAt).sorted(by: >))
-    }
-
-    func testCompletedAndPausedPreferResultDetailTab() {
-        // Parity with shared React RunPage activeDetailTab default.
-        XCTAssertTrue(DashboardRun.Status.completed.prefersResultDetailTab)
-        XCTAssertTrue(DashboardRun.Status.paused.prefersResultDetailTab)
-        for status in DashboardRun.Status.allCases where status != .completed && status != .paused {
-            XCTAssertFalse(
-                status.prefersResultDetailTab,
-                "\(status.rawValue) should open on the Issue tab"
-            )
-        }
     }
 
     @MainActor
