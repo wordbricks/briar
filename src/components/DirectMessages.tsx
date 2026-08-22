@@ -1,6 +1,7 @@
 import {
   Bot,
   Check,
+  FolderKanban,
   MessageCircle,
   Plus,
   Search,
@@ -37,7 +38,14 @@ import { Spinner } from "./ui/spinner";
 
 type Candidate =
   | { type: "user"; id: string; name: string; image: string | null; detail: string }
-  | { type: "agent"; id: string; name: string; image: string | null; detail: string };
+  | {
+      type: "agent";
+      id: string;
+      name: string;
+      image: string | null;
+      detail: string;
+      projectName: string | null;
+    };
 
 type DirectMessagesProps = {
   organizationId: string;
@@ -168,6 +176,7 @@ export function DirectMessages({
             name: agent.name,
             image: agent.avatar,
             detail: agent.description || agent.responsibility,
+            projectName: agent.projectName,
           }),
         );
         setCandidates([...memberCandidates, ...agentCandidates]);
@@ -201,7 +210,9 @@ export function DirectMessages({
   const filteredCandidates = useMemo(() => {
     const query = candidateSearch.trim().toLocaleLowerCase();
     return candidates.filter((candidate) =>
-      !query || `${candidate.name} ${candidate.detail}`.toLocaleLowerCase().includes(query)
+      !query || `${candidate.name} ${candidate.detail} ${
+        candidate.type === "agent" ? candidate.projectName ?? "" : ""
+      }`.toLocaleLowerCase().includes(query)
     );
   }, [candidateSearch, candidates]);
   const selected = useMemo(
@@ -364,7 +375,17 @@ export function DirectMessages({
                         {candidate.image ? <img alt="" src={candidate.image} /> : candidate.type === "agent" ? <Bot aria-hidden="true" size={17} /> : participantInitial(candidate.name)}
                       </span>
                       <span><strong>{candidate.name}</strong><small>{candidate.detail}</small></span>
-                      {candidate.type === "agent" ? <em>{t("dm.agent")}</em> : null}
+                      {candidate.type === "agent" ? (
+                        <span className="dm-candidate-badges">
+                          {candidate.projectName ? (
+                            <span className="dm-candidate-project" title={candidate.projectName}>
+                              <FolderKanban aria-hidden="true" size={11} />
+                              <span>{candidate.projectName}</span>
+                            </span>
+                          ) : null}
+                          <em>{t("dm.agent")}</em>
+                        </span>
+                      ) : null}
                       {checked ? <Check aria-hidden="true" size={16} /> : null}
                     </button>
                   );

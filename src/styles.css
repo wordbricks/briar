@@ -6223,6 +6223,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .dm-candidate-popover strong,.dm-candidate-popover small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dm-candidate-popover strong { font-size:var(--text-sm); }
 .dm-candidate-popover small { color:var(--muted-foreground); font-size:var(--text-xs); }
+.dm-candidate-badges { min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:5px; }
+.dm-candidate-project { max-width:150px; min-width:0; padding:2px 6px; display:flex; align-items:center; gap:4px; overflow:hidden; border-radius:999px; background:var(--secondary); color:var(--secondary-foreground); font-size:10px; font-weight:650; white-space:nowrap; }
+.dm-candidate-project svg { flex:0 0 auto; }
+.dm-candidate-project > span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .dm-candidate-popover em { padding:2px 6px; border-radius:999px; background:color-mix(in srgb,#7d5ce7 12%,transparent); color:#7452d7; font-size:10px; font-style:normal; font-weight:700; }
 .dm-candidate-popover > p,.dm-candidate-status { margin:0; padding:18px; display:flex; justify-content:center; align-items:center; gap:8px; color:var(--muted-foreground); font-size:var(--text-sm); }
 .dm-candidate-avatar { width:30px; height:30px; display:grid; place-items:center; overflow:hidden; border-radius:50%; background:#8f6cef; color:#fff; font-size:12px; font-weight:700; }
