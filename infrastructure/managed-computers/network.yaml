@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Briar managed-computer private subnet and single-AZ NAT egress
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Existing VPC that hosts the managed computers.
+  PublicSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Existing public subnet in the same Availability Zone as the private subnet.
+  PrivateSubnetCidr:
+    Type: String
+    Description: Non-overlapping CIDR block for the managed-computer private subnet.
+  AvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: Availability Zone for both the NAT Gateway subnet and the managed-computer private subnet.
+
+Resources:
+  NatEip:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: briar-managed-computer-nat-eip
+        - Key: briar-managed
+          Value: "true"
+        - Key: Purpose
+          Value: managed-computer-network
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref PublicSubnetId
+      Tags:
+        - Key: Name
+          Value: briar-managed-computer-nat
+        - Key: briar-managed
+          Value: "true"
+        - Key: Purpose
+          Value: managed-computer-network
+
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      CidrBlock: !Ref PrivateSubnetCidr
+      MapPublicIpOnLaunch: false
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: briar-managed-computer-private
+        - Key: briar-managed
+          Value: "true"
+        - Key: Purpose
+          Value: managed-computer-network
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: briar-managed-computer-private
+        - Key: briar-managed
+          Value: "true"
+        - Key: Purpose
+          Value: managed-computer-network
+
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: NatGateway
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet
+
+Outputs:
+  NatGatewayId:
+    Description: Single-AZ NAT Gateway used for private managed-computer egress.
+    Value: !Ref NatGateway
+  NatEipAllocationId:
+    Description: Elastic IP allocation ID attached to the NAT Gateway.
+    Value: !GetAtt NatEip.AllocationId
+  NatEipPublicIp:
+    Description: Public IPv4 address used by private managed-computer egress.
+    Value: !Ref NatEip
+  PrivateSubnetId:
+    Description: Private subnet to pass as SubnetId to cloudformation.yaml.
+    Value: !Ref PrivateSubnet
+  PrivateRouteTableId:
+    Description: Route table associated with the private managed-computer subnet.
+    Value: !Ref PrivateRouteTable

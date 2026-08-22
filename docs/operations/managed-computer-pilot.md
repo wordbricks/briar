@@ -25,7 +25,83 @@ AMI ID, base AMI ID, source commit, Bun/Briar/에이전트 버전, `remote-deskt
 
 ## 2. AWS 스택
 
-`infrastructure/managed-computers/cloudformation.yaml`을 테스트/스테이징 계정에 적용한다. Private subnet은 NAT 또는 필요한 VPC endpoint를 통해 HTTPS outbound가 가능해야 한다.
+네트워크 스택과 컴퓨터 스택은 저장소의 CloudFormation 템플릿으로 순서대로 적용한다. 두 템플릿 모두 계정·리전별 값을 파라미터로 받으며, AWS 콘솔에 수동으로 리소스를 만들거나 템플릿의 실제 값을 코드에 하드코딩하지 않는다.
+
+### 2.1 사설 네트워크
+
+`infrastructure/managed-computers/network.yaml`은 기존 VPC의 기존 public subnet에 단일 AZ NAT Gateway를 만들고, 같은 AZ의 private subnet과 `0.0.0.0/0 → NAT Gateway` route를 만든다. Private subnet의 `MapPublicIpOnLaunch`는 `false`다. NAT Gateway는 시간·데이터 처리 비용이 발생하고 단일 AZ 구성은 고가용성이 아니므로, 파일럿 리전과 비용 한도를 승인한 뒤 적용한다. NAT Gateway를 만들지 않는 경우에는 SSM, Briar API, 저장소 및 모델 제공자에 필요한 VPC endpoint 구성을 별도로 코드화해야 한다.
+
+`PublicSubnetId`와 `AvailabilityZone`은 반드시 같은 AZ를 지정한다. `PrivateSubnetCidr`는 VPC와 기존 subnet에 겹치지 않는 블록이어야 한다.
+
+```bash
+export AWS_REGION=us-east-1
+export NETWORK_STACK=briar-managed-computer-network
+export VPC_ID=<existing-vpc-id>
+export PUBLIC_SUBNET_ID=<existing-public-subnet-id>
+export PRIVATE_SUBNET_CIDR=<non-overlapping-cidr>
+export AVAILABILITY_ZONE=<public-subnet-availability-zone>
+
+aws cloudformation validate-template \
+  --template-body file://infrastructure/managed-computers/network.yaml \
+  --region "$AWS_REGION"
+
+aws cloudformation deploy \
+  --stack-name "$NETWORK_STACK" \
+  --template-file infrastructure/managed-computers/network.yaml \
+  --parameter-overrides \
+    VpcId="$VPC_ID" \
+    PublicSubnetId="$PUBLIC_SUBNET_ID" \
+    PrivateSubnetCidr="$PRIVATE_SUBNET_CIDR" \
+    AvailabilityZone="$AVAILABILITY_ZONE" \
+  --tags \
+    briar-managed=true \
+    Purpose=managed-computer-network \
+  --region "$AWS_REGION" \
+  --no-fail-on-empty-changeset
+
+export PRIVATE_SUBNET_ID="$(aws cloudformation describe-stacks \
+  --stack-name "$NETWORK_STACK" \
+  --query 'Stacks[0].Outputs[?OutputKey==`PrivateSubnetId`].OutputValue' \
+  --output text \
+  --region "$AWS_REGION")"
+```
+
+배포 후 `PrivateSubnetId`, `NatGatewayId`, `NatEipAllocationId`, `NatEipPublicIp` 및 route table의 default route를 확인한다. `NatEipAllocationId`는 Elastic IP allocation ID이고, `NatEipPublicIp`는 실제 public IP다.
+
+### 2.2 관리 컴퓨터 Launch Template
+
+전용 IAM principal을 먼저 만들고, `infrastructure/managed-computers/cloudformation.yaml`을 적용한다. 이 스택은 policy를 만들지만 principal에 자동 연결하지 않는다.
+
+```bash
+export COMPUTER_STACK=briar-managed-computer
+export AMI_ID=<versioned-ami-id>
+export PROVISIONER_PRINCIPAL_ARN=<reviewed-iam-user-or-role-arn>
+
+aws cloudformation validate-template \
+  --template-body file://infrastructure/managed-computers/cloudformation.yaml \
+  --region "$AWS_REGION"
+
+aws cloudformation deploy \
+  --stack-name "$COMPUTER_STACK" \
+  --template-file infrastructure/managed-computers/cloudformation.yaml \
+  --parameter-overrides \
+    AmiId="$AMI_ID" \
+    VpcId="$VPC_ID" \
+    SubnetId="$PRIVATE_SUBNET_ID" \
+    ProvisionerPrincipalArn="$PROVISIONER_PRINCIPAL_ARN" \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --tags \
+    briar-managed=true \
+    Purpose=managed-computer-pilot \
+  --region "$AWS_REGION" \
+  --no-fail-on-empty-changeset
+
+aws cloudformation describe-stacks \
+  --stack-name "$COMPUTER_STACK" \
+  --query 'Stacks[0].Outputs[].{Key:OutputKey,Value:OutputValue}' \
+  --output table \
+  --region "$AWS_REGION"
+```
 
 스택 출력에서 다음 값을 기록한다.
 
@@ -35,6 +111,22 @@ AMI ID, base AMI ID, source commit, Bun/Briar/에이전트 버전, `remote-deskt
 - `SecurityGroupId`
 
 보안 검토 후 `ProvisionerPolicyArn`을 Cloudflare에서 사용하는 정확한 IAM principal에만 연결한다. 템플릿은 자동 연결하지 않아 잘못된 principal에 권한이 붙는 것을 방지한다.
+
+정책 연결은 별도 검토 후 실행한다. 현재 Worker 구현이 AWS access key를 사용하므로 access key를 저장소·user-data·로그·명령 인자에 넣지 말고, 시크릿 저장 위치를 준비한 직후 한 번만 생성해 저장한다. 아직 Worker secret을 준비하지 않았다면 access key를 미리 만들지 않는다.
+
+```bash
+export PROVISIONER_POLICY_ARN="$(aws cloudformation describe-stacks \
+  --stack-name "$COMPUTER_STACK" \
+  --query 'Stacks[0].Outputs[?OutputKey==`ProvisionerPolicyArn`].OutputValue' \
+  --output text \
+  --region "$AWS_REGION")"
+
+aws iam attach-user-policy \
+  --user-name <reviewed-iam-user-name> \
+  --policy-arn "$PROVISIONER_POLICY_ARN"
+```
+
+`LaunchTemplateVersion`은 반드시 스택 출력의 숫자를 Worker 설정에 기록한다. `$Latest`와 `$Default`는 사용하지 않는다. 새 AMI 또는 Launch Template 변경 후에는 새 숫자 버전을 기록하고, 실제 canary 인스턴스에서 AMI·private subnet·public IP 없음·IMDSv2·암호화 EBS·빈 inbound 규칙을 독립적으로 확인한다.
 
 ## 3. D1 및 Cloudflare
 
