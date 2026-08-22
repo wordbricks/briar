@@ -86,6 +86,7 @@ export async function handleIssueReplyWorkerRoute(input: {
   env: Env;
   context?: ExecutionContext;
   authenticatedWorker?: AuthenticatedWorkerProject;
+  claimInput?: ReturnType<typeof decodeIssueReplyClaimInput>;
 }): Promise<Response | undefined> {
   const {
     request,
@@ -95,10 +96,15 @@ export async function handleIssueReplyWorkerRoute(input: {
     env,
     context,
     authenticatedWorker: preauthenticatedWorker,
+    claimInput,
   } = input;
 
-  if (url.pathname === "/issue-reply-claims" && request.method === "POST") {
-    const input = decodeIssueReplyClaimInput(await readJson(request));
+  if (
+    claimInput ||
+    (url.pathname === "/issue-reply-claims" && request.method === "POST")
+  ) {
+    const input = claimInput ??
+      decodeIssueReplyClaimInput(await readJson(request));
     const authenticatedWorker = await requireWorkerProjectBinding(
       db,
       request,
@@ -619,4 +625,19 @@ export async function handleIssueReplyWorkerRoute(input: {
 
 
   return undefined;
+}
+
+export async function claimNextIssueReplyWork(input: {
+  request: Request;
+  url: URL;
+  claimInput: ReturnType<typeof decodeIssueReplyClaimInput>;
+  db: D1Database;
+  attachmentsBucket: R2Bucket;
+  env: Env;
+  context?: ExecutionContext;
+  authenticatedWorker: AuthenticatedWorkerProject;
+}): Promise<Response> {
+  const response = await handleIssueReplyWorkerRoute(input);
+  if (!response) throw new Error("Issue reply claim route did not respond");
+  return response;
 }

@@ -38,6 +38,7 @@ export async function handleProjectAgentTaskWorkerRoute(input: {
   env: Env;
   context?: ExecutionContext;
   authenticatedWorker?: AuthenticatedWorkerProject;
+  claimInput?: ReturnType<typeof decodeProjectAgentTaskClaimInput>;
 }): Promise<Response | undefined> {
   const {
     request,
@@ -46,10 +47,15 @@ export async function handleProjectAgentTaskWorkerRoute(input: {
     env,
     context,
     authenticatedWorker: preauthenticatedWorker,
+    claimInput,
   } = input;
 
-  if (url.pathname === "/agent-task-claims" && request.method === "POST") {
-    const input = decodeProjectAgentTaskClaimInput(await readJson(request));
+  if (
+    claimInput ||
+    (url.pathname === "/agent-task-claims" && request.method === "POST")
+  ) {
+    const input = claimInput ??
+      decodeProjectAgentTaskClaimInput(await readJson(request));
     const authenticatedWorker = await requireWorkerProjectBinding(
       db,
       request,
@@ -277,4 +283,18 @@ export async function handleProjectAgentTaskWorkerRoute(input: {
 
 
   return undefined;
+}
+
+export async function claimNextProjectAgentTaskWork(input: {
+  request: Request;
+  url: URL;
+  claimInput: ReturnType<typeof decodeProjectAgentTaskClaimInput>;
+  db: D1Database;
+  env: Env;
+  context?: ExecutionContext;
+  authenticatedWorker: AuthenticatedWorkerProject;
+}): Promise<Response> {
+  const response = await handleProjectAgentTaskWorkerRoute(input);
+  if (!response) throw new Error("Project Agent task claim route did not respond");
+  return response;
 }

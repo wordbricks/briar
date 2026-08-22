@@ -38,6 +38,7 @@ export async function handleQueueClaimRoute(input: {
   db: D1Database;
   env: Env;
   authenticatedWorker?: AuthenticatedWorkerProject;
+  claimInput?: ReturnType<typeof decodeClaimInput>;
 }): Promise<Response | undefined> {
   const {
     request,
@@ -45,11 +46,15 @@ export async function handleQueueClaimRoute(input: {
     db,
     env,
     authenticatedWorker: preauthenticatedWorker,
+    claimInput,
   } = input;
 
-  if (url.pathname === "/queue/claims" && request.method === "POST") {
+  if (
+    claimInput ||
+    (url.pathname === "/queue/claims" && request.method === "POST")
+  ) {
     // Migration 0090 is applied by worker:deploy before this code can run.
-    const input = decodeClaimInput(await readJson(request));
+    const input = claimInput ?? decodeClaimInput(await readJson(request));
     let authenticatedWorkerId: string | undefined;
     let authenticatedWorker:
       | Awaited<ReturnType<typeof requireWorkerProjectBinding>>
@@ -242,4 +247,17 @@ export async function handleQueueClaimRoute(input: {
 
 
   return undefined;
+}
+
+export async function claimNextQueueWork(input: {
+  request: Request;
+  url: URL;
+  claimInput: ReturnType<typeof decodeClaimInput>;
+  db: D1Database;
+  env: Env;
+  authenticatedWorker: AuthenticatedWorkerProject;
+}): Promise<Response> {
+  const response = await handleQueueClaimRoute(input);
+  if (!response) throw new Error("Queue claim route did not respond");
+  return response;
 }
