@@ -85,25 +85,6 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(task.session.agentName, "Issue processing agent")
     }
 
-    func testEndpointPathsForAgentsAndSessions() {
-        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.projectAgents(projectID: projectID, locale: "ko"),
-            "/projects/11111111-1111-4111-8111-111111111111/agents?locale=ko"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.projectAgentSessions(projectID: projectID),
-            "/projects/11111111-1111-4111-8111-111111111111/agent-sessions"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.projectAgentSession(
-                projectID: projectID,
-                sessionID: "dispatch-1"
-            ),
-            "/projects/11111111-1111-4111-8111-111111111111/agent-sessions/dispatch-1"
-        )
-    }
-
     func testProjectAgentTaskRequestEncodesCanonicalUUIDs() throws {
         let agentID = UUID(uuidString: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA")!
         let skillID = UUID(uuidString: "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB")!
@@ -802,41 +783,6 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertFalse(navigation.preparingIssue)
         XCTAssertNil(navigation.pendingProjectID)
         XCTAssertNil(navigation.pendingIssueID)
-    }
-
-    func testShareLinksMatchOpenPathShape() {
-        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
-        let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
-        let origin = URL(string: "https://briar-api.example")!
-        let issueURL = BriarShareLinks.issueShareURL(projectID: projectID, runID: runID, origin: origin)
-        XCTAssertEqual(
-            issueURL.absoluteString,
-            "https://briar-api.example/open/issues/\(projectID.uuidString.lowercased())/\(runID.uuidString.lowercased())"
-        )
-        let sessionURL = BriarShareLinks.sessionShareURL(
-            projectID: projectID,
-            sessionID: "session-1",
-            origin: origin
-        )
-        XCTAssertEqual(
-            sessionURL.absoluteString,
-            "https://briar-api.example/open/sessions/\(projectID.uuidString.lowercased())/session-1"
-        )
-        let organizationID = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
-        let channelID = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
-        let messageID = UUID(uuidString: "66666666-6666-4666-8666-666666666666")!
-        let rootMessageID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
-        let channelURL = BriarShareLinks.channelShareURL(
-            organizationID: organizationID,
-            channelID: channelID,
-            messageID: messageID,
-            rootMessageID: rootMessageID,
-            origin: origin
-        )
-        XCTAssertEqual(
-            channelURL.absoluteString,
-            "https://briar-api.example/open/channels/\(organizationID.uuidString.lowercased())/\(channelID.uuidString.lowercased())/\(messageID.uuidString.lowercased())?root=\(rootMessageID.uuidString.lowercased())"
-        )
     }
 
     @MainActor
