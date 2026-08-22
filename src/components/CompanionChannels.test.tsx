@@ -295,6 +295,25 @@ describe("CompanionChannels", () => {
     });
   };
 
+  const openThreadFromMessage = async (messageId?: string) => {
+    const selector = messageId
+      ? `[data-companion-channel-message-id="${messageId}"]`
+      : "[data-companion-channel-message-id]";
+    const row = container.querySelector<HTMLElement>(selector);
+    expect(row).not.toBeNull();
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    });
+    const action = container.querySelector<HTMLButtonElement>(
+      ".companion-channel-start-thread",
+    );
+    expect(action?.textContent).toBe("Start a thread");
+    await act(async () => {
+      action!.click();
+      await Promise.resolve();
+    });
+  };
+
   beforeEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
@@ -513,24 +532,14 @@ describe("CompanionChannels", () => {
       openWelcome()?.click();
       await Promise.resolve();
     });
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>(
-        ".companion-channel-message-button",
-      )?.click();
-      await Promise.resolve();
-    });
+    await openThreadFromMessage();
     expect(container.textContent).toContain("Cached immediately");
 
     await act(async () => {
       requestMobileNavigationBack();
       await Promise.resolve();
     });
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>(
-        ".companion-channel-message-button",
-      )?.click();
-      await Promise.resolve();
-    });
+    await openThreadFromMessage();
 
     expect(container.textContent).toContain("Cached immediately");
     expect(container.querySelector(".companion-channel-loading")).toBeNull();
@@ -657,15 +666,7 @@ describe("CompanionChannels", () => {
       container.querySelector(".companion-channel-bar-status"),
     ).toBeNull();
 
-    const messageButton = container.querySelector<HTMLButtonElement>(
-      ".companion-channel-message-button",
-    );
-    await act(async () => {
-      messageButton!.click();
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await openThreadFromMessage();
 
     expect(listChannelMessages).toHaveBeenCalledWith(
       "token",
@@ -934,12 +935,7 @@ describe("CompanionChannels", () => {
         .click();
       await Promise.resolve();
     });
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".companion-channel-message-button")!
-        .click();
-      await Promise.resolve();
-    });
+    await openThreadFromMessage();
 
     await act(async () => {
       emitChannelChange(2);
@@ -1042,7 +1038,7 @@ describe("CompanionChannels", () => {
       1,
       expect.any(AbortSignal),
     );
-    expect(container.textContent).toContain("1 replies");
+    expect(container.textContent).not.toContain("1 replies");
   });
 
   it("retains channel-list upserts and removals consumed after realtime notification", async () => {
@@ -2175,10 +2171,17 @@ describe("CompanionChannels", () => {
       container.querySelector<HTMLImageElement>("img.companion-channel-avatar")
         ?.src,
     ).toBe("https://example.com/jay.png");
-    expect(container.querySelector(".companion-channel-thread-summary")?.textContent)
-      .toContain("2 replies");
-    expect(container.querySelector(".companion-channel-thread-summary")?.textContent)
-      .toContain("last reply");
+    expect(container.querySelector(".companion-channel-thread-summary")).toBeNull();
+    const row = container.querySelector<HTMLElement>(
+      '[data-companion-channel-message-id="m-1"]',
+    );
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    });
+    expect(container.querySelectorAll(".companion-channel-action-sheet button"))
+      .toHaveLength(1);
+    expect(container.querySelector(".companion-channel-start-thread")?.textContent)
+      .toBe("Start a thread");
     expect(
       container.querySelector<HTMLInputElement>(".companion-channel-composer input")
         ?.placeholder,
@@ -2239,12 +2242,7 @@ describe("CompanionChannels", () => {
     await act(async () => channelJump?.click());
     expect(channelScroller.scrollTop).toBe(1_200);
 
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".companion-channel-message-button")!
-        .click();
-      await Promise.resolve();
-    });
+    await openThreadFromMessage();
     const threadScroller = container.querySelector<HTMLElement>(
       ".companion-channel-messages",
     )!;
@@ -2328,14 +2326,7 @@ describe("CompanionChannels", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".companion-channel-message-button")!
-        .click();
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await openThreadFromMessage();
 
     const threadScroller = container.querySelector(
       ".companion-channel-messages",

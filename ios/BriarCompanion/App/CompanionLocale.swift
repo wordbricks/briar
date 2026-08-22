@@ -744,6 +744,7 @@ enum L10n {
         case channelAgents
         case channelReplies
         case channelReplyInThread
+        case channelStartThread
         case channelLastReply
         case channelReact
         case channelMessagePlaceholder
@@ -797,6 +798,7 @@ enum L10n {
             case .channelAgents: "Agent %d개"
             case .channelReplies: "답글 %d개"
             case .channelReplyInThread: "스레드에서 답글"
+            case .channelStartThread: "스레드 시작"
             case .channelLastReply: "마지막 답글 %@"
             case .channelReact: "React"
             case .channelMessagePlaceholder: "#%@에 메시지 보내기"
@@ -853,6 +855,7 @@ enum L10n {
             case .channelAgents: "Agents %d"
             case .channelReplies: "%d replies"
             case .channelReplyInThread: "Reply in thread"
+            case .channelStartThread: "Start a thread"
             case .channelLastReply: "last reply %@"
             case .channelReact: "React"
             case .channelMessagePlaceholder: "Message #%@"
@@ -909,6 +912,7 @@ enum L10n {
             case .channelAgents: "%d 个智能体"
             case .channelReplies: "%d 条回复"
             case .channelReplyInThread: "在线程中回复"
+            case .channelStartThread: "开始话题"
             case .channelLastReply: "最后回复于%@"
             case .channelReact: "React"
             case .channelMessagePlaceholder: "发送消息到 #%@"
