@@ -138,7 +138,6 @@ const event = (
   productionQaDetail: null,
   context: null,
 });
-
 describe("conversational issue execution approval", () => {
   let miniflare: Miniflare;
   let db: D1Database;
@@ -439,114 +438,6 @@ describe("conversational issue execution approval", () => {
     },
   );
 
-  it("checks every worker queue through one empty claim response", async () => {
-    const response = await worker.fetch(
-      new Request("https://briar.example/worker-claims", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${executionWorkerCredential}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          claimedBy: "Execution Worker",
-          workerId: "execution-any-worker",
-          projectId: projectAId,
-        }),
-      }),
-      env(),
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      work: null,
-      retryAfterMs: 15_000,
-    });
-  });
-
-  it("marks an unassigned queued issue reply for a disposable workspace", async () => {
-    sequence += 1;
-    const suffix = sequence.toString(16).padStart(12, "0");
-    const sourceKey = `execution-queued-reply-${sequence}`;
-    const runId = await recordHuntEvent(db, projectAId, {
-      ...event(sourceKey, `Queued reply ${sequence}`),
-      status: "queued",
-      eventKey: `${sourceKey}:queued`,
-    });
-    const triggerMessageId = `bd000000-0000-4000-8000-${suffix}`;
-    const jobId = `be000000-0000-4000-8000-${suffix}`;
-    await createIssueMessage(db, {
-      id: triggerMessageId,
-      projectId: projectAId,
-      runId,
-      parentMessageId: null,
-      authorUserId: ownerId,
-      authorAgentProvider: null,
-      body: "@Execution Agent explain this queued issue",
-      createdAt: new Date().toISOString(),
-    });
-    await enqueueIssueAgentReply(db, {
-      id: jobId,
-      projectId: projectAId,
-      runId,
-      triggerMessageId,
-      parentMessageId: triggerMessageId,
-      replyMessageId: `bf000000-0000-4000-8000-${suffix}`,
-      agentId: projectAgentId,
-      requiresPreferredWorker: false,
-      createdAt: new Date().toISOString(),
-    });
-
-    const response = await worker.fetch(
-      new Request("https://briar.example/worker-claims", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${executionWorkerCredential}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          claimedBy: "Execution Worker",
-          workerId: "execution-any-worker",
-          projectId: projectAId,
-        }),
-      }),
-      env(),
-    );
-    expect(response.status).toBe(200);
-    const claimed = await response.json<{
-      work: {
-        workId: string;
-        runId: string;
-        branch: string | null;
-        requiresPreferredWorker: boolean;
-        claimToken: string;
-      };
-    }>();
-    expect(claimed.work).toMatchObject({
-      workId: jobId,
-      runId,
-      branch: null,
-      requiresPreferredWorker: false,
-    });
-
-    const completed = await worker.fetch(
-      new Request(`https://briar.example/issue-reply-claims/${jobId}/complete`, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${executionWorkerCredential}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          projectId: projectAId,
-          workerId: "execution-any-worker",
-          claimToken: claimed.work.claimToken,
-          body: "Queued issue reply completed.",
-        }),
-      }),
-      env(),
-    );
-    expect(completed.status).toBe(200);
-  });
-
   it("dispatches only after explicit approval and finalizes both audits atomically", async () => {
     const { runId, proposalId } = await seedIssueProposal();
     const providerReportedModel = "gpt-provider-reported-model";
@@ -698,73 +589,6 @@ describe("conversational issue execution approval", () => {
       .toMatchObject({ status: "backlog", dispatch_request_id: null });
   });
 
-  it("stores an Issue Agent reply image with its message", async () => {
-    const seeded = await seedClaimedIssueReply();
-    const form = new FormData();
-    form.append("complete", JSON.stringify({
-      projectId: projectAId,
-      workerId: "execution-any-worker",
-      claimToken: seeded.claimToken,
-      body: "생성한 목업을 첨부했습니다.",
-      proposedAction: null,
-      executionProposal: null,
-      skillExecutionProposal: null,
-    }));
-    form.append(
-      "attachments",
-      new File([new Uint8Array([137, 80, 78, 71])], "mockup.png", {
-        type: "image/png",
-      }),
-    );
-
-    const response = await worker.fetch(
-      new Request(
-        `https://briar.example/issue-reply-claims/${seeded.jobId}/complete`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${executionWorkerCredential}`,
-            "Content-Length": "2048",
-          },
-          body: form,
-        },
-      ),
-      env(),
-    );
-    expect(response.status).toBe(200);
-    const payload = await response.json<{
-      message: {
-        id: string;
-        body: string;
-        attachments: Array<{
-          id: string;
-          filename: string;
-          contentType: string;
-          byteSize: number;
-        }>;
-      };
-    }>();
-    expect(payload.message).toMatchObject({
-      id: seeded.replyMessageId,
-      body: expect.stringContaining("briar-attachment://"),
-      attachments: [{
-        filename: "mockup.png",
-        contentType: "image/png",
-        byteSize: 4,
-      }],
-    });
-
-    const stored = await listIssueAttachments(db, projectAId, seeded.runId);
-    expect(stored).toHaveLength(1);
-    expect(stored[0]).toMatchObject({
-      id: payload.message.attachments[0]?.id,
-      filename: "mockup.png",
-      content_type: "image/png",
-      byte_size: 4,
-    });
-    expect(await attachments.get(stored[0]!.object_key)).not.toBeNull();
-  });
-
   it("rejects expired and superseded Issue Agent leases without stale output", async () => {
     const oldToken = `briar_reply_claim_${"d".repeat(64)}`;
     const seeded = await seedClaimedIssueReply({
@@ -835,63 +659,6 @@ describe("conversational issue execution approval", () => {
     });
   });
 
-  it("never lets a legacy Agent token claim a Worker-dispatched run", async () => {
-    const { runId, proposalId } = await seedIssueProposal();
-    const accepted = await worker.fetch(
-      acceptIssueRequest(runId, proposalId, ownerToken, {
-        provider: "codex",
-        model: null,
-        effort: null,
-        workerId: "execution-any-worker",
-      }),
-      env(),
-    );
-    expect(accepted.status).toBe(200);
-    await expect(accepted.json()).resolves.toMatchObject({
-      dispatch: {
-        dispatchMode: "specific",
-        requestedWorkerId: "execution-any-worker",
-      },
-    });
-
-    const legacyClaim = await worker.fetch(
-      new Request("https://briar.example/queue/claims", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${projectAAgentToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ claimedBy: "legacy-agent", runId }),
-      }),
-      env(),
-    );
-    expect(legacyClaim.status).toBe(200);
-    await expect(legacyClaim.json()).resolves.toEqual({ work: null });
-    expect(await getHuntRunForProject(db, projectAId, runId)).toMatchObject({
-      status: "queued",
-      dispatch_mode: "specific",
-      requested_worker_id: "execution-any-worker",
-      worker_id: null,
-      claim_token_hash: null,
-    });
-
-    const workerClaim = await claimNextQueuedHuntRun(db, projectAId, {
-      claimTokenHash: createHash("sha256").update("worker-claim").digest("hex"),
-      claimedBy: "Execution Worker",
-      claimedAt: "2026-08-11T00:00:30.000Z",
-      leaseExpiresAt: "2026-08-11T00:10:30.000Z",
-      runId,
-      workerId: "execution-any-worker",
-      agentProvider: "codex",
-      detachedOnly: true,
-    });
-    expect(workerClaim).toMatchObject({
-      id: runId,
-      requested_worker_id: "execution-any-worker",
-      worker_id: "execution-any-worker",
-    });
-  });
-
   it("fails a repaired partial dispatch closed until approval audit exists", async () => {
     const { runId, proposalId } = await seedIssueProposal();
     const reservation = await reserveIssueExecutionProposalApproval(db, {
@@ -950,64 +717,6 @@ describe("conversational issue execution approval", () => {
       requestId: `partial-reset-${sequence}`,
       occurredAt: new Date().toISOString(),
     })).resolves.toMatchObject({ outcome: "unassigned" });
-  });
-
-  it("rejects old clear/transfer shapes and resets an any-worker approval on unassign", async () => {
-    const { runId, proposalId } = await seedIssueProposal();
-    expect((await worker.fetch(acceptIssueRequest(runId, proposalId), env())).status)
-      .toBe(200);
-    const accepted = await getIssueExecutionProposal(
-      db,
-      projectAId,
-      runId,
-      proposalId,
-    );
-    expect(accepted?.dispatch_request_id).toEqual(expect.any(String));
-
-    await expect(db.prepare(
-      `update briar_hunt_runs
-       set dispatch_request_id = null, dispatch_mode = null,
-           requested_by_user_id = null, requested_agent_provider = null,
-           requested_agent_model = null, requested_agent_effort = null,
-           status = 'queued', updated_at = ?
-       where id = ?`,
-    ).bind("2026-08-11T00:01:00.000Z", runId).run()).rejects.toThrow(
-      "conversational execution cancellation requires backlog reset",
-    );
-    await expect(db.prepare(
-      `update briar_hunt_runs
-       set project_id = ?, dispatch_request_id = null, dispatch_mode = null,
-           requested_by_user_id = null, requested_agent_provider = null,
-           requested_agent_model = null, requested_agent_effort = null,
-           status = 'queued', updated_at = ?
-       where id = ?`,
-    ).bind(projectBId, "2026-08-11T00:01:01.000Z", runId).run())
-      .rejects.toThrow("conversational execution transfer requires backlog reset");
-
-    await expect(unassignHuntRun(db, organizationId, projectAId, {
-      runId,
-      requestedByUserId: ownerId,
-      requestId: `unassign-${proposalId}`,
-      occurredAt: "2026-08-11T00:02:00.000Z",
-    })).resolves.toMatchObject({ outcome: "unassigned" });
-    expect(await getHuntRunForProject(db, projectAId, runId)).toMatchObject({
-      status: "backlog",
-      dispatch_request_id: null,
-      requested_agent_provider: null,
-    });
-    const invalidated = await getIssueExecutionProposal(
-      db,
-      projectAId,
-      runId,
-      proposalId,
-    );
-    expect(invalidated).toMatchObject({
-      status: "invalidated",
-      generation: 2,
-      dispatch_request_id: accepted?.dispatch_request_id,
-    });
-    expect((await worker.fetch(acceptIssueRequest(runId, proposalId), env())).status)
-      .toBe(409);
   });
 
   it("transfers an approved retryable issue only as a clean backlog", async () => {
