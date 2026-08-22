@@ -319,7 +319,7 @@ final class BriarCompanionUITests: XCTestCase {
         let channel = app.buttons[
             "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
         ]
-        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        XCTAssertTrue(channel.waitForExistence(timeout: transitionTimeout))
         channel.tap()
 
         let field = app.textFields["channel-composer-field"]
@@ -521,8 +521,10 @@ final class BriarCompanionUITests: XCTestCase {
 
         app.buttons["create-issue-button"].tap()
         let title = app.textFields["create-issue-title"]
-        XCTAssertTrue(title.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["create-issue-paste-attachment"].waitForExistence(timeout: 5))
+        XCTAssertTrue(title.waitForExistence(timeout: transitionTimeout))
+        XCTAssertTrue(
+            app.buttons["create-issue-paste-attachment"].waitForExistence(timeout: transitionTimeout)
+        )
         XCTAssertFalse(app.navigationBars["새 이슈"].exists)
         title.tap()
         title.typeText("모바일 쓰기 흐름 확인")
