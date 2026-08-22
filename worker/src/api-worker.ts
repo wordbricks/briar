@@ -93,6 +93,8 @@ import { handleProjectCoreRoute } from "./project-core-routes";
 import { handleProjectLinearRoute } from "./project-linear-routes";
 import { handleProjectSettingsRoute } from "./project-settings-routes";
 import { handlePublicRoute } from "./public-routes";
+import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
+import { handleRealtimeRoute } from "./realtime-routes";
 import { projectJson } from "./project-json";
 import { projectAgentSessionJson } from "./project-agent-session-json";
 import { syncProjectAgentTaskSession } from "./project-agent-task-session";
@@ -3700,157 +3702,13 @@ async function route(
   });
   if (organizationResponse !== undefined) return organizationResponse;
 
-  const channelEventsMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channel-events$/u,
-  );
-  if (channelEventsMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const organizationId = channelEventsMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
-    const issued = await createChannelRealtimeTicket(env.BETTER_AUTH_SECRET, {
-      organizationId,
-      userId: session.user.id,
-    });
-    const socketUrl = new URL(request.url);
-    socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
-    socketUrl.search = "";
-    socketUrl.searchParams.set("ticket", issued.ticket);
-    return privateNoStoreJson({
-      url: socketUrl.toString(),
-      expiresAt: issued.expiresAt,
-    });
-  }
-  if (channelEventsMatch && request.method === "GET") {
-    const organizationId = channelEventsMatch[1];
-    if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
-      const ticket = new URL(request.url).searchParams.get("ticket") ?? "";
-      if (
-        !(await verifyChannelRealtimeTicket(
-          env.BETTER_AUTH_SECRET,
-          ticket,
-          organizationId,
-        ))
-      ) {
-        throw new HttpError(401, "Invalid or expired realtime ticket");
-      }
-      const [channels, inbox] = await Promise.all([
-        getChannelSyncCursor(db, organizationId),
-        getOrganizationInboxSyncVersion(db, organizationId),
-      ]);
-      return subscribeToOrganizationRealtime(env, organizationId, {
-        channels,
-        inbox,
-      });
-    }
-    // Rolling-upgrade compatibility: old SSE clients keep their authoritative
-    // delta fallback but never pin the Durable Object or perform D1 reads here.
-    const response = legacyChannelRealtimeResponse();
-    const headers = new Headers(response.headers);
-    for (const [name, value] of Object.entries(corsHeaders)) {
-      headers.set(name, value);
-    }
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    });
-  }
-
-  const issueActivityEventsMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/runs\/([0-9a-f-]+)\/agent-activity-events$/u,
-  );
-  if (issueActivityEventsMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const [projectId, runId] = issueActivityEventsMatch.slice(1);
-    const project = await getProject(db, projectId, session.user.id);
-    if (!project) throw new HttpError(404, "Project not found");
-    const run = await getHuntRunForProject(db, projectId, runId);
-    if (!run) throw new HttpError(404, "Run not found");
-    const issued = await createIssueActivitySocketTicket(
-      env.BETTER_AUTH_SECRET,
-      {
-        organizationId: project.organization_id,
-        projectId,
-        runId,
-        userId: session.user.id,
-      },
-    );
-    const socketUrl = new URL(request.url);
-    socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
-    socketUrl.search = "";
-    socketUrl.searchParams.set("ticket", issued.ticket);
-    return privateNoStoreJson({
-      url: socketUrl.toString(),
-      expiresAt: issued.expiresAt,
-    });
-  }
-  if (issueActivityEventsMatch && request.method === "GET") {
-    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
-      throw new HttpError(426, "WebSocket transport required");
-    }
-    const [projectId, runId] = issueActivityEventsMatch.slice(1);
-    const ticket = new URL(request.url).searchParams.get("ticket") ?? "";
-    const verified = await verifyIssueActivitySocketTicket(
-      env.BETTER_AUTH_SECRET,
-      ticket,
-      projectId,
-      runId,
-    );
-    if (!verified) {
-      throw new HttpError(401, "Invalid or expired activity ticket");
-    }
-    return subscribeToIssueActivity(env, {
-      organizationId: verified.organizationId,
-      projectId,
-      runId,
-      userId: verified.userId,
-      authorizationExpiresAt: verified.authorizationExpiresAt,
-    });
-  }
-
-  const channelActivityEventsMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/agent-activity-events$/u,
-  );
-  if (channelActivityEventsMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const [organizationId, channelId] = channelActivityEventsMatch.slice(1);
-    await requireChannelAccess(db, organizationId, channelId, session.user.id);
-    const issued = await createChannelActivitySocketTicket(
-      env.BETTER_AUTH_SECRET,
-      { organizationId, channelId, userId: session.user.id },
-    );
-    const socketUrl = new URL(request.url);
-    socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
-    socketUrl.search = "";
-    socketUrl.searchParams.set("ticket", issued.ticket);
-    return privateNoStoreJson({
-      url: socketUrl.toString(),
-      expiresAt: issued.expiresAt,
-    });
-  }
-  if (channelActivityEventsMatch && request.method === "GET") {
-    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
-      throw new HttpError(426, "WebSocket transport required");
-    }
-    const [organizationId, channelId] = channelActivityEventsMatch.slice(1);
-    const ticket = new URL(request.url).searchParams.get("ticket") ?? "";
-    const verified = await verifyChannelActivitySocketTicket(
-      env.BETTER_AUTH_SECRET,
-      ticket,
-      organizationId,
-      channelId,
-    );
-    if (!verified) {
-      throw new HttpError(401, "Invalid or expired activity ticket");
-    }
-    return subscribeToChannelActivity(env, {
-      organizationId,
-      channelId,
-      userId: verified.userId,
-      authorizationExpiresAt: verified.authorizationExpiresAt,
-    });
-  }
+  const realtimeResponse = await handleRealtimeRoute({
+    request,
+    auth,
+    db,
+    env,
+  });
+  if (realtimeResponse !== undefined) return realtimeResponse;
 
   const channelChangesMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channel-changes$/u,
@@ -11194,71 +11052,6 @@ async function route(
   throw new HttpError(404, "Not found");
 }
 
-async function handleIncomingChannelWebhook(
-  request: Request,
-  env: Env,
-  context: ExecutionContext | undefined,
-  webhookId: string,
-  secret: string,
-) {
-  const webhook = await getIncomingChannelWebhook(
-    env.DB,
-    webhookId,
-    await sha256(secret),
-  );
-  if (!webhook) throw new HttpError(404, "Webhook not found");
-  if (webhook.channel_archived_at) {
-    throw new HttpError(409, "Channel is archived");
-  }
-  if (!request.headers.get("content-type")?.toLowerCase().startsWith(
-    "application/json",
-  )) {
-    throw new HttpError(415, "Content-Type must be application/json");
-  }
-  const observedAt = new Date();
-  const allowed = await consumeChannelWebhookRateLimit(
-    env.DB,
-    webhook.id,
-    observedAt.toISOString(),
-    new Date(observedAt.getTime() - 60_000).toISOString(),
-  );
-  if (!allowed) throw new HttpError(429, "Webhook rate limit exceeded");
-  const input = decodeChannelIncomingWebhookMessage(
-    await readJson(request, 65_536),
-  );
-  const rawHeaderEventId = request.headers.get("idempotency-key");
-  const headerEventId = rawHeaderEventId?.trim() ?? null;
-  if (rawHeaderEventId !== null &&
-    (!headerEventId || headerEventId.length > 200)) {
-    throw new HttpError(400, "Invalid idempotency key");
-  }
-  if (headerEventId && input.eventId && input.eventId !== headerEventId) {
-    throw new HttpError(400, "Invalid idempotency key");
-  }
-  const eventId = input.eventId ?? headerEventId;
-  const result = await createIncomingChannelWebhookMessage(env.DB, {
-    id: crypto.randomUUID(),
-    webhookId: webhook.id,
-    channelId: webhook.channel_id,
-    webhookName: webhook.name,
-    eventId,
-    body: input.text ?? channelMessageBlocksFallback(input.blocks ?? []),
-    blocks: input.blocks ?? null,
-    createdAt: observedAt.toISOString(),
-  });
-  if (!result?.message) throw new HttpError(500, "Message was not created");
-  if (result.created) {
-    scheduleChannelRealtimePublish(
-      env,
-      env.DB,
-      webhook.organization_id,
-      context,
-    );
-  }
-  return json({ message: result.message, duplicate: !result.created },
-    result.created ? 201 : 200);
-}
-
 export default {
   scheduled: handleScheduledTask,
   async fetch(
@@ -11273,35 +11066,14 @@ export default {
     const publicResponse = await handlePublicRoute({ request, env });
     if (publicResponse) return publicResponse;
 
-    const incomingChannelWebhookMatch = url.pathname.match(
-      /^\/hooks\/channels\/([0-9a-f-]+)\/([A-Za-z0-9_-]{43})$/u,
-    );
-    if (incomingChannelWebhookMatch && request.method === "POST") {
-      try {
-        return await handleIncomingChannelWebhook(
-          request,
-          env,
-          ctx,
-          incomingChannelWebhookMatch[1],
-          incomingChannelWebhookMatch[2],
-        );
-      } catch (error) {
-        if (error instanceof HttpError) {
-          return json({ message: error.message }, error.status);
-        }
-        if (error instanceof RequestDecodeError) {
-          return json({
-            message: "Invalid request",
-            issues: formatSchemaIssue(error.cause.issue).issues,
-          }, 400);
-        }
-        console.error(JSON.stringify({
-          message: "Incoming channel webhook failed",
-          webhookId: incomingChannelWebhookMatch[1],
-          error: error instanceof Error ? error.message : String(error),
-        }));
-        return json({ message: "Internal server error" }, 500);
-      }
+    const incomingChannelWebhookResponse =
+      await handleIncomingChannelWebhookRoute({
+        request,
+        env,
+        context: ctx,
+      });
+    if (incomingChannelWebhookResponse !== undefined) {
+      return incomingChannelWebhookResponse;
     }
     if (url.pathname === "/github/webhooks" && request.method === "POST") {
       try {
