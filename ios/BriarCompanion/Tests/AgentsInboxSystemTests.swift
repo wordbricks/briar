@@ -1,7 +1,18 @@
 import XCTest
+import UserNotifications
 @testable import BriarCompanion
 
 final class AgentsInboxSystemTests: XCTestCase {
+    @MainActor
+    func testLocalNotificationsRegisterForegroundPresentationDelegate() {
+        let service = LocalNotificationService()
+
+        XCTAssertTrue(
+            UNUserNotificationCenter.current().delegate is InboxNotificationForegroundDelegate
+        )
+        _ = service
+    }
+
     @MainActor
     func testIssueConversationTrackerRefreshesOnlyTheVisibleIssue() async {
         let tracker = IssueConversationViewTracker()
