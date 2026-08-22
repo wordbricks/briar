@@ -1039,3 +1039,34 @@ After the native gate completed, main advanced through `969327c8` and
 `aac0db7b`. Those commits change only the desktop changelog and trusted CI
 file-mode validation; they do not change the native iOS inputs or uploaded
 IPA. The final release PR includes both commits.
+
+## 2026-08-23 — 1.2.150 (3)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.150`
+- App Store Connect build: `3`
+- App Store Connect build ID: `8d5c683d-3b09-434b-be57-5b4d72d981c1`
+- Latest main commit: `e0ccd3ec6897b23c512d2f611ea67fe08ec02e87`
+- Release source commit: `55e7cc2a30e758e7dbe9e989ba912cb0bd36d97a`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Automatic tester notification: enabled
+- IPA SHA-256: `d75889cd47dc00df12235a9b652d923a23977d661f924c86eef742c9bb819651`
+
+This release includes the latest main channel-thread interaction: long-press
+a root channel message, choose `스레드 시작`, and open its reply conversation.
+The release source also makes that gesture high priority over attachment and
+other nested controls, and selects the message body deterministically in the
+native UI test. The complete gate passed the shared mobile contract, Swift
+unit and 18 iPhone UI tests, iPad accessibility and largest Dynamic Type
+layout testing, Production analyze and build checks, session/download/log
+security checks, and the Tauri iOS simulator and Android ARM64 regression
+builds. Archive identity, App Store provisioning, distribution signature,
+production entitlements, exported IPA signature, and the IPA checksum were
+verified before upload.
+
+App Store Connect accepted the build as `VALID` and placed it in internal
+TestFlight testing.
