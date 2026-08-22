@@ -39,7 +39,6 @@ import {
   normalizeProjectAgentScheduleDay,
   normalizeProjectAgentScheduleDays,
   normalizeProjectAgentScheduleInterval,
-  parseProjectAgentScheduleDays,
   projectAgentScheduleIntervalUnits,
   projectAgentScheduleNotificationLevels,
   projectAgentScheduleRecurrences,
@@ -151,11 +150,9 @@ import {
   claimGithubDelivery,
   claimNextIssueAgentReply,
   claimNextProjectAgentTask,
-  claimDueProjectAgentScheduleRun,
   claimNextQueuedHuntRun,
   completeIssueAgentReplyOutput,
   completeIssueResultReview,
-  completeProjectAgentScheduleRun,
   completeGithubDelivery,
   completeSlackEvent,
   connectGithubInstallation,
@@ -173,7 +170,6 @@ import {
   createOrganizationInvitation,
   createProjectAgent,
   createProjectAgentTaskJob,
-  createProjectAgentSchedule,
   createProject,
   createSlackOAuthState,
   claimSlackEvent,
@@ -183,7 +179,6 @@ import {
   disconnectGithubInstallationById,
   disconnectGithubInstallationsByAuthorizedUser,
   deleteProjectAgent,
-  deleteProjectAgentSchedule,
   deleteIssue,
   transferIssue,
   deleteIssueDependency,
@@ -260,9 +255,6 @@ import {
   listProjectAgentSessions,
   listProjectAgentSessionChanges,
   listProjectAgentSessionSummaries,
-  listClaimableProjectAgentScheduleProjectIds,
-  listProjectAgentScheduleRuns,
-  listProjectAgentSchedules,
   listSlackInstallations,
   moveHuntRun,
   planAccountDeletion,
@@ -277,7 +269,6 @@ import {
   subscribeIssue,
   removeOrganizationMember,
   revokeOrganizationInvitation,
-  renewProjectAgentScheduleRunLease,
   renewIssueAgentReplyLease,
   renewProjectAgentTaskLease,
   completeProjectAgentTaskWithReceipt,
@@ -292,7 +283,6 @@ import {
   releaseGithubDelivery,
   releaseSlackEvent,
   updateProjectAgent,
-  updateProjectAgentSchedule,
   updateProjectSettings,
   updateProjectMandatoryCheckpoints,
   updateUserWorkflowCheckpointDefaults,
@@ -331,8 +321,6 @@ import {
   type IssueDependencyRow,
   type ProjectAgentRow,
   type ProjectAgentSessionRow,
-  type ProjectAgentScheduleRunRow,
-  type ProjectAgentScheduleRow,
   type ProjectSettingsRow,
   type OrganizationStatusTrayRunRow,
   type OrganizationUsageRunRow,
@@ -485,7 +473,6 @@ import {
   decodeOrganizationMemberInput,
   decodeOrganizationMemberRoleInput,
   decodeOrganizationUpdateInput,
-  decodeProjectAgentScheduleBatchClaim,
   decodeSlackOAuthInput,
 } from "./account-organization-request-contract";
 import {
@@ -504,7 +491,6 @@ import {
 import {
   decodeOrganizationAgentWrite,
   decodeProjectAgentInput,
-  decodeProjectAgentScheduleInput,
   decodeProjectAgentSessionInput,
   decodeProjectAgentTaskClaimInput,
   decodeProjectAgentTaskCompletion,
@@ -546,8 +532,6 @@ import {
   decodeExecutionWorkerPolicy,
   decodeIssueReplyClaimInput,
   decodeLeaseRenew,
-  decodeProjectAgentScheduleRunCompletion,
-  decodeProjectAgentScheduleRunRenew,
   decodeWorkerBind,
   decodeWorkerClaimInput,
   decodeWorkerConcurrency,
@@ -804,6 +788,7 @@ import {
   resumeRunWithCheckpointIdentity,
 } from "./workflow-resume";
 import { assertRunEventIdentityNotOverridden } from "./run-event-identity";
+import { sha256, sha256Bytes } from "./crypto-digest";
 import {
   loadOrganizationInboxConditionalSnapshot,
   organizationInboxSyncJson,
@@ -813,6 +798,7 @@ import {
   organizationUsageRunJson,
   projectUsageSummaryJson,
 } from "./usage-json";
+import { handleProjectAgentScheduleRoute } from "./project-agent-schedule-routes";
 import {
   corsHeaders,
   HttpError,
@@ -1113,23 +1099,6 @@ async function approveChannelExecutionProposalRequest(input: {
     throw error;
   }
 }
-
-const sha256 = async (value: string) => {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(value),
-  );
-  return [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-};
-
-const sha256Bytes = async (value: ArrayBuffer) => {
-  const digest = await crypto.subtle.digest("SHA-256", value);
-  return [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-};
 
 const channelProposalIssueSourcePrefix = "briar-channel-approved:";
 const legacyChannelProposalIssueSourcePrefix = "briar-channel-proposal:";
@@ -2004,57 +1973,6 @@ async function syncProjectAgentTaskSession(
   }, job.updated_at);
   return updated ? projectAgentSessionJson(updated) : null;
 }
-
-const projectAgentScheduleJson = (row: ProjectAgentScheduleRow) => ({
-  id: row.id,
-  projectId: row.project_id,
-  agentId: row.agent_id,
-  agentName: row.agent_name,
-  agentProvider: row.agent_provider,
-  name: row.name,
-  recurrence: row.frequency ?? row.recurrence,
-  timeOfDay: row.time_of_day,
-  dayOfWeek: row.day_of_week,
-  intervalValue: row.interval_value,
-  intervalUnit: row.interval_unit,
-  daysOfWeek: parseProjectAgentScheduleDays(row.days_of_week),
-  notificationLevel: row.notification_level,
-  timeZone: row.time_zone,
-  enabled: row.enabled === 1,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-});
-
-const projectAgentScheduleRunJson = (
-  row: ProjectAgentScheduleRunRow,
-  claimToken?: string,
-) => ({
-  id: row.id,
-  projectId: row.project_id,
-  scheduleId: row.schedule_id,
-  scheduleName: row.schedule_name,
-  agent: {
-    id: row.agent_id,
-    name: row.agent_name,
-    provider: row.agent_provider,
-    model: row.agent_model,
-    effort: row.agent_effort,
-    description: row.agent_description,
-    responsibility: row.agent_responsibility,
-    skill: row.agent_skill_markdown,
-    skills: row.agent_skills.map(agentSkillJson),
-  },
-  workflow: normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json)),
-  status: row.status,
-  scheduledFor: row.scheduled_for,
-  leaseExpiresAt: row.lease_expires_at,
-  startedAt: row.started_at,
-  completedAt: row.completed_at,
-  resultSummary: row.result_summary,
-  structuredResult: parseStructuredResult(row.structured_result_json),
-  error: row.error,
-  ...(claimToken ? { claimToken } : {}),
-});
 
 const organizationJson = (row: OrganizationRow) => ({
   id: row.id,
@@ -7899,219 +7817,15 @@ async function route(
     return json({ agent: projectAgentJson(agent) }, 201);
   }
 
-  const projectAgentSchedulesMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/agent-schedules$/u,
-  );
-  if (projectAgentSchedulesMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
+  const projectAgentScheduleResponse =
+    await handleProjectAgentScheduleRoute({
+      request,
       db,
-      projectAgentSchedulesMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const schedules = await listProjectAgentSchedules(db, project.id);
-    return json({
-      schedules: schedules.map(projectAgentScheduleJson),
+      env,
+      context,
+      requireSession: () => requireSession(auth, request),
     });
-  }
-  if (projectAgentSchedulesMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentSchedulesMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = decodeProjectAgentScheduleInput(
-      await readJson(request),
-    );
-    const schedule = await createProjectAgentSchedule(db, project.id, {
-      ...input,
-      createdByUserId: session.user.id,
-    });
-    if (!schedule) throw new HttpError(404, "Project agent not found");
-    return json({ schedule: projectAgentScheduleJson(schedule) }, 201);
-  }
-
-  const projectAgentScheduleMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/agent-schedules\/([0-9a-f-]+)$/u,
-  );
-  if (projectAgentScheduleMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentScheduleMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = decodeProjectAgentScheduleInput(
-      await readJson(request),
-    );
-    const schedule = await updateProjectAgentSchedule(
-      db,
-      project.id,
-      projectAgentScheduleMatch[2],
-      input,
-    );
-    if (!schedule) {
-      throw new HttpError(404, "Project agent schedule not found");
-    }
-    return json({ schedule: projectAgentScheduleJson(schedule) });
-  }
-  if (projectAgentScheduleMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentScheduleMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const result = await deleteProjectAgentSchedule(
-      db,
-      project.id,
-      projectAgentScheduleMatch[2],
-    );
-    if (result === "running") {
-      throw new HttpError(409, "A schedule run is currently active");
-    }
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
-  const projectAgentScheduleRunsMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/agent-schedule-runs$/u,
-  );
-  if (projectAgentScheduleRunsMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentScheduleRunsMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const runs = await listProjectAgentScheduleRuns(db, project.id);
-    return json({ runs: runs.map((run) => projectAgentScheduleRunJson(run)) });
-  }
-
-  if (pathname === "/agent-schedule-runs/claim" && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const input = decodeProjectAgentScheduleBatchClaim(
-      await readJson(request),
-    );
-    const observedAt = new Date().toISOString();
-    const projectIds = await listClaimableProjectAgentScheduleProjectIds(
-      db,
-      session.user.id,
-      input.projectIds,
-      observedAt,
-    );
-    for (const projectId of projectIds) {
-      const settings = await getProjectSettings(db, projectId);
-      const workflow = normalizeAutoHuntWorkflow(
-        settings?.workflow_json ? JSON.parse(settings.workflow_json) : null,
-      );
-      if (isRepositoryWorkflowPending(workflow)) continue;
-      const claimToken = `briar_schedule_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
-      const run = await claimDueProjectAgentScheduleRun(db, projectId, {
-        claimTokenHash: await sha256(claimToken),
-        observedAt,
-      });
-      if (!run) continue;
-      scheduleProjectRealtimePublish(env, db, projectId, context);
-      return json({ run: projectAgentScheduleRunJson(run, claimToken) });
-    }
-    return json({ run: null });
-  }
-
-  const projectAgentScheduleRunsClaimMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/agent-schedule-runs\/claim$/u,
-  );
-  if (projectAgentScheduleRunsClaimMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentScheduleRunsClaimMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const settings = await getProjectSettings(db, project.id);
-    const workflow = normalizeAutoHuntWorkflow(
-      settings?.workflow_json ? JSON.parse(settings.workflow_json) : null,
-    );
-    if (isRepositoryWorkflowPending(workflow)) {
-      throw new HttpError(409, "Repository workflow has not been generated");
-    }
-    const observedAt = new Date().toISOString();
-    const claimToken = `briar_schedule_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
-    const run = await claimDueProjectAgentScheduleRun(db, project.id, {
-      claimTokenHash: await sha256(claimToken),
-      observedAt,
-    });
-    if (run) scheduleProjectRealtimePublish(env, db, project.id, context);
-    return json({
-      run: run ? projectAgentScheduleRunJson(run, claimToken) : null,
-    });
-  }
-
-  const projectAgentScheduleRunCompleteMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/agent-schedule-runs\/([0-9a-f-]+)\/complete$/u,
-  );
-  if (projectAgentScheduleRunCompleteMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentScheduleRunCompleteMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = decodeProjectAgentScheduleRunCompletion(
-      await readJson(request),
-    );
-    const run = await completeProjectAgentScheduleRun(
-      db,
-      project.id,
-      projectAgentScheduleRunCompleteMatch[2],
-      {
-        claimTokenHash: await sha256(input.claimToken),
-        status: input.status,
-        resultSummary: input.resultSummary ?? null,
-        structuredResult: input.structuredResult,
-        error: input.error ?? null,
-        observedAt: new Date().toISOString(),
-      },
-    );
-    if (!run)
-      throw new HttpError(409, "Schedule run claim is no longer active");
-    return json({ run: projectAgentScheduleRunJson(run) });
-  }
-
-  const projectAgentScheduleRunRenewMatch = pathname.match(
-    /^\/projects\/([0-9a-f-]+)\/agent-schedule-runs\/([0-9a-f-]+)\/renew$/u,
-  );
-  if (projectAgentScheduleRunRenewMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    const project = await getProject(
-      db,
-      projectAgentScheduleRunRenewMatch[1],
-      session.user.id,
-    );
-    if (!project) throw new HttpError(404, "Project not found");
-    const input = decodeProjectAgentScheduleRunRenew(
-      await readJson(request),
-    );
-    const run = await renewProjectAgentScheduleRunLease(
-      db,
-      project.id,
-      projectAgentScheduleRunRenewMatch[2],
-      {
-        claimTokenHash: await sha256(input.claimToken),
-        observedAt: new Date().toISOString(),
-      },
-    );
-    if (!run)
-      throw new HttpError(409, "Schedule run claim is no longer active");
-    return json({ leaseExpiresAt: run.lease_expires_at });
-  }
+  if (projectAgentScheduleResponse) return projectAgentScheduleResponse;
 
   const projectAgentMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/agents\/([0-9a-f-]+)$/u,
