@@ -1,4 +1,4 @@
-import briarIconPng from "../../src/assets/app-icons/aubergine-riso.png";
+import briarIconPng from "../../src/assets/brand/briar-logo-dark.png";
 import { devicePage as otpDevicePage } from "./auth-device";
 import { json } from "./http-response";
 import { decodeMobileHealthResponse } from "./mobile-contract";
