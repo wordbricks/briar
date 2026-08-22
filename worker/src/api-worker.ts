@@ -109,11 +109,16 @@ import {
   listOrganizationInvitations,
   listOrganizationMembers,
   listOrganizations,
-  type OrganizationInvitationRow,
-  type OrganizationMemberRow,
-  type OrganizationRole,
   type OrganizationRow,
 } from "./organization-repository";
+import { canManageOrganization } from "./organization-access";
+import {
+  organizationInvitationJson,
+  organizationJson,
+  organizationMemberJson,
+  publicOrganizationInvitationJson,
+} from "./organization-json";
+import { issueSubscribers } from "./issue-subscribers";
 import {
   listOrganizationInboxProjects,
   listOrganizationProjects,
@@ -1956,15 +1961,6 @@ async function syncProjectAgentTaskSession(
   return updated ? projectAgentSessionJson(updated) : null;
 }
 
-const organizationJson = (row: OrganizationRow) => ({
-  id: row.id,
-  name: row.name,
-  handle: row.handle,
-  logo: row.logo,
-  role: row.role,
-  createdAt: row.created_at,
-});
-
 const slackInstallationJson = (
   row: Awaited<ReturnType<typeof listSlackInstallations>>[number],
 ) => ({
@@ -3260,62 +3256,6 @@ async function handleGithubOAuthCallback(request: Request, env: Env) {
     );
   }
 }
-const organizationMemberJson = (row: OrganizationMemberRow) => ({
-  userId: row.user_id,
-  name: row.name,
-  email: row.email,
-  image: row.image,
-  role: row.role,
-  createdAt: row.created_at,
-});
-
-const organizationInvitationStatus = (
-  row: OrganizationInvitationRow,
-  observedAt: string,
-) =>
-  row.revoked_at
-    ? "revoked"
-    : row.accepted_at
-      ? "accepted"
-      : row.expires_at <= observedAt
-        ? "expired"
-        : "pending";
-
-const maskInvitationEmail = (email: string) => {
-  const [local = "", domain = ""] = email.split("@");
-  return `${local.slice(0, 1) || "*"}***@${domain}`;
-};
-
-const organizationInvitationJson = (
-  row: OrganizationInvitationRow,
-  observedAt = new Date().toISOString(),
-) => ({
-  id: row.id,
-  organizationId: row.organization_id,
-  organizationName: row.organization_name,
-  initialProjectId: row.initial_project_id,
-  initialProjectName: row.initial_project_name,
-  email: row.email_normalized,
-  emailHint: maskInvitationEmail(row.email_normalized),
-  role: row.role,
-  status: organizationInvitationStatus(row, observedAt),
-  expiresAt: row.expires_at,
-  acceptedAt: row.accepted_at,
-  createdAt: row.created_at,
-});
-
-const publicOrganizationInvitationJson = (
-  row: OrganizationInvitationRow,
-  observedAt = new Date().toISOString(),
-) => {
-  const invitation = organizationInvitationJson(row, observedAt);
-  const { email: _email, ...publicInvitation } = invitation;
-  return publicInvitation;
-};
-
-const canManageOrganization = (role: OrganizationRole | null) =>
-  role === "owner" || role === "admin";
-
 const settingsJson = (
   row: ProjectSettingsRow | null,
   checkpointPolicy?: ReturnType<typeof checkpointPolicyJson>,
@@ -3409,19 +3349,6 @@ const parseJsonArray = (value: string) => {
   const parsed: unknown = JSON.parse(value);
   return Array.isArray(parsed) ? parsed : [];
 };
-
-const issueSubscribers = (run: Pick<HuntRunRow, "subscribers_json">) =>
-  parseJsonArray(run.subscribers_json ?? "[]").flatMap((value) => {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-    const subscriber = value as Record<string, unknown>;
-    return typeof subscriber.userId === "string" &&
-        typeof subscriber.subscribedAt === "string"
-      ? [{
-          userId: subscriber.userId,
-          subscribedAt: subscriber.subscribedAt,
-        }]
-      : [];
-  });
 
 const occurredAtOrAfter = (occurredAt: string, subscribedAt: string) => {
   const occurredTime = Date.parse(occurredAt);
