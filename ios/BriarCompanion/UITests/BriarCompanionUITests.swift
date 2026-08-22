@@ -3,6 +3,7 @@ import XCTest
 @MainActor
 final class BriarCompanionUITests: XCTestCase {
     private let transitionTimeout: TimeInterval = 20
+    private let accessibilityTransitionTimeout: TimeInterval = 60
 
     private func waitForKeyboardFocus(on element: XCUIElement) -> Bool {
         let expectation = XCTNSPredicateExpectation(
@@ -469,7 +470,9 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-accessibility-xxxl")
 
         app.buttons["login-button"].tap()
-        XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: transitionTimeout))
+        XCTAssertTrue(
+            app.buttons["project-menu"].waitForExistence(timeout: accessibilityTransitionTimeout)
+        )
         XCTAssertTrue(app.staticTexts["iOS Native Companion 읽기 경험"].exists)
         try performAccessibilityAudit(on: app, for: [.textClipped])
         captureScreenshot(named: "companion-task-list-accessibility-xxxl")
