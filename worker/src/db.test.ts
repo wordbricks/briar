@@ -126,7 +126,8 @@ import {
   upsertProjectAgentSession,
 } from "./db";
 import { registerExecutionWorker } from "./workers";
-import apiWorker, { processSlackRevocationQueue } from "./index";
+import apiWorker from "./index";
+import { processSlackRevocationQueue } from "./slack-revocations";
 import { encryptSlackToken } from "./slack";
 import { executeD1Sql } from "./test-helpers/d1";
 
