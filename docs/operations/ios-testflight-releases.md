@@ -1070,3 +1070,7 @@ verified before upload.
 
 App Store Connect accepted the build as `VALID` and placed it in internal
 TestFlight testing.
+
+After the upload, `main` advanced through `9c4ec1d9` (the worker route-family
+refactor in PR #1237). That worker-only change is included in the release PR;
+it does not change the native iOS inputs or the uploaded IPA.
