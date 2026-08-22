@@ -143,6 +143,7 @@ struct ChannelMessagesView: View {
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var draft = ""
     @State private var previewFile: PreviewFile?
+    @State private var selectedThreadMessage: ChannelMessage?
 
     let channel: ChannelSummary
     let currentUserID: String?
@@ -189,6 +190,7 @@ struct ChannelMessagesView: View {
             workers: workers,
             onSkillSessionMaterialized: onSkillSessionMaterialized,
             onSkillSessionOpen: onSkillSessionOpen,
+            onOpenThread: { selectedThreadMessage = $0 },
             showsThreadSummary: true
         )
         .navigationTitle(displayTitle)
@@ -209,7 +211,7 @@ struct ChannelMessagesView: View {
             QuickLookPreview(fileURL: file.url)
                 .accessibilityIdentifier("channel-attachment-preview")
         }
-        .navigationDestination(for: ChannelMessage.self) { message in
+        .navigationDestination(item: $selectedThreadMessage) { message in
             ChannelThreadView(
                 channels: channels,
                 channel: currentChannel,
@@ -383,6 +385,7 @@ struct ChannelThreadView: View {
             workers: workers,
             onSkillSessionMaterialized: onSkillSessionMaterialized,
             onSkillSessionOpen: onSkillSessionOpen,
+            onOpenThread: nil,
             showsThreadSummary: false
         )
         .navigationTitle(L10n.text(.channelThread, locale: locale))
@@ -519,6 +522,7 @@ private struct ChannelConversationView: View {
     let workers: [DashboardWorker]
     let onSkillSessionMaterialized: SkillSessionMaterializedHandler
     let onSkillSessionOpen: SkillSessionOpenHandler
+    let onOpenThread: ((ChannelMessage) -> Void)?
     let showsThreadSummary: Bool
 
     private var mentionCandidates: [ChannelMentionTarget] {
@@ -667,6 +671,9 @@ private struct ChannelConversationView: View {
                                     emoji: emoji
                                 )
                             },
+                            onOpenThread: showsThreadSummary
+                                ? { onOpenThread?(message) }
+                                : nil,
                             projects: projects,
                             providers: providers,
                             workers: workers,
@@ -765,12 +772,12 @@ private struct ChannelMessageRow: View {
     let onLoadAttachment: @MainActor (ChannelMessageAttachment) async throws -> URL
     let onOpenAttachment: @MainActor (URL) -> Void
     let onToggleReaction: (String) async -> Void
+    let onOpenThread: (() -> Void)?
     let projects: [ProjectsResponse.Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     var showsThreadSummary = false
-    @State private var copiedToast = ""
-    @State private var showingCopiedToast = false
+    @State private var showingThreadActions = false
 
     private var mentionHandles: Set<String> {
         MessageMentions.channelHandles(
@@ -929,76 +936,48 @@ private struct ChannelMessageRow: View {
                     )
                     .padding(.top, 4)
                 }
-                if showsThreadSummary && !isOptimistic {
-                    NavigationLink(value: message) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "bubble.left")
-                            Text(
-                                message.replyCount > 0
-                                    ? String(
-                                        format: L10n.text(.channelReplies, locale: locale),
-                                        message.replyCount
-                                    )
-                                    : L10n.text(.channelReplyInThread, locale: locale)
-                            )
-                            .fontWeight(.semibold)
-                            if let lastReplyText {
-                                Text("· \(lastReplyText)")
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.tint)
-                        .padding(.top, 4)
-                    }
-                    .buttonStyle(.plain)
-            }
         }
-        .contextMenu {
-            if !isOptimistic {
-                Button {
-                    ClipboardService.copy(
-                        BriarShareLinks.channelShareURL(
-                            organizationID: channel.organizationId,
-                            channelID: channel.id,
-                            messageID: message.id,
-                            rootMessageID: message.parentMessageId ?? message.id,
-                            origin: BriarShareLinks.defaultOrigin
-                        ).absoluteString
-                    )
-                    copiedToast = L10n.text(.linkCopied, locale: locale)
-                    showingCopiedToast = true
-                } label: {
-                    Label(L10n.text(.copyLink, locale: locale), systemImage: "link")
+        .onLongPressGesture(minimumDuration: 0.45) {
+            guard !isOptimistic, onOpenThread != nil else { return }
+            showingThreadActions = true
+        }
+        .sheet(isPresented: $showingThreadActions) {
+            ChannelMessageActionsSheet(locale: locale) {
+                showingThreadActions = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    onOpenThread?()
                 }
-                .accessibilityIdentifier("channel-copy-link")
             }
-            Button {
-                ClipboardService.copy(
-                    messageBodyWithoutAttachments.isEmpty
-                        ? message.body
-                        : messageBodyWithoutAttachments
-                )
-                copiedToast = L10n.text(.messageCopied, locale: locale)
-                showingCopiedToast = true
-            } label: {
-                Label(L10n.text(.copyMessage, locale: locale), systemImage: "doc.on.doc")
-            }
-            .accessibilityIdentifier("channel-copy-message")
+            .presentationDetents([.height(150)])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(.regularMaterial)
         }
-        .companionToast(isPresented: $showingCopiedToast, message: copiedToast)
     }
+}
 
-    private var lastReplyText: String? {
-        guard let lastReplyAt = message.lastReplyAt else { return nil }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: locale.foundationIdentifier)
-        let relative = formatter.localizedString(for: lastReplyAt, relativeTo: Date())
-        return String(
-            format: L10n.text(.channelLastReply, locale: locale),
-            relative
-        )
+private struct ChannelMessageActionsSheet: View {
+    let locale: CompanionLocale
+    let onStartThread: () -> Void
+
+    var body: some View {
+        Button(action: onStartThread) {
+            Label(
+                L10n.text(.channelStartThread, locale: locale),
+                systemImage: "bubble.left.and.bubble.right"
+            )
+            .font(.body.weight(.semibold))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .frame(height: 58)
+            .background(
+                Color(.secondarySystemBackground),
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 18)
+        .padding(.top, 8)
+        .accessibilityIdentifier("channel-start-thread-action")
     }
 }
 

@@ -312,9 +312,11 @@ export async function prepareExactShaValidation(
         );
       }
       const destination = join(root, filename);
+      const mode = filename.endsWith(".sh") ? 0o555 : 0o444;
       await writeFile(destination, source.stdout, {
-        mode: filename.endsWith(".sh") ? 0o555 : 0o444,
+        mode,
       });
+      await chmod(destination, mode);
       trustedPaths.set(repositoryPathname, destination);
     }
 

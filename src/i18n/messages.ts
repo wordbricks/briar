@@ -217,6 +217,7 @@ export const ko = {
   "channel.viewIssue": "이슈 보기",
   "channel.replyCount": "답글 {count}개",
   "channel.replyInThread": "스레드에서 답글",
+  "channel.startThread": "스레드 시작",
   "conversation.lastReply": "마지막 답글 {time}",
   "channel.react": "React",
   "channel.reactWith": "{emoji} 리액션",
@@ -2157,6 +2158,7 @@ export type Messages = Record<MessageKey, string>;
 
 export const en: Messages = {
   ...ko,
+  "channel.startThread": "Start a thread",
   "sidebar.dms": "DMs",
   "dm.conversations": "Direct message conversations",
   "dm.search": "Search DMs",
@@ -3380,6 +3382,7 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "channel.startThread": "开始话题",
   "onboarding.previous": "返回",
   "onboarding.chooseMethodTitle": "您想如何开始项目？",
   "onboarding.chooseMethodDescription": "连接已有代码，或从 Lovable 导入项目。",
