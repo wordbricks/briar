@@ -4,6 +4,14 @@ import XCTest
 final class BriarCompanionUITests: XCTestCase {
     private let transitionTimeout: TimeInterval = 20
 
+    private func waitForKeyboardFocus(on element: XCUIElement) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "hasKeyboardFocus == true"),
+            object: element
+        )
+        return XCTWaiter().wait(for: [expectation], timeout: transitionTimeout) == .completed
+    }
+
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
@@ -227,14 +235,15 @@ final class BriarCompanionUITests: XCTestCase {
         let channel = app.buttons[
             "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
         ]
-        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        XCTAssertTrue(channel.waitForExistence(timeout: transitionTimeout))
         channel.tap()
 
         let attach = app.buttons["channel-composer-attach"]
-        XCTAssertTrue(attach.waitForExistence(timeout: 5))
+        XCTAssertTrue(attach.waitForExistence(timeout: transitionTimeout))
         let field = app.textFields["channel-composer-field"]
-        XCTAssertTrue(field.exists)
+        XCTAssertTrue(field.waitForExistence(timeout: transitionTimeout))
         field.tap()
+        XCTAssertTrue(waitForKeyboardFocus(on: field))
         field.typeText("Native input")
         XCTAssertTrue(app.buttons["channel-composer-send"].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-channel-composer")
@@ -276,12 +285,18 @@ final class BriarCompanionUITests: XCTestCase {
         let channel = app.buttons[
             "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
         ]
-        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        XCTAssertTrue(channel.waitForExistence(timeout: transitionTimeout))
         channel.tap()
+        let navigationBar = app.navigationBars["design"]
+        if !navigationBar.waitForExistence(timeout: 5) {
+            channel.tap()
+        }
+        XCTAssertTrue(navigationBar.waitForExistence(timeout: transitionTimeout))
 
         let field = app.textFields["channel-composer-field"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertTrue(field.waitForExistence(timeout: transitionTimeout))
         field.tap()
+        XCTAssertTrue(waitForKeyboardFocus(on: field))
         let sentBody = "채널에서 바로 보이는 메시지"
         field.typeText(sentBody)
         let send = app.buttons["channel-composer-send"]
@@ -323,8 +338,9 @@ final class BriarCompanionUITests: XCTestCase {
         channel.tap()
 
         let field = app.textFields["channel-composer-field"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertTrue(field.waitForExistence(timeout: transitionTimeout))
         field.tap()
+        XCTAssertTrue(waitForKeyboardFocus(on: field))
         field.typeText("@")
 
         let menu = app.descendants(matching: .any)["channel-mention-menu"]
