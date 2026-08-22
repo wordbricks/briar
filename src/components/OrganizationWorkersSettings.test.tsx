@@ -13,7 +13,10 @@ import {
 import { OrganizationWorkersSettings } from "./OrganizationWorkersSettings";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("../lib/platform", () => ({ isDesktopTauri: () => true }));
+vi.mock("../lib/platform", () => ({
+  isDesktopTauri: () => true,
+  supportsManagedComputerRemoteDesktop: () => true,
+}));
 vi.mock("../lib/api", () => ({
   applyForManagedComputer: vi.fn(),
   deleteOrganizationExecutionWorker: vi.fn(),
