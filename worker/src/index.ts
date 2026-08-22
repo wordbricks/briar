@@ -13610,26 +13610,20 @@ async function route(
       if (job.claimed_worker_id !== binding.id) {
         throw new HttpError(409, "Reply claim is bound to another Worker");
       }
-      const [channel, liveAgent, triggerMessage] = await Promise.all([
+      const [channel, liveAgent, messages] = await Promise.all([
         getChannelById(db, job.organization_id, job.channel_id),
         getOrganizationAgent(db, job.organization_id, job.agent_id),
-        getChannelMessage(db, job.channel_id, job.trigger_message_id),
+        listChannelThreadMessages(db, job.channel_id, job.parent_message_id),
       ]);
-      if (!channel || !liveAgent || !triggerMessage || !job.agent_provider) {
+      if (!channel || !liveAgent || !job.agent_provider) {
         throw new HttpError(409, "Reply job lost its channel context");
       }
       if (job.project_id !== liveAgent.project_id) {
         throw new HttpError(409, "Reply job no longer matches its Agent scope");
       }
-      // Normal channel and DM replies receive the continuous main timeline.
-      // Only an explicit reply to a thread stays scoped to that thread.
-      const messages = triggerMessage.parentMessageId
-        ? await listChannelThreadMessages(
-            db,
-            job.channel_id,
-            triggerMessage.parentMessageId,
-          )
-        : await listChannelRootMessages(db, job.channel_id);
+      const triggerMessage = messages.find(
+        (message) => message.id === job.trigger_message_id,
+      ) ?? null;
       const liveActiveSkill = job.skill_id
         ? liveAgent.skills.find((skill) => skill.id === job.skill_id) ?? null
         : null;
