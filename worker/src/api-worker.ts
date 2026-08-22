@@ -115,6 +115,11 @@ import { projectAgentSessionJson } from "./project-agent-session-json";
 import { syncProjectAgentTaskSession } from "./project-agent-task-session";
 import { settingsJson } from "./project-settings-json";
 import {
+  isReservedProposalIssueSourceKey,
+  newConversationProposalIssueSourceKey,
+} from "./proposal-issue-source";
+import { evidenceImageJson, runEvidenceJson } from "./run-evidence-json";
+import {
   contentDisposition,
   prepareStoredAttachments,
   uploadStoredAttachments,
@@ -731,29 +736,6 @@ const decodeChannelReplyLeaseInput = decodeRequestSync(
 const decodeChannelIncomingWebhookMessage = decodeRequestSync(
   channelIncomingWebhookMessageSchema,
 );
-
-const channelProposalIssueSourcePrefix = "briar-channel-approved:";
-const legacyChannelProposalIssueSourcePrefix = "briar-channel-proposal:";
-const conversationProposalIssueSourcePrefix =
-  "briar-conversation-approved:";
-const legacyConversationProposalIssueSourcePrefix =
-  "briar-conversation-proposal:";
-
-const newChannelProposalIssueSourceKey = () =>
-  `${channelProposalIssueSourcePrefix}${
-    crypto.randomUUID().replaceAll("-", "")
-  }${crypto.randomUUID().replaceAll("-", "")}`;
-
-const newConversationProposalIssueSourceKey = () =>
-  `${conversationProposalIssueSourcePrefix}${
-    crypto.randomUUID().replaceAll("-", "")
-  }${crypto.randomUUID().replaceAll("-", "")}`;
-
-const isReservedProposalIssueSourceKey = (sourceKey: string) =>
-  sourceKey.startsWith(channelProposalIssueSourcePrefix) ||
-  sourceKey.startsWith(legacyChannelProposalIssueSourcePrefix) ||
-  sourceKey.startsWith(conversationProposalIssueSourcePrefix) ||
-  sourceKey.startsWith(legacyConversationProposalIssueSourcePrefix);
 
 const attachmentResponse = (
   attachment: Pick<
@@ -2623,16 +2605,6 @@ const attachmentJson = (attachment: IssueAttachmentRow) => ({
   url: `/projects/${attachment.project_id}/runs/${attachment.run_id}/attachments/${attachment.id}`,
 });
 
-const evidenceImageJson = (image: RunEvidenceImageRow) => ({
-  id: image.id,
-  filename: image.filename,
-  contentType: image.content_type,
-  byteSize: image.byte_size,
-  sha256: image.sha256,
-  position: image.position,
-  url: `/projects/${image.project_id}/runs/${image.run_id}/evidence/images/${image.id}`,
-});
-
 const issueReworkProposalJson = (proposal: IssueReworkProposalRow) => ({
   id: proposal.id,
   type: "request_issue_rework" as const,
@@ -2932,29 +2904,6 @@ const removeOrphanedIssueAttachments = async (
     );
   });
 };
-
-const runEvidenceJson = (
-  evidence: RunEvidenceRow,
-  requiredRevision: number,
-  images: RunEvidenceImageRow[] = [],
-) => ({
-  key: evidence.evidence_key,
-  attempt: evidence.attempt,
-  revision: evidence.revision,
-  stage: evidence.workflow_stage,
-  type: evidence.evidence_type,
-  status: evidence.status,
-  detail: evidence.detail,
-  command: evidence.command,
-  url: evidence.url,
-  metadata: evidence.metadata_json ? JSON.parse(evidence.metadata_json) : null,
-  actor: evidence.actor,
-  observedAt: evidence.observed_at,
-  recordedAt: evidence.recorded_at,
-  images: images.map(evidenceImageJson),
-  requiredRevision,
-  canonical: evidence.revision >= requiredRevision,
-});
 
 function dashboardRunJson(
   run: HuntRunRow,

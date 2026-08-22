@@ -38,6 +38,7 @@ import {
 import { getProject } from "./project-command-repository";
 import type { ProjectRow } from "./project-repository";
 import { getProjectSettings } from "./project-settings-repository";
+import { newChannelProposalIssueSourceKey } from "./proposal-issue-source";
 import { readJson } from "./request-readers";
 import { requireSession } from "./session-auth";
 import {
@@ -306,11 +307,6 @@ async function approveChannelExecutionProposalRequest(input: {
     throw error;
   }
 }
-
-const newChannelProposalIssueSourceKey = () =>
-  `briar-channel-approved:${
-    crypto.randomUUID().replaceAll("-", "")
-  }${crypto.randomUUID().replaceAll("-", "")}`;
 
 export type ChannelProposalRouteInput = {
   request: Request;
