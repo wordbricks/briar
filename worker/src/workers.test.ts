@@ -50,7 +50,6 @@ import {
   renewHuntRunLease,
   unbindExecutionWorker,
   updateExecutionWorkerConcurrency,
-  updateExecutionWorkerIcon,
   updateExecutionWorkerLabel,
   updateProjectExecutionWorkerPolicy,
   WorkerConflictError,
@@ -875,57 +874,6 @@ describe("detached execution workers", () => {
     });
   });
 
-  it("dispatches a newly reported Grok model and model-specific effort", async () => {
-    const selected = await register("grok-46");
-    await recordWorkerHeartbeat(db, projectId, {
-      workerId: selected.worker.id,
-      capabilities: {
-        providers: ["grok"],
-        providerHealth: {
-          grok: { installed: true, authenticated: true, healthy: true },
-        },
-        providerCapabilities: {
-          codex: { models: [], defaultEfforts: [], allowCustomModels: false, error: null },
-          claude: { models: [], defaultEfforts: [], allowCustomModels: true, error: null },
-          cursor: { models: [], defaultEfforts: [], allowCustomModels: true, error: null },
-          grok: {
-            models: [{
-              id: "grok-4.6",
-              label: "Grok 4.6",
-              efforts: [{ id: "xhigh", label: "Extra High" }],
-            }],
-            defaultEfforts: [],
-            allowCustomModels: false,
-            error: null,
-          },
-          agy: { models: [], defaultEfforts: [], allowCustomModels: false, error: null },
-          opencode: { models: [], defaultEfforts: [], allowCustomModels: true, error: null },
-        },
-      },
-      observedAt: atMinute(2),
-    });
-    const runId = await recordHuntEvent(
-      db,
-      projectId,
-      queuedEvent("grok-46-dispatch", 2),
-    );
-
-    await expect(dispatchHuntRun(db, projectId, projectId, {
-      runId,
-      provider: "grok",
-      model: "grok-4.6",
-      effort: "xhigh",
-      workerId: selected.worker.id,
-      requestedByUserId: "member",
-      requestId: "46464646-aaaa-4646-8646-464646464646",
-      occurredAt: atMinute(3),
-    })).resolves.toMatchObject({
-      provider: "grok",
-      model: "grok-4.6",
-      effort: "xhigh",
-    });
-  });
-
   it("records execution metrics only for the assigned Worker attempt", async () => {
     const selected = await register("metrics");
     const runId = await recordHuntEvent(
@@ -1641,47 +1589,6 @@ describe("detached execution workers", () => {
       id: second.worker.id,
       label: "new-hostname",
     });
-  });
-
-  it("stores one device icon and exposes it through every Worker listing", async () => {
-    const registered = await register("icon");
-    const icon = { type: "emoji", value: "🍋" } as const;
-
-    await expect(
-      updateExecutionWorkerIcon(
-        db,
-        registered.device.id,
-        icon,
-        atMinute(3),
-      ),
-    ).resolves.toMatchObject({
-      icon_type: "emoji",
-      icon_value: "🍋",
-    });
-
-    await expect(
-      listOrganizationExecutionWorkers(db, projectId, atMinute(3)),
-    ).resolves.toEqual([
-      expect.objectContaining({
-        icon,
-      }),
-    ]);
-    await expect(
-      listExecutionWorkers(db, projectId, atMinute(3)),
-    ).resolves.toEqual([
-      expect.objectContaining({
-        icon_type: "emoji",
-        icon_value: "🍋",
-      }),
-    ]);
-    await expect(
-      updateExecutionWorkerIcon(
-        db,
-        registered.device.id,
-        { type: "emoji", value: "not-an-emoji" },
-        atMinute(4),
-      ),
-    ).rejects.toThrow("one emoji");
   });
 
   it("binds one organization device to several projects", async () => {

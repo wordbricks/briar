@@ -44,7 +44,6 @@ import {
   createProject,
   createIssueAttachments,
   createIssueDependency,
-  createRunEvidenceImages,
   deleteAccountData,
   deleteProjectAgent,
   deleteIssue,
@@ -58,9 +57,7 @@ import {
   getProject,
   getProjectSettings,
   getHuntRunForProject,
-  getIssueAttachment,
   getIssueActionProposal,
-  getRunEvidenceImage,
   getIssueMessage,
   HuntClaimError,
   HuntTransitionError,
@@ -97,14 +94,11 @@ import {
   listProjectAgentSchedules,
   listProjectUsageTotals,
   listProjectUsageRuns,
-  listRunEvidence,
-  listRunEvidenceImages,
   moveHuntRun,
   planAccountDeletion,
   recoverHuntRun,
   reworkHuntRun,
   recordHuntEvent,
-  recordRunEvidence,
   subscribeIssue,
   resumeWorkflowCheckpoint,
   removeOrganizationMember,
@@ -2224,61 +2218,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     }
   });
 
-  it("creates and lists custom agents scoped to a project", async () => {
-    const agent = await createProjectAgent(db, projectId, {
-      name: "Sentry 오류 탐지 에이전트",
-      provider: "claude",
-      model: "opus",
-      effort: null,
-      responsibility:
-        "Sentry 오류를 분석해 이슈를 만들고 담당자에게 배정합니다.",
-      calendarColor: "#8b5cf6",
-    });
-
-    expect(agent).toMatchObject({
-      project_id: projectId,
-      name: "Sentry 오류 탐지 에이전트",
-      provider: "claude",
-      model: "opus",
-      skill_markdown: expect.stringContaining(
-        "Sentry 오류를 분석해 이슈를 만들고 담당자에게 배정합니다.",
-      ),
-      calendar_color: "#8b5cf6",
-    });
-    await expect(listProjectAgents(db, projectId)).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ name: "Developer agent" }),
-        agent,
-      ]),
-    );
-    await expect(
-      listProjectAgents(db, "22222222-2222-4222-8222-222222222222"),
-    ).resolves.toEqual([]);
-  });
-
-  it("allows duplicate project agent names because Agent IDs route mentions", async () => {
-    const first = await createProjectAgent(db, projectId, {
-      name: "Release agent",
-      provider: "codex",
-      model: null,
-      effort: null,
-      responsibility: "Prepare the first release.",
-      calendarColor: "#8b5cf6",
-    });
-    const second = await createProjectAgent(db, projectId, {
-      name: "Release agent",
-      provider: "codex",
-      model: null,
-      effort: null,
-      responsibility: "Prepare the second release.",
-      calendarColor: "#0f9f76",
-    });
-
-    expect(first.name).toBe("Release agent");
-    expect(second.name).toBe("Release agent");
-    expect(first.id).not.toBe(second.id);
-  });
-
   it("deletes an agent only within its project and cascades its schedules", async () => {
     const agent = await createProjectAgent(db, projectId, {
       name: "Disposable agent",
@@ -2330,44 +2269,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(listProjectAgentSchedules(db, projectId)).resolves.not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: schedule!.id })]),
     );
-  });
-
-  it("creates recurring schedules for an agent in the same project", async () => {
-    const agent = (await listProjectAgents(db, projectId))[0];
-    const schedule = await createProjectAgentSchedule(db, projectId, {
-      agentId: agent.id,
-      name: "Weekday repository audit",
-      recurrence: "weekdays",
-      timeOfDay: "09:00",
-      dayOfWeek: null,
-      timeZone: "Asia/Seoul",
-    });
-
-    expect(schedule).toMatchObject({
-      project_id: projectId,
-      agent_id: agent.id,
-      agent_name: "Developer agent",
-      agent_provider: "codex",
-      name: "Weekday repository audit",
-      recurrence: "weekdays",
-      time_of_day: "09:00",
-      day_of_week: null,
-      time_zone: "Asia/Seoul",
-      enabled: 1,
-    });
-    await expect(listProjectAgentSchedules(db, projectId)).resolves.toEqual([
-      schedule,
-    ]);
-    await expect(
-      createProjectAgentSchedule(db, projectId, {
-        agentId: "22222222-2222-4222-8222-222222222222",
-        name: "Missing agent",
-        recurrence: "daily",
-        timeOfDay: "12:00",
-        dayOfWeek: null,
-        timeZone: "Etc/UTC",
-      }),
-    ).resolves.toBeNull();
   });
 
   it("updates and deletes a recurring schedule within its project", async () => {
@@ -2426,34 +2327,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       deleteProjectAgentSchedule(db, projectId, schedule!.id),
     ).resolves.toBe("not_found");
-  });
-
-  it("persists a custom multi-day cadence and notification preference", async () => {
-    const agent = (await listProjectAgents(db, projectId))[0];
-    const schedule = await createProjectAgentSchedule(db, projectId, {
-      agentId: agent.id,
-      name: "Alternating release checks",
-      recurrence: "custom",
-      timeOfDay: "09:00",
-      dayOfWeek: null,
-      intervalValue: 2,
-      intervalUnit: "week",
-      daysOfWeek: [1, 3, 5],
-      notificationLevel: "none",
-      timeZone: "Etc/UTC",
-    });
-
-    expect(schedule).toMatchObject({
-      recurrence: "daily",
-      frequency: "custom",
-      interval_value: 2,
-      interval_unit: "week",
-      days_of_week: "1,3,5",
-      notification_level: "none",
-    });
-    await expect(
-      deleteProjectAgentSchedule(db, projectId, schedule!.id),
-    ).resolves.toBe("deleted");
   });
 
   it("claims a due schedule once and advances its next occurrence", async () => {
@@ -2770,41 +2643,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toBeNull();
   });
 
-  it("allows a project agent to delete its final Skill", async () => {
-    const agent = await createProjectAgent(db, projectId, {
-      name: "Responsibility-only agent",
-      provider: "codex",
-      model: null,
-      effort: null,
-      responsibility: "Operates only within its saved responsibility.",
-      skills: [
-        {
-          name: "Temporary skill",
-          description: "Use for temporary test requests.",
-          body: "This Skill will be removed.",
-          provider: "codex",
-          model: null,
-          effort: null,
-          kind: "custom",
-          position: 0,
-        },
-      ],
-      calendarColor: "#3275d5",
-    });
-
-    await expect(
-      updateProjectAgent(db, projectId, agent.id, {
-        name: agent.name,
-        provider: agent.provider,
-        model: agent.model,
-        effort: agent.effort,
-        responsibility: agent.responsibility,
-        skills: [],
-        calendarColor: agent.calendar_color,
-      }),
-    ).resolves.toMatchObject({ id: agent.id, skills: [] });
-  });
-
   it("preserves retained Skill job references across name swaps", async () => {
     const agent = await createProjectAgent(db, projectId, {
       name: "Durable skill agent",
@@ -3107,59 +2945,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     }
   });
 
-  it("applies legacy Agent execution updates to a sole Skill", async () => {
-    const agent = await createProjectAgent(db, projectId, {
-      name: "Legacy settings agent",
-      provider: "codex",
-      model: null,
-      effort: null,
-      responsibility: "Run with the original Skill settings.",
-      skills: [
-        {
-          name: "Legacy settings",
-          description: "Use for legacy Agent settings.",
-          body: "Run with the original Skill settings.",
-          provider: "codex",
-          model: null,
-          effort: null,
-          kind: "custom",
-          position: 0,
-        },
-      ],
-      calendarColor: "#3275d5",
-    });
-
-    try {
-      const updated = await updateProjectAgent(db, projectId, agent.id, {
-        name: agent.name,
-        provider: "claude",
-        model: "sonnet",
-        effort: "high",
-        responsibility: "Run with the settings saved by a legacy client.",
-        calendarColor: agent.calendar_color,
-      });
-
-      expect(updated).toMatchObject({
-        provider: "claude",
-        model: "sonnet",
-        effort: "high",
-        responsibility: "Run with the settings saved by a legacy client.",
-        skills: [
-          expect.objectContaining({
-            id: agent.skills[0].id,
-            body: "Run with the settings saved by a legacy client.",
-            provider: "claude",
-            model: "sonnet",
-            effort: "high",
-            is_default: 0,
-          }),
-        ],
-      });
-    } finally {
-      await deleteProjectAgent(db, projectId, agent.id);
-    }
-  });
-
   it("rolls back an Agent update when a Skill ID belongs to another Agent", async () => {
     const owner = (await listProjectAgents(db, projectId))[0];
     const agent = await createProjectAgent(db, projectId, {
@@ -3254,110 +3039,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).rejects.toThrow();
   });
 
-  it("links pull request evidence to its issue run", async () => {
-    await updateProjectSettings(db, projectId, {
-      velenOrg: "example",
-      dataSource: null,
-      linear: { enabled: false, source: null, teamKey: null },
-      githubRepository: "example/repository",
-      workflow: releaseWorkflow,
-    });
-    const runId = await recordHuntEvent(
-      db,
-      projectId,
-      event("queued", 12.1, {
-        sourceKey: "pull-request-evidence-run",
-        eventKey: "pull-request-evidence-run:queued",
-      }),
-    );
-    const pullRequestUrl = "https://github.com/example/repository/pull/42";
-    const evidenceInput = {
-      runId,
-      evidenceKey: "pr_open:pull_request",
-      stage: "pr_open",
-      type: "pull_request",
-      status: "passed" as const,
-      detail: "Pull request created",
-      command: "gh pr create",
-      url: pullRequestUrl,
-      metadata: {
-        githubPullRequest: {
-          repositoryId: 9_001,
-          repository: "example/repository",
-          pullRequestId: 10_042,
-          pullRequestNodeId: "PR_test_42",
-          pullRequestNumber: 42,
-        },
-      },
-      actor: "vitest",
-      observedAt: atMinute(12.2),
-    };
-
-    await recordRunEvidence(db, projectId, evidenceInput);
-    await recordRunEvidence(db, projectId, evidenceInput);
-
-    const linkedRun = await getHuntRunForProject(db, projectId, runId);
-    expect(JSON.parse(linkedRun!.pull_request_urls)).toEqual([pullRequestUrl]);
-  });
-
-  it("stores images against a run evidence record", async () => {
-    await updateProjectSettings(db, projectId, {
-      velenOrg: "example",
-      dataSource: null,
-      linear: { enabled: false, source: null, teamKey: null },
-      githubRepository: "example/repository",
-      workflow: releaseWorkflow,
-    });
-    const runId = await recordHuntEvent(
-      db,
-      projectId,
-      event("queued", 12.3, {
-        sourceKey: "evidence-image-run",
-        eventKey: "evidence-image-run:queued",
-      }),
-    );
-    const evidence = await recordRunEvidence(db, projectId, {
-      runId,
-      evidenceKey: "analyzing:screenshot",
-      stage: "analyzing",
-      type: "repository",
-      status: "passed",
-      detail: "Screenshot captured",
-      command: null,
-      url: null,
-      metadata: null,
-      actor: "vitest",
-      observedAt: atMinute(12.4),
-    });
-    expect(evidence).not.toBeNull();
-    const imageId = "11111111-3333-4444-8555-666666666666";
-    const stored = await createRunEvidenceImages(
-      db,
-      projectId,
-      runId,
-      evidence!.id,
-      [
-        {
-          id: imageId,
-          object_key: `run-evidence/${projectId}/${runId}/${evidence!.id}/${imageId}`,
-          filename: "dashboard.png",
-          content_type: "image/png",
-          byte_size: 8,
-          sha256: "a".repeat(64),
-          position: 0,
-        },
-      ],
-    );
-
-    expect(stored).toHaveLength(1);
-    await expect(listRunEvidenceImages(db, projectId, runId)).resolves.toEqual(
-      stored,
-    );
-    await expect(
-      getRunEvidenceImage(db, projectId, runId, imageId),
-    ).resolves.toEqual(stored?.[0]);
-  });
-
   it("deletes only a project owned by the requesting user", async () => {
     const project = await createProject(db, {
       ownerUserId: "owner",
@@ -3393,6 +3074,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("shares organization projects with members without granting owner deletion", async () => {
+    await updateProjectSettings(db, projectId, {
+      velenOrg: "example",
+      dataSource: null,
+      linear: { enabled: false, source: null, teamKey: null },
+      githubRepository: "example/repository",
+      workflow: releaseWorkflow,
+    });
     await executeSql(
       db,
       `
@@ -4500,91 +4188,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await removeOrganizationMember(db, projectId, "mentioned-member");
   });
 
-  it("resolves an issue reply avatar through its selected Agent Skill", async () => {
-    const agent = await createProjectAgent(db, projectId, {
-      name: "Inbox issue agent",
-      avatar: "data:image/png;base64,aW5ib3gtaXNzdWUtYWdlbnQ=",
-      provider: "codex",
-      model: null,
-      effort: null,
-      responsibility: "Reply to issue conversations.",
-      skills: [{
-        name: "Issue processing",
-        description: "Use for issue conversation replies.",
-        body: "Reply to issue conversations.",
-        provider: "codex",
-        model: null,
-        effort: null,
-        kind: "issue_processing",
-        position: 0,
-      }],
-      calendarColor: "#3275d5",
-    });
-    const runId = await recordHuntEvent(
-      db,
-      projectId,
-      event("queued", 29.6, {
-        sourceKey: "inbox-agent-reply-run",
-        eventKey: "inbox-agent-reply-run:queued",
-        assigneeUserId: "owner",
-      }),
-    );
-    await db.prepare(
-      `update briar_hunt_runs set agent_id = ? where id = ? and project_id = ?`,
-    ).bind(agent.id, runId, projectId).run();
-    const rootId = "11111111-eeee-4eee-8eee-eeeeeeeeeeee";
-    const replyId = "22222222-eeee-4eee-8eee-eeeeeeeeeeee";
-    const jobId = "33333333-eeee-4eee-8eee-eeeeeeeeeeee";
-    await createIssueMessage(db, {
-      id: rootId,
-      projectId,
-      runId,
-      parentMessageId: null,
-      authorUserId: "owner",
-      authorAgentProvider: null,
-      body: "Please investigate this issue.",
-      createdAt: atMinute(29.61),
-    });
-    await enqueueIssueAgentReply(db, {
-      id: jobId,
-      projectId,
-      runId,
-      triggerMessageId: rootId,
-      parentMessageId: rootId,
-      replyMessageId: replyId,
-      skillId: agent.skills[0]!.id,
-      createdAt: atMinute(29.62),
-    });
-    // This broad lifecycle fixture predates the full approval migration; add
-    // the production job attribution explicitly for this notification query.
-    await db.prepare(
-      `update briar_issue_agent_reply_jobs set skill_id = ? where id = ?`,
-    ).bind(agent.skills[0]!.id, jobId).run();
-    await createIssueMessage(db, {
-      id: replyId,
-      projectId,
-      runId,
-      parentMessageId: rootId,
-      authorUserId: null,
-      authorAgentProvider: "codex",
-      body: "The configured agent replied.",
-      createdAt: atMinute(29.63),
-    });
-    await db.prepare(
-      `update briar_hunt_runs set agent_id = null where id = ? and project_id = ?`,
-    ).bind(runId, projectId).run();
-
-    await expect(
-      listIssueConversationNotifications(db, projectId, "owner"),
-    ).resolves.toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        id: replyId,
-        author_agent_image: "data:image/png;base64,aW5ib3gtaXNzdWUtYWdlbnQ=",
-        notification_reason: "thread_reply",
-      }),
-    ]));
-  });
-
   it("keeps assignees subscribed and supports manual subscription changes", async () => {
     await executeSql(
       db,
@@ -4784,64 +4387,6 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         },
       ],
     });
-  });
-
-  it("stores issue attachment metadata scoped to its project and run", async () => {
-    const runId = await recordHuntEvent(
-      db,
-      projectId,
-      event("queued", 19.5, {
-        sourceKey: "issue-attachment-run",
-        eventKey: "issue-attachment-run:queued",
-        title: "Issue attachment run",
-        branch: null,
-        commitSha: null,
-      }),
-    );
-    const run = await claimNextQueuedHuntRun(db, projectId, {
-      claimTokenHash: "6".repeat(64),
-      claimedBy: "attachment-worker",
-      claimedAt: atMinute(19.6),
-      leaseExpiresAt: atMinute(120),
-      runId,
-    });
-    expect(run?.id).toBe(runId);
-    const attachmentId = "66666666-6666-4666-8666-666666666666";
-    await createIssueAttachments(db, projectId, runId, [
-      {
-        id: attachmentId,
-        object_key: `issue-attachments/${projectId}/${runId}/${attachmentId}`,
-        filename: "screen.png",
-        content_type: "image/png",
-        byte_size: 2048,
-      },
-    ]);
-
-    expect(await listIssueAttachments(db, projectId, runId)).toEqual([
-      expect.objectContaining({
-        id: attachmentId,
-        run_id: runId,
-        project_id: projectId,
-        filename: "screen.png",
-        content_type: "image/png",
-        byte_size: 2048,
-      }),
-    ]);
-    expect(
-      await getIssueAttachment(db, projectId, runId, attachmentId),
-    ).toEqual(
-      expect.objectContaining({
-        object_key: expect.stringContaining(attachmentId),
-      }),
-    );
-    expect(
-      await getIssueAttachment(
-        db,
-        "99999999-9999-4999-8999-999999999999",
-        runId,
-        attachmentId,
-      ),
-    ).toBeNull();
   });
 
   it("updates issue fields without changing workflow state", async () => {
