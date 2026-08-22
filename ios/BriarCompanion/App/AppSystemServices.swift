@@ -184,6 +184,16 @@ final class IssueConversationViewTracker: ObservableObject {
     }
 }
 
+final class InboxNotificationForegroundDelegate: NSObject, UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .list, .sound, .badge])
+    }
+}
+
 @MainActor
 final class LocalNotificationService: ObservableObject {
     @Published var preferences = InboxNotificationPreferences.load()
@@ -192,8 +202,12 @@ final class LocalNotificationService: ObservableObject {
     private var knownIDs = Set<String>()
     private var baselineID: String?
     private let center = UNUserNotificationCenter.current()
+    private let foregroundDelegate = InboxNotificationForegroundDelegate()
 
     init() {
+        // iOS does not present local notifications while the app is active
+        // unless its notification center delegate explicitly opts in.
+        center.delegate = foregroundDelegate
         Task { await refreshAuthorizationStatus() }
     }
 
