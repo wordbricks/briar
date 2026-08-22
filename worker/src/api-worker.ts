@@ -17,13 +17,6 @@ import {
   type AutoHuntRunStatus,
 } from "../../src/lib/auto-hunt-contract";
 import {
-  decodeStructuredAgentResultOption,
-  type StructuredAgentResult,
-} from "../../src/lib/agent-result";
-import {
-  decodeAgentExecutionMetricsOption,
-} from "../../src/lib/agent-execution-metrics";
-import {
   decodeAgentProviderCapabilityCatalogOption,
   mergeAgentProviderCapabilityCatalogs,
 } from "../../src/lib/agent-provider-contract";
@@ -77,8 +70,6 @@ import {
 } from "../../src/lib/worker-icon-validation";
 import {
   projectUsageSummaryWindow,
-  summarizeProjectUsage,
-  type ProjectUsagePeriod,
 } from "../../src/lib/project-usage-summary";
 import {
   decodeOrganizationAgentContextAgentsPage,
@@ -590,7 +581,6 @@ import {
   organizationManagedComputer,
   refreshManagedComputerReadiness,
 } from "./managed-computer-repository";
-export { ManagedComputerProvisioningWorkflow } from "./managed-computer-workflow";
 import {
   ingestAgentTranscript,
   listAgentTranscriptSegments,
@@ -678,14 +668,12 @@ import {
   legacyChannelRealtimeResponse,
   subscribeToOrganizationRealtime,
 } from "./channel-realtime";
-export { ChannelRealtimeHub } from "./channel-realtime";
 import {
   publishChannelActivity,
   publishIssueActivity,
   subscribeToChannelActivity,
   subscribeToIssueActivity,
 } from "./channel-activity-realtime";
-export { ChannelActivityHub } from "./channel-activity-realtime";
 import {
   createChannelActivitySocketTicket,
   createIssueActivitySocketTicket,
@@ -752,6 +740,16 @@ import {
   type AgentSkillProvider,
 } from "./agent-skills";
 import {
+  issueClaimExecutionConfig,
+  issueReplyExecutionConfig,
+  legacyAgentSkillInstructions,
+} from "./agent-execution-config";
+import {
+  parseExecutionMetrics,
+  parseJsonObject,
+  parseStructuredResult,
+} from "./agent-result-json";
+import {
   buildSlackCreateIssueModal,
   callSlackApi,
   decryptSlackToken,
@@ -805,6 +803,16 @@ import {
   claimWorkflowContext,
   resumeRunWithCheckpointIdentity,
 } from "./workflow-resume";
+import { assertRunEventIdentityNotOverridden } from "./run-event-identity";
+import {
+  loadOrganizationInboxConditionalSnapshot,
+  organizationInboxSyncJson,
+} from "./organization-inbox-sync";
+import {
+  organizationUsageQuerySince,
+  organizationUsageRunJson,
+  projectUsageSummaryJson,
+} from "./usage-json";
 import {
   corsHeaders,
   HttpError,
@@ -832,38 +840,6 @@ import {
   scheduleProjectAgentSessionRealtimePublish,
   scheduleProjectRealtimePublish,
 } from "./realtime-scheduling";
-
-export {
-  responseWithPostCommitCleanup,
-  schedulePostCommitCleanup,
-} from "./post-commit-cleanup";
-export {
-  flushOrganizationInboxRealtimeOutbox,
-  projectMutationProject,
-  projectScheduleClaimMutation,
-} from "./realtime-scheduling";
-export { processSlackRevocationQueue } from "./slack-revocations";
-export {
-  handleScheduledTask,
-  type ScheduledTaskDependencies,
-} from "./scheduled-task";
-export {
-  readChannelMessageRequest,
-  readChannelReplyCompleteRequest,
-  readIssueMessageRequest,
-  readIssueReplyCompleteRequest,
-  readIssueRequest,
-  readIssueUpdateRequest,
-  readRunEvidenceRequest,
-  readTranscriptRequest,
-} from "./request-readers";
-export {
-  approvedIssueCreation,
-  assertChannelProposalAuthorScope,
-  channelMessageShareUrl,
-  loadChannelCatalogSnapshot,
-  resolveChannelProposalTargetProjectId,
-} from "./channel-proposal-helpers";
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 const decodeChannelAgentActivityPublishInput = decodeRequestSync(
@@ -899,86 +875,6 @@ const decodeChannelIncomingWebhookMessage = decodeRequestSync(
 
 const accountDeletionFreshAgeMs = 24 * 60 * 60 * 1_000;
 const organizationInvitationTtlMs = 7 * 24 * 60 * 60 * 1_000;
-const usageRangeFetchPaddingDays = 1;
-
-type IssueReplyExecutionSource = {
-  provider: AgentSkillProvider | null;
-  model: string | null;
-  effort: AgentSkillEffort | null;
-};
-
-export function issueClaimExecutionConfig(input: {
-  preferred: IssueReplyExecutionSource;
-  requested: IssueReplyExecutionSource;
-  activeSkill: IssueReplyExecutionSource | null;
-  agent: IssueReplyExecutionSource | null;
-}) {
-  // requested_* is the immutable choice approved for the current dispatch.
-  // preferred_* remains a default only until a dispatch snapshot exists.
-  const source = input.requested.provider
-    ? input.requested
-    : input.preferred.provider
-      ? input.preferred
-      : input.activeSkill?.provider
-        ? input.activeSkill
-        : input.agent?.provider
-          ? input.agent
-          : null;
-  return {
-    provider: source?.provider ?? null,
-    model: source?.model ?? null,
-    effort: source?.effort ?? null,
-  };
-}
-
-export function issueReplyExecutionConfig(input: {
-  provider: AgentSkillProvider;
-  preferred: IssueReplyExecutionSource;
-  requested: IssueReplyExecutionSource;
-  activeSkill: IssueReplyExecutionSource | null;
-  agent: IssueReplyExecutionSource | null;
-  prioritizeAgent?: boolean;
-}) {
-  const source = (input.prioritizeAgent
-    ? [input.activeSkill, input.agent, input.requested, input.preferred]
-    : [input.requested, input.preferred, input.activeSkill, input.agent]
-  ).find((candidate) => candidate?.provider === input.provider);
-  return {
-    model: source?.model ?? null,
-    effort: source?.effort ?? null,
-  };
-}
-
-export function legacyAgentSkillInstructions(
-  activeSkill: { instructions: string } | null | undefined,
-  fallback: string,
-) {
-  return activeSkill?.instructions ?? fallback;
-}
-
-export const organizationUsageQuerySince = (
-  days: 7 | 30 | 90,
-  now: number = Date.now(),
-) =>
-  new Date(
-    now - (days + usageRangeFetchPaddingDays) * 24 * 60 * 60_000,
-  ).toISOString();
-
-export function assertRunEventIdentityNotOverridden(input: {
-  run: Pick<HuntRunRow, "source" | "source_key"> | null;
-  source?: string | null;
-  sourceKey?: string | null;
-}) {
-  if (
-    input.run &&
-    (
-      (input.source != null && input.source !== input.run.source) ||
-      (input.sourceKey != null && input.sourceKey !== input.run.source_key)
-    )
-  ) {
-    throw new HttpError(400, "A claimed run's identity cannot be changed");
-  }
-}
 
 async function createApprovedChannelProposalIssue(input: {
   db: D1Database;
@@ -2021,34 +1917,6 @@ const projectAgentSessionSummaryJson = (row: {
 
 const projectAgentSessionSyncEtag = (projectId: string, cursor: number) =>
   `"project-agent-sessions:${projectId}:${cursor}"`;
-
-export const organizationInboxSyncEtag = (
-  organizationId: string,
-  version: number,
-) => `W/"organization-inbox:${organizationId}:${version}"`;
-
-export async function loadOrganizationInboxConditionalSnapshot<T>(input: {
-  organizationId: string;
-  ifNoneMatch: string | null;
-  readVersion: () => Promise<number>;
-  loadSnapshot: () => Promise<T>;
-}) {
-  const version = await input.readVersion();
-  const etag = organizationInboxSyncEtag(input.organizationId, version);
-  if (input.ifNoneMatch === etag) {
-    return { etag, snapshot: null };
-  }
-  return { etag, snapshot: await input.loadSnapshot() };
-}
-
-const organizationInboxSyncJson = (body: unknown, etag: string) =>
-  Response.json(body, {
-    headers: {
-      ...corsHeaders,
-      "Cache-Control": "private, no-cache",
-      ETag: etag,
-    },
-  });
 
 const projectAgentSessionSyncJson = (
   body: unknown,
@@ -3663,167 +3531,6 @@ const occurredAtOrAfter = (occurredAt: string, subscribedAt: string) => {
     occurredTime >= subscribedTime;
 };
 
-const parseJsonObject = (value: string | null) => {
-  if (!value) return null;
-  const parsed: unknown = JSON.parse(value);
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-    ? parsed
-    : null;
-};
-
-const parseStructuredResult = (
-  value: string | null,
-): StructuredAgentResult | null => {
-  const parsed = parseJsonObject(value);
-  return Option.getOrNull(decodeStructuredAgentResultOption(parsed));
-};
-
-const parseExecutionMetrics = (value: string | null) => {
-  return Option.getOrNull(
-    decodeAgentExecutionMetricsOption(parseJsonObject(value)),
-  );
-};
-
-const parseUsageExecutionMetrics = (value: string | null) => {
-  try {
-    return parseExecutionMetrics(value);
-  } catch {
-    return null;
-  }
-};
-
-const usageExecutionAttemptJson = (attempt: RunExecutionAttemptRow) => ({
-  executionId: attempt.id,
-  projectId: attempt.project_id,
-  runAttempt: attempt.run_attempt,
-  claimAttempt: attempt.claim_attempt,
-  workerId: attempt.worker_id,
-  claimedBy: attempt.claimed_by,
-  claimedAt: attempt.claimed_at,
-  recordedAt: attempt.recorded_at,
-});
-
-const organizationUsageRecordJson = (record: OrganizationUsageRecordRow) => ({
-  executionId: record.execution_id,
-  projectId: record.project_id,
-  runAttempt: record.run_attempt,
-  claimAttempt: record.claim_attempt,
-  workerId: record.worker_id,
-  claimedAt: record.claimed_at,
-  usageKey: record.usage_key,
-  sessionId: record.session_id,
-  scopeId: record.scope_id,
-  turnId: record.turn_id,
-  agentProvider: record.agent_provider,
-  modelProvider: record.model_provider,
-  model: record.model,
-  canonicalModel: record.canonical_model,
-  modelSource: record.model_source,
-  source: record.source,
-  uncachedInputTokens: record.uncached_input_tokens,
-  cacheReadTokens: record.cache_read_tokens,
-  cacheWriteTokens: record.cache_write_tokens,
-  outputTokens: record.output_tokens,
-  reasoningOutputTokens: record.reasoning_output_tokens,
-  totalTokens: record.total_tokens,
-  observedAt: record.observed_at,
-  recordedAt: record.recorded_at,
-});
-
-const organizationCostRecordJson = (record: OrganizationCostRecordRow) => ({
-  executionId: record.execution_id,
-  projectId: record.project_id,
-  runAttempt: record.run_attempt,
-  claimAttempt: record.claim_attempt,
-  workerId: record.worker_id,
-  claimedAt: record.claimed_at,
-  costKey: record.cost_key,
-  usageKey: record.usage_key,
-  sessionId: record.session_id,
-  scopeId: record.scope_id,
-  turnId: record.turn_id,
-  agentProvider: record.agent_provider,
-  modelProvider: record.model_provider,
-  model: record.model,
-  canonicalModel: record.canonical_model,
-  modelSource: record.model_source,
-  source: record.source,
-  costSource: "providerReported" as const,
-  amountUsdTicks: record.amount_usd_ticks,
-  observedAt: record.observed_at,
-  recordedAt: record.recorded_at,
-});
-
-export const organizationUsageRunJson = (
-  run: OrganizationUsageRunRow,
-  ledger: {
-    attempts?: RunExecutionAttemptRow[];
-    records?: OrganizationUsageRecordRow[];
-    costRecords?: OrganizationCostRecordRow[];
-    estimatedCostRecords?: ReturnType<typeof estimateOrganizationUsageCosts>;
-  } = {},
-) => ({
-  id: run.id,
-  projectId: run.project_id,
-  status: run.paused_at ? ("paused" as const) : run.status,
-  executionMetrics: parseUsageExecutionMetrics(run.execution_metrics_json),
-  claimedBy: run.claimed_by,
-  claimedAt: run.claimed_at,
-  claimAttempts: run.claim_attempts,
-  workerId: run.worker_id,
-  preferredProvider: run.preferred_agent_provider,
-  preferredModel: run.preferred_agent_model,
-  requestedProvider: run.requested_agent_provider,
-  requestedModel: run.requested_agent_model,
-  executionProvider: run.execution_provider,
-  executionModel: run.execution_model,
-  startedAt: run.started_at,
-  updatedAt: run.updated_at,
-  completedAt: run.completed_at,
-  executionAttempts: (ledger.attempts ?? []).map(usageExecutionAttemptJson),
-  usageRecords: (ledger.records ?? []).map(organizationUsageRecordJson),
-  costRecords: (ledger.costRecords ?? []).map(organizationCostRecordJson),
-  estimatedCostRecords: ledger.estimatedCostRecords ?? [],
-});
-
-export function projectUsageSummaryJson(
-  runs: readonly OrganizationUsageRunRow[],
-  totals: readonly ProjectUsageTotalRow[],
-  period: ProjectUsagePeriod,
-  generatedAt: number,
-) {
-  const totalsByRun = new Map<string, ProjectUsageTotalRow[]>();
-  for (const total of totals) {
-    const entries = totalsByRun.get(total.run_id) ?? [];
-    entries.push(total);
-    totalsByRun.set(total.run_id, entries);
-  }
-  return summarizeProjectUsage(
-    runs.map((run) => {
-      const runTotals = totalsByRun.get(run.id) ?? [];
-      return {
-        ...organizationUsageRunJson(run),
-        sourceCreatedAt: run.source_created_at,
-        createdByUserId: run.created_by_user_id,
-        createdByName: run.created_by_name,
-        agentId: run.agent_id,
-        agentName: run.agent_name,
-        hasUsageLedger: Boolean(run.has_usage_ledger),
-        usageRecords: runTotals.map((total) => ({
-              uncachedInputTokens: null,
-              cacheReadTokens: null,
-              cacheWriteTokens: null,
-              outputTokens: null,
-              totalTokens: total.total_tokens,
-              observedAt: total.observed_at,
-            })),
-      };
-    }),
-    period,
-    generatedAt,
-  );
-}
-
 const dashboardEventJson = (
   event: HuntEventRow,
   actorNames: ReadonlyMap<string, string> = new Map(),
@@ -4238,7 +3945,7 @@ const channelConversationNotificationJson = (
   createdAt: notification.created_at,
 });
 
-export const claimConversationJson = (
+const claimConversationJson = (
   messages: IssueMessageRow[],
   attachments: IssueAttachmentRow[] = [],
 ) => messages.map((message) => issueMessageJson(message, attachments));

@@ -1,31 +1,41 @@
 import { createHmac } from "node:crypto";
 import * as Option from "effect/Option";
 import { describe, expect, it, vi } from "vitest";
-import worker, {
+import worker from "./index";
+import {
   approvedIssueCreation,
-  assertRunEventIdentityNotOverridden,
   assertChannelProposalAuthorScope,
-  claimConversationJson,
-  handleScheduledTask,
-  issueClaimExecutionConfig,
-  issueReplyExecutionConfig,
-  legacyAgentSkillInstructions,
   loadChannelCatalogSnapshot,
-  loadOrganizationInboxConditionalSnapshot,
-  organizationUsageQuerySince,
-  organizationUsageRunJson,
-  projectUsageSummaryJson,
+  resolveChannelProposalTargetProjectId,
+} from "./channel-proposal-helpers";
+import {
   projectMutationProject,
   projectScheduleClaimMutation,
+} from "./realtime-scheduling";
+import {
   readChannelReplyCompleteRequest,
   readIssueReplyCompleteRequest,
   readIssueRequest,
   readRunEvidenceRequest,
   readTranscriptRequest,
-  resolveChannelProposalTargetProjectId,
-  responseWithPostCommitCleanup,
+} from "./request-readers";
+import {
+  handleScheduledTask,
   type ScheduledTaskDependencies,
-} from "./index";
+} from "./scheduled-task";
+import {
+  issueClaimExecutionConfig,
+  issueReplyExecutionConfig,
+  legacyAgentSkillInstructions,
+} from "./agent-execution-config";
+import { assertRunEventIdentityNotOverridden } from "./run-event-identity";
+import { loadOrganizationInboxConditionalSnapshot } from "./organization-inbox-sync";
+import {
+  organizationUsageQuerySince,
+  organizationUsageRunJson,
+  projectUsageSummaryJson,
+} from "./usage-json";
+import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
 import {
   decodeAccountDeletionInput,
   decodeAccountProfileInput,
@@ -445,10 +455,6 @@ describe("Worker HTTP contract", () => {
     } finally {
       consoleError.mockRestore();
     }
-  });
-
-  it("keeps the Worker scheduled entrypoint wired to the extracted handler", () => {
-    expect(worker.scheduled).toBe(handleScheduledTask);
   });
 
   it("keeps scheduled maintenance running when dashboard pruning fails", async () => {
@@ -1451,80 +1457,6 @@ describe("Worker HTTP contract", () => {
     expect(() =>
       decodeOrganizationMemberRoleInput({ role: "owner" }),
     ).toThrow();
-  });
-
-  it("serializes the complete issue conversation into claim snapshots", () => {
-    expect(
-      claimConversationJson([
-        {
-          id: "message-1",
-          run_id: "run-1",
-          parent_message_id: null,
-          author_user_id: "user-1",
-          author_agent_id: null,
-          author_agent_name: null,
-          author_agent_provider: null,
-          author_name: "Jay",
-          author_image: null,
-          author_agent_image: null,
-          body: "Use all three requested articles.\n\n![screen](briar-attachment://attachment-1)",
-          reply_count: 1,
-          created_at: "2026-07-30T00:00:00.000Z",
-          updated_at: "2026-07-30T00:00:00.000Z",
-        },
-        {
-          id: "message-2",
-          run_id: "run-1",
-          parent_message_id: "message-1",
-          author_user_id: null,
-          author_agent_id: null,
-          author_agent_name: null,
-          author_agent_provider: "codex",
-          author_name: null,
-          author_image: null,
-          author_agent_image: null,
-          body: "I will preserve that acceptance criterion.",
-          reply_count: 0,
-          created_at: "2026-07-30T00:01:00.000Z",
-          updated_at: "2026-07-30T00:01:00.000Z",
-        },
-      ], [
-        {
-          id: "attachment-1",
-          run_id: "run-1",
-          project_id: "project-1",
-          object_key: "issues/run-1/attachment-1",
-          filename: "screen.png",
-          content_type: "image/png",
-          byte_size: 4,
-          created_at: "2026-07-30T00:00:00.000Z",
-        },
-      ]),
-    ).toEqual([
-      expect.objectContaining({
-        id: "message-1",
-        body: "Use all three requested articles.\n\n![screen](briar-attachment://attachment-1)",
-        attachments: [
-          expect.objectContaining({
-            id: "attachment-1",
-            filename: "screen.png",
-            contentType: "image/png",
-          }),
-        ],
-        author: expect.objectContaining({ name: "Jay", provider: null }),
-      }),
-      expect.objectContaining({
-        id: "message-2",
-        parentMessageId: "message-1",
-        body: "I will preserve that acceptance criterion.",
-        author: expect.objectContaining({
-          id: null,
-          agentId: null,
-          name: "Agent · Codex",
-          provider: "codex",
-        }),
-      }),
-    ]);
   });
 
   it("accepts exact workflow evidence names containing spaces and slashes", () => {

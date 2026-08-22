@@ -12,7 +12,7 @@ import {
   updateSlackInstallationProject,
   upsertSlackInstallation,
 } from "./db";
-import { processSlackRevocationQueue } from "./index";
+import { processSlackRevocationQueue } from "./slack-revocations";
 import { encryptSlackToken } from "./slack";
 import {
   createIsolatedTestDatabase,

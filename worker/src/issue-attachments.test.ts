@@ -7,7 +7,7 @@ import {
   readIssueRequest,
   readIssueUpdateRequest,
   readRunEvidenceRequest,
-} from "./index";
+} from "./request-readers";
 
 const issueRequest = (
   file: File,

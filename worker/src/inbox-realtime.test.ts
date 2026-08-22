@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { flushOrganizationInboxRealtimeOutbox } from "./index";
+import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 describe("organization Inbox realtime outbox", () => {
