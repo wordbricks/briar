@@ -522,6 +522,57 @@ describe("Channels", () => {
       .toContain("@Honey 안녕");
   });
 
+  it("places the named Agent typing state below the message attachments", async () => {
+    const trigger = message({
+      body: "@Honey 이미지 확인해줘",
+      attachments: [{
+        id: "channel-attachment",
+        filename: "screenshot.png",
+        contentType: "image/png",
+        byteSize: 5,
+        url: "/channels/channel-1/attachments/channel-attachment",
+      }],
+    });
+    await render([trigger]);
+    loadChannelDelta.mockResolvedValueOnce({
+      cursor: 8,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [{
+        id: "reply-1",
+        agentId: agent.agentId,
+        channelId: channel.id,
+        triggerMessageId: trigger.id,
+        parentMessageId: trigger.id,
+        replyMessageId: "agent-message-1",
+        status: "running",
+        attempts: 1,
+        error: null,
+        createdAt: "2026-08-01T01:00:01.000Z",
+        updatedAt: "2026-08-01T01:00:02.000Z",
+      }],
+    });
+
+    await act(async () => {
+      emitChannelChange(8);
+      await Promise.resolve();
+    });
+
+    const bubble = container.querySelector(
+      '[data-channel-message-id="message-1"]',
+    );
+    expect(bubble).not.toBeNull();
+    expect(bubble?.querySelector(".channel-message-images")).not.toBeNull();
+    const typing = bubble?.querySelector(".channel-typing");
+    expect(typing).not.toBeNull();
+    expect(typing?.textContent).toContain("Honey님이 답변을 작성하고 있습니다");
+    expect(bubble?.querySelector(".channel-typing ~ .channel-message-images"))
+      .toBeNull();
+  });
+
   it("places the named Agent typing state above the thread composer", async () => {
     const trigger = message({
       id: "thread-root",
