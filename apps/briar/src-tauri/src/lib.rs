@@ -11046,9 +11046,8 @@ branch refs/heads/briar/second-11111111
         let home = std::env::temp_dir().join(format!("briar-health-test-{unique}"));
         let resources = home.join("missing-resources");
         let config_path = home.join(".config/briar/config.json");
-        let repository = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .expect("workspace root should exist")
+        let repository = git_repository_root(Path::new(env!("CARGO_MANIFEST_DIR")))
+            .expect("workspace should be a git repository")
             .to_string_lossy()
             .into_owned();
         install_auto_hunt_assets(&resources, &home).expect("assets should install");
