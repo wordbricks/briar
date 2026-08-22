@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.148",
+        date: "2026년 8월 22일",
+        title: "조직 DM과 Agent 답글을 하나의 대화 흐름으로 연결합니다",
+        summary:
+          "DM Agent의 프로젝트 맥락을 더 선명하게 보여주고, 일반 채널과 DM의 Agent 답글을 main timeline에 맞춰 이전 대화와 자연스럽게 이어집니다.",
+        items: [
+          "DM 수신자 검색과 목록에서 Agent가 연결된 프로젝트 이름을 함께 보여주고 프로젝트 이름으로도 빠르게 찾을 수 있습니다.",
+          "일반 채널과 DM의 Agent 답글을 트리거 메시지와 같은 main timeline에 기록하고, 명시적인 thread 답글만 해당 thread 안에 유지합니다.",
+          "기존에 잘못된 위치에 저장된 완료된 Agent 답글을 트리거 메시지의 timeline 규칙에 맞게 자동으로 보정하는 D1 마이그레이션을 추가합니다.",
+          "채널 답글 실행과 legacy 데이터 보정이 중복 적용되어도 안전하도록 Worker·D1 회귀 테스트를 보강합니다.",
+        ],
+      },
+      {
         version: "1.2.147",
         date: "2026년 8월 22일",
         title: "조직 협업과 관리형 컴퓨터 파일럿을 더 안전하게 확장합니다",
@@ -948,6 +961,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.148",
+        date: "August 22, 2026",
+        title: "Connect organization DMs and Agent replies into one conversation flow",
+        summary:
+          "Show clearer project context for DM Agents and align Agent replies in ordinary channels and DMs with the main timeline so existing conversations continue naturally.",
+        items: [
+          "Show each Agent's connected project name in the DM recipient search and list, and let people find an Agent by project name.",
+          "Write Agent replies for ordinary channels and DMs to the main timeline beside their trigger message, while keeping only explicit thread replies inside that thread.",
+          "Add a D1 migration that repairs completed legacy Agent replies to follow the timeline rule derived from their trigger message.",
+          "Expand Worker and D1 regression coverage so channel reply completion and legacy data repair remain safe when applied repeatedly.",
+        ],
+      },
       {
         version: "1.2.147",
         date: "August 22, 2026",
@@ -1958,7 +1984,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-147">
+          <a href="#v1-2-148">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -1980,7 +2006,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.147"
+                      entry.version === "1.2.148"
+                        ? "2026-08-22"
+                        : entry.version === "1.2.147"
                         ? "2026-08-22"
                         : entry.version === "1.2.146"
                         ? "2026-08-21"
