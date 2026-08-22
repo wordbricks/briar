@@ -9,7 +9,8 @@ import {
   projectAgentSkillsValid,
 } from "./ProjectAgentSkillsEditor";
 import {
-  agentSkillInstructionsMaxLength,
+  agentSkillBodyMaxLength,
+  agentSkillDescriptionMaxLength,
   agentSkillsMaxCount,
 } from "../lib/agent-limits";
 
@@ -44,7 +45,8 @@ describe("ProjectAgentSkillsEditor", () => {
       id: "skill-1",
       agentId: "agent-1",
       name: "Issue processing",
-      instructions: "Process queued issues.",
+      description: "Use for queued project issues.",
+      body: "Process queued issues.",
       provider: "codex" as const,
       model: "gpt-5.6-sol",
       effort: "high" as const,
@@ -58,7 +60,8 @@ describe("ProjectAgentSkillsEditor", () => {
       {
         id: "skill-1",
         name: "Issue processing",
-        instructions: "Process queued issues.",
+        description: "Use for queued project issues.",
+        body: "Process queued issues.",
         provider: "codex",
         model: "gpt-5.6-sol",
         effort: "high",
@@ -85,7 +88,8 @@ describe("ProjectAgentSkillsEditor", () => {
             {
               id: "skill-1",
               name: "이슈 처리",
-              instructions: "대기 이슈를 처리합니다.",
+              description: "대기 이슈를 처리할 때 사용합니다.",
+              body: "대기 이슈를 처리합니다.",
               provider: "codex",
               model: null,
               effort: null,
@@ -95,7 +99,8 @@ describe("ProjectAgentSkillsEditor", () => {
             {
               id: "skill-2",
               name: "데스크탑 릴리즈",
-              instructions: "데스크탑 앱을 릴리즈합니다.",
+              description: "데스크탑 앱을 릴리즈할 때 사용합니다.",
+              body: "데스크탑 앱을 릴리즈합니다.",
               provider: "claude",
               model: "sonnet",
               effort: "high",
@@ -145,7 +150,8 @@ describe("ProjectAgentSkillsEditor", () => {
             {
               id: "skill-1",
               name: "임시 스킬",
-              instructions: "삭제할 수 있습니다.",
+              description: "삭제 동작을 검증할 때 사용합니다.",
+              body: "삭제할 수 있습니다.",
               provider: "codex",
               model: null,
               effort: null,
@@ -165,11 +171,12 @@ describe("ProjectAgentSkillsEditor", () => {
     expect(onChange).toHaveBeenCalledWith([]);
   });
 
-  it("allows 20000-character instructions and rejects a sixth Skill", async () => {
+  it("enforces description/body limits and rejects a sixth Skill", async () => {
     const skills = Array.from({ length: agentSkillsMaxCount }, (_, index) => ({
       id: `skill-${index}`,
       name: `Skill ${index}`,
-      instructions: "x".repeat(agentSkillInstructionsMaxLength),
+      description: "x".repeat(agentSkillDescriptionMaxLength),
+      body: "x".repeat(agentSkillBodyMaxLength),
       provider: "codex" as const,
       model: null,
       effort: null,
@@ -205,8 +212,13 @@ describe("ProjectAgentSkillsEditor", () => {
     expect(addButton?.disabled).toBe(true);
     expect(
       container.querySelector<HTMLTextAreaElement>(
-        "#project-agent-skill-instructions-0",
+        "#project-agent-skill-body-0",
       )?.maxLength,
-    ).toBe(agentSkillInstructionsMaxLength);
+    ).toBe(agentSkillBodyMaxLength);
+    expect(
+      container.querySelector<HTMLTextAreaElement>(
+        "#project-agent-skill-description-0",
+      )?.maxLength,
+    ).toBe(agentSkillDescriptionMaxLength);
   });
 });

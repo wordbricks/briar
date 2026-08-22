@@ -30,6 +30,10 @@ describe("encrypted environment verification", () => {
         "SLACK_CLIENT_SECRET",
         "SLACK_SIGNING_SECRET",
         "SLACK_TOKEN_ENCRYPTION_KEY",
+        "MANAGED_COMPUTER_PROMOTION_CODE",
+        "MANAGED_COMPUTER_ENROLLMENT_SECRET",
+        "MANAGED_COMPUTER_AWS_ACCESS_KEY_ID",
+        "MANAGED_COMPUTER_AWS_SECRET_ACCESS_KEY",
       ]),
     );
     expect(encryptedEnvPolicies[".env.production"]?.optionalSecrets).toEqual(
@@ -39,6 +43,7 @@ describe("encrypted environment verification", () => {
         "GITHUB_APP_SLUG",
         "GITHUB_CALLBACK_ORIGIN",
         "GITHUB_WEBHOOK_SECRET",
+        "MANAGED_COMPUTER_AWS_SESSION_TOKEN",
       ]),
     );
   });

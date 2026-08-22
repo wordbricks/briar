@@ -123,7 +123,7 @@ export function ProjectAgentTaskDialog({
                 (skill) => skill.id === skillId,
               );
               setSelectedSkillId(skillId);
-              setRequest(nextSkill?.instructions ?? "");
+              setRequest(nextSkill?.body ?? "");
             }}
             options={(agent?.skills ?? []).map((skill) => ({
               label: skill.name,

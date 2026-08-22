@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  agentSkillInstructionsMaxLength,
+  agentSkillBodyMaxLength,
   agentSkillsMaxCount,
 } from "./agent-limits";
 import {
   agentTemplateMarkdownBody,
+  agentTemplateMarkdownDescription,
   backendArchitectAgentTemplate,
   contentCreatorAgentTemplate,
   devopsAutomatorAgentTemplate,
@@ -103,19 +104,20 @@ describe("project Agent templates", () => {
       );
       expect(template.skills).toHaveLength(1);
       expect(template.skills.length).toBeLessThanOrEqual(agentSkillsMaxCount);
-      expect(template.skills[0]?.instructions).toMatch(
+      expect(template.skills[0]?.body).toMatch(
         new RegExp(`^${heading}`, "u"),
       );
-      expect(template.skills[0]?.instructions).toHaveLength(instructionsLength);
-      expect(template.skills[0]?.instructions.length).toBeLessThanOrEqual(
-        agentSkillInstructionsMaxLength,
+      expect(template.skills[0]?.body).toHaveLength(instructionsLength);
+      expect(template.skills[0]?.body.length).toBeLessThanOrEqual(
+        agentSkillBodyMaxLength,
       );
+      expect(template.skills[0]?.description).not.toBe("");
       expect(projectAgentTemplateValidationErrors(template)).toEqual([]);
     },
   );
 
   it("keeps the Frontend Developer accessibility guidance", () => {
-    expect(frontendDeveloperAgentTemplate.skills[0]?.instructions).toContain(
+    expect(frontendDeveloperAgentTemplate.skills[0]?.body).toContain(
       "WCAG 2.1 AA guidelines",
     );
   });
@@ -132,6 +134,14 @@ describe("project Agent templates", () => {
     ).toBe("# Body\n\nText");
   });
 
+  it("reads the discovery description from source frontmatter", () => {
+    expect(
+      agentTemplateMarkdownDescription(
+        "---\nname: Example\ndescription: Use for examples.\n---\n\n# Body\n",
+      ),
+    ).toBe("Use for examples.");
+  });
+
   it("applies the final form runtime to every generated Skill", () => {
     expect(
       projectAgentTemplateSkillInputs(frontendDeveloperAgentTemplate, {
@@ -142,8 +152,9 @@ describe("project Agent templates", () => {
     ).toEqual([
       {
         name: "Frontend Development",
-        instructions:
-          frontendDeveloperAgentTemplate.skills[0]?.instructions,
+        description:
+          frontendDeveloperAgentTemplate.skills[0]?.description,
+        body: frontendDeveloperAgentTemplate.skills[0]?.body,
         kind: "custom",
         provider: "claude",
         model: "claude-sonnet-4-6",

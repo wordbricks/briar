@@ -18,7 +18,8 @@ describe("default project agent copy", () => {
     });
     expect(defaultProjectAgentSkillCopy("ko")).toEqual({
       name: "이슈 처리",
-      instructions: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
+      description: "프로젝트의 이슈를 구현하고 검증해야 할 때 사용합니다.",
+      body: "프로젝트의 개발과 코드 관련 작업을 책임집니다.",
     });
   });
 
@@ -51,7 +52,8 @@ describe("project agent skills", () => {
       ...issueSkill,
       id: "skill-release",
       name: "Desktop release",
-      instructions: "Publish the desktop app.",
+      description: "Use for desktop release requests.",
+      body: "Publish the desktop app.",
       provider: "claude" as const,
       model: "opus",
       effort: "high" as const,

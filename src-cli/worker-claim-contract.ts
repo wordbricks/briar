@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import {
   agentResponsibilityMaxLength,
+  agentSkillDescriptionMaxLength,
   agentSkillsMaxCount,
 } from "../src/lib/agent-limits";
 import { ModelEffort } from "../src/lib/agent-provider-contract";
@@ -171,16 +172,54 @@ export const WorkerBinding = Schema.Struct({
 export type WorkerBinding = typeof WorkerBinding.Type;
 export const decodeWorkerBinding = Schema.decodeUnknownSync(WorkerBinding);
 
-export const DetachedAgentSkill = Schema.Struct({
+const DetachedAgentSkillSource = Schema.Struct({
   id: Schema.NonEmptyString,
   name: Schema.NonEmptyString,
-  instructions: Schema.String,
+  description: Schema.optional(Schema.String),
+  body: Schema.optional(Schema.String),
+  instructions: Schema.optional(Schema.String),
   provider: AgentProviderSchema,
   model: Schema.NullOr(Schema.String),
   effort: Schema.NullOr(ModelEffort),
   kind: Schema.Literals(["issue_processing", "custom"]),
   position: NonNegativeInteger,
 });
+
+const DetachedAgentSkillType = Schema.Struct({
+  id: Schema.NonEmptyString,
+  name: Schema.NonEmptyString,
+  description: Schema.String,
+  body: Schema.String,
+  provider: AgentProviderSchema,
+  model: Schema.NullOr(Schema.String),
+  effort: Schema.NullOr(ModelEffort),
+  kind: Schema.Literals(["issue_processing", "custom"]),
+  position: NonNegativeInteger,
+});
+
+export const DetachedAgentSkill = DetachedAgentSkillSource.pipe(
+  Schema.decodeTo(
+    DetachedAgentSkillType,
+    SchemaTransformation.transform({
+      decode: ({ body, description, instructions, ...skill }) => {
+        const normalizedBody = body ?? instructions ?? "";
+        return {
+          ...skill,
+          description: description ||
+            normalizedBody.replace(/\s+/gu, " ").trim().slice(
+              0,
+              agentSkillDescriptionMaxLength,
+            ) || skill.name,
+          body: normalizedBody,
+        };
+      },
+      encode: (skill) => ({
+        ...skill,
+        instructions: undefined,
+      }),
+    }),
+  ),
+);
 export type DetachedAgentSkill = typeof DetachedAgentSkill.Type;
 export const decodeDetachedAgentSkillsOption = Schema.decodeUnknownOption(
   mutableArray(DetachedAgentSkill),

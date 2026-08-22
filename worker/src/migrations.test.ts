@@ -3780,6 +3780,95 @@ describe("D1 migrations", () => {
     }
   });
 
+  it("separates Agent Skill descriptions from their Markdown bodies", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-agent-skill-document-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await executeD1Sql(
+        db,
+        `create table briar_agent_skills (
+           id text primary key not null,
+           name text not null,
+           instructions text not null default ''
+             check (length(instructions) <= 20000)
+         );
+         create trigger test_agent_skill_body_update
+         after update of instructions on briar_agent_skills
+         begin
+           select new.instructions;
+         end;
+         insert into briar_agent_skills (id, name, instructions)
+         values ('existing-skill', 'Release', 'Publish and verify the release.');
+         insert into briar_agent_skills (id, name, instructions)
+         values (
+           'frontmatter-skill',
+           'iOS release',
+           '---' || char(10) ||
+           'name: ios-release' || char(10) ||
+           'description: >-' || char(10) ||
+           '  Use for TestFlight and iOS release' || char(10) ||
+           '  requests.' || char(10) ||
+           '---' || char(10) || char(10) ||
+           'Verify signing and upload the build.'
+         );`,
+      );
+      await executeD1Sql(
+        db,
+        await readFile(
+          resolve("migrations", "0128_agent_skill_documents.sql"),
+          "utf8",
+        ),
+      );
+
+      expect(await db.prepare(
+        `select name, description, body
+         from briar_agent_skills where id = 'existing-skill'`,
+      ).first()).toEqual({
+        name: "Release",
+        description: "Publish and verify the release.",
+        body: "Publish and verify the release.",
+      });
+      expect(await db.prepare(
+        `select name, description, body
+         from briar_agent_skills where id = 'frontmatter-skill'`,
+      ).first()).toEqual({
+        name: "iOS release",
+        description: "Use for TestFlight and iOS release requests.",
+        body: "Verify signing and upload the build.",
+      });
+      const columns = await db.prepare(
+        `select name from pragma_table_info('briar_agent_skills') order by cid`,
+      ).all<{ name: string }>();
+      expect(columns.results.map((column) => column.name)).toEqual([
+        "id",
+        "name",
+        "body",
+        "description",
+      ]);
+      expect(await db.prepare(
+        `select sql from sqlite_schema
+         where type = 'trigger' and name = 'test_agent_skill_body_update'`,
+      ).first<{ sql: string }>()).toMatchObject({
+        sql: expect.stringContaining("new.body"),
+      });
+      await db.prepare(
+        `update briar_agent_skills set body = ?, description = ? where id = ?`,
+      ).bind("b".repeat(20_000), "d".repeat(1_000), "existing-skill").run();
+      await expect(db.prepare(
+        `update briar_agent_skills set body = ? where id = ?`,
+      ).bind("b".repeat(20_001), "existing-skill").run()).rejects.toThrow();
+      await expect(db.prepare(
+        `update briar_agent_skills set description = ? where id = ?`,
+      ).bind("d".repeat(1_001), "existing-skill").run()).rejects.toThrow();
+    } finally {
+      await miniflare.dispose();
+    }
+  });
+
   it("expands Agent limits without losing linked rows", async () => {
     const miniflare = new Miniflare({
       modules: true,

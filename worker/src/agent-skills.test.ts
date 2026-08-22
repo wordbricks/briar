@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   AgentSkillConflictError,
   agentSkillConflictMessage,
-  agentSkillForMessage,
   agentSkillJson,
   issueProcessingAgentSkillRow,
   listAgentSkills,
@@ -11,7 +10,8 @@ import {
   type AgentSkillRow,
 } from "./agent-skills";
 import {
-  agentSkillInstructionsMaxLength,
+  agentSkillBodyMaxLength,
+  agentSkillDescriptionMaxLength,
   agentSkillsMaxCount,
 } from "../../src/lib/agent-limits";
 
@@ -21,7 +21,8 @@ const skill = (
   id: input.id,
   agent_id: input.agent_id ?? "agent-1",
   name: input.name,
-  instructions: input.instructions ?? `${input.name} instructions`,
+  description: input.description ?? `Use for ${input.name} requests.`,
+  body: input.body ?? `${input.name} body`,
   provider: input.provider ?? "codex",
   model: input.model ?? null,
   effort: input.effort ?? null,
@@ -32,21 +33,12 @@ const skill = (
   updated_at: "2026-08-09T00:00:00.000Z",
 });
 
-describe("Agent Skill selection", () => {
+describe("Agent Skills", () => {
   const skills = [
     skill({ id: "default", name: "Issue processing", is_default: 1 }),
     skill({ id: "release", name: "Release" }),
     skill({ id: "ios-release", name: "iOS release" }),
   ];
-
-  it("selects the most specific Skill named in a channel invocation", () => {
-    expect(agentSkillForMessage(skills, "@developer please run iOS RELEASE"))
-      .toMatchObject({ id: "ios-release" });
-  });
-
-  it("does not choose a Skill when the invocation names none", () => {
-    expect(agentSkillForMessage(skills, "@developer can you help?")).toBeNull();
-  });
 
   it("keeps the deprecated default marker for older Workers", () => {
     expect(agentSkillJson(skill({ id: "release", name: "Release" })))
@@ -101,7 +93,8 @@ describe("Agent Skill selection", () => {
 describe("Agent Skill normalization", () => {
   const fallback = {
     name: "Developer",
-    instructions: "Handle project work.",
+    description: "Use for project work.",
+    body: "Handle project work.",
     provider: "codex" as const,
     model: null,
     effort: null,
@@ -120,7 +113,8 @@ describe("Agent Skill normalization", () => {
       expect.objectContaining({
         agent_id: "agent-1",
         name: "Developer",
-        instructions: "Handle project work.",
+        description: "Use for project work.",
+        body: "Handle project work.",
         is_default: 0,
       }),
     ]);
@@ -137,12 +131,13 @@ describe("Agent Skill normalization", () => {
     ).toEqual([]);
   });
 
-  it("accepts five Skills with 20000-character instructions", () => {
+  it("accepts five Skills at the description/body limits", () => {
     const rows = normalizedAgentSkillRows(
       "agent-1",
       Array.from({ length: agentSkillsMaxCount }, (_, index) => ({
         name: `Skill ${index}`,
-        instructions: "x".repeat(agentSkillInstructionsMaxLength),
+        description: "x".repeat(agentSkillDescriptionMaxLength),
+        body: "x".repeat(agentSkillBodyMaxLength),
         provider: "codex" as const,
         model: null,
         effort: null,
@@ -154,13 +149,15 @@ describe("Agent Skill normalization", () => {
     );
 
     expect(rows).toHaveLength(agentSkillsMaxCount);
-    expect(rows[0]?.instructions).toHaveLength(agentSkillInstructionsMaxLength);
+    expect(rows[0]?.description).toHaveLength(agentSkillDescriptionMaxLength);
+    expect(rows[0]?.body).toHaveLength(agentSkillBodyMaxLength);
   });
 
-  it("rejects a sixth Skill and instructions longer than 20000 characters", () => {
+  it("rejects a sixth Skill and document fields above their limits", () => {
     const input = (index: number) => ({
       name: `Skill ${index}`,
-      instructions: "instructions",
+      description: "Use for test requests.",
+      body: "instructions",
       provider: "codex" as const,
       model: null,
       effort: null,
@@ -178,11 +175,20 @@ describe("Agent Skill normalization", () => {
       "agent-1",
       [{
         ...input(0),
-        instructions: "x".repeat(agentSkillInstructionsMaxLength + 1),
+        body: "x".repeat(agentSkillBodyMaxLength + 1),
       }],
       fallback,
       "2026-08-10T00:00:00.000Z",
-    )).toThrow("cannot exceed 20000 characters");
+    )).toThrow("must contain 1 to 20000 characters");
+    expect(() => normalizedAgentSkillRows(
+      "agent-1",
+      [{
+        ...input(0),
+        description: "x".repeat(agentSkillDescriptionMaxLength + 1),
+      }],
+      fallback,
+      "2026-08-10T00:00:00.000Z",
+    )).toThrow("must contain 1 to 1000 characters");
   });
 });
 

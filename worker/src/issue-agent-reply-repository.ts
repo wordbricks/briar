@@ -121,7 +121,7 @@ export async function enqueueIssueAgentReply(
               case when selected_skill.id is null then null else agent.name end,
               case when selected_skill.id is null then null
                 else agent.responsibility end,
-              selected_skill.name, selected_skill.instructions,
+              selected_skill.name, selected_skill.body,
               selected_skill.kind,
               selected_skill.provider, selected_skill.model,
               selected_skill.effort,
@@ -311,7 +311,7 @@ export async function claimNextIssueAgentReply(
                and selected_agent.responsibility =
                  job.selected_agent_responsibility_snapshot
                and selected_skill.name = job.selected_skill_name_snapshot
-               and selected_skill.instructions =
+               and selected_skill.body =
                  job.selected_skill_instructions_snapshot
                and selected_skill.kind = job.selected_skill_kind_snapshot
                and selected_skill.provider = job.selected_skill_provider_snapshot
