@@ -77,7 +77,9 @@ final class BriarCompanionUITests: XCTestCase {
         let settings = app.buttons["Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.tap()
-        XCTAssertTrue(app.navigationBars["Companion settings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.navigationBars["Companion settings"].waitForExistence(timeout: transitionTimeout)
+        )
         XCTAssertTrue(app.staticTexts["Appearance"].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-english-settings")
     }
@@ -127,7 +129,7 @@ final class BriarCompanionUITests: XCTestCase {
         let channel = app.buttons[
             "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
         ]
-        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        XCTAssertTrue(channel.waitForExistence(timeout: transitionTimeout))
         channel.tap()
 
         let navigationBar = app.navigationBars["design"]
@@ -142,7 +144,7 @@ final class BriarCompanionUITests: XCTestCase {
         let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.5))
         let destination = app.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5))
         edge.press(forDuration: 0.05, thenDragTo: destination)
-        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        XCTAssertTrue(channel.waitForExistence(timeout: transitionTimeout))
 
         channel.tap()
         let cachedMessage = app.descendants(matching: .any)[
@@ -161,7 +163,7 @@ final class BriarCompanionUITests: XCTestCase {
         let channel = app.buttons[
             "channel-row-cccccccc-cccc-4ccc-8ccc-cccccccccccc"
         ]
-        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        XCTAssertTrue(channel.waitForExistence(timeout: transitionTimeout))
         channel.tap()
 
         let spinner = app.descendants(matching: .any)["channel-message-loading-spinner"]
