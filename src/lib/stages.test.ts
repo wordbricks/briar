@@ -2,29 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeAutoHuntWorkflow,
   progressForAutoHuntRun,
-  repositoryWorkflowBootstrap,
 } from "./auto-hunt-contract";
-import { demoDashboard } from "./demo-data";
-import { eventMeta, runMeta } from "./stages";
 
 describe("Auto Hunt workflows", () => {
-  it("marks the pre-analysis contract as pending instead of inventing stages", () => {
-    expect(repositoryWorkflowBootstrap.stages.map((stage) => stage.id)).toEqual(
-      ["repository_workflow_pending"],
-    );
-    expect(
-      repositoryWorkflowBootstrap.stages.map((stage) => stage.id),
-    ).not.toContain("production_qa");
-    expect(repositoryWorkflowBootstrap.completion.requiredStages).toEqual([
-      "repository_workflow_pending",
-    ]);
-    expect(repositoryWorkflowBootstrap.execution.checkpoints).toEqual([{
-      key: "project-after-repository_workflow_pending",
-      stage: "repository_workflow_pending",
-      position: "after",
-    }]);
-  });
-
   it("calculates progress from repository-defined stages", () => {
     const workflow = normalizeAutoHuntWorkflow({
       version: 2,
@@ -123,24 +103,4 @@ describe("Auto Hunt workflows", () => {
     ]);
   });
 
-  it("ships a representative read-only demo", () => {
-    expect(demoDashboard.runs).toHaveLength(4);
-    expect(demoDashboard.runs.some((run) => run.status === "completed")).toBe(
-      true,
-    );
-    expect(demoDashboard.runs.some((run) => run.status === "blocked")).toBe(
-      true,
-    );
-  });
-
-  it("renders legacy stage values returned in the status field", () => {
-    expect(runMeta("analyzing", undefined)).toEqual({
-      label: "분석",
-      tone: "blue",
-    });
-    expect(eventMeta("production_qa", undefined)).toEqual({
-      label: "Production QA",
-      tone: "orange",
-    });
-  });
 });

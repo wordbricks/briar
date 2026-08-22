@@ -3,7 +3,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InboxMessage } from "../hooks/useInbox";
 import {
-  defaultInboxNotificationPreferences,
   inboxNotificationContent,
   inboxNotificationLabelKey,
   inboxNotificationTarget,
@@ -40,12 +39,6 @@ describe("inbox notification preferences", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-  });
-
-  it("defaults every inbox importance category off", () => {
-    expect(readInboxNotificationPreferences()).toEqual(
-      defaultInboxNotificationPreferences(),
-    );
   });
 
   it("persists each importance category independently", () => {

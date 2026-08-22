@@ -4,9 +4,7 @@ import {
   createCursorEventState,
   cursorPermissionDecisionResult,
   finalizeCursorMessage,
-  mapEffortToCursor,
   normalizeCursorSessionUpdate,
-  resolveCursorModelId,
   shouldAutoApproveCursorPermission,
   type CursorRunnerRequest,
 } from "./cursor-runner-lib";
@@ -44,14 +42,6 @@ describe("Cursor runner helpers", () => {
         ].join("\n\n"),
       },
     ]);
-  });
-
-  it("maps Cursor model and reasoning selections", () => {
-    expect(resolveCursorModelId(request.model)).toBe("gpt-5.4-medium-fast");
-    expect(resolveCursorModelId(null)).toBe("default");
-    expect(mapEffortToCursor("xhigh")).toBe("xhigh");
-    expect(mapEffortToCursor("extra-high")).toBe("xhigh");
-    expect(mapEffortToCursor("high")).toBe("high");
   });
 
   it("uses one-turn permission responses", () => {

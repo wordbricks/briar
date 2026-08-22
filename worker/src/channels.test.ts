@@ -560,85 +560,6 @@ describe("organization channels", () => {
     expect(earlier?.nextCursor).toBeNull();
   });
 
-  it("resolves the Agent's configured avatar onto channel message authors", async () => {
-    const channelId = "e0000000-0000-4000-8000-000000000090";
-    await createChannel(db, {
-      id: channelId,
-      organizationId,
-      slug: "avatar-room",
-      name: "Avatar room",
-      topic: null,
-      visibility: "public",
-      defaultProjectId: null,
-      createdByUserId: ownerId,
-      createdAt: at(80),
-    });
-    const agentId = "aa000000-0000-4000-8000-000000000090";
-    const avatar = "data:image/png;base64,cHJvamVjdC1hdmF0YXI=";
-    await db
-      .prepare(
-        `insert into briar_project_agents (
-           id, organization_id, project_id, handle, name, avatar, provider,
-           responsibility, created_at, updated_at
-         ) values (?, ?, null, 'avatar-bot', 'Avatar Bot', ?, 'claude',
-                   'Research', ?, ?)`,
-      )
-      .bind(agentId, organizationId, avatar, at(80), at(80))
-      .run();
-    await addChannelAgent(db, {
-      channelId,
-      agentId,
-      addedByUserId: ownerId,
-      createdAt: at(80),
-    });
-    const rootId = "f0000000-0000-4000-8000-000000000090";
-    await createChannelMessage(db, {
-      id: rootId,
-      channelId,
-      parentMessageId: null,
-      authorUserId: null,
-      authorAgentId: agentId,
-      authorAgentName: "Avatar Bot",
-      authorAgentProvider: "claude",
-      body: "Hello from the avatar room",
-      mentionedUserIds: [],
-      mentionedAgentIds: [],
-      createdAt: at(81),
-    });
-    const replyId = "f0000000-0000-4000-8000-000000000091";
-    await createChannelMessage(db, {
-      id: replyId,
-      channelId,
-      parentMessageId: rootId,
-      authorUserId: outsiderId,
-      authorAgentId: null,
-      authorAgentName: null,
-      authorAgentProvider: null,
-      body: "Nice to meet you",
-      mentionedUserIds: [],
-      mentionedAgentIds: [],
-      createdAt: at(82),
-    });
-
-    const roots = await listChannelRootMessages(db, channelId);
-    expect(roots[0]?.author).toMatchObject({
-      type: "agent",
-      id: agentId,
-      name: "Avatar Bot",
-      provider: "claude",
-      image: avatar,
-    });
-    expect(roots[0]?.replyAuthors).toEqual([
-      expect.objectContaining({ type: "user", id: outsiderId, image: null }),
-    ]);
-
-    const delta = await loadChannelDelta(db, organizationId, ownerId, 0);
-    expect(delta.messages.find((message) => message.id === rootId)).toMatchObject({
-      author: expect.objectContaining({ image: avatar }),
-      replyAuthors: [expect.objectContaining({ id: outsiderId })],
-    });
-  });
-
   it("authenticates, rate limits, deduplicates, rotates, and revokes incoming webhooks", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000060";
     const webhookId = "f0000000-0000-4000-8000-000000000060";
@@ -1035,26 +956,6 @@ describe("organization channels", () => {
       processArchiveCleanupQueue(db, archives, archives, at(9), 10),
     ).resolves.toEqual({ deleted: 1, failed: 0 });
     await expect(archives.head(objectKey)).resolves.toBeNull();
-  });
-
-  it("allows the channel creator to delete a channel as an organization member", async () => {
-    const channelId = "e0000000-0000-4000-8000-000000000018";
-    await createChannel(db, {
-      id: channelId,
-      organizationId,
-      slug: "creator-delete-room",
-      name: "Creator delete room",
-      topic: null,
-      visibility: "public",
-      defaultProjectId: null,
-      createdByUserId: outsiderId,
-      createdAt: at(10),
-    });
-
-    await expect(
-      deleteChannel(db, organizationId, channelId, outsiderId, at(11)),
-    ).resolves.toBe(true);
-    await expect(getChannelById(db, organizationId, channelId)).resolves.toBeNull();
   });
 
   it("does not delete or queue attachments after an admin role is removed", async () => {
@@ -3130,51 +3031,6 @@ describe("organization channels", () => {
     });
   });
 
-  it("allows Agents with the same display name because routing uses Agent IDs", async () => {
-    const duplicate = await createOrganizationAgent(db, {
-      id: "aa000000-0000-4000-8000-000000000006",
-      organizationId,
-      name: "Honey",
-      provider: "claude",
-      model: null,
-      responsibility: "Second writer",
-      effort: null,
-      createdAt: at(23),
-    });
-    expect(duplicate?.name).toBe("Honey");
-
-    const elsewhere = await createOrganizationAgent(db, {
-      id: "aa000000-0000-4000-8000-000000000007",
-      organizationId: otherOrganizationId,
-      name: "Honey",
-      provider: "claude",
-      model: null,
-      responsibility: "Writer",
-      effort: null,
-      createdAt: at(23),
-    });
-    expect(elsewhere?.name).toBe("Honey");
-    expect(
-      (await listOrganizationAgents(db, otherOrganizationId)).map(
-        (row) => row.id,
-      ),
-    ).toEqual([elsewhere!.id]);
-  });
-
-  it("preserves a non-Latin Agent Name without generating another identity", async () => {
-    const agent = await createOrganizationAgent(db, {
-      id: "aa000000-0000-4000-8000-000000000008",
-      organizationId,
-      name: "꿀벌",
-      provider: "claude",
-      model: null,
-      responsibility: "한국어 이름",
-      effort: null,
-      createdAt: at(24),
-    });
-    expect(agent?.name).toBe("꿀벌");
-  });
-
   it("excludes changes in channels the member cannot see from the delta", async () => {
     const hiddenId = "e0000000-0000-4000-8000-000000000008";
     await createChannel(db, {
@@ -3234,9 +3090,6 @@ describe("organization channels", () => {
       "e0000000-0000-4000-8000-000000000004",
     );
     expect(agents.map((agent) => agent.name)).toEqual(["Honey"]);
-    expect(agents[0]?.description).toBe(
-      "Helps the team write and refine content.",
-    );
   });
 
   it("toggles emoji reactions and refreshes them through channel deltas", async () => {

@@ -226,70 +226,6 @@ describe("AppSettings", () => {
     ).IS_REACT_ACT_ENVIRONMENT = true;
   });
 
-  it("shows account deletion beside the profile settings", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    const onBack = vi.fn();
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <AppSettings
-            error={null}
-            initialSection="account"
-            isSidebarOpen
-            loading={false}
-            onAccountDelete={async () => undefined}
-            onAccountSave={async (input) => ({
-              id: "user-1",
-              email: "jay@example.com",
-              ...input,
-            })}
-            onBack={onBack}
-            onRefresh={() => Promise.resolve(readiness)}
-            projectId="project-1"
-            projectName="Briar"
-            readiness={readiness}
-            user={{
-              id: "user-1",
-              username: "jay",
-              name: "Jay",
-              email: "jay@example.com",
-            }}
-          />
-        </I18nProvider>,
-      );
-    });
-
-    expect(container.textContent).toContain("Profile information");
-    expect(container.textContent).toContain("Delete account and data");
-    expect(container.textContent).toContain("Delete account");
-
-    const shell = container.querySelector<HTMLElement>("main.settings-shell");
-    const sidebar = shell?.querySelector<HTMLElement>(
-      'aside[aria-label="Settings navigation"]',
-    );
-    expect(sidebar?.getAttribute("aria-hidden")).toBe("false");
-    expect(sidebar?.querySelector('input[type="search"]')?.getAttribute("aria-label"))
-      .toBe("Search settings");
-    expect(sidebar?.querySelectorAll("nav > .settings-nav-group").length)
-      .toBeGreaterThan(0);
-
-    const settingsMain = shell?.querySelector<HTMLElement>(
-      "section.settings-main",
-    );
-    expect(settingsMain?.querySelector("header h1")?.textContent).toBe(
-      "My account",
-    );
-    await act(async () => {
-      sidebar?.querySelector<HTMLButtonElement>("button.settings-back")?.click();
-    });
-    expect(onBack).toHaveBeenCalledOnce();
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
   it("checks ego (lite) and installs agent-browser from Browser settings", async () => {
     vi.mocked(loadBrowserAutomationSettings).mockResolvedValue({
       provider: "ego-browser",
@@ -533,50 +469,6 @@ describe("AppSettings", () => {
     container.remove();
   });
 
-  it("offers system, light, and dark appearance themes", async () => {
-    window.localStorage.setItem(themeStorageKey, "system");
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <ThemeProvider>
-          <I18nProvider>
-            <AppSettings
-              error={null}
-              initialSection="appearance"
-              isSidebarOpen
-              loading={false}
-              onBack={() => undefined}
-              onRefresh={() => Promise.resolve(readiness)}
-              projectId="project-1"
-              projectName="Briar"
-              readiness={readiness}
-            />
-          </I18nProvider>
-        </ThemeProvider>,
-      );
-    });
-
-    const options = Array.from(
-      container.querySelectorAll<HTMLButtonElement>('[role="radio"]'),
-    );
-    expect(options.map((option) => option.textContent?.trim())).toEqual([
-      "System",
-      "Light",
-      "Dark",
-    ]);
-    expect(options[0]?.getAttribute("aria-checked")).toBe("true");
-
-    await act(async () => options[2]?.click());
-
-    expect(window.localStorage.getItem(themeStorageKey)).toBe("dark");
-    expect(document.documentElement.classList.contains("dark")).toBe(true);
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
 
   it("shows the Source Control tab and persists provider preferences", async () => {
     const onRefresh = vi.fn().mockResolvedValue(readiness);

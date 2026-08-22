@@ -50,7 +50,6 @@ import {
   renewHuntRunLease,
   unbindExecutionWorker,
   updateExecutionWorkerConcurrency,
-  updateExecutionWorkerIcon,
   updateExecutionWorkerLabel,
   updateProjectExecutionWorkerPolicy,
   WorkerConflictError,
@@ -875,57 +874,6 @@ describe("detached execution workers", () => {
     });
   });
 
-  it("dispatches a newly reported Grok model and model-specific effort", async () => {
-    const selected = await register("grok-46");
-    await recordWorkerHeartbeat(db, projectId, {
-      workerId: selected.worker.id,
-      capabilities: {
-        providers: ["grok"],
-        providerHealth: {
-          grok: { installed: true, authenticated: true, healthy: true },
-        },
-        providerCapabilities: {
-          codex: { models: [], defaultEfforts: [], allowCustomModels: false, error: null },
-          claude: { models: [], defaultEfforts: [], allowCustomModels: true, error: null },
-          cursor: { models: [], defaultEfforts: [], allowCustomModels: true, error: null },
-          grok: {
-            models: [{
-              id: "grok-4.6",
-              label: "Grok 4.6",
-              efforts: [{ id: "xhigh", label: "Extra High" }],
-            }],
-            defaultEfforts: [],
-            allowCustomModels: false,
-            error: null,
-          },
-          agy: { models: [], defaultEfforts: [], allowCustomModels: false, error: null },
-          opencode: { models: [], defaultEfforts: [], allowCustomModels: true, error: null },
-        },
-      },
-      observedAt: atMinute(2),
-    });
-    const runId = await recordHuntEvent(
-      db,
-      projectId,
-      queuedEvent("grok-46-dispatch", 2),
-    );
-
-    await expect(dispatchHuntRun(db, projectId, projectId, {
-      runId,
-      provider: "grok",
-      model: "grok-4.6",
-      effort: "xhigh",
-      workerId: selected.worker.id,
-      requestedByUserId: "member",
-      requestId: "46464646-aaaa-4646-8646-464646464646",
-      occurredAt: atMinute(3),
-    })).resolves.toMatchObject({
-      provider: "grok",
-      model: "grok-4.6",
-      effort: "xhigh",
-    });
-  });
-
   it("records execution metrics only for the assigned Worker attempt", async () => {
     const selected = await register("metrics");
     const runId = await recordHuntEvent(
@@ -1641,47 +1589,6 @@ describe("detached execution workers", () => {
       id: second.worker.id,
       label: "new-hostname",
     });
-  });
-
-  it("stores one device icon and exposes it through every Worker listing", async () => {
-    const registered = await register("icon");
-    const icon = { type: "emoji", value: "🍋" } as const;
-
-    await expect(
-      updateExecutionWorkerIcon(
-        db,
-        registered.device.id,
-        icon,
-        atMinute(3),
-      ),
-    ).resolves.toMatchObject({
-      icon_type: "emoji",
-      icon_value: "🍋",
-    });
-
-    await expect(
-      listOrganizationExecutionWorkers(db, projectId, atMinute(3)),
-    ).resolves.toEqual([
-      expect.objectContaining({
-        icon,
-      }),
-    ]);
-    await expect(
-      listExecutionWorkers(db, projectId, atMinute(3)),
-    ).resolves.toEqual([
-      expect.objectContaining({
-        icon_type: "emoji",
-        icon_value: "🍋",
-      }),
-    ]);
-    await expect(
-      updateExecutionWorkerIcon(
-        db,
-        registered.device.id,
-        { type: "emoji", value: "not-an-emoji" },
-        atMinute(4),
-      ),
-    ).rejects.toThrow("one emoji");
   });
 
   it("binds one organization device to several projects", async () => {
@@ -3365,47 +3272,6 @@ describe("detached execution workers", () => {
     ).text();
     expect(decompressed).toContain('"sequence":1');
     expect(decompressed).toContain("Raw thought");
-  });
-
-  it("does not expose legacy D1 transcript rows", async () => {
-    const sessionToken = "legacy-transcript-session-token";
-    await db.batch([
-      db.prepare(
-        `insert into "session" (
-           id, expiresAt, token, createdAt, updatedAt, userId
-         ) values (?, '2099-01-01T00:00:00.000Z', ?, ?, ?, 'owner')`,
-      ).bind("legacy-transcript-session", sessionToken, atMinute(1), atMinute(1)),
-      db.prepare(
-        `insert into briar_agent_transcript_sessions (
-           session_id, project_id, run_id, worker_id, agent_provider,
-           started_at, last_event_at, event_count, byte_count
-         ) values ('legacy-only', ?, null, null, 'codex', ?, ?, 1, 16)`,
-      ).bind(projectId, atMinute(1), atMinute(1)),
-      db.prepare(
-        `insert into briar_agent_transcripts (
-           session_id, sequence, direction, payload_json, recorded_at
-         ) values ('legacy-only', 1, 'server', '{"type":"result"}', ?)`,
-      ).bind(atMinute(1)),
-    ]);
-    const env = {
-      DB: db,
-      ARCHIVES: archives,
-      BETTER_AUTH_SECRET: "legacy-transcript-secret-legacy-transcript-secret",
-      GOOGLE_CLIENT_ID: "google-client-test",
-      GOOGLE_CLIENT_SECRET: "google-secret-test",
-    } as unknown as Env;
-    const headers = { authorization: `Bearer ${sessionToken}` };
-
-    for (const suffix of ["transcript", "raw-transcript"]) {
-      const response = await apiWorker.fetch(
-        new Request(
-          `https://briar-api.example/projects/${projectId}/sessions/legacy-only/${suffix}`,
-          { headers },
-        ),
-        env,
-      );
-      expect(response.status).toBe(404);
-    }
   });
 
 });

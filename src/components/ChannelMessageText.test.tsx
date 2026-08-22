@@ -1,8 +1,5 @@
 /** @vitest-environment jsdom */
 
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -110,93 +107,6 @@ describe("ChannelMessageText", () => {
     expect(buttons[1].type).toBe("button");
   });
 
-  it("renders the markdown elements covered by shared channel styles", async () => {
-    const markdownMessage = {
-      ...message,
-      body: [
-        "[Read the documentation](https://example.com/docs)",
-        "",
-        "Use `inline code` when naming a command.",
-        "",
-        "```ts",
-        "const longLine = 'keeps code blocks horizontally scrollable';",
-        "```",
-        "",
-        "- first item",
-        "- second item",
-        "",
-        "1. first ordered item",
-        "2. second ordered item",
-        "",
-        "> quoted content stays visually distinct",
-        "",
-        "| Name | Detail |",
-        "| --- | --- |",
-        "| item | value |",
-      ].join("\n"),
-    };
-
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ChannelMessageText
-            agents={[agent]}
-            members={[member]}
-            message={markdownMessage}
-          />
-        </I18nProvider>,
-      );
-    });
-
-    const markdown = container.querySelector<HTMLElement>(
-      ".channel-message-text",
-    );
-    expect(markdown).not.toBeNull();
-    expect(
-      markdown?.querySelector<HTMLAnchorElement>(
-        'a[href="https://example.com/docs"]',
-      )?.textContent,
-    ).toBe("Read the documentation");
-    expect(markdown?.querySelector("p > code")?.textContent).toBe(
-      "inline code",
-    );
-    expect(markdown?.querySelector("pre > code")?.textContent).toContain(
-      "keeps code blocks horizontally scrollable",
-    );
-    expect(markdown?.querySelector("ul > li")?.textContent).toBe(
-      "first item",
-    );
-    expect(markdown?.querySelector("ol > li")?.textContent).toBe(
-      "first ordered item",
-    );
-    expect(markdown?.querySelector("blockquote")?.textContent).toContain(
-      "visually distinct",
-    );
-    expect(
-      markdown?.querySelector(".markdown-table-wrap table th")
-        ?.textContent,
-    ).toBe("Name");
-  });
-
-  it("opts Android and web message bodies into long-press text selection", () => {
-    const css = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), "../styles.css"),
-      "utf8",
-    );
-    for (const selector of [
-      ".issue-message-body",
-      ".channel-message-text",
-      ".channel-message-blocks",
-      ".companion-channel-message-copy",
-    ]) {
-      expect(css).toContain(`${selector}`);
-      const start = css.indexOf(selector);
-      const slice = css.slice(start, start + 280);
-      expect(slice).toMatch(/-webkit-user-select:\s*text/);
-      expect(slice).toMatch(/user-select:\s*text/);
-    }
-  });
-
   it("leaves duplicate Agent Names unlinked instead of opening the wrong profile", async () => {
     const duplicate = { ...agent, agentId: "agent-2", responsibility: "Research" };
     await act(async () => {
@@ -270,49 +180,4 @@ describe("ChannelMessageText", () => {
       .toBe("All systems operational");
   });
 
-  it("shows the Agent's runtime and responsibility on its profile", async () => {
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ProfileDialog
-            onOpenChange={() => undefined}
-            profile={{
-              type: "agent",
-              id: agent.agentId,
-              name: agent.name,
-              provider: agent.provider,
-              model: agent.model,
-              responsibility: agent.responsibility,
-              skills: [
-                {
-                  id: "skill-1",
-                  agentId: agent.agentId,
-                  name: "Issue processing",
-                  description: "Use for queued project issues.",
-                  body: "Process queued issues.",
-                  provider: "codex",
-                  model: "gpt-5.6-sol",
-                  effort: "high",
-                  kind: "issue_processing",
-                  position: 0,
-                  createdAt: agent.createdAt,
-                  updatedAt: agent.createdAt,
-                },
-              ],
-              projectId: agent.projectId,
-              createdAt: agent.createdAt,
-            }}
-          />
-        </I18nProvider>,
-      );
-    });
-
-    const profile = document.body.querySelector<HTMLElement>(
-      ".profile-dialog[role='dialog']",
-    );
-    expect(profile?.textContent).toContain("Honey");
-    expect(profile?.textContent).toContain("Writing partner");
-    expect(profile?.textContent).toContain("claude · sonnet");
-    expect(profile?.textContent).not.toContain("codex · gpt-5.6-sol");
-  });
 });

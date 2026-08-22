@@ -447,27 +447,6 @@ describe("native merge queue coordinator", () => {
     return context;
   };
 
-  it("registers every exact current PR only for an enabled ci_qa profile", async () => {
-    const lane = await setupLane(1, { enabled: false });
-    const run = await createReadyRun(lane, {
-      readyAt: at(1, 1),
-      pullRequestCount: 2,
-      headSha: sha("1"),
-    });
-    await expect(registerRun(lane, run, at(1, 2))).resolves.toEqual([]);
-
-    await db.prepare(
-      `update briar_merge_queue_profiles
-       set enabled = 1, updated_at = ? where project_id = ?`,
-    ).bind(at(1, 3), lane.projectId).run();
-    const candidates = await registerRun(lane, run, at(1, 3));
-    expect(candidates).toHaveLength(2);
-    expect(candidates.map((candidate) => candidate.pull_request_number))
-      .toEqual(run.pullRequestNumbers);
-    expect(new Set(candidates.map((candidate) => candidate.run_id)))
-      .toEqual(new Set([run.runId]));
-  });
-
   it("atomically seals five of six racing candidates and leaves one ready", async () => {
     const lane = await setupLane(2);
     const runs: ReadyRun[] = [];

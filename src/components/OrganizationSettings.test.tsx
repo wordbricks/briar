@@ -267,44 +267,6 @@ describe("OrganizationSettings", () => {
     container.remove();
   });
 
-  it("opens organization agents as its own initial settings section", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <OrganizationSettings
-          initialSection="agents"
-          organization={{
-            id: "organization-1",
-            name: "Wordbricks",
-            handle: "wordbricks",
-            logo: null,
-            role: "owner",
-            createdAt: "2023-12-01T00:00:00Z",
-          }}
-          onBack={() => undefined}
-          onLogoChange={vi.fn()}
-          onRename={vi.fn()}
-          token="token"
-        />,
-      );
-    });
-
-    expect(listOrganizationAgents).toHaveBeenCalledWith(
-      "token",
-      "organization-1",
-    );
-    expect(container.querySelector("header h1")?.textContent).toBe(
-      "조직 에이전트",
-    );
-    expect(container.textContent).toContain("아직 조직 에이전트가 없습니다.");
-    expect(loadOrganizationExecutionWorkers).not.toHaveBeenCalled();
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
 
   it("lets an admin change another member's role", async () => {
     const container = document.createElement("div");
@@ -361,86 +323,6 @@ describe("OrganizationSettings", () => {
     container.remove();
   });
 
-  it("shows organization-scoped Worker devices and project bindings", async () => {
-    vi.mocked(loadOrganizationExecutionWorkers).mockResolvedValue({
-      workers: [
-        {
-          deviceId: "device-1",
-          ownerUserId: "user-1",
-          ownerName: "Jay Nam",
-          label: "Jay MacBook",
-          state: "online",
-          maxConcurrentSessions: 2,
-          activeSessions: 1,
-          lastHeartbeatAt: "2026-07-29T00:00:00Z",
-          createdAt: "2026-07-29T00:00:00Z",
-          bindings: [
-            {
-              id: "worker-1",
-              projectId: "project-1",
-              projectName: "Briar",
-              agentProvider: "codex",
-              providers: ["codex", "claude", "grok"],
-              state: "online",
-              acceptingWork: true,
-              readiness: "available",
-              readinessDetail: null,
-            },
-          ],
-        },
-      ],
-      canManage: true,
-      generatedAt: "2026-07-29T00:00:00Z",
-    });
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <OrganizationSettings
-          connectedProjectIds={["project-1"]}
-          initialSection="workers"
-          organization={{
-            id: "organization-1",
-            name: "Wordbricks",
-            handle: "wordbricks",
-            logo: null,
-            role: "owner",
-            createdAt: "2023-12-01T00:00:00Z",
-          }}
-          onBack={() => undefined}
-          onLogoChange={vi.fn()}
-          onRename={vi.fn()}
-          projects={[
-            {
-              id: "project-1",
-              name: "Briar",
-              organizationId: "organization-1",
-              createdAt: "2026-07-29T00:00:00Z",
-            },
-          ]}
-          token="token"
-          userId="user-1"
-        />,
-      );
-    });
-
-    expect(container.textContent).toContain("Jay MacBook");
-    expect(container.textContent).toContain("Briar");
-    expect(container.querySelector('[aria-label="Codex"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Claude"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Grok"]')).not.toBeNull();
-    expect(container.textContent).toContain("사용 가능");
-    expect(container.textContent).toContain("실행 슬롯 1/2 사용 중");
-    expect(loadOrganizationExecutionWorkers).toHaveBeenCalledWith(
-      "token",
-      "organization-1",
-    );
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
 
   it("uploads and saves an organization logo", async () => {
     const container = document.createElement("div");

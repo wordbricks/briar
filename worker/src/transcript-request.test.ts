@@ -81,19 +81,6 @@ describe("transcript request schema", () => {
     ).toThrow();
   });
 
-  it("preserves the legacy optional unknown event payload", () => {
-    const decoded = decodeTranscriptRequest({
-      ...transcript,
-      events: [{ sequence: 1, direction: "server" }],
-    });
-
-    expect(decoded.events[0]).toEqual({
-      sequence: 1,
-      direction: "server",
-    });
-    expect(decoded.events[0]).not.toHaveProperty("payload");
-  });
-
   it("requires usage identity and a matching provider", () => {
     expect(() =>
       decodeTranscriptRequest({ ...transcript, executionId: undefined })

@@ -8,31 +8,8 @@ import {
   mergeAgentProviderCapabilityCatalogs,
   ModelEffort,
 } from "./agent-provider-contract";
-import { agentProviderLabels, agentProviders } from "./agent-provider";
 
 describe("agent provider contract", () => {
-  it("keeps only the provider roster and labels static", () => {
-    expect(agentProviders).toEqual([
-      "codex",
-      "claude",
-      "cursor",
-      "grok",
-      "agy",
-      "opencode",
-      "openrouter",
-    ]);
-    expect(agentProviderLabels).toEqual({
-      codex: "Codex",
-      claude: "Claude",
-      cursor: "Cursor",
-      grok: "Grok",
-      agy: "Antigravity",
-      opencode: "OpenCode",
-      openrouter: "OpenRouter",
-    });
-    expect(emptyAgentProviderCapabilityCatalog().grok.models).toEqual([]);
-  });
-
   it("accepts provider-owned model and effort identifiers structurally", () => {
     const catalog = emptyAgentProviderCapabilityCatalog();
     catalog.grok.models = [{

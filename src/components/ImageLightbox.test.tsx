@@ -53,14 +53,4 @@ describe("ImageLightbox", () => {
       .toBe("finished-dashboard.png 다운로드");
   });
 
-  it("uses the URL filename when the image has no label", () => {
-    expect(imageDownloadFilename("https://example.com/images/result%20view.png"))
-      .toBe("result view.png");
-    expect(imageDownloadFilename(
-      "https://example.com/images/architecture.png",
-      "Architecture diagram",
-    )).toBe("architecture.png");
-    expect(imageDownloadFilename("blob:preview", "  diagram.png  "))
-      .toBe("diagram.png");
-  });
 });

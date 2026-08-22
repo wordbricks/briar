@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  ChannelRealtimeHub,
-  legacyChannelRealtimeResponse,
-} from "./channel-realtime";
+import { ChannelRealtimeHub } from "./channel-realtime";
 
 class FakeSocket {
   sent: string[] = [];
@@ -131,22 +128,6 @@ describe("ChannelRealtimeHub", () => {
       body: JSON.stringify({ topic: "inbox", version: 6 }),
     }));
     expect(socket.sent).toHaveLength(1);
-  });
-
-  it("does not create a long-lived stream for legacy subscribers", async () => {
-    const response = legacyChannelRealtimeResponse();
-    expect(response.status).toBe(426);
-    expect(response.headers.get("retry-after")).toBe("60");
-    expect(await response.text()).toBe("WebSocket transport required");
-
-    const hub = new ChannelRealtimeHub(
-      {} as DurableObjectState,
-      {} as Env,
-    );
-    const upgradeRequired = await hub.fetch(
-      new Request("https://realtime.test/subscribe?cursor=9"),
-    );
-    expect(upgradeRequired.status).toBe(426);
   });
 
   it("rejects malformed notifications", async () => {

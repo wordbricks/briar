@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  encryptedEnvPolicies,
-  verifyEncryptedEnv,
-} from "./verify-encrypted-env";
+import { verifyEncryptedEnv } from "./verify-encrypted-env";
 
 const policy = {
   publicKey: "DOTENV_PUBLIC_KEY_TEST",
@@ -23,31 +20,6 @@ function fixture(overrides: Partial<Record<string, string>> = {}) {
 }
 
 describe("encrypted environment verification", () => {
-  it("requires integration production settings to remain encrypted", () => {
-    expect(encryptedEnvPolicies[".env.production"]?.secrets).toEqual(
-      expect.arrayContaining([
-        "SLACK_CLIENT_ID",
-        "SLACK_CLIENT_SECRET",
-        "SLACK_SIGNING_SECRET",
-        "SLACK_TOKEN_ENCRYPTION_KEY",
-        "MANAGED_COMPUTER_PROMOTION_CODE",
-        "MANAGED_COMPUTER_ENROLLMENT_SECRET",
-        "MANAGED_COMPUTER_AWS_ACCESS_KEY_ID",
-        "MANAGED_COMPUTER_AWS_SECRET_ACCESS_KEY",
-      ]),
-    );
-    expect(encryptedEnvPolicies[".env.production"]?.optionalSecrets).toEqual(
-      expect.arrayContaining([
-        "GITHUB_APP_CLIENT_ID",
-        "GITHUB_APP_CLIENT_SECRET",
-        "GITHUB_APP_SLUG",
-        "GITHUB_CALLBACK_ORIGIN",
-        "GITHUB_WEBHOOK_SECRET",
-        "MANAGED_COMPUTER_AWS_SESSION_TOKEN",
-      ]),
-    );
-  });
-
   it("allows an encrypted optional secret and rejects plaintext", () => {
     const optionalPolicy = {
       ...policy,

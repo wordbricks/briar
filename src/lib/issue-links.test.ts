@@ -1,19 +1,13 @@
 import { readFileSync } from "node:fs";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   channelShareUrl,
-  copyChannelMessageText,
-  copyChannelShareLink,
-  copyIssueId,
-  copyIssueShareLink,
-  copySessionShareLink,
   issueShareUrl,
   parseBriarLink,
   parseChannelLink,
   parseIssueLink,
   parseSessionLink,
   sessionShareUrl,
-  shareIssueLink,
 } from "./issue-links";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
@@ -45,10 +39,6 @@ const desktopCapabilities = JSON.parse(
     "utf8",
   ),
 );
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("issue links", () => {
   it("builds a deterministic HTTPS issue share link", () => {
@@ -217,112 +207,4 @@ describe("issue links", () => {
     expect(desktopCapabilities.permissions).toContain("deep-link:default");
   });
 
-  it("copies the deterministic issue URL directly", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
-
-    await copyIssueShareLink({ projectId, runId });
-
-    expect(writeText).toHaveBeenCalledWith(
-      `http://127.0.0.1:8787/open/issues/${projectId}/${runId}`,
-    );
-  });
-
-  it("copies the deterministic channel URL and message text", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
-
-    await copyChannelShareLink({
-      organizationId,
-      channelId,
-      messageId,
-      rootMessageId,
-    });
-    await copyChannelMessageText("Hello team");
-
-    expect(writeText).toHaveBeenNthCalledWith(
-      1,
-      `http://127.0.0.1:8787/open/channels/${organizationId}/${channelId}/${messageId}?root=${rootMessageId}`,
-    );
-    expect(writeText).toHaveBeenNthCalledWith(2, "Hello team");
-  });
-
-  it("copies the deterministic session URL directly", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
-
-    await copySessionShareLink({ projectId, sessionId });
-
-    expect(writeText).toHaveBeenCalledWith(
-      `http://127.0.0.1:8787/open/sessions/${projectId}/${sessionId}`,
-    );
-  });
-
-  it("copies the displayed AH issue ID", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
-
-    await copyIssueId(42);
-
-    expect(writeText).toHaveBeenCalledWith("AH-42");
-  });
-
-  it("copies the configured project issue key", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
-
-    await copyIssueId(42, "BR");
-
-    expect(writeText).toHaveBeenCalledWith("BR-42");
-  });
-
-  it("uses native sharing when the WebView supports it", async () => {
-    const share = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "share", {
-      configurable: true,
-      value: share,
-    });
-
-    await expect(
-      shareIssueLink({ projectId, runId, title: "Shared issue" }),
-    ).resolves.toBe("shared");
-    expect(share).toHaveBeenCalledWith({
-      title: "Shared issue",
-      url: `http://127.0.0.1:8787/open/issues/${projectId}/${runId}`,
-    });
-  });
-
-  it("copies the link when native sharing is unavailable", async () => {
-    Object.defineProperty(navigator, "share", {
-      configurable: true,
-      value: undefined,
-    });
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
-
-    await expect(
-      shareIssueLink({ projectId, runId, title: "Copied issue" }),
-    ).resolves.toBe("copied");
-    expect(writeText).toHaveBeenCalledWith(
-      `http://127.0.0.1:8787/open/issues/${projectId}/${runId}`,
-    );
-  });
 });

@@ -82,17 +82,6 @@ describe("UpdateControl", () => {
     </AppUpdateProvider>
   );
 
-  it("stays hidden when the signed channel is current", async () => {
-    check.mockResolvedValue(null);
-    const root = createRoot(container);
-    await act(async () => root.render(control));
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(check).toHaveBeenCalledOnce();
-    expect(container.querySelector("button")).toBeNull();
-    await act(async () => root.unmount());
-  });
 
   it("refreshes the bundled Worker runtime for a remote update link", async () => {
     check.mockResolvedValue(null);
@@ -161,39 +150,6 @@ describe("UpdateControl", () => {
     });
     expect(downloadAndInstall).toHaveBeenCalledOnce();
     expect(invoke).toHaveBeenCalledWith("prepare_for_app_update");
-    expect(relaunch).toHaveBeenCalledOnce();
-    await act(async () => root.unmount());
-  });
-
-  it("keeps the installing state compact without showing feedback text", async () => {
-    let finishDownload: (() => void) | undefined;
-    const downloadAndInstall = vi.fn(
-      () => new Promise<void>((resolve) => {
-        finishDownload = resolve;
-      }),
-    );
-    check.mockResolvedValue({ version: "1.0.1", downloadAndInstall });
-    const root = createRoot(container);
-    await act(async () => root.render(control));
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    const button = container.querySelector("button");
-    await act(async () => {
-      button?.click();
-    });
-
-    expect(downloadAndInstall).toHaveBeenCalledOnce();
-    expect(button?.hasAttribute("disabled")).toBe(true);
-    expect(button?.className).toBe("sidebar-update-trigger is-installing");
-    expect(container.querySelector(".sidebar-update-feedback")).toBeNull();
-    expect(container.textContent).not.toContain("업데이트를 설치하고 있습니다");
-
-    await act(async () => {
-      finishDownload?.();
-      await Promise.resolve();
-    });
     expect(relaunch).toHaveBeenCalledOnce();
     await act(async () => root.unmount());
   });

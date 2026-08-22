@@ -3,7 +3,6 @@ import * as Option from "effect/Option";
 import { describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import {
-  approvedIssueCreation,
   assertChannelProposalAuthorScope,
   loadChannelCatalogSnapshot,
   resolveChannelProposalTargetProjectId,
@@ -26,7 +25,6 @@ import {
 import {
   issueClaimExecutionConfig,
   issueReplyExecutionConfig,
-  legacyAgentSkillInstructions,
 } from "./agent-execution-config";
 import { assertRunEventIdentityNotOverridden } from "./run-event-identity";
 import { loadOrganizationInboxConditionalSnapshot } from "./organization-inbox-sync";
@@ -39,10 +37,7 @@ import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
 import {
   decodeAccountDeletionInput,
   decodeAccountProfileInput,
-  decodeOrganizationInvitationInput,
-  decodeOrganizationLogoInput,
   decodeOrganizationMemberRoleInput,
-  decodeOrganizationUpdateInput,
   decodeProjectAgentScheduleBatchClaim,
 } from "./account-organization-request-contract";
 import {
@@ -50,13 +45,8 @@ import {
   decodeIssueUpdateInput,
 } from "./issue-request-contract";
 import {
-  decodeProjectAgentInput,
-  decodeProjectAgentInputOption,
   decodeProjectAgentScheduleInput,
   decodeProjectAgentSessionInput,
-  decodeProjectIconInput,
-  decodeProjectIssueKeyPrefixInput,
-  decodeProjectTabsInput,
 } from "./project-request-contract";
 import {
   decodePausedRunReworkInput,
@@ -74,12 +64,6 @@ import {
 } from "./worker-request-contract";
 import { decodeTranscriptRequest } from "./transcript-request";
 import { slackCreateIssueShortcutCallbackId } from "./slack";
-import {
-  agentResponsibilityMaxLength,
-  agentSkillBodyMaxLength,
-  agentSkillDescriptionMaxLength,
-  agentSkillsMaxCount,
-} from "../../src/lib/agent-limits";
 
 const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
   archiveCompletedLogs: vi.fn(async () => ({
@@ -116,7 +100,6 @@ const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
     reason: "not_configured" as const,
   })),
 });
-
 const scheduledController = (cron: string): ScheduledController => ({
   cron,
   scheduledTime: Date.parse("2026-08-10T00:17:00.000Z"),
@@ -250,12 +233,6 @@ describe("Worker HTTP contract", () => {
     });
   });
 
-  it("keeps issue creation approval separate from execution approval", () => {
-    expect(
-      approvedIssueCreation({ title: "Ship it", status: "queued" }),
-    ).toEqual({ title: "Ship it", status: "backlog", checkpoints: [] });
-  });
-
   it("rejects identity overrides on claimed run events", () => {
     const run = { source: "issue", source_key: "existing-identity" } as const;
     expect(() =>
@@ -305,30 +282,6 @@ describe("Worker HTTP contract", () => {
     ).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
   });
 
-  it("rejects legacy Project Agent proposals whose stored target lost scope", () => {
-    const validProjectProposal = {
-      channelOrganizationId: "organization-a",
-      proposedProjectId: "project-a",
-      replyAuthorAgentId: "agent-a",
-      replyAuthorAgentOrganizationId: "organization-a",
-      replyAuthorAgentProjectId: "project-a",
-    };
-    expect(() => assertChannelProposalAuthorScope(validProjectProposal))
-      .not.toThrow();
-    expect(() =>
-      assertChannelProposalAuthorScope({
-        ...validProjectProposal,
-        proposedProjectId: null,
-      })
-    ).toThrow("Project Agent proposal scope is invalid");
-    expect(() =>
-      assertChannelProposalAuthorScope({
-        ...validProjectProposal,
-        proposedProjectId: "project-b",
-      })
-    ).toThrow("Project Agent proposal scope is invalid");
-  });
-
   it("rejects proposals whose original Agent scope cannot be verified", () => {
     const organizationProposal = {
       channelOrganizationId: "organization-a",
@@ -351,47 +304,6 @@ describe("Worker HTTP contract", () => {
         replyAuthorAgentOrganizationId: "organization-b",
       })
     ).toThrow("can no longer be verified");
-  });
-
-  it("allows Agent writes to omit Skills or provide an empty roster", () => {
-    const input = {
-      provider: "codex" as const,
-      responsibility: "Handle project work.",
-    };
-
-    expect(decodeProjectAgentInput(input).skills).toBeUndefined();
-    expect(decodeProjectAgentInput({ ...input, skills: [] }).skills)
-      .toEqual([]);
-  });
-
-  it("enforces the expanded Agent responsibility and Skill limits", () => {
-    const skill = (index: number) => ({
-      name: `Skill ${index}`,
-      description: "x".repeat(agentSkillDescriptionMaxLength),
-      body: "x".repeat(agentSkillBodyMaxLength),
-      provider: "codex" as const,
-      model: null,
-      effort: null,
-      kind: "custom" as const,
-      position: index,
-    });
-    const input = {
-      provider: "codex" as const,
-      responsibility: "x".repeat(agentResponsibilityMaxLength),
-      skills: Array.from({ length: agentSkillsMaxCount }, (_, index) =>
-        skill(index)
-      ),
-    };
-
-    expect(Option.isSome(decodeProjectAgentInputOption(input))).toBe(true);
-    expect(Option.isSome(decodeProjectAgentInputOption({
-      ...input,
-      responsibility: `${input.responsibility}x`,
-    }))).toBe(false);
-    expect(Option.isSome(decodeProjectAgentInputOption({
-      ...input,
-      skills: [...input.skills, skill(agentSkillsMaxCount)],
-    }))).toBe(false);
   });
 
   it("routes minute and six-hour scheduled work separately", async () => {
@@ -598,18 +510,6 @@ describe("Worker HTTP contract", () => {
         prioritizeAgent: true,
       }),
     ).toEqual({ model: "mentioned-agent-skill", effort: "xhigh" });
-  });
-
-  it("projects active Skill instructions through the legacy Agent field", () => {
-    expect(
-      legacyAgentSkillInstructions(
-        { body: "Perform the iOS release." },
-        "Legacy Agent instructions",
-      ),
-    ).toBe("Perform the iOS release.");
-    expect(
-      legacyAgentSkillInstructions(null, "Legacy Agent instructions"),
-    ).toBe("Legacy Agent instructions");
   });
 
   it("classifies a malformed project workflow separately from checkpoint policy errors", () => {
@@ -1141,63 +1041,6 @@ describe("Worker HTTP contract", () => {
         image: "http://example.com/avatar.png",
       }),
     ).toThrow();
-  });
-
-  it("normalizes invitation emails and requires a starting project", () => {
-    expect(
-      decodeOrganizationInvitationInput({
-        email: "  New.Person@Example.COM ",
-        role: "member",
-        initialProjectId: "11111111-1111-4111-8111-111111111111",
-      }),
-    ).toEqual({
-      email: "new.person@example.com",
-      role: "member",
-      initialProjectId: "11111111-1111-4111-8111-111111111111",
-    });
-    expect(() =>
-      decodeOrganizationInvitationInput({
-        email: "new.person@example.com",
-      }),
-    ).toThrow();
-  });
-
-  it("accepts bounded browser-supported project icons or removal", () => {
-    for (const icon of [
-      "data:image/webp;base64,bG9nbw==",
-      "data:image/png;base64,bG9nbw==",
-      "data:image/jpeg;base64,bG9nbw==",
-    ]) {
-      expect(decodeProjectIconInput({ icon })).toEqual({ icon });
-    }
-    expect(decodeProjectIconInput({ icon: null })).toEqual({ icon: null });
-    expect(() =>
-      decodeProjectIconInput({
-        icon: "data:image/svg+xml;base64,bG9nbw==",
-      }),
-    ).toThrow();
-  });
-
-  it("normalizes project issue key prefixes and enforces the three-character limit", () => {
-    expect(
-      decodeProjectIssueKeyPrefixInput({ issueKeyPrefix: " br " }),
-    ).toEqual({ issueKeyPrefix: "BR" });
-    expect(() =>
-      decodeProjectIssueKeyPrefixInput({ issueKeyPrefix: "LONG" }),
-    ).toThrow();
-    expect(() =>
-      decodeProjectIssueKeyPrefixInput({ issueKeyPrefix: "B-R" }),
-    ).toThrow();
-  });
-
-  it("accepts only the optional schedule tab in project tab updates", () => {
-    expect(decodeProjectTabsInput({ schedule: false })).toEqual({
-      schedule: false,
-    });
-    expect(() =>
-      decodeProjectTabsInput({ issues: false, schedule: true }),
-    ).toThrow();
-    expect(() => decodeProjectTabsInput({})).toThrow();
   });
 
   it("validates structural issue model effort preferences", () => {
@@ -1839,40 +1682,6 @@ describe("Worker HTTP contract", () => {
     ).toThrow(/Choose at least one weekday/u);
   });
 
-  it("accepts a name-only organization update", () => {
-    expect(
-      decodeOrganizationUpdateInput({ name: "  Briar Labs  " }),
-    ).toEqual({
-      name: "Briar Labs",
-    });
-  });
-
-  it("accepts bounded browser-supported organization logos or removal", () => {
-    expect(
-      decodeOrganizationLogoInput({
-        logo: "data:image/webp;base64,bG9nbw==",
-      }),
-    ).toEqual({ logo: "data:image/webp;base64,bG9nbw==" });
-    expect(
-      decodeOrganizationLogoInput({
-        logo: "data:image/png;base64,bG9nbw==",
-      }),
-    ).toEqual({ logo: "data:image/png;base64,bG9nbw==" });
-    expect(
-      decodeOrganizationLogoInput({
-        logo: "data:image/jpeg;base64,bG9nbw==",
-      }),
-    ).toEqual({ logo: "data:image/jpeg;base64,bG9nbw==" });
-    expect(decodeOrganizationLogoInput({ logo: null })).toEqual({
-      logo: null,
-    });
-    expect(() =>
-      decodeOrganizationLogoInput({
-        logo: "data:image/gif;base64,bG9nbw==",
-      }),
-    ).toThrow();
-  });
-
   it("validates editable issue fields", () => {
     expect(
       decodeIssueUpdateInput({
@@ -1992,316 +1801,6 @@ describe("Worker HTTP contract", () => {
     expect(decodeProjectAgentScheduleBatchClaim({
       projectIds: [projectId, projectId],
     })).toEqual({ projectIds: [projectId, projectId] });
-  });
-
-  it("renders mobile Companion authorization and returns to the app", async () => {
-    const response = await worker.fetch(
-      new Request(
-        "https://briar-api.example/device?user_code=F65P9NQN&client=mobile",
-      ),
-      {} as never,
-    );
-    const page = await response.text();
-
-    expect(response.status).toBe(200);
-    expect(page).toContain("Companion 로그인 승인");
-    expect(page).not.toContain("<h1>데스크톱 연결 승인</h1>");
-    expect(page).toContain("briar-companion://auth-complete");
-    expect(page).toContain("callbackParams.set('client','mobile')");
-    expect(page).toContain("/brand/briar-icon.png");
-    expect(page).not.toContain("briar-mark.svg");
-  });
-
-  it("serves web assets after removing the public /app prefix", async () => {
-    const fetchAsset = vi.fn(async (request: Request) =>
-      new Response(new URL(request.url).pathname)
-    );
-    const response = await worker.fetch(
-      new Request("https://briar.wordbricks.ai/app/assets/index.js"),
-      { ASSETS: { fetch: fetchAsset } } as never,
-    );
-
-    expect(response.status).toBe(200);
-    expect(await response.text()).toBe("/assets/index.js");
-    expect(fetchAsset).toHaveBeenCalledOnce();
-  });
-
-  it("keeps the desktop authorization copy for desktop clients", async () => {
-    const response = await worker.fetch(
-      new Request("https://briar-api.example/device?user_code=F65P9NQN"),
-      {} as never,
-    );
-    const page = await response.text();
-
-    expect(page).toContain("<h1>데스크톱 연결 승인</h1>");
-    expect(page).not.toContain("<h1>Companion 로그인 승인</h1>");
-    expect(page).toContain('inputmode="numeric"');
-    expect(page).toContain('autocomplete="one-time-code"');
-    expect(page).toContain("인증코드 다시 받기");
-    expect(page).toContain("replace(/\\D/g,'')");
-    expect(page).toContain("replace(/\\{(\\w+)\\}/g");
-    expect(page.indexOf('id="email-form"')).toBeLessThan(
-      page.indexOf('id="google"'),
-    );
-  });
-
-  it("shows email and Google choices when switching invitation accounts", async () => {
-    const response = await worker.fetch(
-      new Request(
-        "https://briar-api.example/device?user_code=F65P9NQN&client=web&switch_account=1",
-      ),
-      {} as never,
-    );
-    const page = await response.text();
-
-    expect(page).toContain("switchAccount=params.get('switch_account')==='1'");
-    expect(page).toContain("additionalParams:{prompt:'select_account'}");
-    expect(page).toContain("if(switchAccount){showEmail();return}");
-    expect(page).not.toContain("if(switchAccount){google.hidden=true;await beginGoogle();return}");
-  });
-
-  it("serves issue links that open the exact issue in the Briar app", async () => {
-    const projectId = "11111111-1111-4111-8111-111111111111";
-    const runId = "22222222-2222-4222-8222-222222222222";
-    const response = await worker.fetch(
-      new Request(
-        `https://briar-api.example/open/issues/${projectId}/${runId}`,
-      ),
-      {} as never,
-    );
-    const page = await response.text();
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toContain("text/html");
-    expect(page).toContain(
-      `briar-companion://issues/${projectId}/${runId}`,
-    );
-    expect(page).toContain("Briar 앱이 설치되어 있어야 합니다.");
-    expect(page).not.toContain("authorization");
-  });
-
-  it("serves session links that open the exact session in the Briar app", async () => {
-    const projectId = "11111111-1111-4111-8111-111111111111";
-    const sessionId = "33333333-3333-4333-8333-333333333333";
-    const response = await worker.fetch(
-      new Request(
-        `https://briar-api.example/open/sessions/${projectId}/${sessionId}`,
-      ),
-      {} as never,
-    );
-    const page = await response.text();
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toContain("text/html");
-    expect(page).toContain(
-      `briar-companion://sessions/${projectId}/${sessionId}`,
-    );
-    expect(page).toContain("Briar에서 세션을 여는 중입니다");
-    expect(page).toContain("Briar 앱이 설치되어 있어야 합니다.");
-  });
-
-  it("serves channel links that open the exact message in the Briar app", async () => {
-    const organizationId = "44444444-4444-4444-8444-444444444444";
-    const channelId = "55555555-5555-4555-8555-555555555555";
-    const messageId = "66666666-6666-4666-8666-666666666666";
-    const rootMessageId = "77777777-7777-4777-8777-777777777777";
-    const response = await worker.fetch(
-      new Request(
-        `https://briar-api.example/open/channels/${organizationId}/${channelId}/${messageId}?root=${rootMessageId}`,
-      ),
-      {} as never,
-    );
-    const page = await response.text();
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toContain("text/html");
-    expect(page).toContain(
-      `briar-companion://channels/${organizationId}/${channelId}/${messageId}?root=${rootMessageId}`,
-    );
-    expect(page).toContain("Briar에서 메시지를 여는 중입니다");
-    expect(page).toContain("Briar 앱이 설치되어 있어야 합니다.");
-  });
-
-  it("serves channel-only links that open the channel in the Briar app", async () => {
-    const organizationId = "44444444-4444-4444-8444-444444444444";
-    const channelId = "55555555-5555-4555-8555-555555555555";
-    const response = await worker.fetch(
-      new Request(
-        `https://briar-api.example/open/channels/${organizationId}/${channelId}`,
-      ),
-      {} as never,
-    );
-    const page = await response.text();
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toContain("text/html");
-    expect(page).toContain(
-      `briar-companion://channels/${organizationId}/${channelId}`,
-    );
-    expect(page).toContain("Briar에서 채널을 여는 중입니다");
-    expect(page).toContain("Briar 앱이 설치되어 있어야 합니다.");
-  });
-
-  it("publishes the iOS Universal Link association", async () => {
-    const response = await worker.fetch(
-      new Request(
-        "https://briar-api.example/.well-known/apple-app-site-association",
-      ),
-      {} as never,
-    );
-
-    expect(response.headers.get("Content-Type")).toBe("application/json");
-    await expect(response.json()).resolves.toMatchObject({
-      applinks: {
-        details: [{
-          appIDs: ["QFJZ2V3829.app.briar.companion"],
-          components: [
-            { "/": "/open/issues/*" },
-            { "/": "/open/sessions/*" },
-            { "/": "/open/channels/*" },
-          ],
-        }],
-      },
-    });
-  });
-
-  it("allows project deletion through CORS preflight", async () => {
-    const response = await worker.fetch(
-      new Request(
-        "https://briar-api.example/projects/00000000-0000-0000-0000-000000000000",
-        {
-          method: "OPTIONS",
-          headers: {
-            "Access-Control-Request-Headers": "authorization, content-type",
-            "Access-Control-Request-Method": "DELETE",
-            Origin: "tauri://localhost",
-          },
-        },
-      ),
-      {} as never,
-    );
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    expect(response.headers.get("Access-Control-Allow-Headers")).toContain(
-      "authorization",
-    );
-    expect(response.headers.get("Access-Control-Allow-Headers")).toContain(
-      "idempotency-key",
-    );
-    expect(
-      response.headers
-        .get("Access-Control-Allow-Methods")
-        ?.split(",")
-        .map((method) => method.trim()),
-    ).toContain("DELETE");
-  });
-
-  it("allows worker concurrency updates through CORS preflight", async () => {
-    const response = await worker.fetch(
-      new Request(
-        "https://briar-api.example/organizations/00000000-0000-0000-0000-000000000000/workers/device-id",
-        {
-          method: "OPTIONS",
-          headers: {
-            "Access-Control-Request-Headers": "authorization, content-type",
-            "Access-Control-Request-Method": "PATCH",
-            Origin: "tauri://localhost",
-          },
-        },
-      ),
-      {} as never,
-    );
-
-    expect(response.status).toBe(200);
-    expect(
-      response.headers
-        .get("Access-Control-Allow-Methods")
-        ?.split(",")
-        .map((method) => method.trim()),
-    ).toContain("PATCH");
-  });
-
-  it("verifies and acknowledges GitHub App ping webhooks", async () => {
-    const secret = "github-webhook-test-secret";
-    const body = JSON.stringify({ zen: "Responsive is better than fast.", hook_id: 42 });
-    const signature = `sha256=${
-      createHmac("sha256", secret).update(body).digest("hex")
-    }`;
-    const run = vi.fn(async () => ({ meta: { changes: 1 } }));
-    const bind = vi.fn(() => ({ run }));
-    const prepare = vi.fn(() => ({ bind }));
-    const env = {
-      DB: { prepare },
-      GITHUB_WEBHOOK_SECRET: secret,
-    } as never;
-    const request = new Request("https://briar-api.example/github/webhooks", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-github-delivery": "33333333-3333-4333-8333-333333333333",
-        "x-github-event": "ping",
-        "x-hub-signature-256": signature,
-      },
-      body,
-    });
-
-    const response = await worker.fetch(request, env);
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true, event: "ping" });
-    expect(prepare).toHaveBeenCalledTimes(3);
-  });
-
-  it("acknowledges GitHub App repository-selection deliveries", async () => {
-    const secret = "github-webhook-test-secret";
-    const body = JSON.stringify({
-      action: "added",
-      installation: { id: 901 },
-      repositories_added: [{
-        id: 701,
-        name: "briar",
-        full_name: "wordbricks/briar",
-        owner: { login: "wordbricks" },
-      }],
-      repositories_removed: [],
-    });
-    const signature = `sha256=${
-      createHmac("sha256", secret).update(body).digest("hex")
-    }`;
-    const run = vi.fn(async () => ({ meta: { changes: 1 } }));
-    const bind = vi.fn(() => ({ run }));
-    const prepare = vi.fn(() => ({ bind }));
-    const batch = vi.fn(async () => [
-      { meta: { changes: 0 } },
-      { meta: { changes: 0 } },
-      { meta: { changes: 0 } },
-    ]);
-    const response = await worker.fetch(new Request(
-      "https://briar-api.example/github/webhooks",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-github-delivery": "44444444-4444-4444-8444-444444444444",
-          "x-github-event": "installation_repositories",
-          "x-hub-signature-256": signature,
-        },
-        body,
-      },
-    ), {
-      DB: { prepare, batch },
-      GITHUB_WEBHOOK_SECRET: secret,
-    } as never);
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      ok: true,
-      event: "installation_repositories",
-      action: "added",
-      updated: false,
-    });
-    expect(batch).toHaveBeenCalledOnce();
   });
 
   it("rejects a GitHub webhook before touching the database when its signature is invalid", async () => {

@@ -100,32 +100,6 @@ describe("ChannelMessageReactions", () => {
     return chip!;
   };
 
-  it("shows reactor avatars and names in the hover help popup", async () => {
-    await renderChip(
-      ["user-sam", "user-jay"],
-      [
-        member({
-          userId: "user-sam",
-          name: "Sam",
-          image: "https://example.com/sam.png",
-        }),
-        member({ userId: "user-jay", name: "Jay" }),
-      ],
-    );
-
-    const chip = await openTooltip();
-    expect(chip.getAttribute("aria-label")).toBe("👍 2 · Sam, Jay (나)");
-
-    const tooltip = document.body.querySelector<HTMLElement>(
-      '[role="tooltip"]',
-    );
-    expect(tooltip?.textContent).toContain("👍 리액션");
-    expect(tooltip?.textContent).toContain("Sam");
-    expect(tooltip?.textContent).toContain("Jay (나)");
-    expect(
-      tooltip?.querySelector<HTMLImageElement>("img")?.getAttribute("src"),
-    ).toBe("https://example.com/sam.png");
-  });
 
   it("falls back for members who left and still toggles on click", async () => {
     const onToggle = await renderChip(

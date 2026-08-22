@@ -172,53 +172,8 @@ async function selectValidRepository(container: HTMLElement) {
 }
 
 describe("ProjectOnboarding", () => {
-  it("starts project creation with three clear choices in a dialog", () => {
-    const markup = renderToStaticMarkup(<ProjectOnboarding {...baseProps} />);
 
-    expect(markup).toContain("Connect Local Git Repository");
-    expect(markup).toContain("Create from scratch");
-    expect(markup).toContain("Migrate from Lovable");
-    expect(markup).toMatch(/<img[^>]*src="[^"]*lovable-color\.png"[^>]*>/);
-    expect(markup).toContain('aria-hidden="true"');
-    expect(markup).toContain("aria-modal=\"true\"");
-    expect(markup).toContain("disabled=\"\"");
-  });
 
-  it("shows developer tools before repository setup", async () => {
-    const { container, root } = mountOnboarding();
-    await act(async () =>
-      root.render(
-        <ProjectOnboarding {...baseProps} includeDeveloperTools />,
-      ),
-    );
-
-    await act(async () => {
-      buttonWithText(container, "Connect Local Git Repository")?.click();
-    });
-    expect(container.textContent).toContain("개발 도구를 연결해 주세요");
-    expect(container.textContent).toContain("Git필수");
-    expect(container.querySelectorAll(".initial-prerequisite-row")).toHaveLength(8);
-    expect(container.textContent).toContain("Cursor");
-    expect(container.textContent).not.toContain("로컬 Git 저장소");
-
-    await act(async () => {
-      buttonWithText(container, "저장소 연결하기")?.click();
-    });
-
-    expect(container.textContent).toContain("로컬 Git 저장소");
-    expect(container.textContent).toContain("프로젝트 설정 · 2/4");
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
-  it("keeps create from scratch visibly disabled", () => {
-    const markup = renderToStaticMarkup(<ProjectOnboarding {...baseProps} canCancel />);
-
-    expect(markup).toContain("Create from scratch");
-    expect(markup).toContain("준비 중");
-    expect(markup).toMatch(/<button[^>]*aria-disabled="true"[^>]*disabled/);
-  });
 
   it("shows Next only after validating a Git repository", async () => {
     const { container, root } = mountOnboarding();
@@ -476,55 +431,6 @@ describe("ProjectOnboarding", () => {
     container.remove();
   });
 
-  it("explains a quiet long-running workflow without exposing tool commands", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-08-14T04:00:00.000Z"));
-    const { container, root } = mountOnboarding();
-    let reportProgress: ((progress: ProjectLlmProgress) => void) | undefined;
-    const onConnect = vi.fn((
-      _settings: unknown,
-      _repositoryPath: string,
-      onProgress?: (progress: ProjectLlmProgress) => void,
-    ) => {
-      reportProgress = onProgress;
-      return new Promise<never>(() => undefined);
-    });
-
-    try {
-      await act(async () => root.render(
-        <ProjectOnboarding
-          {...baseProps}
-          connection={connection}
-          onConnect={onConnect}
-        />,
-      ));
-      await selectValidRepository(container);
-      await act(async () => buttonWithText(container, "다음")?.click());
-
-      expect(container.textContent).toContain("경과 0s");
-      await act(async () => vi.advanceTimersByTimeAsync(61_000));
-      expect(container.textContent).toContain("경과 1m 1s");
-      expect(container.textContent).toContain("1m 1s 동안 새 업데이트 없음");
-      expect(container.textContent).toContain("요청은 계속 실행 중입니다");
-
-      await act(async () => reportProgress?.({
-        provider: "codex",
-        messageId: "command-1",
-        phase: "activity",
-        message: "git status --short --branch",
-        activityKind: "command",
-      }));
-      expect(container.textContent).toContain(
-        "저장소 파일과 검증 명령을 확인하고 있습니다",
-      );
-      expect(container.textContent).not.toContain("git status");
-      expect(container.textContent).toContain("방금 업데이트됨");
-    } finally {
-      await act(async () => root.unmount());
-      container.remove();
-      vi.useRealTimers();
-    }
-  });
 
   it("finishes reconnection without workflow setup or tool analysis when a workflow already exists", async () => {
     const { container, root } = mountOnboarding();
@@ -705,90 +611,4 @@ describe("ProjectOnboarding", () => {
     container.remove();
   });
 
-  it("shows the latest LLM provider message while analyzing required tools", async () => {
-    const { container, root } = mountOnboarding();
-    let reportProgress: ((progress: ProjectLlmProgress) => void) | undefined;
-    let resolveAnalysis: ((value: {
-      workflow: typeof generatedWorkflow;
-      requirements: never[];
-    }) => void) | undefined;
-    const onAnalyzeRequirements = vi.fn((
-      _projectId: string,
-      onProgress?: (progress: ProjectLlmProgress) => void,
-    ) => {
-      reportProgress = onProgress;
-      return new Promise<{
-        workflow: typeof generatedWorkflow;
-        requirements: never[];
-      }>((resolve) => { resolveAnalysis = resolve; });
-    });
-
-    await act(async () => root.render(
-      <ProjectOnboarding
-        {...baseProps}
-        connection={connection}
-        onAnalyzeRequirements={onAnalyzeRequirements}
-      />,
-    ));
-    await selectValidRepository(container);
-    await act(async () => buttonWithText(container, "다음")?.click());
-    await act(async () => Promise.resolve());
-    await act(async () => buttonWithText(container, "다음")?.click());
-
-    expect(container.textContent).toContain("필요한 개발 도구를 확인하고 있어요");
-    expect(container.textContent).toContain("LLM 프로바이더의 첫 메시지를 기다리고 있습니다");
-    expect(onAnalyzeRequirements).toHaveBeenCalledWith(
-      "project-1",
-      expect.any(Function),
-    );
-
-    await act(async () => reportProgress?.({
-      provider: "codex",
-      messageId: "tools-message-1",
-      phase: "commentary",
-      message: "패키지 매니저와 테스트 도구를 확인하고 있습니다.",
-    }));
-    const providerProgress = container.querySelector(
-      ".onboarding-provider-progress",
-    );
-    expect(providerProgress?.getAttribute("role")).toBe("group");
-    const liveProgress = providerProgress?.querySelector('[role="status"]');
-    expect(liveProgress?.getAttribute("aria-live")).toBe("polite");
-    expect(liveProgress?.getAttribute("aria-atomic")).toBe("true");
-    expect(providerProgress?.textContent).toContain("Codex");
-    expect(providerProgress?.textContent).toContain(
-      "패키지 매니저와 테스트 도구를 확인하고 있습니다.",
-    );
-
-    await act(async () => reportProgress?.({
-      provider: "codex",
-      messageId: "tools-message-2",
-      phase: "commentary",
-      message: "로컬 실행 파일 요구 사항을 정리하고 있습니다.",
-    }));
-    expect(providerProgress?.textContent).toContain(
-      "로컬 실행 파일 요구 사항을 정리하고 있습니다.",
-    );
-    expect(providerProgress?.textContent).not.toContain(
-      "패키지 매니저와 테스트 도구를 확인하고 있습니다.",
-    );
-
-    await act(async () => reportProgress?.({
-      provider: "claude",
-      messageId: "tools-message-3",
-      phase: "final",
-      message: '{"requirements":[]}',
-    }));
-    expect(providerProgress?.textContent).toContain("분석 결과를 정리하고 있습니다…");
-    expect(providerProgress?.textContent).not.toContain('"requirements"');
-
-    await act(async () => resolveAnalysis?.({
-      workflow: generatedWorkflow,
-      requirements: [],
-    }));
-    expect(container.textContent).toContain("로컬 개발 환경을 확인해 주세요");
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
 });

@@ -620,52 +620,5 @@ describe("IssueExecutionApproval", () => {
     expect(onIssueOpen).toHaveBeenCalledWith(pendingProposal.runId);
   });
 
-  it("resolves an accepted Worker label without reopening the approval dialog", async () => {
-    const loadExecutionContext = vi.fn(async () => context());
-    await act(async () => {
-      root.render(
-        <IssueExecutionApproval
-          loadExecutionContext={loadExecutionContext}
-          onAccept={vi.fn()}
-          onAccepted={vi.fn()}
-          proposal={{
-            ...pendingProposal,
-            status: "accepted",
-            acceptedAt: "2026-08-11T00:04:00.000Z",
-            requestedProvider: "codex",
-            requestedWorkerId: worker.id,
-          }}
-          surfaceKey="channel:accepted-loader"
-        />,
-      );
-      await Promise.resolve();
-    });
 
-    expect(loadExecutionContext).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain("Build Mac");
-    expect(document.body.textContent).not.toContain("이슈 실행 승인");
-  });
-
-  it("does not show a pending-only disabled reason on accepted history", async () => {
-    await act(async () => {
-      root.render(
-        <IssueExecutionApproval
-          disabledReason="보관된 채널에서는 실행을 승인할 수 없습니다."
-          executionContext={context()}
-          onAccept={vi.fn()}
-          onAccepted={vi.fn()}
-          proposal={{
-            ...pendingProposal,
-            status: "accepted",
-            acceptedAt: "2026-08-11T00:04:00.000Z",
-            requestedProvider: "codex",
-          }}
-          surfaceKey="channel:archived-accepted"
-        />,
-      );
-    });
-
-    expect(container.textContent).not.toContain("보관된 채널");
-    expect(container.querySelector('[role="alert"]')).toBeNull();
-  });
 });

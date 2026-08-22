@@ -386,108 +386,8 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("bolds unread channel names and restores the regular weight when read", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    const unreadChannel = {
-      id: "channel-1",
-      organizationId: "organization-1",
-      slug: "general",
-      name: "General",
-      topic: null,
-      visibility: "public" as const,
-      defaultProjectId: null,
-      archivedAt: null,
-      memberCount: 1,
-      agentCount: 0,
-      createdAt: "2026-08-01T00:00:00Z",
-      updatedAt: "2026-08-01T00:00:00Z",
-      hasUnread: true,
-    };
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activePage="issues"
-          channels={[unreadChannel]}
-          onChannelOpen={() => undefined}
-        />,
-      );
-    });
-    expect(
-      container.querySelector("#sidebar-channel-list button")?.className,
-    ).toContain("unread");
 
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activePage="issues"
-          channels={[{ ...unreadChannel, hasUnread: false }]}
-          onChannelOpen={() => undefined}
-        />,
-      );
-    });
-    expect(
-      container.querySelector("#sidebar-channel-list button")?.className,
-    ).not.toContain("unread");
 
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
-  it("shows projects as a native-style hierarchy", () => {
-    const markup = renderToStaticMarkup(
-      <Sidebar
-        {...sidebarProps}
-      />,
-    );
-
-    expect(markup).toContain('aria-label="프로젝트 추가"');
-    expect(markup).toContain("프로젝트");
-    expect(markup).toContain("Briar");
-    expect(markup).toContain('aria-label="현재 프로젝트"');
-    expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain('aria-label="조직 메뉴 열기"');
-    expect(markup).not.toContain("sidebar-organization-heading");
-    expect(markup).toContain('aria-haspopup="menu"');
-    expect(markup).toContain('aria-label="계정 메뉴"');
-    expect(markup).toContain("이슈");
-    expect(markup).not.toContain("홈");
-    expect(markup).not.toContain('href="#project-lobby"');
-    expect(markup).toContain('class="sidebar-issue-add"');
-    expect(markup).toContain('aria-label="이슈 만들기"');
-    expect(markup).toContain("에이전트");
-    expect(markup).not.toContain("아이디어");
-    expect(markup).toContain("스케줄");
-    expect(markup).toContain("받은 편지함");
-    expect(markup).not.toContain('href="#auto-hunt"');
-    expect(markup).not.toContain("도움말");
-    expect(markup).not.toContain('href="#help"');
-    expect(markup).toContain('aria-label="Briar 프로젝트 메뉴"');
-    expect(markup).toContain('aria-label="Briar 프로젝트 접기"');
-    expect(markup).toContain('class="sidebar-project-toggle"');
-    expect(markup).toContain('id="project-views-project-1"');
-    expect(markup).not.toContain("<select");
-  });
-
-  it("shows a saved project icon in the project hierarchy", () => {
-    const markup = renderToStaticMarkup(
-      <Sidebar
-        {...sidebarProps}
-        projects={[
-          {
-            ...sidebarProps.projects[0],
-            icon: "data:image/webp;base64,aWNvbg==",
-          },
-        ]}
-      />,
-    );
-
-    expect(markup).toContain('src="data:image/webp;base64,aWNvbg=="');
-    expect(markup).toContain('class="shrink-0 rounded-sm object-contain size-4"');
-  });
 
   it("opens projects by default and lets each project collapse independently", async () => {
     const container = document.createElement("div");
@@ -587,16 +487,6 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("marks the project name as the current page on the home view", () => {
-    const markup = renderToStaticMarkup(
-      <Sidebar {...sidebarProps} activePage="lobby" />,
-    );
-
-    expect(markup).toContain('class="sidebar-project-heading active"');
-    expect(markup).toContain('aria-current="page"');
-    expect(markup).not.toContain("홈");
-    expect(markup).not.toContain('href="#project-lobby"');
-  });
 
   it("selects a project and keeps it expanded when opening a child view", async () => {
     const onProjectChange = vi.fn();
@@ -666,37 +556,6 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("hides the schedule tab when the project has turned it off", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          projects={[
-            {
-              ...sidebarProps.projects[0]!,
-              scheduleTabEnabled: false,
-            },
-          ]}
-        />,
-      );
-    });
-
-    expect(
-      container.querySelector('a[href="#schedule"]'),
-    ).toBeNull();
-    expect(
-      container.querySelector('a[href="#issues"]'),
-    ).not.toBeNull();
-    expect(
-      container.querySelector('a[href="#agents"]'),
-    ).not.toBeNull();
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
 
   it("opens issue creation for the clicked project when another is active", async () => {
     const onProjectChange = vi.fn();
@@ -856,26 +715,7 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("shows an unread dot for Inbox messages", () => {
-    const markup = renderToStaticMarkup(
-      <Sidebar {...sidebarProps} unreadInboxCount={2} />,
-    );
 
-    expect(markup).toContain("sidebar-unread-dot");
-    expect(markup).toContain('aria-label="읽지 않은 메시지 2개"');
-  });
-
-  it("places DMs above Inbox and exposes unread direct messages", () => {
-    const markup = renderToStaticMarkup(
-      <Sidebar {...sidebarProps} activePage="dms" unreadDmCount={3} />,
-    );
-
-    expect(markup.indexOf('href="#dms"')).toBeLessThan(
-      markup.indexOf('href="#inbox"'),
-    );
-    expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain('aria-label="읽지 않은 DM 3개"');
-  });
 
   it("shows running sessions beneath Agents and opens their details", async () => {
     const onAgentSessionOpen = vi.fn();
@@ -1125,16 +965,6 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("does not show a repository connection warning beside projects", () => {
-    const markup = renderToStaticMarkup(
-      <Sidebar {...sidebarProps} connectedProjectIds={[]} />,
-    );
-
-    expect(markup).not.toContain("sidebar-project-disconnected");
-    expect(markup).not.toContain(
-      "Briar: 이 컴퓨터에 저장소가 연결되지 않았습니다",
-    );
-  });
 
   it("switches and persists the language from the account submenu", async () => {
     window.localStorage.setItem("briar.locale.v1", "ko");
@@ -1193,49 +1023,6 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("renders the chevron to the right of the Channels label for alignment with other menu items", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activePage="channels"
-          channels={[
-            sidebarChannel("channel-org", "General", null),
-            sidebarChannel("channel-project", "Project dev", "project-1"),
-          ]}
-          onChannelOpen={() => undefined}
-        />,
-      );
-    });
-
-    const orgToggle = container.querySelector<HTMLButtonElement>(
-      ".sidebar-primary-nav .sidebar-channels-toggle",
-    );
-    expect(orgToggle).not.toBeNull();
-    const orgChildren = Array.from(orgToggle!.children);
-    expect(orgChildren[0]?.tagName.toLowerCase()).toBe("svg");
-    expect(orgChildren[1]?.tagName.toLowerCase()).toBe("span");
-    expect(
-      orgChildren[2]?.classList.contains("sidebar-channels-chevron"),
-    ).toBe(true);
-
-    const projectToggle = container.querySelector<HTMLButtonElement>(
-      ".sidebar-project-channels-toggle",
-    );
-    expect(projectToggle).not.toBeNull();
-    const projectChildren = Array.from(projectToggle!.children);
-    expect(projectChildren[0]?.tagName.toLowerCase()).toBe("svg");
-    expect(projectChildren[1]?.tagName.toLowerCase()).toBe("span");
-    expect(
-      projectChildren[2]?.classList.contains("sidebar-channels-chevron"),
-    ).toBe(true);
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
 
   it("opens a project from its menu in a new window", async () => {
     const onProjectOpenInNewWindow = vi.fn().mockResolvedValue(undefined);

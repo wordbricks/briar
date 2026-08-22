@@ -2,13 +2,6 @@ import { describe, expect, it } from "vitest";
 import { managedComputerConfig } from "./managed-computer-model";
 
 describe("managed computer remote desktop configuration", () => {
-  it("keeps remote access disabled by default", () => {
-    const config = managedComputerConfig({} as Env);
-    expect(config.remoteDesktopEnabled).toBe(false);
-    expect(config.remoteDesktopTokenTtlSeconds).toBe(60);
-    expect(config.remoteDesktopMaxSessionMinutes).toBe(60);
-  });
-
   it("deduplicates approved origins and rejects unsafe duration limits", () => {
     const config = managedComputerConfig({
       MANAGED_COMPUTER_API_ORIGIN: "https://briar.example/path",

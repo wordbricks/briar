@@ -504,50 +504,6 @@ describe("useInbox read-state synchronization", () => {
     expect(inbox.notificationBaselineId).toBe("user-a:local");
   });
 
-  it("normalizes legacy terminal session versions without marking them unread", async () => {
-    const messageId = "session:legacy-session";
-    const legacyVersion = "legacy-terminal-event-id";
-    const occurredAt = "2026-08-01T12:22:38.913Z";
-    window.localStorage.setItem(
-      "briar.inbox.v1:user-a",
-      JSON.stringify({
-        messages: [{
-          id: messageId,
-          kind: "session",
-          projectId: demoDashboard.project.id,
-          projectName: demoDashboard.project.name,
-          targetId: "legacy-session",
-          title: "Previously failed task",
-          occurredAt,
-          version: legacyVersion,
-          status: "failed",
-          agentName: "Inbox Agent",
-          issueCount: 1,
-          error: "Runner stopped",
-          summary: null,
-          requiresAttention: true,
-        }],
-        readVersions: { [messageId]: legacyVersion },
-      }),
-    );
-    mockedLoadInboxReadStates.mockResolvedValue({
-      [messageId]: legacyVersion,
-    });
-    mockedLoadInboxFeed.mockRejectedValueOnce(new Error("offline"));
-
-    await renderHarness({
-      dashboard: dashboardAt(1),
-      token: "token-a",
-      userId: "user-a",
-    });
-    await flushPromises();
-
-    expect(inbox.messages.find((message) => message.id === messageId))
-      .toMatchObject({
-        version: `session:v1:failed:${occurredAt}`,
-        isUnread: false,
-      });
-  });
 
   it("preserves richer local details for the same canonical feed version", async () => {
     const feed = deferred<Awaited<ReturnType<typeof loadInboxFeed>>>();

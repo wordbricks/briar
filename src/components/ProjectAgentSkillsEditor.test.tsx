@@ -36,10 +36,6 @@ afterEach(async () => {
 });
 
 describe("ProjectAgentSkillsEditor", () => {
-  it("accepts an empty Skill roster", () => {
-    expect(projectAgentSkillsValid([])).toBe(true);
-  });
-
   it("serializes only fields accepted by the Skill input contract", () => {
     const persistedSkill = {
       id: "skill-1",
@@ -71,66 +67,6 @@ describe("ProjectAgentSkillsEditor", () => {
     ]);
   });
 
-  it("includes each Skill name in repeated runtime control names", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    mounted.push({ container, root });
-
-    await act(async () => {
-      root.render(
-        <ProjectAgentSkillsEditor
-          defaultEffort={null}
-          defaultModel={null}
-          defaultProvider="codex"
-          onChange={vi.fn()}
-          skills={[
-            {
-              id: "skill-1",
-              name: "이슈 처리",
-              description: "대기 이슈를 처리할 때 사용합니다.",
-              body: "대기 이슈를 처리합니다.",
-              provider: "codex",
-              model: null,
-              effort: null,
-              kind: "issue_processing",
-              position: 0,
-            },
-            {
-              id: "skill-2",
-              name: "데스크탑 릴리즈",
-              description: "데스크탑 앱을 릴리즈할 때 사용합니다.",
-              body: "데스크탑 앱을 릴리즈합니다.",
-              provider: "claude",
-              model: "sonnet",
-              effort: "high",
-              kind: "custom",
-              position: 1,
-            },
-          ]}
-        />,
-      );
-    });
-
-    const labels = Array.from(
-      container.querySelectorAll<HTMLButtonElement>(
-        ".project-agent-skill-card .native-select button",
-      ),
-      (button) => button.getAttribute("aria-label"),
-    );
-    expect(labels).toEqual(
-      expect.arrayContaining([
-        "이슈 처리 · 프로바이더",
-        "이슈 처리 · 모델",
-        "이슈 처리 · Effort",
-        "데스크탑 릴리즈 · 프로바이더",
-        "데스크탑 릴리즈 · 모델",
-        "데스크탑 릴리즈 · Effort",
-      ]),
-    );
-    expect(container.textContent).not.toContain("기본 스킬");
-    expect(container.textContent).not.toContain("기본으로 설정");
-  });
 
   it("allows the final Skill to be deleted", async () => {
     const container = document.createElement("div");

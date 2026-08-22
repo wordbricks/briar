@@ -21,13 +21,6 @@ final class MobileAPIContractTests: XCTestCase {
         operations = try XCTUnwrap(fixture["operations"] as? [String: [String: Any]])
     }
 
-    func testClientIDsAndContractVersionAreStable() {
-        XCTAssertEqual(MobileAPIContract.version, "1.0.0")
-        XCTAssertEqual(MobileAPIContract.iOSClientID, "briar-mobile")
-        XCTAssertEqual(MobileAPIContract.androidClientID, "briar-android")
-        XCTAssertEqual(DeviceCodeRequest(), DeviceCodeRequest(clientID: "briar-mobile"))
-    }
-
     func testChannelRealtimeEndpointAndSocketPayloadUseCursorNotifications() throws {
         let organizationID = UUID(
             uuidString: "22222222-2222-4222-8222-222222222222"

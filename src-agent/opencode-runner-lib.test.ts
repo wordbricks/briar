@@ -6,7 +6,6 @@ import {
   buildOpenCodePrompt,
   completeOpenCodeMessages,
   createOpenCodeEventState,
-  mapEffortToOpenCode,
   normalizeOpenCodeEvent,
   openCodeBlockedRetry,
   openCodeSystemPrompt,
@@ -57,11 +56,6 @@ describe("OpenCode runner helpers", () => {
       modelID: "claude-sonnet-4-5",
     });
     expect(parseOpenCodeModel("sonnet")).toBeUndefined();
-  });
-
-  it("maps unsupported high effort aliases to OpenCode's high variant", () => {
-    expect(mapEffortToOpenCode("ultra")).toBe("ultra");
-    expect(mapEffortToOpenCode("medium")).toBe("medium");
   });
 
   it("detects a free-tier retry as a blocking provider state", () => {

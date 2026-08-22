@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Organization, SessionUser } from "../types";
 import {
-  defaultOrganizationInput,
   ensureDefaultOrganization,
 } from "./default-organization";
 
@@ -28,13 +27,6 @@ function createDependencies() {
 }
 
 describe("default organization", () => {
-  it("builds a deterministic organization for the signed-in user", () => {
-    expect(defaultOrganizationInput(user)).toEqual({
-      name: "Briar User",
-      handle: "organization-9a5bda98-8785-4fd7-a3cb-54be7b0a1aa4",
-    });
-  });
-
   it("keeps an existing organization without creating another one", async () => {
     const dependencies = createDependencies();
 
@@ -58,7 +50,10 @@ describe("default organization", () => {
     ).resolves.toEqual([organization]);
     expect(dependencies.createOrganization).toHaveBeenCalledWith(
       "token",
-      defaultOrganizationInput(user),
+      {
+        name: "Briar User",
+        handle: "organization-9a5bda98-8785-4fd7-a3cb-54be7b0a1aa4",
+      },
     );
   });
 

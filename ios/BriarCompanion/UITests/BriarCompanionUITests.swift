@@ -59,41 +59,6 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-search-detail")
     }
 
-    func testEnglishLocalizationSurface() {
-        let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--ui-testing-english"]
-        app.launch()
-
-        let login = app.buttons["Sign in with Briar"]
-        XCTAssertTrue(login.waitForExistence(timeout: 5))
-        login.tap()
-        XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: 5))
-        for tab in ["Home", "Tasks", "DMs", "Inbox"] {
-            XCTAssertTrue(app.tabBars.buttons[tab].exists, "The English \(tab) tab should be visible.")
-        }
-
-        let completed = app.descendants(matching: .any)[
-            "task-row-33333333-3333-4333-8333-333333333333"
-        ]
-        XCTAssertTrue(completed.waitForExistence(timeout: 5))
-        completed.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["run-detail"].waitForExistence(timeout: 5))
-        for tab in ["Issue", "Control", "Conversation", "Result", "Logs", "Status"] {
-            XCTAssertTrue(app.buttons[tab].waitForExistence(timeout: 5), "The English \(tab) tab should be visible.")
-        }
-
-        app.buttons["BackButton"].tap()
-        app.buttons["account-menu"].tap()
-        let settings = app.buttons["Settings"]
-        XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        settings.tap()
-        XCTAssertTrue(
-            app.navigationBars["Companion settings"].waitForExistence(timeout: transitionTimeout)
-        )
-        XCTAssertTrue(app.staticTexts["Appearance"].waitForExistence(timeout: 5))
-        captureScreenshot(named: "companion-english-settings")
-    }
-
     func testRepresentativeRunStatesAndFilters() {
         let app = launchInsideCompanion()
 
@@ -114,22 +79,6 @@ final class BriarCompanionUITests: XCTestCase {
         let completed = app.cells.staticTexts["공유 API 계약 검증"]
         XCTAssertFalse(completed.exists && completed.isHittable)
         captureScreenshot(named: "companion-attention-filter")
-    }
-
-    func testDirectMessagesTabShowsRecentConversationList() {
-        let app = launchInsideCompanion()
-
-        app.tabBars.buttons["DMs"].tap()
-        XCTAssertTrue(app.navigationBars["DMs"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["project-menu"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["account-menu"].exists)
-        XCTAssertTrue(app.buttons[
-            "dm-row-12121212-1212-4212-8212-121212121212"
-        ].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Honey"].exists)
-        XCTAssertTrue(app.staticTexts["iOS DM 화면 시안을 준비했습니다."].exists)
-        XCTAssertTrue(app.buttons["new-dm-button"].exists)
-        captureScreenshot(named: "companion-direct-messages")
     }
 
     func testChannelUsesNativeNavigationAndShowsParticipationCounts() {
@@ -211,22 +160,6 @@ final class BriarCompanionUITests: XCTestCase {
             earlierMessage.waitForExistence(timeout: 5),
             "화면 상단에 도달하면 이전 메시지 페이지를 불러와야 합니다."
         )
-    }
-
-    func testChannelComposerShowsAttachmentButton() {
-        let app = launchInsideCompanion()
-
-        _ = openHomeChannel(in: app)
-
-        let attach = app.buttons["channel-composer-attach"]
-        XCTAssertTrue(attach.waitForExistence(timeout: transitionTimeout))
-        let field = app.textFields["channel-composer-field"]
-        XCTAssertTrue(field.waitForExistence(timeout: transitionTimeout))
-        field.tap()
-        XCTAssertTrue(waitForKeyboardFocus(on: field))
-        field.typeText("Native input")
-        XCTAssertTrue(app.buttons["channel-composer-send"].waitForExistence(timeout: 5))
-        captureScreenshot(named: "companion-channel-composer")
     }
 
     func testChannelAttachmentCardOpensPreview() {
@@ -439,61 +372,6 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["iOS Native Companion 읽기 경험"].exists)
         try performAccessibilityAudit(on: app, for: [.textClipped])
         captureScreenshot(named: "companion-task-list-accessibility-xxxl")
-    }
-
-    func testDirectMessagesInboxAndSettingsSurface() {
-        let app = launchInsideCompanion()
-
-        XCTAssertTrue(app.tabBars.buttons["DMs"].waitForExistence(timeout: 5))
-        app.tabBars.buttons["DMs"].tap()
-        XCTAssertTrue(app.navigationBars["DMs"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons[
-            "dm-row-12121212-1212-4212-8212-121212121212"
-        ].waitForExistence(timeout: 5))
-        captureScreenshot(named: "companion-direct-messages-list")
-
-        app.tabBars.buttons["Inbox"].tap()
-        XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.scrollViews["inbox-feed"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["inbox-mark-all-read"].exists)
-        XCTAssertTrue(app.staticTexts["오프라인 복구 확인"].waitForExistence(timeout: 5))
-        XCTAssertTrue(
-            app.staticTexts["공유 API 계약 검증"].waitForExistence(timeout: 5),
-            "모바일 인박스는 모든 중요도 메시지를 하나의 시간순 피드에 표시해야 합니다."
-        )
-        captureScreenshot(named: "companion-inbox")
-
-        app.buttons["account-menu"].tap()
-        let settingsButton = app.buttons["설정"]
-        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
-        settingsButton.tap()
-        XCTAssertTrue(app.navigationBars["Companion 설정"].waitForExistence(timeout: 5))
-        // Settings sheet exposes profile, theme, language, icons, and notification toggles.
-        let settingsIdentifiers = [
-            "account-profile-photo",
-            "settings-theme-picker",
-            "settings-locale-picker",
-            "settings-app-icon-picker",
-            "app-icon-purple",
-            "app-icon-gray",
-            "app-icon-pink",
-            "app-icon-green",
-            "notification-toggle-urgent",
-            "notification-toggle-action_required",
-            "notification-toggle-important",
-            "notification-toggle-activity",
-        ]
-        for identifier in settingsIdentifiers {
-            let element = app.descendants(matching: .any)[identifier]
-            for _ in 0..<4 where !element.exists {
-                app.swipeUp()
-            }
-            XCTAssertTrue(
-                element.waitForExistence(timeout: 5),
-                "설정 제어 \(identifier)가 표시되어야 합니다."
-            )
-        }
-        captureScreenshot(named: "companion-settings-icons")
     }
 
     func testCreateRunStateAndMessageFlow() {

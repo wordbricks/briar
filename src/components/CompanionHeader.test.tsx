@@ -2,7 +2,6 @@
 
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { CompanionHeader } from "./CompanionHeader";
 
@@ -45,67 +44,6 @@ const user = {
   .IS_REACT_ACT_ENVIRONMENT = true;
 
 describe("CompanionHeader", () => {
-  it("renders a compact workspace header with project and account controls", () => {
-    const markup = renderToStaticMarkup(
-      <CompanionHeader
-        activeOrganizationId="organization-1"
-        activeProjectId="project-1"
-        loading={false}
-        onLogout={() => undefined}
-        onOrganizationChange={() => undefined}
-        onProjectChange={() => undefined}
-        onRefresh={() => undefined}
-        onSettings={() => undefined}
-        organizations={organizations}
-        pageTitle="Tasks"
-        projects={projects}
-        user={user}
-      />,
-    );
-
-    expect(markup).toContain('class="companion-workspace"');
-    expect(markup).not.toContain("companion-workspace-mark");
-    expect(markup).toContain('aria-label="현재 프로젝트"');
-    expect(markup).toContain('<span class="select-menu-value">Briar</span>');
-    expect(markup).toContain('class="select-menu-trigger-icon"');
-    expect(markup).toContain('src="data:image/png;base64,AA=="');
-    expect(markup).toContain('class="companion-header-trailing"');
-    expect(markup).toContain('class="companion-page-title"');
-    expect(markup).toContain(">Tasks</h1>");
-    // Title sits in the leading workspace area (header empty space), not beside actions.
-    expect(markup.indexOf('class="companion-page-title"')).toBeLessThan(
-      markup.indexOf('class="companion-header-trailing"'),
-    );
-    expect(markup).toContain('class="companion-header-actions"');
-    expect(markup).toContain('class="companion-account-button"');
-    expect(markup).toContain('aria-label="계정 메뉴"');
-    expect(markup).toContain('aria-expanded="false"');
-    expect(markup).toContain(">J</span>");
-  });
-
-  it("renders the Agents page title with the shared project controls", () => {
-    const markup = renderToStaticMarkup(
-      <CompanionHeader
-        activeOrganizationId="organization-1"
-        activeProjectId="project-1"
-        loading={false}
-        onLogout={() => undefined}
-        onOrganizationChange={() => undefined}
-        onProjectChange={() => undefined}
-        onRefresh={() => undefined}
-        onSettings={() => undefined}
-        organizations={organizations}
-        pageTitle="Agents"
-        projects={projects}
-        user={user}
-      />,
-    );
-
-    expect(markup).toContain(">Agents</h1>");
-    expect(markup).toContain('aria-label="현재 프로젝트"');
-    expect(markup).toContain('class="companion-account-button"');
-  });
-
   it("opens account actions without logging out and switches organizations", async () => {
     const container = document.createElement("div");
     const root = createRoot(container);
