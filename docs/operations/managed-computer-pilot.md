@@ -159,6 +159,13 @@ aws iam attach-user-policy \
    - `MANAGED_COMPUTER_AWS_SECRET_ACCESS_KEY`
    - 단기 자격 증명을 쓰는 경우 `MANAGED_COMPUTER_AWS_SESSION_TOKEN`
 
+   이 값들은 저장소의 `.env.production`에 `dotenvx` ciphertext로만 기록한다.
+   `.env.keys`는 신뢰된 배포 호스트에서만 보관하고 커밋하거나 Cloudflare에
+   올리지 않는다. `bun run worker:deploy`는 위 allowlist만 복호화해 임시
+   `secrets.json`으로 Wrangler에 전달한 뒤 파일을 삭제한다. 복호화된 값이나
+   AWS access-key CSV를 PR, 로그, user-data, 명령 인자로 남기지 않는다.
+   변경 전후에는 `bun run secrets:verify-encrypted`를 실행한다.
+
 Identity public key는 AWS의 **해당 리전 RSA 인증서**를 공식 `regions-certs` 문서에서 받아 `openssl x509 -pubkey -noout -in certificate.pem`으로 추출한다. DSA/PKCS7이 아닌 `instance-identity/signature` 검증용 RSA 키여야 한다. 리전을 바꾸면 키도 함께 바꾸고 신규 신청을 다시 켜기 전 서명 음수 테스트를 수행한다.
 
 모든 설정과 migration이 준비되기 전에는 `MANAGED_COMPUTER_APPLICATIONS_ENABLED=false`를 유지한다. 원격 화면은 아래 스테이징 검증과 비용 승인이 끝날 때까지 별도로 `MANAGED_COMPUTER_REMOTE_DESKTOP_ENABLED=false`를 유지한다.
