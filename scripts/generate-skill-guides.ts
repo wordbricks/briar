@@ -2,17 +2,17 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dir, "..");
-const target = resolve(root, "src-cli/bundled-skill-guides.ts");
+const target = resolve(root, "apps/briar/src-cli/bundled-skill-guides.ts");
 const sources = [
   {
     name: "briar-workflow",
     description: "Execute and track repository work through a Briar workflow.",
-    path: resolve(root, "src-cli/guides/briar-workflow.md"),
+    path: resolve(root, "apps/briar/src-cli/guides/briar-workflow.md"),
   },
   {
     name: "browser",
     description: "Verify interfaces and capture result evidence with an agent browser.",
-    path: resolve(root, "src-cli/guides/browser.md"),
+    path: resolve(root, "apps/briar/src-cli/guides/browser.md"),
   },
 ];
 

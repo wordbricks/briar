@@ -5,7 +5,7 @@ binary_directory="$HOME/.local/bin"
 library_directory="$HOME/.local/share/briar"
 skill_root="$HOME/.codex/skills"
 mkdir -p "$binary_directory" "$library_directory" "$skill_root"
-install -m 644 "$(dirname "$0")/../dist-cli/briar.js" "$library_directory/briar.js"
+install -m 644 "$(dirname "$0")/../apps/briar/dist-cli/briar.js" "$library_directory/briar.js"
 install -m 644 "$(dirname "$0")/../skills/briar-workflow/VERSION" "$library_directory/VERSION"
 install -m 755 "$(dirname "$0")/briar-launcher" "$binary_directory/briar"
 for skill_name in briar-workflow browser; do

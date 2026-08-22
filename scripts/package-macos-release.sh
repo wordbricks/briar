@@ -2,10 +2,10 @@
 set -euo pipefail
 
 workspace_root="$(cd "$(dirname "$0")/.." && pwd -P)"
-bundle_root="${BRIAR_RELEASE_CARGO_TARGET_DIR:-${CARGO_TARGET_DIR:-$workspace_root/src-tauri/target}}/release/bundle"
+bundle_root="${BRIAR_RELEASE_CARGO_TARGET_DIR:-${CARGO_TARGET_DIR:-$workspace_root/apps/briar/src-tauri/target}}/release/bundle"
 artifact_root="$workspace_root/release-artifacts"
 app_path="$bundle_root/macos/Briar.app"
-version="$(bun -e "import config from './src-tauri/tauri.conf.json'; console.log(config.version)" --cwd "$workspace_root")"
+version="$(bun -e "import config from './apps/briar/src-tauri/tauri.conf.json'; console.log(config.version)" --cwd "$workspace_root")"
 release_env="$workspace_root/config/release.env"
 
 set -a
@@ -38,7 +38,7 @@ if (( ${#dmg_files[@]} == 0 )); then
 fi
 cp "${dmg_files[@]}" "$artifact_root/"
 
-bun run "$workspace_root/src-cli/release-manifest.ts" generate \
+bun run "$workspace_root/apps/briar/src-cli/release-manifest.ts" generate \
   --root "$artifact_root" \
   --version "$version"
 
@@ -48,6 +48,6 @@ bun run "$workspace_root/src-cli/release-manifest.ts" generate \
   shasum -a 256 --check SHA256SUMS
 )
 
-bun run "$workspace_root/src-cli/release-manifest.ts" verify --root "$artifact_root"
+bun run "$workspace_root/apps/briar/src-cli/release-manifest.ts" verify --root "$artifact_root"
 
 echo "Packaged Briar v$version release artifacts in $artifact_root"

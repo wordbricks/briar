@@ -160,16 +160,16 @@ run_phase() {
     rust:rust-fmt)
       prepare_rust_inputs
       rustup run 1.96.0 cargo fmt \
-        --manifest-path src-tauri/Cargo.toml --all --check
+        --manifest-path apps/briar/src-tauri/Cargo.toml --all --check
       ;;
     rust:rust-clippy)
       prepare_rust_inputs
       rustup run 1.96.0 cargo clippy \
-        --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+        --manifest-path apps/briar/src-tauri/Cargo.toml --all-targets -- -D warnings
       ;;
     rust:rust-test)
       prepare_rust_inputs
-      rustup run 1.96.0 cargo test --manifest-path src-tauri/Cargo.toml
+      rustup run 1.96.0 cargo test --manifest-path apps/briar/src-tauri/Cargo.toml
       ;;
     security:security-bun-audit) bun run audit:dependencies ;;
     security:security-rust-audit) bun run audit:rust ;;

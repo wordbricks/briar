@@ -2,7 +2,7 @@
 set -euo pipefail
 
 cargo_audit_bin="${CARGO_AUDIT_BIN:-cargo-audit}"
-lockfile="src-tauri/Cargo.lock"
+lockfile="apps/briar/src-tauri/Cargo.lock"
 run_audit() {
   if [[ "${BRIAR_TRUSTED_MERGE_GROUP_CI:-}" == "1" ]]; then
     "$cargo_audit_bin" audit --no-fetch --stale "$@"

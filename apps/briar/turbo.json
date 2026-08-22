@@ -1,0 +1,127 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "transit": {
+      "dependsOn": ["^transit"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/config/merge-group-ci-image.json",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md"
+      ]
+    },
+    "build": {
+      "dependsOn": [
+        "^build",
+        "runtime:prepare",
+        "skills:check",
+        "typecheck",
+        "agent:build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.env*",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md"
+      ],
+      "env": ["VITE_BRIAR_*"],
+      "outputs": ["dist/**"],
+      "cache": true
+    },
+    "web:build": {
+      "dependsOn": ["transit"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.env*",
+        "$TURBO_ROOT$/config/release.env",
+        "$TURBO_ROOT$/scripts/with-release-env.sh",
+        "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md"
+      ],
+      "env": ["VITE_BRIAR_*"],
+      "outputs": ["dist/**"],
+      "cache": true
+    },
+    "build:release": {
+      "dependsOn": [
+        "^build",
+        "runtime:prepare",
+        "skills:check",
+        "typecheck",
+        "agent:build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.env*",
+        "$TURBO_ROOT$/config/release.env",
+        "$TURBO_ROOT$/scripts/verify-release-config.sh",
+        "$TURBO_ROOT$/scripts/with-release-env.sh",
+        "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md"
+      ],
+      "env": ["VITE_BRIAR_*"],
+      "outputs": ["dist/**"],
+      "cache": false
+    },
+    "typecheck": {
+      "dependsOn": ["transit", "worker:check"],
+      "outputs": []
+    },
+    "skills:check": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/generate-skill-guides.ts"
+      ],
+      "outputs": []
+    },
+    "skills:generate": {
+      "cache": false
+    },
+    "runtime:prepare": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/config/bun-runtime.json",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/scripts/prepare-bun-sidecar.ts"
+      ],
+      "cache": false
+    },
+    "cli:build": {
+      "dependsOn": ["transit", "skills:check"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/config/merge-group-ci-image.json",
+        "$TURBO_ROOT$/package.json"
+      ],
+      "outputs": ["dist-cli/briar.js"]
+    },
+    "cli:install": {
+      "dependsOn": ["cli:build"],
+      "cache": false
+    },
+    "agent:build": {
+      "dependsOn": ["transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/package.json"],
+      "outputs": [
+        "dist-agent/**",
+        "dist-cli/briar-remote-session-agent.js"
+      ],
+      "cache": true
+    },
+    "worker:build": {
+      "dependsOn": ["web:build"],
+      "outputs": ["dist-worker/**"],
+      "cache": true
+    },
+    "worker:deploy": {
+      "dependsOn": ["web:build"],
+      "cache": false
+    },
+    "worker:check": {
+      "dependsOn": ["transit"],
+      "outputs": []
+    },
+    "ios:release:verify": {
+      "passThroughEnv": ["BRIAR_IOS_RELEASE_CONFIG"],
+      "cache": false
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import {
   cleanD1TestTemplates,
   prepareD1TestTemplate,
-} from "../worker/src/test-helpers/d1";
+} from "../apps/briar/worker/src/test-helpers/d1";
 
 if (process.argv.includes("--clean")) {
   await cleanD1TestTemplates();
