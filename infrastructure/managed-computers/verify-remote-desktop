@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+expected_user="${BRIAR_REMOTE_USER:-briar}"
+expected_port="${BRIAR_REMOTE_DISPLAY_PORT:-5901}"
+
+test "$(stat -c '%U:%G' /home/briar)" == "$expected_user:$expected_user"
+test "$(stat -c '%U:%G %a' /var/lib/briar)" == "root:$expected_user 750"
+test -s /opt/briar/remote-desktop-packages.lock
+sha256sum --check /opt/briar/remote-desktop-packages.lock.sha256
+
+for service in \
+  briar-managed-enroll.service \
+  briar-remote-desktop.service \
+  briar-remote-session-agent.service; do
+  systemctl is-enabled --quiet "$service"
+done
+
+systemctl is-active --quiet briar-managed-enroll.service
+systemctl is-active --quiet briar-remote-desktop.service
+systemctl is-active --quiet briar-remote-session-agent.service
+
+listeners="$(ss -H -ltn "sport = :${expected_port}")"
+if [[ -z "$listeners" ]]; then
+  echo "Remote display is not listening on port $expected_port" >&2
+  exit 1
+fi
+if grep -Eq '(^|[[:space:]])(0\.0\.0\.0|\[::\]|\*):' <<< "$listeners"; then
+  echo "Remote display is exposed on a non-loopback interface" >&2
+  exit 1
+fi
+if grep -Evq '127\.0\.0\.1:|\[::1\]:' <<< "$listeners"; then
+  echo "Remote display has a non-loopback listener" >&2
+  exit 1
+fi
+
+if systemctl show briar-remote-desktop.service \
+  --property=User --value | grep -Fxq root; then
+  echo "Remote desktop must not run as root" >&2
+  exit 1
+fi
+if systemctl show briar-remote-session-agent.service \
+  --property=User --value | grep -Fxq root; then
+  echo "Remote session agent must not run as root" >&2
+  exit 1
+fi
+
+echo "remote desktop verification passed"

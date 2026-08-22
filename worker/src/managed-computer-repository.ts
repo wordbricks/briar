@@ -26,6 +26,15 @@ export async function managedComputerById(
   ).bind(managedComputerId).first<ManagedComputerRow>();
 }
 
+export async function managedComputerByDeviceId(
+  db: D1Database,
+  deviceId: string,
+) {
+  return db.prepare(
+    `select * from briar_managed_computers where briar_device_id = ?`,
+  ).bind(deviceId).first<ManagedComputerRow>();
+}
+
 export async function organizationManagedComputer(
   db: D1Database,
   organizationId: string,

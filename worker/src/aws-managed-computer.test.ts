@@ -7,6 +7,13 @@ import type { ManagedComputerConfig } from "./managed-computer-model";
 
 const config: ManagedComputerConfig = {
   applicationsEnabled: true,
+  remoteDesktopEnabled: false,
+  remoteDesktopAllowedOrigins: [],
+  remoteDesktopTokenTtlSeconds: 60,
+  remoteDesktopMaxSessionMinutes: 60,
+  remoteDesktopOrganizationSessionLimit: 2,
+  remoteDesktopFleetSessionLimit: 20,
+  remoteDesktopRateLimit: 10,
   campaignId: "getbriar-pilot",
   promotionCode: "GETBRIAR",
   organizationLimit: 1,

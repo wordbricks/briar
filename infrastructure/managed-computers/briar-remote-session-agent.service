@@ -1,0 +1,25 @@
+[Unit]
+Description=Briar managed computer outbound remote session agent
+After=network-online.target briar-managed-enroll.service briar-remote-desktop.service
+Wants=network-online.target briar-remote-desktop.service
+Requires=briar-managed-enroll.service briar-remote-desktop.service
+
+[Service]
+Type=simple
+User=briar
+Group=briar
+Environment=HOME=/home/briar
+Environment=BRIAR_MANAGED_CREDENTIAL_FILE=/var/lib/briar/worker-credential.json
+Environment=BRIAR_REMOTE_DISPLAY_HOST=127.0.0.1
+Environment=BRIAR_REMOTE_DISPLAY_PORT=5901
+ExecStart=/opt/briar/bin/bun /opt/briar/bin/briar-remote-session-agent.js
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/var/lib/briar
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$(id -u)" != "0" ]]; then
+  echo "resolve-remote-desktop-packages must run as root in the AMI builder" >&2
+  exit 1
+fi
+
+package_list="${1:-/opt/briar/source/remote-desktop-packages.txt}"
+output="${2:-/opt/briar/source/remote-desktop-packages.lock}"
+test -r "$package_list"
+
+apt-get update
+: > "$output"
+while IFS= read -r package; do
+  [[ -z "$package" || "$package" == \#* ]] && continue
+  version="$(apt-cache policy "$package" | awk '/Candidate:/ { print $2; exit }')"
+  if [[ -z "$version" || "$version" == "(none)" ]]; then
+    echo "No installable candidate for $package" >&2
+    exit 1
+  fi
+  printf '%s=%s\n' "$package" "$version" >> "$output"
+done < "$package_list"
+
+chmod 0644 "$output"
+sha256sum "$output"

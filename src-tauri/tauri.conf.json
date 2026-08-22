@@ -69,7 +69,8 @@
       "../skills/browser/": "skills/browser/",
       "../third-party/bun-LICENSE.md": "licenses/bun-LICENSE.md",
       "../third-party/claude-agent-sdk-LICENSE.md": "licenses/claude-agent-sdk-LICENSE.md",
-      "../third-party/agency-agents-LICENSE.md": "licenses/agency-agents-LICENSE.md"
+      "../third-party/agency-agents-LICENSE.md": "licenses/agency-agents-LICENSE.md",
+      "../third-party/novnc-LICENSE.txt": "licenses/novnc-LICENSE.txt"
     },
     "macOS": {
       "minimumSystemVersion": "12.0",

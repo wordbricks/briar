@@ -196,6 +196,7 @@ import {
 } from "../lib/issue-mentions";
 import { hyperlinkSegments } from "../lib/hyperlink-text";
 import { fitIssueDescriptionField } from "../lib/issue-description-field-size";
+import { remoteDesktopCapturesKeyboard } from "../lib/remote-desktop-focus";
 import { ProfileDialog, type ProfileTarget } from "./ProfileDialog";
 import { MentionComposerField } from "./MentionComposerField";
 import {
@@ -851,6 +852,7 @@ export function HuntDashboard({
 
     const openIssueCreation = (event: KeyboardEvent) => {
       if (
+        remoteDesktopCapturesKeyboard() ||
         event.isComposing ||
         !event.metaKey ||
         event.ctrlKey ||

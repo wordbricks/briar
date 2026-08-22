@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useEffect } from "react";
 import { useI18n } from "../i18n";
+import { remoteDesktopCapturesKeyboard } from "../lib/remote-desktop-focus";
 
 export function WindowNavigationControls({
   canGoBack,
@@ -28,6 +29,7 @@ export function WindowNavigationControls({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (remoteDesktopCapturesKeyboard()) return;
       if (
         event.isComposing ||
         !event.metaKey ||

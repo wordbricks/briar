@@ -17,12 +17,21 @@ import {
   refreshManagedComputerReadiness,
 } from "./managed-computer-repository";
 import { countExecutionWorkerDeviceSessions } from "./workers";
+import {
+  endManagedComputerRemoteSessionsAndDisconnect,
+  expireStaleManagedComputerRemoteSessionsAndDisconnect,
+} from "./managed-computer-remote-service";
 
 export async function reconcileManagedComputers(
   db: D1Database,
   env: Env,
   observedAt: string,
 ) {
+  await expireStaleManagedComputerRemoteSessionsAndDisconnect(
+    db,
+    env,
+    observedAt,
+  );
   const config = managedComputerConfig(env);
   if (
     !config.region ||
@@ -47,6 +56,11 @@ export async function reconcileManagedComputers(
       const draining = await beginManagedComputerDrain(db, computer.id, observedAt);
       if (draining) {
         drained += 1;
+        await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
+          managedComputerId: computer.id,
+          reason: "computer_expired",
+          observedAt,
+        });
         await recordManagedComputerAuditEvent(db, {
           organizationId: computer.organization_id,
           managedComputerId: computer.id,
@@ -76,6 +90,11 @@ export async function reconcileManagedComputers(
         const updated = await markManagedComputerStopped(db, computer.id, observedAt);
         if (updated) {
           stopped += 1;
+          await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
+            managedComputerId: computer.id,
+            reason: "computer_stopped",
+            observedAt,
+          });
           await recordManagedComputerAuditEvent(db, {
             organizationId: computer.organization_id,
             managedComputerId: computer.id,
@@ -104,6 +123,11 @@ export async function reconcileManagedComputers(
       const updated = await markManagedComputerTerminated(db, computer.id, observedAt);
       if (updated) {
         terminated += 1;
+        await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
+          managedComputerId: computer.id,
+          reason: "computer_terminated",
+          observedAt,
+        });
         await recordManagedComputerAuditEvent(db, {
           organizationId: computer.organization_id,
           managedComputerId: computer.id,
@@ -168,6 +192,11 @@ export async function reconcileManagedComputers(
       });
       if (updated) {
         failed += 1;
+        await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
+          managedComputerId: computer.id,
+          reason: "computer_unhealthy",
+          observedAt,
+        });
         await recordManagedComputerAuditEvent(db, {
           organizationId: computer.organization_id,
           managedComputerId: computer.id,
