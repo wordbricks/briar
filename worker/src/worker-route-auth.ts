@@ -1,4 +1,5 @@
 import { sha256 } from "./crypto-digest";
+import { findProjectIdByAgentTokenHash } from "./db";
 import { HttpError } from "./http-response";
 import {
   authenticateExecutionWorker,
@@ -10,6 +11,22 @@ const bearerToken = (request: Request) => {
   const authorization = request.headers.get("authorization") ?? "";
   return authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
 };
+
+export async function requireAgentProject(
+  db: D1Database,
+  request: Request,
+) {
+  const token = bearerToken(request);
+  if (!token.startsWith("briar_agent_")) {
+    throw new HttpError(401, "Invalid agent token");
+  }
+  const projectId = await findProjectIdByAgentTokenHash(
+    db,
+    await sha256(token),
+  );
+  if (!projectId) throw new HttpError(401, "Invalid agent token");
+  return projectId;
+}
 
 export async function requireWorkerCredential(
   db: D1Database,

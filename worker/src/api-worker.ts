@@ -133,15 +133,18 @@ import { handleOrganizationRoute } from "./organization-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
 import { handleProjectAgentSessionRoute } from "./project-agent-session-routes";
 import { handleProjectAgentTaskRoute } from "./project-agent-task-routes";
+import { handleProjectAgentTaskWorkerRoute } from "./project-agent-task-worker-routes";
 import { handleProjectCoreRoute } from "./project-core-routes";
 import { handleProjectLinearRoute } from "./project-linear-routes";
 import { handleProjectSettingsRoute } from "./project-settings-routes";
 import { handleProjectWorkerRoute } from "./project-worker-routes";
+import { handleQueueClaimRoute } from "./queue-claim-routes";
 import { handlePublicRoute } from "./public-routes";
 import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
 import { handleRealtimeRoute } from "./realtime-routes";
 import {
   type AuthenticatedWorkerProject,
+  requireAgentProject,
   requireWorkerCredential,
   requireWorkerProjectBinding,
 } from "./worker-route-auth";
@@ -783,19 +786,6 @@ const decodeChannelReplyLeaseInput = decodeRequestSync(
 const decodeChannelIncomingWebhookMessage = decodeRequestSync(
   channelIncomingWebhookMessageSchema,
 );
-
-async function requireAgentProject(db: D1Database, request: Request) {
-  const token = bearerToken(request);
-  if (!token.startsWith("briar_agent_")) {
-    throw new HttpError(401, "Invalid agent token");
-  }
-  const projectId = await findProjectIdByAgentTokenHash(
-    db,
-    await sha256(token),
-  );
-  if (!projectId) throw new HttpError(401, "Invalid agent token");
-  return projectId;
-}
 
 const bearerToken = (request: Request) => {
   const authorization = request.headers.get("authorization") ?? "";
@@ -3156,425 +3146,27 @@ async function route(
     return channelReplyResultResponse;
   }
 
-  if (pathname === "/agent-task-claims" && request.method === "POST") {
-    const input = decodeProjectAgentTaskClaimInput(await readJson(request));
-    const authenticatedWorker = await requireWorkerProjectBinding(
-      db,
+  const projectAgentTaskWorkerResponse =
+    await handleProjectAgentTaskWorkerRoute({
       request,
-      input.projectId,
-      input.workerId,
-      workerClaimContext,
-    );
-    const observedAt = new Date().toISOString();
-    if (
-      workerStateAt(
-        authenticatedWorker.binding.last_heartbeat_at,
-        observedAt,
-        authenticatedWorker.binding.state,
-      ) !== "online" ||
-      authenticatedWorker.binding.accepting_work !== 1 ||
-      authenticatedWorker.binding.readiness_state === "needs_attention"
-    ) {
-      throw new HttpError(409, "Worker is not ready to claim agent tasks");
-    }
-    const providers = executionWorkerProviders(authenticatedWorker.binding);
-    if (providers.length === 0) {
-      throw new HttpError(409, "Worker has no available agent provider");
-    }
-    if (
-      !(await isExecutionWorkerAllowedForProject(
-        db,
-        input.projectId,
-        authenticatedWorker.binding.id,
-      ))
-    ) {
-      throw new HttpError(
-        409,
-        "Worker is not allowed by this project's execution policy",
-      );
-    }
-    const reaped = await reapProjectAgentTaskJobs(db, input.projectId, {
-      observedAt,
-      error: "Worker lease expired after repeated attempts.",
+      url,
+      db,
+      env,
+      context,
+      authenticatedWorker: workerClaimContext,
     });
-    await Promise.all(
-      reaped.map(async (job) => {
-        if (job.skill_execution_proposal_id) {
-          const session = await getProjectAgentSession(
-            db,
-            job.project_id,
-            job.id,
-          );
-          if (!session) return;
-          await upsertProjectAgentSessionSummary(db, session, false);
-          scheduleProjectAgentSessionRealtimePublish(
-            env,
-            db,
-            job.project_id,
-            context,
-          );
-          return;
-        }
-        const session = await syncProjectAgentTaskSession(
-          db,
-          job,
-          { error: job.error },
-        );
-        if (session) {
-          scheduleProjectAgentSessionRealtimePublish(
-            env,
-            db,
-            job.project_id,
-            context,
-          );
-        }
-      }),
-    );
-    const claimToken = `briar_agent_task_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
-    const job = await claimNextProjectAgentTask(db, input.projectId, {
-      workerId: authenticatedWorker.binding.id,
-      agentProviders: providers,
-      claimTokenHash: await sha256(claimToken),
-      claimedAt: observedAt,
-      leaseExpiresAt: leaseExpiryFrom(observedAt),
-    });
-    if (!job) return json({ work: null });
-    const activeSkill = job.agent_skills.find(
-      (skill) => skill.id === job.selected_skill_id,
-    );
-    if (!activeSkill) {
-      throw new HttpError(409, "Agent task lost its selected Skill");
-    }
-    const handoffContext = await latestExecutionWorkerUpdateHandoff(db, {
-      deviceId: authenticatedWorker.principal.deviceId,
-      workType: "projectAgentTask",
-      workId: job.id,
-    });
-    return json({
-      work: {
-        workType: "projectAgentTask",
-        workId: job.id,
-        runId: job.id,
-        sourceKey: `project-agent:${input.projectId}:${job.id}`,
-        title: job.agent_name,
-        claimToken,
-        claimAttempts: job.attempts,
-        claimedAt: job.claimed_at,
-        leaseExpiresAt: job.lease_expires_at,
-        request: job.request,
-        activeSkill: agentSkillJson(activeSkill),
-        handoffContext,
-        agent: {
-          id: job.agent_id,
-          name: job.agent_name,
-          provider: job.agent_provider,
-          model: job.agent_model,
-          effort: job.agent_effort,
-          responsibility: job.agent_responsibility,
-          skill: job.agent_skill,
-          skills: job.agent_skills.map(agentSkillJson),
-        },
-      },
-    });
+  if (projectAgentTaskWorkerResponse !== undefined) {
+    return projectAgentTaskWorkerResponse;
   }
 
-  const projectAgentTaskClaimMatch = pathname.match(
-    /^\/agent-task-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
-  );
-  if (projectAgentTaskClaimMatch && request.method === "POST") {
-    const body = await readJson(request);
-    if (projectAgentTaskClaimMatch[2] === "lease") {
-      const input = decodeProjectAgentTaskLease(body);
-      const worker = await requireWorkerProjectBinding(
-        db,
-        request,
-        input.projectId,
-        input.workerId,
-      );
-      const renewed = await renewProjectAgentTaskLease(
-        db,
-        input.projectId,
-        projectAgentTaskClaimMatch[1],
-        {
-          workerId: worker.binding.id,
-          claimTokenHash: await sha256(input.claimToken),
-          leaseExpiresAt: leaseExpiryFrom(new Date().toISOString()),
-          updatedAt: new Date().toISOString(),
-        },
-      );
-      if (!renewed) throw new HttpError(409, "Agent task claim is no longer active");
-      return json({ leaseExpiresAt: renewed.lease_expires_at });
-    }
-    const input = decodeProjectAgentTaskCompletion(body);
-    const worker = await requireWorkerProjectBinding(
-      db,
-      request,
-      input.projectId,
-      input.workerId,
-    );
-    const claimTokenHash = await sha256(input.claimToken);
-    const observedAt = new Date().toISOString();
-    const completion = await completeProjectAgentTaskWithReceipt(
-      db,
-      input.projectId,
-      projectAgentTaskClaimMatch[1],
-      {
-        workerId: worker.binding.id,
-        claimTokenHash,
-        updatedAt: observedAt,
-        summary: input.summary ?? null,
-        conversationId: input.conversationId ?? null,
-        error: input.error,
-      },
-    );
-    if (!completion) {
-      throw new HttpError(409, "Agent task completion conflicts with its receipt");
-    }
-    const completed = completion.job;
-    const hotSession = await getProjectAgentSession(
-      db,
-      input.projectId,
-      projectAgentTaskClaimMatch[1],
-    );
-    let session = hotSession ? projectAgentSessionJson(hotSession) : null;
-    let sessionChanged = false;
-    if (
-      completed && !completed.skill_execution_proposal_id &&
-      hotSession &&
-      (
-        !completion.replayed || hotSession.updated_at !== completed.updated_at ||
-        hotSession.status !== (completed.status === "queued" ? "running" : completed.status)
-      )
-    ) {
-      session = await syncProjectAgentTaskSession(db, completed, {
-        summary: completed.result_summary ?? input.summary ?? null,
-        conversationId:
-          completed.result_conversation_id ?? input.conversationId ?? null,
-        error: completed.error ?? input.error ?? null,
-      });
-      sessionChanged = session !== null;
-    }
-    if (completed?.skill_execution_proposal_id && hotSession) {
-      const summaryResult = await upsertProjectAgentSessionSummary(
-        db,
-        hotSession,
-        false,
-      );
-      sessionChanged ||= (summaryResult.meta.changes ?? 0) > 0;
-    }
-    if (sessionChanged) {
-      scheduleProjectAgentSessionRealtimePublish(
-        env,
-        db,
-        input.projectId,
-        context,
-      );
-    }
-    if (!session) {
-      const archived = await getArchivedProjectAgentSession(
-        db,
-        env.ARCHIVES,
-        input.projectId,
-        projectAgentTaskClaimMatch[1],
-      );
-      session = archived ? projectAgentSessionJson(archived) : null;
-    }
-    if (!session) throw new HttpError(409, "Agent task session is missing");
-    return json({ session });
-  }
-
-  if (pathname === "/queue/claims" && request.method === "POST") {
-    // Migration 0090 is applied by worker:deploy before this code can run.
-    const input = decodeClaimInput(await readJson(request));
-    let authenticatedWorkerId: string | undefined;
-    let authenticatedWorker:
-      | Awaited<ReturnType<typeof requireWorkerProjectBinding>>
-      | undefined;
-    const projectId = input.workerId
-      ? (() => {
-          if (!input.projectId) {
-            throw new HttpError(400, "projectId is required for worker claims");
-          }
-          return input.projectId;
-        })()
-      : await requireAgentProject(db, request);
-    if (input.workerId) {
-      authenticatedWorker = await requireWorkerProjectBinding(
-        db,
-        request,
-        projectId,
-        input.workerId,
-        workerClaimContext,
-      );
-      authenticatedWorkerId = authenticatedWorker.binding.id;
-      if (
-        workerStateAt(
-          authenticatedWorker.binding.last_heartbeat_at,
-          new Date().toISOString(),
-          authenticatedWorker.binding.state,
-        ) !== "online" ||
-        authenticatedWorker.binding.accepting_work !== 1 ||
-        authenticatedWorker.binding.readiness_state === "needs_attention"
-      ) {
-        throw new HttpError(409, "Worker is not ready to claim work");
-      }
-    }
-    const claimedAt = new Date().toISOString();
-    // Recover runs abandoned by a dead worker before looking at the queue, so
-    // they are claimable again in this same request.
-    await reapStalledHuntRuns(db, projectId, claimedAt);
-    const leaseExpiresAt = leaseExpiryFrom(claimedAt);
-    const claimToken = `briar_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
-    const run = await claimNextQueuedHuntRun(db, projectId, {
-      claimTokenHash: await sha256(claimToken),
-      claimedBy: input.claimedBy,
-      claimedAt,
-      leaseExpiresAt,
-      runId: input.runId,
-      workerId: authenticatedWorkerId,
-      workerDeviceId: authenticatedWorker?.principal.deviceId,
-      agentProviders: authenticatedWorker
-        ? executionWorkerProviders(authenticatedWorker.binding)
-        : undefined,
-      detachedOnly: Boolean(authenticatedWorkerId),
-    });
-    if (!run && input.runId) {
-      const waiting = await db
-        .prepare(
-          `select count(*) as count
-           from briar_issue_dependencies dependency
-           join briar_hunt_runs prerequisite
-             on prerequisite.id = dependency.prerequisite_run_id
-           where dependency.project_id = ?
-             and dependency.dependent_run_id = ?
-             and prerequisite.status != 'completed'`,
-        )
-        .bind(projectId, input.runId)
-        .first<{ count: number }>();
-      if ((waiting?.count ?? 0) > 0) {
-        throw new HttpError(
-          409,
-          "Run is waiting for prerequisite issues to complete",
-        );
-      }
-    }
-    if (run && authenticatedWorker) {
-      await auditExecutionEvent(db, {
-        organizationId: authenticatedWorker.principal.organizationId,
-        projectId,
-        runId: run.id,
-        workerId: authenticatedWorker.binding.id,
-        agentId: run.agent_id,
-        actorDeviceId: authenticatedWorker.principal.deviceId,
-        action: "claimed",
-        detail: { claimAttempts: run.claim_attempts },
-        occurredAt: claimedAt,
-      });
-    }
-    const agent =
-      run?.agent_id ? await getProjectAgent(db, projectId, run.agent_id) : null;
-    const activeSkill = agent
-      ? issueProcessingAgentSkillRow(agent.skills)
-      : null;
-    const execution = run
-      ? issueClaimExecutionConfig({
-          preferred: {
-            provider: run.preferred_agent_provider,
-            model: run.preferred_agent_model,
-            effort: run.preferred_agent_effort,
-          },
-          requested: {
-            provider: run.requested_agent_provider,
-            model: run.requested_agent_model,
-            effort: run.requested_agent_effort,
-          },
-          activeSkill,
-          agent,
-        })
-      : null;
-    const [attachments, messages, reworkFeedbackEvent] = run
-      ? await Promise.all([
-          listIssueAttachments(db, projectId, run.id),
-          listIssueMessagesWithArchive(db, env.ARCHIVES, projectId, run.id),
-          run.current_revision > 1
-            ? db
-                .prepare(
-                  `select detail from briar_hunt_events
-                   where run_id = ? and revision = ?
-                     and event_key like 'workflow:rework:%'
-                   order by recorded_at desc, id desc
-                   limit 1`,
-                )
-                .bind(run.id, run.current_revision)
-                .first<{ detail: string | null }>()
-            : null,
-        ])
-      : [[], [], null];
-    const workflowContext = run
-      ? await claimWorkflowContext(db, projectId, run)
-      : { startStage: null, resumeContext: null };
-    const handoffContext = run && authenticatedWorker
-      ? await latestExecutionWorkerUpdateHandoff(db, {
-          deviceId: authenticatedWorker.principal.deviceId,
-          workType: "issue",
-          workId: run.id,
-        })
-      : null;
-    return json({
-      work: run
-        ? {
-            runId: run.id,
-            runNumber: run.run_number,
-            currentAttempt: run.current_attempt,
-            currentRevision: run.current_revision,
-            source: run.source,
-            sourceKey: run.source_key,
-            title: run.title,
-            description: run.issue_description,
-            priority: run.priority,
-            repository: run.repository,
-            sourceCreatedAt: run.source_created_at,
-            createdByUserId: run.created_by_user_id ?? null,
-            context: parseJsonObject(run.context_json),
-            reviewFeedback: reworkFeedbackEvent?.detail ?? null,
-            workflowStage: run.workflow_stage,
-            startStage: workflowContext.startStage,
-            resumeContext: workflowContext.resumeContext,
-            workflow: normalizeAutoHuntWorkflow(
-              JSON.parse(run.workflow_snapshot_json),
-            ),
-            attachments: attachments.map(attachmentJson),
-            messages: claimConversationJson(messages, attachments),
-            claimToken,
-            executionId: run.last_execution_id,
-            claimedBy: run.claimed_by,
-            claimedAt: run.claimed_at,
-            leaseExpiresAt: run.lease_expires_at,
-            claimAttempts: run.claim_attempts,
-            handoffContext,
-            execution: execution?.provider
-              ? execution
-              : null,
-            activeSkill: activeSkill ? agentSkillJson(activeSkill) : null,
-            agent: agent
-              ? {
-                  id: agent.id,
-                  name: agent.name,
-                  provider: execution?.provider ?? agent.provider,
-                  model: execution?.model ?? null,
-                  effort: execution?.effort ?? null,
-                  responsibility: agent.responsibility,
-                  skill: legacyAgentSkillInstructions(
-                    activeSkill,
-                    agent.skill_markdown,
-                  ),
-                  skills: agent.skills.map(agentSkillJson),
-                }
-              : null,
-          }
-        : null,
-    });
-  }
+  const queueClaimResponse = await handleQueueClaimRoute({
+    request,
+    url,
+    db,
+    env,
+    authenticatedWorker: workerClaimContext,
+  });
+  if (queueClaimResponse !== undefined) return queueClaimResponse;
 
   const runAgentResponse = await handleRunAgentRoute({
     request,
