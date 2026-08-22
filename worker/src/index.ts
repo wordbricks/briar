@@ -466,6 +466,7 @@ import {
   countExecutionWorkerDeviceSessions,
   completeExecutionWorkerUpdates,
   countLeasedRuns,
+  deleteExecutionWorker,
   disableExecutionWorker,
   dispatchHuntRun,
   unassignHuntRun,
@@ -8411,7 +8412,7 @@ async function route(
       );
     }
     if (
-      !(await disableExecutionWorker(
+      !(await deleteExecutionWorker(
         db,
         device.id,
         new Date().toISOString(),

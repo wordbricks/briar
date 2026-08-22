@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  deleteOrganizationExecutionWorker,
   loadOrganizationExecutionWorkers,
   requestOrganizationExecutionWorkerUpdate,
   updateOrganizationExecutionWorkerIcon,
@@ -15,7 +16,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("../lib/platform", () => ({ isDesktopTauri: () => true }));
 vi.mock("../lib/api", () => ({
   applyForManagedComputer: vi.fn(),
-  disableOrganizationExecutionWorker: vi.fn(),
+  deleteOrganizationExecutionWorker: vi.fn(),
   loadManagedComputerProduct: vi.fn(async () => ({
     product: {
       currency: "USD",
@@ -256,6 +257,100 @@ describe("OrganizationWorkersSettings", () => {
       "organization-1",
       "device-1",
     );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("permanently deletes an old Worker after an irreversible warning", async () => {
+    const currentWorker = {
+      deviceId: "device-1",
+      ownerUserId: "user-1",
+      ownerName: "Jay",
+      label: "renamed-host",
+      state: "online" as const,
+      maxConcurrentSessions: 1,
+      activeSessions: 0,
+      lastHeartbeatAt: "2026-07-30T00:00:00Z",
+      createdAt: "2026-07-30T00:00:00Z",
+      versions: { briar: "1.2.84" },
+      remoteUpdateSupported: true,
+      updateRequest: null,
+      bindings: [],
+    };
+    const oldWorker = {
+      ...currentWorker,
+      deviceId: "device-old",
+      label: "old-mango",
+      state: "stale" as const,
+      versions: { briar: "1.2.69" },
+      updateRequest: {
+        id: "77777777-7777-4777-8777-777777777779",
+        targetVersion: "1.2.84",
+        status: "requested" as const,
+        requestedAt: "2026-07-30T00:00:00Z",
+        handoffState: "ready" as const,
+        handoffError: null,
+      },
+    };
+    vi.mocked(loadOrganizationExecutionWorkers)
+      .mockResolvedValueOnce({
+        workers: [currentWorker, oldWorker],
+        latestVersion: "1.2.84",
+        canManage: true,
+        generatedAt: "2026-07-30T00:00:00Z",
+      })
+      .mockResolvedValue({
+        workers: [currentWorker],
+        latestVersion: "1.2.84",
+        canManage: true,
+        generatedAt: "2026-07-30T00:01:00Z",
+      });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <OrganizationWorkersSettings
+          connectedProjectIds={["project-1"]}
+          organization={{
+            id: "organization-1",
+            name: "Wordbricks",
+            handle: "wordbricks",
+            logo: null,
+            role: "owner",
+            createdAt: "2026-07-30T00:00:00Z",
+          }}
+          projects={[]}
+          token="token"
+          userId="user-1"
+        />,
+      );
+    });
+
+    const remove = container.querySelector<HTMLButtonElement>(
+      '[aria-label="old-mango 컴퓨터 영구 삭제"]',
+    );
+    await act(async () => remove?.click());
+
+    expect(deleteOrganizationExecutionWorker).not.toHaveBeenCalled();
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog?.textContent).toContain("old-mango 컴퓨터 영구 삭제");
+    expect(dialog?.textContent).toContain(
+      "실행 자격 증명, 모든 프로젝트 연결, 대기 중 업데이트와 이 컴퓨터 전용 작업 데이터가 삭제되며 되돌릴 수 없습니다.",
+    );
+    const confirmDelete = Array.from(
+      dialog?.querySelectorAll<HTMLButtonElement>("button") ?? [],
+    ).find((button) => button.textContent?.includes("영구 삭제"));
+    await act(async () => confirmDelete?.click());
+
+    expect(deleteOrganizationExecutionWorker).toHaveBeenCalledWith(
+      "token",
+      "organization-1",
+      "device-old",
+    );
+    expect(container.textContent).not.toContain("old-mango");
 
     await act(async () => root.unmount());
     container.remove();
