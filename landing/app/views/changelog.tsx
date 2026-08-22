@@ -30,6 +30,21 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.150",
+        date: "2026년 8월 22일",
+        title: "관리형 컴퓨터 원격 화면과 모바일 DM을 더 가까이 연결합니다",
+        summary:
+          "관리형 컴퓨터의 원격 GUI 세션을 안전하게 열고 다시 연결할 수 있도록 하며, 모바일 Companion에서 Agent 대화를 DM 중심으로 확인하고 채널·알림 흐름을 더 안정적으로 다듬습니다.",
+        items: [
+          "관리형 컴퓨터에서 만료·재연결·종료 상태를 추적하는 원격 세션을 만들고, 데스크톱에서 화면을 보고 제어할 수 있는 보안 원격 GUI를 제공합니다.",
+          "모바일 Companion의 Agents 탭을 조직 DM으로 교체해 Agent와의 비공개 대화를 더 빠르게 찾고 이어갈 수 있도록 합니다.",
+          "첨부 파일이 있는 채널 답글의 실행 상태를 메시지 아래에 표시해 답글 처리 결과를 한눈에 확인할 수 있습니다.",
+          "iOS 앱이 열려 있을 때도 Inbox 답글 알림을 표시하고, 첫 Agent 답글을 원래 대화 흐름에 자연스럽게 유지합니다.",
+          "Worker 라우트와 실행 경계를 모듈별로 분리하고 Effect 기반 lint·typecheck를 추가해 서버 변경을 더 안전하게 검증합니다.",
+          "더 이상 사용하지 않는 이전 Worker를 완전히 삭제할 수 있도록 하고, 원격 세션·첨부 답글·모바일 DM 회귀 테스트를 보강합니다.",
+        ],
+      },
+      {
         version: "1.2.149",
         date: "2026년 8월 22일",
         title: "이슈 답글과 OpenCode 모델 fallback을 더 유연하게 지원합니다",
@@ -973,6 +988,21 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.150",
+        date: "August 22, 2026",
+        title: "Connect managed-computer remote screens and mobile DMs more closely",
+        summary:
+          "Open and reconnect to secure remote GUI sessions for managed computers, make Agent conversations easier to find through mobile DMs, and strengthen channel and notification delivery.",
+        items: [
+          "Create managed-computer remote sessions with expiry, reconnect, and end-state tracking, then view and control the computer through a secure desktop remote GUI.",
+          "Replace the mobile Companion's Agents tab with organization DMs so conversations with Agents are easier to find and continue privately.",
+          "Show channel-reply execution status below messages with attachments so the result of processing is visible at a glance.",
+          "Present Inbox reply notifications while the iOS app is in the foreground and keep the first Agent reply in the natural conversation timeline.",
+          "Split Worker routes and execution boundaries into focused modules and add Effect-based lint and typecheck coverage for safer server changes.",
+          "Allow obsolete Workers to be removed completely and expand regression coverage for remote sessions, attachment replies, and mobile DMs.",
+        ],
+      },
       {
         version: "1.2.149",
         date: "August 22, 2026",
@@ -2008,7 +2038,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-149">
+          <a href="#v1-2-150">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2030,7 +2060,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.149"
+                      entry.version === "1.2.150"
+                        ? "2026-08-22"
+                        : entry.version === "1.2.149"
                         ? "2026-08-22"
                         : entry.version === "1.2.148"
                         ? "2026-08-22"
