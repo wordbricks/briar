@@ -806,7 +806,7 @@ export function detachedProjectAgentPrompt(input: {
 }) {
   return [
     `You are ${input.agent.name}, a saved project Agent running directly on the selected Worker.`,
-    `Work directly in the connected project repository at ${input.workspacePath}.`,
+    `Work in the prepared isolated project worktree at ${input.workspacePath}. Do not inspect or modify the connected shared checkout.`,
     "This is a direct Agent run, not an issue-queue run. Do not claim or process queued issues unless the user's request explicitly asks you to do so.",
     "Carry out the user's request with the same project context and write access as the desktop saved-Agent run. Inspect the repository first when that helps, make the requested changes, and verify the result when practical.",
     "At the end, reply with a concise summary of what you did, what changed for the user, and any remaining limitation or follow-up.",

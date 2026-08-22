@@ -106,104 +106,144 @@ async function runClaimedProjectAgentTask(
   workerId: string,
   signal: AbortSignal,
   reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
+  runtime: {
+    allocateWorktree: typeof allocateAnalysisWorktree;
+    removeWorktree: typeof removeAnalysisWorktree;
+    runProviderTurn: typeof runDetachedProviderTurn;
+    git: typeof runGit;
+  } = {
+    allocateWorktree: allocateAnalysisWorktree,
+    removeWorktree: removeAnalysisWorktree,
+    runProviderTurn: runDetachedProviderTurn,
+    git: runGit,
+  },
 ) {
-  const workspacePath = project.repositoryPath;
-  reportCheckpoint?.({ workspacePath });
   const organizationId = project.executionWorker?.organizationId;
   if (!organizationId) throw new Error("Worker registration is missing");
-  const agent: DetachedAgent = {
-    ...detachedAgentWithActiveSkill(task.agent, task.activeSkill),
-    scope: { kind: "project", organizationId, projectId: project.id },
-  };
-  const prompt = detachedProjectAgentPrompt({
-    agent,
-    request: task.request,
-    workspacePath,
-  });
-  const transcriptSequencer = createDetachedTranscriptSequencer(
-    task.claimAttempts,
-  );
-  // Direct Agent tasks are not Hunt runs. Their task/session UUID is the
-  // durable transcript key, while attempt-scoped sequence ranges make Worker
-  // retries append safely without requiring a Hunt-run binding.
-  const transcriptEnvelope = {
+  const worktree = await runtime.allocateWorktree({
+    repositoryPath: project.repositoryPath,
     projectId: project.id,
-    sessionId: task.workId,
-    workType: "projectAgentTask" as const,
     workId: task.workId,
-    claimToken: task.claimToken,
-    workerId,
-    agentProvider: agent.provider,
-  };
-  const transcriptBatcher = new TranscriptBatcher({
-    send: async (events) => {
-      await request(config.apiUrl, "/transcripts", workerToken, {
-        method: "POST",
-        body: serializeTranscriptRequest(transcriptEnvelope, events),
-      });
-    },
-    measureBytes: (events) =>
-      Buffer.byteLength(
-        serializeTranscriptRequest(transcriptEnvelope, events),
-        "utf8",
-      ),
-    isPayloadTooLarge: isTranscriptPayloadTooLarge,
-    onError: (error) => {
-      console.error(
-        `transcript upload failed for ${task.sourceKey}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    },
+    settings: worktreeSettings(project),
+    git: runtime.git,
   });
-  let conversationId: string | null = task.handoffContext?.conversationId ?? null;
-  if (conversationId) reportCheckpoint?.({ conversationId });
-  const turn = await (async () => {
+  let taskError: unknown;
+  try {
+    const workspacePath = worktree.path;
+    reportCheckpoint?.({ workspacePath });
+    const agent: DetachedAgent = {
+      ...detachedAgentWithActiveSkill(task.agent, task.activeSkill),
+      scope: { kind: "project", organizationId, projectId: project.id },
+    };
+    const prompt = detachedProjectAgentPrompt({
+      agent,
+      request: task.request,
+      workspacePath,
+    });
+    const transcriptSequencer = createDetachedTranscriptSequencer(
+      task.claimAttempts,
+    );
+    // Direct Agent tasks are not Hunt runs. Their task/session UUID is the
+    // durable transcript key, while attempt-scoped sequence ranges make Worker
+    // retries append safely without requiring a Hunt-run binding.
+    const transcriptEnvelope = {
+      projectId: project.id,
+      sessionId: task.workId,
+      workType: "projectAgentTask" as const,
+      workId: task.workId,
+      claimToken: task.claimToken,
+      workerId,
+      agentProvider: agent.provider,
+    };
+    const transcriptBatcher = new TranscriptBatcher({
+      send: async (events) => {
+        await request(config.apiUrl, "/transcripts", workerToken, {
+          method: "POST",
+          body: serializeTranscriptRequest(transcriptEnvelope, events),
+        });
+      },
+      measureBytes: (events) =>
+        Buffer.byteLength(
+          serializeTranscriptRequest(transcriptEnvelope, events),
+          "utf8",
+        ),
+      isPayloadTooLarge: isTranscriptPayloadTooLarge,
+      onError: (error) => {
+        console.error(
+          `transcript upload failed for ${task.sourceKey}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      },
+    });
+    let conversationId: string | null = task.handoffContext?.conversationId ?? null;
+    if (conversationId) reportCheckpoint?.({ conversationId });
+    const turn = await (async () => {
+      try {
+        return await runtime.runProviderTurn({
+          agent,
+          prompt,
+          workspacePath,
+          fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
+          conversationId,
+          environment: providerExecutionEnvironment(config, agent.provider, {
+            ...process.env,
+            PATH: workerExecutionPath(),
+            BRIAR_CLI: workerCliPath(),
+            BRIAR_WORKER_TOKEN: workerToken,
+            BRIAR_PROJECT_ID: project.id,
+          }),
+          signal,
+          onConversationId: (nextConversationId) => {
+            conversationId = nextConversationId;
+            reportCheckpoint?.({ conversationId: nextConversationId });
+          },
+          onPayload: async (rawPayload, line) => {
+            const payload = detachedTranscriptPayload(rawPayload, line);
+            const sequence = transcriptSequencer.nextForPayload(payload);
+            if (sequence === null) return;
+            await transcriptBatcher.enqueue({
+              sequence,
+              direction: detachedPayloadDirection(rawPayload),
+              payload,
+            });
+          },
+        });
+      } finally {
+        // Transcript telemetry remains optional, but buffered progress deserves
+        // one final upload attempt before the durable task result is settled.
+        await transcriptBatcher.flush();
+      }
+    })();
+    assertDetachedProviderTurnSucceeded(turn);
+    if (!turn.resultText) throw new Error("Agent returned an empty direct-run summary");
+    return {
+      projectId: project.id,
+      workerId,
+      claimToken: task.claimToken,
+      summary: turn.resultText.slice(0, 50_000),
+      conversationId: turn.conversationId ?? conversationId,
+    };
+  } catch (error) {
+    taskError = error;
+    throw error;
+  } finally {
     try {
-      return await runDetachedProviderTurn({
-        agent,
-        prompt,
-        workspacePath,
-        fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
-        conversationId,
-        environment: providerExecutionEnvironment(config, agent.provider, {
-          ...process.env,
-          PATH: workerExecutionPath(),
-          BRIAR_CLI: workerCliPath(),
-          BRIAR_WORKER_TOKEN: workerToken,
-          BRIAR_PROJECT_ID: project.id,
-        }),
-        signal,
-        onConversationId: (nextConversationId) => {
-          conversationId = nextConversationId;
-          reportCheckpoint?.({ conversationId: nextConversationId });
-        },
-        onPayload: async (rawPayload, line) => {
-          const payload = detachedTranscriptPayload(rawPayload, line);
-          const sequence = transcriptSequencer.nextForPayload(payload);
-          if (sequence === null) return;
-          await transcriptBatcher.enqueue({
-            sequence,
-            direction: detachedPayloadDirection(rawPayload),
-            payload,
-          });
-        },
+      await runtime.removeWorktree({
+        repositoryPath: project.repositoryPath,
+        path: worktree.path,
+        git: runtime.git,
       });
-    } finally {
-      // Transcript telemetry remains optional, but buffered progress deserves
-      // one final upload attempt before the durable task result is settled.
-      await transcriptBatcher.flush();
+    } catch (cleanupError) {
+      if (taskError !== undefined) {
+        throw new AggregateError(
+          [taskError, cleanupError],
+          "Project Agent task and worktree cleanup both failed",
+        );
+      }
+      throw cleanupError;
     }
-  })();
-  assertDetachedProviderTurnSucceeded(turn);
-  if (!turn.resultText) throw new Error("Agent returned an empty direct-run summary");
-  return {
-    projectId: project.id,
-    workerId,
-    claimToken: task.claimToken,
-    summary: turn.resultText.slice(0, 50_000),
-    conversationId: turn.conversationId ?? conversationId,
-  };
+  }
 }
 
 async function completeClaimedProjectAgentTask(
