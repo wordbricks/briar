@@ -1024,6 +1024,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "0121_repository_merge_batches.sql",
       "0122_remove_repository_merge_batches.sql",
       "0123_native_merge_queue_coordinator.sql",
+      "0128_agent_skill_documents.sql",
     ]) {
       await executeSql(
         db,
@@ -2241,9 +2242,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         status: "running",
         attempts: 1,
         agent_provider: "codex",
-        agent_skill: skill.instructions,
+        agent_skill: skill.body,
         selected_skill_id: skill.id,
-        selected_skill_instructions: skill.instructions,
+        selected_skill_instructions: skill.body,
       });
 
       await expect(
@@ -2787,7 +2788,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         {
           id: current.skills[0].id,
           name: "Issue processing",
-          instructions: "Process queued issues.",
+          description: "Use for queued project issues.",
+          body: "Process queued issues.",
           provider: "codex",
           model: null,
           effort: "medium",
@@ -2796,7 +2798,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         },
         {
           name: "Desktop release",
-          instructions: "Publish and verify the desktop release.",
+          description: "Use for desktop release requests.",
+          body: "Publish and verify the desktop release.",
           provider: "claude",
           model: "sonnet",
           effort: "high",
@@ -2865,7 +2868,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       skills: [
         {
           name: "Temporary skill",
-          instructions: "This Skill will be removed.",
+          description: "Use for temporary test requests.",
+          body: "This Skill will be removed.",
           provider: "codex",
           model: null,
           effort: null,
@@ -2899,7 +2903,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       skills: [
         {
           name: "Issue processing",
-          instructions: "Process queued issues.",
+          description: "Use for queued project issues.",
+          body: "Process queued issues.",
           provider: "codex",
           model: null,
           effort: "medium",
@@ -2908,7 +2913,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         },
         {
           name: "Desktop release",
-          instructions: "Publish the desktop release.",
+          description: "Use for desktop release requests.",
+          body: "Publish the desktop release.",
           provider: "claude",
           model: "sonnet",
           effort: "high",
@@ -2949,7 +2955,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
             {
               id: issueSkill.id,
               name: issueSkill.name,
-              instructions: issueSkill.instructions,
+              description: issueSkill.description,
+              body: issueSkill.body,
               provider: issueSkill.provider,
               model: issueSkill.model,
               effort: issueSkill.effort,
@@ -2995,7 +3002,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           {
             id: issueSkill.id,
             name: "Desktop release",
-            instructions: issueSkill.instructions,
+            description: issueSkill.description,
+            body: issueSkill.body,
             provider: issueSkill.provider,
             model: issueSkill.model,
             effort: issueSkill.effort,
@@ -3005,7 +3013,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           {
             id: releaseSkill.id,
             name: "Issue processing",
-            instructions: releaseSkill.instructions,
+            description: releaseSkill.description,
+            body: releaseSkill.body,
             provider: releaseSkill.provider,
             model: releaseSkill.model,
             effort: releaseSkill.effort,
@@ -3054,7 +3063,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       responsibility: "Keep direct task execution settings stable.",
       skills: [{
         name: "Desktop release",
-        instructions: "Publish the desktop release.",
+        description: "Use for desktop release requests.",
+        body: "Publish the desktop release.",
         provider: "codex",
         model: null,
         effort: "medium",
@@ -3068,7 +3078,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     type RuntimeOverride = Partial<
       Pick<
         typeof selectedSkill,
-        "instructions" | "provider" | "model" | "effort"
+        "body" | "provider" | "model" | "effort"
       >
     >;
     const updateSkill = (overrides: RuntimeOverride) =>
@@ -3081,7 +3091,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         skills: [{
           id: selectedSkill.id,
           name: selectedSkill.name,
-          instructions: selectedSkill.instructions,
+          description: selectedSkill.description,
+          body: selectedSkill.body,
           provider: selectedSkill.provider,
           model: selectedSkill.model,
           effort: selectedSkill.effort,
@@ -3105,11 +3116,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       });
 
       for (const change of [
-        { instructions: "Changed while queued." },
+        { body: "Changed while queued." },
         { provider: "claude" as const },
       ]) {
         await expect(updateSkill(change)).rejects.toThrow(
-          "cannot change instructions or execution settings while queued or running direct Agent work",
+          "cannot change body or execution settings while queued or running direct Agent work",
         );
       }
 
@@ -3124,7 +3135,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         { effort: "high" as const },
       ]) {
         await expect(updateSkill(change)).rejects.toThrow(
-          "cannot change instructions or execution settings while queued or running direct Agent work",
+          "cannot change body or execution settings while queued or running direct Agent work",
         );
       }
 
@@ -3133,7 +3144,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
           (candidate) => candidate.id === agent.id,
         )?.skills[0],
       ).toMatchObject({
-        instructions: selectedSkill.instructions,
+        body: selectedSkill.body,
         provider: selectedSkill.provider,
         model: selectedSkill.model,
         effort: selectedSkill.effort,
@@ -3147,7 +3158,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         .run();
       await expect(
         updateSkill({
-          instructions: "Publish and verify the desktop release.",
+          body: "Publish and verify the desktop release.",
           provider: "claude",
           model: "sonnet",
           effort: "high",
@@ -3155,7 +3166,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ).resolves.toMatchObject({
         skills: [
           expect.objectContaining({
-            instructions: "Publish and verify the desktop release.",
+            body: "Publish and verify the desktop release.",
             provider: "claude",
             model: "sonnet",
             effort: "high",
@@ -3194,7 +3205,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       skills: [
         {
           name: "Legacy settings",
-          instructions: "Run with the original Skill settings.",
+          description: "Use for legacy Agent settings.",
+          body: "Run with the original Skill settings.",
           provider: "codex",
           model: null,
           effort: null,
@@ -3223,7 +3235,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         skills: [
           expect.objectContaining({
             id: agent.skills[0].id,
-            instructions: "Run with the settings saved by a legacy client.",
+            body: "Run with the settings saved by a legacy client.",
             provider: "claude",
             model: "sonnet",
             effort: "high",
@@ -3247,7 +3259,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       skills: [
         {
           name: "Owned Skill",
-          instructions: "Must remain attached to the collision target.",
+          description: "Use for collision ownership tests.",
+          body: "Must remain attached to the collision target.",
           provider: "codex",
           model: null,
           effort: null,
@@ -3270,7 +3283,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
             {
               id: owner.skills[0].id,
               name: "Stolen Skill",
-              instructions: "Must never move between Agents.",
+              description: "Use for cross-Agent collision tests.",
+              body: "Must never move between Agents.",
               provider: "claude",
               model: "sonnet",
               effort: "high",
@@ -4681,7 +4695,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       responsibility: "Reply to issue conversations.",
       skills: [{
         name: "Issue processing",
-        instructions: "Reply to issue conversations.",
+        description: "Use for issue conversation replies.",
+        body: "Reply to issue conversations.",
         provider: "codex",
         model: null,
         effort: null,

@@ -632,7 +632,6 @@ import {
 } from "../../src/lib/channels-contract";
 import {
   agentSkillConflictMessage,
-  agentSkillForMessage,
   agentSkillJson,
   getAgentSkill,
   hydrateAgentSkills,
@@ -4839,21 +4838,18 @@ async function route(
     };
     const invokedAgents = await Promise.all(
       mentionedAgents.map(async (agent) => {
-        const activeSkill = agentSkillForMessage(agent.skills, input.body);
-        const runtime = activeSkill ?? agent;
         const hasAvailableWorker = await hasAvailableChannelReplyWorker(db, {
           organizationId,
           projectId: agent.project_id,
-          provider: runtime.provider,
-          model: runtime.model,
-          effort: runtime.effort,
+          provider: agent.provider,
+          model: agent.model,
+          effort: agent.effort,
           observedAt: createdAt,
         });
         const unavailableReason: typeof channelReplyNoAvailableWorkerError | null =
           hasAvailableWorker ? null : channelReplyNoAvailableWorkerError;
         return {
           agent,
-          activeSkill,
           unavailableReason,
         };
       }),
@@ -4914,11 +4910,11 @@ async function route(
       channelId: channel.id,
       triggerMessageId: message.id,
       parentMessageId: agentReplyParentMessageId(message),
-      agents: invokedAgents.map(({ agent, activeSkill, unavailableReason }) => ({
+      agents: invokedAgents.map(({ agent, unavailableReason }) => ({
         id: agent.id,
         projectId: agent.project_id,
-        skillId: activeSkill?.id ?? null,
-        provider: activeSkill?.provider ?? agent.provider,
+        skillId: null,
+        provider: agent.provider,
         unavailableReason,
       })),
       preferredDeviceId: input.preferredDeviceId,
@@ -7529,12 +7525,7 @@ async function route(
     }
     const agentReplies: IssueAgentReplyJobRow[] = [];
     if (targetAgents.size > 0) {
-      const skillExecutionAvailable =
-        await agentSkillExecutionApprovalTablesAvailable(db);
       for (const agent of targetAgents.values()) {
-        const selectedSkillId = skillExecutionAvailable
-          ? agentSkillForMessage(agent.skills, input.body)?.id ?? null
-          : null;
         const agentReply = await enqueueIssueAgentReply(db, {
           id: crypto.randomUUID(),
           projectId: project.id,
@@ -7546,7 +7537,7 @@ async function route(
           }),
           replyMessageId: crypto.randomUUID(),
           agentId: agent.id,
-          skillId: selectedSkillId,
+          skillId: null,
           // A live processing Worker is the only safe place to look for the
           // issue's uncommitted worktree. If the run has not been claimed yet,
           // keep the reply claimable and let the Worker answer from the
@@ -10257,7 +10248,7 @@ async function route(
       ? {
           ...liveSelectedSkill,
           name: job.selected_skill_name_snapshot!,
-          instructions: job.selected_skill_instructions_snapshot!,
+          body: job.selected_skill_instructions_snapshot!,
           provider: job.selected_skill_provider_snapshot!,
           model: job.selected_skill_model_snapshot ?? null,
           effort: job.selected_skill_effort_snapshot ?? null,
@@ -10276,9 +10267,7 @@ async function route(
             : liveAgent.skills,
         }
       : null;
-    const activeSkill = selectedSkill ?? (agent
-      ? issueProcessingAgentSkillRow(agent.skills)
-      : null);
+    const activeSkill = selectedSkill;
     const replyExecution = issueReplyExecutionConfig({
       provider: job.agent_provider,
       preferred: {
@@ -10500,7 +10489,7 @@ async function route(
         ? {
             ...liveActiveSkill,
             name: job.selected_skill_name_snapshot!,
-            instructions: job.selected_skill_instructions_snapshot!,
+            body: job.selected_skill_instructions_snapshot!,
             provider: job.selected_skill_provider_snapshot!,
             model: job.selected_skill_model_snapshot ?? null,
             effort: job.selected_skill_effort_snapshot ?? null,
@@ -11190,15 +11179,11 @@ async function route(
           "Delegation target is not an eligible Project Agent in this channel",
         );
       }
-      const selectedSkill = agentSkillForMessage(
-        target.skills,
-        result.delegation.request,
-      );
       delegation = {
         projectId: target.project_id,
         agentId: target.id,
-        skillId: selectedSkill?.id ?? null,
-        provider: selectedSkill?.provider ?? target.provider,
+        skillId: null,
+        provider: target.provider,
         request: result.delegation.request,
       };
     }

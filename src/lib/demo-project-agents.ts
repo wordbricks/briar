@@ -17,7 +17,8 @@ export function demoProjectAgents(
     id: string;
     agentId: string;
     name: string;
-    instructions: string;
+    description: string;
+    body: string;
     provider: ProjectAgent["provider"];
     model: string | null;
   }): ProjectAgent["skills"][number] => ({
@@ -75,7 +76,8 @@ export function demoProjectAgents(
           id: "demo-skill-sentry",
           agentId: "demo-agent-sentry",
           name: "Sentry 오류 탐지",
-          instructions:
+          description: "Sentry 오류를 분석해 실행 가능한 이슈로 정리해야 할 때 사용합니다.",
+          body:
             "Sentry의 에러 내역을 확인하고 필요한 이슈를 만들어 배정합니다.",
           provider: "claude",
           model: "opus",
@@ -107,7 +109,8 @@ export function demoProjectAgents(
           id: "demo-skill-feedback",
           agentId: "demo-agent-feedback",
           name: "Feedback 분석",
-          instructions:
+          description: "사용자 피드백에서 제품 액션 아이템을 도출해야 할 때 사용합니다.",
+          body:
             "채널 피드백을 취합하고 분석해 액션 아이템을 이슈로 만듭니다.",
           provider: "grok",
           model: "grok-4.5",

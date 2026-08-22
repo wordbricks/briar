@@ -15,7 +15,8 @@ import {
 } from "./channels-contract";
 import {
   agentResponsibilityMaxLength,
-  agentSkillInstructionsMaxLength,
+  agentSkillBodyMaxLength,
+  agentSkillDescriptionMaxLength,
   agentSkillsMaxCount,
 } from "./agent-limits";
 
@@ -34,7 +35,8 @@ const accepts = <S extends Schema.ConstraintDecoder<unknown>>(
 describe("Agent input limits", () => {
   const skill = (index: number) => ({
     name: `Skill ${index}`,
-    instructions: "x".repeat(agentSkillInstructionsMaxLength),
+    description: "x".repeat(agentSkillDescriptionMaxLength),
+    body: "x".repeat(agentSkillBodyMaxLength),
     provider: "codex" as const,
     model: null,
     effort: null,
@@ -42,7 +44,7 @@ describe("Agent input limits", () => {
     position: index,
   });
 
-  it("accepts 20000-character responsibility and Skill instructions", () => {
+  it("accepts bounded responsibility and Skill document fields", () => {
     expect(accepts(channelAgentSkillInputSchema, skill(0))).toBe(true);
     expect(accepts(organizationAgentInputSchema, {
       name: "Builder",
@@ -54,10 +56,14 @@ describe("Agent input limits", () => {
     })).toBe(true);
   });
 
-  it("rejects responsibility, instructions, and rosters above their limits", () => {
+  it("rejects responsibility, Skill fields, and rosters above their limits", () => {
     expect(accepts(channelAgentSkillInputSchema, {
       ...skill(0),
-      instructions: "x".repeat(agentSkillInstructionsMaxLength + 1),
+      body: "x".repeat(agentSkillBodyMaxLength + 1),
+    })).toBe(false);
+    expect(accepts(channelAgentSkillInputSchema, {
+      ...skill(0),
+      description: "x".repeat(agentSkillDescriptionMaxLength + 1),
     })).toBe(false);
     expect(accepts(organizationAgentInputSchema, {
       name: "Builder",
@@ -73,6 +79,22 @@ describe("Agent input limits", () => {
         skill(index)
       ),
     })).toBe(false);
+  });
+
+  it("normalizes the legacy combined Skill field into description and body", () => {
+    expect(decode(channelAgentSkillInputSchema, {
+      name: "Release",
+      instructions: "Publish and verify the release.",
+      provider: "codex",
+      model: null,
+      effort: null,
+      kind: "custom",
+      position: 0,
+    })).toMatchObject({
+      name: "Release",
+      description: "Publish and verify the release.",
+      body: "Publish and verify the release.",
+    });
   });
 });
 

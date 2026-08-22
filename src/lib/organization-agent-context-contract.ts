@@ -7,7 +7,8 @@ import { IsoDateTimeWithOffset } from "./date-time-schema";
 import {
   agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
-  agentSkillInstructionsMaxLength,
+  agentSkillBodyMaxLength,
+  agentSkillDescriptionMaxLength,
   agentSkillsMaxCount,
 } from "./agent-limits";
 import {
@@ -264,8 +265,11 @@ export type OrganizationAgentContextRequestTurn =
 export const OrganizationAgentContextAgentSkill = strict(Schema.Struct({
   id: OrganizationAgentContextId,
   name: stringBetween(1, 100),
-  instructions: Schema.String.check(
-    Schema.isMaxLength(agentSkillInstructionsMaxLength),
+  description: Schema.String.check(
+    Schema.isLengthBetween(1, agentSkillDescriptionMaxLength),
+  ),
+  body: Schema.String.check(
+    Schema.isLengthBetween(1, agentSkillBodyMaxLength),
   ),
   provider: Schema.Literals(agentProviders),
   model: Schema.NullOr(stringBetween(1, 100)),

@@ -144,7 +144,8 @@ export function OrganizationAgentsSettings({
         agent.skills.map((skill) => ({
           id: skill.id,
           name: skill.name,
-          instructions: skill.instructions,
+          description: skill.description,
+          body: skill.body,
           provider: skill.provider,
           model: skill.model,
           effort: skill.effort,

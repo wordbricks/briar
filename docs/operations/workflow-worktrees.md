@@ -37,6 +37,13 @@ control-plane access. The saved-agent worktree is removed after the turn,
 including when the agent fails; a worktree allocation, fetch, or cleanup error
 fails the run instead of falling back to the connected checkout.
 
+Approved Project Agent Skill executions claimed by a selected Worker use the
+same detached temporary-worktree lifecycle as project-scoped channel turns.
+The task UUID selects the isolated checkout path, `.worktreeinclude` inputs are
+copied before the provider starts, and the checkout is removed after success,
+failure, or cancellation. Allocation never falls back to the connected
+checkout.
+
 ## Where things live
 
 | | Value |

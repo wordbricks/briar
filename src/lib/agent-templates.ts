@@ -18,7 +18,8 @@ import type {
 import {
   agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
-  agentSkillInstructionsMaxLength,
+  agentSkillBodyMaxLength,
+  agentSkillDescriptionMaxLength,
   agentSkillsMaxCount,
 } from "./agent-limits";
 import type { AgentProvider, ModelEffort } from "./project-llm";
@@ -42,7 +43,8 @@ export type ProjectAgentTemplate = {
   calendarColor: string;
   skills: readonly {
     name: string;
-    instructions: string;
+    description: string;
+    body: string;
     kind: ProjectAgentSkillKind;
   }[];
 };
@@ -55,6 +57,27 @@ export function agentTemplateMarkdownBody(markdown: string) {
     throw new Error("Agent template frontmatter is not closed");
   }
   return normalized.slice(frontmatterEnd + "\n---\n".length).trim();
+}
+
+export function agentTemplateMarkdownDescription(markdown: string) {
+  const normalized = markdown.replace(/\r\n?/gu, "\n");
+  if (!normalized.startsWith("---\n")) {
+    throw new Error("Agent template frontmatter is missing");
+  }
+  const frontmatterEnd = normalized.indexOf("\n---\n", 4);
+  if (frontmatterEnd === -1) {
+    throw new Error("Agent template frontmatter is not closed");
+  }
+  const description = normalized
+    .slice(4, frontmatterEnd)
+    .split("\n")
+    .find((line) => line.startsWith("description:"))
+    ?.slice("description:".length)
+    .trim();
+  if (!description) {
+    throw new Error("Agent template description is missing");
+  }
+  return description;
 }
 
 const agencyAgentsRepository = "https://github.com/msitarzewski/agency-agents";
@@ -88,7 +111,8 @@ export const frontendDeveloperAgentTemplate = {
   skills: [
     {
       name: "Frontend Development",
-      instructions: agentTemplateMarkdownBody(frontendDeveloperMarkdown),
+      description: agentTemplateMarkdownDescription(frontendDeveloperMarkdown),
+      body: agentTemplateMarkdownBody(frontendDeveloperMarkdown),
       kind: "custom",
     },
   ],
@@ -110,7 +134,8 @@ export const backendArchitectAgentTemplate = {
   skills: [
     {
       name: "Backend Architecture",
-      instructions: agentTemplateMarkdownBody(backendArchitectMarkdown),
+      description: agentTemplateMarkdownDescription(backendArchitectMarkdown),
+      body: agentTemplateMarkdownBody(backendArchitectMarkdown),
       kind: "custom",
     },
   ],
@@ -132,7 +157,8 @@ export const mobileAppBuilderAgentTemplate = {
   skills: [
     {
       name: "Mobile App Development",
-      instructions: agentTemplateMarkdownBody(mobileAppBuilderMarkdown),
+      description: agentTemplateMarkdownDescription(mobileAppBuilderMarkdown),
+      body: agentTemplateMarkdownBody(mobileAppBuilderMarkdown),
       kind: "custom",
     },
   ],
@@ -154,7 +180,8 @@ export const devopsAutomatorAgentTemplate = {
   skills: [
     {
       name: "DevOps Automation",
-      instructions: agentTemplateMarkdownBody(devopsAutomatorMarkdown),
+      description: agentTemplateMarkdownDescription(devopsAutomatorMarkdown),
+      body: agentTemplateMarkdownBody(devopsAutomatorMarkdown),
       kind: "custom",
     },
   ],
@@ -174,7 +201,8 @@ export const uiDesignerAgentTemplate = {
   skills: [
     {
       name: "UI Design",
-      instructions: agentTemplateMarkdownBody(uiDesignerMarkdown),
+      description: agentTemplateMarkdownDescription(uiDesignerMarkdown),
+      body: agentTemplateMarkdownBody(uiDesignerMarkdown),
       kind: "custom",
     },
   ],
@@ -196,7 +224,8 @@ export const sprintPrioritizerAgentTemplate = {
   skills: [
     {
       name: "Sprint Prioritization",
-      instructions: agentTemplateMarkdownBody(sprintPrioritizerMarkdown),
+      description: agentTemplateMarkdownDescription(sprintPrioritizerMarkdown),
+      body: agentTemplateMarkdownBody(sprintPrioritizerMarkdown),
       kind: "custom",
     },
   ],
@@ -216,7 +245,8 @@ export const growthHackerAgentTemplate = {
   skills: [
     {
       name: "Growth Hacking",
-      instructions: agentTemplateMarkdownBody(growthHackerMarkdown),
+      description: agentTemplateMarkdownDescription(growthHackerMarkdown),
+      body: agentTemplateMarkdownBody(growthHackerMarkdown),
       kind: "custom",
     },
   ],
@@ -238,7 +268,8 @@ export const socialMediaStrategistAgentTemplate = {
   skills: [
     {
       name: "Social Media Strategy",
-      instructions: agentTemplateMarkdownBody(socialMediaStrategistMarkdown),
+      description: agentTemplateMarkdownDescription(socialMediaStrategistMarkdown),
+      body: agentTemplateMarkdownBody(socialMediaStrategistMarkdown),
       kind: "custom",
     },
   ],
@@ -258,7 +289,8 @@ export const contentCreatorAgentTemplate = {
   skills: [
     {
       name: "Content Creation",
-      instructions: agentTemplateMarkdownBody(contentCreatorMarkdown),
+      description: agentTemplateMarkdownDescription(contentCreatorMarkdown),
+      body: agentTemplateMarkdownBody(contentCreatorMarkdown),
       kind: "custom",
     },
   ],
@@ -280,7 +312,8 @@ export const instagramCuratorAgentTemplate = {
   skills: [
     {
       name: "Instagram Marketing",
-      instructions: agentTemplateMarkdownBody(instagramCuratorMarkdown),
+      description: agentTemplateMarkdownDescription(instagramCuratorMarkdown),
+      body: agentTemplateMarkdownBody(instagramCuratorMarkdown),
       kind: "custom",
     },
   ],
@@ -300,7 +333,8 @@ export const tiktokStrategistAgentTemplate = {
   skills: [
     {
       name: "TikTok Marketing",
-      instructions: agentTemplateMarkdownBody(tiktokStrategistMarkdown),
+      description: agentTemplateMarkdownDescription(tiktokStrategistMarkdown),
+      body: agentTemplateMarkdownBody(tiktokStrategistMarkdown),
       kind: "custom",
     },
   ],
@@ -370,11 +404,16 @@ export function projectAgentTemplateValidationErrors(
     }
     skillNames.add(skillName);
     if (
-      !skill.instructions.trim() ||
-      skill.instructions.length > agentSkillInstructionsMaxLength
+      !skill.description.trim() ||
+      skill.description.length > agentSkillDescriptionMaxLength
     ) {
       errors.push(
-        `skill ${index + 1} instructions must contain 1 to ${agentSkillInstructionsMaxLength} characters`,
+        `skill ${index + 1} description must contain 1 to ${agentSkillDescriptionMaxLength} characters`,
+      );
+    }
+    if (!skill.body.trim() || skill.body.length > agentSkillBodyMaxLength) {
+      errors.push(
+        `skill ${index + 1} body must contain 1 to ${agentSkillBodyMaxLength} characters`,
       );
     }
   });
