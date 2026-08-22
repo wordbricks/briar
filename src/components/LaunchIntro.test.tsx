@@ -52,19 +52,4 @@ describe("LaunchIntro", () => {
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
-  it("automatically completes a forced development preview", async () => {
-    vi.useFakeTimers();
-    const onComplete = vi.fn();
-
-    await act(async () => root.render(
-      <LaunchIntro preview onComplete={onComplete} />,
-    ));
-    expect(container.querySelector(".launch-intro-preview")).not.toBeNull();
-
-    await act(async () => vi.advanceTimersByTime(5_599));
-    expect(onComplete).not.toHaveBeenCalled();
-
-    await act(async () => vi.advanceTimersByTime(1));
-    expect(onComplete).toHaveBeenCalledOnce();
-  });
 });

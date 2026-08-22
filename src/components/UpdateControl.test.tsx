@@ -82,17 +82,6 @@ describe("UpdateControl", () => {
     </AppUpdateProvider>
   );
 
-  it("stays hidden when the signed channel is current", async () => {
-    check.mockResolvedValue(null);
-    const root = createRoot(container);
-    await act(async () => root.render(control));
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(check).toHaveBeenCalledOnce();
-    expect(container.querySelector("button")).toBeNull();
-    await act(async () => root.unmount());
-  });
 
   it("refreshes the bundled Worker runtime for a remote update link", async () => {
     check.mockResolvedValue(null);

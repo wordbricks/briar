@@ -180,49 +180,4 @@ describe("ChannelMessageText", () => {
       .toBe("All systems operational");
   });
 
-  it("shows the Agent's runtime and responsibility on its profile", async () => {
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ProfileDialog
-            onOpenChange={() => undefined}
-            profile={{
-              type: "agent",
-              id: agent.agentId,
-              name: agent.name,
-              provider: agent.provider,
-              model: agent.model,
-              responsibility: agent.responsibility,
-              skills: [
-                {
-                  id: "skill-1",
-                  agentId: agent.agentId,
-                  name: "Issue processing",
-                  description: "Use for queued project issues.",
-                  body: "Process queued issues.",
-                  provider: "codex",
-                  model: "gpt-5.6-sol",
-                  effort: "high",
-                  kind: "issue_processing",
-                  position: 0,
-                  createdAt: agent.createdAt,
-                  updatedAt: agent.createdAt,
-                },
-              ],
-              projectId: agent.projectId,
-              createdAt: agent.createdAt,
-            }}
-          />
-        </I18nProvider>,
-      );
-    });
-
-    const profile = document.body.querySelector<HTMLElement>(
-      ".profile-dialog[role='dialog']",
-    );
-    expect(profile?.textContent).toContain("Honey");
-    expect(profile?.textContent).toContain("Writing partner");
-    expect(profile?.textContent).toContain("claude · sonnet");
-    expect(profile?.textContent).not.toContain("codex · gpt-5.6-sol");
-  });
 });

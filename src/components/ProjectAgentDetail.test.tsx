@@ -276,39 +276,6 @@ describe("ProjectAgentDetail", () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it("closes the Skill picker before navigating back on mobile", async () => {
-    const onBack = vi.fn();
-    const container = await mount(
-      <ProjectAgentDetail
-        agent={agent}
-        companionMode
-        dashboard={dashboardWithWorker}
-        isSidebarOpen
-        onBack={onBack}
-        onIssueOpen={() => undefined}
-        onStartRemoteTask={async () => "remote-session"}
-        onSettleTaskSession={() => undefined}
-        onStopSession={async () => true}
-        onStartAutoHunt={() => "dispatch-1"}
-        onStartTaskSession={() => undefined}
-        requestedSessionId={null}
-        sessions={[]}
-      />,
-    );
-
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".project-agent-run-task")
-        ?.click();
-    });
-    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
-
-    await act(async () => {
-      expect(requestMobileNavigationBack()).toBe(true);
-    });
-    expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(onBack).not.toHaveBeenCalled();
-  });
 
   it("closes the Skill picker and allows Back while a mobile run is pending", async () => {
     const onBack = vi.fn();

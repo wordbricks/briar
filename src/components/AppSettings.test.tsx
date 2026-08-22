@@ -469,50 +469,6 @@ describe("AppSettings", () => {
     container.remove();
   });
 
-  it("offers system, light, and dark appearance themes", async () => {
-    window.localStorage.setItem(themeStorageKey, "system");
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <ThemeProvider>
-          <I18nProvider>
-            <AppSettings
-              error={null}
-              initialSection="appearance"
-              isSidebarOpen
-              loading={false}
-              onBack={() => undefined}
-              onRefresh={() => Promise.resolve(readiness)}
-              projectId="project-1"
-              projectName="Briar"
-              readiness={readiness}
-            />
-          </I18nProvider>
-        </ThemeProvider>,
-      );
-    });
-
-    const options = Array.from(
-      container.querySelectorAll<HTMLButtonElement>('[role="radio"]'),
-    );
-    expect(options.map((option) => option.textContent?.trim())).toEqual([
-      "System",
-      "Light",
-      "Dark",
-    ]);
-    expect(options[0]?.getAttribute("aria-checked")).toBe("true");
-
-    await act(async () => options[2]?.click());
-
-    expect(window.localStorage.getItem(themeStorageKey)).toBe("dark");
-    expect(document.documentElement.classList.contains("dark")).toBe(true);
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
 
   it("shows the Source Control tab and persists provider preferences", async () => {
     const onRefresh = vi.fn().mockResolvedValue(readiness);

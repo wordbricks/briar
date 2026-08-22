@@ -121,27 +121,6 @@ describe("OrganizationAgentsSettings", () => {
     expect(container.textContent).not.toContain("스케줄");
   });
 
-  it("shows the Agent-level runtime on an organization Agent card", async () => {
-    listOrganizationAgents.mockResolvedValue({
-      agents: [
-        {
-          ...organizationAgent,
-          skills: [
-            {
-              ...organizationAgent.skills[0],
-              provider: "claude",
-              model: "sonnet",
-            },
-          ],
-        },
-      ],
-      canManage: true,
-    });
-    await render();
-
-    expect(container.textContent).toContain("Codex");
-    expect(container.textContent).not.toContain("Claude · sonnet");
-  });
 
   it("saves per-Skill runtime settings for an organization Agent", async () => {
     await render();

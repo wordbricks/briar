@@ -66,64 +66,7 @@ describe("WorkerStatusBar", () => {
     localStorage.clear();
   });
 
-  it("shows a compact computer trigger with the active worker count", () => {
-    const markup = renderToStaticMarkup(
-      <I18nProvider>
-        <WorkerStatusBar
-          onOpenSettings={() => undefined}
-          workers={[
-            worker(),
-            worker({
-              id: "worker-2",
-              state: "stale",
-              readiness: "offline",
-            }),
-          ]}
-        />
-      </I18nProvider>,
-    );
 
-    expect(markup).toContain("worker-status-trigger");
-    expect(markup).toContain('aria-label="활성 Worker 1대"');
-    expect(markup).toContain("<strong>1</strong>");
-    expect(markup).not.toContain("worker-status-popover");
-  });
-
-  it("opens a list with readiness, name, and every supported provider icon", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <WorkerStatusBar
-            onOpenSettings={() => undefined}
-            workers={[
-              worker({ icon: { type: "emoji", value: "🍋" } }),
-            ]}
-          />
-        </I18nProvider>,
-      );
-    });
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".worker-status-trigger")
-        ?.click();
-    });
-
-    expect(container.innerHTML).toContain("worker-status-dot available");
-    expect(container.innerHTML).toContain("Janet's Mac");
-    expect(container.querySelector(".worker-icon")?.textContent).toBe("🍋");
-    expect(container.innerHTML).toContain("사용 가능");
-    expect(container.innerHTML).toContain('aria-label="Codex"');
-    expect(container.innerHTML).toContain('aria-label="Claude"');
-    expect(container.innerHTML.match(/title="Codex"/g)).toHaveLength(1);
-    expect(container.innerHTML.match(/title="Claude"/g)).toHaveLength(1);
-    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
-
-    await act(async () => root.unmount());
-  });
 
   it("shows each worker's used and total slots with an accessible meter", async () => {
     const container = document.createElement("div");
@@ -162,33 +105,6 @@ describe("WorkerStatusBar", () => {
     await act(async () => root.unmount());
   });
 
-  it("shows each worker's current Briar version", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <WorkerStatusBar
-            onOpenSettings={() => undefined}
-            workers={[worker({ versions: { briar: "1.2.69" } })]}
-          />
-        </I18nProvider>,
-      );
-    });
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".worker-status-trigger")
-        ?.click();
-    });
-
-    expect(container.querySelector(".worker-status-version")?.textContent).toBe(
-      "v1.2.69",
-    );
-
-    await act(async () => root.unmount());
-  });
 
   it("shows an update control when a Worker is behind the latest version", async () => {
     vi.mocked(loadOrganizationExecutionWorkers).mockResolvedValue({

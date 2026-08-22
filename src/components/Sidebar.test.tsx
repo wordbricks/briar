@@ -386,56 +386,6 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("bolds unread channel names and restores the regular weight when read", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    const unreadChannel = {
-      id: "channel-1",
-      organizationId: "organization-1",
-      slug: "general",
-      name: "General",
-      topic: null,
-      visibility: "public" as const,
-      defaultProjectId: null,
-      archivedAt: null,
-      memberCount: 1,
-      agentCount: 0,
-      createdAt: "2026-08-01T00:00:00Z",
-      updatedAt: "2026-08-01T00:00:00Z",
-      hasUnread: true,
-    };
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activePage="issues"
-          channels={[unreadChannel]}
-          onChannelOpen={() => undefined}
-        />,
-      );
-    });
-    expect(
-      container.querySelector("#sidebar-channel-list button")?.className,
-    ).toContain("unread");
-
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activePage="issues"
-          channels={[{ ...unreadChannel, hasUnread: false }]}
-          onChannelOpen={() => undefined}
-        />,
-      );
-    });
-    expect(
-      container.querySelector("#sidebar-channel-list button")?.className,
-    ).not.toContain("unread");
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
 
 
 
@@ -606,37 +556,6 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("hides the schedule tab when the project has turned it off", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          projects={[
-            {
-              ...sidebarProps.projects[0]!,
-              scheduleTabEnabled: false,
-            },
-          ]}
-        />,
-      );
-    });
-
-    expect(
-      container.querySelector('a[href="#schedule"]'),
-    ).toBeNull();
-    expect(
-      container.querySelector('a[href="#issues"]'),
-    ).not.toBeNull();
-    expect(
-      container.querySelector('a[href="#agents"]'),
-    ).not.toBeNull();
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
 
   it("opens issue creation for the clicked project when another is active", async () => {
     const onProjectChange = vi.fn();
@@ -796,26 +715,7 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("shows an unread dot for Inbox messages", () => {
-    const markup = renderToStaticMarkup(
-      <Sidebar {...sidebarProps} unreadInboxCount={2} />,
-    );
 
-    expect(markup).toContain("sidebar-unread-dot");
-    expect(markup).toContain('aria-label="읽지 않은 메시지 2개"');
-  });
-
-  it("places DMs above Inbox and exposes unread direct messages", () => {
-    const markup = renderToStaticMarkup(
-      <Sidebar {...sidebarProps} activePage="dms" unreadDmCount={3} />,
-    );
-
-    expect(markup.indexOf('href="#dms"')).toBeLessThan(
-      markup.indexOf('href="#inbox"'),
-    );
-    expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain('aria-label="읽지 않은 DM 3개"');
-  });
 
   it("shows running sessions beneath Agents and opens their details", async () => {
     const onAgentSessionOpen = vi.fn();

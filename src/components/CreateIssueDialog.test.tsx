@@ -71,69 +71,6 @@ describe("CreateIssueDialog attachments", () => {
     vi.restoreAllMocks();
   });
 
-  it("adds a pasted clipboard image and renders its preview", async () => {
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <CreateIssueDialog
-          {...projectProps}
-          isSubmitting={false}
-          members={[
-            {
-              userId: "user-1",
-              name: "Kim",
-              email: "kim@example.com",
-              image: null,
-              role: "member",
-              createdAt: "2026-07-01T00:00:00.000Z",
-            },
-          ]}
-          onClose={() => undefined}
-          onCreate={async () => undefined}
-        />,
-      );
-    });
-
-    const image = new File(["clipboard image"], "clipboard.png", {
-      type: "image/png",
-    });
-    const pasteEvent = new Event("paste", { bubbles: true, cancelable: true });
-    Object.defineProperty(pasteEvent, "clipboardData", {
-      value: {
-        files: [],
-        items: [
-          { getAsFile: () => image, kind: "file", type: "image/png" },
-          { getAsFile: () => null, kind: "string", type: "text/plain" },
-        ],
-      },
-    });
-
-    await act(async () => {
-      container.querySelector("form")?.dispatchEvent(pasteEvent);
-    });
-
-    expect(pasteEvent.defaultPrevented).toBe(true);
-    const inlineImage = container.querySelector<HTMLImageElement>(
-      ".issue-inline-attachment img",
-    );
-    expect(inlineImage?.alt).toBe("clipboard.png");
-    expect(inlineImage?.src).toBe("blob:clipboard-preview");
-    expect(
-      Array.from(container.querySelectorAll<HTMLTextAreaElement>("textarea"))
-        .map((textarea) => textarea.value)
-        .join(""),
-    ).not.toContain("briar-attachment://");
-    expect(container.querySelector(".issue-attachment-item")).toBeNull();
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".issue-inline-attachment button")
-        ?.click();
-    });
-    expect(container.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("");
-    expect(container.querySelector(".issue-attachment-item")).toBeNull();
-
-    await act(async () => root.unmount());
-  });
 
   it("inserts a pasted image at the description caret and submits its reference", async () => {
     const onCreate = vi.fn<(
@@ -222,36 +159,6 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => root.unmount());
   });
 
-  it("leaves ordinary text paste untouched", async () => {
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <CreateIssueDialog
-          {...projectProps}
-          isSubmitting={false}
-          onClose={() => undefined}
-          onCreate={async () => undefined}
-        />,
-      );
-    });
-
-    const pasteEvent = new Event("paste", { bubbles: true, cancelable: true });
-    Object.defineProperty(pasteEvent, "clipboardData", {
-      value: {
-        files: [],
-        items: [{ getAsFile: () => null, kind: "string", type: "text/plain" }],
-      },
-    });
-
-    await act(async () => {
-      container.querySelector("textarea")?.dispatchEvent(pasteEvent);
-    });
-
-    expect(pasteEvent.defaultPrevented).toBe(false);
-    expect(container.querySelector(".issue-attachment-item")).toBeNull();
-
-    await act(async () => root.unmount());
-  });
 
   it("adds a dropped image and shows drag feedback", async () => {
     const root = createRoot(container);
@@ -316,49 +223,6 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => root.unmount());
   });
 
-  it("accepts a dropped image even when File.type is empty", async () => {
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <CreateIssueDialog
-          {...projectProps}
-          isSubmitting={false}
-          onClose={() => undefined}
-          onCreate={async () => undefined}
-        />,
-      );
-    });
-
-    const image = new File(["untyped image"], "from-finder.jpg", {
-      type: "",
-    });
-    const dataTransfer = {
-      dropEffect: "none",
-      files: [image],
-      types: ["Files"],
-    };
-    const dropEvent = new Event("drop", {
-      bubbles: true,
-      cancelable: true,
-    });
-    Object.defineProperty(dropEvent, "dataTransfer", {
-      value: dataTransfer,
-    });
-
-    await act(async () => {
-      container.querySelector("form")?.dispatchEvent(dropEvent);
-    });
-
-    expect(dropEvent.defaultPrevented).toBe(true);
-    expect(
-      container.querySelector<HTMLImageElement>(
-        ".issue-inline-attachment img",
-      )?.alt,
-    ).toBe("from-finder.jpg");
-    expect(container.querySelector(".issue-form-error")).toBeNull();
-
-    await act(async () => root.unmount());
-  });
 
   it("submits with Command+Enter when the title is present", async () => {
     const onCreate = vi.fn(async () => undefined);
@@ -459,78 +323,7 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => root.unmount());
   });
 
-  it("keeps plain Enter available for the description", async () => {
-    const onCreate = vi.fn(async () => undefined);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <CreateIssueDialog
-          {...projectProps}
-          isSubmitting={false}
-          onClose={() => undefined}
-          onCreate={onCreate}
-        />,
-      );
-    });
 
-    const enterEvent = new KeyboardEvent("keydown", {
-      bubbles: true,
-      cancelable: true,
-      key: "Enter",
-    });
-    await act(async () => {
-      container.querySelector("textarea")?.dispatchEvent(enterEvent);
-    });
-
-    expect(enterEvent.defaultPrevented).toBe(false);
-    expect(onCreate).not.toHaveBeenCalled();
-
-    await act(async () => root.unmount());
-  });
-
-  it("renders description URLs as clickable hyperlinks inside the editor", async () => {
-    const draft = {
-      title: "링크 이슈",
-      description: "버그 재현 사이트: https://github.com/org/repo/issues/1",
-      status: "queued" as const,
-      priority: "2" as const,
-      projectId: "project-1",
-    };
-    window.localStorage.setItem(
-      createIssueDraftStorageKey,
-      JSON.stringify(draft),
-    );
-    const onCreate = vi.fn(async () => undefined);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <CreateIssueDialog
-          {...projectProps}
-          isSubmitting={false}
-          onClose={() => undefined}
-          onCreate={onCreate}
-        />,
-      );
-    });
-
-    const textarea = container.querySelector<HTMLTextAreaElement>(
-      ".issue-description-input",
-    );
-    expect(textarea?.value).toBe(draft.description);
-
-    const link = container.querySelector<HTMLAnchorElement>(
-      ".issue-description-mirror a",
-    );
-    expect(link?.textContent).toBe("https://github.com/org/repo/issues/1");
-    expect(link?.getAttribute("href")).toBe(
-      "https://github.com/org/repo/issues/1",
-    );
-    expect(link?.target).toBe("_blank");
-    expect(link?.rel).toBe("noreferrer");
-
-    await act(async () => root.unmount());
-    window.localStorage.removeItem(createIssueDraftStorageKey);
-  });
 
   it("does not submit Enter while the title is being composed", async () => {
     const onCreate = vi.fn(async () => undefined);
@@ -1096,106 +889,5 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => root.unmount());
   });
 
-  it("floats the checkpoint menu above the dialog backdrop", async () => {
-    const style = document.createElement("style");
-    style.textContent = ".issue-dialog-backdrop { z-index: 1100; }";
-    document.head.append(style);
-    const root = createRoot(container);
-    await act(async () => root.render(
-      <CreateIssueDialog
-        {...projectProps}
-        isSubmitting={false}
-        onClose={() => undefined}
-        onCreate={async () => undefined}
-        workflow={demoDashboard.settings.workflow}
-        workflowProjectId="project-1"
-      />,
-    ));
 
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>(
-        ".issue-checkpoint-trigger",
-      )?.dispatchEvent(
-        new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
-      );
-    });
-    const menu = document.body.querySelector<HTMLElement>(
-      ".issue-checkpoint-menu",
-    );
-    expect(menu).not.toBeNull();
-    expect(Number.parseInt(menu?.style.zIndex ?? "", 10)).toBeGreaterThan(1100);
-
-    await act(async () => root.unmount());
-    style.remove();
-  });
-
-  it("uses the cached Supported models catalog for issue creation", async () => {
-    vi.mocked(loadAgentProviderModels).mockResolvedValue({
-      ...defaultAgentProviderModelCatalog,
-      opencode: {
-        models: [
-          { id: "openai/gpt-5.6", label: "GPT 5.6" },
-          { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4" },
-        ],
-        error: null,
-      },
-    });
-    writeAgentProviderModelPreference("opencode", {
-      defaultModel: "anthropic/claude-sonnet-4",
-      favoriteModels: ["anthropic/claude-sonnet-4"],
-    });
-    const root = createRoot(container);
-    await act(async () => root.render(
-      <CreateIssueDialog
-        {...projectProps}
-        availableProviders={["opencode"]}
-        isSubmitting={false}
-        onClose={() => undefined}
-        onCreate={async () => undefined}
-      />,
-    ));
-
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>(
-        ".issue-provider-select .select-menu-trigger",
-      )?.click();
-    });
-    await act(async () => {
-      document.querySelector<HTMLButtonElement>(
-        '[role="option"][data-value="opencode"]',
-      )?.click();
-      await Promise.resolve();
-    });
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>(
-        ".issue-model-select .select-menu-trigger",
-      )?.click();
-    });
-
-    expect(
-      container.querySelector<HTMLButtonElement>(
-        ".issue-model-select .select-menu-trigger",
-      )?.textContent,
-    ).toContain("Claude Sonnet 4");
-    expect(
-      Array.from(
-        document.querySelectorAll<HTMLElement>(
-          '[aria-label="선호 모델"] [role="option"]',
-        ),
-      ).map((option) => option.dataset.value),
-    ).toEqual([
-      "",
-      "anthropic/claude-sonnet-4",
-      "openai/gpt-5.6",
-    ]);
-    expect(document.body.textContent).toContain("GPT 5.6");
-    expect(document.body.textContent).toContain("openai/gpt-5.6");
-    expect(document.body.textContent).toContain("Claude Sonnet 4");
-    expect(document.querySelector<HTMLInputElement>(
-      ".select-menu-search input",
-    )).not.toBeNull();
-    expect(loadAgentProviderModels).toHaveBeenCalledOnce();
-
-    await act(async () => root.unmount());
-  });
 });

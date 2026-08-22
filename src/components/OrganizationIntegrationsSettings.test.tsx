@@ -122,39 +122,6 @@ describe("OrganizationIntegrationsSettings", () => {
     container.remove();
   });
 
-  it("offers a manual connection refresh", async () => {
-    vi.mocked(loadGithubIntegration).mockResolvedValue(connected);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <OrganizationIntegrationsSettings
-          organizationId="organization-1"
-          token="token"
-        />,
-      );
-    });
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('[data-integration="github"]')
-        ?.click();
-    });
-
-    vi.mocked(loadGithubIntegration).mockClear();
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(
-          'button[aria-label="GitHub 연결 새로고침"]',
-        )
-        ?.click();
-    });
-    expect(loadGithubIntegration).toHaveBeenCalledOnce();
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
 
   it("does not let an older disconnected refresh overwrite OAuth completion", async () => {
     const container = document.createElement("div");

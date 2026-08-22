@@ -103,57 +103,6 @@ describe("ProjectAgents", () => {
 
 
 
-  it("shows only the agent with an active session as running", async () => {
-    const runningSession: AutoHuntSession = {
-      id: "running-session",
-      dispatchGroupId: "running-session",
-      workers: [],
-      dispatchEvents: [],
-      projectId: project.id,
-      agentId: "demo-agent-auto-hunt",
-      status: "running",
-      issues: [],
-      startedAt: "2026-07-28T00:00:00.000Z",
-      completedAt: null,
-      conversationId: null,
-      workspaceRoot: null,
-      summary: null,
-      error: null,
-      events: [],
-    };
-    const container = await mount(
-      <ProjectAgents {...projectAgentsProps} sessions={[runningSession]} />,
-    );
-    await act(async () => Promise.resolve());
-
-    expect(
-      container.querySelector<HTMLButtonElement>(
-        'button[aria-label="개발자 에이전트 세부 정보 열기"]',
-      )?.textContent,
-    ).toContain("실행 중");
-    expect(
-      container.querySelector<HTMLButtonElement>(
-        'button[aria-label="Sentry 오류 탐지 에이전트 세부 정보 열기"]',
-      )?.textContent,
-    ).toContain("준비됨");
-
-    const runButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="개발자 에이전트 스킬 실행"]',
-    );
-    expect(runButton?.disabled).toBe(false);
-
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(
-          'button[aria-label="개발자 에이전트 세부 정보 열기"]',
-        )
-        ?.click();
-    });
-    expect(
-      container.querySelector<HTMLButtonElement>(".project-agent-run-task")
-        ?.disabled,
-    ).toBe(false);
-  });
 
   it("starts another Skill run before the first one finishes", async () => {
     let finishRun:

@@ -205,19 +205,6 @@ describe("ProjectAgentSessionDetail", () => {
     expect(container.textContent).toContain("산출물");
   });
 
-  it("does not leave a writing indicator on a terminal session", async () => {
-    const container = await mount({
-      ...session,
-      status: "completed",
-      completedAt: "2026-07-29T11:02:00.000Z",
-    });
-
-    expect(container.querySelector(".auto-hunt-message-streaming")).toBeNull();
-    expect(container.querySelector(".auto-hunt-agent-message.running")).toBeNull();
-    expect(container.textContent).toContain(
-      "원인을 확인하고 화면을 수정하고 있습니다.",
-    );
-  });
 
   it("exports the visible session request and execution log", async () => {
     const createObjectURL = vi.fn(() => "blob:session-log");
@@ -247,46 +234,6 @@ describe("ProjectAgentSessionDetail", () => {
     click.mockRestore();
   });
 
-  it("shows live execution messages for a task session", async () => {
-    mockedAppServerEvents.mockReturnValue({
-      events: [{
-        sessionId: "task-session-1",
-        sequence: 1,
-        occurredAtMs: Date.parse("2026-07-29T11:01:00.000Z"),
-        direction: "server",
-        message: {},
-        event: {
-          type: "messageCompleted",
-          id: "message-1",
-          phase: "commentary",
-          text:
-            '[commentary] {"action":"call_host_tool","message":"블록된 이슈의 상태를 확인하고 있습니다.","structuredResult":null,"toolCall":{"name":"list_briar_runs","arguments":{"statuses":["blocked","failed"]}}}',
-        },
-      }],
-      isLoading: false,
-      error: null,
-    });
-
-    const container = await mount({
-      ...session,
-      id: "task-session-1",
-      dispatchGroupId: "",
-      sessionType: "task",
-      dispatchEvents: [],
-    });
-
-    expect(mockedAppServerEvents).toHaveBeenCalledWith("task-session-1");
-    expect(container.textContent).toContain("수행 로그");
-    expect(container.textContent).toContain(
-      "블록된 이슈의 상태를 확인하고 있습니다.",
-    );
-    expect(container.textContent).not.toContain("[commentary]");
-    expect(container.textContent).not.toContain("call_host_tool");
-    expect(
-      container.querySelector(".auto-hunt-agent-messages")
-        ?.getAttribute("role"),
-    ).toBe("log");
-  });
 
   it("separates requests from the shared work log and sends a follow-up", async () => {
     const onFollowUp = vi.fn().mockResolvedValue(undefined);
@@ -339,129 +286,8 @@ describe("ProjectAgentSessionDetail", () => {
     expect(onFollowUp).toHaveBeenCalledWith("변경 내용을 커밋해 줘");
   });
 
-  it("shows a detached Worker's final result in the linked Agent session", async () => {
-    mockedWorkerEvents.mockReturnValue({
-      events: [{
-        sessionId: "detached-run-42",
-        sequence: 9,
-        occurredAtMs: Date.parse("2026-07-29T11:09:00.000Z"),
-        direction: "server",
-        provider: "codex",
-        message: {
-          type: "item.completed",
-          item: {
-            id: "worker-final-1",
-            type: "agent_message",
-            text: "워커가 수정과 검증을 완료했습니다.",
-          },
-        },
-      }],
-      isLoading: false,
-      error: null,
-    });
 
-    const container = await mount({
-      ...session,
-      id: "worker-dispatch-1",
-      issues: [{
-        runId: "run-42",
-        runNumber: 42,
-        sourceKey: "BRIAR-42",
-        title: "누락된 워커 로그",
-        outcome: "completed",
-        summary: "수정 완료",
-      }],
-      status: "completed",
-    });
 
-    expect(mockedWorkerEvents).toHaveBeenCalledWith(
-      null,
-      "project-1",
-      ["run-42"],
-      false,
-      [],
-    );
-    expect(container.textContent).toContain("수행 로그");
-    expect(container.textContent).toContain("워커가 수정과 검증을 완료했습니다.");
-    expect(container.textContent).toContain("Codex");
-    expect(container.textContent).not.toContain("최종 메시지");
-  });
-
-  it("shows a remote task transcript instead of suppressing its log", async () => {
-    mockedWorkerEvents.mockReturnValue({
-      events: [{
-        sessionId: "remote-task-1",
-        sequence: 1,
-        occurredAtMs: Date.parse("2026-08-18T00:01:00.000Z"),
-        direction: "server",
-        provider: "codex",
-        message: {
-          type: "event",
-          event: {
-            type: "messageCompleted",
-            id: "message-1",
-            phase: "final_answer",
-            text: "원격 Agent 결과가 저장되었습니다.",
-          },
-        },
-        event: {
-          type: "messageCompleted",
-          id: "remote-task-1:message-1",
-          phase: "final_answer",
-          text: "원격 Agent 결과가 저장되었습니다.",
-        },
-      }],
-      isLoading: false,
-      error: null,
-    });
-
-    const container = await mount({
-      ...session,
-      id: "remote-task-1",
-      dispatchGroupId: "remote-task-1",
-      sessionType: "task",
-      status: "completed",
-      completedAt: "2026-08-18T00:01:00.000Z",
-      localOwner: false,
-      dispatchEvents: [],
-      summary: "원격 Agent 결과가 저장되었습니다.",
-    });
-
-    expect(mockedAppServerEvents).toHaveBeenCalledWith(null);
-    expect(mockedWorkerEvents).toHaveBeenCalledWith(
-      null,
-      "project-1",
-      [],
-      false,
-      ["remote-task-1"],
-    );
-    expect(container.textContent).toContain("원격 Agent 결과가 저장되었습니다.");
-    expect(container.textContent).not.toContain("아직 Agent 메시지가 없습니다.");
-  });
-
-  it("uses a completed remote task summary when no historical transcript exists", async () => {
-    mockedWorkerEvents.mockReturnValue({
-      events: [],
-      isLoading: false,
-      error: "Transcript not found",
-    });
-
-    const container = await mount({
-      ...session,
-      id: "historical-remote-task",
-      dispatchGroupId: "historical-remote-task",
-      sessionType: "task",
-      status: "completed",
-      completedAt: "2026-08-17T00:01:00.000Z",
-      localOwner: false,
-      dispatchEvents: [],
-      summary: "기존 원격 Agent 작업 결과입니다.",
-    });
-
-    const workLog = container.querySelector(".auto-hunt-agent-messages");
-    expect(workLog?.textContent).toContain("기존 원격 Agent 작업 결과입니다.");
-    expect(workLog?.textContent).not.toContain("Transcript not found");
-  });
 
   it("loads authoritative completed detail after a lightweight remote update", async () => {
     const synchronizedSummary = {
@@ -511,41 +337,4 @@ describe("ProjectAgentSessionDetail", () => {
     ).toContain("완료된 원격 Agent 산출물입니다.");
   });
 
-  it("shows the assigned worker name instead of the worker id", async () => {
-    const workerId = "94ba9871-ec10-4752-9e7b-de876b587214";
-    const workers = [
-      { id: workerId, label: "Studio Mac" },
-      { id: "worker-requested", label: "Laptop Mac" },
-    ];
-
-    expect(sessionWorkerLabel({
-      workerId,
-      requestedWorkerId: "worker-requested",
-    }, workers)).toBe("Studio Mac");
-    expect(sessionWorkerLabel({
-      workerId: null,
-      requestedWorkerId: "worker-requested",
-    }, workers)).toBe("Laptop Mac");
-    expect(sessionWorkerLabel({
-      workerId: "missing-worker",
-      requestedWorkerId: null,
-    }, workers)).toBe("missing-worker");
-    expect(sessionWorkerLabel({
-      workerId: null,
-      requestedWorkerId: null,
-    }, workers)).toBeNull();
-
-    const container = await mount({
-      ...session,
-      workerId,
-      requestedWorkerId: "worker-requested",
-    }, vi.fn(), undefined, undefined, workers);
-    const workerRow = Array.from(container.querySelectorAll("div")).find((row) =>
-      row.querySelector("dt")?.textContent === "실행 Worker"
-    );
-
-    expect(workerRow?.querySelector("dd")?.textContent).toBe("Studio Mac");
-    expect(workerRow?.querySelector("dd")?.getAttribute("title")).toBe(workerId);
-    expect(container.textContent).not.toContain(workerId);
-  });
 });

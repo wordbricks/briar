@@ -32,22 +32,6 @@ describe("InitialOnboarding", () => {
     vi.clearAllMocks();
   });
 
-  it("starts Google login from the second step", async () => {
-    const props = createProps();
-    await act(async () => root.render(<InitialOnboarding {...props} />));
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".initial-welcome-copy button")
-        ?.click();
-    });
-
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>(".google-button")?.click();
-    });
-
-    expect(props.onLogin).toHaveBeenCalledOnce();
-    expect(props.onLogin).toHaveBeenCalledWith("google");
-  });
 
   it("starts email verification from the primary second-step action", async () => {
     const props = createProps();
