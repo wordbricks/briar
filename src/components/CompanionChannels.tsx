@@ -2094,6 +2094,15 @@ function MessageRow({
 }) {
   const { localeTag, t } = useI18n();
   const [reacting, setReacting] = useState(false);
+  const [showingThreadActions, setShowingThreadActions] = useState(false);
+  useMobileBackHandler(
+    () => {
+      if (!showingThreadActions) return false;
+      setShowingThreadActions(false);
+      return true;
+    },
+    { enabled: showingThreadActions, priority: 200 },
+  );
   const issueProposal = message.proposal?.actionType === "request_issue_create"
     ? message.proposal
     : null;
@@ -2119,6 +2128,14 @@ function MessageRow({
     <article
       className={`companion-channel-message${reacting ? " is-reacting" : ""}${message.optimistic ? " is-optimistic" : ""}`}
       data-companion-channel-message-id={message.id}
+      onContextMenu={(event) => {
+        if (!showThreadSummary || !onOpenThread || message.optimistic) return;
+        if ((event.target as HTMLElement).closest("button,a,input,select,textarea")) {
+          return;
+        }
+        event.preventDefault();
+        setShowingThreadActions(true);
+      }}
     >
       <MessageAvatar message={message} />
       <div className="companion-channel-message-copy">
@@ -2289,29 +2306,35 @@ function MessageRow({
           organizationId={channel.organizationId}
           showHoverActions
         />
-        {showThreadSummary && onOpenThread && !message.optimistic ? (
-          <button
-            aria-label={`${t("run.viewThread")}: ${message.author.name} — ${message.body}`}
-            className="companion-channel-message-button companion-channel-thread-summary"
-            onClick={onOpenThread}
-            type="button"
-          >
-            <MessageSquare size={14} />
-            <strong>
-              {message.replyCount > 0
-                ? t("run.replies", { count: message.replyCount })
-                : t("channel.replyInThread")}
-            </strong>
-            {message.lastReplyAt ? (
-              <small>
-                · {t("companion.channelLastReply", {
-                  time: relativeTime(message.lastReplyAt, localeTag),
-                })}
-              </small>
-            ) : null}
-          </button>
-        ) : null}
       </div>
+      {showingThreadActions ? (
+        <div
+          className="companion-channel-action-backdrop"
+          onClick={() => setShowingThreadActions(false)}
+        >
+          <div
+            aria-label={t("channel.messageActions")}
+            aria-modal="true"
+            className="companion-channel-action-sheet"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <span aria-hidden="true" className="companion-channel-action-handle" />
+            <button
+              autoFocus
+              className="companion-channel-message-button companion-channel-start-thread"
+              onClick={() => {
+                setShowingThreadActions(false);
+                onOpenThread?.();
+              }}
+              type="button"
+            >
+              <MessageSquare aria-hidden="true" size={20} />
+              <strong>{t("channel.startThread")}</strong>
+            </button>
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }
