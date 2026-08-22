@@ -447,6 +447,10 @@ describe("Worker HTTP contract", () => {
     }
   });
 
+  it("keeps the Worker scheduled entrypoint wired to the extracted handler", () => {
+    expect(worker.scheduled).toBe(handleScheduledTask);
+  });
+
   it("keeps scheduled maintenance running when dashboard pruning fails", async () => {
     const dependencies = createScheduledTaskDependencies();
     dependencies.pruneExpiredDashboardChanges = vi.fn(async () => {
