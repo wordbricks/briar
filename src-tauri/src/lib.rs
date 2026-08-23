@@ -5368,7 +5368,7 @@ fn configure_execution_worker(
     sync_auto_hunt_assets_and_restart_workers(
         &resource_directory,
         &home,
-        ExecutionWorkerRestartPolicy::WhenAssetsChange,
+        ExecutionWorkerRestartPolicy::WhenRuntimeIsStale,
     )?;
     let bun = bundled_bun_binary()
         .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
@@ -5452,7 +5452,7 @@ fn sync_execution_worker_labels(app: AppHandle) -> Result<serde_json::Value, Str
     sync_auto_hunt_assets_and_restart_workers(
         &resource_directory,
         &home,
-        ExecutionWorkerRestartPolicy::WhenAssetsChange,
+        ExecutionWorkerRestartPolicy::WhenRuntimeIsStale,
     )?;
     let bun = bundled_bun_binary()
         .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
@@ -5569,14 +5569,31 @@ fn should_manage_installed_auto_hunt_assets() -> bool {
 
 #[derive(Clone, Copy)]
 enum ExecutionWorkerRestartPolicy {
-    WhenAssetsChange,
+    WhenRuntimeIsStale,
     Always,
 }
 
 impl ExecutionWorkerRestartPolicy {
-    fn should_restart(self, assets_updated: bool) -> bool {
-        assets_updated || matches!(self, Self::Always)
+    fn should_restart(self, assets_updated: bool, runtime_restart_is_current: bool) -> bool {
+        assets_updated || !runtime_restart_is_current || matches!(self, Self::Always)
     }
+}
+
+fn execution_worker_restart_version_path(home: &Path) -> PathBuf {
+    home.join(".local/share/briar/WORKER_RUNTIME_RESTART_VERSION")
+}
+
+fn execution_worker_restart_is_current(home: &Path) -> bool {
+    read_trimmed_file(&execution_worker_restart_version_path(home)).as_deref()
+        == Some(env!("CARGO_PKG_VERSION"))
+}
+
+fn record_execution_worker_restart_version(home: &Path) -> Result<(), String> {
+    fs::write(
+        execution_worker_restart_version_path(home),
+        format!("{}\n", env!("CARGO_PKG_VERSION")),
+    )
+    .map_err(|error| format!("Worker 재시작 버전을 기록하지 못했습니다: {error}"))
 }
 
 fn sync_auto_hunt_assets_and_restart_workers(
@@ -5591,15 +5608,26 @@ fn sync_auto_hunt_assets_and_restart_workers(
         return Ok(false);
     }
     let updated = sync_auto_hunt_assets(resource_directory, home)?;
-    if !restart_policy.should_restart(updated) {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    let runtime_restart_is_current = execution_worker_restart_is_current(home);
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    let runtime_restart_is_current = true;
+    if !restart_policy.should_restart(updated, runtime_restart_is_current) {
         return Ok(false);
     }
     #[cfg(any(target_os = "macos", target_os = "linux"))]
-    if let Err(error) = restart_execution_worker_services(home) {
-        // Invalidate the installed version marker so the next app start retries
-        // both asset synchronization and the Worker service restart.
-        let _ = fs::remove_file(home.join(".local/share/briar/VERSION"));
-        return Err(error);
+    {
+        if let Err(error) = restart_execution_worker_services(home) {
+            // Assets and running processes have independent versions. Keep the
+            // valid assets, but leave the restart marker stale so the next app
+            // start retries the safe Worker service handoff.
+            let _ = fs::remove_file(execution_worker_restart_version_path(home));
+            return Err(error);
+        }
+        if let Err(error) = record_execution_worker_restart_version(home) {
+            let _ = fs::remove_file(execution_worker_restart_version_path(home));
+            return Err(error);
+        }
     }
     Ok(updated)
 }
@@ -8917,7 +8945,7 @@ pub fn run() {
                 if let Err(error) = sync_auto_hunt_assets_and_restart_workers(
                     &resource_directory,
                     &home,
-                    ExecutionWorkerRestartPolicy::WhenAssetsChange,
+                    ExecutionWorkerRestartPolicy::WhenRuntimeIsStale,
                 ) {
                     eprintln!(
                         "Briar CLI and Auto Hunt skill automatic synchronization failed: {error}"
@@ -11037,18 +11065,41 @@ branch refs/heads/briar/second-11111111
         assert!(!sync_auto_hunt_assets_and_restart_workers(
             &resources,
             &home,
-            ExecutionWorkerRestartPolicy::WhenAssetsChange,
+            ExecutionWorkerRestartPolicy::WhenRuntimeIsStale,
         )
         .expect("development asset synchronization should be skipped"));
         assert!(!home.join(".local/share/briar").exists());
     }
 
     #[test]
-    fn explicit_worker_runtime_refresh_restarts_current_assets() {
-        assert!(ExecutionWorkerRestartPolicy::WhenAssetsChange.should_restart(true));
-        assert!(!ExecutionWorkerRestartPolicy::WhenAssetsChange.should_restart(false));
-        assert!(ExecutionWorkerRestartPolicy::Always.should_restart(true));
-        assert!(ExecutionWorkerRestartPolicy::Always.should_restart(false));
+    fn worker_runtime_restart_policy_repairs_stale_processes() {
+        assert!(ExecutionWorkerRestartPolicy::WhenRuntimeIsStale.should_restart(true, true));
+        assert!(!ExecutionWorkerRestartPolicy::WhenRuntimeIsStale.should_restart(false, true));
+        assert!(ExecutionWorkerRestartPolicy::WhenRuntimeIsStale.should_restart(false, false));
+        assert!(ExecutionWorkerRestartPolicy::Always.should_restart(true, true));
+        assert!(ExecutionWorkerRestartPolicy::Always.should_restart(false, true));
+    }
+
+    #[test]
+    fn worker_restart_version_marker_tracks_the_current_app() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("briar-worker-restart-test-{unique}"));
+        fs::create_dir_all(home.join(".local/share/briar"))
+            .expect("runtime directory should be created");
+
+        assert!(!execution_worker_restart_is_current(&home));
+        record_execution_worker_restart_version(&home)
+            .expect("current restart version should be recorded");
+        assert!(execution_worker_restart_is_current(&home));
+
+        fs::write(execution_worker_restart_version_path(&home), "0.0.0\n")
+            .expect("restart marker should become stale");
+        assert!(!execution_worker_restart_is_current(&home));
+
+        fs::remove_dir_all(home).expect("test home should be removed");
     }
 
     #[cfg(unix)]
