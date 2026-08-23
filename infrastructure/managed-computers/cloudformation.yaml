@@ -83,7 +83,9 @@ Resources:
               - !Ref ManagedComputerSecurityGroup
             SubnetId: !Ref SubnetId
         BlockDeviceMappings:
-          - DeviceName: /dev/sda1
+          # The Debian AMI root device is /dev/xvda. Override that exact
+          # mapping so encryption applies to the boot volume, not an extra disk.
+          - DeviceName: /dev/xvda
             Ebs:
               DeleteOnTermination: true
               Encrypted: true
