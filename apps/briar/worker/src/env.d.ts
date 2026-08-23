@@ -45,6 +45,8 @@ interface Env {
   MANAGED_COMPUTER_PROVISIONING: Workflow<{
     managedComputerId: string;
     provisioningJobId: string;
+    previousInstanceId?: string | null;
+    previousInstanceRegion?: string | null;
   }>;
   MANAGED_COMPUTER_REMOTE: DurableObjectNamespace<
     import("./managed-computer-remote-relay").ManagedComputerRemoteSessionHub

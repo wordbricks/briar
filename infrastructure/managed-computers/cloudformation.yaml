@@ -4,7 +4,7 @@ Description: Briar managed-computer remote desktop v2 launch template and least-
 Parameters:
   AmiId:
     Type: AWS::EC2::Image::Id
-    Description: Versioned AMI containing Briar CLI, Bun, supported agent CLIs, SSM Agent, non-root XFCE/TigerVNC, Chromium, enrollment, and outbound remote session services.
+    Description: Versioned Debian GNU/Linux 13 (trixie) x86_64 AMI containing Briar CLI, Bun, supported agent CLIs, SSM Agent, non-root XFCE/TigerVNC, Chromium, enrollment, and outbound remote session services.
   VpcId:
     Type: AWS::EC2::VPC::Id
   SubnetId:
@@ -83,7 +83,9 @@ Resources:
               - !Ref ManagedComputerSecurityGroup
             SubnetId: !Ref SubnetId
         BlockDeviceMappings:
-          - DeviceName: /dev/sda1
+          # The Debian AMI root device is /dev/xvda. Override that exact
+          # mapping so encryption applies to the boot volume, not an extra disk.
+          - DeviceName: /dev/xvda
             Ebs:
               DeleteOnTermination: true
               Encrypted: true

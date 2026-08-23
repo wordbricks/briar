@@ -151,7 +151,7 @@ struct GrokMoneyValue {
     val: Option<Value>,
 }
 
-pub(crate) async fn load(home: PathBuf) -> AgentUsageSnapshot {
+pub(crate) async fn load(home: PathBuf, openrouter_configured: bool) -> AgentUsageSnapshot {
     let codex_home = home.clone();
     let claude_home = home.clone();
     let grok_home = home.clone();
@@ -182,11 +182,7 @@ pub(crate) async fn load(home: PathBuf) -> AgentUsageSnapshot {
     let cursor = cursor.await.unwrap_or_else(|error| {
         failed_provider("cursor", format!("Cursor usage task failed: {error}"))
     });
-    let openrouter = provider_without_usage(
-        "openrouter",
-        "unavailable",
-        "OpenRouter usage limits are managed at openrouter.ai.".to_string(),
-    );
+    let openrouter = load_openrouter(openrouter_configured);
     AgentUsageSnapshot {
         codex,
         claude,
@@ -197,6 +193,17 @@ pub(crate) async fn load(home: PathBuf) -> AgentUsageSnapshot {
         cursor,
         updated_at: now_millis(),
     }
+}
+
+fn load_openrouter(configured: bool) -> ProviderUsage {
+    if configured {
+        return connected_provider_without_windows("openrouter", None);
+    }
+    provider_without_usage(
+        "openrouter",
+        "unavailable",
+        "OpenRouter API 키가 필요합니다.".to_string(),
+    )
 }
 
 pub(crate) fn codex_locally_authenticated(home: &Path) -> bool {
@@ -1497,6 +1504,22 @@ fn now_millis() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reflects_openrouter_credential_status_without_quota_windows() {
+        let configured = load_openrouter(true);
+        assert_eq!(configured.status, "ok");
+        assert!(configured.authenticated);
+        assert!(configured.session.is_none());
+        assert!(configured.weekly.is_none());
+        assert!(configured.monthly.is_none());
+        assert!(configured.error.is_none());
+
+        let missing = load_openrouter(false);
+        assert_eq!(missing.status, "unavailable");
+        assert!(!missing.authenticated);
+        assert!(missing.error.is_some());
+    }
 
     #[test]
     fn parses_codex_rate_limit_response() {

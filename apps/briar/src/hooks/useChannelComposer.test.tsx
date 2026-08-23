@@ -9,13 +9,17 @@ import type {
   ChannelMember,
 } from "../lib/channels-contract";
 import type { MentionTarget } from "../lib/channel-mentions";
-import { useChannelComposer } from "./useChannelComposer";
+import {
+  useChannelComposer,
+  type ChannelSkillCommandTarget,
+} from "./useChannelComposer";
 
 type OnSend = (
   body: string,
   mentions: MentionTarget[],
   attachments: File[],
   attachmentReferences: string[],
+  selectedSkill?: ChannelSkillCommandTarget,
 ) => void;
 
 const agents: ChannelAgentSummary[] = [
@@ -26,7 +30,36 @@ const agents: ChannelAgentSummary[] = [
     provider: "codex",
     model: null,
     effort: null,
-    skills: [],
+    skills: [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        agentId: "project-agent",
+        name: "Release app",
+        description: "Build and publish a release.",
+        body: "Follow the release checklist.",
+        provider: "codex",
+        model: null,
+        effort: null,
+        kind: "custom",
+        position: 0,
+        createdAt: "2026-08-01T00:00:00.000Z",
+        updatedAt: "2026-08-01T00:00:00.000Z",
+      },
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        agentId: "project-agent",
+        name: "Review code",
+        description: "Review a proposed code change.",
+        body: "Inspect the diff and report findings.",
+        provider: "codex",
+        model: null,
+        effort: null,
+        kind: "custom",
+        position: 1,
+        createdAt: "2026-08-01T00:00:00.000Z",
+        updatedAt: "2026-08-01T00:00:00.000Z",
+      },
+    ],
     projectId: "project-1",
     projectName: "Briar",
     responsibility: "Build",
@@ -61,8 +94,10 @@ const members: ChannelMember[] = [
 function Harness({
   onInvite,
   onSend,
+  enableSkillCommands = false,
   submitOnEnter = false,
 }: {
+  enableSkillCommands?: boolean;
   onInvite?: () => void;
   onSend: OnSend;
   submitOnEnter?: boolean;
@@ -71,6 +106,7 @@ function Harness({
     agents,
     busy: false,
     currentUserId: "user-1",
+    enableSkillCommands,
     members,
     onInvite,
     onSend,
@@ -116,6 +152,19 @@ function Harness({
           </li>
         ))}
       </ul>
+      <ol data-testid="skills">
+        {composer.skillSuggestions.map((suggestion, index) => (
+          <li key={`${suggestion.agentId}:${suggestion.skill.id}`}>
+            <button
+              aria-selected={index === composer.activeSkillSuggestionIndex}
+              onClick={() => composer.pickSkillSuggestion(suggestion)}
+              type="button"
+            >
+              {suggestion.skill.name} · {suggestion.skill.description}
+            </button>
+          </li>
+        ))}
+      </ol>
       <output data-testid="images">{composer.images.length}</output>
       <output data-testid="error">{composer.attachmentError}</output>
       <button type="submit">Send</button>
@@ -212,6 +261,60 @@ describe("useChannelComposer", () => {
     expect(onInvite).toHaveBeenCalledOnce();
     expect(onSend).not.toHaveBeenCalled();
     expect(input.value).toBe("");
+    await act(async () => root.unmount());
+  });
+
+  it("selects an Agent Skill when slash is the first character", async () => {
+    const onSend = vi.fn<OnSend>();
+    const { container, root } = await renderHarness({
+      enableSkillCommands: true,
+      onSend,
+      submitOnEnter: true,
+    });
+    const input = container.querySelector<HTMLInputElement>(
+      '[data-testid="composer"]',
+    )!;
+
+    await typeInto(input, "/");
+    expect(container.querySelector('[data-testid="skills"]')?.textContent)
+      .toContain("Release app · Build and publish a release.");
+    expect(container.querySelectorAll('[data-testid="skills"] button'))
+      .toHaveLength(2);
+
+    await act(async () => input.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "ArrowDown",
+      }),
+    ));
+    await act(async () => input.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "Enter",
+      }),
+    ));
+    expect(input.value).toBe("/Review code ");
+
+    await typeInto(input, "/Review code Check the auth change");
+    await act(async () => container.querySelector("form")?.requestSubmit());
+    expect(onSend).toHaveBeenCalledWith(
+      "/Review code Check the auth change",
+      [],
+      [],
+      [],
+      expect.objectContaining({
+        agentId: "project-agent",
+        skill: expect.objectContaining({
+          id: "22222222-2222-4222-8222-222222222222",
+        }),
+      }),
+    );
+
+    await typeInto(input, "Ask / for help");
+    expect(container.querySelectorAll('[data-testid="skills"] button'))
+      .toHaveLength(0);
     await act(async () => root.unmount());
   });
 

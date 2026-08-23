@@ -1,5 +1,6 @@
 import { decodeOrganizationAgentContextDescriptor } from "../../src/lib/organization-agent-context-contract";
 import { channelReplyContextMessageJson } from "../../src/lib/channels-contract";
+import { agentReplyDisplayParentMessageId } from "../../src/lib/issue-reply-decision";
 import {
   agentSkillJson,
   hydrateAgentSkills,
@@ -14,6 +15,7 @@ import {
   getChannelById,
   getOrganizationProject,
   listChannelAgents,
+  listChannelRootMessages,
   listChannelThreadMessages,
   snapshotChannelReplyExecutionTargets,
 } from "./channels";
@@ -112,14 +114,27 @@ export async function claimNextChannelReplyWork(
     if (job.claimed_worker_id !== binding.id) {
       throw new HttpError(409, "Reply claim is bound to another Worker");
     }
-    const [channel, liveAgent, messages] = await Promise.all([
+    const [channel, liveAgent] = await Promise.all([
       getChannelById(db, job.organization_id, job.channel_id),
       getOrganizationAgent(db, job.organization_id, job.agent_id),
-      listChannelThreadMessages(db, job.channel_id, job.parent_message_id),
     ]);
     if (!channel || !liveAgent || !job.agent_provider) {
       throw new HttpError(409, "Reply job lost its channel context");
     }
+    const contextParentMessageId = agentReplyDisplayParentMessageId(
+      channel.kind,
+      {
+        id: job.trigger_message_id,
+        parentMessageId: job.parent_message_id,
+      },
+    );
+    const messages = contextParentMessageId
+      ? await listChannelThreadMessages(
+          db,
+          job.channel_id,
+          contextParentMessageId,
+        )
+      : await listChannelRootMessages(db, job.channel_id);
     if (job.project_id !== liveAgent.project_id) {
       throw new HttpError(409, "Reply job no longer matches its Agent scope");
     }

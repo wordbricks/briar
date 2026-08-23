@@ -17,6 +17,7 @@ import {
   type ChannelWebhook,
   type DirectMessageParticipant,
 } from "../../src/lib/channels-contract";
+import { agentReplyDisplayParentMessageId } from "../../src/lib/issue-reply-decision";
 import { isWorkerEmoji } from "../../src/lib/worker-icon-validation";
 import type { AgentSkillEffort, AgentSkillKind } from "./agent-skills";
 import type {
@@ -1680,7 +1681,8 @@ export type ChannelMessagePage = {
  * Read one page from the newest messages towards older history. Messages
  * within a page remain chronological so CLI consumers can render them without
  * re-sorting. A thread view includes its root message, matching the existing
- * channel thread API.
+ * channel thread API. Direct messages can opt into one bounded timeline that
+ * also includes replies created before DM replies moved to the root level.
  */
 export async function listChannelMessagePage(
   db: D1Database,
@@ -1689,8 +1691,11 @@ export async function listChannelMessagePage(
     parentMessageId: string | null;
     cursor: string | null;
     limit: number;
+    includeRepliesInTimeline?: boolean;
   },
 ): Promise<ChannelMessagePage | null> {
+  const includesReplies =
+    input.includeRepliesInTimeline === true && input.parentMessageId === null;
   const cursor = input.cursor
     ? await db
         .prepare(
@@ -1700,6 +1705,8 @@ export async function listChannelMessagePage(
              and ${
                input.parentMessageId
                  ? `(id = ? or parent_message_id = ?)`
+                 : includesReplies
+                   ? "1 = 1"
                  : "parent_message_id is null"
              }`,
         )
@@ -1717,7 +1724,9 @@ export async function listChannelMessagePage(
   const select = await messageSelectFor(db);
   const scope = input.parentMessageId
     ? `(message.id = ? or message.parent_message_id = ?)`
-    : "message.parent_message_id is null";
+    : includesReplies
+      ? "1 = 1"
+      : "message.parent_message_id is null";
   const before = cursor
     ? `and (message.created_at < ?
             or (message.created_at = ? and message.id < ?))`
@@ -2907,6 +2916,19 @@ export async function completeChannelReply(
   job: ChannelReplyJobRow,
   input: ChannelReplyCompletionInput,
 ) {
+  const channel = await getChannelById(
+    db,
+    job.organization_id,
+    job.channel_id,
+  );
+  if (!channel) return null;
+  const replyParentMessageId = agentReplyDisplayParentMessageId(
+    channel.kind,
+    {
+      id: job.trigger_message_id,
+      parentMessageId: job.parent_message_id,
+    },
+  );
   const executionApprovalsAvailable =
     await channelExecutionProposalTablesAvailable(db);
   const skillExecutionApprovalsAvailable =
@@ -3160,7 +3182,7 @@ export async function completeChannelReply(
            id, channel_id, parent_message_id, author_user_id, author_agent_id,
            author_agent_name, author_agent_provider, body, created_at, updated_at
          )
-         select ?, ?, claim.parent_message_id, null, ?, ?, ?, ?, ?, ?
+         select ?, ?, ?, null, ?, ?, ?, ?, ?, ?
          from briar_channel_agent_reply_jobs claim
          where claim.id = ? and claim.claimed_device_id = ?
            and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
@@ -3169,6 +3191,7 @@ export async function completeChannelReply(
       .bind(
         job.reply_message_id,
         job.channel_id,
+        replyParentMessageId,
         job.agent_id,
         input.agentName,
         input.agentProvider,

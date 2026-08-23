@@ -106,6 +106,59 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-channel-reentry")
     }
 
+    func testDirectMessageOpensItsBoundedTimeline() {
+        let app = launchInsideCompanion()
+
+        let directMessages = app.tabBars.buttons["DMs"]
+        XCTAssertTrue(directMessages.waitForExistence(timeout: transitionTimeout))
+        directMessages.tap()
+        let conversation = app.buttons[
+            "dm-row-12121212-1212-4212-8212-121212121212"
+        ]
+        XCTAssertTrue(conversation.waitForExistence(timeout: channelTransitionTimeout))
+        conversation.tap()
+
+        let identity = app.descendants(matching: .any)["channel-header-identity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: channelTransitionTimeout))
+        XCTAssertTrue(identity.label.contains("Honey"))
+        XCTAssertFalse(identity.label.contains("비공개 대화"))
+        XCTAssertTrue(
+            element(withLabel: "iOS DM 화면을 검토해 주세요.", in: app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element(withLabel: "검토를 마쳤습니다.", in: app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["channel-message-loading-spinner"].exists
+        )
+        captureScreenshot(named: "companion-direct-message-timeline")
+        identity.tap()
+        let profile = app.descendants(matching: .any)["conversation-profile-sheet"]
+        XCTAssertTrue(profile.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["conversation-profile-name"].label.contains("Honey")
+        )
+        XCTAssertTrue(app.staticTexts["Review mobile product work."].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-direct-message-profile")
+        app.buttons["conversation-profile-close"].tap()
+        XCTAssertTrue(profile.waitForNonExistence(timeout: 5))
+
+        let rootMessage = app.textViews[
+            "channel-message-16161616-1616-4616-8616-161616161616"
+        ]
+        XCTAssertTrue(rootMessage.waitForExistence(timeout: 5))
+        XCTAssertFalse(
+            app.buttons["channel-react-16161616-1616-4616-8616-161616161616"].exists,
+            "리액션이 없는 DM 메시지에는 단독 React 버튼이 보이지 않아야 합니다."
+        )
+        rootMessage.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.7)
+        XCTAssertTrue(app.buttons["channel-quick-reaction-👍"].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-dm-reaction-actions")
+    }
+
     func testChannelShowsLoadingSpinnerWhileMessagesLoad() {
         let app = launchInsideCompanion(
             additionalArguments: ["--ui-testing-delayed-channel-load"]
@@ -214,14 +267,68 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-channel-optimistic-message")
 
         XCTAssertTrue(
+            waitForKeyboardFocus(on: field),
+            "채널 메시지를 보낸 뒤에도 입력창 키보드가 유지되어야 합니다."
+        )
+        captureScreenshot(named: "companion-channel-composer-stays-focused")
+        XCTAssertTrue(
             send.waitForNonExistence(timeout: 5),
             "서버가 메시지를 확정하면 빈 입력창의 전송 버튼이 다시 숨겨져야 합니다."
+        )
+        XCTAssertTrue(
+            waitForKeyboardFocus(on: field),
+            "전송이 끝난 뒤에도 입력창 키보드가 내려가지 않아야 합니다."
         )
         XCTAssertEqual(
             app.descendants(matching: .any).matching(
                 NSPredicate(format: "label == %@", sentBody)
             ).count,
             1
+        )
+    }
+
+    func testDirectMessageKeepsComposerFocusedAfterSend() {
+        let app = launchInsideCompanion(
+            additionalArguments: ["--ui-testing-delayed-message-send"]
+        )
+
+        let directMessages = app.tabBars.buttons["DMs"]
+        XCTAssertTrue(directMessages.waitForExistence(timeout: transitionTimeout))
+        directMessages.tap()
+        let conversation = app.buttons[
+            "dm-row-12121212-1212-4212-8212-121212121212"
+        ]
+        XCTAssertTrue(conversation.waitForExistence(timeout: channelTransitionTimeout))
+        conversation.tap()
+
+        let field = app.textFields["channel-composer-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: channelTransitionTimeout))
+        field.tap()
+        XCTAssertTrue(waitForKeyboardFocus(on: field))
+        let sentBody = "DM에서도 입력창이 유지됩니다"
+        field.typeText(sentBody)
+        let send = app.buttons["channel-composer-send"]
+        send.tap()
+
+        let sentMessage = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", sentBody)
+        ).firstMatch
+        XCTAssertTrue(
+            sentMessage.waitForExistence(timeout: 1),
+            "서버 응답 전에도 DM 메시지가 즉시 표시되어야 합니다."
+        )
+        XCTAssertTrue(
+            waitForKeyboardFocus(on: field),
+            "DM 메시지를 보낸 뒤에도 입력창 키보드가 유지되어야 합니다."
+        )
+        captureScreenshot(named: "companion-dm-composer-stays-focused")
+        XCTAssertTrue(
+            send.waitForNonExistence(timeout: 5),
+            "서버가 메시지를 확정하면 빈 입력창의 전송 버튼이 다시 숨겨져야 합니다."
+        )
+        XCTAssertTrue(
+            waitForKeyboardFocus(on: field),
+            "DM 전송이 끝난 뒤에도 입력창 키보드가 내려가지 않아야 합니다."
         )
     }
 
@@ -263,10 +370,35 @@ final class BriarCompanionUITests: XCTestCase {
         let rootMessage = rootMessageMatches.element(boundBy: 0)
         XCTAssertTrue(rootMessage.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["스레드에서 답글"].exists)
+        XCTAssertFalse(
+            app.buttons["channel-react-dddddddd-dddd-4ddd-8ddd-dddddddddddd"].exists,
+            "리액션이 없는 채널 메시지에는 단독 React 버튼이 보이지 않아야 합니다."
+        )
         rootMessage.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             .press(forDuration: 0.7)
 
+        XCTAssertTrue(app.buttons["channel-quick-reaction-👍"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["channel-quick-reaction-❤️"].exists)
+        XCTAssertTrue(app.buttons["channel-quick-reaction-😂"].exists)
+        XCTAssertTrue(app.buttons["channel-quick-reaction-🎉"].exists)
         let startThread = app.buttons["channel-start-thread-action"]
+        XCTAssertTrue(startThread.waitForExistence(timeout: 5))
+        XCTAssertTrue(startThread.isHittable, "스레드 시작 버튼이 하단 시트 안에 보여야 합니다.")
+        XCTAssertTrue(app.buttons["channel-copy-link-action"].exists)
+        XCTAssertTrue(app.buttons["channel-copy-text-action"].exists)
+        captureScreenshot(named: "companion-channel-message-actions")
+
+        app.buttons["channel-copy-link-action"].tap()
+        XCTAssertTrue(app.staticTexts["링크를 복사했습니다"].waitForExistence(timeout: 5))
+
+        rootMessage.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.7)
+        XCTAssertTrue(app.buttons["channel-copy-text-action"].waitForExistence(timeout: 5))
+        app.buttons["channel-copy-text-action"].tap()
+        XCTAssertTrue(app.staticTexts["메시지를 복사했습니다"].waitForExistence(timeout: 5))
+
+        rootMessage.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.7)
         XCTAssertTrue(startThread.waitForExistence(timeout: 5))
         startThread.tap()
 
@@ -443,6 +575,10 @@ final class BriarCompanionUITests: XCTestCase {
             "낙관적으로 표시한 이슈 메시지에는 보내는 중 문구가 없어야 합니다."
         )
         captureScreenshot(named: "companion-message-draft-cleared")
+        XCTAssertTrue(
+            waitForKeyboardFocus(on: message),
+            "이슈 메시지를 보낸 뒤에도 입력창 키보드가 유지되어야 합니다."
+        )
         XCTAssertTrue(
             send.waitForNonExistence(timeout: 5),
             "서버가 메시지를 확정하면 빈 입력창의 전송 버튼이 다시 숨겨져야 합니다."

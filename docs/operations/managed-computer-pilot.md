@@ -12,11 +12,13 @@
 
 ## 1. AMI 준비
 
+관리형 컴퓨터의 기준 운영체제는 **Debian GNU/Linux 13 (trixie) x86_64**다. Amazon Linux 또는 다른 Debian 버전의 AMI를 사용하지 않는다. 이 저장소의 AMI 빌드 스크립트와 패키지 lock은 Debian의 `apt`, `apt-cache`, `dpkg`를 전제로 하며, `assert-debian-13-x86_64`가 기준에서 벗어난 빌더를 거부한다.
+
 버전이 고정된 AMI에 다음 항목을 설치한다.
 
 1. Briar CLI와 Worker 서비스, Bun, 지원할 에이전트 CLI.
-2. 최신 Amazon SSM Agent.
-3. 비특권 `briar` 사용자와 XFCE, Chromium, TigerVNC, D-Bus 패키지. `remote-desktop-packages.txt`의 각 패키지는 승인된 Debian 저장소 스냅샷에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다. base AMI의 배포판·버전과 저장소 스냅샷을 릴리스 기록에 함께 고정한다.
+2. 최신 AWS Systems Manager Agent(`amazon-ssm-agent`).
+3. 비특권 `briar` 사용자와 XFCE, Chromium, TigerVNC, D-Bus 패키지. `remote-desktop-packages.txt`의 각 패키지는 승인된 Debian 13 저장소 스냅샷에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다. base AMI의 배포판·버전과 저장소 스냅샷을 릴리스 기록에 함께 고정한다.
 4. `mise exec -- bun run agent:build`로 만든 `apps/briar/dist-cli/briar-remote-session-agent.js`와 `infrastructure/managed-computers/`의 스크립트·서비스를 AMI 빌더에 복사한 뒤, root로 `install-remote-desktop <source-dir> <package-lock> <agent-bundle>`을 실행한다.
 5. 설치 스크립트는 enrollment, loopback 원격 데스크톱, outbound 원격 세션 에이전트를 `/opt/briar/bin`과 systemd에 설치하고 부팅 대상으로 활성화한다. systemd는 enrollment oneshot이 성공한 뒤 데스크톱과 원격 에이전트를 시작하며, GUI와 Worker는 모두 `/home/briar`를 사용한다.
 6. `briar-worker.service`는 `/var/lib/briar/worker-credential.json`을 읽되 저장소와 모델 제공자가 설정되고 heartbeat 건강 검사를 통과하기 전에는 `acceptingWork=false`, 동시 실행 수 1을 보고해야 한다.
@@ -186,7 +188,7 @@ Identity public key는 AWS의 **해당 리전 RSA 인증서**를 공식 `regions
 10. 원격 화면에서 테스트 저장소와 테스트 모델 제공자에 로그인하고 같은 `/home/briar`를 사용하는 Worker 건강 검사가 `acceptingWork=true`가 되어 `사용 가능`으로 전환되는지 확인한다.
 11. D1 감사 테이블과 Cloudflare 로그에는 세션 ID, 상태, 사유 코드, 방향별 바이트 수만 남고 화면 바이트, 키 입력, 비밀번호, protocol token, Worker credential이 없음을 표본 검사한다.
 12. 스테이징에서 10분 세션의 평균/최대 대역폭, 왕복 지연, Durable Object 요청·기간·메모리와 예상 월 비용을 릴리스 기록에 남긴다. 승인 기준을 넘으면 공개 플래그를 켜지 않고 WebRTC 또는 승인된 전송 계층 검토로 넘긴다.
-13. 실패 후 재시도와 Workflow 재실행에서 EC2 `ClientToken`이 동일한 인스턴스를 돌려주는지 확인한다.
+13. 실패 후 재시도는 새 provisioning job의 EC2 `ClientToken`으로 새 인스턴스를 만들고, 이전 인스턴스는 `briar-managed` 및 컴퓨터 ID 태그를 확인한 뒤 종료하는지 확인한다. 같은 Workflow 안의 AWS 재시도에서는 동일 `ClientToken`이 중복 생성을 막는지 확인한다.
 14. 만료 시간을 앞당긴 테스트 데이터로 활성 원격 세션 종료 → 새 작업 차단 → drain → stop → 보존 기간 후 terminate와 credential revoke를 확인한다.
 
 검증을 모두 통과한 뒤에만 `MANAGED_COMPUTER_REMOTE_DESKTOP_ENABLED=true`로 다시 배포한다. 플래그를 켠 배포에서 웹과 Tauri 각각 `화면 열기`를 다시 확인한다.
@@ -204,6 +206,6 @@ Identity public key는 AWS의 **해당 리전 RSA 인증서**를 공식 `regions
 
 - 신규 신청 즉시 중단: `MANAGED_COMPUTER_APPLICATIONS_ENABLED=false`로 배포한다. 기존 컴퓨터 lifecycle은 유지된다.
 - 원격 제어 즉시 중단: `MANAGED_COMPUTER_REMOTE_DESKTOP_ENABLED=false`로 배포한다. 컴퓨터/Worker는 유지되며 새 원격 세션만 막힌다. 컴퓨터 중지·만료·종료 또는 credential revoke 시 활성 세션도 종료된다.
-- 준비 실패: UI의 제한된 재시도(최대 3회)를 사용한다. 동일 EC2 client token과 user-data가 재사용된다.
+- 준비 실패: UI의 제한된 재시도(최대 3회)를 사용한다. 새 시도는 현재 Launch Template 설정과 새 EC2 client token을 사용하며, 이전 인스턴스는 태그가 일치할 때만 종료한다.
 - 고아 리소스: 6시간 reconciliation 결과의 `orphanInstanceIds`와 `briar-managed=true` 태그를 대조한다. 자동 종료하지 말고 D1 감사 기록과 조직 태그를 확인한 뒤 운영자가 처리한다.
 - 파일럿 종료: 수명 정책을 통해 drain과 stop을 먼저 수행한다. 즉시 terminate하지 않는다.

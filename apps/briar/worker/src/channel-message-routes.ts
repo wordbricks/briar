@@ -137,6 +137,7 @@ export async function handleChannelMessageRoute(
       parentMessageId: query.parentMessageId,
       cursor: query.cursor,
       limit: query.limit,
+      includeRepliesInTimeline: channel.kind === "dm",
     });
     if (!page) {
       throw new HttpError(400, "Cursor does not belong to this message view");
@@ -226,6 +227,7 @@ export async function handleChannelMessageRoute(
         parentMessageId: query.parentMessageId,
         cursor: query.cursor,
         limit: query.limit,
+        includeRepliesInTimeline: channel.kind === "dm",
       });
       if (!page) {
         throw new HttpError(400, "Cursor does not belong to this message view");
@@ -270,6 +272,22 @@ export async function handleChannelMessageRoute(
       db,
       await listChannelAgents(db, channel.id),
     );
+    if (rawInput.skillId && channel.kind !== "dm") {
+      throw new HttpError(
+        400,
+        "Agent Skill commands are only available in direct messages",
+      );
+    }
+    const selectedSkillTarget = rawInput.skillId
+      ? roster.flatMap((agent) =>
+          agent.skills
+            .filter((skill) => skill.id === rawInput.skillId)
+            .map((skill) => ({ agent, skill }))
+        )[0] ?? null
+      : null;
+    if (rawInput.skillId && !selectedSkillTarget) {
+      throw new HttpError(400, "Selected Agent Skill is not in this channel");
+    }
     const implicitDirectAgent =
       channel.kind === "dm" &&
         channel.member_count === 1 &&
@@ -287,6 +305,12 @@ export async function handleChannelMessageRoute(
       }
       return agent;
     });
+    if (
+      selectedSkillTarget &&
+      !mentionedAgents.some((agent) => agent.id === selectedSkillTarget.agent.id)
+    ) {
+      throw new HttpError(400, "Selected Agent Skill was not invoked");
+    }
     for (const userId of rawInput.mentionedUserIds) {
       if (!(await getOrganizationRole(db, organizationId, userId))) {
         throw new HttpError(400, "Mentioned member is not in this organization");
@@ -313,12 +337,16 @@ export async function handleChannelMessageRoute(
     };
     const invokedAgents = await Promise.all(
       mentionedAgents.map(async (agent) => {
+        const selectedSkill = selectedSkillTarget?.agent.id === agent.id
+          ? selectedSkillTarget.skill
+          : null;
+        const replyRuntime = selectedSkill ?? agent;
         const hasAvailableWorker = await hasAvailableChannelReplyWorker(db, {
           organizationId,
           projectId: agent.project_id,
-          provider: agent.provider,
-          model: agent.model,
-          effort: agent.effort,
+          provider: replyRuntime.provider,
+          model: replyRuntime.model,
+          effort: replyRuntime.effort,
           observedAt: createdAt,
         });
         const unavailableReason:
@@ -326,7 +354,7 @@ export async function handleChannelMessageRoute(
           | null = hasAvailableWorker
             ? null
             : channelReplyNoAvailableWorkerError;
-        return { agent, unavailableReason };
+        return { agent, selectedSkill, replyRuntime, unavailableReason };
       }),
     );
     const uploadedKeys: string[] = [];
@@ -384,11 +412,16 @@ export async function handleChannelMessageRoute(
       channelId: channel.id,
       triggerMessageId: message.id,
       parentMessageId: agentReplyParentMessageId(message),
-      agents: invokedAgents.map(({ agent, unavailableReason }) => ({
+      agents: invokedAgents.map(({
+        agent,
+        selectedSkill,
+        replyRuntime,
+        unavailableReason,
+      }) => ({
         id: agent.id,
         projectId: agent.project_id,
-        skillId: null,
-        provider: agent.provider,
+        skillId: selectedSkill?.id ?? null,
+        provider: replyRuntime.provider,
         unavailableReason,
       })),
       preferredDeviceId: input.preferredDeviceId,

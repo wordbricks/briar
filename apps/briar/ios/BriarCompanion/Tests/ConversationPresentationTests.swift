@@ -69,6 +69,19 @@ final class ConversationPresentationTests: XCTestCase {
         )
     }
 
+    func testProgrammaticScrollDoesNotDismissComposerKeyboard() {
+        XCTAssertTrue(
+            ConversationScrollPresentation.dismissesKeyboardInteractively(
+                programmaticScrollActive: false
+            )
+        )
+        XCTAssertFalse(
+            ConversationScrollPresentation.dismissesKeyboardInteractively(
+                programmaticScrollActive: true
+            )
+        )
+    }
+
     @MainActor
     func testComposerClearsImmediatelyAndRestoresDraftAfterFailedSend() async throws {
         let draft = ConversationComposerDraftBox()

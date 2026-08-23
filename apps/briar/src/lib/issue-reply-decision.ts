@@ -11,6 +11,38 @@ export function agentReplyParentMessageId(
   return message.parentMessageId ?? message.id;
 }
 
+export type AgentReplyConversationKind = "dm" | "channel" | "issue";
+
+type ReplyTargetMessage = Pick<
+  IssueReplyContextMessage,
+  "id" | "parentMessageId"
+>;
+
+/**
+ * Keep the message that triggered an Agent as its execution context while
+ * choosing independently where the completed reply is displayed.
+ */
+export function agentReplyDisplayParentMessageId(
+  conversationKind: "dm",
+  message: ReplyTargetMessage,
+): null;
+export function agentReplyDisplayParentMessageId(
+  conversationKind: "channel" | "issue",
+  message: ReplyTargetMessage,
+): string;
+export function agentReplyDisplayParentMessageId(
+  conversationKind: AgentReplyConversationKind,
+  message: ReplyTargetMessage,
+): string | null;
+export function agentReplyDisplayParentMessageId(
+  conversationKind: AgentReplyConversationKind,
+  message: ReplyTargetMessage,
+) {
+  return conversationKind === "dm"
+    ? null
+    : agentReplyParentMessageId(message);
+}
+
 /**
  * Resolve the Project Agents that should answer an issue message.
  *

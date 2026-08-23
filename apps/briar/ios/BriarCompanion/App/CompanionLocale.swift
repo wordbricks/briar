@@ -128,6 +128,14 @@ enum L10n {
         "아직 메시지가 없습니다.": "No messages yet.",
         "어제": "Yesterday",
         "비공개 대화": "Private conversation",
+        "참여자 목록 열기": "Open participant list",
+        "프로필 보기": "View profile",
+        "조직 Agent": "Organization agent",
+        "프로젝트 Agent": "Project agent",
+        "채널 멤버": "Channel member",
+        "채널 소유자": "Channel owner",
+        "역할": "Role",
+        "참여일": "Joined",
         "멤버와 Agent를 불러오는 중…": "Loading members and agents…",
         "멤버 또는 Agent 검색": "Search members or agents",
         "대화 시작": "Start chat",
@@ -475,6 +483,14 @@ enum L10n {
         "아직 메시지가 없습니다.": "还没有消息。",
         "어제": "昨天",
         "비공개 대화": "私密对话",
+        "참여자 목록 열기": "打开参与者列表",
+        "프로필 보기": "查看资料",
+        "조직 Agent": "组织 Agent",
+        "프로젝트 Agent": "项目 Agent",
+        "채널 멤버": "频道成员",
+        "채널 소유자": "频道所有者",
+        "역할": "角色",
+        "참여일": "加入日期",
         "멤버와 Agent를 불러오는 중…": "正在加载成员和 Agent…",
         "멤버 또는 Agent 검색": "搜索成员或 Agent",
         "대화 시작": "开始对话",
@@ -747,6 +763,8 @@ enum L10n {
         case channelStartThread
         case channelLastReply
         case channelReact
+        case channelReactWith
+        case channelCopyText
         case channelMessagePlaceholder
         case channelAgentTyping
         case channelHome
@@ -801,6 +819,8 @@ enum L10n {
             case .channelStartThread: "스레드 시작"
             case .channelLastReply: "마지막 답글 %@"
             case .channelReact: "React"
+            case .channelReactWith: "%@ 리액션"
+            case .channelCopyText: "텍스트 복사"
             case .channelMessagePlaceholder: "#%@에 메시지 보내기"
             case .channelAgentTyping: "%@님이 답변을 작성하고 있습니다…"
             case .channelHome: "홈"
@@ -858,6 +878,8 @@ enum L10n {
             case .channelStartThread: "Start a thread"
             case .channelLastReply: "last reply %@"
             case .channelReact: "React"
+            case .channelReactWith: "React with %@"
+            case .channelCopyText: "Copy text"
             case .channelMessagePlaceholder: "Message #%@"
             case .channelAgentTyping: "%@ is writing a reply…"
             case .channelHome: "Home"
@@ -915,6 +937,8 @@ enum L10n {
             case .channelStartThread: "开始话题"
             case .channelLastReply: "最后回复于%@"
             case .channelReact: "React"
+            case .channelReactWith: "用 %@ 回应"
+            case .channelCopyText: "复制文本"
             case .channelMessagePlaceholder: "发送消息到 #%@"
             case .channelAgentTyping: "%@ 正在撰写回复…"
             case .channelHome: "主页"

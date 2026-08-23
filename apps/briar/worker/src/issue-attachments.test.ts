@@ -394,6 +394,7 @@ describe("channel image multipart input", () => {
     form.set("body", `Screenshot\n\n![screen.png](briar-attachment://${reference})`);
     form.set("parentMessageId", "11111111-1111-4111-8111-111111111111");
     form.set("clientMessageId", clientMessageId.toUpperCase());
+    form.set("skillId", "44444444-4444-4444-8444-444444444444");
     form.set("mentionedUserIds", JSON.stringify(["owner"]));
     form.set(
       "mentionedAgentIds",
@@ -420,6 +421,7 @@ describe("channel image multipart input", () => {
     expect(result.attachmentReferences).toEqual([reference]);
     expect(result.input).toMatchObject({
       clientMessageId,
+      skillId: "44444444-4444-4444-8444-444444444444",
       parentMessageId: "11111111-1111-4111-8111-111111111111",
       mentionedUserIds: ["owner"],
       mentionedAgentIds: ["22222222-2222-4222-8222-222222222222"],
@@ -580,6 +582,28 @@ describe("issue conversation multipart input", () => {
       expect.objectContaining({ name: "clipboard.png", type: "image/png" }),
     ]);
     expect(result.attachmentReferences).toEqual([reference]);
+  });
+
+  it("canonicalizes uppercase agent UUIDs from iOS conversation requests", async () => {
+    const mentionedAgentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const request = new Request(
+      "https://briar.example/projects/project/runs/run/messages",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body: "@developer 확인해 주세요",
+          parentMessageId: null,
+          mentionedUserIds: [],
+          mentionedAgentIds: [mentionedAgentId.toUpperCase()],
+          agentConversationId: null,
+        }),
+      },
+    );
+
+    const result = await readIssueMessageRequest(request);
+
+    expect(result.input.mentionedAgentIds).toEqual([mentionedAgentId]);
   });
 
   it("rejects videos in issue conversations", async () => {

@@ -32,12 +32,21 @@ enum ConversationDatePresentation {
 
 enum ConversationScrollPresentation {
     static let bottomThreshold: CGFloat = 80
+    static let programmaticScrollHold: Duration = .milliseconds(250)
 
     static func isAwayFromBottom(
         bottomMaxY: CGFloat,
         viewportHeight: CGFloat
     ) -> Bool {
         bottomMaxY - viewportHeight > bottomThreshold
+    }
+
+    /// Auto-scroll to a newly sent message must not collapse the composer keyboard.
+    /// User-driven scrolling still dismisses it interactively.
+    static func dismissesKeyboardInteractively(
+        programmaticScrollActive: Bool
+    ) -> Bool {
+        !programmaticScrollActive
     }
 }
 
@@ -67,6 +76,8 @@ where Message.ID: Hashable {
     @State private var requestedEarlierMessages = false
     @State private var positioningInitially = false
     @State private var positionedInitially = false
+    @State private var programmaticScrollActive = false
+    @State private var programmaticScrollGeneration = 0
     @State private var showsScrollToBottom = false
     @Namespace private var scrollCoordinateSpace
 
@@ -101,7 +112,11 @@ where Message.ID: Hashable {
                 }
                 .coordinateSpace(name: scrollCoordinateSpace)
                 .defaultScrollAnchor(.bottom)
-                .scrollDismissesKeyboard(.interactively)
+                .scrollDismissesKeyboard(
+                    ConversationScrollPresentation.dismissesKeyboardInteractively(
+                        programmaticScrollActive: programmaticScrollActive
+                    ) ? .interactively : .never
+                )
                 .onPreferenceChange(ConversationBottomMaxYPreferenceKey.self) { bottomMaxY in
                     showsScrollToBottom = ConversationScrollPresentation.isAwayFromBottom(
                         bottomMaxY: bottomMaxY,
@@ -113,10 +128,9 @@ where Message.ID: Hashable {
                     if !positionedInitially {
                         if !positioningInitially {
                             positioningInitially = true
-                            Task { @MainActor in
-                                await Task.yield()
+                            performProgrammaticScroll {
                                 proxy.scrollTo(conversationBottomAnchorID, anchor: .bottom)
-                                await Task.yield()
+                            } afterLayout: {
                                 positionedInitially = true
                                 positioningInitially = false
                             }
@@ -124,20 +138,26 @@ where Message.ID: Hashable {
                         return
                     }
                     guard previous != current else { return }
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        proxy.scrollTo(current, anchor: .bottom)
+                    performProgrammaticScroll {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            proxy.scrollTo(current, anchor: .bottom)
+                        }
                     }
                 }
                 .onChange(of: messages.first?.id) { previous, current in
                     guard let previous, previous != current else { return }
-                    proxy.scrollTo(previous, anchor: .top)
+                    performProgrammaticScroll {
+                        proxy.scrollTo(previous, anchor: .top)
+                    }
                 }
                 .overlay(alignment: .bottom) {
                     if showsScrollToBottom {
                         Button {
                             showsScrollToBottom = false
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                proxy.scrollTo(conversationBottomAnchorID, anchor: .bottom)
+                            performProgrammaticScroll {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    proxy.scrollTo(conversationBottomAnchorID, anchor: .bottom)
+                                }
                             }
                         } label: {
                             Image(systemName: "arrow.down")
@@ -251,6 +271,26 @@ where Message.ID: Hashable {
         Task { @MainActor in
             await onLoadEarlier?()
             requestedEarlierMessages = false
+        }
+    }
+
+    private func performProgrammaticScroll(
+        _ scroll: @escaping () -> Void,
+        afterLayout: (() -> Void)? = nil
+    ) {
+        programmaticScrollGeneration += 1
+        let generation = programmaticScrollGeneration
+        programmaticScrollActive = true
+        Task { @MainActor in
+            await Task.yield()
+            guard generation == programmaticScrollGeneration else { return }
+            scroll()
+            await Task.yield()
+            afterLayout?()
+            try? await Task.sleep(for: ConversationScrollPresentation.programmaticScrollHold)
+            if generation == programmaticScrollGeneration {
+                programmaticScrollActive = false
+            }
         }
     }
 }
@@ -406,6 +446,7 @@ struct ConversationComposer: View {
     @Binding var attachments: [PendingIssueAttachment]
 
     @StateObject private var submission = ConversationComposerSubmissionModel()
+    @FocusState private var isComposerFocused: Bool
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var isLoadingPhotos = false
     @State private var attachmentError: String?
@@ -498,17 +539,10 @@ struct ConversationComposer: View {
                     .font(.body)
                     .lineLimit(1...4)
                     .padding(.vertical, 10)
-                    .disabled(isSending)
+                    .focused($isComposerFocused)
                     .accessibilityIdentifier(accessibility.field)
                 if canSend || isSending {
-                    Button {
-                        submission.submit(
-                            draft: $draft,
-                            mentions: $mentions,
-                            attachments: $attachments,
-                            send: send
-                        )
-                    } label: {
+                    Button(action: submitDraft) {
                         if isSending {
                             ProgressView()
                                 .controlSize(.small)
@@ -524,6 +558,7 @@ struct ConversationComposer: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .focusable(false)
                     .disabled(isSending)
                     .accessibilityLabel(L10n.text("보내기", locale: locale))
                     .accessibilityIdentifier(accessibility.send)
@@ -546,6 +581,11 @@ struct ConversationComposer: View {
         .onChange(of: selectedPhotos) { _, items in
             guard !items.isEmpty else { return }
             Task { await importPhotos(items) }
+        }
+        .onChange(of: isSending) { _, sending in
+            if sending {
+                isComposerFocused = true
+            }
         }
     }
 
@@ -667,6 +707,16 @@ struct ConversationComposer: View {
 
     private var maximumSelectionCount: Int {
         max(1, PendingIssueAttachment.maximumCount - attachments.count)
+    }
+
+    private func submitDraft() {
+        isComposerFocused = true
+        submission.submit(
+            draft: $draft,
+            mentions: $mentions,
+            attachments: $attachments,
+            send: send
+        )
     }
 
     @MainActor

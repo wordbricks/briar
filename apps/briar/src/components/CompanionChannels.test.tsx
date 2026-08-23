@@ -344,6 +344,7 @@ describe("CompanionChannels", () => {
       .querySelectorAll("[data-testid='toast-viewport']")
       .forEach((node) => node.remove());
     Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    Reflect.deleteProperty(navigator, "clipboard");
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -608,6 +609,108 @@ describe("CompanionChannels", () => {
     expect(handled).toBe(true);
     expect(container.querySelector(".companion-channel-bar")).toBeNull();
     expect(container.textContent).toContain("Common channels");
+  });
+
+  it("keeps thread and copy actions beside reactions in the long-press menu", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    const item = message("m-quick-reaction", "React from long press");
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [item],
+    });
+    toggleChannelMessageReaction.mockResolvedValue({
+      message: {
+        ...item,
+        reactions: [{ emoji: "👍", count: 1, userIds: ["user-1"] }],
+      },
+    });
+    await render();
+
+    const channelButton = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-group button",
+      ),
+    ].find((button) => button.textContent?.includes("Welcome"));
+    await act(async () => {
+      channelButton!.click();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".channel-reaction-add")).toBeNull();
+    expect(container.querySelector(".channel-message-actions")).toBeNull();
+    const row = container.querySelector<HTMLElement>(
+      '[data-companion-channel-message-id="m-quick-reaction"]',
+    );
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    });
+
+    const quickReactions = container.querySelectorAll<HTMLButtonElement>(
+      ".companion-channel-quick-reactions button",
+    );
+    expect([...quickReactions].map((button) => button.textContent)).toEqual([
+      "👍",
+      "❤️",
+      "😂",
+      "🎉",
+    ]);
+    expect(
+      container.querySelector<HTMLButtonElement>(".companion-channel-start-thread")
+        ?.textContent,
+    ).toBe("Start a thread");
+    expect(
+      container.querySelector<HTMLButtonElement>(".companion-channel-copy-link")
+        ?.textContent,
+    ).toBe("Copy link");
+    expect(
+      container.querySelector<HTMLButtonElement>(".companion-channel-copy-text")
+        ?.textContent,
+    ).toBe("Copy text");
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".companion-channel-copy-text")!
+        .click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenLastCalledWith("React from long press");
+
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".companion-channel-copy-link")!
+        .click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenLastCalledWith(
+      "http://127.0.0.1:8787/open/channels/org-1/c-common/m-quick-reaction",
+    );
+
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    });
+    const reopenedQuickReactions = container.querySelectorAll<HTMLButtonElement>(
+      ".companion-channel-quick-reactions button",
+    );
+    await act(async () => {
+      reopenedQuickReactions[0]!.click();
+      await Promise.resolve();
+    });
+
+    expect(toggleChannelMessageReaction).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      item.id,
+      "👍",
+    );
+    expect(container.querySelector(".companion-channel-action-sheet")).toBeNull();
   });
 
   it("preserves materialized approvals when a reaction returns a stale message", async () => {

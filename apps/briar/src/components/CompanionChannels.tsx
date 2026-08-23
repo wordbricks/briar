@@ -1,8 +1,10 @@
 import {
   Bot,
   ChevronLeft,
+  Copy,
   FileText,
   Hash,
+  Link2,
   Lock,
   MessageSquare,
   Plus,
@@ -39,6 +41,7 @@ import {
 } from "../lib/channel-grouping";
 import {
   applyChannelThreadSubscribers,
+  channelQuickReactionEmojis,
   type ChannelAgentReply,
   type ChannelAgentSummary,
   type ChannelExecutionProposal,
@@ -90,6 +93,7 @@ import {
   ChannelDraftImages,
   ChannelMessageImageCacheProvider,
   ChannelMessageImages,
+  channelBodyWithoutImages,
   useChannelMessageImageCache,
 } from "./ChannelImages";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
@@ -119,6 +123,10 @@ import {
   createChannelRealtimeTransport,
   MAX_CHANNEL_DELTA_PAGES_PER_SYNC,
 } from "../lib/channel-realtime";
+import {
+  copyChannelMessageText,
+  copyChannelShareLink,
+} from "../lib/issue-links";
 
 const mergeChannels = (
   current: ChannelSummary[],
@@ -2093,6 +2101,7 @@ function MessageRow({
   showTypingState?: boolean;
 }) {
   const { localeTag, t } = useI18n();
+  const { toast } = useToast();
   const [reacting, setReacting] = useState(false);
   const [showingThreadActions, setShowingThreadActions] = useState(false);
   useMobileBackHandler(
@@ -2129,7 +2138,7 @@ function MessageRow({
       className={`companion-channel-message${reacting ? " is-reacting" : ""}${message.optimistic ? " is-optimistic" : ""}`}
       data-companion-channel-message-id={message.id}
       onContextMenu={(event) => {
-        if (!showThreadSummary || !onOpenThread || message.optimistic) return;
+        if (message.optimistic) return;
         if ((event.target as HTMLElement).closest("button,a,input,select,textarea")) {
           return;
         }
@@ -2295,16 +2304,12 @@ function MessageRow({
           />
         ) : null}
         <ChannelMessageReactions
-          alwaysShowAdd
           busy={busy || message.optimistic}
           currentUserId={currentUserId}
           members={members}
           message={message}
-          onOpenThread={message.optimistic ? undefined : onOpenThread}
           onReactingChange={setReacting}
           onToggle={onToggleReaction}
-          organizationId={channel.organizationId}
-          showHoverActions
         />
       </div>
       {showingThreadActions ? (
@@ -2320,17 +2325,68 @@ function MessageRow({
             role="dialog"
           >
             <span aria-hidden="true" className="companion-channel-action-handle" />
+            <div className="companion-channel-quick-reactions">
+              {channelQuickReactionEmojis.map((emoji, index) => (
+                <button
+                  aria-label={t("channel.reactWith", { emoji })}
+                  autoFocus={!onOpenThread && index === 0}
+                  disabled={busy}
+                  key={emoji}
+                  onClick={() => {
+                    setShowingThreadActions(false);
+                    onToggleReaction(emoji);
+                  }}
+                  type="button"
+                >
+                  <span aria-hidden="true">{emoji}</span>
+                </button>
+              ))}
+            </div>
+            {onOpenThread ? (
+              <button
+                autoFocus
+                className="companion-channel-message-button companion-channel-sheet-action companion-channel-start-thread"
+                onClick={() => {
+                  setShowingThreadActions(false);
+                  onOpenThread();
+                }}
+                type="button"
+              >
+                <MessageSquare aria-hidden="true" size={20} />
+                <strong>{t("channel.startThread")}</strong>
+              </button>
+            ) : null}
             <button
-              autoFocus
-              className="companion-channel-message-button companion-channel-start-thread"
+              className="companion-channel-message-button companion-channel-sheet-action companion-channel-copy-link"
               onClick={() => {
                 setShowingThreadActions(false);
-                onOpenThread?.();
+                void copyChannelShareLink({
+                  organizationId: channel.organizationId,
+                  channelId: message.channelId,
+                  messageId: message.id,
+                  rootMessageId: message.parentMessageId ?? message.id,
+                })
+                  .then(() => toast(t("channel.linkCopied"), { tone: "success" }))
+                  .catch(() => toast(t("channel.copyFailed"), { tone: "error" }));
               }}
               type="button"
             >
-              <MessageSquare aria-hidden="true" size={20} />
-              <strong>{t("channel.startThread")}</strong>
+              <Link2 aria-hidden="true" size={20} />
+              <strong>{t("channel.copyLink")}</strong>
+            </button>
+            <button
+              className="companion-channel-message-button companion-channel-sheet-action companion-channel-copy-text"
+              onClick={() => {
+                setShowingThreadActions(false);
+                const text = channelBodyWithoutImages(message.body) || message.body.trim();
+                void copyChannelMessageText(text)
+                  .then(() => toast(t("channel.messageCopied"), { tone: "success" }))
+                  .catch(() => toast(t("channel.copyFailed"), { tone: "error" }));
+              }}
+              type="button"
+            >
+              <Copy aria-hidden="true" size={20} />
+              <strong>{t("channel.copyText")}</strong>
             </button>
           </div>
         </div>

@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 @testable import BriarCompanion
 
+@MainActor
 final class ChannelsStoreTests: XCTestCase {
     private let organizationID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
     private let channelID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
@@ -17,6 +18,58 @@ final class ChannelsStoreTests: XCTestCase {
     )!
     private let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
     private let resultRunID = UUID(uuidString: "88888888-8888-4888-8888-888888888888")!
+
+    @MainActor
+    func testDirectMessageUsesTheBoundedTimelineWithoutThreadFanOut() async throws {
+        var directMessage = summary(id: channelID, name: "Developer")
+        directMessage.kind = .directMessage
+        let root = message(
+            id: rootID,
+            channelID: channelID,
+            body: "Please review this",
+            replyCount: 1,
+            lastReplyAt: Date(timeIntervalSince1970: 1_700_000_020)
+        )
+        let legacyReply = message(
+            id: replyID,
+            channelID: channelID,
+            parentMessageID: rootID,
+            body: "Reviewed",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_020),
+            authorKind: .agent
+        )
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let threadPath = MobileAPIContract.Endpoint.channelMessages(
+            organizationID: organizationID,
+            channelID: channelID,
+            parentMessageID: rootID
+        )
+        let api = ChannelPollingAPI(routes: [
+            listPath: [try encoded(ChannelsResponse(channels: [directMessage], cursor: 10))],
+            detailPath: [try encoded(ChannelDetailResponse(
+                channel: directMessage,
+                members: [],
+                agents: [],
+                messages: [root, legacyReply]
+            ))],
+        ])
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+
+        XCTAssertEqual(store.messages.map(\.id), [rootID, replyID])
+        XCTAssertFalse(store.loading)
+        let threadRequestCount = await api.requestCount(for: threadPath)
+        XCTAssertEqual(threadRequestCount, 0)
+        store.applicationDidEnterBackground()
+    }
 
     func testSendPublishesOptimisticMessageBeforeTheRequestCompletes() async throws {
         let channel = summary(id: channelID, name: "Briar")

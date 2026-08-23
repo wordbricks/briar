@@ -29,7 +29,9 @@ struct CreateIssueSheet: View {
     ) {
         self.mutations = mutations
         self.members = members
-        self.providers = providers.isEmpty ? AgentProvider.allCases : providers
+        self.providers = AgentProvider.stableMenuOrder(
+            providers.isEmpty ? AgentProvider.allCases : providers
+        )
         self.capabilities = capabilities
         self.persistence = persistence
         self.refresh = refresh
@@ -424,7 +426,7 @@ struct ExecutionConfigurationFields: View {
     let locale: CompanionLocale
 
     private var availableProviders: [AgentProvider] {
-        providers
+        AgentProvider.stableMenuOrder(providers)
     }
 
     private var visibleEfforts: [AgentEffortCapability] {
@@ -539,7 +541,7 @@ struct ExecutionProposalApprovalSheet: View {
         approve: @escaping @MainActor (AcceptIssueExecutionProposalRequest) async throws -> Bool
     ) {
         self.targetTitle = targetTitle
-        let availableProviders = providers
+        let availableProviders = AgentProvider.stableMenuOrder(providers)
         let executableProviders = availableProviders.filter { provider in
             !eligibleExecutionWorkers(
                 workers: workers,
@@ -902,11 +904,14 @@ struct DispatchIssueSheet: View {
     ) {
         runID = run.id
         self.reassign = reassign
-        self.providers = providers.isEmpty ? AgentProvider.allCases : providers
+        let availableProviders = AgentProvider.stableMenuOrder(
+            providers.isEmpty ? AgentProvider.allCases : providers
+        )
+        self.providers = availableProviders
         self.workers = workers
         self.mutations = mutations
         self.refresh = refresh
-        let provider = run.preferredProvider ?? run.requestedProvider ?? providers.first ?? .codex
+        let provider = run.preferredProvider ?? run.requestedProvider ?? availableProviders.first ?? .codex
         let usesPreferredSettings = run.preferredProvider != nil
         _preferences = State(initialValue: IssueExecutionPreferences(
             provider: provider,

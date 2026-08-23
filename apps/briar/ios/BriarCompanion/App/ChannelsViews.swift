@@ -144,6 +144,7 @@ struct ChannelMessagesView: View {
     @State private var draft = ""
     @State private var previewFile: PreviewFile?
     @State private var selectedThreadMessage: ChannelMessage?
+    @State private var selectedProfile: ConversationProfileTarget?
 
     let channel: ChannelSummary
     let currentUserID: String?
@@ -169,9 +170,7 @@ struct ChannelMessagesView: View {
     }
 
     private var navigationSubtitle: String {
-        currentChannel.isDirectMessage
-            ? L10n.text("비공개 대화", locale: locale)
-            : channelParticipationLabel(channel: currentChannel, locale: locale)
+        channelParticipationLabel(channel: currentChannel, locale: locale)
     }
 
     var body: some View {
@@ -198,16 +197,29 @@ struct ChannelMessagesView: View {
                 : { selectedThreadMessage = $0 },
             showsThreadSummary: !currentChannel.isDirectMessage
         )
-        .navigationTitle(displayTitle)
+        .navigationTitle(currentChannel.isDirectMessage ? "" : displayTitle)
         .navigationBarTitleDisplayMode(.inline)
-        .channelNavigationSubtitle(navigationSubtitle)
+        .channelNavigationSubtitle(currentChannel.isDirectMessage ? nil : navigationSubtitle)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                ChannelNavigationTitle(
-                    channel: currentChannel,
-                    currentUserID: currentUserID,
-                    locale: locale
-                )
+            if currentChannel.isDirectMessage {
+                ToolbarItem(placement: .topBarLeading) {
+                    DirectMessageNavigationTitle(
+                        channel: currentChannel,
+                        currentUserID: currentUserID,
+                        members: channels.members,
+                        agents: channels.agents,
+                        locale: locale,
+                        onSelect: { selectedProfile = $0 }
+                    )
+                }
+            } else {
+                ToolbarItem(placement: .principal) {
+                    ChannelNavigationTitle(
+                        channel: currentChannel,
+                        currentUserID: currentUserID,
+                        locale: locale
+                    )
+                }
             }
         }
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -215,6 +227,9 @@ struct ChannelMessagesView: View {
         .sheet(item: $previewFile) { file in
             QuickLookPreview(fileURL: file.url)
                 .accessibilityIdentifier("channel-attachment-preview")
+        }
+        .sheet(item: $selectedProfile) { profile in
+            ConversationProfileSheet(profile: profile, locale: locale)
         }
         .navigationDestination(item: $selectedThreadMessage) { message in
             ChannelThreadView(
@@ -282,8 +297,8 @@ private func channelParticipationLabel(
 
 private extension View {
     @ViewBuilder
-    func channelNavigationSubtitle(_ subtitle: String) -> some View {
-        if #available(iOS 26.0, *) {
+    func channelNavigationSubtitle(_ subtitle: String?) -> some View {
+        if #available(iOS 26.0, *), let subtitle {
             navigationSubtitle(subtitle)
         } else {
             self
@@ -347,6 +362,236 @@ private struct ChannelNavigationTitle: View {
             "\(title), \(subtitle)"
         )
         .accessibilityIdentifier("channel-header-identity")
+    }
+}
+
+private struct DirectMessageNavigationTitle: View {
+    let channel: ChannelSummary
+    let currentUserID: String?
+    let members: [ChannelMember]
+    let agents: [ChannelAgentSummary]
+    let locale: CompanionLocale
+    let onSelect: (ConversationProfileTarget) -> Void
+
+    private var participants: [DirectMessageParticipant] {
+        channel.directMessageParticipants(excluding: currentUserID)
+    }
+
+    private var title: String {
+        channel.directMessageDisplayName(currentUserID: currentUserID)
+    }
+
+    var body: some View {
+        Group {
+            if participants.count > 1 {
+                Menu {
+                    ForEach(participants, id: \.profileKey) { participant in
+                        Button {
+                            onSelect(
+                                ConversationProfileTarget.resolve(
+                                    participant: participant,
+                                    members: members,
+                                    agents: agents
+                                )
+                            )
+                        } label: {
+                            Label(
+                                participant.name,
+                                systemImage: participant.type == .agent
+                                    ? "cpu.fill"
+                                    : "person.fill"
+                            )
+                        }
+                        .accessibilityIdentifier(
+                            "dm-header-participant-\(participant.profileKey)"
+                        )
+                    }
+                } label: {
+                    identityPill
+                }
+                .menuIndicator(.hidden)
+                .accessibilityHint(L10n.text("참여자 목록 열기", locale: locale))
+            } else {
+                Button {
+                    guard let participant = participants.first else { return }
+                    onSelect(
+                        ConversationProfileTarget.resolve(
+                            participant: participant,
+                            members: members,
+                            agents: agents
+                        )
+                    )
+                } label: {
+                    identityPill
+                }
+                .disabled(participants.isEmpty)
+                .accessibilityHint(L10n.text("프로필 보기", locale: locale))
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("channel-header-identity")
+    }
+
+    private var identityPill: some View {
+        HStack(spacing: 8) {
+            DirectMessageHeaderAvatar(
+                participants: participants,
+                fallbackName: title
+            )
+            Text(title)
+                .font(.subheadline.weight(.bold))
+                .lineLimit(1)
+        }
+        .padding(.leading, 4)
+        .padding(.trailing, 12)
+        .padding(.vertical, 3)
+        .background(.regularMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+    }
+}
+
+private struct DirectMessageHeaderAvatar: View {
+    let participants: [DirectMessageParticipant]
+    let fallbackName: String
+
+    var body: some View {
+        let visible = Array(participants.prefix(2))
+        ZStack {
+            if visible.isEmpty {
+                ProfileImageView(
+                    image: nil,
+                    name: fallbackName,
+                    systemImage: "person.2.fill",
+                    size: 28
+                )
+            } else {
+                ForEach(Array(visible.enumerated()), id: \.offset) { index, participant in
+                    ProfileImageView(
+                        image: participant.image,
+                        name: participant.name,
+                        systemImage: participant.type == .agent ? "cpu.fill" : "person.fill",
+                        size: visible.count == 1 ? 28 : 22
+                    )
+                    .offset(
+                        x: visible.count == 1 ? 0 : CGFloat(index * 8 - 4),
+                        y: visible.count == 1 ? 0 : CGFloat(index * 5 - 2)
+                    )
+                }
+            }
+        }
+        .frame(width: visible.count > 1 ? 34 : 28, height: 28)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct ConversationProfileSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let profile: ConversationProfileTarget
+    let locale: CompanionLocale
+
+    private var roleLabel: String {
+        switch profile {
+        case let .agent(agent):
+            return agent.projectId == nil
+                ? L10n.text("조직 Agent", locale: locale)
+                : L10n.text("프로젝트 Agent", locale: locale)
+        case let .user(user):
+            if user.role == "owner" {
+                return L10n.text("채널 소유자", locale: locale)
+            }
+            return L10n.text("채널 멤버", locale: locale)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    HStack(spacing: 14) {
+                        ProfileImageView(
+                            image: profile.image,
+                            name: profile.name,
+                            systemImage: profile.isAgent ? "cpu.fill" : "person.fill",
+                            size: 56
+                        )
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(profile.name)
+                                .font(.title3.weight(.semibold))
+                                .accessibilityIdentifier("conversation-profile-name")
+                            Text(roleLabel)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    .accessibilityIdentifier("conversation-profile-header")
+                }
+
+                Section(L10n.text("프로필", locale: locale)) {
+                    LabeledContent(L10n.text("역할", locale: locale), value: roleLabel)
+                    switch profile {
+                    case let .user(user):
+                        if let email = user.email, !email.isEmpty {
+                            LabeledContent(L10n.text("이메일", locale: locale), value: email)
+                        }
+                        if let createdAt = user.createdAt {
+                            LabeledContent(
+                                L10n.text("참여일", locale: locale),
+                                value: createdAt.formatted(
+                                    Date.FormatStyle(date: .long, time: .omitted)
+                                        .locale(Locale(identifier: locale.foundationIdentifier))
+                                )
+                            )
+                        }
+                    case let .agent(agent):
+                        if let provider = agent.provider, !provider.isEmpty {
+                            LabeledContent(
+                                L10n.text("실행 환경", locale: locale),
+                                value: agent.model.map { "\(provider) · \($0)" } ?? provider
+                            )
+                        }
+                        if let createdAt = agent.createdAt {
+                            LabeledContent(
+                                L10n.text("참여일", locale: locale),
+                                value: createdAt.formatted(
+                                    Date.FormatStyle(date: .long, time: .omitted)
+                                        .locale(Locale(identifier: locale.foundationIdentifier))
+                                )
+                            )
+                        }
+                    }
+                }
+
+                if case let .agent(agent) = profile {
+                    if let description = agent.description, !description.isEmpty {
+                        Section(L10n.text("설명", locale: locale)) {
+                            Text(description)
+                        }
+                    }
+                    if let responsibility = agent.responsibility, !responsibility.isEmpty {
+                        Section(L10n.text("책임", locale: locale)) {
+                            Text(responsibility)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(L10n.text("프로필", locale: locale))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.text("닫기", locale: locale)) { dismiss() }
+                        .accessibilityIdentifier("conversation-profile-close")
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .accessibilityIdentifier("conversation-profile-sheet")
     }
 }
 
@@ -783,6 +1028,8 @@ private struct ChannelMessageRow: View {
     let workers: [DashboardWorker]
     var showsThreadSummary = false
     @State private var showingThreadActions = false
+    @State private var linkCopied = false
+    @State private var messageCopied = false
 
     private var mentionHandles: Set<String> {
         MessageMentions.channelHandles(
@@ -931,7 +1178,7 @@ private struct ChannelMessageRow: View {
                     )
                     .padding(.top, 5)
                 }
-                if !isOptimistic {
+                if !isOptimistic, !message.reactions.isEmpty {
                     ChannelReactionBar(
                         currentUserID: currentUserID,
                         locale: locale,
@@ -946,47 +1193,143 @@ private struct ChannelMessageRow: View {
         .highPriorityGesture(
             LongPressGesture(minimumDuration: 0.45)
                 .onEnded { _ in
-                    guard !isOptimistic, onOpenThread != nil else { return }
+                    guard !isOptimistic else { return }
                     showingThreadActions = true
                 }
         )
         .sheet(isPresented: $showingThreadActions) {
-            ChannelMessageActionsSheet(locale: locale) {
-                showingThreadActions = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    onOpenThread?()
+            ChannelMessageActionsSheet(
+                locale: locale,
+                quickEmojis: Self.quickReactionEmojis,
+                onToggleReaction: { emoji in
+                    showingThreadActions = false
+                    Task { await onToggleReaction(emoji) }
+                },
+                onCopyLink: {
+                    showingThreadActions = false
+                    let url = BriarShareLinks.channelShareURL(
+                        organizationID: channel.organizationId,
+                        channelID: channel.id,
+                        messageID: message.id,
+                        rootMessageID: message.parentMessageId ?? message.id,
+                        origin: BriarShareLinks.defaultOrigin
+                    )
+                    ClipboardService.copy(url.absoluteString)
+                    linkCopied = true
+                },
+                onCopyText: {
+                    showingThreadActions = false
+                    let copyText = messageBodyWithoutAttachments.isEmpty
+                        ? message.body.trimmingCharacters(in: .whitespacesAndNewlines)
+                        : messageBodyWithoutAttachments
+                    ClipboardService.copy(copyText)
+                    messageCopied = true
+                },
+                onStartThread: onOpenThread.map { openThread in
+                    {
+                        showingThreadActions = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            openThread()
+                        }
+                    }
                 }
-            }
-            .presentationDetents([.height(150)])
+            )
+            .presentationDetents([.height(onOpenThread == nil ? 290 : 370)])
             .presentationDragIndicator(.visible)
             .presentationBackground(.regularMaterial)
         }
+        .companionToast(
+            isPresented: $linkCopied,
+            message: L10n.text(.linkCopied, locale: locale)
+        )
+        .companionToast(
+            isPresented: $messageCopied,
+            message: L10n.text(.messageCopied, locale: locale)
+        )
     }
 }
 
 private struct ChannelMessageActionsSheet: View {
     let locale: CompanionLocale
-    let onStartThread: () -> Void
+    let quickEmojis: [String]
+    let onToggleReaction: (String) -> Void
+    let onCopyLink: () -> Void
+    let onCopyText: () -> Void
+    let onStartThread: (() -> Void)?
 
     var body: some View {
-        Button(action: onStartThread) {
-            Label(
-                L10n.text(.channelStartThread, locale: locale),
-                systemImage: "bubble.left.and.bubble.right"
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                ForEach(quickEmojis, id: \.self) { emoji in
+                    Button {
+                        onToggleReaction(emoji)
+                    } label: {
+                        Text(emoji)
+                            .font(.system(size: 28))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(
+                                Color(.secondarySystemBackground),
+                                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        String(
+                            format: L10n.text(.channelReactWith, locale: locale),
+                            emoji
+                        )
+                    )
+                    .accessibilityIdentifier("channel-quick-reaction-\(emoji)")
+                }
+            }
+
+            if let onStartThread {
+                actionButton(
+                    title: L10n.text(.channelStartThread, locale: locale),
+                    systemImage: "bubble.left.and.bubble.right",
+                    identifier: "channel-start-thread-action",
+                    action: onStartThread
+                )
+            }
+
+            actionButton(
+                title: L10n.text(.copyLink, locale: locale),
+                systemImage: "link",
+                identifier: "channel-copy-link-action",
+                action: onCopyLink
             )
-            .font(.body.weight(.semibold))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .frame(height: 58)
-            .background(
-                Color(.secondarySystemBackground),
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+
+            actionButton(
+                title: L10n.text(.channelCopyText, locale: locale),
+                systemImage: "doc.on.doc",
+                identifier: "channel-copy-text-action",
+                action: onCopyText
             )
         }
-        .buttonStyle(.plain)
         .padding(.horizontal, 18)
         .padding(.top, 8)
-        .accessibilityIdentifier("channel-start-thread-action")
+    }
+
+    private func actionButton(
+        title: String,
+        systemImage: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .frame(height: 58)
+                .background(
+                    Color(.secondarySystemBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 }
 

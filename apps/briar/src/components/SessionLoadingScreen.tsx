@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
-import briarMarkDarkUrl from "../assets/brand/briar-mark-dark.png";
-import briarMarkLightUrl from "../assets/brand/briar-mark-light.png";
+import briarWhiteStrokeUrl from "../assets/brand/briar-white-stroke.svg";
+import briarBlackStrokeUrl from "../assets/brand/briar-black-stroke.svg";
 import { useI18n } from "../i18n";
 
 type LoadingLogoStyle = CSSProperties & {
@@ -24,8 +24,8 @@ export function SessionLoadingScreen() {
         className="session-loading-logo"
         style={
           {
-            "--session-loading-logo-light": `url("${briarMarkLightUrl}")`,
-            "--session-loading-logo-dark": `url("${briarMarkDarkUrl}")`,
+            "--session-loading-logo-light": `url("${briarBlackStrokeUrl}")`,
+            "--session-loading-logo-dark": `url("${briarWhiteStrokeUrl}")`,
           } as LoadingLogoStyle
         }
       >
@@ -33,13 +33,13 @@ export function SessionLoadingScreen() {
           alt=""
           aria-hidden="true"
           className="session-loading-logo-light"
-          src={briarMarkLightUrl}
+          src={briarBlackStrokeUrl}
         />
         <img
           alt=""
           aria-hidden="true"
           className="session-loading-logo-dark"
-          src={briarMarkDarkUrl}
+          src={briarWhiteStrokeUrl}
         />
       </div>
       <span className="visually-hidden">{t("session.restoring")}</span>

@@ -30,6 +30,34 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.152",
+        date: "2026년 8월 23일",
+        title: "Worker 재시작과 관리형 컴퓨터 재시도를 더 안정적으로 연결합니다",
+        summary:
+          "관리형 컴퓨터 재시도에서 새 인스턴스를 안전하게 만들고, DM Agent 답변을 메인 대화 흐름에 이어 표시하며, 데스크톱 업데이트 뒤 Worker가 최신 앱 런타임으로 확실히 재시작되도록 합니다.",
+        items: [
+          "관리형 컴퓨터 프로비저닝 재시도마다 최신 인프라 설정과 새 EC2 ClientToken을 사용해 새 인스턴스를 만들고, 이전 인스턴스는 태그 검증 후 종료합니다.",
+          "DM의 Agent 답변을 thread 전용 맥락과 구분해 메인 대화 흐름에 표시하고, 이전 대화의 root 메시지를 Worker context로 안전하게 전달합니다.",
+          "데스크톱 앱 시작 시 Worker runtime 재시작 상태를 앱 버전과 비교해 오래된 서비스를 안전한 handoff 뒤 재시작하고, 실패하면 다음 실행에서 다시 시도합니다.",
+        ],
+      },
+      {
+        version: "1.2.151",
+        date: "2026년 8월 23일",
+        title: "이슈를 더 빠르게 찾고 Worker 실행을 더 안정적으로 이어갑니다",
+        summary:
+          "보드와 목록에서 원하는 이슈를 여러 속성으로 좁혀 보고, DM에서 저장한 Agent 스킬을 바로 실행하며, Worker 업데이트와 제공자 상태를 더 안정적으로 처리합니다.",
+        items: [
+          "상태·출처·우선순위·담당자·Agent·생성자 속성을 조합해 이슈 보드와 목록을 빠르게 필터링합니다.",
+          "DM 입력창의 `/` 명령으로 저장한 Project Agent 스킬을 설명과 함께 찾아 바로 실행합니다.",
+          "채널 메시지를 길게 눌러 thread를 열고, 메시지 첨부 답글의 실행 상태를 더 자연스럽게 이어서 확인합니다.",
+          "앱 업데이트 뒤 현재 실행 중인 Worker를 명시적으로 재시작하고, detached runner의 시작·종료·오류 진단 정보를 안전하게 기록합니다.",
+          "OpenRouter와 관리형 컴퓨터의 실제 설정·상태를 기준으로 사용 가능 여부를 판정해 잘못된 Worker 상태 표시를 줄입니다.",
+          "첫 실행 onboarding 이후 macOS 타이틀바를 복원하고, 투명 배경에서도 밝은·어두운 테마 브랜딩이 올바르게 보이도록 다듬습니다.",
+          "대규모 Worker API 라우트를 기능별 경계로 나누고 회귀 테스트를 정리해 서버 변경을 더 안전하게 배포합니다.",
+        ],
+      },
+      {
         version: "1.2.150",
         date: "2026년 8월 23일",
         title: "새 브랜딩과 관리형 컴퓨터 원격 화면, 모바일 DM을 더 가까이 연결합니다",
@@ -990,6 +1018,34 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.152",
+        date: "August 23, 2026",
+        title: "Make Worker restarts and managed-computer retries more dependable",
+        summary:
+          "Create fresh managed-computer instances safely on retry, keep DM Agent replies in the main conversation flow, and restart Worker services when a desktop update leaves their runtime stale.",
+        items: [
+          "Use the latest infrastructure configuration and a fresh EC2 ClientToken for each managed-computer provisioning retry, retiring the previous instance only after its tags are verified.",
+          "Keep DM Agent replies in the main conversation timeline instead of thread-only context, while safely sending root-message history to the Worker.",
+          "Compare the Worker runtime restart marker with the desktop app version at launch, restart stale services after a safe handoff, and retry on the next launch when a restart fails.",
+        ],
+      },
+      {
+        version: "1.2.151",
+        date: "August 23, 2026",
+        title: "Find issues faster and keep Worker execution moving reliably",
+        summary:
+          "Filter issues by the properties that matter, invoke saved Agent skills directly from DMs, and make Worker updates and provider status more dependable.",
+        items: [
+          "Combine status, source, priority, assignee, Agent, and creator filters to narrow issue boards and lists quickly.",
+          "Use `/` commands in DMs to find saved Project Agent skills by description and invoke them immediately.",
+          "Open channel threads from a long press and follow attachment-reply execution status through the conversation more naturally.",
+          "Explicitly restart the current Worker after app updates and safely record detached-runner start, exit, and error diagnostics.",
+          "Derive OpenRouter and managed-computer availability from their actual configuration and state to reduce misleading Worker status.",
+          "Restore the macOS title bar after first-run onboarding and keep theme-aware branding visible on transparent surfaces.",
+          "Split the large Worker API surface into focused route boundaries and prune regression coverage so server changes remain safer to ship.",
+        ],
+      },
       {
         version: "1.2.150",
         date: "August 23, 2026",
@@ -2042,7 +2098,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-150">
+          <a href="#v1-2-152">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2064,7 +2120,11 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.150"
+                      entry.version === "1.2.152"
+                        ? "2026-08-23"
+                        : entry.version === "1.2.151"
+                        ? "2026-08-23"
+                        : entry.version === "1.2.150"
                         ? "2026-08-23"
                         : entry.version === "1.2.149"
                         ? "2026-08-22"

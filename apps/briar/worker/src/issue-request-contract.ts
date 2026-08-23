@@ -142,7 +142,7 @@ export const IssueMessageInput = strictSchema(Schema.Struct({
     ),
   ),
   mentionedAgentIds: Schema.optional(
-    mutableArray(UuidString).check(Schema.isMaxLength(20)),
+    mutableArray(CanonicalUuid).check(Schema.isMaxLength(20)),
   ),
   agentConversationId: Schema.optional(
     Schema.NullOr(trimmedText(1, 1_000)),

@@ -1074,3 +1074,69 @@ TestFlight testing.
 After the upload, `main` advanced through `9c4ec1d9` (the worker route-family
 refactor in PR #1237). That worker-only change is included in the release PR;
 it does not change the native iOS inputs or the uploaded IPA.
+
+## 2026-08-23 — 1.2.152 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.152`
+- App Store Connect build: `1`
+- App Store Connect build ID: `a3444726-0be2-4f24-a8b9-f2cc8c66d9d6`
+- Latest main commit: `ef1a92fc30dbbd1d2aa1daaef915e6679948d107`
+- Release source commit: `31c2fada74899c05d8d9f02a55e909e9763ac8df`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Automatic tester notification: enabled
+- IPA SHA-256: `5201bc976fbff606f547acbbd92e8f18f1e1fa51f4ce9d774070d98e87780357`
+
+The exact latest-main release source passed the shared API contract, 15 iPhone
+UI tests, the iPad accessibility and largest Dynamic Type layout test,
+Production analyze and build checks, session/download/log security checks, and
+the Tauri iOS simulator and Android ARM64 regression builds. Archive identity,
+App Store provisioning, distribution signature, production entitlements,
+exported IPA signature, and the IPA checksum were verified before upload.
+
+The release source adds explicit `@MainActor` isolation to the native
+`ChannelsStoreTests` and `CompanionReadTests` XCTest classes for Swift 6 test
+compilation. This is test-only and does not change the app's runtime behavior
+or Android source. App Store Connect accepted the build as `VALID`, enabled
+automatic internal tester notification, and placed it in internal TestFlight
+testing; external beta submission remains pending (`READY_FOR_BETA_SUBMISSION`).
+
+## 2026-08-23 — 1.2.152 (2)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.152`
+- App Store Connect build: `2`
+- App Store Connect build ID: `0d87a837-76e4-4586-aba2-2bde899547f4`
+- Latest main commit: `34ee613995389d35bac766a3beaf0cb9eff05091`
+- Release source commit: `bef054a09095135398a6f941cbd556ed71dba159`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Automatic tester notification: enabled
+- External beta state: `READY_FOR_BETA_SUBMISSION`
+- IPA SHA-256: `6f674a2cd3170765dc7aace20c3ab9b770d0d417c47419a25f86c9c95458b15d`
+
+This is the final latest-main release for this run. It includes the latest
+main channel interaction update from PR #1265: messages without reactions no
+longer show a standalone React button, and long-pressing the message opens the
+quick-reaction actions. The release source also makes the direct-message UI
+test target the message body text view when SwiftUI exposes the same identifier
+on the message's accessibility subviews. The earlier 1.2.152 (1) upload was
+valid, but build 2 supersedes it because main advanced before the final release
+was completed.
+
+The complete gate passed the shared API contract, Swift unit and 15 iPhone UI
+tests, the iPad accessibility and largest Dynamic Type layout test, Production
+analyze and build checks, session/download/log security checks, and the Tauri
+iOS simulator and Android ARM64 regression builds. Archive identity, App Store
+provisioning, distribution signature, production entitlements, exported IPA
+signature, and the IPA checksum were verified before upload. App Store Connect
+accepted the build as `VALID`, enabled automatic internal tester notification,
+and placed it in internal TestFlight testing; external beta submission remains
+pending (`READY_FOR_BETA_SUBMISSION`).

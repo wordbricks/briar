@@ -426,15 +426,6 @@ final class ChannelsStore: ObservableObject {
             members = response.members
             agents = response.agents
             agentReplies = response.agentReplies ?? []
-            if response.channel.isDirectMessage {
-                await expandDirectMessageReplies(
-                    parents: response.messages,
-                    expectedGeneration: expectedGeneration,
-                    expectedLoadRevision: expectedLoadRevision,
-                    channelID: channelID
-                )
-                guard focusedThreadParentID == nil else { return }
-            }
             cacheFocusedConversation()
             errorMessage = nil
         } catch {
@@ -520,12 +511,6 @@ final class ChannelsStore: ObservableObject {
             )
             nextMessageCursor = response.nextCursor
             hasEarlierMessages = response.nextCursor != nil
-            await expandDirectMessageReplies(
-                parents: stabilizedMessages,
-                expectedGeneration: expectedGeneration,
-                expectedLoadRevision: expectedLoadRevision,
-                channelID: channelID
-            )
             errorMessage = nil
         } catch {
             guard
@@ -1891,74 +1876,6 @@ final class ChannelsStore: ObservableObject {
 
     private func isDirectMessage(channelID: UUID) -> Bool {
         channels.first(where: { $0.id == channelID })?.isDirectMessage == true
-    }
-
-    /// A direct message conversation reads as one continuous timeline. After a
-    /// page of root messages loads, replies to those roots are fetched through
-    /// the thread endpoint and merged chronologically instead of waiting
-    /// behind a thread summary chip. A failed expansion keeps the loaded page
-    /// visible; the next authoritative load or delta restores missing replies.
-    private func expandDirectMessageReplies(
-        parents: [ChannelMessage],
-        expectedGeneration: Int,
-        expectedLoadRevision: Int,
-        channelID: UUID
-    ) async {
-        guard let organizationID, let token,
-              !Task.isCancelled,
-              expectedGeneration == generation,
-              expectedLoadRevision == authoritativeLoadRevision,
-              focusedChannelID == channelID,
-              focusedThreadParentID == nil,
-              isDirectMessage(channelID: channelID)
-        else { return }
-        let threadParents = parents.filter {
-            $0.channelId == channelID &&
-                $0.parentMessageId == nil &&
-                $0.replyCount > 0
-        }
-        guard !threadParents.isEmpty else { return }
-        let api = self.api
-        let fetchedReplies = await withTaskGroup(
-            of: [ChannelMessage].self,
-            returning: [ChannelMessage].self
-        ) { group in
-            for parent in threadParents {
-                group.addTask {
-                    do {
-                        let response: ChannelMessagesResponse = try await api.get(
-                            MobileAPIContract.Endpoint.channelMessages(
-                                organizationID: organizationID,
-                                channelID: channelID,
-                                parentMessageID: parent.id
-                            ),
-                            token: token,
-                            as: ChannelMessagesResponse.self
-                        )
-                        return response.messages
-                    } catch {
-                        return []
-                    }
-                }
-            }
-            var collected: [ChannelMessage] = []
-            for await threadMessages in group {
-                collected.append(contentsOf: threadMessages.filter {
-                    $0.parentMessageId != nil
-                })
-            }
-            return collected
-        }
-        guard
-            !fetchedReplies.isEmpty,
-            !Task.isCancelled,
-            expectedGeneration == generation,
-            expectedLoadRevision == authoritativeLoadRevision,
-            focusedChannelID == channelID,
-            focusedThreadParentID == nil
-        else { return }
-        recordProposalMessages(fetchedReplies)
-        messages = Self.mergeMessages(messages, updates: fetchedReplies, removing: [])
     }
 
     private func apply(_ delta: ChannelDeltaResponse) {

@@ -24,6 +24,8 @@ import {
   HuntDashboard,
   IssueAgentActivityPanel,
   RunPage,
+  runMatchesIssuePropertyFilters,
+  type IssuePropertyFilters,
 } from "./HuntDashboard";
 import { ToastProvider } from "./ui/toast";
 import { TooltipProvider } from "./ui/tooltip";
@@ -149,6 +151,118 @@ function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
 }
 
 describe("HuntDashboard", () => {
+
+  it.each(["issue", "feedback", "error"] as const)(
+    "shows the assignee avatar immediately after the %s source label",
+    async (source) => {
+      const member = demoDashboard.members![0]!;
+      const run = {
+        ...demoDashboard.runs[0],
+        assigneeUserId: member.userId,
+        source,
+      };
+      const container = document.createElement("div");
+      document.body.append(container);
+      const root = createRoot(container);
+      await act(async () => root.render(
+        <HuntDashboard
+          {...dashboardProps}
+          dashboard={{ ...demoDashboard, runs: [run] }}
+        />,
+      ));
+
+      const sourceLabel = container.querySelector(".kanban-source");
+      const assigneeAvatar = container.querySelector(".kanban-assignee");
+      expect(sourceLabel?.nextElementSibling).toBe(assigneeAvatar);
+      expect(assigneeAvatar?.getAttribute("aria-label")).toBe(
+        `담당자: ${member.name}`,
+      );
+
+      await act(async () => root.unmount());
+      container.remove();
+    },
+  );
+
+  it("filters the visible issues from the property menu", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(
+      <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />,
+    ));
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      '[aria-label="프로퍼티 필터"]',
+    );
+    expect(trigger).not.toBeNull();
+    await act(async () => {
+      trigger?.dispatchEvent(new MouseEvent("pointerdown", {
+        bubbles: true,
+        button: 0,
+      }));
+    });
+    const statusFilter = Array.from(
+      document.body.querySelectorAll<HTMLElement>(
+        ".issue-property-filter-item",
+      ),
+    ).find((item) => item.textContent?.includes("상태"));
+    expect(statusFilter).toBeTruthy();
+    await act(async () => statusFilter?.click());
+    const completedFilter = Array.from(
+      document.body.querySelectorAll<HTMLElement>(
+        ".issue-property-filter-choice",
+      ),
+    ).find((item) => item.textContent?.includes("완료"));
+    expect(completedFilter).toBeTruthy();
+    await act(async () => completedFilter?.click());
+
+    expect(container.querySelectorAll(".kanban-card")).toHaveLength(1);
+    expect(container.textContent).toContain("D1 작업 이벤트 스키마 추가");
+    expect(trigger?.textContent).toContain("1");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("combines issue property filters while allowing multiple values per property", () => {
+    const runningIssue = {
+      ...demoDashboard.runs[0],
+      agentId: "agent-1",
+      assigneeUserId: "member-1",
+      createdByUserId: "creator-1",
+      priority: 1,
+      source: "issue" as const,
+      status: "running" as const,
+    };
+    const unassignedFeedback = {
+      ...demoDashboard.runs[1],
+      agentId: null,
+      assigneeUserId: null,
+      createdByUserId: "creator-1",
+      priority: null,
+      source: "feedback" as const,
+      status: "paused" as const,
+    };
+    const filters: IssuePropertyFilters = {
+      status: ["running", "paused"],
+      source: ["issue", "feedback"],
+      priority: ["1"],
+      assignee: ["member-1"],
+      agent: ["agent-1"],
+      creator: ["creator-1"],
+    };
+
+    expect(runMatchesIssuePropertyFilters(runningIssue, filters)).toBe(true);
+    expect(runMatchesIssuePropertyFilters(unassignedFeedback, filters)).toBe(false);
+    expect(runMatchesIssuePropertyFilters(unassignedFeedback, {
+      status: ["paused"],
+      source: [],
+      priority: ["__unset__"],
+      assignee: ["__unset__"],
+      agent: ["__unset__"],
+      creator: [],
+    })).toBe(true);
+  });
 
 
 

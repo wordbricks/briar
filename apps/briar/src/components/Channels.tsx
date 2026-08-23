@@ -2,6 +2,7 @@ import {
   AtSign,
   Bot,
   Check,
+  ChevronLeft,
   Copy,
   Hash,
   Headphones,
@@ -38,7 +39,10 @@ import {
 } from "react";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useI18n } from "../i18n";
-import { useChannelComposer } from "../hooks/useChannelComposer";
+import {
+  useChannelComposer,
+  type ChannelSkillCommandTarget,
+} from "../hooks/useChannelComposer";
 import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import {
@@ -84,8 +88,12 @@ import {
   type ChannelExecutionProposal,
   type ChannelSummary,
   type ChannelWebhook,
+  type DirectMessageParticipant,
 } from "../lib/channels-contract";
-import { directMessageDisplayName } from "../lib/direct-messages";
+import {
+  directMessageDisplayName,
+  directMessageParticipants,
+} from "../lib/direct-messages";
 import {
   channelHasUnread,
   laterTimestamp,
@@ -106,6 +114,7 @@ import {
   useChannelMessageImageCache,
 } from "./ChannelImages";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
+import { ChannelSkillMenu } from "./ChannelSkillMenu";
 import { ChannelTypingState } from "./ChannelTypingState";
 import { MentionComposerField } from "./MentionComposerField";
 import { AgentProviderIcon } from "./AgentIcons";
@@ -113,6 +122,7 @@ import {
   ProfileDialog,
   profileTargetForChannelAgent,
   profileTargetForChannelMember,
+  profileTargetForDirectMessageParticipant,
   type ProfileTarget,
 } from "./ProfileDialog";
 import {
@@ -432,6 +442,8 @@ export function Channels({
   ]);
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [agents, setAgents] = useState<ChannelAgentSummary[]>([]);
+  const [headerProfile, setHeaderProfile] = useState<ProfileTarget | null>(null);
+  const [participantMenuOpen, setParticipantMenuOpen] = useState(false);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [messageNextCursor, setMessageNextCursor] = useState<string | null>(null);
   const [channelLoading, setChannelLoading] = useState(false);
@@ -603,6 +615,15 @@ export function Channels({
   const activeChannelName = activeChannel && surface === "dm"
     ? directMessageDisplayName(activeChannel, currentUserId)
     : activeChannel?.name ?? "";
+  const dmParticipants = activeChannel && surface === "dm"
+    ? directMessageParticipants(activeChannel, currentUserId)
+    : [];
+  const isGroupDirectMessage = dmParticipants.length > 1;
+
+  useEffect(() => {
+    setParticipantMenuOpen(false);
+    setHeaderProfile(null);
+  }, [activeChannelId]);
   const showRequestedThreadOnly = Boolean(
     inboxDetail &&
       requestedMessage &&
@@ -1243,12 +1264,14 @@ export function Channels({
             );
             if (relevant.length || delta.removedMessageIds.length) {
               recordProposalMessages(relevant);
-              const rootUpdates = relevant.filter(
-                (message) => message.parentMessageId === null,
-              );
+              const timelineUpdates = surface === "dm"
+                ? relevant
+                : relevant.filter(
+                    (message) => message.parentMessageId === null,
+                  );
               const scroller = messagesScrollRef.current;
               if (
-                rootUpdates.length > 0 &&
+                timelineUpdates.length > 0 &&
                 scroller &&
                 scroller.scrollHeight - scroller.scrollTop -
                     scroller.clientHeight <= 80
@@ -1258,7 +1281,7 @@ export function Channels({
               setMessages((current) => {
                 const next = mergeChannelMessages(
                   current,
-                  rootUpdates,
+                  timelineUpdates,
                   delta.removedMessageIds,
                 );
                 if (activeChannelId) {
@@ -1347,6 +1370,7 @@ export function Channels({
     onChannelsChange,
     organizationId,
     recordProposalMessages,
+    surface,
     t,
     token,
   ]);
@@ -1518,6 +1542,7 @@ export function Channels({
       parentMessageId: string | null,
       attachments: File[],
       attachmentReferences: string[],
+      selectedSkill?: ChannelSkillCommandTarget,
     ) => {
       if (!activeChannelId || !body.trim()) return;
       const sendContext = captureChannelSurface();
@@ -1565,19 +1590,28 @@ export function Channels({
         );
         const implicitlyInvokesDirectAgent =
           activeChannel?.kind === "dm" && members.length === 1 && agents.length === 1;
-        const preferredDeviceId = hasAgentMention || implicitlyInvokesDirectAgent
+        const preferredDeviceId =
+          hasAgentMention || implicitlyInvokesDirectAgent || selectedSkill
           ? await currentExecutionWorkerDeviceId(organizationId)
           : null;
+        const mentionedAgentIds = mentions
+          .filter((mention) => mention.type === "agent")
+          .map((mention) => mention.id);
+        if (
+          selectedSkill &&
+          !mentionedAgentIds.includes(selectedSkill.agentId)
+        ) {
+          mentionedAgentIds.push(selectedSkill.agentId);
+        }
         const result = await sendChannelMessage(token, organizationId, activeChannelId, {
           body: body.trim(),
           clientMessageId,
+          skillId: selectedSkill?.skill.id ?? null,
           parentMessageId,
           mentionedUserIds: mentions
             .filter((mention) => mention.type === "user")
             .map((mention) => mention.id),
-          mentionedAgentIds: mentions
-            .filter((mention) => mention.type === "agent")
-            .map((mention) => mention.id),
+          mentionedAgentIds,
           ...(preferredDeviceId ? { preferredDeviceId } : {}),
           attachments,
           attachmentReferences,
@@ -2156,16 +2190,37 @@ export function Channels({
         {activeChannel ? (
           <>
             <header className="channel-header" data-tauri-drag-region>
-              <div className="channel-header-title">
-                {surface === "dm" ? (
-                  <MessageCircle size={16} aria-hidden="true" />
-                ) : activeChannel.visibility === "private" ? (
-                  <Lock size={16} aria-hidden="true" />
-                ) : (
-                  <Hash size={16} aria-hidden="true" />
-                )}
-                <h2>{activeChannelName}</h2>
-              </div>
+              {surface === "dm" ? (
+                <button
+                  aria-label={t("navigation.back")}
+                  className="channel-header-back"
+                  onClick={() => onChannelSelect(null)}
+                  type="button"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+              ) : null}
+              {surface === "dm" ? (
+                <DirectMessageHeaderIdentity
+                  members={members}
+                  agents={agents}
+                  isGroup={isGroupDirectMessage}
+                  menuOpen={participantMenuOpen}
+                  name={activeChannelName}
+                  onMenuOpenChange={setParticipantMenuOpen}
+                  onSelectProfile={setHeaderProfile}
+                  participants={dmParticipants}
+                />
+              ) : (
+                <div className="channel-header-title">
+                  {activeChannel.visibility === "private" ? (
+                    <Lock size={16} aria-hidden="true" />
+                  ) : (
+                    <Hash size={16} aria-hidden="true" />
+                  )}
+                  <h2>{activeChannelName}</h2>
+                </div>
+              )}
               <div className="channel-header-actions">
                 {surface === "channel" ? <button
                   type="button"
@@ -2269,7 +2324,9 @@ export function Channels({
                       onSkillExecutionProposalAccepted={(proposal) =>
                         applyAcceptedSkillExecutionProposal(message.id, proposal)}
                       onIssueOpen={openIssue}
-                      onOpenThread={() => void openThread(message.id)}
+                      onOpenThread={surface === "channel"
+                        ? () => void openThread(message.id)
+                        : undefined}
                       onProjectChange={(projectId) => {
                         const proposalId = message.proposal?.id;
                         if (!proposalId) return;
@@ -2324,6 +2381,7 @@ export function Channels({
             <Composer
               agents={agents}
               busy={busy || channelLoading}
+              enableSkillCommands={surface === "dm"}
               members={members}
               currentUserId={currentUserId}
               channelName={activeChannelName}
@@ -2333,8 +2391,15 @@ export function Channels({
                   ? t("dm.messagePlaceholder", { name: activeChannelName })
                   : undefined
               }
-              onSend={(body, mentions, attachments, references) =>
-                void send(body, mentions, null, attachments, references)
+              onSend={(body, mentions, attachments, references, selectedSkill) =>
+                void send(
+                  body,
+                  mentions,
+                  null,
+                  attachments,
+                  references,
+                  selectedSkill,
+                )
               }
             />
           </>
@@ -2470,18 +2535,20 @@ export function Channels({
           <Composer
             agents={agents}
             busy={busy}
+            enableSkillCommands={surface === "dm"}
             members={members}
             currentUserId={currentUserId}
             channelName={activeChannelName}
             onInvite={() => openInvite()}
             placeholder={t("channel.threadPlaceholder")}
-            onSend={(body, mentions, attachments, references) =>
+            onSend={(body, mentions, attachments, references, selectedSkill) =>
               void send(
                 body,
                 mentions,
                 threadParentId,
                 attachments,
                 references,
+                selectedSkill,
               )
             }
           />
@@ -2532,6 +2599,12 @@ export function Channels({
           }}
         />
       ) : null}
+      <ProfileDialog
+        profile={headerProfile}
+        onOpenChange={(open) => {
+          if (!open) setHeaderProfile(null);
+        }}
+      />
       {surface === "channel" && webhooksOpen && activeChannel ? (
         <ChannelWebhooksDialog
           channel={activeChannel}
@@ -2551,6 +2624,130 @@ export function Channels({
       ) : null}
       </div>
     </ChannelMessageImageCacheProvider>
+  );
+}
+
+function DirectMessageHeaderAvatar({
+  name,
+  participants,
+}: {
+  name: string;
+  participants: readonly DirectMessageParticipant[];
+}) {
+  const visible = participants.slice(0, 2);
+  const items = visible.length > 0
+    ? visible
+    : [{ type: "user" as const, id: "fallback", name, image: null }];
+  return (
+    <span
+      aria-hidden="true"
+      className={`channel-header-dm-avatar${items.length > 1 ? " is-group" : ""}`}
+    >
+      {items.map((participant) => (
+        <span
+          className="channel-header-dm-avatar-part"
+          key={`${participant.type}:${participant.id}`}
+        >
+          {participant.image ? (
+            <img alt="" src={participant.image} />
+          ) : participant.type === "agent" ? (
+            <Bot size={14} />
+          ) : (
+            participant.name.trim().charAt(0).toUpperCase() || "?"
+          )}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function DirectMessageHeaderIdentity({
+  agents,
+  isGroup,
+  members,
+  menuOpen,
+  name,
+  onMenuOpenChange,
+  onSelectProfile,
+  participants,
+}: {
+  agents: ChannelAgentSummary[];
+  isGroup: boolean;
+  members: ChannelMember[];
+  menuOpen: boolean;
+  name: string;
+  onMenuOpenChange: (open: boolean) => void;
+  onSelectProfile: (profile: ProfileTarget) => void;
+  participants: readonly DirectMessageParticipant[];
+}) {
+  const { t } = useI18n();
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !menuRef.current?.contains(event.target)
+      ) {
+        onMenuOpenChange(false);
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [menuOpen, onMenuOpenChange]);
+
+  const openProfile = (participant: DirectMessageParticipant) => {
+    onMenuOpenChange(false);
+    onSelectProfile(
+      profileTargetForDirectMessageParticipant(participant, members, agents),
+    );
+  };
+
+  return (
+    <div className="channel-header-identity" ref={menuRef}>
+      <button
+        aria-expanded={isGroup ? menuOpen : undefined}
+        aria-haspopup={isGroup ? "menu" : undefined}
+        aria-label={
+          isGroup ? t("dm.participants") : t("dm.openProfile", { name })
+        }
+        className="channel-header-identity-button"
+        onClick={() => {
+          if (isGroup) {
+            onMenuOpenChange(!menuOpen);
+            return;
+          }
+          if (participants[0]) openProfile(participants[0]);
+        }}
+        type="button"
+      >
+        <DirectMessageHeaderAvatar name={name} participants={participants} />
+        <h2>{name}</h2>
+      </button>
+      {isGroup && menuOpen ? (
+        <div
+          aria-label={t("dm.participants")}
+          className="channel-header-participant-menu"
+          role="menu"
+        >
+          {participants.map((participant) => (
+            <button
+              key={`${participant.type}:${participant.id}`}
+              onClick={() => openProfile(participant)}
+              role="menuitem"
+              type="button"
+            >
+              <DirectMessageHeaderAvatar
+                name={participant.name}
+                participants={[participant]}
+              />
+              <span>{participant.name}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -3946,6 +4143,7 @@ function Composer({
   channelName,
   placeholder,
   busy,
+  enableSkillCommands = false,
   onInvite,
   onSend,
 }: {
@@ -3955,17 +4153,20 @@ function Composer({
   channelName: string;
   placeholder?: string;
   busy: boolean;
+  enableSkillCommands?: boolean;
   onInvite: () => void;
   onSend: (
     body: string,
     mentions: MentionTarget[],
     attachments: File[],
     attachmentReferences: string[],
+    selectedSkill?: ChannelSkillCommandTarget,
   ) => void;
 }) {
   const { t } = useI18n();
   const [profile, setProfile] = useState<ProfileTarget | null>(null);
   const {
+    activeSkillSuggestionIndex,
     activeSuggestionIndex,
     attachmentError,
     attachmentInputRef,
@@ -3986,15 +4187,21 @@ function Composer({
     insertAtCaret,
     mentionListId,
     mentions,
+    pickSkillSuggestion,
     pickSuggestion,
     removeImage,
+    setActiveSkillSuggestionIndex,
     setActiveSuggestionIndex,
+    showsSkillSuggestions,
     showsSuggestions,
+    skillListId,
+    skillSuggestions,
     suggestions,
   } = useChannelComposer<HTMLTextAreaElement>({
     agents,
     busy,
     currentUserId,
+    enableSkillCommands,
     members,
     onInvite,
     onSend,
@@ -4038,6 +4245,17 @@ function Composer({
         onDrop={handleDrop}
         onSubmit={handleSubmit}
       >
+      {showsSkillSuggestions ? (
+        <ChannelSkillMenu
+          activeSuggestionIndex={activeSkillSuggestionIndex}
+          ariaLabel={t("agents.skills")}
+          id={skillListId}
+          onActiveSuggestionIndexChange={setActiveSkillSuggestionIndex}
+          onPickSuggestion={pickSkillSuggestion}
+          skillLabel={t("agents.skill")}
+          suggestions={skillSuggestions}
+        />
+      ) : null}
       {showsSuggestions ? (
         <ChannelMentionMenu
           activeSuggestionIndex={activeSuggestionIndex}
@@ -4064,13 +4282,21 @@ function Composer({
         >
           <textarea
             aria-activedescendant={
-              showsSuggestions
+              showsSkillSuggestions
+                ? `${skillListId}-option-${activeSkillSuggestionIndex}`
+                : showsSuggestions
                 ? `${mentionListId}-option-${activeSuggestionIndex}`
                 : undefined
             }
             aria-autocomplete="list"
-            aria-controls={showsSuggestions ? mentionListId : undefined}
-            aria-expanded={showsSuggestions}
+            aria-controls={
+              showsSkillSuggestions
+                ? skillListId
+                : showsSuggestions
+                  ? mentionListId
+                  : undefined
+            }
+            aria-expanded={showsSkillSuggestions || showsSuggestions}
             aria-label={t("channel.messageAria")}
             disabled={busy}
             placeholder={resolvedPlaceholder}

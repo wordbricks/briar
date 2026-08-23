@@ -5371,7 +5371,11 @@ fn configure_execution_worker(
         .resource_dir()
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)?;
+    sync_auto_hunt_assets_and_restart_workers(
+        &resource_directory,
+        &home,
+        ExecutionWorkerRestartPolicy::WhenRuntimeIsStale,
+    )?;
     let bun = bundled_bun_binary()
         .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
     let cli = home.join(".local/share/briar/briar.js");
@@ -5451,7 +5455,11 @@ fn sync_execution_worker_labels(app: AppHandle) -> Result<serde_json::Value, Str
         .resource_dir()
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)?;
+    sync_auto_hunt_assets_and_restart_workers(
+        &resource_directory,
+        &home,
+        ExecutionWorkerRestartPolicy::WhenRuntimeIsStale,
+    )?;
     let bun = bundled_bun_binary()
         .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
     let cli = home.join(".local/share/briar/briar.js");
@@ -5477,7 +5485,11 @@ fn refresh_execution_worker_runtime(app: AppHandle) -> Result<bool, String> {
         .resource_dir()
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)
+    sync_auto_hunt_assets_and_restart_workers(
+        &resource_directory,
+        &home,
+        ExecutionWorkerRestartPolicy::Always,
+    )
 }
 
 fn inspect_execution_workers_at(
@@ -5561,9 +5573,39 @@ fn should_manage_installed_auto_hunt_assets() -> bool {
     !cfg!(debug_assertions) && !cfg!(dev)
 }
 
+#[derive(Clone, Copy)]
+enum ExecutionWorkerRestartPolicy {
+    WhenRuntimeIsStale,
+    Always,
+}
+
+impl ExecutionWorkerRestartPolicy {
+    fn should_restart(self, assets_updated: bool, runtime_restart_is_current: bool) -> bool {
+        assets_updated || !runtime_restart_is_current || matches!(self, Self::Always)
+    }
+}
+
+fn execution_worker_restart_version_path(home: &Path) -> PathBuf {
+    home.join(".local/share/briar/WORKER_RUNTIME_RESTART_VERSION")
+}
+
+fn execution_worker_restart_is_current(home: &Path) -> bool {
+    read_trimmed_file(&execution_worker_restart_version_path(home)).as_deref()
+        == Some(env!("CARGO_PKG_VERSION"))
+}
+
+fn record_execution_worker_restart_version(home: &Path) -> Result<(), String> {
+    fs::write(
+        execution_worker_restart_version_path(home),
+        format!("{}\n", env!("CARGO_PKG_VERSION")),
+    )
+    .map_err(|error| format!("Worker 재시작 버전을 기록하지 못했습니다: {error}"))
+}
+
 fn sync_auto_hunt_assets_and_restart_workers(
     resource_directory: &Path,
     home: &Path,
+    restart_policy: ExecutionWorkerRestartPolicy,
 ) -> Result<bool, String> {
     // Development apps share the production bundle identifier and home
     // directory. Letting one synchronize these global assets can restart the
@@ -5572,17 +5614,28 @@ fn sync_auto_hunt_assets_and_restart_workers(
         return Ok(false);
     }
     let updated = sync_auto_hunt_assets(resource_directory, home)?;
-    if !updated {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    let runtime_restart_is_current = execution_worker_restart_is_current(home);
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    let runtime_restart_is_current = true;
+    if !restart_policy.should_restart(updated, runtime_restart_is_current) {
         return Ok(false);
     }
     #[cfg(any(target_os = "macos", target_os = "linux"))]
-    if let Err(error) = restart_execution_worker_services(home) {
-        // Keep the installed version stale so a transient service-manager
-        // failure is retried the next time the desktop app starts.
-        let _ = fs::remove_file(home.join(".local/share/briar/VERSION"));
-        return Err(error);
+    {
+        if let Err(error) = restart_execution_worker_services(home) {
+            // Assets and running processes have independent versions. Keep the
+            // valid assets, but leave the restart marker stale so the next app
+            // start retries the safe Worker service handoff.
+            let _ = fs::remove_file(execution_worker_restart_version_path(home));
+            return Err(error);
+        }
+        if let Err(error) = record_execution_worker_restart_version(home) {
+            let _ = fs::remove_file(execution_worker_restart_version_path(home));
+            return Err(error);
+        }
     }
-    Ok(true)
+    Ok(updated)
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -7910,7 +7963,13 @@ async fn load_agent_usage(
     app: tauri::AppHandle,
 ) -> Result<agent_usage::AgentUsageSnapshot, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    Ok(agent_usage::load(home).await)
+    let config_path = cli_config_path(&app)?;
+    let openrouter_configured = tauri::async_runtime::spawn_blocking(move || {
+        openrouter_api_key_from(&config_path).map(|api_key| api_key.is_some())
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    Ok(agent_usage::load(home, openrouter_configured).await)
 }
 
 #[tauri::command]
@@ -8175,6 +8234,10 @@ fn main_window_decorated(compact: bool) -> bool {
     !compact
 }
 
+fn restored_main_window_title_bar_style(compact: bool) -> Option<tauri::TitleBarStyle> {
+    (!compact).then_some(tauri::TitleBarStyle::Overlay)
+}
+
 #[cfg(desktop)]
 fn main_window_state_flags() -> tauri_plugin_window_state::StateFlags {
     use tauri_plugin_window_state::StateFlags;
@@ -8280,6 +8343,13 @@ fn set_main_window_onboarding_mode(app: tauri::AppHandle, compact: bool) -> Resu
     {
         main.set_decorations(main_window_decorated(compact))
             .map_err(|error| error.to_string())?;
+        // Switching back from the borderless onboarding window rebuilds the
+        // native style mask without FullSizeContentView. Reapply the configured
+        // overlay so macOS keeps the traffic lights inside Briar's header.
+        if let Some(style) = restored_main_window_title_bar_style(compact) {
+            main.set_title_bar_style(style)
+                .map_err(|error| error.to_string())?;
+        }
         main.set_shadow(true).map_err(|error| error.to_string())?;
     }
     main.set_min_size(Some(tauri::LogicalSize::new(min_width, min_height)))
@@ -8878,9 +8948,11 @@ pub fn run() {
                 {
                     eprintln!("Auto Hunt dispatch recovery failed: {error}");
                 }
-                if let Err(error) =
-                    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)
-                {
+                if let Err(error) = sync_auto_hunt_assets_and_restart_workers(
+                    &resource_directory,
+                    &home,
+                    ExecutionWorkerRestartPolicy::WhenRuntimeIsStale,
+                ) {
                     eprintln!(
                         "Briar CLI and Auto Hunt skill automatic synchronization failed: {error}"
                     );
@@ -10223,13 +10295,18 @@ branch refs/heads/briar/second-11111111
     }
 
     #[test]
-    fn uses_compact_window_dimensions_only_during_onboarding() {
+    fn uses_compact_window_presentation_only_during_onboarding() {
         assert_eq!(main_window_size(true), ONBOARDING_MAIN_WINDOW_SIZE);
         assert_eq!(main_window_size(false), DEFAULT_MAIN_WINDOW_SIZE);
         assert_eq!(main_window_min_size(true), ONBOARDING_MAIN_WINDOW_SIZE);
         assert_eq!(main_window_min_size(false), DEFAULT_MAIN_WINDOW_MIN_SIZE);
         assert!(!main_window_decorated(true));
         assert!(main_window_decorated(false));
+        assert_eq!(restored_main_window_title_bar_style(true), None);
+        assert_eq!(
+            restored_main_window_title_bar_style(false),
+            Some(tauri::TitleBarStyle::Overlay)
+        );
     }
 
     #[cfg(desktop)]
@@ -10995,11 +11072,44 @@ branch refs/heads/briar/second-11111111
         let home = std::env::temp_dir().join(format!("briar-dev-assets-test-{unique}"));
         let resources = home.join("missing-resources");
 
-        assert!(
-            !sync_auto_hunt_assets_and_restart_workers(&resources, &home)
-                .expect("development asset synchronization should be skipped")
-        );
+        assert!(!sync_auto_hunt_assets_and_restart_workers(
+            &resources,
+            &home,
+            ExecutionWorkerRestartPolicy::WhenRuntimeIsStale,
+        )
+        .expect("development asset synchronization should be skipped"));
         assert!(!home.join(".local/share/briar").exists());
+    }
+
+    #[test]
+    fn worker_runtime_restart_policy_repairs_stale_processes() {
+        assert!(ExecutionWorkerRestartPolicy::WhenRuntimeIsStale.should_restart(true, true));
+        assert!(!ExecutionWorkerRestartPolicy::WhenRuntimeIsStale.should_restart(false, true));
+        assert!(ExecutionWorkerRestartPolicy::WhenRuntimeIsStale.should_restart(false, false));
+        assert!(ExecutionWorkerRestartPolicy::Always.should_restart(true, true));
+        assert!(ExecutionWorkerRestartPolicy::Always.should_restart(false, true));
+    }
+
+    #[test]
+    fn worker_restart_version_marker_tracks_the_current_app() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("briar-worker-restart-test-{unique}"));
+        fs::create_dir_all(home.join(".local/share/briar"))
+            .expect("runtime directory should be created");
+
+        assert!(!execution_worker_restart_is_current(&home));
+        record_execution_worker_restart_version(&home)
+            .expect("current restart version should be recorded");
+        assert!(execution_worker_restart_is_current(&home));
+
+        fs::write(execution_worker_restart_version_path(&home), "0.0.0\n")
+            .expect("restart marker should become stale");
+        assert!(!execution_worker_restart_is_current(&home));
+
+        fs::remove_dir_all(home).expect("test home should be removed");
     }
 
     #[cfg(unix)]

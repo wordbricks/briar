@@ -1633,6 +1633,7 @@ export async function sendChannelMessage(
   input: {
     body: string;
     clientMessageId?: string;
+    skillId?: string | null;
     parentMessageId?: string | null;
     mentionedUserIds?: string[];
     mentionedAgentIds?: string[];
@@ -1648,6 +1649,9 @@ export async function sendChannelMessage(
     form.set("body", input.body);
     if (clientMessageId) {
       form.set("clientMessageId", clientMessageId);
+    }
+    if (input.skillId) {
+      form.set("skillId", input.skillId);
     }
     form.set("parentMessageId", input.parentMessageId ?? "");
     form.set("mentionedUserIds", JSON.stringify(input.mentionedUserIds ?? []));
