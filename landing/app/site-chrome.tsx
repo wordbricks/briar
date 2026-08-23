@@ -39,7 +39,7 @@ export function Brand({
     <a className="brand" href={href} aria-label={copy.aria.brandHome}>
       <span className="brand-mark">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/briar-mark-light.png" alt="" />
+        <img src="/briar-black-stroke.svg" alt="" />
       </span>
       <span>briar</span>
     </a>
