@@ -39,21 +39,57 @@ BRIAR_VERSION="${BRIAR_VERSION:-unknown}" /opt/briar/bin/bun --eval '
   const config = JSON.parse(fs.readFileSync(`${state}/managed-enrollment.json`, "utf8"));
   const identityDocument = fs.readFileSync(`${state}/instance-identity.json`, "utf8");
   const identitySignature = fs.readFileSync(`${state}/instance-identity-signature`, "utf8");
-  const response = await fetch(
-    `${config.apiOrigin}/managed-computers/${config.managedComputerId}/enroll`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nonce: config.nonce,
-        identityDocument,
-        identitySignature,
-        briarVersion: process.env.BRIAR_VERSION ?? "unknown",
-      }),
-    },
-  );
-  if (!response.ok) process.exit(response.status === 409 ? 75 : 1);
-  const enrollment = await response.json();
+  let response;
+  try {
+    response = await fetch(
+      `${config.apiOrigin}/managed-computers/${config.managedComputerId}/enroll`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nonce: config.nonce,
+          identityDocument,
+          identitySignature,
+          briarVersion: process.env.BRIAR_VERSION ?? "unknown",
+        }),
+      },
+    );
+  } catch {
+    console.error(
+      "briar-managed-enroll: enrollment failed http_status=none error_code=NETWORK_REQUEST_FAILED",
+    );
+    process.exit(1);
+  }
+
+  const responseBody = await response.text();
+  const safeErrorCode = () => {
+    try {
+      const parsed = JSON.parse(responseBody);
+      const code = parsed && typeof parsed === "object" ? parsed.code : null;
+      return typeof code === "string" && /^[A-Z][A-Z0-9_]{0,127}$/u.test(code)
+        ? code
+        : "UNKNOWN";
+    } catch {
+      return "UNKNOWN";
+    }
+  };
+
+  if (!response.ok) {
+    console.error(
+      `briar-managed-enroll: enrollment failed http_status=${response.status} error_code=${safeErrorCode()}`,
+    );
+    process.exit(response.status === 409 ? 75 : 1);
+  }
+
+  let enrollment;
+  try {
+    enrollment = JSON.parse(responseBody);
+  } catch {
+    console.error(
+      `briar-managed-enroll: enrollment failed http_status=${response.status} error_code=INVALID_SUCCESS_RESPONSE`,
+    );
+    process.exit(1);
+  }
   fs.writeFileSync(`${state}/worker-credential.json`, JSON.stringify({
     ...enrollment,
     managedComputerId: config.managedComputerId,

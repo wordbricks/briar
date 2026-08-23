@@ -12,11 +12,13 @@
 
 ## 1. AMI 준비
 
+관리형 컴퓨터의 기준 운영체제는 **Debian GNU/Linux 13 (trixie) x86_64**다. Amazon Linux 또는 다른 Debian 버전의 AMI를 사용하지 않는다. 이 저장소의 AMI 빌드 스크립트와 패키지 lock은 Debian의 `apt`, `apt-cache`, `dpkg`를 전제로 하며, `assert-debian-13-x86_64`가 기준에서 벗어난 빌더를 거부한다.
+
 버전이 고정된 AMI에 다음 항목을 설치한다.
 
 1. Briar CLI와 Worker 서비스, Bun, 지원할 에이전트 CLI.
-2. 최신 Amazon SSM Agent.
-3. 비특권 `briar` 사용자와 XFCE, Chromium, TigerVNC, D-Bus 패키지. `remote-desktop-packages.txt`의 각 패키지는 승인된 Debian 저장소 스냅샷에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다. base AMI의 배포판·버전과 저장소 스냅샷을 릴리스 기록에 함께 고정한다.
+2. 최신 AWS Systems Manager Agent(`amazon-ssm-agent`).
+3. 비특권 `briar` 사용자와 XFCE, Chromium, TigerVNC, D-Bus 패키지. `remote-desktop-packages.txt`의 각 패키지는 승인된 Debian 13 저장소 스냅샷에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다. base AMI의 배포판·버전과 저장소 스냅샷을 릴리스 기록에 함께 고정한다.
 4. `mise exec -- bun run agent:build`로 만든 `dist-cli/briar-remote-session-agent.js`와 `infrastructure/managed-computers/`의 스크립트·서비스를 AMI 빌더에 복사한 뒤, root로 `install-remote-desktop <source-dir> <package-lock> <agent-bundle>`을 실행한다.
 5. 설치 스크립트는 enrollment, loopback 원격 데스크톱, outbound 원격 세션 에이전트를 `/opt/briar/bin`과 systemd에 설치하고 부팅 대상으로 활성화한다. systemd는 enrollment oneshot이 성공한 뒤 데스크톱과 원격 에이전트를 시작하며, GUI와 Worker는 모두 `/home/briar`를 사용한다.
 6. `briar-worker.service`는 `/var/lib/briar/worker-credential.json`을 읽되 저장소와 모델 제공자가 설정되고 heartbeat 건강 검사를 통과하기 전에는 `acceptingWork=false`, 동시 실행 수 1을 보고해야 한다.

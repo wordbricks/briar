@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+/opt/briar/bin/assert-debian-13-x86_64
+
 expected_user="${BRIAR_REMOTE_USER:-briar}"
 expected_port="${BRIAR_REMOTE_DISPLAY_PORT:-5901}"
 

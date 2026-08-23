@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ ! -r /etc/os-release ]]; then
+  echo "Managed computer AMI must expose /etc/os-release" >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1091
+. /etc/os-release
+
+if [[ "${ID:-}" != "debian" || "${VERSION_ID:-}" != "13" ||
+  "${VERSION_CODENAME:-}" != "trixie" ]]; then
+  echo "Managed computer AMI must be Debian GNU/Linux 13 (trixie); found ${PRETTY_NAME:-unknown}" >&2
+  exit 1
+fi
+
+if [[ "$(uname -m)" != "x86_64" ]]; then
+  echo "Managed computer AMI must use x86_64; found $(uname -m)" >&2
+  exit 1
+fi
+
+if ! command -v dpkg >/dev/null 2>&1 ||
+  [[ "$(dpkg --print-architecture)" != "amd64" ]]; then
+  echo "Managed computer AMI must use the Debian amd64 package architecture" >&2
+  exit 1
+fi
+
+echo "Debian GNU/Linux 13 (trixie) amd64/x86_64 base verified"

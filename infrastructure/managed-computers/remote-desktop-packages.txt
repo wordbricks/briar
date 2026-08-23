@@ -1,5 +1,5 @@
-# One Debian package per line. The AMI build must resolve this list to
-# exact package=version entries in remote-desktop-packages.lock before install.
+# One Debian 13 (trixie) package per line. The AMI build must resolve this
+# list to exact package=version entries in remote-desktop-packages.lock before install.
 dbus-x11
 chromium
 tigervnc-standalone-server
