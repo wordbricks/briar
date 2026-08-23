@@ -48,6 +48,28 @@ final class ConversationPresentationTests: XCTestCase {
         XCTAssertTrue(previousLabel.contains("2025"))
     }
 
+    func testFocusedMessageWinsOverBottomAnchorWhenPresent() {
+        let focused = UUID()
+        XCTAssertTrue(
+            ConversationScrollPresentation.shouldScrollToFocusedMessage(
+                focusedMessageID: focused,
+                messageIDs: [UUID(), focused]
+            )
+        )
+        XCTAssertFalse(
+            ConversationScrollPresentation.shouldScrollToFocusedMessage(
+                focusedMessageID: focused,
+                messageIDs: [UUID()]
+            )
+        )
+        XCTAssertFalse(
+            ConversationScrollPresentation.shouldScrollToFocusedMessage(
+                focusedMessageID: Optional<UUID>.none,
+                messageIDs: [focused]
+            )
+        )
+    }
+
     func testScrollToBottomControlAppearsOnlyBeyondThreshold() {
         XCTAssertFalse(
             ConversationScrollPresentation.isAwayFromBottom(

@@ -106,6 +106,10 @@ import { ChannelTypingState } from "./ChannelTypingState";
 import { MentionComposerField } from "./MentionComposerField";
 import { ChannelMessageText } from "./ChannelMessageText";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
+import {
+  ConversationReplySummary,
+  type ConversationReplyParticipant,
+} from "./ConversationReplySummary";
 import { Button } from "./ui/button";
 import {
   ProfileDialog,
@@ -2046,6 +2050,47 @@ function ChannelBar({
   );
 }
 
+const companionChannelAuthorId = (author: ChannelMessage["author"]) =>
+  author.type === "user"
+    ? `user:${author.id || author.email || author.name}`
+    : `${author.type}:${author.id ?? author.name}`;
+
+const companionChannelReplyParticipants = (
+  message: ChannelMessage,
+): ConversationReplyParticipant[] =>
+  [message.author, ...(message.replyAuthors ?? [])]
+    .filter(
+      (author, index, authors) =>
+        authors.findIndex(
+          (candidate) =>
+            companionChannelAuthorId(candidate) === companionChannelAuthorId(author),
+        ) === index,
+    )
+    .slice(0, 3)
+    .map((author) => ({
+      id: companionChannelAuthorId(author),
+      name: author.name,
+      image: author.type === "user" || author.type === "agent"
+        ? author.image
+        : null,
+      isAgent: author.type !== "user",
+    }));
+
+const companionReplyRelativeTime = (
+  value: string,
+  t: ReturnType<typeof useI18n>["t"],
+) => {
+  const minutes = Math.max(
+    1,
+    Math.round((Date.now() - new Date(value).getTime()) / 60_000),
+  );
+  if (minutes < 60) return t("time.minutesAgo", { count: minutes });
+  if (minutes < 1_440) {
+    return t("time.hoursAgo", { count: Math.floor(minutes / 60) });
+  }
+  return t("time.daysAgo", { count: Math.floor(minutes / 1_440) });
+};
+
 function MessageRow({
   acceptingProposal,
   agents,
@@ -2334,6 +2379,23 @@ function MessageRow({
           onReactingChange={setReacting}
           onToggle={onToggleReaction}
         />
+        {showThreadSummary && !message.optimistic && onOpenThread &&
+            message.replyCount > 0
+          ? (
+            <ConversationReplySummary
+              countLabel={t("channel.replyCount", {
+                count: message.replyCount,
+              })}
+              lastReplyLabel={message.lastReplyAt
+                ? t("conversation.lastReply", {
+                  time: companionReplyRelativeTime(message.lastReplyAt, t),
+                })
+                : null}
+              onClick={onOpenThread}
+              participants={companionChannelReplyParticipants(message)}
+            />
+          )
+          : null}
       </div>
       {showingThreadActions ? (
         <div

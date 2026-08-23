@@ -39,9 +39,32 @@ func channelSkillExecutionProposalApprovalIsEnabled(
     !acceptanceInFlight && !channelArchived && proposal.status == .pending
 }
 
+enum ChannelReplySummaryPresentation {
+    static func isVisible(
+        showsThreadSummary: Bool,
+        isOptimistic: Bool,
+        replyCount: Int
+    ) -> Bool {
+        showsThreadSummary && !isOptimistic && replyCount > 0
+    }
+
+    static func participants(for message: ChannelMessage) -> [ChannelMessage.Author] {
+        var seen = Set<String>()
+        var result: [ChannelMessage.Author] = []
+        for author in [message.author] + message.replyAuthors {
+            let key = "\(author.type.rawValue):\(author.name):\(author.image ?? "")"
+            guard seen.insert(key).inserted else { continue }
+            result.append(author)
+            if result.count == 3 { break }
+        }
+        return result
+    }
+}
+
 /// Home: the organization's channels, grouped by project with section dividers.
 struct ChannelsHomeView: View {
     @ObservedObject var channels: ChannelsStore
+    @ObservedObject var navigation: CompanionNavigationModel
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
 
     let activeProjectID: UUID?
@@ -102,6 +125,7 @@ struct ChannelsHomeView: View {
         .navigationDestination(for: ChannelSummary.self) { channel in
             ChannelMessagesView(
                 channels: channels,
+                navigation: navigation,
                 channel: channel,
                 currentUserID: currentUserID,
                 projects: projects,
@@ -140,10 +164,11 @@ private struct ChannelRow: View {
 /// A channel's root messages. Tapping one opens its thread.
 struct ChannelMessagesView: View {
     @ObservedObject var channels: ChannelsStore
+    @ObservedObject var navigation: CompanionNavigationModel
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var draft = ""
     @State private var previewFile: PreviewFile?
-    @State private var selectedThreadMessage: ChannelMessage?
+    @State private var selectedThread: ChannelThreadRoute?
     @State private var selectedProfile: ConversationProfileTarget?
 
     let channel: ChannelSummary
@@ -194,7 +219,7 @@ struct ChannelMessagesView: View {
             // long-press thread actions stay unavailable.
             onOpenThread: currentChannel.isDirectMessage
                 ? nil
-                : { selectedThreadMessage = $0 },
+                : { openThread(from: $0) },
             showsThreadSummary: !currentChannel.isDirectMessage
         )
         .navigationTitle(currentChannel.isDirectMessage ? "" : displayTitle)
@@ -231,11 +256,12 @@ struct ChannelMessagesView: View {
         .sheet(item: $selectedProfile) { profile in
             ConversationProfileSheet(profile: profile, locale: locale)
         }
-        .navigationDestination(item: $selectedThreadMessage) { message in
+        .navigationDestination(item: $selectedThread) { route in
             ChannelThreadView(
                 channels: channels,
                 channel: currentChannel,
-                parent: message,
+                parentMessageID: route.parentMessageID,
+                highlightMessageID: route.highlightMessageID,
                 currentUserID: currentUserID,
                 projects: projects,
                 providers: providers,
@@ -244,6 +270,12 @@ struct ChannelMessagesView: View {
                 onSkillSessionMaterialized: onSkillSessionMaterialized,
                 onSkillSessionOpen: onSkillSessionOpen
             )
+        }
+        .onChange(of: navigation.pendingChannelThread) { _, _ in
+            applyPendingInboxThread()
+        }
+        .task(id: navigation.pendingChannelThread?.parentMessageID) {
+            applyPendingInboxThread()
         }
         .onDisappear {
             // Covers interactive navigation pops. This is intentionally a
@@ -265,6 +297,24 @@ struct ChannelMessagesView: View {
                 }
             }
         }
+    }
+
+    private func openThread(from message: ChannelMessage) {
+        selectedThread = ChannelThreadRoute(
+            channelID: currentChannel.id,
+            parentMessageID: message.id,
+            highlightMessageID: nil
+        )
+    }
+
+    private func applyPendingInboxThread() {
+        guard
+            let route = navigation.pendingChannelThread,
+            route.channelID == channel.id,
+            !currentChannel.isDirectMessage
+        else { return }
+        selectedThread = route
+        navigation.pendingChannelThread = nil
     }
 }
 
@@ -602,7 +652,8 @@ struct ChannelThreadView: View {
     @State private var previewFile: PreviewFile?
 
     let channel: ChannelSummary
-    let parent: ChannelMessage
+    let parentMessageID: UUID
+    var highlightMessageID: UUID? = nil
     let currentUserID: String?
     let projects: [ProjectsResponse.Project]
     let providers: [AgentProvider]
@@ -629,14 +680,15 @@ struct ChannelThreadView: View {
             locale: locale,
             messages: channels.thread,
             onIssueOpen: onIssueOpen,
-            parentMessageID: parent.id,
+            parentMessageID: parentMessageID,
             projects: projects,
             providers: providers,
             workers: workers,
             onSkillSessionMaterialized: onSkillSessionMaterialized,
             onSkillSessionOpen: onSkillSessionOpen,
             onOpenThread: nil,
-            showsThreadSummary: false
+            showsThreadSummary: false,
+            focusedMessageID: highlightMessageID
         )
         .navigationTitle(L10n.text(.channelThread, locale: locale))
         .navigationBarTitleDisplayMode(.inline)
@@ -648,7 +700,7 @@ struct ChannelThreadView: View {
                     channelID: channel.id,
                     currentUserID: currentUserID,
                     locale: locale,
-                    rootMessageID: parent.id
+                    rootMessageID: parentMessageID
                 )
             }
         }
@@ -656,13 +708,16 @@ struct ChannelThreadView: View {
             QuickLookPreview(fileURL: file.url)
                 .accessibilityIdentifier("channel-attachment-preview")
         }
-        .task(id: parent.id) {
-            await channels.openThread(channelID: channel.id, parentMessageID: parent.id)
+        .task(id: parentMessageID) {
+            await channels.openThread(
+                channelID: channel.id,
+                parentMessageID: parentMessageID
+            )
         }
         .onDisappear {
             channels.closeThreadFocus(
                 channelID: channel.id,
-                parentMessageID: parent.id
+                parentMessageID: parentMessageID
             )
         }
         .overlay {
@@ -774,6 +829,7 @@ private struct ChannelConversationView: View {
     let onSkillSessionOpen: SkillSessionOpenHandler
     let onOpenThread: ((ChannelMessage) -> Void)?
     let showsThreadSummary: Bool
+    var focusedMessageID: UUID? = nil
 
     private var mentionCandidates: [ChannelMentionTarget] {
         ChannelMentions.candidates(
@@ -806,6 +862,7 @@ private struct ChannelConversationView: View {
                 hasEarlierMessages: parentMessageID == nil && channels.hasEarlierMessages,
                 loadingEarlierMessages:
                     parentMessageID == nil && channels.loadingEarlierMessages,
+                focusedMessageID: focusedMessageID,
                 onLoadEarlier: parentMessageID == nil
                     ? { await channels.loadEarlierMessages(channelID: channel.id) }
                     : nil
@@ -1047,6 +1104,7 @@ private struct ChannelMessageRow: View {
     }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
         ConversationMessageLayout(
             authorImage: (message.author.type == .user || message.author.type == .agent)
                 ? message.author.image
@@ -1181,8 +1239,35 @@ private struct ChannelMessageRow: View {
                     .padding(.top, 4)
                 }
         }
+        if ChannelReplySummaryPresentation.isVisible(
+            showsThreadSummary: showsThreadSummary,
+            isOptimistic: isOptimistic,
+            replyCount: message.replyCount
+        ), let onOpenThread {
+            ChannelReplySummary(
+                countLabel: String(
+                    format: L10n.text(.channelReplies, locale: locale),
+                    message.replyCount
+                ),
+                lastReplyLabel: message.lastReplyAt.map {
+                    String(
+                        format: L10n.text(.channelLastReply, locale: locale),
+                        L10n.relativeDate($0, locale: locale)
+                    )
+                },
+                participants: ChannelReplySummaryPresentation.participants(
+                    for: message
+                ),
+                identifier: "channel-thread-summary-\(message.id.uuidString.lowercased())",
+                action: onOpenThread
+            )
+            .padding(.leading, 67)
+            .padding(.trailing, 16)
+            .padding(.bottom, 8)
+        }
+        }
         .contentShape(Rectangle())
-        .highPriorityGesture(
+        .simultaneousGesture(
             LongPressGesture(minimumDuration: 0.45)
                 .onEnded { _ in
                     guard !isOptimistic else { return }
@@ -1238,6 +1323,60 @@ private struct ChannelMessageRow: View {
             isPresented: $messageCopied,
             message: L10n.text(.messageCopied, locale: locale)
         )
+    }
+}
+
+private struct ChannelReplySummary: View {
+    let countLabel: String
+    let lastReplyLabel: String?
+    let participants: [ChannelMessage.Author]
+    let identifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                if participants.isEmpty {
+                    Image(systemName: "bubble.left.and.bubble.right")
+                        .font(.caption.weight(.semibold))
+                } else {
+                    HStack(spacing: -6) {
+                        ForEach(Array(participants.prefix(3).enumerated()), id: \.offset) {
+                            _,
+                            author in
+                            ProfileImageView(
+                                image: (author.type == .user || author.type == .agent)
+                                    ? author.image
+                                    : nil,
+                                name: author.name,
+                                systemImage: author.type == .agent ? "cpu" : "person.fill",
+                                size: 22
+                            )
+                            .overlay {
+                                Circle().stroke(Color(.systemBackground), lineWidth: 1.5)
+                            }
+                        }
+                    }
+                }
+                Text(countLabel)
+                    .font(.caption.weight(.bold))
+                if let lastReplyLabel {
+                    Text("·")
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    Text(lastReplyLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.accentColor)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier(identifier)
+        .accessibilityLabel(countLabel)
     }
 }
 

@@ -48,6 +48,7 @@ struct CompanionShellView: View {
             NavigationStack(path: $homePath) {
                 ChannelsHomeView(
                     channels: channels,
+                    navigation: navigation,
                     activeProjectID: project.id,
                     currentUserID: user?.id,
                     projects: projects,
@@ -115,6 +116,7 @@ struct CompanionShellView: View {
             NavigationStack(path: $directMessagesPath) {
                 DirectMessagesHomeView(
                     channels: channels,
+                    navigation: navigation,
                     currentUserID: user?.id,
                     projects: projects,
                     providers: snapshot?.organizationProviders ?? [],
@@ -315,6 +317,8 @@ struct CompanionShellView: View {
     @MainActor
     private func openPendingChannel() async {
         guard let target = navigation.consumePendingChannel() else { return }
+        let expectedToken = navigation.pathChannelToken
+        navigation.pendingChannelThread = nil
         if !channels.channels.contains(where: { $0.id == target.channelID }) {
             await channels.refresh()
         }
@@ -331,17 +335,17 @@ struct CompanionShellView: View {
             homePath.append(channel)
         }
         await channels.openChannel(target.channelID)
-        guard let root = await channels.loadRootMessageForNavigation(
+        _ = await channels.loadRootMessageForNavigation(
             channelID: target.channelID,
             messageID: target.rootMessageID
-        ) else {
-            return
-        }
-        if channel.isDirectMessage {
-            directMessagesPath.append(root)
-        } else {
-            homePath.append(root)
-        }
+        )
+        guard navigation.pathChannelToken == expectedToken else { return }
+        navigation.pendingChannelThread = ChannelInboxNavigation.threadRoute(
+            isDirectMessage: channel.isDirectMessage,
+            channelID: target.channelID,
+            messageID: target.messageID,
+            rootMessageID: target.rootMessageID
+        )
     }
 
     @ToolbarContentBuilder

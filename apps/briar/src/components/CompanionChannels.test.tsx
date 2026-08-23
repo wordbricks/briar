@@ -611,6 +611,54 @@ describe("CompanionChannels", () => {
     expect(container.textContent).toContain("Common channels");
   });
 
+  it("opens a channel thread from the visible reply summary", async () => {
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [
+        {
+          ...message("m-1", "Hello team", 2),
+          lastReplyAt: "2026-08-01T01:04:00.000Z",
+        },
+      ],
+    });
+    listChannelMessages.mockResolvedValue({
+      messages: [message("m-1", "Hello team", 2), message("m-2", "On it")],
+    });
+    await render();
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+      await Promise.resolve();
+    });
+
+    const summary = container.querySelector<HTMLButtonElement>(
+      ".conversation-reply-summary",
+    );
+    expect(summary).not.toBeNull();
+    expect(summary?.textContent).toContain("2 replies");
+    await act(async () => {
+      summary!.click();
+      await Promise.resolve();
+    });
+
+    expect(listChannelMessages).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      "m-1",
+    );
+    expect(container.textContent).toContain("On it");
+    expect(container.textContent).toContain("Thread");
+    expect(container.querySelector(".conversation-reply-summary")).toBeNull();
+  });
+
   it("keeps thread and copy actions beside reactions in the long-press menu", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
@@ -1052,7 +1100,7 @@ describe("CompanionChannels", () => {
       1,
       expect.any(AbortSignal),
     );
-    expect(container.textContent).not.toContain("1 replies");
+    expect(container.textContent).not.toContain("Newer delegated reply");
   });
 
   it("retains channel-list upserts and removals consumed after realtime notification", async () => {

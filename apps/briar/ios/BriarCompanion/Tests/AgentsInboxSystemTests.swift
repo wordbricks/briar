@@ -1006,6 +1006,32 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(navigation.selectedTab, .home)
         XCTAssertEqual(navigation.pendingChannelID, UUID(uuidString: channelReply.targetId))
         XCTAssertEqual(navigation.pendingChannelMessageID, channelReply.channelMessageId)
+        XCTAssertEqual(navigation.pendingChannelRootMessageID, channelReply.rootMessageId)
+        let pending = try XCTUnwrap(navigation.consumePendingChannel())
+        let threadRoute = ChannelInboxNavigation.threadRoute(
+            isDirectMessage: false,
+            channelID: pending.channelID,
+            messageID: pending.messageID,
+            rootMessageID: pending.rootMessageID
+        )
+        XCTAssertEqual(threadRoute?.parentMessageID, channelReply.rootMessageId)
+        XCTAssertEqual(threadRoute?.highlightMessageID, channelReply.channelMessageId)
+        XCTAssertNil(
+            ChannelInboxNavigation.threadRoute(
+                isDirectMessage: true,
+                channelID: pending.channelID,
+                messageID: pending.messageID,
+                rootMessageID: pending.rootMessageID
+            )
+        )
+        XCTAssertNil(
+            ChannelInboxNavigation.threadRoute(
+                isDirectMessage: false,
+                channelID: pending.channelID,
+                messageID: pending.rootMessageID,
+                rootMessageID: pending.rootMessageID
+            )
+        )
         let failedSession = try XCTUnwrap(messages.first { $0.kind == .session })
         XCTAssertEqual(InboxMessageBuilder.classify(failedSession), .actionRequired)
         XCTAssertEqual(

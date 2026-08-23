@@ -7370,6 +7370,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-message-body > header strong { font-size: 14px; font-weight: 720; letter-spacing: -0.01em; }
 .channel-message-body > header time { color: var(--muted-foreground, #9a948a); font-size: 12px; }
 .channel-message .conversation-reply-summary { --conversation-reply-avatar-size:26px; margin-top:2px; font-size:12px; }
+.companion-channel-message .conversation-reply-summary { --conversation-reply-avatar-size:26px; margin-top:4px; font-size:12px; }
 .channel-message-body p { margin: 0; overflow-wrap: anywhere; }
 .channel-message-text {
   min-width:0;
