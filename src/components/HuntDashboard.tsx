@@ -124,6 +124,8 @@ import {
 } from "../lib/auto-hunt-agent";
 import { eventMeta, runMeta } from "../lib/stages";
 import {
+  autoHuntRunStatuses,
+  autoHuntSources,
   checkpointKeyForBoundary,
   type AutoHuntWorkflow,
   type AutoHuntWorkflowCheckpoint,
@@ -274,6 +276,75 @@ import type { MessageKey } from "../i18n/messages";
 type SourceFilter = "all" | HuntSource;
 type StatusFilter = CompanionStatusFilter;
 type DashboardView = "kanban" | "list";
+export type IssuePropertyFilterKey =
+  | "status"
+  | "source"
+  | "priority"
+  | "assignee"
+  | "agent"
+  | "creator";
+export type IssuePropertyFilters = Record<IssuePropertyFilterKey, string[]>;
+const unsetIssuePropertyFilterValue = "__unset__";
+
+function emptyIssuePropertyFilters(): IssuePropertyFilters {
+  return {
+    status: [],
+    source: [],
+    priority: [],
+    assignee: [],
+    agent: [],
+    creator: [],
+  };
+}
+
+function propertyFilterMatches(
+  selected: readonly string[],
+  value: string | null | undefined,
+) {
+  return (
+    selected.length === 0 ||
+    selected.includes(value ?? unsetIssuePropertyFilterValue)
+  );
+}
+
+export function runMatchesIssuePropertyFilters(
+  run: HuntRun,
+  filters: IssuePropertyFilters,
+) {
+  return (
+    propertyFilterMatches(filters.status, run.status) &&
+    propertyFilterMatches(filters.source, run.source) &&
+    propertyFilterMatches(
+      filters.priority,
+      run.priority === null ? null : String(run.priority),
+    ) &&
+    propertyFilterMatches(filters.assignee, run.assigneeUserId) &&
+    propertyFilterMatches(filters.agent, run.agentId) &&
+    propertyFilterMatches(filters.creator, run.createdByUserId)
+  );
+}
+
+function selectedIssuePropertyFilterCount(filters: IssuePropertyFilters) {
+  return Object.values(filters).reduce(
+    (count, selected) => count + selected.length,
+    0,
+  );
+}
+
+function toggleIssuePropertyFilterValue(
+  filters: IssuePropertyFilters,
+  key: IssuePropertyFilterKey,
+  value: string,
+) {
+  const selected = filters[key];
+  return {
+    ...filters,
+    [key]: selected.includes(value)
+      ? selected.filter((candidate) => candidate !== value)
+      : [...selected, value],
+  };
+}
+
 const issueConversationTabBreakpoint = 960;
 type KanbanColumn = {
   id: string;
@@ -371,6 +442,187 @@ const kanbanAutoScrollEdge = 72;
 const kanbanAutoScrollInterval = 16;
 const companionSwipeActionWidth = 72;
 const companionSwipeOpenThreshold = 44;
+
+function IssuePropertyFilterMenu({
+  agents,
+  filters,
+  members,
+  onChange,
+}: {
+  agents: ProjectAgent[];
+  filters: IssuePropertyFilters;
+  members: OrganizationMember[];
+  onChange: (filters: IssuePropertyFilters) => void;
+}) {
+  const { t } = useI18n();
+  const selectedCount = selectedIssuePropertyFilterCount(filters);
+  const groups: Array<{
+    icon: ReactElement;
+    key: IssuePropertyFilterKey;
+    label: string;
+    options: Array<{ label: string; value: string }>;
+  }> = [
+    {
+      icon: <Activity aria-hidden="true" size={16} />,
+      key: "status",
+      label: t("dashboard.status"),
+      options: autoHuntRunStatuses.map((value) => ({
+        label: t(`status.${value}` as MessageKey),
+        value,
+      })),
+    },
+    {
+      icon: <Waypoints aria-hidden="true" size={16} />,
+      key: "source",
+      label: t("dashboard.type"),
+      options: autoHuntSources.map((value) => ({
+        label: t(`source.${value}` as MessageKey),
+        value,
+      })),
+    },
+    {
+      icon: <Signal aria-hidden="true" size={16} />,
+      key: "priority",
+      label: t("issue.priority"),
+      options: [
+        ...([1, 2, 3, 4] as const).map((value) => ({
+          label: t(`issue.priority${value}` as MessageKey),
+          value: String(value),
+        })),
+        {
+          label: t("run.notSet"),
+          value: unsetIssuePropertyFilterValue,
+        },
+      ],
+    },
+    {
+      icon: <UserRound aria-hidden="true" size={16} />,
+      key: "assignee",
+      label: t("run.assignee"),
+      options: [
+        ...members.map((member) => ({
+          label: member.name,
+          value: member.userId,
+        })),
+        {
+          label: t("run.unassigned"),
+          value: unsetIssuePropertyFilterValue,
+        },
+      ],
+    },
+    {
+      icon: <Bot aria-hidden="true" size={16} />,
+      key: "agent",
+      label: t("run.agent"),
+      options: [
+        ...agents.map((agent) => ({ label: agent.name, value: agent.id })),
+        {
+          label: t("run.notSet"),
+          value: unsetIssuePropertyFilterValue,
+        },
+      ],
+    },
+    {
+      icon: <Pencil aria-hidden="true" size={16} />,
+      key: "creator",
+      label: t("run.creator"),
+      options: [
+        ...members.map((member) => ({
+          label: member.name,
+          value: member.userId,
+        })),
+        {
+          label: t("run.notSet"),
+          value: unsetIssuePropertyFilterValue,
+        },
+      ],
+    },
+  ];
+
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          aria-label={t("dashboard.propertyFilters")}
+          className={`issue-property-filter-trigger${selectedCount > 0 ? " active" : ""}`}
+          type="button"
+        >
+          <ListFilter aria-hidden="true" size={15} />
+          <span>{t("dashboard.filter")}</span>
+          {selectedCount > 0 ? <strong>{selectedCount}</strong> : null}
+          <ChevronDown aria-hidden="true" size={12} />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="start"
+          className="issue-property-filter-menu"
+          collisionPadding={10}
+          sideOffset={6}
+        >
+          <DropdownMenu.Label className="issue-property-filter-heading">
+            {t("dashboard.propertyFilters")}
+          </DropdownMenu.Label>
+          {groups.map((group) => (
+            <DropdownMenu.Sub key={group.key}>
+              <DropdownMenu.SubTrigger className="issue-property-filter-item">
+                {group.icon}
+                <span>{group.label}</span>
+                {filters[group.key].length > 0 ? (
+                  <small>{filters[group.key].length}</small>
+                ) : null}
+                <ChevronRight aria-hidden="true" size={14} />
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.SubContent
+                  className="issue-property-filter-menu issue-property-filter-submenu"
+                  collisionPadding={10}
+                  sideOffset={4}
+                >
+                  <DropdownMenu.Label className="issue-property-filter-heading">
+                    {group.label}
+                  </DropdownMenu.Label>
+                  {group.options.map((option) => {
+                    const checked = filters[group.key].includes(option.value);
+                    return (
+                      <DropdownMenu.CheckboxItem
+                        checked={checked}
+                        className="issue-property-filter-choice"
+                        key={option.value}
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          onChange(toggleIssuePropertyFilterValue(
+                            filters,
+                            group.key,
+                            option.value,
+                          ));
+                        }}
+                      >
+                        <DropdownMenu.ItemIndicator className="issue-property-filter-check">
+                          <Check aria-hidden="true" size={13} />
+                        </DropdownMenu.ItemIndicator>
+                        <span>{option.label}</span>
+                      </DropdownMenu.CheckboxItem>
+                    );
+                  })}
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Sub>
+          ))}
+          <DropdownMenu.Separator className="issue-property-filter-separator" />
+          <DropdownMenu.Item
+            className="issue-property-filter-clear"
+            disabled={selectedCount === 0}
+            onSelect={() => onChange(emptyIssuePropertyFilters())}
+          >
+            <X aria-hidden="true" size={15} />
+            <span>{t("dashboard.clearFilters")}</span>
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}
 
 function CompanionTaskSwipeAction({
   children,
@@ -685,6 +937,8 @@ export function HuntDashboard({
   const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
+  const [propertyFilters, setPropertyFilters] =
+    useState<IssuePropertyFilters>(emptyIssuePropertyFilters);
   const [isSourceFilterOpen, setIsSourceFilterOpen] = useState(false);
   const sourceFilterRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<DashboardView>("kanban");
@@ -874,6 +1128,10 @@ export function HuntDashboard({
   }, [noProject, setIsIssueDialogOpen]);
 
   useEffect(() => {
+    setPropertyFilters(emptyIssuePropertyFilters());
+  }, [dashboard?.project.id]);
+
+  useEffect(() => {
     if (!isSourceFilterOpen) return;
 
     const closeOnOutsideClick = (event: MouseEvent) => {
@@ -943,6 +1201,7 @@ export function HuntDashboard({
     const normalized = companionMode ? "" : query.trim().toLowerCase();
     const next = runs.filter((run) => {
       if (source !== "all" && run.source !== source) return false;
+      if (!runMatchesIssuePropertyFilters(run, propertyFilters)) return false;
       if (status === "active" && ["completed", "cancelled"].includes(run.status)) return false;
       if (status === "attention" && !["paused", "blocked", "failed"].includes(run.status)) return false;
       if (
@@ -965,6 +1224,7 @@ export function HuntDashboard({
     companionMode,
     dashboard?.project.issueKeyPrefix,
     query,
+    propertyFilters,
     runs,
     source,
     status,
@@ -1464,6 +1724,12 @@ export function HuntDashboard({
                 />
                 <Search aria-hidden="true" size={15} />
               </label>
+              <IssuePropertyFilterMenu
+                agents={agents}
+                filters={propertyFilters}
+                members={dashboard?.members ?? []}
+                onChange={setPropertyFilters}
+              />
               <div
                 aria-label={t("dashboard.viewMode")}
                 className="view-switch"
