@@ -4,8 +4,10 @@ import { mentionAtCaret as issueMentionAtCaret } from "./mention-token";
 export { issueMentionAtCaret };
 
 export {
+  agentReplyDisplayParentMessageId,
   agentReplyParentMessageId,
   issueReplyAgentIds,
+  type AgentReplyConversationKind,
   type IssueReplyContextMessage,
 } from "./issue-reply-decision";
 

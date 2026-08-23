@@ -17,6 +17,7 @@ import {
   type ChannelWebhook,
   type DirectMessageParticipant,
 } from "../../src/lib/channels-contract";
+import { agentReplyDisplayParentMessageId } from "../../src/lib/issue-reply-decision";
 import { isWorkerEmoji } from "../../src/lib/worker-icon-validation";
 import type { AgentSkillEffort, AgentSkillKind } from "./agent-skills";
 import type {
@@ -2907,6 +2908,19 @@ export async function completeChannelReply(
   job: ChannelReplyJobRow,
   input: ChannelReplyCompletionInput,
 ) {
+  const channel = await getChannelById(
+    db,
+    job.organization_id,
+    job.channel_id,
+  );
+  if (!channel) return null;
+  const replyParentMessageId = agentReplyDisplayParentMessageId(
+    channel.kind,
+    {
+      id: job.trigger_message_id,
+      parentMessageId: job.parent_message_id,
+    },
+  );
   const executionApprovalsAvailable =
     await channelExecutionProposalTablesAvailable(db);
   const skillExecutionApprovalsAvailable =
@@ -3160,7 +3174,7 @@ export async function completeChannelReply(
            id, channel_id, parent_message_id, author_user_id, author_agent_id,
            author_agent_name, author_agent_provider, body, created_at, updated_at
          )
-         select ?, ?, claim.parent_message_id, null, ?, ?, ?, ?, ?, ?
+         select ?, ?, ?, null, ?, ?, ?, ?, ?, ?
          from briar_channel_agent_reply_jobs claim
          where claim.id = ? and claim.claimed_device_id = ?
            and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
@@ -3169,6 +3183,7 @@ export async function completeChannelReply(
       .bind(
         job.reply_message_id,
         job.channel_id,
+        replyParentMessageId,
         job.agent_id,
         input.agentName,
         input.agentProvider,
