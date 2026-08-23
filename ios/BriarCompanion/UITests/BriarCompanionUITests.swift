@@ -267,14 +267,68 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-channel-optimistic-message")
 
         XCTAssertTrue(
+            waitForKeyboardFocus(on: field),
+            "채널 메시지를 보낸 뒤에도 입력창 키보드가 유지되어야 합니다."
+        )
+        captureScreenshot(named: "companion-channel-composer-stays-focused")
+        XCTAssertTrue(
             send.waitForNonExistence(timeout: 5),
             "서버가 메시지를 확정하면 빈 입력창의 전송 버튼이 다시 숨겨져야 합니다."
+        )
+        XCTAssertTrue(
+            waitForKeyboardFocus(on: field),
+            "전송이 끝난 뒤에도 입력창 키보드가 내려가지 않아야 합니다."
         )
         XCTAssertEqual(
             app.descendants(matching: .any).matching(
                 NSPredicate(format: "label == %@", sentBody)
             ).count,
             1
+        )
+    }
+
+    func testDirectMessageKeepsComposerFocusedAfterSend() {
+        let app = launchInsideCompanion(
+            additionalArguments: ["--ui-testing-delayed-message-send"]
+        )
+
+        let directMessages = app.tabBars.buttons["DMs"]
+        XCTAssertTrue(directMessages.waitForExistence(timeout: transitionTimeout))
+        directMessages.tap()
+        let conversation = app.buttons[
+            "dm-row-12121212-1212-4212-8212-121212121212"
+        ]
+        XCTAssertTrue(conversation.waitForExistence(timeout: channelTransitionTimeout))
+        conversation.tap()
+
+        let field = app.textFields["channel-composer-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: channelTransitionTimeout))
+        field.tap()
+        XCTAssertTrue(waitForKeyboardFocus(on: field))
+        let sentBody = "DM에서도 입력창이 유지됩니다"
+        field.typeText(sentBody)
+        let send = app.buttons["channel-composer-send"]
+        send.tap()
+
+        let sentMessage = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", sentBody)
+        ).firstMatch
+        XCTAssertTrue(
+            sentMessage.waitForExistence(timeout: 1),
+            "서버 응답 전에도 DM 메시지가 즉시 표시되어야 합니다."
+        )
+        XCTAssertTrue(
+            waitForKeyboardFocus(on: field),
+            "DM 메시지를 보낸 뒤에도 입력창 키보드가 유지되어야 합니다."
+        )
+        captureScreenshot(named: "companion-dm-composer-stays-focused")
+        XCTAssertTrue(
+            send.waitForNonExistence(timeout: 5),
+            "서버가 메시지를 확정하면 빈 입력창의 전송 버튼이 다시 숨겨져야 합니다."
+        )
+        XCTAssertTrue(
+            waitForKeyboardFocus(on: field),
+            "DM 전송이 끝난 뒤에도 입력창 키보드가 내려가지 않아야 합니다."
         )
     }
 
@@ -521,6 +575,10 @@ final class BriarCompanionUITests: XCTestCase {
             "낙관적으로 표시한 이슈 메시지에는 보내는 중 문구가 없어야 합니다."
         )
         captureScreenshot(named: "companion-message-draft-cleared")
+        XCTAssertTrue(
+            waitForKeyboardFocus(on: message),
+            "이슈 메시지를 보낸 뒤에도 입력창 키보드가 유지되어야 합니다."
+        )
         XCTAssertTrue(
             send.waitForNonExistence(timeout: 5),
             "서버가 메시지를 확정하면 빈 입력창의 전송 버튼이 다시 숨겨져야 합니다."
