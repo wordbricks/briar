@@ -23,6 +23,7 @@ import {
 import { agentImageAttachments } from "../src-agent/runner-attachments";
 import {
   assertDetachedProviderTurnSucceeded,
+  logDetachedProviderTurnDiagnostic,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
 import { TranscriptBatcher } from "./transcript-batcher";
@@ -519,6 +520,12 @@ async function runClaimedIssueReply(
             BRIAR_PROJECT_ID: project.id,
           }),
           signal,
+          diagnosticContext: {
+            runId: issue.runId,
+            workId: issue.workId,
+            workType: "issueReply",
+          },
+          onDiagnostic: logDetachedProviderTurnDiagnostic,
           onConversationId: (nextConversationId) => {
             conversationId = nextConversationId;
             reportCheckpoint?.({ conversationId: nextConversationId });
@@ -809,6 +816,12 @@ async function runClaimedChannelReply(
           BRIAR_PROJECT_ID: project.id,
         }),
         signal,
+        diagnosticContext: {
+          runId: reply.runId,
+          workId: reply.workId,
+          workType: "channelReply",
+        },
+        onDiagnostic: logDetachedProviderTurnDiagnostic,
         onConversationId: (nextConversationId) => {
           conversationId = nextConversationId;
           reportCheckpoint?.({ conversationId: nextConversationId });

@@ -45,6 +45,30 @@ class OpenCodeBlockedError extends Error {
   }
 }
 
+type RunnerDiagnostic = (
+  phase: string,
+  detail?: Record<string, unknown>,
+) => void;
+
+function emitRunnerDiagnostic(
+  phase: string,
+  detail: Record<string, unknown> = {},
+) {
+  try {
+    process.stderr.write(
+      `${JSON.stringify({
+        event: "briar.runner",
+        phase,
+        pid: process.pid,
+        at: new Date().toISOString(),
+        ...detail,
+      })}\n`,
+    );
+  } catch {
+    // Diagnostics must never prevent the runner from completing its work.
+  }
+}
+
 async function availablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer();
@@ -147,8 +171,10 @@ class OpenCodeServer {
     workspaceRoot: string,
     environment: NodeJS.ProcessEnv,
     pure: boolean,
+    diagnose: RunnerDiagnostic = emitRunnerDiagnostic,
   ): Promise<OpenCodeServer> {
     const port = await availablePort();
+    diagnose("opencode.port_allocated", { port, pure });
     const serverArgs = openCodeServerArgs(port, pure);
     const spawnSpec = openCodeServerSpawnSpec({
       binary,
@@ -167,10 +193,25 @@ class OpenCodeServer {
         stdio: ["pipe", "pipe", "pipe"],
       },
     );
+    diagnose("opencode.spawned", {
+      opencodePid: child.pid ?? null,
+      port,
+      pure,
+    });
     let url: string;
     try {
       url = await Effect.runPromise(waitForOpenCodeServerUrl(child));
+      diagnose("opencode.ready", {
+        opencodePid: child.pid ?? null,
+        port,
+        url,
+      });
     } catch (caught) {
+      diagnose("opencode.start_failed", {
+        opencodePid: child.pid ?? null,
+        port,
+        error: caught instanceof Error ? caught.message : String(caught),
+      });
       stopOpenCodeProcess(child);
       throw caught;
     }
@@ -178,6 +219,9 @@ class OpenCodeServer {
   }
 
   close() {
+    emitRunnerDiagnostic("opencode.close_requested", {
+      opencodePid: this.child.pid ?? null,
+    });
     stopOpenCodeProcess(this.child);
   }
 }
@@ -258,12 +302,21 @@ type OpenCodeRunnerIo = ReturnType<
 
 async function main(runnerIo: OpenCodeRunnerIo) {
   const { emit, request: requestPromise, waitForApproval } = runnerIo;
+  emitRunnerDiagnostic("runner.request_waiting");
   const request = await requestPromise;
+  emitRunnerDiagnostic("runner.request_received", {
+    workspaceRoot: request.workspaceRoot,
+    opencodeBinary: request.opencodeBinary,
+    model: request.model ?? null,
+    sandboxMode: request.sandboxMode,
+    attachmentCount: request.attachments?.length ?? 0,
+  });
   const server = await OpenCodeServer.start(
     request.opencodeBinary,
     request.workspaceRoot,
     process.env,
     request.sandboxMode === "readOnly",
+    emitRunnerDiagnostic,
   );
   try {
     const client = createOpencodeClient({
@@ -395,14 +448,19 @@ async function main(runnerIo: OpenCodeRunnerIo) {
 }
 
 export async function runOpenCodeRunner() {
+  emitRunnerDiagnostic("runner.started");
   const runnerIo = createRunnerIo<OpenCodeRunnerRequest, OpenCodeRunnerOutput>({
     closeError: "Briar closed the OpenCode runner input.",
     decodeRequest: decodeOpenCodeRunnerRequest,
+    onClose: () => emitRunnerDiagnostic("runner.input_closed"),
   });
   const { emit } = runnerIo;
   try {
     await main(runnerIo);
   } catch (caught) {
+    emitRunnerDiagnostic("runner.failed", {
+      error: caught instanceof Error ? caught.message : String(caught),
+    });
     if (caught instanceof OpenCodeBlockedError) {
       emit({ type: "blocked", ...caught.blocker });
     } else {
@@ -414,6 +472,9 @@ export async function runOpenCodeRunner() {
     process.exitCode = 1;
   } finally {
     runnerIo.close();
+    emitRunnerDiagnostic("runner.closed", {
+      exitCode: process.exitCode ?? 0,
+    });
   }
 }
 
