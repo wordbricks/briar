@@ -584,6 +584,28 @@ describe("issue conversation multipart input", () => {
     expect(result.attachmentReferences).toEqual([reference]);
   });
 
+  it("canonicalizes uppercase agent UUIDs from iOS conversation requests", async () => {
+    const mentionedAgentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const request = new Request(
+      "https://briar.example/projects/project/runs/run/messages",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body: "@developer 확인해 주세요",
+          parentMessageId: null,
+          mentionedUserIds: [],
+          mentionedAgentIds: [mentionedAgentId.toUpperCase()],
+          agentConversationId: null,
+        }),
+      },
+    );
+
+    const result = await readIssueMessageRequest(request);
+
+    expect(result.input.mentionedAgentIds).toEqual([mentionedAgentId]);
+  });
+
   it("rejects videos in issue conversations", async () => {
     await expect(
       readIssueMessageRequest(
