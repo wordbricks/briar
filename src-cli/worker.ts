@@ -334,6 +334,9 @@ export async function runWorkerLoop(
         if (renewal.signal.aborted) break;
         try {
           await dependencies.renewLease(issue);
+          dependencies.log(
+            `lease renewed for ${issue.sourceKey} (${issue.runId})`,
+          );
         } catch (error) {
           leaseFailure = error;
           dependencies.log(
@@ -373,9 +376,15 @@ export async function runWorkerLoop(
         throw execution.signal.reason ?? new WorkerUpdateDrainError();
       }
       if (leaseFailure) throw leaseFailure;
+      dependencies.log(
+        `execution started for ${issue.sourceKey} (${issue.runId}) attempt ${issue.claimAttempts ?? "unknown"}`,
+      );
       await dependencies.runIssue(issue, execution.signal, (value) => {
         checkpoint = { ...checkpoint, ...value };
       });
+      dependencies.log(
+        `execution returned for ${issue.sourceKey} (${issue.runId})`,
+      );
       if (leaseFailure) throw leaseFailure;
       if (updateDirective && execution.signal.aborted) {
         if (!dependencies.handoff) {
