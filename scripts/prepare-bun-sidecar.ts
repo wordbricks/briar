@@ -23,16 +23,19 @@ async function sha256(path: string) {
   return createHash("sha256").update(await readFile(path)).digest("hex");
 }
 
-export async function prepareBunSidecar(workspaceRoot = resolve(import.meta.dir, "..")) {
+export async function prepareBunSidecar(
+  repositoryRoot = resolve(import.meta.dir, ".."),
+  appRoot = resolve(repositoryRoot, "apps/briar"),
+) {
   const packageJson = JSON.parse(
-    await readFile(join(workspaceRoot, "package.json"), "utf8"),
+    await readFile(join(repositoryRoot, "package.json"), "utf8"),
   ) as { packageManager?: string };
   const expectedVersion = packageJson.packageManager?.match(/^bun@(.+)$/u)?.[1];
   if (!expectedVersion) {
     throw new Error("package.json packageManager must pin an exact Bun version.");
   }
   const manifest = JSON.parse(
-    await readFile(join(workspaceRoot, "config/bun-runtime.json"), "utf8"),
+    await readFile(join(repositoryRoot, "config/bun-runtime.json"), "utf8"),
   ) as BunRuntimeManifest;
   if (manifest.version !== expectedVersion || Bun.version !== expectedVersion) {
     throw new Error(
@@ -53,7 +56,7 @@ export async function prepareBunSidecar(workspaceRoot = resolve(import.meta.dir,
     );
   }
 
-  const binariesDirectory = join(workspaceRoot, "src-tauri/binaries");
+  const binariesDirectory = join(appRoot, "src-tauri/binaries");
   const destination = join(binariesDirectory, `bun-${targetTriple}`);
   await mkdir(binariesDirectory, { recursive: true });
   await copyFile(source, destination);

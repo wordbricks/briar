@@ -12,7 +12,7 @@ updates:
       prefix: "ci"
 
   - package-ecosystem: cargo
-    directory: "/src-tauri"
+    directory: "/apps/briar/src-tauri"
     schedule:
       interval: weekly
       day: monday

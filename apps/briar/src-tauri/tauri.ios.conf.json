@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Briar Companion",
+  "identifier": "app.briar.companion",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bun run runtime:prepare && bun run skills:check && bun run typecheck && bun run worker:check && bash ../../scripts/with-release-env.sh bun run build && bun run agent:build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://briar-api.wbai.workers.dev https://raw.githubusercontent.com; img-src 'self' asset: http://asset.localhost https: data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "mobile": [
+        {
+          "scheme": ["briar-companion"],
+          "appLink": false
+        },
+        {
+          "scheme": ["https"],
+          "host": "briar-api.wbai.workers.dev",
+          "pathPrefix": ["/open/issues", "/open/sessions", "/open/channels"],
+          "appLink": true
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "resources": [],
+    "shortDescription": "Monitor Briar issue processing from iOS",
+    "longDescription": "Briar Companion monitors issue processing and queues new issues for a connected Briar desktop agent.",
+    "iOS": {
+      "developmentTeam": "QFJZ2V3829"
+    }
+  }
+}

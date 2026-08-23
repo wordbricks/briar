@@ -69,7 +69,7 @@ fi
 echo "[briar] Starting Tauri app. Press Ctrl+C to stop both processes."
 VITE_BRIAR_API_URL="$worker_url" \
 VITE_BRIAR_DEMO=false \
-bun tauri dev &
+bun --cwd apps/briar tauri dev &
 app_pid=$!
 
 while kill -0 "$worker_pid" 2>/dev/null && kill -0 "$app_pid" 2>/dev/null; do

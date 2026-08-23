@@ -146,7 +146,7 @@ curl --fail https://briar-api.wbai.workers.dev/releases/latest.json | jq .
 curl --fail --head \
   https://briar-api.wbai.workers.dev/releases/v1.1.1/Briar.app.tar.gz
 (cd release-artifacts && shasum -a 256 --check SHA256SUMS)
-bun run src-cli/production-release.ts verify-artifacts \
+bun run apps/briar/src-cli/production-release.ts verify-artifacts \
   --root release-artifacts \
   --version 1.1.1 \
   --commit-sha "$(git rev-parse HEAD)" \

@@ -171,7 +171,7 @@ set -a
 source "$release_env"
 set +a
 
-version="$(bun -e "import config from './src-tauri/tauri.conf.json'; console.log(config.version)")"
+version="$(bun -e "import config from './apps/briar/src-tauri/tauri.conf.json'; console.log(config.version)")"
 tag="v$version"
 commit_sha="$(git rev-parse HEAD)"
 
@@ -203,11 +203,11 @@ if [[ "$publish" == true ]]; then
   fi
 
   scripts/with-release-env.sh \
-    bun run src-cli/production-release.ts preflight \
+    bun run apps/briar/src-cli/production-release.ts preflight \
       --version "$version" \
       --publish
   scripts/with-release-env.sh \
-    bun run src-cli/production-release.ts verify-artifacts \
+    bun run apps/briar/src-cli/production-release.ts verify-artifacts \
       --root "$artifact_root" \
       --version "$version" \
       --commit-sha "$commit_sha" \
@@ -272,7 +272,7 @@ export BRIAR_RELEASE_COMMIT="$commit_sha"
 export BRIAR_RELEASE_INVOCATION_ID="local:$tag:$commit_sha"
 
 scripts/with-release-env.sh \
-  bun run src-cli/production-release.ts preflight --version "$version"
+  bun run apps/briar/src-cli/production-release.ts preflight --version "$version"
 
 read_keychains
 scripts/import-apple-signing-assets.sh
@@ -283,10 +283,10 @@ set +a
 
 production_config="$release_temp/tauri.production.json"
 scripts/with-release-env.sh \
-  bun run src-cli/production-release.ts config \
+  bun run apps/briar/src-cli/production-release.ts config \
     --version "$version" \
     --output "$production_config"
-scripts/with-release-env.sh bun run tauri build --config "$production_config"
+scripts/with-release-env.sh bun --cwd apps/briar tauri build --config "$production_config"
 
 dmg_directory="$BRIAR_RELEASE_CARGO_TARGET_DIR/release/bundle/dmg"
 dmg_path="$(
@@ -308,7 +308,7 @@ scripts/qa-macos-lifecycle.sh \
   --allow-same-version \
   --require-production-signature \
   --evidence-file "$artifact_root/lifecycle-evidence.json"
-bun run tauri signer sign "$artifact_root/lifecycle-evidence.json"
+bun --cwd apps/briar tauri signer sign "$artifact_root/lifecycle-evidence.json"
 (
   cd "$artifact_root"
   find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 \

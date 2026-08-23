@@ -11,7 +11,7 @@ if (!nextProvider || !/^[a-z][a-z0-9_-]*$/u.test(nextProvider) || !outputName) {
   );
 }
 
-const migrationsDirectory = resolve("migrations");
+const migrationsDirectory = resolve("apps/briar/migrations");
 const outputPath = resolve(migrationsDirectory, outputName);
 const migrationNames = (await readdir(migrationsDirectory))
   .filter((name) => name.endsWith(".sql") && name !== outputName)

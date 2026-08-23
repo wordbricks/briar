@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "landing",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "landing"],
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["--cwd", "apps/landing", "run", "dev"],
       "port": 3000
     }
   ]

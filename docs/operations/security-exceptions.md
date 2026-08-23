@@ -1,21 +1,31 @@
 # Security exceptions
 
-## GHSA-f88m-g3jw-g9cj — temporary development-only exception
+## GHSA-w3rx-r6r6-pgpr and GHSA-5p2g-fcmc-qvqq — temporary landing build exception
 
-- Recorded: 2026-07-22
-- Review by: 2026-08-05
-- Dependency path: `wrangler -> miniflare -> sharp@0.34.5`
-- Scope: development and CI tooling only; `sharp` is not bundled into the Briar
-  desktop application or deployed Worker.
-- Exposure: Briar does not pass untrusted images to Miniflare's image handling in
-  local tests or CI.
-- Upstream status: Wrangler 4.113.0 currently resolves Miniflare
-  4.20260721.0, which pins the affected Sharp version. Sharp 0.35.x is not
-  forced with an override because Miniflare declares 0.34.5 exactly and an
-  unsupported override could invalidate Worker simulation.
-- Removal condition: remove `--ignore GHSA-f88m-g3jw-g9cj` from
-  `scripts/audit-dependencies.sh` as soon as a compatible Wrangler/Miniflare
-  release resolves Sharp 0.35.0 or newer.
+- Recorded: 2026-08-23
+- Review by: 2026-09-06
+- Dependency path: `vinext@0.0.50 -> image-size@2.0.2`
+- Scope: landing build tooling only. Vinext calls `image-size` while Vite builds
+  statically imported images and metadata routes. The landing build processes
+  only repository-managed PNG, WebP, and GIF assets; it contains no ICNS, JXL,
+  HEIF, or HEIC input and does not accept user-supplied build assets.
+- Production exposure: the generated Cloudflare Worker bundle does not contain
+  the `image-size` parser. Runtime image transformations use the Cloudflare
+  `IMAGES` binding, so untrusted requests do not reach this dependency.
+- Upstream status: both advisories affect every published `image-size` version
+  through 2.0.2, and the advisory database lists no patched version. Vinext
+  pins 2.0.2 through `1.0.0-beta.5`; `1.0.0-beta.6` removes the dependency.
+- Compatibility constraint: upgrading to Vinext `1.0.0-beta.6` was tested, but
+  changed the locale redirect `Location` from the current absolute
+  `http://localhost/ko` contract to relative `/ko`, failing
+  `apps/landing/tests/rendered-html.check.mjs`. The beta upgrade was therefore
+  reverted instead of weakening that routing contract as part of a security
+  dependency update.
+- Removal conditions: remove both ignores as soon as a patched `image-size`
+  release is accepted by Vinext, or a Vinext release without this dependency
+  preserves the absolute redirect contract (or that contract is deliberately
+  migrated and reviewed). Revoke this exception immediately if landing builds
+  begin processing untrusted or externally supplied images.
 
 This exception does not lower the gate for any other high or critical advisory.
 

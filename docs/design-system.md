@@ -6,13 +6,13 @@ shadcn/ui (New York) + Tailwind CSS v4, with Briar’s warm paper surface and vi
 
 | Path | Role |
 |------|------|
-| `src/styles/tokens.css` | Color, type, radius, elevation tokens |
-| `src/styles/globals.css` | Tailwind theme bridge + base typography |
-| `src/styles.css` | Legacy screen styles (consume tokens; migrate gradually) |
-| `src/components/ui/*` | Primitives (Button, Input, Dialog, Typography, …) |
-| `src/lib/utils.ts` | `cn()` class merger |
-| `src/lib/typography.ts` | Type scale constants for TS |
-| `components.json` | shadcn CLI config |
+| `apps/briar/src/styles/tokens.css` | Color, type, radius, elevation tokens |
+| `apps/briar/src/styles/globals.css` | Tailwind theme bridge + base typography |
+| `apps/briar/src/styles.css` | Legacy screen styles (consume tokens; migrate gradually) |
+| `apps/briar/src/components/ui/*` | Primitives (Button, Input, Dialog, Typography, …) |
+| `apps/briar/src/lib/utils.ts` | `cn()` class merger |
+| `apps/briar/src/lib/typography.ts` | Type scale constants for TS |
+| `apps/briar/components.json` | shadcn CLI config |
 
 ## Typography scale
 
@@ -120,7 +120,7 @@ bunx shadcn@latest add select dropdown-menu popover avatar
 
 ## Product pages
 
-Shared page layout primitives live in `src/components/layout/`:
+Shared page layout primitives live in `apps/briar/src/components/layout/`:
 
 | Export | Role |
 |--------|------|
@@ -133,12 +133,12 @@ Migrated product surfaces include Login, Inbox, Auto Hunt, Agents, Schedule,
 Issue queue/dashboard, Organization create, Companion chrome, and settings.
 Remaining dialogs/forms should prefer `@/components/ui` controls as they are touched.
 
-Legacy `src/styles.css` is tokenized for type scale and common colors so older
+Legacy `apps/briar/src/styles.css` is tokenized for type scale and common colors so older
 class-based screens inherit the system even before full JSX rewrites.
 
 ## Settings surfaces (migrated)
 
-Settings screens use shared layout primitives in `src/components/settings/`:
+Settings screens use shared layout primitives in `apps/briar/src/components/settings/`:
 
 | Export | Role |
 |--------|------|
@@ -169,4 +169,4 @@ Migrated screens:
 - UI: **Inter**
 - Mono / meters: **DM Mono**
 
-Loaded in `index.html` from Google Fonts.
+Loaded in `apps/briar/index.html` from Google Fonts.

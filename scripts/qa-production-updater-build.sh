@@ -7,8 +7,8 @@ private_key="$qa_root/updater.key"
 public_key="$private_key.pub"
 production_config="$qa_root/tauri.production.json"
 password="briar-ephemeral-ci-key"
-version="$(bun -e "import config from './src-tauri/tauri.conf.json'; console.log(config.version)" --cwd "$workspace_root")"
-bundle_root="${BRIAR_RELEASE_CARGO_TARGET_DIR:-${CARGO_TARGET_DIR:-$workspace_root/src-tauri/target}}/release/bundle"
+version="$(bun -e "import config from './apps/briar/src-tauri/tauri.conf.json'; console.log(config.version)" --cwd "$workspace_root")"
+bundle_root="${BRIAR_RELEASE_CARGO_TARGET_DIR:-${CARGO_TARGET_DIR:-$workspace_root/apps/briar/src-tauri/target}}/release/bundle"
 
 cleanup() {
   case "$qa_root" in
@@ -18,21 +18,21 @@ cleanup() {
 }
 trap cleanup EXIT
 
-CI=true bun run tauri signer generate \
+CI=true bun --cwd apps/briar tauri signer generate \
   --password "$password" \
   --write-keys "$private_key" \
   --force >/dev/null
 
 BRIAR_UPDATER_PUBLIC_KEY="$(cat "$public_key")" \
   "$workspace_root/scripts/with-release-env.sh" \
-  bun run "$workspace_root/src-cli/production-release.ts" config \
+  bun run "$workspace_root/apps/briar/src-cli/production-release.ts" config \
     --version "$version" \
     --output "$production_config"
 
 TAURI_SIGNING_PRIVATE_KEY="$private_key" \
 TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$password" \
   "$workspace_root/scripts/with-release-env.sh" \
-  bun run tauri build --config "$production_config"
+  bun --cwd apps/briar tauri build --config "$production_config"
 
 shopt -s nullglob
 archives=("$bundle_root"/macos/*.app.tar.gz)

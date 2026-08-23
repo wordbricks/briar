@@ -1,0 +1,96 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Briar",
+  "version": "1.2.152",
+  "identifier": "app.briar.desktop",
+  "build": {
+    "beforeDevCommand": "bun run runtime:prepare && bun run skills:generate && bun run cli:build && bun run agent:build && bun run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "bun run runtime:prepare && bun run skills:check && bun run typecheck && bun run worker:check && bun run build && bun run cli:build && bun run agent:build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "title": "Briar",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 980,
+        "minHeight": 680,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 16, "y": 22 },
+        "backgroundColor": "#f7f7f3",
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:8787 https: wss://briar-api.wbai.workers.dev; frame-src https://www.youtube-nocookie.com; img-src 'self' asset: http://asset.localhost https: data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'",
+      "devCsp": "default-src 'self' http://localhost:1420; connect-src 'self' ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420 http://127.0.0.1:8787 http://127.0.0.1:8788 https: wss://briar-api.wbai.workers.dev; frame-src https://www.youtube-nocookie.com; img-src 'self' asset: http://asset.localhost http://localhost:1420 https: data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline' http://localhost:1420; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:1420"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["briar-companion"]
+      }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ1RkQ4ODQ5RUZFOTMwMTAKUldRUU1PbnZTWWo5UlFuM1RuM1prR2lFQXUrSjBMa285azh3aUhpVzNpVkJEeGU5eEtvSTJQdUsK",
+      "endpoints": [
+        "https://briar-api.wbai.workers.dev/releases/dev-disabled.json"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "DeveloperTool",
+    "shortDescription": "Agent Development Environment",
+    "longDescription": "Connect local agents and observe issue processing progress from a desktop dashboard.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../dist-cli/briar.js": "cli/briar.js",
+      "../dist-agent/codex-runner.js": "agent/codex-runner.js",
+      "../dist-agent/claude-runner.js": "agent/claude-runner.js",
+      "../dist-agent/cursor-runner.js": "agent/cursor-runner.js",
+      "../dist-agent/grok-runner.js": "agent/grok-runner.js",
+      "../dist-agent/agy-runner.js": "agent/agy-runner.js",
+      "../dist-agent/opencode-runner.js": "agent/opencode-runner.js",
+      "../../../scripts/briar-launcher": "cli/briar",
+      "../../../skills/briar-workflow/": "skills/briar-workflow/",
+      "../../../skills/browser/": "skills/browser/",
+      "../../../third-party/bun-LICENSE.md": "licenses/bun-LICENSE.md",
+      "../../../third-party/claude-agent-sdk-LICENSE.md": "licenses/claude-agent-sdk-LICENSE.md",
+      "../../../third-party/agency-agents-LICENSE.md": "licenses/agency-agents-LICENSE.md",
+      "../../../third-party/novnc-LICENSE.txt": "licenses/novnc-LICENSE.txt"
+    },
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "signingIdentity": "-",
+      "entitlements": "Entitlements.plist",
+      "dmg": {
+        "background": "icons/dmg-background.png",
+        "windowSize": {
+          "width": 720,
+          "height": 440
+        },
+        "appPosition": {
+          "x": 180,
+          "y": 226
+        },
+        "applicationFolderPosition": {
+          "x": 540,
+          "y": 226
+        }
+      }
+    }
+  }
+}

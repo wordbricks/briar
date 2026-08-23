@@ -94,7 +94,8 @@ iOS TestFlight uploads and their final App Store Connect states are recorded in
 
 ## Rollback
 
-- Worker: redeploy a known-good main SHA or use `wrangler rollback`.
+- Worker: redeploy a known-good main SHA or use
+  `bun --cwd apps/briar wrangler rollback`.
 - D1: capture a Time Travel bookmark before each remote migration and restore it
   only after confirming the forward fix is unsafe.
 - Desktop: retain the previous signed release until the new candidate passes

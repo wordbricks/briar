@@ -1,0 +1,148 @@
+{
+  "$schema": "https://v2-10-9.turborepo.dev/schema.json",
+  "globalPassThroughEnv": ["CI"],
+  "tasks": {
+    "//#lint:repo": {
+      "inputs": [
+        "scripts/**/*.ts",
+        ".oxlintrc.jsonc",
+        "package.json",
+        "bun.lock"
+      ],
+      "outputs": []
+    },
+    "//#lint:repo:type-aware": {
+      "inputs": [
+        "scripts/**/*.ts",
+        ".oxlintrc.jsonc",
+        "package.json",
+        "bun.lock"
+      ],
+      "outputs": []
+    },
+    "//#test:repo-tools": {
+      "inputs": [
+        "scripts/apply-remote-d1-migrations.ts",
+        "scripts/apply-remote-d1-migrations.test.ts",
+        "scripts/verify-encrypted-env.ts",
+        "scripts/verify-encrypted-env.test.ts",
+        "package.json",
+        "bun.lock"
+      ],
+      "cache": false
+    },
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "lint": {
+      "dependsOn": ["transit"],
+      "outputs": []
+    },
+    "lint:type-aware": {
+      "dependsOn": ["transit"],
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["transit"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["transit"],
+      "cache": false
+    },
+    "skills:check": {
+      "outputs": []
+    },
+    "web:build": { "cache": false },
+    "build:release": { "cache": false },
+    "mobile:contract": { "cache": false },
+    "ios:native:project": { "cache": false },
+    "ios:native:test": { "cache": false },
+    "ios:release:verify": { "outputs": [] },
+    "qa:release-updater": {
+      "cache": false,
+      "passThroughEnv": ["BRIAR_RELEASE_CARGO_TARGET_DIR", "CARGO_TARGET_DIR"]
+    },
+    "tauri": {
+      "cache": false,
+      "passThroughEnv": [
+        "ANDROID_*",
+        "APPLE_*",
+        "BRIAR_*",
+        "CARGO_TARGET_DIR",
+        "TAURI_*",
+        "VITE_BRIAR_*"
+      ]
+    },
+    "tauri:build:release": {
+      "cache": false,
+      "passThroughEnv": [
+        "APPLE_*",
+        "BRIAR_*",
+        "CARGO_TARGET_DIR",
+        "TAURI_*",
+        "VITE_BRIAR_*"
+      ]
+    },
+    "android:init": {
+      "cache": false,
+      "passThroughEnv": ["ANDROID_*", "JAVA_HOME", "NDK_HOME", "TAURI_*"]
+    },
+    "android:dev": {
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": ["ANDROID_*", "JAVA_HOME", "NDK_HOME", "TAURI_*"]
+    },
+    "android:build": {
+      "cache": false,
+      "passThroughEnv": ["ANDROID_*", "JAVA_HOME", "NDK_HOME", "TAURI_*"]
+    },
+    "android:build:debug": {
+      "cache": false,
+      "passThroughEnv": ["ANDROID_*", "JAVA_HOME", "NDK_HOME", "TAURI_*"]
+    },
+    "cli:build": { "cache": false },
+    "cli:install": { "cache": false },
+    "agent:build": { "cache": false },
+    "runtime:prepare": { "cache": false },
+    "skills:generate": { "cache": false },
+    "d1:migrate:local": { "cache": false },
+    "d1:migrate:remote": {
+      "cache": false,
+      "passThroughEnv": ["CLOUDFLARE_*", "WRANGLER_*"]
+    },
+    "test:d1:migrations": { "cache": false },
+    "test:d1:cache-recovery": { "cache": false },
+    "test:d1:integration": { "cache": false },
+    "test:d1:prepare": { "cache": false },
+    "test:d1:clean": { "cache": false },
+    "secrets:verify-encrypted": { "cache": false },
+    "secrets:check": { "cache": false },
+    "worker:dev": {
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": [
+        "BRIAR_WORKER_DEV_PORT",
+        "CLOUDFLARE_*",
+        "DOTENV_*",
+        "WRANGLER_*"
+      ]
+    },
+    "worker:types": { "cache": false },
+    "worker:check": { "outputs": [] },
+    "worker:build": { "cache": false },
+    "worker:deploy": {
+      "cache": false,
+      "passThroughEnv": ["CLOUDFLARE_*", "DOTENV_*", "WRANGLER_*"]
+    },
+    "worker:startup": { "cache": false }
+  }
+}

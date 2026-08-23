@@ -1,0 +1,20 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "cache": true,
+      "env": ["NEXT_PUBLIC_GA_MEASUREMENT_ID"],
+      "outputs": ["dist/**"]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
+    "typecheck": {
+      "outputs": ["tsconfig.tsbuildinfo"]
+    },
+    "dev": {
+      "passThroughEnv": ["CODEX_SANDBOX"]
+    }
+  }
+}
