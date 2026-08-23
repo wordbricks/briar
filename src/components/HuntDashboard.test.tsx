@@ -152,6 +152,37 @@ function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
 
 describe("HuntDashboard", () => {
 
+  it.each(["issue", "feedback", "error"] as const)(
+    "shows the assignee avatar immediately after the %s source label",
+    async (source) => {
+      const member = demoDashboard.members![0]!;
+      const run = {
+        ...demoDashboard.runs[0],
+        assigneeUserId: member.userId,
+        source,
+      };
+      const container = document.createElement("div");
+      document.body.append(container);
+      const root = createRoot(container);
+      await act(async () => root.render(
+        <HuntDashboard
+          {...dashboardProps}
+          dashboard={{ ...demoDashboard, runs: [run] }}
+        />,
+      ));
+
+      const sourceLabel = container.querySelector(".kanban-source");
+      const assigneeAvatar = container.querySelector(".kanban-assignee");
+      expect(sourceLabel?.nextElementSibling).toBe(assigneeAvatar);
+      expect(assigneeAvatar?.getAttribute("aria-label")).toBe(
+        `담당자: ${member.name}`,
+      );
+
+      await act(async () => root.unmount());
+      container.remove();
+    },
+  );
+
   it("filters the visible issues from the property menu", async () => {
     const container = document.createElement("div");
     document.body.append(container);
