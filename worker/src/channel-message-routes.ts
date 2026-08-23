@@ -137,6 +137,7 @@ export async function handleChannelMessageRoute(
       parentMessageId: query.parentMessageId,
       cursor: query.cursor,
       limit: query.limit,
+      includeRepliesInTimeline: channel.kind === "dm",
     });
     if (!page) {
       throw new HttpError(400, "Cursor does not belong to this message view");
@@ -226,6 +227,7 @@ export async function handleChannelMessageRoute(
         parentMessageId: query.parentMessageId,
         cursor: query.cursor,
         limit: query.limit,
+        includeRepliesInTimeline: channel.kind === "dm",
       });
       if (!page) {
         throw new HttpError(400, "Cursor does not belong to this message view");

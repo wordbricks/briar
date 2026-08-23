@@ -560,6 +560,74 @@ describe("organization channels", () => {
     expect(earlier?.nextCursor).toBeNull();
   });
 
+  it("pages a direct-message timeline across roots and legacy replies", async () => {
+    const channelId = "e3000000-0000-4000-8000-000000000001";
+    const firstRootId = "f3000000-0000-4000-8000-000000000001";
+    const legacyReplyId = "f3000000-0000-4000-8000-000000000002";
+    const secondRootId = "f3000000-0000-4000-8000-000000000003";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      kind: "dm",
+      slug: "paged-dm-history",
+      name: "Paged DM history",
+      topic: null,
+      visibility: "private",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(6),
+    });
+    for (const item of [
+      { id: firstRootId, parentMessageId: null, body: "First", minute: 7 },
+      {
+        id: legacyReplyId,
+        parentMessageId: firstRootId,
+        body: "Legacy reply",
+        minute: 8,
+      },
+      { id: secondRootId, parentMessageId: null, body: "Second", minute: 9 },
+    ]) {
+      await createChannelMessage(db, {
+        id: item.id,
+        channelId,
+        parentMessageId: item.parentMessageId,
+        authorUserId: ownerId,
+        authorAgentId: null,
+        authorAgentName: null,
+        authorAgentProvider: null,
+        body: item.body,
+        mentionedUserIds: [],
+        mentionedAgentIds: [],
+        createdAt: at(item.minute),
+      });
+    }
+
+    const newest = await listChannelMessagePage(db, {
+      channelId,
+      parentMessageId: null,
+      cursor: null,
+      limit: 2,
+      includeRepliesInTimeline: true,
+    });
+    expect(newest?.messages.map((message) => message.id)).toEqual([
+      legacyReplyId,
+      secondRootId,
+    ]);
+    expect(newest?.nextCursor).toBe(legacyReplyId);
+
+    const earlier = await listChannelMessagePage(db, {
+      channelId,
+      parentMessageId: null,
+      cursor: newest?.nextCursor ?? null,
+      limit: 2,
+      includeRepliesInTimeline: true,
+    });
+    expect(earlier?.messages.map((message) => message.id)).toEqual([
+      firstRootId,
+    ]);
+    expect(earlier?.nextCursor).toBeNull();
+  });
+
   it("authenticates, rate limits, deduplicates, rotates, and revokes incoming webhooks", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000060";
     const webhookId = "f0000000-0000-4000-8000-000000000060";
@@ -2792,6 +2860,26 @@ describe("organization channels", () => {
       mentionedAgentIds: [],
       createdAt: at(21),
     });
+    const dmTimelineResponse = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}?limit=20`,
+      {
+        headers: { authorization: `Bearer ${ownerSessionToken}` },
+      },
+    ), apiEnv);
+    expect(dmTimelineResponse.status).toBe(200);
+    const dmTimeline = await dmTimelineResponse.json() as {
+      messages: Array<{ id: string; parentMessageId: string | null }>;
+    };
+    expect(dmTimeline.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: earlierDmMessageId,
+        parentMessageId: null,
+      }),
+      expect.objectContaining({
+        id: earlierDmThreadReplyId,
+        parentMessageId: earlierDmMessageId,
+      }),
+    ]));
     const message = await apiWorker.fetch(new Request(
       `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/messages`,
       {
@@ -3235,7 +3323,7 @@ describe("organization channels", () => {
       createdByUserId: ownerId,
       createdAt: at(25),
     });
-    const before = await loadChannelDelta(db, organizationId, outsiderId, 0);
+    const beforeCursor = await getChannelSyncCursor(db, organizationId);
     await createChannelMessage(db, {
       id: "f0000000-0000-4000-8000-000000000008",
       channelId: hiddenId,
@@ -3254,20 +3342,20 @@ describe("organization channels", () => {
       db,
       organizationId,
       outsiderId,
-      before.cursor,
+      beforeCursor,
     );
     expect(outsiderDelta.messages).toHaveLength(0);
     expect(outsiderDelta.channels.map((channel) => channel.id)).not.toContain(
       hiddenId,
     );
     // The cursor still advances so the member does not re-read the same rows.
-    expect(outsiderDelta.cursor).toBeGreaterThan(before.cursor);
+    expect(outsiderDelta.cursor).toBeGreaterThan(beforeCursor);
 
     const ownerDelta = await loadChannelDelta(
       db,
       organizationId,
       ownerId,
-      before.cursor,
+      beforeCursor,
     );
     expect(ownerDelta.messages.map((message) => message.body)).toContain(
       "Confidential",

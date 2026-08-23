@@ -418,10 +418,81 @@ describe("Channels", () => {
     );
   });
 
+  it("keeps legacy DM replies in the main timeline", async () => {
+    const directMessage: ChannelSummary = {
+      ...channel,
+      kind: "dm",
+      visibility: "private",
+      dmParticipants: [
+        { type: "user", id: "user-1", name: "Jay", image: null },
+        { type: "agent", id: "agent-1", name: "Honey", image: null },
+      ],
+    };
+    const rootMessage = message({
+      body: "Please review this",
+      replyCount: 1,
+    });
+    const legacyReply = message({
+      id: "message-legacy-reply",
+      parentMessageId: rootMessage.id,
+      body: "Reviewed in the DM timeline",
+      author: {
+        type: "agent",
+        id: "agent-1",
+        name: "Honey",
+        provider: "claude",
+        image: null,
+      },
+      createdAt: "2026-08-01T01:01:00.000Z",
+    });
+    loadChannel.mockResolvedValue({
+      channel: directMessage,
+      members: [member],
+      agents: [agent],
+      messages: [rootMessage],
+      nextCursor: null,
+    });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 8,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [legacyReply],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
 
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId={directMessage.id}
+          channelCatalogCursor={7}
+          channels={[directMessage]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          surface="dm"
+          token="token"
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain("Please review this");
+    });
+    expect(container.querySelector(".conversation-reply-summary")).toBeNull();
 
-
-
+    await act(async () => {
+      emitChannelChange(8);
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain("Reviewed in the DM timeline");
+    });
+    expect(listChannelMessages).not.toHaveBeenCalled();
+  });
 
   it("renames the channel and changes the linked project from settings", async () => {
     updateChannel.mockResolvedValue({ channel: { ...channel, name: "Design" } });

@@ -1681,7 +1681,8 @@ export type ChannelMessagePage = {
  * Read one page from the newest messages towards older history. Messages
  * within a page remain chronological so CLI consumers can render them without
  * re-sorting. A thread view includes its root message, matching the existing
- * channel thread API.
+ * channel thread API. Direct messages can opt into one bounded timeline that
+ * also includes replies created before DM replies moved to the root level.
  */
 export async function listChannelMessagePage(
   db: D1Database,
@@ -1690,8 +1691,11 @@ export async function listChannelMessagePage(
     parentMessageId: string | null;
     cursor: string | null;
     limit: number;
+    includeRepliesInTimeline?: boolean;
   },
 ): Promise<ChannelMessagePage | null> {
+  const includesReplies =
+    input.includeRepliesInTimeline === true && input.parentMessageId === null;
   const cursor = input.cursor
     ? await db
         .prepare(
@@ -1701,6 +1705,8 @@ export async function listChannelMessagePage(
              and ${
                input.parentMessageId
                  ? `(id = ? or parent_message_id = ?)`
+                 : includesReplies
+                   ? "1 = 1"
                  : "parent_message_id is null"
              }`,
         )
@@ -1718,7 +1724,9 @@ export async function listChannelMessagePage(
   const select = await messageSelectFor(db);
   const scope = input.parentMessageId
     ? `(message.id = ? or message.parent_message_id = ?)`
-    : "message.parent_message_id is null";
+    : includesReplies
+      ? "1 = 1"
+      : "message.parent_message_id is null";
   const before = cursor
     ? `and (message.created_at < ?
             or (message.created_at = ? and message.id < ?))`

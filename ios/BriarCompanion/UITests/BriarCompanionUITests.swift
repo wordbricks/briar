@@ -106,6 +106,36 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-channel-reentry")
     }
 
+    func testDirectMessageOpensItsBoundedTimeline() {
+        let app = launchInsideCompanion()
+
+        let directMessages = app.tabBars.buttons["DMs"]
+        XCTAssertTrue(directMessages.waitForExistence(timeout: transitionTimeout))
+        directMessages.tap()
+        let conversation = app.buttons[
+            "dm-row-12121212-1212-4212-8212-121212121212"
+        ]
+        XCTAssertTrue(conversation.waitForExistence(timeout: channelTransitionTimeout))
+        conversation.tap()
+
+        let identity = app.descendants(matching: .any)["channel-header-identity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: channelTransitionTimeout))
+        XCTAssertTrue(identity.label.contains("Honey"))
+        XCTAssertTrue(identity.label.contains("비공개 대화"))
+        XCTAssertTrue(
+            element(withLabel: "iOS DM 화면을 검토해 주세요.", in: app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element(withLabel: "검토를 마쳤습니다.", in: app)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["channel-message-loading-spinner"].exists
+        )
+        captureScreenshot(named: "companion-direct-message-timeline")
+    }
+
     func testChannelShowsLoadingSpinnerWhileMessagesLoad() {
         let app = launchInsideCompanion(
             additionalArguments: ["--ui-testing-delayed-channel-load"]
