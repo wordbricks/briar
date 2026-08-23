@@ -7904,7 +7904,13 @@ async fn load_agent_usage(
     app: tauri::AppHandle,
 ) -> Result<agent_usage::AgentUsageSnapshot, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    Ok(agent_usage::load(home).await)
+    let config_path = cli_config_path(&app)?;
+    let openrouter_configured = tauri::async_runtime::spawn_blocking(move || {
+        openrouter_api_key_from(&config_path).map(|api_key| api_key.is_some())
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    Ok(agent_usage::load(home, openrouter_configured).await)
 }
 
 #[tauri::command]
