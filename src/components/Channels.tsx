@@ -2,6 +2,7 @@ import {
   AtSign,
   Bot,
   Check,
+  ChevronLeft,
   Copy,
   Hash,
   Headphones,
@@ -87,8 +88,12 @@ import {
   type ChannelExecutionProposal,
   type ChannelSummary,
   type ChannelWebhook,
+  type DirectMessageParticipant,
 } from "../lib/channels-contract";
-import { directMessageDisplayName } from "../lib/direct-messages";
+import {
+  directMessageDisplayName,
+  directMessageParticipants,
+} from "../lib/direct-messages";
 import {
   channelHasUnread,
   laterTimestamp,
@@ -117,6 +122,7 @@ import {
   ProfileDialog,
   profileTargetForChannelAgent,
   profileTargetForChannelMember,
+  profileTargetForDirectMessageParticipant,
   type ProfileTarget,
 } from "./ProfileDialog";
 import {
@@ -436,6 +442,8 @@ export function Channels({
   ]);
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [agents, setAgents] = useState<ChannelAgentSummary[]>([]);
+  const [headerProfile, setHeaderProfile] = useState<ProfileTarget | null>(null);
+  const [participantMenuOpen, setParticipantMenuOpen] = useState(false);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [messageNextCursor, setMessageNextCursor] = useState<string | null>(null);
   const [channelLoading, setChannelLoading] = useState(false);
@@ -607,6 +615,15 @@ export function Channels({
   const activeChannelName = activeChannel && surface === "dm"
     ? directMessageDisplayName(activeChannel, currentUserId)
     : activeChannel?.name ?? "";
+  const dmParticipants = activeChannel && surface === "dm"
+    ? directMessageParticipants(activeChannel, currentUserId)
+    : [];
+  const isGroupDirectMessage = dmParticipants.length > 1;
+
+  useEffect(() => {
+    setParticipantMenuOpen(false);
+    setHeaderProfile(null);
+  }, [activeChannelId]);
   const showRequestedThreadOnly = Boolean(
     inboxDetail &&
       requestedMessage &&
@@ -2173,16 +2190,37 @@ export function Channels({
         {activeChannel ? (
           <>
             <header className="channel-header" data-tauri-drag-region>
-              <div className="channel-header-title">
-                {surface === "dm" ? (
-                  <MessageCircle size={16} aria-hidden="true" />
-                ) : activeChannel.visibility === "private" ? (
-                  <Lock size={16} aria-hidden="true" />
-                ) : (
-                  <Hash size={16} aria-hidden="true" />
-                )}
-                <h2>{activeChannelName}</h2>
-              </div>
+              {surface === "dm" ? (
+                <button
+                  aria-label={t("navigation.back")}
+                  className="channel-header-back"
+                  onClick={() => onChannelSelect(null)}
+                  type="button"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+              ) : null}
+              {surface === "dm" ? (
+                <DirectMessageHeaderIdentity
+                  members={members}
+                  agents={agents}
+                  isGroup={isGroupDirectMessage}
+                  menuOpen={participantMenuOpen}
+                  name={activeChannelName}
+                  onMenuOpenChange={setParticipantMenuOpen}
+                  onSelectProfile={setHeaderProfile}
+                  participants={dmParticipants}
+                />
+              ) : (
+                <div className="channel-header-title">
+                  {activeChannel.visibility === "private" ? (
+                    <Lock size={16} aria-hidden="true" />
+                  ) : (
+                    <Hash size={16} aria-hidden="true" />
+                  )}
+                  <h2>{activeChannelName}</h2>
+                </div>
+              )}
               <div className="channel-header-actions">
                 {surface === "channel" ? <button
                   type="button"
@@ -2561,6 +2599,12 @@ export function Channels({
           }}
         />
       ) : null}
+      <ProfileDialog
+        profile={headerProfile}
+        onOpenChange={(open) => {
+          if (!open) setHeaderProfile(null);
+        }}
+      />
       {surface === "channel" && webhooksOpen && activeChannel ? (
         <ChannelWebhooksDialog
           channel={activeChannel}
@@ -2580,6 +2624,130 @@ export function Channels({
       ) : null}
       </div>
     </ChannelMessageImageCacheProvider>
+  );
+}
+
+function DirectMessageHeaderAvatar({
+  name,
+  participants,
+}: {
+  name: string;
+  participants: readonly DirectMessageParticipant[];
+}) {
+  const visible = participants.slice(0, 2);
+  const items = visible.length > 0
+    ? visible
+    : [{ type: "user" as const, id: "fallback", name, image: null }];
+  return (
+    <span
+      aria-hidden="true"
+      className={`channel-header-dm-avatar${items.length > 1 ? " is-group" : ""}`}
+    >
+      {items.map((participant) => (
+        <span
+          className="channel-header-dm-avatar-part"
+          key={`${participant.type}:${participant.id}`}
+        >
+          {participant.image ? (
+            <img alt="" src={participant.image} />
+          ) : participant.type === "agent" ? (
+            <Bot size={14} />
+          ) : (
+            participant.name.trim().charAt(0).toUpperCase() || "?"
+          )}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function DirectMessageHeaderIdentity({
+  agents,
+  isGroup,
+  members,
+  menuOpen,
+  name,
+  onMenuOpenChange,
+  onSelectProfile,
+  participants,
+}: {
+  agents: ChannelAgentSummary[];
+  isGroup: boolean;
+  members: ChannelMember[];
+  menuOpen: boolean;
+  name: string;
+  onMenuOpenChange: (open: boolean) => void;
+  onSelectProfile: (profile: ProfileTarget) => void;
+  participants: readonly DirectMessageParticipant[];
+}) {
+  const { t } = useI18n();
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !menuRef.current?.contains(event.target)
+      ) {
+        onMenuOpenChange(false);
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [menuOpen, onMenuOpenChange]);
+
+  const openProfile = (participant: DirectMessageParticipant) => {
+    onMenuOpenChange(false);
+    onSelectProfile(
+      profileTargetForDirectMessageParticipant(participant, members, agents),
+    );
+  };
+
+  return (
+    <div className="channel-header-identity" ref={menuRef}>
+      <button
+        aria-expanded={isGroup ? menuOpen : undefined}
+        aria-haspopup={isGroup ? "menu" : undefined}
+        aria-label={
+          isGroup ? t("dm.participants") : t("dm.openProfile", { name })
+        }
+        className="channel-header-identity-button"
+        onClick={() => {
+          if (isGroup) {
+            onMenuOpenChange(!menuOpen);
+            return;
+          }
+          if (participants[0]) openProfile(participants[0]);
+        }}
+        type="button"
+      >
+        <DirectMessageHeaderAvatar name={name} participants={participants} />
+        <h2>{name}</h2>
+      </button>
+      {isGroup && menuOpen ? (
+        <div
+          aria-label={t("dm.participants")}
+          className="channel-header-participant-menu"
+          role="menu"
+        >
+          {participants.map((participant) => (
+            <button
+              key={`${participant.type}:${participant.id}`}
+              onClick={() => openProfile(participant)}
+              role="menuitem"
+              type="button"
+            >
+              <DirectMessageHeaderAvatar
+                name={participant.name}
+                participants={[participant]}
+              />
+              <span>{participant.name}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

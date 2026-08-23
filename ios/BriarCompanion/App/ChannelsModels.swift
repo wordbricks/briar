@@ -57,6 +57,126 @@ struct DirectMessageParticipant: Codable, Hashable, Identifiable, Sendable {
     let id: String
     let name: String
     let image: String?
+
+    var profileKey: String { "\(type.rawValue):\(id)" }
+}
+
+/// Profile presented from a DM header. Roster details are preferred when the
+/// open conversation has already loaded members and agents; otherwise the
+/// catalog participant fields are enough to open a readable sheet.
+enum ConversationProfileTarget: Hashable, Identifiable, Sendable {
+    struct User: Hashable, Sendable {
+        let id: String
+        let name: String
+        let email: String?
+        let image: String?
+        let role: String?
+        let createdAt: Date?
+    }
+
+    struct Agent: Hashable, Sendable {
+        let id: String
+        let name: String
+        let image: String?
+        let provider: String?
+        let model: String?
+        let description: String?
+        let responsibility: String?
+        let projectId: UUID?
+        let createdAt: Date?
+    }
+
+    case user(User)
+    case agent(Agent)
+
+    var id: String {
+        switch self {
+        case let .user(user): "user:\(user.id)"
+        case let .agent(agent): "agent:\(agent.id)"
+        }
+    }
+
+    var name: String {
+        switch self {
+        case let .user(user): user.name
+        case let .agent(agent): agent.name
+        }
+    }
+
+    var image: String? {
+        switch self {
+        case let .user(user): user.image
+        case let .agent(agent): agent.image
+        }
+    }
+
+    var isAgent: Bool {
+        if case .agent = self { return true }
+        return false
+    }
+
+    static func resolve(
+        participant: DirectMessageParticipant,
+        members: [ChannelMember],
+        agents: [ChannelAgentSummary]
+    ) -> ConversationProfileTarget {
+        switch participant.type {
+        case .agent:
+            if let agent = agents.first(where: {
+                $0.agentId.uuidString.lowercased() == participant.id.lowercased()
+            }) {
+                return .agent(
+                    Agent(
+                        id: agent.agentId.uuidString.lowercased(),
+                        name: agent.name,
+                        image: agent.avatar ?? participant.image,
+                        provider: agent.provider,
+                        model: agent.model,
+                        description: agent.description,
+                        responsibility: agent.responsibility,
+                        projectId: agent.projectId,
+                        createdAt: agent.createdAt
+                    )
+                )
+            }
+            return .agent(
+                Agent(
+                    id: participant.id,
+                    name: participant.name,
+                    image: participant.image,
+                    provider: nil,
+                    model: nil,
+                    description: nil,
+                    responsibility: nil,
+                    projectId: nil,
+                    createdAt: nil
+                )
+            )
+        case .user:
+            if let member = members.first(where: { $0.userId == participant.id }) {
+                return .user(
+                    User(
+                        id: member.userId,
+                        name: member.name,
+                        email: member.email,
+                        image: member.image ?? participant.image,
+                        role: member.role,
+                        createdAt: member.createdAt
+                    )
+                )
+            }
+            return .user(
+                User(
+                    id: participant.id,
+                    name: participant.name,
+                    email: nil,
+                    image: participant.image,
+                    role: nil,
+                    createdAt: nil
+                )
+            )
+        }
+    }
 }
 
 enum DirectMessageOrdering {

@@ -199,6 +199,104 @@ final class ChannelGroupingTests: XCTestCase {
         XCTAssertEqual(dm.directMessageDisplayName(currentUserID: "fixture-user"), "Honey")
         XCTAssertEqual(dm.lastMessagePreview, "작업 결과를 확인해 주세요.")
         XCTAssertEqual(DirectMessageOrdering.byMostRecent([olderDM, dm]).map(\.id), [dm.id, olderDM.id])
+        XCTAssertEqual(
+            dm.directMessageParticipants(excluding: "fixture-user").map(\.profileKey),
+            ["agent:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
+        )
+    }
+
+    func testDirectMessageProfileUsesAgentRosterDetailsWhenPresent() {
+        let participant = DirectMessageParticipant(
+            type: .agent,
+            id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            name: "Honey",
+            image: nil
+        )
+        let agent = ChannelAgentSummary(
+            agentId: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+            name: "Honey",
+            avatar: "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
+            provider: "codex",
+            model: "gpt-5.4",
+            projectId: nil,
+            description: "제품 작업을 돕는 Organization Agent",
+            responsibility: "Review mobile product work.",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+
+        let profile = ConversationProfileTarget.resolve(
+            participant: participant,
+            members: [],
+            agents: [agent]
+        )
+
+        guard case let .agent(resolved) = profile else {
+            return XCTFail("expected an agent profile")
+        }
+        XCTAssertEqual(resolved.name, "Honey")
+        XCTAssertEqual(resolved.image, agent.avatar)
+        XCTAssertEqual(resolved.provider, "codex")
+        XCTAssertEqual(resolved.model, "gpt-5.4")
+        XCTAssertEqual(resolved.responsibility, "Review mobile product work.")
+        XCTAssertNil(resolved.projectId)
+    }
+
+    func testDirectMessageProfileFallsBackToCatalogParticipant() {
+        let participant = DirectMessageParticipant(
+            type: .agent,
+            id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            name: "QA Engineer",
+            image: nil
+        )
+
+        let profile = ConversationProfileTarget.resolve(
+            participant: participant,
+            members: [],
+            agents: []
+        )
+
+        guard case let .agent(resolved) = profile else {
+            return XCTFail("expected an agent profile")
+        }
+        XCTAssertEqual(resolved.name, "QA Engineer")
+        XCTAssertNil(resolved.provider)
+        XCTAssertNil(resolved.responsibility)
+    }
+
+    func testGroupDirectMessageListsEveryParticipantExceptTheCurrentUser() throws {
+        let json = """
+        {
+          "id": "aaaaaaaa-0000-4000-8000-000000000003",
+          "organizationId": "99999999-9999-4999-8999-999999999999",
+          "kind": "dm",
+          "slug": "dm-group",
+          "name": "Honey, Growth Marketer",
+          "topic": null,
+          "visibility": "private",
+          "defaultProjectId": null,
+          "archivedAt": null,
+          "memberCount": 1,
+          "agentCount": 2,
+          "createdAt": "2026-08-01T01:00:00Z",
+          "updatedAt": "2026-08-01T02:00:00Z",
+          "dmParticipants": [
+            {"type":"user","id":"fixture-user","name":"Briar User","image":null},
+            {"type":"agent","id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Honey","image":null},
+            {"type":"agent","id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","name":"Growth Marketer","image":null}
+          ]
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let dm = try decoder.decode(ChannelSummary.self, from: Data(json.utf8))
+        let participants = dm.directMessageParticipants(excluding: "fixture-user")
+
+        XCTAssertEqual(participants.map(\.name), ["Honey", "Growth Marketer"])
+        XCTAssertEqual(
+            dm.directMessageDisplayName(currentUserID: "fixture-user"),
+            "Honey, Growth Marketer"
+        )
+        XCTAssertGreaterThan(participants.count, 1)
     }
 
     func testDecodesAvatarAndLastReplyMetadataUsedByMessageRows() throws {
