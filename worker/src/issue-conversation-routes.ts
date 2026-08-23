@@ -1,4 +1,7 @@
-import { agentReplyParentMessageId, issueReplyAgentIds } from "../../src/lib/issue-reply-decision";
+import {
+  agentReplyDisplayParentMessageId,
+  issueReplyAgentIds,
+} from "../../src/lib/issue-reply-decision";
 import { canonicalizeIssueAttachmentReferences } from "../../src/lib/issue-markdown";
 import { prepareStoredAttachments, uploadStoredAttachments } from "./attachment-storage";
 import type { BriarAuth } from "./auth";
@@ -355,7 +358,7 @@ export async function handleIssueConversationRoute(input: {
           projectId: project.id,
           runId: issueMessagesMatch[2],
           triggerMessageId: message.id,
-          parentMessageId: agentReplyParentMessageId({
+          parentMessageId: agentReplyDisplayParentMessageId("issue", {
             id: message.id,
             parentMessageId: message.parent_message_id,
           }),

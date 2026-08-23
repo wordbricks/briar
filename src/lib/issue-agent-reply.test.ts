@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  agentReplyDisplayParentMessageId,
   agentReplyParentMessageId,
   issueMentionAtCaret,
   issueMentionHandle,
@@ -21,6 +22,29 @@ describe("issue agent replies", () => {
         parentMessageId: "thread-root",
       }),
     ).toBe("thread-root");
+  });
+
+  it("routes DM replies to the timeline while preserving channel and issue threads", () => {
+    const rootMessage = { id: "root-mention", parentMessageId: null };
+    const threadMessage = {
+      id: "thread-mention",
+      parentMessageId: "thread-root",
+    };
+
+    expect(agentReplyDisplayParentMessageId("dm", rootMessage)).toBeNull();
+    expect(agentReplyDisplayParentMessageId("dm", threadMessage)).toBeNull();
+    expect(agentReplyDisplayParentMessageId("channel", rootMessage)).toBe(
+      "root-mention",
+    );
+    expect(agentReplyDisplayParentMessageId("channel", threadMessage)).toBe(
+      "thread-root",
+    );
+    expect(agentReplyDisplayParentMessageId("issue", rootMessage)).toBe(
+      "root-mention",
+    );
+    expect(agentReplyDisplayParentMessageId("issue", threadMessage)).toBe(
+      "thread-root",
+    );
   });
 
   it("routes every explicitly mentioned Project Agent", () => {
