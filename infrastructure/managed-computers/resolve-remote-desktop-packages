@@ -8,6 +8,8 @@ fi
 
 package_list="${1:-/opt/briar/source/remote-desktop-packages.txt}"
 output="${2:-/opt/briar/source/remote-desktop-packages.lock}"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+"$script_dir/assert-debian-13-x86_64"
 test -r "$package_list"
 
 apt-get update
