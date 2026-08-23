@@ -2741,6 +2741,57 @@ describe("organization channels", () => {
     expect((await repeated.json() as { channel: { id: string } }).channel.id)
       .toBe(createdBody.channel.id);
 
+    const claimedAt = new Date().toISOString();
+    const workerCapabilitiesJson = JSON.stringify({
+      providerHealth: { claude: { healthy: true } },
+      organizationAgentContext: { protocol: 1 },
+    });
+    await db.batch([
+      db.prepare(
+        `update briar_execution_worker_devices
+         set state = 'online', last_heartbeat_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(claimedAt, claimedAt, deviceId),
+      db.prepare(
+        `update briar_execution_workers
+         set state = 'online', accepting_work = 1, readiness_state = 'ready',
+             capabilities_json = ?, last_heartbeat_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(
+        workerCapabilitiesJson,
+        claimedAt,
+        claimedAt,
+        otherWorkerId,
+      ),
+    ]);
+    const earlierDmMessageId = "ac000000-0000-4000-8000-000000000120";
+    const earlierDmThreadReplyId = "ad000000-0000-4000-8000-000000000120";
+    await createChannelMessage(db, {
+      id: earlierDmMessageId,
+      channelId: createdBody.channel.id,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Earlier direct-message context",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(20),
+    });
+    await createChannelMessage(db, {
+      id: earlierDmThreadReplyId,
+      channelId: createdBody.channel.id,
+      parentMessageId: earlierDmMessageId,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Thread-only context",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(21),
+    });
     const message = await apiWorker.fetch(new Request(
       `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/messages`,
       {
@@ -2754,17 +2805,107 @@ describe("organization channels", () => {
     ), apiEnv);
     expect(message.status).toBe(201);
     const messageBody = await message.json() as {
-      message: { mentionedAgentIds: string[] };
+      message: { id: string; mentionedAgentIds: string[] };
       agentReplies: Array<{ id: string; agentId: string }>;
     };
     expect(messageBody.message.mentionedAgentIds).toEqual([]);
     expect(messageBody.agentReplies).toHaveLength(1);
     expect(messageBody.agentReplies[0]?.agentId).toBe(agentId);
-    await expect(getChannelAgentReplyJob(
+    const dmReplyJob = await getChannelAgentReplyJob(
       db,
       organizationId,
       messageBody.agentReplies[0]!.id,
-    )).resolves.toMatchObject({ skill_id: null, agent_provider: "claude" });
+    );
+    expect(dmReplyJob).toMatchObject({
+      skill_id: null,
+      agent_provider: "claude",
+    });
+    // Other tests intentionally leave queued work behind. Make this job the
+    // oldest candidate so the public claim route exercises this DM.
+    await db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set created_at = ?, updated_at = ? where id = ?`,
+    ).bind(new Date(0).toISOString(), claimedAt, dmReplyJob!.id).run();
+
+    const dmClaimResponse = await apiWorker.fetch(
+      new Request("https://briar-api.example/channel-reply-claims", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${contextWorkerToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ organizationId, workerId: otherWorkerId }),
+      }),
+      apiEnv,
+    );
+    expect(dmClaimResponse.status).toBe(200);
+    const dmClaimPayload = await dmClaimResponse.json() as {
+      work: {
+        workId: string;
+        claimToken: string;
+        claimedAt: string;
+        snapshot: {
+          messages: Array<{ id: string; parentMessageId: string | null }>;
+        };
+      };
+    };
+    expect(dmClaimPayload.work.workId).toBe(dmReplyJob!.id);
+    expect(dmClaimPayload.work.snapshot.messages.map((item) => item.id)).toEqual(
+      expect.arrayContaining([earlierDmMessageId, messageBody.message.id]),
+    );
+    expect(dmClaimPayload.work.snapshot.messages.map((item) => item.id))
+      .not.toContain(earlierDmThreadReplyId);
+    expect(dmClaimPayload.work.snapshot.messages.every(
+      (item) => item.parentMessageId === null,
+    )).toBe(true);
+    const dmClaimTokenHash = sha256Hex(dmClaimPayload.work.claimToken);
+    const claimed = await getClaimedChannelReply(db, {
+      jobId: dmReplyJob!.id,
+      deviceId,
+      workerId: otherWorkerId,
+      claimTokenHash: dmClaimTokenHash,
+      observedAt: dmClaimPayload.work.claimedAt,
+    });
+    expect(claimed).toMatchObject({
+      trigger_message_id: messageBody.message.id,
+      parent_message_id: messageBody.message.id,
+    });
+    await completeChannelReply(db, claimed!, {
+      jobId: claimed!.id,
+      deviceId,
+      workerId: otherWorkerId,
+      claimTokenHash: dmClaimTokenHash,
+      body: "Main timeline reply",
+      document: null,
+      issueProposal: null,
+      executionProposal: null,
+      agentName: "Direct Falcon",
+      agentProvider: "claude",
+      completedAt: new Date(
+        Date.parse(dmClaimPayload.work.claimedAt) + 1_000,
+      ).toISOString(),
+    });
+    const dmReply = await getChannelMessage(
+      db,
+      createdBody.channel.id,
+      claimed!.reply_message_id,
+    );
+    expect(dmReply?.parentMessageId).toBeNull();
+    expect(
+      (await listChannelRootMessages(db, createdBody.channel.id)).map(
+        (candidate) => candidate.id,
+      ),
+    ).toEqual(expect.arrayContaining([
+      messageBody.message.id,
+      claimed!.reply_message_id,
+    ]));
+    expect(
+      (await listChannelThreadMessages(
+        db,
+        createdBody.channel.id,
+        messageBody.message.id,
+      )).map((candidate) => candidate.id),
+    ).not.toContain(claimed!.reply_message_id);
 
     const selectedSkillMessage = await apiWorker.fetch(new Request(
       `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/messages`,

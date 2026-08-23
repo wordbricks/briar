@@ -188,7 +188,7 @@ Identity public key는 AWS의 **해당 리전 RSA 인증서**를 공식 `regions
 10. 원격 화면에서 테스트 저장소와 테스트 모델 제공자에 로그인하고 같은 `/home/briar`를 사용하는 Worker 건강 검사가 `acceptingWork=true`가 되어 `사용 가능`으로 전환되는지 확인한다.
 11. D1 감사 테이블과 Cloudflare 로그에는 세션 ID, 상태, 사유 코드, 방향별 바이트 수만 남고 화면 바이트, 키 입력, 비밀번호, protocol token, Worker credential이 없음을 표본 검사한다.
 12. 스테이징에서 10분 세션의 평균/최대 대역폭, 왕복 지연, Durable Object 요청·기간·메모리와 예상 월 비용을 릴리스 기록에 남긴다. 승인 기준을 넘으면 공개 플래그를 켜지 않고 WebRTC 또는 승인된 전송 계층 검토로 넘긴다.
-13. 실패 후 재시도와 Workflow 재실행에서 EC2 `ClientToken`이 동일한 인스턴스를 돌려주는지 확인한다.
+13. 실패 후 재시도는 새 provisioning job의 EC2 `ClientToken`으로 새 인스턴스를 만들고, 이전 인스턴스는 `briar-managed` 및 컴퓨터 ID 태그를 확인한 뒤 종료하는지 확인한다. 같은 Workflow 안의 AWS 재시도에서는 동일 `ClientToken`이 중복 생성을 막는지 확인한다.
 14. 만료 시간을 앞당긴 테스트 데이터로 활성 원격 세션 종료 → 새 작업 차단 → drain → stop → 보존 기간 후 terminate와 credential revoke를 확인한다.
 
 검증을 모두 통과한 뒤에만 `MANAGED_COMPUTER_REMOTE_DESKTOP_ENABLED=true`로 다시 배포한다. 플래그를 켠 배포에서 웹과 Tauri 각각 `화면 열기`를 다시 확인한다.
@@ -206,6 +206,6 @@ Identity public key는 AWS의 **해당 리전 RSA 인증서**를 공식 `regions
 
 - 신규 신청 즉시 중단: `MANAGED_COMPUTER_APPLICATIONS_ENABLED=false`로 배포한다. 기존 컴퓨터 lifecycle은 유지된다.
 - 원격 제어 즉시 중단: `MANAGED_COMPUTER_REMOTE_DESKTOP_ENABLED=false`로 배포한다. 컴퓨터/Worker는 유지되며 새 원격 세션만 막힌다. 컴퓨터 중지·만료·종료 또는 credential revoke 시 활성 세션도 종료된다.
-- 준비 실패: UI의 제한된 재시도(최대 3회)를 사용한다. 동일 EC2 client token과 user-data가 재사용된다.
+- 준비 실패: UI의 제한된 재시도(최대 3회)를 사용한다. 새 시도는 현재 Launch Template 설정과 새 EC2 client token을 사용하며, 이전 인스턴스는 태그가 일치할 때만 종료한다.
 - 고아 리소스: 6시간 reconciliation 결과의 `orphanInstanceIds`와 `briar-managed=true` 태그를 대조한다. 자동 종료하지 말고 D1 감사 기록과 조직 태그를 확인한 뒤 운영자가 처리한다.
 - 파일럿 종료: 수명 정책을 통해 drain과 stop을 먼저 수행한다. 즉시 terminate하지 않는다.
