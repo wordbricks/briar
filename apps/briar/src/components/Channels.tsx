@@ -2189,7 +2189,7 @@ export function Channels({
         <section className="channel-main">
         {activeChannel ? (
           <>
-            <header className="channel-header" data-tauri-drag-region>
+            <header className="channel-header" data-tauri-drag-region="deep">
               {surface === "dm" ? (
                 <button
                   aria-label={t("navigation.back")}
@@ -2425,7 +2425,7 @@ export function Channels({
             />
           )}
           <aside className="channel-thread">
-          <header>
+          <header data-tauri-drag-region="deep">
             <span>
               <MessageSquare size={15} /> {t("channel.thread")}
             </span>

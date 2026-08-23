@@ -533,6 +533,11 @@ describe("Channels", () => {
         container.querySelector(".channel-header-identity-button")?.textContent,
       ).toContain("Honey");
     });
+    const dmHeader = container.querySelector(".channel-header");
+    expect(dmHeader?.getAttribute("data-tauri-drag-region")).toBe("deep");
+    expect(
+      dmHeader?.querySelector("button")?.hasAttribute("data-tauri-drag-region"),
+    ).toBe(false);
 
     await act(async () => {
       container
@@ -1322,6 +1327,37 @@ describe("Channels", () => {
       rootMessage.id,
       false,
     );
+  });
+
+  it("marks channel and thread headers as deep window drag regions", async () => {
+    const rootMessage = message({ id: "message-root", replyCount: 1 });
+    const reply = message({
+      id: "message-reply",
+      parentMessageId: "message-root",
+      body: "Requested reply",
+    });
+    listChannelMessages.mockResolvedValue({ messages: [rootMessage, reply] });
+
+    await render(
+      [rootMessage],
+      {
+        channelId: channel.id,
+        messageId: reply.id,
+        rootMessageId: rootMessage.id,
+      },
+    );
+
+    const channelHeader = container.querySelector(".channel-header");
+    expect(channelHeader?.getAttribute("data-tauri-drag-region")).toBe("deep");
+    expect(
+      channelHeader?.querySelector("button")?.hasAttribute("data-tauri-drag-region"),
+    ).toBe(false);
+
+    const threadHeader = container.querySelector(".channel-thread > header");
+    expect(threadHeader?.getAttribute("data-tauri-drag-region")).toBe("deep");
+    expect(
+      threadHeader?.querySelector("button")?.hasAttribute("data-tauri-drag-region"),
+    ).toBe(false);
   });
 
 
