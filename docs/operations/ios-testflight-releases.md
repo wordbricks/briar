@@ -1074,3 +1074,33 @@ TestFlight testing.
 After the upload, `main` advanced through `9c4ec1d9` (the worker route-family
 refactor in PR #1237). That worker-only change is included in the release PR;
 it does not change the native iOS inputs or the uploaded IPA.
+
+## 2026-08-23 — 1.2.152 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.152`
+- App Store Connect build: `1`
+- App Store Connect build ID: `a3444726-0be2-4f24-a8b9-f2cc8c66d9d6`
+- Latest main commit: `ef1a92fc30dbbd1d2aa1daaef915e6679948d107`
+- Release source commit: `31c2fada74899c05d8d9f02a55e909e9763ac8df`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Automatic tester notification: enabled
+- IPA SHA-256: `5201bc976fbff606f547acbbd92e8f18f1e1fa51f4ce9d774070d98e87780357`
+
+The exact latest-main release source passed the shared API contract, 15 iPhone
+UI tests, the iPad accessibility and largest Dynamic Type layout test,
+Production analyze and build checks, session/download/log security checks, and
+the Tauri iOS simulator and Android ARM64 regression builds. Archive identity,
+App Store provisioning, distribution signature, production entitlements,
+exported IPA signature, and the IPA checksum were verified before upload.
+
+The release source adds explicit `@MainActor` isolation to the native
+`ChannelsStoreTests` and `CompanionReadTests` XCTest classes for Swift 6 test
+compilation. This is test-only and does not change the app's runtime behavior
+or Android source. App Store Connect accepted the build as `VALID`, enabled
+automatic internal tester notification, and placed it in internal TestFlight
+testing; external beta submission remains pending (`READY_FOR_BETA_SUBMISSION`).
