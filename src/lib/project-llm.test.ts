@@ -9,6 +9,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen }));
 
 import {
+  agentEffortOptions,
   agentModelOptions,
   chatWithProjectLlm,
   loadAgentProviderModels,
@@ -17,6 +18,7 @@ import {
   loadProjectSandboxSettings,
   projectAgentRunSnapshots,
   runProjectAgent,
+  sortAgentProviders,
   stopProjectAgentSession,
   updateAppProviderSettings,
   updateProjectLlmSettings,
@@ -133,7 +135,7 @@ describe("project LLM gateway", () => {
     ]);
   });
 
-  it("keeps favorite models first without disturbing the remaining catalog order", () => {
+  it("keeps favorite models first and gives the remaining models a stable order", () => {
     const catalog = {
       codex: {
         models: [
@@ -159,7 +161,46 @@ describe("project LLM gateway", () => {
         null,
         ["gpt-favorite"],
       ).map((option) => option.value),
-    ).toEqual(["", "gpt-favorite", "gpt-standard", "gpt-other"]);
+    ).toEqual(["", "gpt-favorite", "gpt-other", "gpt-standard"]);
+  });
+
+  it("uses canonical provider, model, and effort menu ordering", () => {
+    const catalog = {
+      codex: {
+        models: [
+          {
+            id: "zeta",
+            label: "Zeta",
+            efforts: [
+              { id: "future", label: "Future" },
+              { id: "xhigh", label: "Extra high" },
+              { id: "low", label: "Low" },
+              { id: "max", label: "Maximum" },
+              { id: "medium", label: "Medium" },
+              { id: "high", label: "High" },
+            ],
+          },
+          { id: "alpha", label: "alpha" },
+          { id: "beta", label: "Beta" },
+        ],
+        error: null,
+      },
+      claude: { models: [], error: null },
+      cursor: { models: [], error: null },
+      grok: { models: [], error: null },
+      agy: { models: [], error: null },
+      opencode: { models: [], error: null },
+      openrouter: { models: [], error: null },
+    };
+
+    expect(sortAgentProviders(["openrouter", "grok", "codex", "claude"]))
+      .toEqual(["codex", "claude", "grok", "openrouter"]);
+    expect(agentModelOptions(catalog, "codex", "Provider default").map(
+      (option) => option.value,
+    )).toEqual(["", "alpha", "beta", "zeta"]);
+    expect(agentEffortOptions(catalog, "codex", "zeta").map(
+      (option) => option.value,
+    )).toEqual(["low", "medium", "high", "xhigh", "max", "future"]);
   });
 
   it("rolls provider message deltas into request-scoped progress updates", async () => {

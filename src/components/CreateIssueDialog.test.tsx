@@ -526,6 +526,89 @@ describe("CreateIssueDialog attachments", () => {
     await act(async () => root.unmount());
   });
 
+  it("keeps provider, model, and effort menus in a stable order", async () => {
+    vi.mocked(loadAgentProviderModels).mockResolvedValue({
+      ...defaultAgentProviderModelCatalog,
+      codex: {
+        models: [
+          {
+            id: "zeta",
+            label: "Zeta",
+            efforts: [
+              { id: "future", label: "Future" },
+              { id: "xhigh", label: "Extra high" },
+              { id: "low", label: "Low" },
+              { id: "max", label: "Maximum" },
+              { id: "medium", label: "Medium" },
+              { id: "high", label: "High" },
+            ],
+          },
+          { id: "alpha", label: "alpha" },
+          { id: "beta", label: "Beta" },
+        ],
+        defaultEfforts: [],
+        allowCustomModels: false,
+        error: null,
+      },
+    });
+    const optionValues = () => Array.from(
+      document.querySelectorAll<HTMLElement>('[role="option"]'),
+      (option) => option.dataset.value,
+    );
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <CreateIssueDialog
+          {...projectProps}
+          availableProviders={["openrouter", "grok", "claude", "codex"]}
+          isSubmitting={false}
+          onClose={() => undefined}
+          onCreate={async () => undefined}
+        />,
+      );
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".issue-provider-select .select-menu-trigger",
+      )?.click();
+    });
+    expect(optionValues()).toEqual(["", "codex", "claude", "grok", "openrouter"]);
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>(
+        '[role="option"][data-value="codex"]',
+      )?.click();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".issue-model-select .select-menu-trigger",
+      )?.click();
+    });
+    expect(optionValues()).toEqual(["", "alpha", "beta", "zeta"]);
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>(
+        '[role="option"][data-value="zeta"]',
+      )?.click();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".issue-effort-select .select-menu-trigger",
+      )?.click();
+    });
+    expect(optionValues()).toEqual([
+      "",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+      "future",
+    ]);
+
+    await act(async () => root.unmount());
+  });
+
   it("defaults to the active project and can create in another organization project", async () => {
     const onCreate = vi.fn(async () => undefined);
     const root = createRoot(container);

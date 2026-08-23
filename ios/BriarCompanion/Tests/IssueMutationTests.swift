@@ -92,6 +92,72 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(restored.preferredModel, "sonnet")
     }
 
+    func testIssueExecutionMenusUseStableProviderModelAndEffortOrder() {
+        let model = { (id: String, label: String, efforts: [AgentEffortCapability]) in
+            AgentModelCapability(
+                id: id,
+                label: label,
+                isDefault: false,
+                defaultEffortId: nil,
+                efforts: efforts
+            )
+        }
+        let effort = { (id: String, label: String) in
+            AgentEffortCapability(
+                id: id,
+                label: label,
+                description: nil,
+                isDefault: false
+            )
+        }
+        let worker = { (id: String, models: [AgentModelCapability]) in
+            DashboardWorker(
+                id: id,
+                label: id,
+                providers: [.codex],
+                capabilities: .init(providerCapabilities: [
+                    AgentProvider.codex.rawValue: AgentProviderCapability(
+                        models: models,
+                        defaultEfforts: [],
+                        allowCustomModels: false,
+                        error: nil
+                    ),
+                ]),
+                readiness: "available",
+                acceptingWork: true,
+                readinessDetail: nil,
+                activeSessions: 0,
+                availableSessions: 1
+            )
+        }
+        let first = worker("first", [
+            model("zeta", "Zeta", [effort("xhigh", "Extra high"), effort("low", "Low")]),
+            model("alpha", "alpha", [effort("ultra", "Ultra")]),
+        ])
+        let second = worker("second", [
+            model("beta", "Beta", []),
+            model("alpha", "alpha", [effort("high", "High"), effort("medium", "Medium")]),
+        ])
+
+        let forward = AgentProviderCapabilityCatalog(workers: [first, second])
+        let reversed = AgentProviderCapabilityCatalog(workers: [second, first])
+
+        XCTAssertEqual(
+            AgentProvider.stableMenuOrder([.openrouter, .grok, .codex, .claude]),
+            [.codex, .claude, .grok, .openrouter]
+        )
+        XCTAssertEqual(forward.models(for: .codex).map(\.id), ["alpha", "beta", "zeta"])
+        XCTAssertEqual(reversed.models(for: .codex).map(\.id), ["alpha", "beta", "zeta"])
+        XCTAssertEqual(
+            forward.efforts(for: .codex, model: "alpha").map(\.id),
+            ["medium", "high", "ultra"]
+        )
+        XCTAssertEqual(
+            reversed.efforts(for: .codex, model: "alpha").map(\.id),
+            ["medium", "high", "ultra"]
+        )
+    }
+
     func testCreateIssueRequestEncodesPreferredProviderAndModel() throws {
         let request = CreateIssueRequest(
             title: "선호 실행 이슈",
