@@ -10,13 +10,16 @@
 .dark .provider-artwork-theme-switcher > .provider-artwork-light { display:none; }
 .dark .provider-artwork-theme-switcher > .provider-artwork-dark { display:block; }
 
-.dark .sidebar,
-.dark .sidebar-bottom,
+.dark .sidebar {
+  border-color: var(--sidebar-border);
+  color: var(--sidebar-foreground);
+}
+
 .dark .app-settings-sidebar,
 .dark .organization-settings-sidebar {
   border-color: var(--sidebar-border);
   color: var(--sidebar-foreground);
-  background: var(--sidebar);
+  background: var(--sidebar-fallback);
 }
 
 .dark .sidebar-brand,

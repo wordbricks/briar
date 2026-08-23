@@ -167,11 +167,15 @@
   --input: #dcded8;
   --ring: #73585d;
 
-  --sidebar: rgba(244, 244, 242, 0.94);
+  --sidebar: rgba(244, 244, 242, 0.76);
+  --sidebar-fallback: #f4f4f2;
+  --sidebar-glass-highlight: rgba(255, 255, 255, 0.42);
   --sidebar-foreground: #5f605b;
-  --sidebar-border: rgba(56, 57, 52, 0.09);
-  --sidebar-accent: rgba(48, 49, 45, 0.085);
+  --sidebar-border: rgba(56, 57, 52, 0.14);
+  --sidebar-border-strong: #6e706a;
+  --sidebar-accent: rgba(48, 49, 45, 0.1);
   --sidebar-accent-foreground: #30312d;
+  --sidebar-shadow: 10px 0 32px rgba(34, 35, 31, 0.07);
 
   --radius: 0.625rem;
 
@@ -245,11 +249,15 @@
   --input: #2a2a30;
   --ring: #a894ff;
 
-  --sidebar: #161618;
+  --sidebar: rgba(20, 20, 23, 0.78);
+  --sidebar-fallback: #161618;
+  --sidebar-glass-highlight: rgba(255, 255, 255, 0.055);
   --sidebar-foreground: #c4c4bc;
-  --sidebar-border: #26262c;
-  --sidebar-accent: #242428;
+  --sidebar-border: rgba(255, 255, 255, 0.11);
+  --sidebar-border-strong: #a8a8b0;
+  --sidebar-accent: rgba(255, 255, 255, 0.09);
   --sidebar-accent-foreground: #f2f2ef;
+  --sidebar-shadow: 12px 0 36px rgba(0, 0, 0, 0.28);
 
   --ink: var(--foreground);
   --ink-3: var(--muted-foreground);
