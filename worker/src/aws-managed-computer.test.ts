@@ -36,12 +36,16 @@ const config: ManagedComputerConfig = {
   awsSessionToken: "session-token",
 };
 
-const instanceXml = (httpTokens = "required") => `
+const instanceXml = (
+  httpTokens = "required",
+  launchTemplate = `<launchTemplate><launchTemplateId>lt-0123456789abcdef0</launchTemplateId><version>7</version></launchTemplate>`,
+  launchTemplateTags = "",
+) => `
 <DescribeInstancesResponse><reservationSet><item><instancesSet><item>
   <instanceId>i-0123456789abcdef0</instanceId>
   <instanceType>m7i.large</instanceType>
   <instanceState><name>running</name></instanceState>
-  <launchTemplate><launchTemplateId>lt-0123456789abcdef0</launchTemplateId><version>7</version></launchTemplate>
+  ${launchTemplate}
   <metadataOptions><httpTokens>${httpTokens}</httpTokens></metadataOptions>
   <blockDeviceMapping><item><ebs><volumeId>vol-0123456789abcdef0</volumeId><encrypted>true</encrypted></ebs></item></blockDeviceMapping>
   <groupSet><item><groupId>sg-0123456789abcdef0</groupId></item></groupSet>
@@ -50,6 +54,7 @@ const instanceXml = (httpTokens = "required") => `
     <item><key>briar-organization</key><value>11111111-1111-4111-8111-111111111111</value></item>
     <item><key>briar-managed-computer</key><value>22222222-2222-4222-8222-222222222222</value></item>
     <item><key>briar-campaign</key><value>getbriar-pilot</value></item>
+    ${launchTemplateTags}
   </tagSet>
 </item></instancesSet></item></reservationSet></DescribeInstancesResponse>`;
 
@@ -114,6 +119,34 @@ describe("AWS managed computer adapter", () => {
       encrypted: true,
       httpTokens: "required",
       volumeId: "vol-0123456789abcdef0",
+    });
+  });
+
+  it("uses AWS launch template tags when the response omits launchTemplate", async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(instanceXml(
+        "required",
+        "",
+        `
+    <item><key>aws:ec2launchtemplate:id</key><value>lt-0123456789abcdef0</value></item>
+    <item><key>aws:ec2launchtemplate:version</key><value>7</value></item>`,
+      )))
+      .mockResolvedValueOnce(new Response(volumeXml))
+      .mockResolvedValueOnce(new Response(
+        "<DescribeSecurityGroupsResponse><securityGroupInfo><item><groupId>sg-0123456789abcdef0</groupId><ipPermissions></ipPermissions></item></securityGroupInfo></DescribeSecurityGroupsResponse>",
+      ));
+    await expect(verifyManagedInstance(config, {
+      managedComputerId: "22222222-2222-4222-8222-222222222222",
+      organizationId: "11111111-1111-4111-8111-111111111111",
+      campaignId: "getbriar-pilot",
+      instanceId: "i-0123456789abcdef0",
+      region: "us-east-1",
+      launchTemplateId: "lt-0123456789abcdef0",
+      launchTemplateVersion: "7",
+      instanceType: "m7i.large",
+    }, fetcher as typeof fetch)).resolves.toMatchObject({
+      launchTemplateId: "lt-0123456789abcdef0",
+      launchTemplateVersion: "7",
     });
   });
 
