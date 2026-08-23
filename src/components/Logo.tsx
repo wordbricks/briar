@@ -1,18 +1,18 @@
-import briarMarkDarkUrl from "../assets/brand/briar-mark-dark.png";
-import briarMarkLightUrl from "../assets/brand/briar-mark-light.png";
+import briarWhiteStrokeUrl from "../assets/brand/briar-white-stroke.svg";
+import briarBlackStrokeUrl from "../assets/brand/briar-black-stroke.svg";
 
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (
     <div className="brand" aria-label="Briar">
       <img
         className="brand-mark brand-mark-light"
-        src={briarMarkLightUrl}
+        src={briarBlackStrokeUrl}
         alt=""
         aria-hidden="true"
       />
       <img
         className="brand-mark brand-mark-dark"
-        src={briarMarkDarkUrl}
+        src={briarWhiteStrokeUrl}
         alt=""
         aria-hidden="true"
       />
