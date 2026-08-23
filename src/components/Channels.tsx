@@ -1247,12 +1247,14 @@ export function Channels({
             );
             if (relevant.length || delta.removedMessageIds.length) {
               recordProposalMessages(relevant);
-              const rootUpdates = relevant.filter(
-                (message) => message.parentMessageId === null,
-              );
+              const timelineUpdates = surface === "dm"
+                ? relevant
+                : relevant.filter(
+                    (message) => message.parentMessageId === null,
+                  );
               const scroller = messagesScrollRef.current;
               if (
-                rootUpdates.length > 0 &&
+                timelineUpdates.length > 0 &&
                 scroller &&
                 scroller.scrollHeight - scroller.scrollTop -
                     scroller.clientHeight <= 80
@@ -1262,7 +1264,7 @@ export function Channels({
               setMessages((current) => {
                 const next = mergeChannelMessages(
                   current,
-                  rootUpdates,
+                  timelineUpdates,
                   delta.removedMessageIds,
                 );
                 if (activeChannelId) {
@@ -1351,6 +1353,7 @@ export function Channels({
     onChannelsChange,
     organizationId,
     recordProposalMessages,
+    surface,
     t,
     token,
   ]);
@@ -2283,7 +2286,9 @@ export function Channels({
                       onSkillExecutionProposalAccepted={(proposal) =>
                         applyAcceptedSkillExecutionProposal(message.id, proposal)}
                       onIssueOpen={openIssue}
-                      onOpenThread={() => void openThread(message.id)}
+                      onOpenThread={surface === "channel"
+                        ? () => void openThread(message.id)
+                        : undefined}
                       onProjectChange={(projectId) => {
                         const proposalId = message.proposal?.id;
                         if (!proposalId) return;

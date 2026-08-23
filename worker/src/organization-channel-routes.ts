@@ -297,6 +297,7 @@ export async function handleOrganizationChannelRoute(
               parentMessageId: null,
               cursor: null,
               limit: messageLimit,
+              includeRepliesInTimeline: channel.kind === "dm",
             }),
         listActiveChannelAgentReplies(db, channel.id),
       ]);
