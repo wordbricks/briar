@@ -327,6 +327,7 @@ export async function readChannelMessageRequest(request: Request) {
   }
   const parentMessageId = form.get("parentMessageId");
   const clientMessageId = form.get("clientMessageId");
+  const skillId = form.get("skillId");
   const preferredDeviceId = form.get("preferredDeviceId");
   return {
     input: decodeChannelMessageInput({
@@ -335,6 +336,8 @@ export async function readChannelMessageRequest(request: Request) {
         typeof clientMessageId === "string" && clientMessageId
           ? clientMessageId
           : undefined,
+      skillId:
+        typeof skillId === "string" && skillId ? skillId : null,
       parentMessageId:
         typeof parentMessageId === "string" && parentMessageId
           ? parentMessageId
@@ -576,4 +579,3 @@ export async function readTranscriptRequest(request: Request) {
     ),
   );
 }
-

@@ -2766,6 +2766,56 @@ describe("organization channels", () => {
       messageBody.agentReplies[0]!.id,
     )).resolves.toMatchObject({ skill_id: null, agent_provider: "claude" });
 
+    const selectedSkillMessage = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/messages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          body: "/Direct response Summarize the update",
+          skillId: "ab000000-0000-4000-8000-000000000120",
+        }),
+      },
+    ), apiEnv);
+    expect(selectedSkillMessage.status).toBe(201);
+    const selectedSkillBody = await selectedSkillMessage.json() as {
+      message: { mentionedAgentIds: string[] };
+      agentReplies: Array<{ id: string; agentId: string }>;
+    };
+    expect(selectedSkillBody.message.mentionedAgentIds).toEqual([]);
+    expect(selectedSkillBody.agentReplies).toHaveLength(1);
+    await expect(getChannelAgentReplyJob(
+      db,
+      organizationId,
+      selectedSkillBody.agentReplies[0]!.id,
+    )).resolves.toMatchObject({
+      skill_id: "ab000000-0000-4000-8000-000000000120",
+      selected_skill_id_snapshot: "ab000000-0000-4000-8000-000000000120",
+      agent_provider: "claude",
+      selected_skill_name_snapshot: "Direct response",
+      skill_execution_request_snapshot:
+        "/Direct response Summarize the update",
+    });
+
+    const unknownSkillMessage = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/messages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          body: "/Unknown skill Try this",
+          skillId: "ab000000-0000-4000-8000-000000000999",
+        }),
+      },
+    ), apiEnv);
+    expect(unknownSkillMessage.status).toBe(400);
+
     const expanded = await apiWorker.fetch(new Request(
       `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/members/${outsiderId}`,
       {

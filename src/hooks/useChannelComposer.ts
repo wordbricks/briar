@@ -20,6 +20,7 @@ import {
   type MentionTarget,
 } from "../lib/channel-mentions";
 import type {
+  ChannelAgentSkill,
   ChannelAgentSummary,
   ChannelMember,
 } from "../lib/channels-contract";
@@ -32,6 +33,12 @@ import {
 
 type ComposerInput = HTMLInputElement | HTMLTextAreaElement;
 
+export type ChannelSkillCommandTarget = {
+  agentId: string;
+  agentName: string;
+  skill: ChannelAgentSkill;
+};
+
 type UseChannelComposerOptions = {
   agents: ChannelAgentSummary[];
   busy: boolean;
@@ -43,7 +50,9 @@ type UseChannelComposerOptions = {
     mentions: MentionTarget[],
     attachments: File[],
     attachmentReferences: string[],
+    selectedSkill?: ChannelSkillCommandTarget,
   ) => void;
+  enableSkillCommands?: boolean;
   submitOnEnter?: boolean;
 };
 
@@ -54,6 +63,7 @@ export function useChannelComposer<T extends ComposerInput>({
   members,
   onInvite,
   onSend,
+  enableSkillCommands = false,
   submitOnEnter = false,
 }: UseChannelComposerOptions) {
   const { t } = useI18n();
@@ -61,6 +71,12 @@ export function useChannelComposer<T extends ComposerInput>({
   const [caret, setCaret] = useState(0);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const [mentionDismissed, setMentionDismissed] = useState(false);
+  const [activeSkillSuggestionIndex, setActiveSkillSuggestionIndex] =
+    useState(0);
+  const [skillSuggestionsDismissed, setSkillSuggestionsDismissed] =
+    useState(false);
+  const [selectedSkill, setSelectedSkill] =
+    useState<ChannelSkillCommandTarget | null>(null);
   // Mentions are trusted only after a candidate is picked. Text that happens
   // to look like a handle must never become a hidden recipient.
   const [mentions, setMentions] = useState<MentionTarget[]>([]);
@@ -73,6 +89,7 @@ export function useChannelComposer<T extends ComposerInput>({
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const pendingCaret = useRef<number | null>(null);
   const mentionListId = useId();
+  const skillListId = useId();
 
   const candidates = useMemo<MentionTarget[]>(
     () => [
@@ -111,10 +128,51 @@ export function useChannelComposer<T extends ComposerInput>({
         .slice(0, 6)
     : [];
   const showsSuggestions = !mentionDismissed && suggestions.length > 0;
+  const skillCommands = useMemo<ChannelSkillCommandTarget[]>(
+    () => enableSkillCommands
+      ? agents.flatMap((agent) => agent.skills.map((skill) => ({
+          agentId: agent.agentId,
+          agentName: agent.name,
+          skill,
+        })))
+      : [],
+    [agents, enableSkillCommands],
+  );
+  const skillQuery =
+    body.startsWith("/") && caret >= 1 && selectedSkill === null
+      ? body.slice(1, caret)
+      : null;
+  const normalizedSkillQuery = skillQuery?.trim().toLocaleLowerCase() ?? null;
+  const skillSuggestions = normalizedSkillQuery === null
+    ? []
+    : skillCommands.filter((target) =>
+        !normalizedSkillQuery ||
+        `${target.skill.name} ${target.skill.description} ${target.agentName}`
+          .toLocaleLowerCase()
+          .includes(normalizedSkillQuery)
+      );
+  const showsSkillSuggestions =
+    !skillSuggestionsDismissed && skillSuggestions.length > 0;
 
   useEffect(() => {
     setActiveSuggestionIndex(0);
   }, [query?.query]);
+
+  useEffect(() => {
+    setActiveSkillSuggestionIndex(0);
+  }, [normalizedSkillQuery]);
+
+  useEffect(() => {
+    if (
+      selectedSkill &&
+      !skillCommands.some((target) =>
+        target.agentId === selectedSkill.agentId &&
+        target.skill.id === selectedSkill.skill.id
+      )
+    ) {
+      setSelectedSkill(null);
+    }
+  }, [selectedSkill, skillCommands]);
 
   useEffect(() => {
     if (pendingCaret.current === null) return;
@@ -139,6 +197,17 @@ export function useChannelComposer<T extends ComposerInput>({
         ? current
         : [...current, target],
     );
+  };
+
+  const pickSkillSuggestion = (target: ChannelSkillCommandTarget) => {
+    if (skillQuery === null) return;
+    const inserted = `/${target.skill.name} `;
+    const nextCaret = inserted.length;
+    setBody(`${inserted}${body.slice(caret)}`);
+    setCaret(nextCaret);
+    pendingCaret.current = nextCaret;
+    setSelectedSkill(target);
+    setSkillSuggestionsDismissed(true);
   };
 
   const insertAtCaret = (text: string) => {
@@ -186,28 +255,71 @@ export function useChannelComposer<T extends ComposerInput>({
     if (onInvite && body.trim() === "/invite" && images.length === 0) {
       onInvite();
     } else {
-      onSend(
-        channelBodyWithImages(body, images),
-        retainedMentions(body, mentions),
-        images.map((image) => image.file),
-        images.map((image) => image.reference),
-      );
+      const sendBody = channelBodyWithImages(body, images);
+      const sendMentions = retainedMentions(body, mentions);
+      const attachments = images.map((image) => image.file);
+      const attachmentReferences = images.map((image) => image.reference);
+      if (selectedSkill) {
+        onSend(
+          sendBody,
+          sendMentions,
+          attachments,
+          attachmentReferences,
+          selectedSkill,
+        );
+      } else {
+        onSend(sendBody, sendMentions, attachments, attachmentReferences);
+      }
     }
     setBody("");
     setImages([]);
     setMentions([]);
     setMentionDismissed(false);
+    setSelectedSkill(null);
+    setSkillSuggestionsDismissed(false);
   };
 
   const handleChange = (event: ChangeEvent<T>) => {
-    setBody(event.target.value);
-    setCaret(event.target.selectionStart ?? event.target.value.length);
+    const nextBody = event.target.value;
+    setBody(nextBody);
+    setCaret(event.target.selectionStart ?? nextBody.length);
     setMentionDismissed(false);
+    setSkillSuggestionsDismissed(false);
+    if (
+      selectedSkill &&
+      !nextBody.startsWith(`/${selectedSkill.skill.name} `)
+    ) {
+      setSelectedSkill(null);
+    }
   };
   const handleCaret = (
     event: KeyboardEvent<T> | MouseEvent<T>,
   ) => setCaret(event.currentTarget.selectionStart ?? 0);
   const handleKeyDown = (event: KeyboardEvent<T>) => {
+    if (showsSkillSuggestions) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const offset = event.key === "ArrowDown" ? 1 : -1;
+        setActiveSkillSuggestionIndex(
+          (index) =>
+            (index + offset + skillSuggestions.length) %
+            skillSuggestions.length,
+        );
+        return;
+      }
+      if (event.key === "Enter" || event.key === "Tab") {
+        event.preventDefault();
+        const target =
+          skillSuggestions[activeSkillSuggestionIndex] ?? skillSuggestions[0];
+        if (target) pickSkillSuggestion(target);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setSkillSuggestionsDismissed(true);
+        return;
+      }
+    }
     if (showsSuggestions) {
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
@@ -275,6 +387,7 @@ export function useChannelComposer<T extends ComposerInput>({
   };
 
   return {
+    activeSkillSuggestionIndex,
     activeSuggestionIndex,
     attachmentError,
     attachmentInputRef,
@@ -295,10 +408,16 @@ export function useChannelComposer<T extends ComposerInput>({
     insertAtCaret,
     mentionListId,
     mentions,
+    pickSkillSuggestion,
     pickSuggestion,
     removeImage,
+    selectedSkill,
+    setActiveSkillSuggestionIndex,
     setActiveSuggestionIndex,
+    showsSkillSuggestions,
     showsSuggestions,
+    skillListId,
+    skillSuggestions,
     suggestions,
   };
 }
