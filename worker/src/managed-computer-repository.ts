@@ -501,6 +501,11 @@ export async function createManagedComputerRetry(
     provisioningJobId: string;
     workflowInstanceId: string;
     enrollmentExpiresAt: string;
+    region: string;
+    instanceType: string;
+    launchTemplateId: string;
+    launchTemplateVersion: string;
+    bootstrapApiOrigin: string;
     observedAt: string;
   },
 ) {
@@ -510,7 +515,14 @@ export async function createManagedComputerRetry(
     `select * from briar_managed_computer_provisioning_jobs
      where idempotency_key = ?`,
   ).bind(idempotencyKey).first<ManagedComputerProvisioningJobRow>();
-  if (existing) return { job: existing, created: false };
+  if (existing) {
+    return {
+      job: existing,
+      created: false,
+      previousInstanceId: null,
+      previousInstanceRegion: null,
+    };
+  }
   const computer = await organizationManagedComputer(
     db,
     input.organizationId,
@@ -519,12 +531,18 @@ export async function createManagedComputerRetry(
   if (!computer || computer.state !== "failed" || computer.retry_count >= 3) {
     return null;
   }
+  const previousInstanceId = computer.aws_instance_id;
+  const previousInstanceRegion = computer.aws_region;
   const attempt = computer.retry_count + 2;
   await db.batch([
     db.prepare(
       `update briar_managed_computers
        set state = 'requested', provisioning_job_id = ?,
            retry_count = retry_count + 1, last_retry_at = ?,
+           aws_account_id = null, aws_region = ?, aws_instance_type = ?,
+           aws_instance_id = null, aws_volume_id = null,
+           aws_launch_template_id = ?, aws_launch_template_version = ?,
+           bootstrap_api_origin = ?,
            state_updated_at = ?, error_code = null, error_detail = null,
            enrollment_expires_at = ?,
            updated_at = ?
@@ -533,6 +551,11 @@ export async function createManagedComputerRetry(
     ).bind(
       input.provisioningJobId,
       input.observedAt,
+      input.region,
+      input.instanceType,
+      input.launchTemplateId,
+      input.launchTemplateVersion,
+      input.bootstrapApiOrigin,
       input.observedAt,
       input.enrollmentExpiresAt,
       input.observedAt,
@@ -573,7 +596,12 @@ export async function createManagedComputerRetry(
     detail: { attempt },
     occurredAt: input.observedAt,
   });
-  return { job, created: true };
+  return {
+    job,
+    created: true,
+    previousInstanceId,
+    previousInstanceRegion,
+  };
 }
 
 export async function enrollManagedComputerDevice(
