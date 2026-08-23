@@ -391,6 +391,8 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     let reactions: [ChannelMessageReaction]
     let replyCount: Int
     let lastReplyAt: Date?
+    /// Up to three unique reply authors, newest first. Older payloads omit it.
+    let replyAuthors: [Author]
     let document: Document?
     var proposal: Proposal?
     /// A generated follow-up may coexist with the accepted create proposal so
@@ -415,6 +417,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         case reactions
         case replyCount
         case lastReplyAt
+        case replyAuthors
         case document
         case proposal
         case executionProposal
@@ -436,6 +439,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         reactions: [ChannelMessageReaction] = [],
         replyCount: Int,
         lastReplyAt: Date?,
+        replyAuthors: [Author] = [],
         document: Document?,
         proposal: Proposal?,
         executionProposal: IssueExecutionProposal? = nil,
@@ -455,6 +459,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         self.reactions = reactions
         self.replyCount = replyCount
         self.lastReplyAt = lastReplyAt
+        self.replyAuthors = replyAuthors
         self.document = document
         self.proposal = proposal
         self.executionProposal = executionProposal
@@ -477,6 +482,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         reactions = try container.decodeIfPresent([ChannelMessageReaction].self, forKey: .reactions) ?? []
         replyCount = try container.decode(Int.self, forKey: .replyCount)
         lastReplyAt = try container.decodeIfPresent(Date.self, forKey: .lastReplyAt)
+        replyAuthors = try container.decodeIfPresent([Author].self, forKey: .replyAuthors) ?? []
         document = try container.decodeIfPresent(Document.self, forKey: .document)
         proposal = try container.decodeIfPresent(Proposal.self, forKey: .proposal)
         executionProposal = try container.decodeIfPresent(

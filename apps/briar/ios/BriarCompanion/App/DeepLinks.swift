@@ -148,6 +148,37 @@ struct CompanionIssueNavigationRoute: Hashable {
     let initialTab: RunDetailTab?
 }
 
+/// Pushes a channel thread without putting the full `ChannelMessage` snapshot
+/// on the `NavigationPath`. Inbox and in-channel opens share this identity so
+/// reply-count updates cannot pop the destination.
+struct ChannelThreadRoute: Hashable, Identifiable {
+    let channelID: UUID
+    let parentMessageID: UUID
+    let highlightMessageID: UUID?
+
+    var id: String {
+        "\(parentMessageID.uuidString.lowercased()):\(highlightMessageID?.uuidString.lowercased() ?? "")"
+    }
+}
+
+enum ChannelInboxNavigation {
+    /// Thread replies open the parent thread and scroll to the reply. Root
+    /// mentions and DM conversations stay on the channel timeline.
+    static func threadRoute(
+        isDirectMessage: Bool,
+        channelID: UUID,
+        messageID: UUID,
+        rootMessageID: UUID
+    ) -> ChannelThreadRoute? {
+        guard !isDirectMessage, messageID != rootMessageID else { return nil }
+        return ChannelThreadRoute(
+            channelID: channelID,
+            parentMessageID: rootMessageID,
+            highlightMessageID: messageID
+        )
+    }
+}
+
 @MainActor
 final class CompanionNavigationModel: ObservableObject {
     enum Tab: Hashable {
@@ -167,6 +198,7 @@ final class CompanionNavigationModel: ObservableObject {
     @Published var pendingChannelID: UUID?
     @Published var pendingChannelMessageID: UUID?
     @Published var pendingChannelRootMessageID: UUID?
+    @Published var pendingChannelThread: ChannelThreadRoute?
     @Published var pathChannelToken = 0
     @Published private(set) var preparingIssue = false
     private var issuePreparationRevision = 0
@@ -190,6 +222,7 @@ final class CompanionNavigationModel: ObservableObject {
             pendingChannelID = nil
             pendingChannelMessageID = nil
             pendingChannelRootMessageID = nil
+            pendingChannelThread = nil
             selectedTab = .tasks
             pathIssueToken &+= 1
         case let .session(_, sessionID):
@@ -198,6 +231,7 @@ final class CompanionNavigationModel: ObservableObject {
             pendingChannelID = nil
             pendingChannelMessageID = nil
             pendingChannelRootMessageID = nil
+            pendingChannelThread = nil
             selectedTab = .directMessages
             pathSessionToken &+= 1
         case let .channel(_, channelID, messageID, rootMessageID):
@@ -206,6 +240,7 @@ final class CompanionNavigationModel: ObservableObject {
             pendingChannelID = channelID
             pendingChannelMessageID = messageID
             pendingChannelRootMessageID = rootMessageID
+            pendingChannelThread = nil
             selectedTab = .home
             pathChannelToken &+= 1
         }
@@ -268,6 +303,7 @@ final class CompanionNavigationModel: ObservableObject {
             pendingChannelID = channelID
             pendingChannelMessageID = messageID
             pendingChannelRootMessageID = rootMessageID
+            pendingChannelThread = nil
             selectedTab = .home
             pathChannelToken &+= 1
         }

@@ -41,6 +41,16 @@ enum ConversationScrollPresentation {
         bottomMaxY - viewportHeight > bottomThreshold
     }
 
+    /// Inbox thread replies land on the matching message; otherwise the
+    /// timeline still opens at the newest row.
+    static func shouldScrollToFocusedMessage<ID: Equatable>(
+        focusedMessageID: ID?,
+        messageIDs: [ID]
+    ) -> Bool {
+        guard let focusedMessageID else { return false }
+        return messageIDs.contains(focusedMessageID)
+    }
+
     /// Auto-scroll to a newly sent message must not collapse the composer keyboard.
     /// User-driven scrolling still dismisses it interactively.
     static func dismissesKeyboardInteractively(
@@ -71,6 +81,7 @@ where Message.ID: Hashable {
     let timestamp: (Message) -> Date
     let hasEarlierMessages: Bool
     let loadingEarlierMessages: Bool
+    let focusedMessageID: Message.ID?
     let onLoadEarlier: (() async -> Void)?
     let row: (Message) -> RowContent
     @State private var requestedEarlierMessages = false
@@ -88,6 +99,7 @@ where Message.ID: Hashable {
         timestamp: @escaping (Message) -> Date,
         hasEarlierMessages: Bool = false,
         loadingEarlierMessages: Bool = false,
+        focusedMessageID: Message.ID? = nil,
         onLoadEarlier: (() async -> Void)? = nil,
         @ViewBuilder row: @escaping (Message) -> RowContent
     ) {
@@ -97,6 +109,7 @@ where Message.ID: Hashable {
         self.timestamp = timestamp
         self.hasEarlierMessages = hasEarlierMessages
         self.loadingEarlierMessages = loadingEarlierMessages
+        self.focusedMessageID = focusedMessageID
         self.onLoadEarlier = onLoadEarlier
         self.row = row
     }
@@ -128,8 +141,20 @@ where Message.ID: Hashable {
                     if !positionedInitially {
                         if !positioningInitially {
                             positioningInitially = true
+                            let scrollToFocused = ConversationScrollPresentation
+                                .shouldScrollToFocusedMessage(
+                                    focusedMessageID: focusedMessageID,
+                                    messageIDs: messages.map(\.id)
+                                )
                             performProgrammaticScroll {
-                                proxy.scrollTo(conversationBottomAnchorID, anchor: .bottom)
+                                if scrollToFocused, let focusedMessageID {
+                                    proxy.scrollTo(focusedMessageID, anchor: .center)
+                                } else {
+                                    proxy.scrollTo(
+                                        conversationBottomAnchorID,
+                                        anchor: .bottom
+                                    )
+                                }
                             } afterLayout: {
                                 positionedInitially = true
                                 positioningInitially = false
@@ -142,6 +167,19 @@ where Message.ID: Hashable {
                         withAnimation(.easeOut(duration: 0.2)) {
                             proxy.scrollTo(current, anchor: .bottom)
                         }
+                    }
+                }
+                .onChange(of: focusedMessageID) { _, focused in
+                    guard
+                        positionedInitially,
+                        ConversationScrollPresentation.shouldScrollToFocusedMessage(
+                            focusedMessageID: focused,
+                            messageIDs: messages.map(\.id)
+                        ),
+                        let focused
+                    else { return }
+                    performProgrammaticScroll {
+                        proxy.scrollTo(focused, anchor: .center)
                     }
                 }
                 .onChange(of: messages.first?.id) { previous, current in

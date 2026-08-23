@@ -369,6 +369,15 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertGreaterThan(rootMessageMatches.count, 0)
         let rootMessage = rootMessageMatches.element(boundBy: 0)
         XCTAssertTrue(rootMessage.waitForExistence(timeout: 5))
+        let threadSummary = app.descendants(matching: .any)[
+            "channel-thread-summary-dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+        ]
+        XCTAssertTrue(
+            threadSummary.waitForExistence(timeout: 5) ||
+                app.staticTexts["답글 1개"].waitForExistence(timeout: 5),
+            "채널 루트 메시지에는 달린 스레드 요약이 보여야 합니다."
+        )
+        captureScreenshot(named: "companion-channel-thread-summary")
         XCTAssertFalse(app.staticTexts["스레드에서 답글"].exists)
         XCTAssertFalse(
             app.buttons["channel-react-dddddddd-dddd-4ddd-8ddd-dddddddddddd"].exists,
@@ -407,6 +416,9 @@ final class BriarCompanionUITests: XCTestCase {
             "channel-message-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
         ].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["channel-composer-attach"].exists)
+        XCTAssertFalse(
+            app.buttons["channel-thread-summary-dddddddd-dddd-4ddd-8ddd-dddddddddddd"].exists
+        )
         XCTAssertFalse(app.staticTexts["답글 1개"].exists)
         captureScreenshot(named: "companion-channel-thread")
     }

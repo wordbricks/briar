@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DirectMessagesHomeView: View {
     @ObservedObject var channels: ChannelsStore
+    @ObservedObject var navigation: CompanionNavigationModel
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var search = ""
     @State private var showingComposer = false
@@ -150,6 +151,7 @@ struct DirectMessagesHomeView: View {
         .navigationDestination(for: ChannelSummary.self) { channel in
             ChannelMessagesView(
                 channels: channels,
+                navigation: navigation,
                 channel: channel,
                 currentUserID: currentUserID,
                 projects: projects,
