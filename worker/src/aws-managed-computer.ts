@@ -385,6 +385,7 @@ export async function describeManagedInstance(
     const launchTemplate = xmlSection(instance, "launchTemplate");
     const metadataOptions = xmlSection(instance, "metadataOptions");
     const groupSet = xmlSection(instance, "groupSet");
+    const tags = tagsFromXml(instance);
     const volumeId = Option.getOrNull(
       decodeVolumeId(xmlValue(blockDevices, "volumeId")),
     );
@@ -401,12 +402,14 @@ export async function describeManagedInstance(
       state: xmlValue(xmlSection(instance, "instanceState"), "name") ?? "unknown",
       volumeId,
       instanceType: xmlValue(instance, "instanceType") ?? "",
-      launchTemplateId: xmlValue(launchTemplate, "launchTemplateId") ?? "",
-      launchTemplateVersion: xmlValue(launchTemplate, "version") ?? "",
+      launchTemplateId: xmlValue(launchTemplate, "launchTemplateId") ??
+        tags["aws:ec2launchtemplate:id"] ?? "",
+      launchTemplateVersion: xmlValue(launchTemplate, "version") ??
+        tags["aws:ec2launchtemplate:version"] ?? "",
       httpTokens: xmlValue(metadataOptions, "httpTokens") ?? "",
       encrypted,
       securityGroupIds: xmlValues(groupSet, "groupId"),
-      tags: tagsFromXml(instance),
+      tags,
     };
   } catch (error) {
     if (
