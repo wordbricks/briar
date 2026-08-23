@@ -783,6 +783,8 @@ private struct ChannelMessageRow: View {
     let workers: [DashboardWorker]
     var showsThreadSummary = false
     @State private var showingThreadActions = false
+    @State private var linkCopied = false
+    @State private var messageCopied = false
 
     private var mentionHandles: Set<String> {
         MessageMentions.channelHandles(
@@ -958,6 +960,26 @@ private struct ChannelMessageRow: View {
                     showingThreadActions = false
                     Task { await onToggleReaction(emoji) }
                 },
+                onCopyLink: {
+                    showingThreadActions = false
+                    let url = BriarShareLinks.channelShareURL(
+                        organizationID: channel.organizationId,
+                        channelID: channel.id,
+                        messageID: message.id,
+                        rootMessageID: message.parentMessageId ?? message.id,
+                        origin: BriarShareLinks.defaultOrigin
+                    )
+                    ClipboardService.copy(url.absoluteString)
+                    linkCopied = true
+                },
+                onCopyText: {
+                    showingThreadActions = false
+                    let copyText = messageBodyWithoutAttachments.isEmpty
+                        ? message.body.trimmingCharacters(in: .whitespacesAndNewlines)
+                        : messageBodyWithoutAttachments
+                    ClipboardService.copy(copyText)
+                    messageCopied = true
+                },
                 onStartThread: onOpenThread.map { openThread in
                     {
                         showingThreadActions = false
@@ -967,10 +989,18 @@ private struct ChannelMessageRow: View {
                     }
                 }
             )
-            .presentationDetents([.height(onOpenThread == nil ? 130 : 210)])
+            .presentationDetents([.height(onOpenThread == nil ? 290 : 370)])
             .presentationDragIndicator(.visible)
             .presentationBackground(.regularMaterial)
         }
+        .companionToast(
+            isPresented: $linkCopied,
+            message: L10n.text(.linkCopied, locale: locale)
+        )
+        .companionToast(
+            isPresented: $messageCopied,
+            message: L10n.text(.messageCopied, locale: locale)
+        )
     }
 }
 
@@ -978,6 +1008,8 @@ private struct ChannelMessageActionsSheet: View {
     let locale: CompanionLocale
     let quickEmojis: [String]
     let onToggleReaction: (String) -> Void
+    let onCopyLink: () -> Void
+    let onCopyText: () -> Void
     let onStartThread: (() -> Void)?
 
     var body: some View {
@@ -1008,26 +1040,51 @@ private struct ChannelMessageActionsSheet: View {
             }
 
             if let onStartThread {
-                Button(action: onStartThread) {
-                    Label(
-                        L10n.text(.channelStartThread, locale: locale),
-                        systemImage: "bubble.left.and.bubble.right"
-                    )
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
-                    .frame(height: 58)
-                    .background(
-                        Color(.secondarySystemBackground),
-                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("channel-start-thread-action")
+                actionButton(
+                    title: L10n.text(.channelStartThread, locale: locale),
+                    systemImage: "bubble.left.and.bubble.right",
+                    identifier: "channel-start-thread-action",
+                    action: onStartThread
+                )
             }
+
+            actionButton(
+                title: L10n.text(.copyLink, locale: locale),
+                systemImage: "link",
+                identifier: "channel-copy-link-action",
+                action: onCopyLink
+            )
+
+            actionButton(
+                title: L10n.text(.channelCopyText, locale: locale),
+                systemImage: "doc.on.doc",
+                identifier: "channel-copy-text-action",
+                action: onCopyText
+            )
         }
         .padding(.horizontal, 18)
         .padding(.top, 8)
+    }
+
+    private func actionButton(
+        title: String,
+        systemImage: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .frame(height: 58)
+                .background(
+                    Color(.secondarySystemBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 }
 

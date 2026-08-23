@@ -317,8 +317,24 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["channel-quick-reaction-❤️"].exists)
         XCTAssertTrue(app.buttons["channel-quick-reaction-😂"].exists)
         XCTAssertTrue(app.buttons["channel-quick-reaction-🎉"].exists)
-        captureScreenshot(named: "companion-channel-reaction-actions")
         let startThread = app.buttons["channel-start-thread-action"]
+        XCTAssertTrue(startThread.waitForExistence(timeout: 5))
+        XCTAssertTrue(startThread.isHittable, "스레드 시작 버튼이 하단 시트 안에 보여야 합니다.")
+        XCTAssertTrue(app.buttons["channel-copy-link-action"].exists)
+        XCTAssertTrue(app.buttons["channel-copy-text-action"].exists)
+        captureScreenshot(named: "companion-channel-message-actions")
+
+        app.buttons["channel-copy-link-action"].tap()
+        XCTAssertTrue(app.staticTexts["링크를 복사했습니다"].waitForExistence(timeout: 5))
+
+        rootMessage.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.7)
+        XCTAssertTrue(app.buttons["channel-copy-text-action"].waitForExistence(timeout: 5))
+        app.buttons["channel-copy-text-action"].tap()
+        XCTAssertTrue(app.staticTexts["메시지를 복사했습니다"].waitForExistence(timeout: 5))
+
+        rootMessage.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.7)
         XCTAssertTrue(startThread.waitForExistence(timeout: 5))
         startThread.tap()
 
