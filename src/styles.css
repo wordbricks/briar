@@ -7617,6 +7617,44 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-mention-avatar.agent { color:var(--primary,#5943a4); background:color-mix(in srgb,var(--primary,#5943a4) 13%,var(--card,#fff)); }
 .channel-mention-menu button > span:not(.channel-mention-avatar) { margin-left: auto; color: var(--muted-foreground, #777168); font-size: 11px; }
 
+.channel-skill-menu {
+  position: absolute;
+  bottom: calc(100% - 8px);
+  left: 16px;
+  z-index: 21;
+  width: min(520px, calc(100% - 32px));
+  max-height: min(360px, 50vh);
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border, #ddd8cf);
+  border-radius: 12px;
+  background: var(--card, #fff);
+  box-shadow: 0 16px 42px rgb(20 17 13 / 17%);
+}
+.channel-skill-menu button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+.channel-skill-menu button:hover,
+.channel-skill-menu button.active { background: var(--background, #f2efe9); }
+.channel-skill-menu button > svg { color: var(--muted-foreground, #777168); }
+.channel-skill-menu button > span { min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.channel-skill-menu strong { flex: 0 0 auto; max-width: 46%; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.channel-skill-menu small { min-width: 0; overflow: hidden; color: var(--muted-foreground, #777168); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.channel-skill-menu em { color: var(--muted-foreground, #777168); font-size: 12px; font-style: normal; }
+
 .channel-thread { display: flex; min-height: 0; flex-direction: column; border-left: 1px solid var(--border, #ddd8cf); background: var(--card, #fff); }
 .channel-thread > header {
   display: flex;

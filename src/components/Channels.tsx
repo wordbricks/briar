@@ -38,7 +38,10 @@ import {
 } from "react";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useI18n } from "../i18n";
-import { useChannelComposer } from "../hooks/useChannelComposer";
+import {
+  useChannelComposer,
+  type ChannelSkillCommandTarget,
+} from "../hooks/useChannelComposer";
 import { useHorizontalPaneResize } from "../hooks/useHorizontalPaneResize";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import {
@@ -106,6 +109,7 @@ import {
   useChannelMessageImageCache,
 } from "./ChannelImages";
 import { ChannelMentionMenu } from "./ChannelMentionMenu";
+import { ChannelSkillMenu } from "./ChannelSkillMenu";
 import { ChannelTypingState } from "./ChannelTypingState";
 import { MentionComposerField } from "./MentionComposerField";
 import { AgentProviderIcon } from "./AgentIcons";
@@ -1518,6 +1522,7 @@ export function Channels({
       parentMessageId: string | null,
       attachments: File[],
       attachmentReferences: string[],
+      selectedSkill?: ChannelSkillCommandTarget,
     ) => {
       if (!activeChannelId || !body.trim()) return;
       const sendContext = captureChannelSurface();
@@ -1565,19 +1570,28 @@ export function Channels({
         );
         const implicitlyInvokesDirectAgent =
           activeChannel?.kind === "dm" && members.length === 1 && agents.length === 1;
-        const preferredDeviceId = hasAgentMention || implicitlyInvokesDirectAgent
+        const preferredDeviceId =
+          hasAgentMention || implicitlyInvokesDirectAgent || selectedSkill
           ? await currentExecutionWorkerDeviceId(organizationId)
           : null;
+        const mentionedAgentIds = mentions
+          .filter((mention) => mention.type === "agent")
+          .map((mention) => mention.id);
+        if (
+          selectedSkill &&
+          !mentionedAgentIds.includes(selectedSkill.agentId)
+        ) {
+          mentionedAgentIds.push(selectedSkill.agentId);
+        }
         const result = await sendChannelMessage(token, organizationId, activeChannelId, {
           body: body.trim(),
           clientMessageId,
+          skillId: selectedSkill?.skill.id ?? null,
           parentMessageId,
           mentionedUserIds: mentions
             .filter((mention) => mention.type === "user")
             .map((mention) => mention.id),
-          mentionedAgentIds: mentions
-            .filter((mention) => mention.type === "agent")
-            .map((mention) => mention.id),
+          mentionedAgentIds,
           ...(preferredDeviceId ? { preferredDeviceId } : {}),
           attachments,
           attachmentReferences,
@@ -2324,6 +2338,7 @@ export function Channels({
             <Composer
               agents={agents}
               busy={busy || channelLoading}
+              enableSkillCommands={surface === "dm"}
               members={members}
               currentUserId={currentUserId}
               channelName={activeChannelName}
@@ -2333,8 +2348,15 @@ export function Channels({
                   ? t("dm.messagePlaceholder", { name: activeChannelName })
                   : undefined
               }
-              onSend={(body, mentions, attachments, references) =>
-                void send(body, mentions, null, attachments, references)
+              onSend={(body, mentions, attachments, references, selectedSkill) =>
+                void send(
+                  body,
+                  mentions,
+                  null,
+                  attachments,
+                  references,
+                  selectedSkill,
+                )
               }
             />
           </>
@@ -2470,18 +2492,20 @@ export function Channels({
           <Composer
             agents={agents}
             busy={busy}
+            enableSkillCommands={surface === "dm"}
             members={members}
             currentUserId={currentUserId}
             channelName={activeChannelName}
             onInvite={() => openInvite()}
             placeholder={t("channel.threadPlaceholder")}
-            onSend={(body, mentions, attachments, references) =>
+            onSend={(body, mentions, attachments, references, selectedSkill) =>
               void send(
                 body,
                 mentions,
                 threadParentId,
                 attachments,
                 references,
+                selectedSkill,
               )
             }
           />
@@ -3946,6 +3970,7 @@ function Composer({
   channelName,
   placeholder,
   busy,
+  enableSkillCommands = false,
   onInvite,
   onSend,
 }: {
@@ -3955,17 +3980,20 @@ function Composer({
   channelName: string;
   placeholder?: string;
   busy: boolean;
+  enableSkillCommands?: boolean;
   onInvite: () => void;
   onSend: (
     body: string,
     mentions: MentionTarget[],
     attachments: File[],
     attachmentReferences: string[],
+    selectedSkill?: ChannelSkillCommandTarget,
   ) => void;
 }) {
   const { t } = useI18n();
   const [profile, setProfile] = useState<ProfileTarget | null>(null);
   const {
+    activeSkillSuggestionIndex,
     activeSuggestionIndex,
     attachmentError,
     attachmentInputRef,
@@ -3986,15 +4014,21 @@ function Composer({
     insertAtCaret,
     mentionListId,
     mentions,
+    pickSkillSuggestion,
     pickSuggestion,
     removeImage,
+    setActiveSkillSuggestionIndex,
     setActiveSuggestionIndex,
+    showsSkillSuggestions,
     showsSuggestions,
+    skillListId,
+    skillSuggestions,
     suggestions,
   } = useChannelComposer<HTMLTextAreaElement>({
     agents,
     busy,
     currentUserId,
+    enableSkillCommands,
     members,
     onInvite,
     onSend,
@@ -4038,6 +4072,17 @@ function Composer({
         onDrop={handleDrop}
         onSubmit={handleSubmit}
       >
+      {showsSkillSuggestions ? (
+        <ChannelSkillMenu
+          activeSuggestionIndex={activeSkillSuggestionIndex}
+          ariaLabel={t("agents.skills")}
+          id={skillListId}
+          onActiveSuggestionIndexChange={setActiveSkillSuggestionIndex}
+          onPickSuggestion={pickSkillSuggestion}
+          skillLabel={t("agents.skill")}
+          suggestions={skillSuggestions}
+        />
+      ) : null}
       {showsSuggestions ? (
         <ChannelMentionMenu
           activeSuggestionIndex={activeSuggestionIndex}
@@ -4064,13 +4109,21 @@ function Composer({
         >
           <textarea
             aria-activedescendant={
-              showsSuggestions
+              showsSkillSuggestions
+                ? `${skillListId}-option-${activeSkillSuggestionIndex}`
+                : showsSuggestions
                 ? `${mentionListId}-option-${activeSuggestionIndex}`
                 : undefined
             }
             aria-autocomplete="list"
-            aria-controls={showsSuggestions ? mentionListId : undefined}
-            aria-expanded={showsSuggestions}
+            aria-controls={
+              showsSkillSuggestions
+                ? skillListId
+                : showsSuggestions
+                  ? mentionListId
+                  : undefined
+            }
+            aria-expanded={showsSkillSuggestions || showsSuggestions}
             aria-label={t("channel.messageAria")}
             disabled={busy}
             placeholder={resolvedPlaceholder}

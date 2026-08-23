@@ -104,12 +104,14 @@ describe("channel message contract", () => {
       decode(channelMessageInputSchema, {
         body: "@Honey reply in the thread",
         clientMessageId: clientMessageId.toUpperCase(),
+        skillId: agentId.toUpperCase(),
         parentMessageId: projectId.toUpperCase(),
         mentionedAgentIds: [agentId.toUpperCase()],
         preferredDeviceId: agentId.toUpperCase(),
       }),
     ).toMatchObject({
       clientMessageId,
+      skillId: agentId,
       parentMessageId: projectId,
       mentionedAgentIds: [agentId],
       preferredDeviceId: agentId,

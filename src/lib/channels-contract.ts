@@ -430,6 +430,7 @@ export const channelUpdateInputSchema = strict(Schema.Struct({
 export const channelMessageInputSchema = strict(Schema.Struct({
   body: channelMessageBodySchema,
   clientMessageId: Schema.optional(canonicalUuidSchema),
+  skillId: nullableDefault(canonicalUuidSchema),
   parentMessageId: nullableDefault(canonicalUuidSchema),
   mentionedUserIds: defaultedWith(
     mutableArray(
