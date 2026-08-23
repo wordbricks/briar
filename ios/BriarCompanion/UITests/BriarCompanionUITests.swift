@@ -135,7 +135,7 @@ final class BriarCompanionUITests: XCTestCase {
         )
         captureScreenshot(named: "companion-direct-message-timeline")
 
-        let rootMessage = app.descendants(matching: .any)[
+        let rootMessage = app.textViews[
             "channel-message-16161616-1616-4616-8616-161616161616"
         ]
         XCTAssertTrue(rootMessage.waitForExistence(timeout: 5))
