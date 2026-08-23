@@ -8169,6 +8169,10 @@ fn main_window_decorated(compact: bool) -> bool {
     !compact
 }
 
+fn restored_main_window_title_bar_style(compact: bool) -> Option<tauri::TitleBarStyle> {
+    (!compact).then_some(tauri::TitleBarStyle::Overlay)
+}
+
 #[cfg(desktop)]
 fn main_window_state_flags() -> tauri_plugin_window_state::StateFlags {
     use tauri_plugin_window_state::StateFlags;
@@ -8274,6 +8278,13 @@ fn set_main_window_onboarding_mode(app: tauri::AppHandle, compact: bool) -> Resu
     {
         main.set_decorations(main_window_decorated(compact))
             .map_err(|error| error.to_string())?;
+        // Switching back from the borderless onboarding window rebuilds the
+        // native style mask without FullSizeContentView. Reapply the configured
+        // overlay so macOS keeps the traffic lights inside Briar's header.
+        if let Some(style) = restored_main_window_title_bar_style(compact) {
+            main.set_title_bar_style(style)
+                .map_err(|error| error.to_string())?;
+        }
         main.set_shadow(true).map_err(|error| error.to_string())?;
     }
     main.set_min_size(Some(tauri::LogicalSize::new(min_width, min_height)))
@@ -10216,13 +10227,18 @@ branch refs/heads/briar/second-11111111
     }
 
     #[test]
-    fn uses_compact_window_dimensions_only_during_onboarding() {
+    fn uses_compact_window_presentation_only_during_onboarding() {
         assert_eq!(main_window_size(true), ONBOARDING_MAIN_WINDOW_SIZE);
         assert_eq!(main_window_size(false), DEFAULT_MAIN_WINDOW_SIZE);
         assert_eq!(main_window_min_size(true), ONBOARDING_MAIN_WINDOW_SIZE);
         assert_eq!(main_window_min_size(false), DEFAULT_MAIN_WINDOW_MIN_SIZE);
         assert!(!main_window_decorated(true));
         assert!(main_window_decorated(false));
+        assert_eq!(restored_main_window_title_bar_style(true), None);
+        assert_eq!(
+            restored_main_window_title_bar_style(false),
+            Some(tauri::TitleBarStyle::Overlay)
+        );
     }
 
     #[cfg(desktop)]
