@@ -134,6 +134,19 @@ final class BriarCompanionUITests: XCTestCase {
             app.descendants(matching: .any)["channel-message-loading-spinner"].exists
         )
         captureScreenshot(named: "companion-direct-message-timeline")
+
+        let rootMessage = app.descendants(matching: .any)[
+            "channel-message-16161616-1616-4616-8616-161616161616"
+        ]
+        XCTAssertTrue(rootMessage.waitForExistence(timeout: 5))
+        XCTAssertFalse(
+            app.buttons["channel-react-16161616-1616-4616-8616-161616161616"].exists,
+            "리액션이 없는 DM 메시지에는 단독 React 버튼이 보이지 않아야 합니다."
+        )
+        rootMessage.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.7)
+        XCTAssertTrue(app.buttons["channel-quick-reaction-👍"].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-dm-reaction-actions")
     }
 
     func testChannelShowsLoadingSpinnerWhileMessagesLoad() {
@@ -293,9 +306,18 @@ final class BriarCompanionUITests: XCTestCase {
         let rootMessage = rootMessageMatches.element(boundBy: 0)
         XCTAssertTrue(rootMessage.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["스레드에서 답글"].exists)
+        XCTAssertFalse(
+            app.buttons["channel-react-dddddddd-dddd-4ddd-8ddd-dddddddddddd"].exists,
+            "리액션이 없는 채널 메시지에는 단독 React 버튼이 보이지 않아야 합니다."
+        )
         rootMessage.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             .press(forDuration: 0.7)
 
+        XCTAssertTrue(app.buttons["channel-quick-reaction-👍"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["channel-quick-reaction-❤️"].exists)
+        XCTAssertTrue(app.buttons["channel-quick-reaction-😂"].exists)
+        XCTAssertTrue(app.buttons["channel-quick-reaction-🎉"].exists)
+        captureScreenshot(named: "companion-channel-reaction-actions")
         let startThread = app.buttons["channel-start-thread-action"]
         XCTAssertTrue(startThread.waitForExistence(timeout: 5))
         startThread.tap()

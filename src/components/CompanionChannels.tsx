@@ -39,6 +39,7 @@ import {
 } from "../lib/channel-grouping";
 import {
   applyChannelThreadSubscribers,
+  channelQuickReactionEmojis,
   type ChannelAgentReply,
   type ChannelAgentSummary,
   type ChannelExecutionProposal,
@@ -2129,7 +2130,7 @@ function MessageRow({
       className={`companion-channel-message${reacting ? " is-reacting" : ""}${message.optimistic ? " is-optimistic" : ""}`}
       data-companion-channel-message-id={message.id}
       onContextMenu={(event) => {
-        if (!showThreadSummary || !onOpenThread || message.optimistic) return;
+        if (message.optimistic) return;
         if ((event.target as HTMLElement).closest("button,a,input,select,textarea")) {
           return;
         }
@@ -2295,16 +2296,12 @@ function MessageRow({
           />
         ) : null}
         <ChannelMessageReactions
-          alwaysShowAdd
           busy={busy || message.optimistic}
           currentUserId={currentUserId}
           members={members}
           message={message}
-          onOpenThread={message.optimistic ? undefined : onOpenThread}
           onReactingChange={setReacting}
           onToggle={onToggleReaction}
-          organizationId={channel.organizationId}
-          showHoverActions
         />
       </div>
       {showingThreadActions ? (
@@ -2320,18 +2317,37 @@ function MessageRow({
             role="dialog"
           >
             <span aria-hidden="true" className="companion-channel-action-handle" />
-            <button
-              autoFocus
-              className="companion-channel-message-button companion-channel-start-thread"
-              onClick={() => {
-                setShowingThreadActions(false);
-                onOpenThread?.();
-              }}
-              type="button"
-            >
-              <MessageSquare aria-hidden="true" size={20} />
-              <strong>{t("channel.startThread")}</strong>
-            </button>
+            <div className="companion-channel-quick-reactions">
+              {channelQuickReactionEmojis.map((emoji, index) => (
+                <button
+                  aria-label={t("channel.reactWith", { emoji })}
+                  autoFocus={!onOpenThread && index === 0}
+                  disabled={busy}
+                  key={emoji}
+                  onClick={() => {
+                    setShowingThreadActions(false);
+                    onToggleReaction(emoji);
+                  }}
+                  type="button"
+                >
+                  <span aria-hidden="true">{emoji}</span>
+                </button>
+              ))}
+            </div>
+            {showThreadSummary && onOpenThread ? (
+              <button
+                autoFocus
+                className="companion-channel-message-button companion-channel-start-thread"
+                onClick={() => {
+                  setShowingThreadActions(false);
+                  onOpenThread();
+                }}
+                type="button"
+              >
+                <MessageSquare aria-hidden="true" size={20} />
+                <strong>{t("channel.startThread")}</strong>
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}
