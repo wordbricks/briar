@@ -494,6 +494,116 @@ describe("Channels", () => {
     expect(listChannelMessages).not.toHaveBeenCalled();
   });
 
+  it("opens the agent profile from a one-to-one DM header", async () => {
+    const directMessage: ChannelSummary = {
+      ...channel,
+      kind: "dm",
+      visibility: "private",
+      dmParticipants: [
+        { type: "user", id: "user-1", name: "Jay", image: null },
+        { type: "agent", id: "agent-1", name: "Honey", image: agent.avatar },
+      ],
+    };
+    loadChannel.mockResolvedValue({
+      channel: directMessage,
+      members: [member],
+      agents: [agent],
+      messages: [message()],
+      nextCursor: null,
+    });
+
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId={directMessage.id}
+          channels={[directMessage]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          surface="dm"
+          token="token"
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => {
+      expect(
+        container.querySelector(".channel-header-identity-button")?.textContent,
+      ).toContain("Honey");
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".channel-header-identity-button")!
+        .click();
+    });
+    const dialog = document.body.querySelector<HTMLElement>(".profile-dialog");
+    expect(dialog?.textContent).toContain("Honey");
+    expect(dialog?.textContent).toContain("Writing partner");
+  });
+
+  it("opens a participant menu from a group DM header then the selected profile", async () => {
+    const group: ChannelSummary = {
+      ...channel,
+      kind: "dm",
+      visibility: "private",
+      dmParticipants: [
+        { type: "user", id: "user-1", name: "Jay", image: null },
+        { type: "agent", id: "agent-1", name: "Honey", image: agent.avatar },
+        { type: "user", id: "user-2", name: "Sam", image: null },
+      ],
+    };
+    loadChannel.mockResolvedValue({
+      channel: group,
+      members: [member],
+      agents: [agent],
+      messages: [message()],
+      nextCursor: null,
+    });
+
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId={group.id}
+          channels={[group]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          surface="dm"
+          token="token"
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => {
+      expect(
+        container.querySelector(".channel-header-identity-button")?.textContent,
+      ).toContain("Honey, Sam");
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".channel-header-identity-button")!
+        .click();
+    });
+    const sam = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".channel-header-participant-menu button",
+      ),
+    ].find((button) => button.textContent?.includes("Sam"));
+    expect(sam).toBeDefined();
+    await act(async () => {
+      sam!.click();
+    });
+    expect(
+      document.body.querySelector<HTMLElement>(".profile-dialog")?.textContent,
+    ).toContain("sam@example.com");
+  });
+
   it("renames the channel and changes the linked project from settings", async () => {
     updateChannel.mockResolvedValue({ channel: { ...channel, name: "Design" } });
     await render(

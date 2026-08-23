@@ -10,6 +10,7 @@
 | 프로젝트 목록 조회 | 제공 | 제공 | 제공 | 사용자·조직·프로젝트 저장소가 선택 상태를 관리 |
 | Home/Tasks/DMs/Inbox 앱 셸 | 제공 | 제공 | 제공 | Android React와 네이티브 iOS에서 같은 4개 주요 탭을 유지 |
 | DM 목록·검색·대화 생성 | 제공 | 제공 | 제공 | 조직 채널 카탈로그의 `kind=dm`, 참가자, 최근 메시지, 읽지 않음 메타데이터를 사용하고 기존 채널 대화 읽기·쓰기를 재사용 |
+| DM 대화 헤더 상대 표시·프로필 | 제공 | 제공 | 제공 | 뒤로가기 옆에 상대 아바타·이름을 두고, 1:1은 탭하면 프로필 모달, 그룹은 참여자 드롭다운 후 프로필 모달을 연다 |
 | 작업 목록·상태 필터·검색 | 제공 | 제공 | 제공 | All/Active/Attention/Completed 필터와 제목·설명·진행·결과 통합 검색 |
 | 이슈 설명 및 결과 상세 | 제공 | 제공 | 제공 | dashboard snapshot/delta의 Markdown 설명, structured result, 리뷰 필드를 읽기 전용으로 사용 |
 | 실행 진행 상황 | 제공 | 제공 | 제공 | snapshot/delta 공유 계약, 15초 polling, foreground·오프라인 복귀, cursor 만료 시 snapshot 복구 |

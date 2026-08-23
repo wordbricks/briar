@@ -80,6 +80,8 @@ export const ko = {
   "dm.messagePlaceholder": "{name}에게 메시지 보내기",
   "dm.welcome": "{name}님과의 대화가 시작되었습니다.",
   "dm.welcomeDescription": "여기서 보낸 메시지는 이 대화의 참가자만 볼 수 있습니다.",
+  "dm.openProfile": "{name} 프로필 보기",
+  "dm.participants": "참여자",
   "sidebar.issues": "이슈",
   "sidebar.agents": "에이전트",
   "sidebar.runningAgentSessions": "실행 중인 에이전트 세션",
@@ -2185,6 +2187,8 @@ export const en: Messages = {
   "dm.messagePlaceholder": "Message {name}",
   "dm.welcome": "This is the start of your conversation with {name}.",
   "dm.welcomeDescription": "Only participants in this conversation can see these messages.",
+  "dm.openProfile": "View {name}'s profile",
+  "dm.participants": "Participants",
   "onboarding.previous": "Back",
   "onboarding.chooseMethodTitle": "How would you like to start?",
   "onboarding.chooseMethodDescription": "Connect code you already have, or bring in a project from Lovable.",
@@ -3388,6 +3392,8 @@ export const en: Messages = {
 };
 export const zh: Messages = {
   ...en,
+  "dm.openProfile": "查看 {name} 的资料",
+  "dm.participants": "参与者",
   "channel.startThread": "开始话题",
   "channel.copyText": "复制文本",
   "onboarding.previous": "返回",

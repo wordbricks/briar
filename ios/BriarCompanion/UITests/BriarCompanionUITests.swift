@@ -121,7 +121,7 @@ final class BriarCompanionUITests: XCTestCase {
         let identity = app.descendants(matching: .any)["channel-header-identity"]
         XCTAssertTrue(identity.waitForExistence(timeout: channelTransitionTimeout))
         XCTAssertTrue(identity.label.contains("Honey"))
-        XCTAssertTrue(identity.label.contains("비공개 대화"))
+        XCTAssertFalse(identity.label.contains("비공개 대화"))
         XCTAssertTrue(
             element(withLabel: "iOS DM 화면을 검토해 주세요.", in: app)
                 .waitForExistence(timeout: 5)
@@ -134,6 +134,16 @@ final class BriarCompanionUITests: XCTestCase {
             app.descendants(matching: .any)["channel-message-loading-spinner"].exists
         )
         captureScreenshot(named: "companion-direct-message-timeline")
+        identity.tap()
+        let profile = app.descendants(matching: .any)["conversation-profile-sheet"]
+        XCTAssertTrue(profile.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["conversation-profile-name"].label.contains("Honey")
+        )
+        XCTAssertTrue(app.staticTexts["Review mobile product work."].waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-direct-message-profile")
+        app.buttons["conversation-profile-close"].tap()
+        XCTAssertTrue(profile.waitForNonExistence(timeout: 5))
 
         let rootMessage = app.textViews[
             "channel-message-16161616-1616-4616-8616-161616161616"

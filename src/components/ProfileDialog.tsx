@@ -5,6 +5,7 @@ import type {
   ChannelAgentProvider,
   ChannelAgentSkill,
   ChannelMember,
+  DirectMessageParticipant,
 } from "../lib/channels-contract";
 import {
   Dialog,
@@ -70,6 +71,43 @@ export function profileTargetForChannelMember(
   };
 }
 
+export function profileTargetForDirectMessageParticipant(
+  participant: DirectMessageParticipant,
+  members: readonly ChannelMember[] = [],
+  agents: readonly ChannelAgentSummary[] = [],
+): ProfileTarget {
+  if (participant.type === "agent") {
+    const agent = agents.find((item) => item.agentId === participant.id);
+    return agent
+      ? profileTargetForChannelAgent(agent)
+      : {
+          type: "agent",
+          id: participant.id,
+          name: participant.name,
+          provider: null,
+          model: null,
+          description: null,
+          responsibility: null,
+          skills: [],
+          projectId: null,
+          createdAt: null,
+        };
+  }
+  const member = members.find((item) => item.userId === participant.id);
+  return member
+    ? profileTargetForChannelMember(member)
+    : {
+        type: "user",
+        id: participant.id,
+        name: participant.name,
+        email: "",
+        image: participant.image,
+        role: "member",
+        roleContext: "channel",
+        createdAt: "",
+      };
+}
+
 export function ProfileDialog({
   profile,
   onOpenChange,
@@ -121,7 +159,7 @@ export function ProfileDialog({
             </DialogHeader>
 
             <dl className="profile-dialog-details">
-              {profile.type === "user" ? (
+              {profile.type === "user" && profile.email ? (
                 <div>
                   <dt>
                     <Mail aria-hidden="true" size={16} /> {t("profile.email")}
