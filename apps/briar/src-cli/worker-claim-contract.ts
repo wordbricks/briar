@@ -294,7 +294,11 @@ const GithubRepositoryName = Schema.String.check(
 );
 const MergeGroupRef = Schema.String.check(
   Schema.isPattern(
-    /^refs\/heads\/gh-readonly-queue\/main\/[A-Za-z0-9._/-]+$/u,
+    new RegExp(
+      "^refs/heads/(?:gh-readonly-queue/main/[A-Za-z0-9._/-]+|" +
+        "briar/merge-queue/[0-9a-f-]{36})$",
+      "u",
+    ),
   ),
 );
 const MergeGroupContext = Schema.Literals(MERGE_GROUP_CI_CONTEXTS);
@@ -423,7 +427,7 @@ const ClaimedMergeBatchInput = strict(Schema.Struct({
     ) {
       issues.push({
         path: ["batch", "mergeGroupSha"],
-        issue: "Merge batch phase requires complete signed authority",
+        issue: "Merge batch phase requires complete integration authority",
       });
     }
     if (

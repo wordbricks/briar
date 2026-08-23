@@ -29,22 +29,16 @@ available to GitHub accounts outside the account that owns the App. Configure:
 - Webhook secret: the value of `BRIAR_GITHUB_WEBHOOK_SECRET`
 - Repository permissions:
   - **Pull requests — Read-only**
-  - **Merge queues — Read-only**
 - Subscribe to events:
   - **Pull request**
-  - **Merge group**
 
 Record the App's **Client ID**, generate a **Client secret**, and record the App
 slug from `https://github.com/apps/<app-slug>`. The App does not need Contents
 or Commit statuses write access, an App private key, or a long-lived user or
 installation token. Signed webhooks are inbound authority only; the designated
-local Worker uses its existing `gh` login for exact-head enqueue and status
-publication.
-
-Existing installations may require an organization owner to approve the added
-Merge queues permission and event subscription before native batching can be
-enabled. Ordinary pull-request synchronization continues to work while the
-merge-queue profile remains disabled.
+local Worker uses its existing `gh` login for bors-style integration refs,
+exact-base publication, and status reporting. GitHub's native Merge queues
+permission and Merge group webhook are not required.
 
 GitHub sends a signed `ping` delivery when the webhook is saved. A successful
 configuration receives an HTTP 200 response from Briar.

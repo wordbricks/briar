@@ -4,11 +4,11 @@ import {
   blockMergeBatch,
   claimNextMergeBatch,
   completeMergeBatchPublication,
+  recordPreparedMergeBatch,
   recordMergeBatchCandidateEnqueued,
   recordMergeBatchValidationProof,
   releaseMergeBatchLease,
   renewMergeBatchLease,
-  selectAuthoritativeMergeGroupHead,
 } from "./merge-batches";
 import {
   decodeMergeBatchAuthorityInput,
@@ -222,22 +222,23 @@ export async function handleMergeBatchRoute(
         input.projectId,
         input.workerId,
       );
-      const result = await selectAuthoritativeMergeGroupHead(db, {
+      const result = await recordPreparedMergeBatch(db, {
         batchId,
         projectId: input.projectId,
         workerId: input.workerId,
         claimTokenHash: await sha256(input.claimToken),
-        deliveryId: input.deliveryId,
-        authorityEntries: input.authorityEntries,
+        integrationRef: input.integrationRef,
+        integrationSha: input.integrationSha,
+        baseSha: input.baseSha,
         observedAt,
       });
       if (!result) {
-        throw new HttpError(409, "Signed merge-group head is not the exact cohort tail");
+        throw new HttpError(409, "Prepared integration ref was rejected");
       }
       return json({
         batchId,
-        state: result.batch.state,
-        mergeGroupSha: result.batch.merge_group_sha,
+        state: result.state,
+        mergeGroupSha: result.merge_group_sha,
       });
     }
     if (action === "validation") {

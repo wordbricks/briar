@@ -2,9 +2,10 @@
 
 Briar keeps issue development parallel and serializes only delivery to
 `main`. Ready pull requests enter one repository lane, form an immutable
-cohort, and are queued in their original form through GitHub's native merge
-queue. The designated local Worker validates only the final cumulative
-merge-group SHA. The lane remains occupied until signed GitHub webhooks confirm
+cohort, and are assembled by the designated local Worker as ordinary merge
+commits on `briar/merge-queue/<batch-id>`. The Worker validates that exact
+integration SHA and publishes it to `main` with an exact-base lease. The lane
+remains occupied until signed GitHub webhooks confirm
 that every original pull request merged.
 
 This feature is default-off. Applying its migration does not change a GitHub
@@ -23,13 +24,11 @@ The coordinator enforces these boundaries:
 - collection stays open until five minutes after the latest ready candidate;
   reaching the five-PR limit freezes the cohort immediately;
 - one transaction freezes at most five candidates with stable ordinals;
-- enqueue uses GitHub GraphQL `expectedHeadOid` and `jump: false`, followed by
-  an exact identity readback;
-- signed `merge_group.checks_requested` deliveries are durable input, but
-  arrival order is never authority;
-- intermediate cumulative heads are ignored; the Worker selects only a signed
-  final-tail SHA whose fully paginated queue entries exactly match the cohort;
-- the exact queue ref and protected `main` ref are fetched into private refs,
+- enqueue records a stable internal entry only after an exact OPEN, non-draft
+  PR identity readback;
+- the Worker fetches every exact PR head, merges the sealed cohort in ordinal
+  order, and publishes one immutable integration ref;
+- the exact integration ref and protected `main` ref are fetched into private refs,
   verified by SHA, and passed credential-free to the isolated executor;
 - validation proof is stored before status publication, so a publication retry
   never reruns CI;
@@ -38,22 +37,23 @@ The coordinator enforces these boundaries:
 - Briar never directly resumes member runs. The existing signed-PR path resumes
   them only after the batch itself is complete.
 
-GitHub's Require merge queue rule and branch protection are the authoritative
-`main` gate. The D1 lane serializes Briar delivery; it cannot prevent a GitHub
-administrator from changing repository rules or using an explicit bypass.
-Configure no bypass actors and restrict repository administration accordingly.
+GitHub branch protection remains the authoritative `main` gate. The exact-main
+ruleset must grant always-on bypass to exactly one trusted publisher GitHub App
+or a dedicated single-member publisher team used by the local Worker's `gh`
+credential. The D1 lane and `--force-with-lease`
+serialize that publisher; no other user, role, team, or App may bypass it.
 
 ## Required GitHub policy
 
 Before enabling a Briar profile, create one repository-level branch ruleset
 that targets only `refs/heads/main` and verify all of the following:
 
-- enforcement is active and there are no bypass actors;
+- enforcement is active and the same single GitHub App or dedicated publisher
+  team has `always` bypass on every effective exact-main ruleset;
 - pull requests are required;
 - deletion and non-fast-forward updates are blocked;
-- merge queue is required with `HEADGREEN` grouping and `SQUASH` merge;
-- `max_entries_to_build` and `max_entries_to_merge` are at least the Briar
-  profile's maximum batch size (at most five);
+- linear-history, required-signature, and commit-metadata rules do not apply to
+  the publisher; cohort publication intentionally creates merge commits;
 - the four `signoff/*` contexts above are required;
 - required status checks use `strict_required_status_checks_policy: false`.
 
@@ -62,10 +62,11 @@ cumulative commit against the current protected base, so individual pull
 requests do not need to rerun the same CI merely because another pull request
 merged first.
 
-The Briar GitHub App needs Pull requests read, Merge queues read, and the Pull
-request and Merge group webhook subscriptions. It remains read-only. The local
-Worker's existing `gh` credential performs enqueue, queue readback, dequeue,
-and exact-SHA status publication.
+The Briar GitHub App needs Pull requests read and the Pull request webhook
+subscription. It remains read-only. Neither Merge queues permission nor the
+Merge group event is used. The local Worker's existing `gh` credential fetches
+PR refs, publishes integration refs and statuses, and performs the lease-fenced
+fast-forward to `main`.
 
 ## Safe rollout
 
@@ -77,8 +78,7 @@ request review. Roll out in this order during an explicit maintenance window:
 2. Publish an independently reproduced OCI executor digest and update both the
    audited manifest and compiled digest in one reviewed change. Until then the
    Worker refuses merge-batch claims.
-3. Add the GitHub App permission and event subscription, then confirm signed
-   Merge group deliveries reach Briar.
+3. Confirm signed Pull request deliveries reach Briar.
 4. Create the exact-main ruleset inactive or in evaluation mode and inspect its
    full JSON, including bypass actors and required check sources.
 5. Confirm the designated local Worker has the audited image, repository
@@ -99,8 +99,8 @@ briar merge-queue configure --enable \
 
 `doctor` is read-only. It validates the audited local runtime, local `gh`
 authentication, immutable repository identity, effective exact-main active
-rulesets, no bypass actors, `HEADGREEN`/`SQUASH` queue capacity, branch
-protections, the exact four status contexts, and `strict=false`. It never
+rulesets, exactly one publisher bypass actor, branch protections, the exact
+four status contexts, and `strict=false`. It never
 creates or edits GitHub rulesets.
 
 The profile API is owner/admin-only:
@@ -128,18 +128,17 @@ collecting → frozen → enqueueing → waiting_tail
            → validating → publishing → awaiting_merge → completed
 ```
 
-A deterministic CI failure publishes failure for the same cumulative SHA,
-finishes all four durable status results even if GitHub removes the queue ref,
-drains the original queue entries, and leaves the lane `blocked` for operator
+A deterministic CI failure publishes failure for the same integration SHA,
+finishes all four durable status results, and leaves the lane `blocked` for operator
 review. Infrastructure failures release the fenced lease for retry;
 they do not publish a false failure. A stale Worker cannot renew, record proof,
 publish completion, or release a claim after its lease expires.
 
 Never clear a blocked lane by editing D1 directly. First inspect the exact
-cohort and GitHub queue, remove or repair its original entries, and rework the
+cohort and integration ref, remove or repair its original entries, and rework the
 member runs so new exact heads produce a new cohort.
 
 For rollback, stop new profile claims first, drain or resolve the active cohort,
-confirm the GitHub queue is empty, restore the previous protected-branch
-policy, and only then disable the Require merge queue ruleset. The API refuses
+confirm no integration publish is active, restore the previous protected-branch
+policy, and only then remove the trusted publisher bypass. The API refuses
 to disable or retarget a profile while an active batch holds its lane.

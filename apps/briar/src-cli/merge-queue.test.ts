@@ -1,14 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   claimMergeBatchIfReady,
-  exactAwaitingChecksWindow,
   executeClaimedMergeBatch,
   inspectMergeQueueDoctor,
-  listCompleteMergeQueue,
-  selectTailAuthority,
   type MergeBatchApi,
   type MergeQueueCommandRunner,
-  type MergeQueueEntry,
 } from "./merge-queue";
 import type { MergeGroupContainerRuntime } from "./merge-group-validation";
 import {
@@ -22,23 +18,23 @@ const memberId = "3".repeat(32);
 const runId = "44444444-4444-4444-8444-444444444444";
 const headSha = "a".repeat(40);
 const historicalBaseSha = "b".repeat(40);
-const signedBaseSha = "c".repeat(40);
-const mergeGroupSha = "d".repeat(40);
-const wrongSha = "e".repeat(40);
+const liveBaseSha = "c".repeat(40);
+const integrationSha = "d".repeat(40);
+const treeSha = "e".repeat(40);
 const logSha256 = "f".repeat(64);
-const mergeGroupRef =
-  "refs/heads/gh-readonly-queue/main/pr-42-deadbeef";
+const integrationRef = `refs/heads/briar/merge-queue/${batchId}`;
 const runtime: MergeGroupContainerRuntime = {
   executable: "/usr/local/bin/docker",
   image: `ghcr.io/wordbricks/briar-merge-group-ci@sha256:${"9".repeat(64)}`,
 };
-
-const validationResults = [
+const validationResults: NonNullable<
+  ClaimedMergeBatch["batch"]["validationResults"]
+> = ([
   "app-worker",
   "d1-migrations",
   "rust",
   "security",
-].map((context) => ({
+] as const).map((context) => ({
   context,
   passed: true,
   exitCode: 0,
@@ -50,10 +46,10 @@ const validationResults = [
 
 function claimFixture(
   phase: ClaimedMergeBatch["phase"] = "tail_authority",
-  overrides: Partial<Record<string, unknown>> = {},
+  proof = validationResults,
 ) {
   const hasAuthority = ["validate", "publish", "drain"].includes(phase);
-  const raw = {
+  return decodeClaimedMergeBatch({
     workType: "mergeBatch",
     workId: batchId,
     runId: batchId,
@@ -79,23 +75,19 @@ function claimFixture(
             : phase === "publish"
               ? "publishing"
               : "draining",
-      finalDeliveryId: hasAuthority ? "delivery-final" : null,
-      mergeGroupRef: hasAuthority ? mergeGroupRef : null,
-      mergeGroupSha: hasAuthority ? mergeGroupSha : null,
-      mergeGroupBaseSha: hasAuthority ? signedBaseSha : null,
+      finalDeliveryId: hasAuthority ? `integration:${integrationSha}` : null,
+      mergeGroupRef: hasAuthority ? integrationRef : null,
+      mergeGroupSha: hasAuthority ? integrationSha : null,
+      mergeGroupBaseSha: hasAuthority ? liveBaseSha : null,
       validationResults: phase === "publish" || phase === "drain"
-        ? validationResults
+        ? proof
         : null,
       validatedAt: phase === "publish" || phase === "drain"
         ? "2026-08-21T01:05:00+00:00"
         : null,
-      publishedAt: phase === "drain"
-        ? "2026-08-21T01:06:00+00:00"
-        : null,
+      publishedAt: phase === "drain" ? "2026-08-21T01:06:00+00:00" : null,
       failureCode: phase === "drain" ? "validation_failed" : null,
-      failureDetail: phase === "drain"
-        ? "One or more required validation contexts failed"
-        : null,
+      failureDetail: phase === "drain" ? "validation failed" : null,
     },
     members: [{
       id: memberId,
@@ -109,49 +101,14 @@ function claimFixture(
       pullRequestUrl: "https://github.com/wordbricks/briar/pull/42",
       headSha,
       baseSha: historicalBaseSha,
-      queueEntryId: phase === "enqueue" ? null : "MQE_42",
+      queueEntryId: phase === "enqueue" ? null : `briar:${batchId}:1`,
       state: phase === "enqueue" ? "frozen" : "enqueued",
     }],
-    pendingHeads: phase === "tail_authority"
-      ? [{
-          deliveryId: "delivery-final",
-          headRef: mergeGroupRef,
-          headSha: mergeGroupSha,
-          baseSha: signedBaseSha,
-          tailPullRequestNumber: 42,
-          receivedAt: "2026-08-21T01:04:00+00:00",
-        }]
-      : [],
-    ...overrides,
-  };
-  return decodeClaimedMergeBatch(raw);
+    pendingHeads: [],
+  });
 }
 
-function queueEntry(input: {
-  id?: string;
-  number?: number;
-  sha?: string;
-  state?: string;
-} = {}): MergeQueueEntry {
-  const number = input.number ?? 42;
-  return {
-    id: input.id ?? "MQE_42",
-    state: input.state ?? "AWAITING_CHECKS",
-    pullRequest: {
-      id: number === 42 ? "PR_kwDOBriar42" : `PR_${number}`,
-      databaseId: number === 42 ? 501 : 1_000 + number,
-      number,
-      headRefOid: input.sha ?? (number === 42 ? headSha : wrongSha),
-      baseRefName: "main",
-      baseRefOid: historicalBaseSha,
-    },
-  };
-}
-
-function pullRequestResponse(
-  queueEntryId: string | null,
-  liveBaseSha = historicalBaseSha,
-) {
+function pullRequestResponse() {
   return JSON.stringify({
     data: {
       repository: {
@@ -166,63 +123,13 @@ function pullRequestResponse(
           headRefOid: headSha,
           baseRefName: "main",
           baseRefOid: liveBaseSha,
-          mergeQueueEntry: queueEntryId
-            ? { id: queueEntryId, state: "AWAITING_CHECKS" }
-            : null,
         },
       },
     },
   });
 }
 
-function enqueueResponse(liveBaseSha = historicalBaseSha) {
-  return JSON.stringify({
-    data: {
-      enqueuePullRequest: {
-        mergeQueueEntry: {
-          ...queueEntry(),
-          pullRequest: {
-            ...queueEntry().pullRequest,
-            baseRefOid: liveBaseSha,
-          },
-        },
-      },
-    },
-  });
-}
-
-function dequeueResponse() {
-  return JSON.stringify({
-    data: { dequeuePullRequest: { clientMutationId: null } },
-  });
-}
-
-function queuePage(
-  nodes: readonly MergeQueueEntry[],
-  hasNextPage = false,
-  endCursor: string | null = null,
-) {
-  return JSON.stringify({
-    data: {
-      repository: {
-        databaseId: 701,
-        nameWithOwner: "wordbricks/briar",
-        mergeQueue: {
-          entries: {
-            nodes,
-            pageInfo: { hasNextPage, endCursor },
-          },
-        },
-      },
-    },
-  });
-}
-
-const successful = (stdout = "{}") => ({
-  exitCode: 0,
-  stdout,
-  stderr: "",
-});
+const successful = (stdout = "{}") => ({ exitCode: 0, stdout, stderr: "" });
 
 function recordingApi() {
   const calls: Array<{ path: string; body: Record<string, unknown> }> = [];
@@ -230,25 +137,14 @@ function recordingApi() {
     method: "POST";
     body: string;
   }) => {
-    calls.push({
-      path,
-      body: JSON.parse(init.body) as Record<string, unknown>,
-    });
+    calls.push({ path, body: JSON.parse(init.body) as Record<string, unknown> });
     return {} as T;
   };
   return { api, calls };
 }
 
-describe("local GitHub merge-queue worker", () => {
-  it("decodes a sealed member with the production opaque candidate ID", () => {
-    const claim = claimFixture("publish");
-    expect(claim.members).toHaveLength(1);
-    expect(claim.members[0].id).toBe(memberId);
-    expect(claim.members[0].baseSha).toBe(historicalBaseSha);
-    expect(claim.batch.mergeGroupBaseSha).toBe(signedBaseSha);
-  });
-
-  it("skips merge claims when the runtime is not ready or polling replies only", async () => {
+describe("local provider-independent merge-queue worker", () => {
+  it("does not claim merge work without the audited runtime", async () => {
     const api = vi.fn();
     await expect(claimMergeBatchIfReady({
       api: api as unknown as MergeBatchApi,
@@ -258,40 +154,52 @@ describe("local GitHub merge-queue worker", () => {
       repliesOnly: false,
       runtime: null,
     })).resolves.toBeNull();
-    await expect(claimMergeBatchIfReady({
-      api: api as unknown as MergeBatchApi,
-      projectId,
-      workerId: "worker-1",
-      claimedBy: "local",
-      repliesOnly: true,
-      runtime,
-    })).resolves.toBeNull();
     expect(api).not.toHaveBeenCalled();
   });
 
-  it("enqueues with exactHeadOid and jump:false across historical base drift, then requires readback", async () => {
-    const claim = claimFixture("enqueue");
-    const githubCalls: string[][] = [];
-    let pullReads = 0;
+  it("seals an exact PR identity without calling GitHub merge-queue mutations", async () => {
+    const commands: string[][] = [];
     const run: MergeQueueCommandRunner = (command) => {
-      githubCalls.push([...command]);
-      const query = command.find((argument) => argument.startsWith("query=")) ?? "";
-      if (query.includes("BriarMergePullRequest")) {
-        pullReads += 1;
-        return successful(pullRequestResponse(
-          pullReads === 1 ? null : "MQE_42",
-          signedBaseSha,
-        ));
+      commands.push([...command]);
+      return successful(pullRequestResponse());
+    };
+    const api = recordingApi();
+    await executeClaimedMergeBatch({
+      claim: claimFixture("enqueue"),
+      workerId: "worker-1",
+      repositoryPath: "/repo",
+      runtime,
+      signal: new AbortController().signal,
+      api: api.api,
+      runCommand: run,
+    });
+    expect(commands.join("\n")).not.toContain("enqueuePullRequest");
+    expect(commands.join("\n")).not.toContain("mergeQueue");
+    expect(api.calls[0]).toMatchObject({
+      path: `/merge-batch-claims/${batchId}/enqueued`,
+      body: { queueEntryId: `briar:${batchId}:1`, expectedHeadSha: headSha },
+    });
+  });
+
+  it("assembles and publishes an exact bors-style integration ref", async () => {
+    const commands: string[][] = [];
+    const run: MergeQueueCommandRunner = (command) => {
+      commands.push([...command]);
+      if (command[0] === "gh") return successful(pullRequestResponse());
+      if (command[1] === "fetch" || command[1] === "push") return successful();
+      if (command[1] === "merge-tree") return successful(treeSha);
+      if (command[1] === "commit-tree") return successful(integrationSha);
+      if (command[1] === "ls-remote") {
+        return successful(`${liveBaseSha}\trefs/heads/main\n`);
       }
-      if (query.includes("BriarEnqueuePullRequest")) {
-        return successful(enqueueResponse(signedBaseSha));
+      if (command[1] === "rev-parse") {
+        return successful(command.at(-1)?.includes("/1^{commit}") ? headSha : liveBaseSha);
       }
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
     const api = recordingApi();
-
     await executeClaimedMergeBatch({
-      claim,
+      claim: claimFixture(),
       workerId: "worker-1",
       repositoryPath: "/repo",
       runtime,
@@ -299,231 +207,35 @@ describe("local GitHub merge-queue worker", () => {
       api: api.api,
       runCommand: run,
     });
-
-    const mutation = githubCalls.find((command) =>
-      command.some((argument) => argument.includes("BriarEnqueuePullRequest"))
-    )!;
-    const mutationText = mutation.find((argument) =>
-      argument.startsWith("query=")
-    )!;
-    expect(mutationText).toContain("expectedHeadOid: $expectedHeadOid");
-    expect(mutationText).toContain("jump: false");
-    expect(mutation).toContain(`expectedHeadOid=${headSha}`);
-    expect(pullReads).toBe(2);
-    expect(api.calls.map((call) => call.path)).toEqual([
-      `/merge-batch-claims/${batchId}/enqueued`,
-      `/merge-batch-claims/${batchId}/release`,
-    ]);
-    expect(api.calls[0].body).toMatchObject({
-      candidateId: memberId,
-      expectedHeadSha: headSha,
-      expectedBaseSha: historicalBaseSha,
-      queueEntryId: "MQE_42",
-    });
-  });
-
-  it("releases instead of accepting an enqueue whose post-readback is absent", async () => {
-    const claim = claimFixture("enqueue");
-    let pullReads = 0;
-    const run: MergeQueueCommandRunner = (command) => {
-      const query = command.find((argument) => argument.startsWith("query=")) ?? "";
-      if (query.includes("BriarMergePullRequest")) {
-        pullReads += 1;
-        return successful(pullRequestResponse(null));
-      }
-      if (query.includes("BriarEnqueuePullRequest")) {
-        return successful(enqueueResponse());
-      }
-      throw new Error("unexpected command");
-    };
-    const api = recordingApi();
-
-    await expect(executeClaimedMergeBatch({
-      claim,
-      workerId: "worker-1",
-      repositoryPath: "/repo",
-      runtime,
-      signal: new AbortController().signal,
-      api: api.api,
-      runCommand: run,
-    })).rejects.toThrow("enqueue readback did not match");
-    expect(pullReads).toBe(2);
-    expect(api.calls.map((call) => call.path)).toEqual([
-      `/merge-batch-claims/${batchId}/release`,
-    ]);
-  });
-
-  it("paginates the complete queue instead of trusting the first entries", async () => {
-    const claim = claimFixture();
-    const commands: string[][] = [];
-    const distractors = Array.from({ length: 5 }, (_, index) =>
-      queueEntry({ id: `MQE_${index}`, number: index + 1 })
-    );
-    const run: MergeQueueCommandRunner = (command) => {
-      commands.push([...command]);
-      const hasCursor = command.includes("cursor=page-2");
-      return successful(hasCursor
-        ? queuePage([queueEntry()])
-        : queuePage(distractors, true, "page-2"));
-    };
-
-    const entries = await listCompleteMergeQueue(claim, "/repo", run);
-
-    expect(entries).toHaveLength(6);
-    expect(entries.at(-1)?.id).toBe("MQE_42");
-    expect(commands).toHaveLength(2);
-    expect(commands[0].join("\n")).toContain("entries(first: 100");
-    expect(commands[1]).toContain("cursor=page-2");
-  });
-
-  it("ignores intermediate signed heads and selects only the exact live final tail", () => {
-    const final = claimFixture();
-    const intermediate = {
-      deliveryId: "delivery-intermediate",
-      headRef: "refs/heads/gh-readonly-queue/main/pr-41-deadbeef",
-      headSha: wrongSha,
-      baseSha: signedBaseSha,
-      tailPullRequestNumber: 41,
-      receivedAt: "2026-08-21T01:03:00+00:00",
-    };
-    const claim = decodeClaimedMergeBatch({
-      ...final,
-      pendingHeads: [intermediate, ...final.pendingHeads],
-    });
-    const entries = [queueEntry()];
-    const refs = new Map([
-      ["refs/heads/main", signedBaseSha],
-      [mergeGroupRef, mergeGroupSha],
-      [intermediate.headRef, intermediate.headSha],
-    ]);
-
-    expect(selectTailAuthority(claim, entries, refs)).toEqual({
-      head: final.pendingHeads[0],
-      authorityEntries: [{
-        queueEntryId: "MQE_42",
-        pullRequestNumber: 42,
-      }],
-    });
-    expect(selectTailAuthority(
-      decodeClaimedMergeBatch({ ...final, pendingHeads: [intermediate] }),
-      entries,
-      refs,
-    )).toBeNull();
-    expect(selectTailAuthority(
-      claim,
-      [queueEntry({ id: "MQE_external", number: 7 }), ...entries],
-      refs,
-    )).toBeNull();
-    expect(exactAwaitingChecksWindow(claim, [
-      queueEntry({ state: "LOCKED" }),
-    ])).toBeNull();
-  });
-
-  it("fails and releases when the signed final ref or protected base is not live", async () => {
-    const claim = claimFixture();
-    const run: MergeQueueCommandRunner = (command) => {
-      if (command[0] === "gh") return successful(queuePage([queueEntry()]));
-      if (command[0] === "git") {
-        return successful(
-          `${wrongSha}\t${mergeGroupRef}\n${signedBaseSha}\trefs/heads/main\n`,
-        );
-      }
-      throw new Error("unexpected command");
-    };
-    const api = recordingApi();
-
-    await expect(executeClaimedMergeBatch({
-      claim,
-      workerId: "worker-1",
-      repositoryPath: "/repo",
-      runtime,
-      signal: new AbortController().signal,
-      api: api.api,
-      runCommand: run,
-    })).rejects.toThrow("live exact queue ref and protected main SHA");
-    expect(api.calls.map((call) => call.path)).toEqual([
-      `/merge-batch-claims/${batchId}/release`,
-    ]);
-  });
-
-  it("dequeues and blocks instead of accepting a signed cohort with a foreign prefix", async () => {
-    const claim = claimFixture();
-    const commands: string[][] = [];
-    let pullReads = 0;
-    const run: MergeQueueCommandRunner = (command) => {
-      commands.push([...command]);
-      if (command[0] === "git") {
-        return successful(
-          `${mergeGroupSha}\t${mergeGroupRef}\n${signedBaseSha}\trefs/heads/main\n`,
-        );
-      }
-      const query = command.find((argument) => argument.startsWith("query=")) ?? "";
-      if (query.includes("BriarMergeQueuePage")) {
-        return successful(queuePage([
-          queueEntry({ id: "MQE_external", number: 7 }),
-          queueEntry(),
-        ]));
-      }
-      if (query.includes("BriarMergePullRequest")) {
-        pullReads += 1;
-        return successful(pullRequestResponse(
-          pullReads === 1 ? "MQE_42" : null,
-        ));
-      }
-      if (query.includes("BriarDequeuePullRequest")) {
-        return successful(dequeueResponse());
-      }
-      throw new Error(`unexpected command: ${command.join(" ")}`);
-    };
-    const api = recordingApi();
-
-    await executeClaimedMergeBatch({
-      claim,
-      workerId: "worker-1",
-      repositoryPath: "/repo",
-      runtime,
-      signal: new AbortController().signal,
-      api: api.api,
-      runCommand: run,
-    });
-
+    expect(commands.some((command) => command[1] === "merge-tree")).toBe(true);
     expect(commands.some((command) =>
-      command.some((argument) => argument.includes("BriarDequeuePullRequest"))
+      command[1] === "push" && command.includes(`${integrationSha}:${integrationRef}`)
     )).toBe(true);
-    expect(api.calls).toEqual([{
-      path: `/merge-batch-claims/${batchId}/block`,
-      body: {
-        projectId,
-        workerId: "worker-1",
-        claimToken: claim.claimToken,
-        code: "foreign_queue_prefix",
-        detail:
-          "The signed cumulative merge-group contains a queue entry outside the sealed Briar cohort",
-      },
-    }]);
+    expect(api.calls.at(-2)).toMatchObject({
+      path: `/merge-batch-claims/${batchId}/authority`,
+      body: { integrationRef, integrationSha, baseSha: liveBaseSha },
+    });
   });
 
-  it("re-fences before every status and always targets the claimed SHA", async () => {
-    const claim = claimFixture("publish");
+  it("re-fences every status and lease-publishes the tested SHA to main", async () => {
     const commands: string[][] = [];
     const run: MergeQueueCommandRunner = (command) => {
       commands.push([...command]);
-      if (command[0] === "git") {
+      if (command[0] === "gh" && command.includes("graphql")) {
+        return successful(pullRequestResponse());
+      }
+      if (command[0] === "gh") return successful();
+      if (command[1] === "ls-remote") {
         return successful(
-          `${mergeGroupSha}\t${mergeGroupRef}\n${signedBaseSha}\trefs/heads/main\n`,
+          `${integrationSha}\t${integrationRef}\n${liveBaseSha}\trefs/heads/main\n`,
         );
       }
-      const query = command.find((argument) => argument.startsWith("query=")) ?? "";
-      if (query.includes("BriarMergeQueuePage")) {
-        return successful(queuePage([queueEntry()]));
-      }
-      if (command[2]?.startsWith("repos/")) return successful();
+      if (command[1] === "push") return successful();
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
     const api = recordingApi();
-
     await executeClaimedMergeBatch({
-      claim,
+      claim: claimFixture("publish"),
       workerId: "worker-1",
       repositoryPath: "/repo",
       runtime,
@@ -531,62 +243,34 @@ describe("local GitHub merge-queue worker", () => {
       api: api.api,
       runCommand: run,
     });
-
     const statuses = commands.filter((command) =>
-      command[2]?.startsWith("repos/wordbricks/briar/statuses/")
+      command[2] === `repos/wordbricks/briar/statuses/${integrationSha}`
     );
     expect(statuses).toHaveLength(4);
-    expect(statuses.every((command) =>
-      command[2] === `repos/wordbricks/briar/statuses/${mergeGroupSha}`
-    )).toBe(true);
-    expect(statuses.map((command) =>
-      command.find((argument) => argument.startsWith("context="))
-    )).toEqual([
-      "context=signoff/app-worker",
-      "context=signoff/d1-migrations",
-      "context=signoff/rust",
-      "context=signoff/security",
-    ]);
     expect(api.calls.filter((call) => call.path.endsWith("/lease"))).toHaveLength(4);
-    expect(api.calls.at(-1)?.path).toBe(
-      `/merge-batch-claims/${batchId}/published`,
-    );
+    expect(commands.some((command) =>
+      command[1] === "push" &&
+      command.includes(`--force-with-lease=refs/heads/main:${liveBaseSha}`) &&
+      command.includes(`${integrationSha}:refs/heads/main`)
+    )).toBe(true);
+    expect(api.calls.at(-1)?.path).toBe(`/merge-batch-claims/${batchId}/published`);
   });
 
-  it("finishes exact-SHA failure publication after GitHub removes the queue ref", async () => {
-    const successfulClaim = claimFixture("publish");
-    const failedProof = successfulClaim.batch.validationResults!.map(
-      (result, index) => index === 0
-        ? {
-            ...result,
-            passed: false,
-            exitCode: 1,
-            failureCode: "ci_failed" as const,
-            log: "app-worker failed",
-          }
-        : result,
+  it("publishes a failed proof without updating main", async () => {
+    const failedProof = validationResults.map((result, index) =>
+      index === 0
+        ? { ...result, passed: false, exitCode: 1, failureCode: "ci_failed" as const }
+        : result
     );
-    const claim = decodeClaimedMergeBatch({
-      ...successfulClaim,
-      batch: {
-        ...successfulClaim.batch,
-        validationResults: failedProof,
-      },
-    });
     const commands: string[][] = [];
     const run: MergeQueueCommandRunner = (command) => {
       commands.push([...command]);
-      if (command[2]?.startsWith("repos/wordbricks/briar/statuses/")) {
-        return successful();
-      }
-      throw new Error(
-        `failed proof must not depend on a deleted queue ref: ${command.join(" ")}`,
-      );
+      if (command[0] === "gh") return successful();
+      throw new Error(`failed publication must not run git: ${command.join(" ")}`);
     };
     const api = recordingApi();
-
     await executeClaimedMergeBatch({
-      claim,
+      claim: claimFixture("publish", failedProof),
       workerId: "worker-1",
       repositoryPath: "/repo",
       runtime,
@@ -594,22 +278,12 @@ describe("local GitHub merge-queue worker", () => {
       api: api.api,
       runCommand: run,
     });
-
-    const statuses = commands.filter((command) =>
-      command[2]?.startsWith("repos/wordbricks/briar/statuses/")
-    );
-    expect(statuses).toHaveLength(4);
-    expect(statuses.every((command) =>
-      command[2] === `repos/wordbricks/briar/statuses/${mergeGroupSha}`
-    )).toBe(true);
-    expect(statuses[0]).toContain("state=failure");
-    expect(api.calls.filter((call) => call.path.endsWith("/lease"))).toHaveLength(4);
-    expect(api.calls.at(-1)?.path).toBe(
-      `/merge-batch-claims/${batchId}/published`,
-    );
+    expect(commands.every((command) => command[0] === "gh")).toBe(true);
+    expect(commands.filter((command) => command[0] === "gh")).toHaveLength(4);
+    expect(api.calls.at(-1)?.path).toBe(`/merge-batch-claims/${batchId}/published`);
   });
 
-  it("recovers a successful publication receipt after a signed merge removes the queue ref", async () => {
+  it("accepts a retry only after main resolves to the tested integration SHA", async () => {
     const initial = claimFixture("publish");
     const claim = decodeClaimedMergeBatch({
       ...initial,
@@ -619,11 +293,16 @@ describe("local GitHub merge-queue worker", () => {
         state: "merged",
       })),
     });
+    const commands: string[][] = [];
+    const run: MergeQueueCommandRunner = (command) => {
+      commands.push([...command]);
+      if (command[0] === "gh") return successful();
+      if (command[1] === "ls-remote") {
+        return successful(`${integrationSha}\trefs/heads/main\n`);
+      }
+      throw new Error(`unexpected command: ${command.join(" ")}`);
+    };
     const api = recordingApi();
-    const run = vi.fn<MergeQueueCommandRunner>(() => {
-      throw new Error("signed merge recovery must not inspect a deleted queue ref");
-    });
-
     await executeClaimedMergeBatch({
       claim,
       workerId: "worker-1",
@@ -633,15 +312,12 @@ describe("local GitHub merge-queue worker", () => {
       api: api.api,
       runCommand: run,
     });
-
-    expect(run).not.toHaveBeenCalled();
-    expect(api.calls.map((call) => call.path)).toEqual([
-      `/merge-batch-claims/${batchId}/lease`,
-      `/merge-batch-claims/${batchId}/published`,
-    ]);
+    expect(commands.filter((command) => command[1] === "ls-remote")).toHaveLength(4);
+    expect(commands.some((command) => command[1] === "push")).toBe(false);
+    expect(api.calls.at(-1)?.path).toBe(`/merge-batch-claims/${batchId}/published`);
   });
 
-  it("doctors only exact-main active no-bypass effective rules", () => {
+  it("requires exact-main rules with one publisher bypass and no native merge_queue rule", () => {
     const profile = {
       projectId,
       repositoryId: 701,
@@ -653,16 +329,6 @@ describe("local GitHub merge-queue worker", () => {
       updatedAt: "2026-08-21T01:00:00Z",
     };
     const effectiveRules = [[
-      {
-        type: "merge_queue",
-        ruleset_id: 99,
-        parameters: {
-          grouping_strategy: "HEADGREEN",
-          merge_method: "SQUASH",
-          max_entries_to_build: 5,
-          max_entries_to_merge: 5,
-        },
-      },
       { type: "pull_request", ruleset_id: 99 },
       { type: "deletion", ruleset_id: 99 },
       { type: "non_fast_forward", ruleset_id: 99 },
@@ -681,17 +347,15 @@ describe("local GitHub merge-queue worker", () => {
       id: 99,
       target: "branch",
       enforcement: "active",
-      bypass_actors: [],
-      conditions: {
-        ref_name: { include: ["refs/heads/main"], exclude: [] },
-      },
+      bypass_actors: [{
+        actor_id: 123,
+        actor_type: "Integration",
+        bypass_mode: "always",
+      }],
+      conditions: { ref_name: { include: ["refs/heads/main"], exclude: [] } },
     };
-    const commands: string[][] = [];
     const run: MergeQueueCommandRunner = (command) => {
-      commands.push([...command]);
-      if (command[0] === "git") {
-        return successful("git@github.com:wordbricks/briar.git\n");
-      }
+      if (command[0] === "git") return successful("git@github.com:wordbricks/briar.git\n");
       if (command[1] === "auth") return successful();
       const endpoint = command.at(-1) ?? "";
       if (endpoint === "repos/wordbricks/briar") {
@@ -704,57 +368,40 @@ describe("local GitHub merge-queue worker", () => {
       if (endpoint.includes("rules/branches/main")) {
         return successful(JSON.stringify(effectiveRules));
       }
-      if (endpoint.includes("rulesets/99")) {
-        return successful(JSON.stringify(ruleset));
-      }
+      if (endpoint.includes("rulesets/99")) return successful(JSON.stringify(ruleset));
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
-
     const result = inspectMergeQueueDoctor({
       profile,
       repositoryPath: "/repo",
       runtime: { ready: true, ...runtime },
       runCommand: run,
     });
-
     expect(result.ok).toBe(true);
-    expect(result.checks.every((check) => check.ok)).toBe(true);
-    expect(commands.some((command) =>
-      command.some((argument) => argument.includes("/installation"))
-    )).toBe(false);
-
-    const disabled = inspectMergeQueueDoctor({
-      profile: { ...profile, enabled: false },
-      repositoryPath: "/repo",
-      runtime: { ready: true, ...runtime },
-      runCommand: run,
-    });
-    expect(disabled.ok).toBe(true);
-    expect(disabled.checks).toContainEqual(expect.objectContaining({
-      name: "active-no-bypass-rulesets",
+    expect(result.checks.map((check) => check.name)).not.toContain("merge-queue-rule");
+    expect(result.checks).toContainEqual(expect.objectContaining({
+      name: "active-publisher-bypass-rulesets",
       ok: true,
     }));
 
-    const bypassedRun: MergeQueueCommandRunner = (command, options) => {
-      const endpoint = command.at(-1) ?? "";
-      if (endpoint.includes("rulesets/99")) {
-        return successful(JSON.stringify({
-          ...ruleset,
-          bypass_actors: [{ actor_type: "OrganizationAdmin" }],
-        }));
-      }
-      return run(command, options);
-    };
-    const bypassed = inspectMergeQueueDoctor({
-      profile: { ...profile, enabled: false },
+    const broadBypass = inspectMergeQueueDoctor({
+      profile,
       repositoryPath: "/repo",
       runtime: { ready: true, ...runtime },
-      runCommand: bypassedRun,
+      runCommand: (command, options) => {
+        if ((command.at(-1) ?? "").includes("rulesets/99")) {
+          return successful(JSON.stringify({
+            ...ruleset,
+            bypass_actors: [{
+              actor_id: 1,
+              actor_type: "OrganizationAdmin",
+              bypass_mode: "always",
+            }],
+          }));
+        }
+        return run(command, options);
+      },
     });
-    expect(bypassed.ok).toBe(false);
-    expect(bypassed.checks).toContainEqual(expect.objectContaining({
-      name: "active-no-bypass-rulesets",
-      ok: false,
-    }));
+    expect(broadBypass.ok).toBe(false);
   });
 });
