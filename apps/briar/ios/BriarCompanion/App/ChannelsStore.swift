@@ -2163,6 +2163,13 @@ final class ChannelsStore: ObservableObject {
         }
     }
 
+    func failedReply(for messageID: UUID) -> ChannelAgentReply? {
+        agentReplies.first { reply in
+            reply.status == .failed &&
+                (reply.parentMessageId == messageID || reply.triggerMessageId == messageID)
+        }
+    }
+
     func typingStatuses(messageIDs: Set<UUID>) -> [AgentTypingStatus] {
         let now = Date()
         var byAgentID: [UUID: AgentTypingStatus] = [:]

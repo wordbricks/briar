@@ -74,7 +74,11 @@ import {
 } from "../lib/optimistic-channel-message";
 import { toggleOptimisticChannelReaction } from "../lib/optimistic-channel-reaction";
 import { useToast } from "./ui/toast";
-import { channelReplyErrorText } from "../lib/channel-reply-error";
+import {
+  channelReplyErrorText,
+  failedChannelReplyErrors,
+} from "../lib/channel-reply-error";
+import { ChannelErrorNotice, ChannelReplyFailure } from "./ChannelAlertNotice";
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import { useI18n } from "../i18n";
 import { useChannelComposer } from "../hooks/useChannelComposer";
@@ -1225,6 +1229,14 @@ export function CompanionChannels({
       item.channelId === channel?.id &&
       (item.status === "queued" || item.status === "running"),
   );
+  const failedReplyErrors = failedChannelReplyErrors(
+    replies,
+    channel?.id ?? null,
+    {
+      fallback: t("run.failed"),
+      noAvailableWorker: t("agents.agentWorkerUnavailable"),
+    },
+  );
   const threadMessageIds = threadParentId
     ? new Set([threadParentId, ...(thread ?? []).map((message) => message.id)])
     : new Set<string>();
@@ -1708,7 +1720,9 @@ export function CompanionChannels({
           )}
           title={t("companion.channelThread")}
         />
-        {error ? <p className="companion-channel-error">{error}</p> : null}
+        {error ? (
+          <ChannelErrorNotice className="companion-channel-error" text={error} />
+        ) : null}
         <div className="conversation-scroll-region">
           <div
             className="companion-channel-messages"
@@ -1759,6 +1773,7 @@ export function CompanionChannels({
               }}
               onToggleReaction={(emoji) => void toggleReaction(item, emoji)}
               projects={projects}
+              replyError={failedReplyErrors.get(item.id) ?? null}
               selectedProjectId={
                 item.proposal ? proposalProjects[item.proposal.id] ?? null : null
               }
@@ -1819,7 +1834,9 @@ export function CompanionChannels({
           onBack={closeChannel}
           channel={channel}
         />
-        {error ? <p className="companion-channel-error">{error}</p> : null}
+        {error ? (
+          <ChannelErrorNotice className="companion-channel-error" text={error} />
+        ) : null}
         <div className="conversation-scroll-region">
           <div
             className="companion-channel-messages"
@@ -1876,6 +1893,7 @@ export function CompanionChannels({
               }}
               onToggleReaction={(emoji) => void toggleReaction(item, emoji)}
               projects={projects}
+              replyError={failedReplyErrors.get(item.id) ?? null}
               selectedProjectId={
                 item.proposal ? proposalProjects[item.proposal.id] ?? null : null
               }
@@ -1931,7 +1949,9 @@ export function CompanionChannels({
   return (
     <ChannelMessageImageCacheProvider cache={imageCache}>
       <section className="companion-channels">
-      {error ? <p className="companion-channel-error">{error}</p> : null}
+      {error ? (
+        <ChannelErrorNotice className="companion-channel-error" text={error} />
+      ) : null}
       {loading && channels.length === 0 ? <CompanionChannelLoadingSpinner /> : null}
       {groups.map((group) => (
         <div className="companion-channel-group" key={group.key}>
@@ -2047,6 +2067,7 @@ function MessageRow({
   onProjectChange,
   onToggleReaction,
   projects,
+  replyError,
   selectedProjectId,
   showThreadSummary = false,
   token,
@@ -2093,6 +2114,7 @@ function MessageRow({
   onProjectChange: (projectId: string) => void;
   onToggleReaction: (emoji: string) => void;
   projects: readonly ChannelGroupProject[];
+  replyError?: string | null;
   selectedProjectId: string | null;
   showThreadSummary?: boolean;
   token: string;
@@ -2160,6 +2182,7 @@ function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
+        {replyError ? <ChannelReplyFailure error={replyError} /> : null}
         <ChannelMessageImages
           attachments={message.attachments}
           interactive={!showThreadSummary}

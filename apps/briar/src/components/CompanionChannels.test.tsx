@@ -1194,6 +1194,8 @@ describe("CompanionChannels", () => {
 
     expect(container.querySelector(".companion-channel-error")?.textContent)
       .toContain("worker unavailable");
+    expect(container.querySelector(".channel-reply-failure")?.textContent)
+      .toContain("worker unavailable");
   });
 
   it("opens a requested Inbox reply directly in its thread", async () => {
