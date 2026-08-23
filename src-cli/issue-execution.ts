@@ -32,6 +32,7 @@ import {
 import { agentImageAttachments } from "../src-agent/runner-attachments";
 import {
   detachedProviderTurnFailure,
+  logDetachedProviderTurnDiagnostic,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
 import { TranscriptBatcher } from "./transcript-batcher";
@@ -380,6 +381,15 @@ async function runClaimedIssueInRuntime(
             : undefined,
         environment,
         signal,
+        diagnosticContext: {
+          runId: issue.runId,
+          workId: issue.runId,
+          executionId: issue.executionId ?? null,
+          attempt: issue.currentAttempt,
+          workType: "issue",
+          turnNumber,
+        },
+        onDiagnostic: logDetachedProviderTurnDiagnostic,
         onConversationId: (nextConversationId) => {
           conversationId = nextConversationId;
           reportCheckpoint?.({ conversationId: nextConversationId });

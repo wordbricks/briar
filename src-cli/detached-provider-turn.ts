@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -26,6 +27,22 @@ export type DetachedProviderTurnResult = {
   conversationId: string | null;
 };
 
+export type DetachedProviderTurnDiagnosticContext = {
+  runId?: string;
+  workId?: string;
+  executionId?: string | null;
+  attempt?: number;
+  workType?: string;
+  turnNumber?: number;
+};
+
+export type DetachedProviderTurnDiagnostic = {
+  at: string;
+  phase: string;
+  context?: DetachedProviderTurnDiagnosticContext;
+  [key: string]: unknown;
+};
+
 export type DetachedProviderTurnInput = {
   agent: DetachedAgent;
   prompt: string;
@@ -39,14 +56,98 @@ export type DetachedProviderTurnInput = {
   outputSchema?: JsonSchema | null;
   environment: NodeJS.ProcessEnv;
   signal: AbortSignal;
+  diagnosticContext?: DetachedProviderTurnDiagnosticContext;
+  onDiagnostic?: (diagnostic: DetachedProviderTurnDiagnostic) => void;
   onPayload?: (payload: unknown, rawLine: string) => void | Promise<void>;
   onConversationId?: (conversationId: string) => void | Promise<void>;
 };
 
+type DiagnosticEmitter = (
+  phase: string,
+  detail?: Record<string, unknown>,
+) => void;
+
+const describeDiagnosticError = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
+
+const boundedDiagnosticText = (value: unknown, maxLength = 2_000) =>
+  String(value).slice(0, maxLength);
+
+const redactDiagnosticText = (value: unknown) =>
+  boundedDiagnosticText(value)
+    .replace(
+      /(authorization|api[-_]?key|token|secret|password)(\s*[:=]\s*)("[^"]*"|'[^']*'|\S+)/giu,
+      "$1$2[redacted]",
+    )
+    .replace(/\bBearer\s+\S+/giu, "Bearer [redacted]")
+    .replace(/\bsk-[A-Za-z0-9_-]+\b/gu, "[redacted]");
+
+function createDiagnosticEmitter(
+  input: Pick<
+    DetachedProviderTurnInput,
+    "diagnosticContext" | "onDiagnostic"
+  >,
+): DiagnosticEmitter {
+  return (phase, detail = {}) => {
+    if (!input.onDiagnostic) return;
+    try {
+      input.onDiagnostic({
+        at: new Date().toISOString(),
+        phase,
+        ...(input.diagnosticContext
+          ? { context: input.diagnosticContext }
+          : {}),
+        ...detail,
+      });
+    } catch {
+      // Diagnostics must never change the provider turn's behavior.
+    }
+  };
+}
+
+function runnerDiagnosticFromLine(line: string): {
+  phase: string;
+  detail: Record<string, unknown>;
+} | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const record = parsed as Record<string, unknown>;
+  if (
+    record.event !== "briar.runner" ||
+    typeof record.phase !== "string"
+  ) {
+    return null;
+  }
+  const detail: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (key === "event" || key === "phase") continue;
+    const normalizedKey =
+      key === "pid" ? "runnerPid" : key === "at" ? "runnerAt" : key;
+    detail[normalizedKey] =
+      key === "error" || key === "message"
+        ? redactDiagnosticText(value)
+        : value;
+  }
+  return { phase: `runner.${record.phase}`, detail };
+}
+
+export function logDetachedProviderTurnDiagnostic(
+  diagnostic: DetachedProviderTurnDiagnostic,
+) {
+  console.error(`[briar-agent-runner] ${JSON.stringify(diagnostic)}`);
+}
+
 export async function runDetachedProviderTurn(
   input: DetachedProviderTurnInput,
 ): Promise<DetachedProviderTurnResult> {
+  const diagnose = createDiagnosticEmitter(input);
   if (input.signal.aborted) {
+    diagnose("turn.aborted_before_start");
     throw input.signal.reason instanceof Error
       ? input.signal.reason
       : new Error("Worker execution was cancelled");
@@ -54,8 +155,17 @@ export async function runDetachedProviderTurn(
   const provider = input.agent.provider;
   const runnerProvider = provider === "openrouter" ? "opencode" : provider;
   const binaryName = agentProviderBinaryName(provider);
+  diagnose("turn.started", {
+    provider,
+    runnerProvider,
+    binaryName,
+    model: input.agent.model ?? null,
+    workspacePath: input.workspacePath,
+    readOnly: input.readOnly ?? false,
+  });
   const agentBinary = Bun.which(binaryName);
   if (!agentBinary) {
+    diagnose("turn.binary_missing", { binaryName });
     throw new Error(`${binaryName} coding agent is not installed on this Worker`);
   }
   const runnerPath = (
@@ -67,12 +177,17 @@ export async function runDetachedProviderTurn(
     )
   ).find((path): path is string => Boolean(path));
   if (!runnerPath) {
+    diagnose("turn.runner_missing", { provider, runnerProvider });
     throw new Error(
       `${provider} runner bundle is missing; run \`bun run agent:build\``,
     );
   }
+  diagnose("turn.runner_selected", { runnerPath, agentBinary });
   const skillCatalog = await materializeDetachedAgentSkillCatalog(input.agent, {
     temporaryParentPath: input.workspacePath,
+  });
+  diagnose("turn.skill_catalog_ready", {
+    materialized: skillCatalog !== null,
   });
   try {
     return await executeDetachedProviderTurn(
@@ -80,8 +195,10 @@ export async function runDetachedProviderTurn(
       runnerPath,
       agentBinary,
       skillCatalog,
+      diagnose,
     );
   } finally {
+    diagnose("turn.skill_catalog_cleanup");
     await cleanupDetachedAgentSkillCatalog(skillCatalog);
   }
 }
@@ -91,6 +208,7 @@ async function executeDetachedProviderTurn(
   runnerPath: string,
   agentBinary: string,
   skillCatalog: DetachedAgentSkillCatalog | null,
+  diagnose: DiagnosticEmitter,
 ) {
   const runnerRequest = detachedProviderRequest({
     agent: input.agent,
@@ -107,22 +225,49 @@ async function executeDetachedProviderTurn(
     outputSchema: input.outputSchema ?? null,
     agentBinary,
   }).request;
+  const requestLine = `${JSON.stringify(runnerRequest)}\n`;
+  const requestBytes = Buffer.byteLength(requestLine, "utf8");
+  diagnose("runner.spawn_start", {
+    runnerPath,
+    workspacePath: input.workspacePath,
+    requestBytes,
+  });
   const child = spawn(process.execPath, [runnerPath], {
     cwd: input.workspacePath,
     env: input.environment,
     stdio: ["pipe", "pipe", "pipe"],
   });
+  diagnose("runner.spawned", { runnerPid: child.pid ?? null });
   const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
-    child.once("error", rejectExit);
-    child.once("close", resolveExit);
+    child.once("error", (error) => {
+      diagnose("runner.process_error", {
+        runnerPid: child.pid ?? null,
+        error: describeDiagnosticError(error),
+      });
+      rejectExit(error);
+    });
+    child.once("close", (exitCode, signal) => {
+      diagnose("runner.process_closed", {
+        runnerPid: child.pid ?? null,
+        exitCode,
+        signal: signal ?? null,
+      });
+      resolveExit(exitCode);
+    });
   });
   let stderr = "";
   let runnerError: string | null = null;
   let completed = false;
   let resultText: string | null = null;
   let conversationId = input.conversationId ?? null;
+  let outputCount = 0;
+  let runnerStderrBuffer = "";
   const terminate = () => {
     if (child.exitCode !== null || child.killed) return;
+    diagnose("runner.terminate_requested", {
+      runnerPid: child.pid ?? null,
+      reason: input.signal.aborted ? "aborted" : "cleanup",
+    });
     child.kill("SIGTERM");
     setTimeout(() => {
       if (child.exitCode === null) child.kill("SIGKILL");
@@ -130,12 +275,48 @@ async function executeDetachedProviderTurn(
   };
   input.signal.addEventListener("abort", terminate, { once: true });
   child.stderr.setEncoding("utf8");
+  child.stdin.on("error", (error) => {
+    diagnose("runner.stdin_error", {
+      runnerPid: child.pid ?? null,
+      error: describeDiagnosticError(error),
+    });
+  });
   child.stderr.on("data", (chunk: string) => {
     stderr = `${stderr}${chunk}`.slice(-8_000);
+    runnerStderrBuffer = `${runnerStderrBuffer}${chunk}`;
+    const lines = runnerStderrBuffer.split(/\r?\n/u);
+    runnerStderrBuffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const diagnostic = runnerDiagnosticFromLine(line.trim());
+      if (!diagnostic) continue;
+      diagnose(diagnostic.phase, {
+        runnerPid: child.pid ?? null,
+        ...diagnostic.detail,
+      });
+    }
   });
-  child.stdin.write(`${JSON.stringify(runnerRequest)}\n`);
 
   try {
+    diagnose("runner.stdin_write_start", {
+      runnerPid: child.pid ?? null,
+      requestBytes,
+    });
+    const accepted = child.stdin.write(requestLine, () => {
+      diagnose("runner.stdin_write_complete", {
+        runnerPid: child.pid ?? null,
+        requestBytes,
+      });
+    });
+    diagnose("runner.stdin_write_accepted", {
+      runnerPid: child.pid ?? null,
+      accepted,
+      requestBytes,
+    });
+    if (!accepted) {
+      child.stdin.once("drain", () => {
+        diagnose("runner.stdin_drain", { runnerPid: child.pid ?? null });
+      });
+    }
     const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
     for await (const line of lines) {
       if (!line.trim()) continue;
@@ -145,6 +326,27 @@ async function executeDetachedProviderTurn(
       } catch {
         // Preserve plain provider output for caller diagnostics.
       }
+      outputCount += 1;
+      const payloadType =
+        payload && typeof payload === "object" && "type" in payload
+          ? String((payload as { type?: unknown }).type ?? "unknown")
+          : "text";
+      diagnose("runner.stdout_payload", {
+        runnerPid: child.pid ?? null,
+        outputNumber: outputCount,
+        payloadType,
+        bytes: Buffer.byteLength(line, "utf8"),
+        ...(payloadType === "error" &&
+        payload &&
+        typeof payload === "object" &&
+        "message" in payload
+          ? {
+              error: redactDiagnosticText(
+                (payload as { message?: unknown }).message,
+              ),
+            }
+          : {}),
+      });
       const nextConversationId = detachedConversationIdFromPayload(payload);
       if (nextConversationId && nextConversationId !== conversationId) {
         conversationId = nextConversationId;
@@ -189,11 +391,28 @@ async function executeDetachedProviderTurn(
       await input.onPayload?.(payload, line);
     }
     const exitCode = await exitPromise;
+    if (runnerStderrBuffer.trim()) {
+      const diagnostic = runnerDiagnosticFromLine(runnerStderrBuffer.trim());
+      if (diagnostic) {
+        diagnose(diagnostic.phase, {
+          runnerPid: child.pid ?? null,
+          ...diagnostic.detail,
+        });
+      }
+    }
     if (input.signal.aborted) {
       throw input.signal.reason instanceof Error
         ? input.signal.reason
         : new Error("Worker execution was cancelled");
     }
+    diagnose("turn.returned", {
+      runnerPid: child.pid ?? null,
+      exitCode,
+      outputCount,
+      completed,
+      hasResultText: resultText !== null,
+      stderrBytes: Buffer.byteLength(stderr, "utf8"),
+    });
     return {
       exitCode,
       stderr,
