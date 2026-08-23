@@ -610,6 +610,65 @@ describe("CompanionChannels", () => {
     expect(container.textContent).toContain("Common channels");
   });
 
+  it("hides the empty reaction control and reacts from the long-press menu", async () => {
+    const item = message("m-quick-reaction", "React from long press");
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [item],
+    });
+    toggleChannelMessageReaction.mockResolvedValue({
+      message: {
+        ...item,
+        reactions: [{ emoji: "👍", count: 1, userIds: ["user-1"] }],
+      },
+    });
+    await render();
+
+    const channelButton = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".companion-channel-group button",
+      ),
+    ].find((button) => button.textContent?.includes("Welcome"));
+    await act(async () => {
+      channelButton!.click();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".channel-reaction-add")).toBeNull();
+    expect(container.querySelector(".channel-message-actions")).toBeNull();
+    const row = container.querySelector<HTMLElement>(
+      '[data-companion-channel-message-id="m-quick-reaction"]',
+    );
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    });
+
+    const quickReactions = container.querySelectorAll<HTMLButtonElement>(
+      ".companion-channel-quick-reactions button",
+    );
+    expect([...quickReactions].map((button) => button.textContent)).toEqual([
+      "👍",
+      "❤️",
+      "😂",
+      "🎉",
+    ]);
+    await act(async () => {
+      quickReactions[0]!.click();
+      await Promise.resolve();
+    });
+
+    expect(toggleChannelMessageReaction).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "c-common",
+      item.id,
+      "👍",
+    );
+    expect(container.querySelector(".companion-channel-action-sheet")).toBeNull();
+  });
+
   it("preserves materialized approvals when a reaction returns a stale message", async () => {
     const item = message("m-reaction-safe", "승인 기록이 있는 메시지");
     item.reactions = [{ emoji: "👍", count: 1, userIds: ["user-1"] }];

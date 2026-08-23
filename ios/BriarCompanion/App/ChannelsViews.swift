@@ -931,7 +931,7 @@ private struct ChannelMessageRow: View {
                     )
                     .padding(.top, 5)
                 }
-                if !isOptimistic {
+                if !isOptimistic, !message.reactions.isEmpty {
                     ChannelReactionBar(
                         currentUserID: currentUserID,
                         locale: locale,
@@ -946,18 +946,28 @@ private struct ChannelMessageRow: View {
         .highPriorityGesture(
             LongPressGesture(minimumDuration: 0.45)
                 .onEnded { _ in
-                    guard !isOptimistic, onOpenThread != nil else { return }
+                    guard !isOptimistic else { return }
                     showingThreadActions = true
                 }
         )
         .sheet(isPresented: $showingThreadActions) {
-            ChannelMessageActionsSheet(locale: locale) {
-                showingThreadActions = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    onOpenThread?()
+            ChannelMessageActionsSheet(
+                locale: locale,
+                quickEmojis: Self.quickReactionEmojis,
+                onToggleReaction: { emoji in
+                    showingThreadActions = false
+                    Task { await onToggleReaction(emoji) }
+                },
+                onStartThread: onOpenThread.map { openThread in
+                    {
+                        showingThreadActions = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            openThread()
+                        }
+                    }
                 }
-            }
-            .presentationDetents([.height(150)])
+            )
+            .presentationDetents([.height(onOpenThread == nil ? 130 : 210)])
             .presentationDragIndicator(.visible)
             .presentationBackground(.regularMaterial)
         }
@@ -966,27 +976,58 @@ private struct ChannelMessageRow: View {
 
 private struct ChannelMessageActionsSheet: View {
     let locale: CompanionLocale
-    let onStartThread: () -> Void
+    let quickEmojis: [String]
+    let onToggleReaction: (String) -> Void
+    let onStartThread: (() -> Void)?
 
     var body: some View {
-        Button(action: onStartThread) {
-            Label(
-                L10n.text(.channelStartThread, locale: locale),
-                systemImage: "bubble.left.and.bubble.right"
-            )
-            .font(.body.weight(.semibold))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .frame(height: 58)
-            .background(
-                Color(.secondarySystemBackground),
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-            )
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                ForEach(quickEmojis, id: \.self) { emoji in
+                    Button {
+                        onToggleReaction(emoji)
+                    } label: {
+                        Text(emoji)
+                            .font(.system(size: 28))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(
+                                Color(.secondarySystemBackground),
+                                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        String(
+                            format: L10n.text(.channelReactWith, locale: locale),
+                            emoji
+                        )
+                    )
+                    .accessibilityIdentifier("channel-quick-reaction-\(emoji)")
+                }
+            }
+
+            if let onStartThread {
+                Button(action: onStartThread) {
+                    Label(
+                        L10n.text(.channelStartThread, locale: locale),
+                        systemImage: "bubble.left.and.bubble.right"
+                    )
+                    .font(.body.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .frame(height: 58)
+                    .background(
+                        Color(.secondarySystemBackground),
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("channel-start-thread-action")
+            }
         }
-        .buttonStyle(.plain)
         .padding(.horizontal, 18)
         .padding(.top, 8)
-        .accessibilityIdentifier("channel-start-thread-action")
     }
 }
 
