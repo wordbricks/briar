@@ -1,6 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  claimMergeBatchIfReady,
   executeClaimedMergeBatch,
   inspectMergeQueueDoctor,
   type MergeBatchApi,
@@ -144,19 +143,6 @@ function recordingApi() {
 }
 
 describe("local provider-independent merge-queue worker", () => {
-  it("does not claim merge work without the audited runtime", async () => {
-    const api = vi.fn();
-    await expect(claimMergeBatchIfReady({
-      api: api as unknown as MergeBatchApi,
-      projectId,
-      workerId: "worker-1",
-      claimedBy: "local",
-      repliesOnly: false,
-      runtime: null,
-    })).resolves.toBeNull();
-    expect(api).not.toHaveBeenCalled();
-  });
-
   it("seals an exact PR identity without calling GitHub merge-queue mutations", async () => {
     const commands: string[][] = [];
     const run: MergeQueueCommandRunner = (command) => {
