@@ -3980,12 +3980,6 @@ function KanbanCard({
             <span className={`source-dot ${run.source}`} />
             {t(`source.${run.source}` as MessageKey)}
           </i>
-          {run.executionReadiness === "waiting" && (
-            <i>{t("issue.waitingOnPrerequisites", {
-              count: run.waitingOnPrerequisiteCount ?? 0,
-            })}</i>
-          )}
-          {run.priority !== null && <i className="kanban-priority">P{run.priority}</i>}
           {assignee && (
             <i
               aria-label={`${t("issue.assignee")}: ${assignee.name}`}
@@ -3995,6 +3989,12 @@ function KanbanCard({
               <IssueAssigneeAvatar member={assignee} />
             </i>
           )}
+          {run.executionReadiness === "waiting" && (
+            <i>{t("issue.waitingOnPrerequisites", {
+              count: run.waitingOnPrerequisiteCount ?? 0,
+            })}</i>
+          )}
+          {run.priority !== null && <i className="kanban-priority">P{run.priority}</i>}
         </span>
         <span className="kanban-card-footer">
           <small>{isClaimed ? t("run.assigned", { agent: run.claimedBy ?? "agent" }) : relativeTime(run.updatedAt, t)}</small>
