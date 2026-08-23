@@ -848,25 +848,11 @@ private struct ChannelConversationView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let errorMessage = channels.errorMessage {
-                HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                    Text(errorMessage)
-                        .font(.caption)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Button {
-                        channels.dismissError()
-                    } label: {
-                        Image(systemName: "xmark")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(L10n.text("닫기", locale: locale))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(Color.red.opacity(0.08))
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("channel-error-banner")
+                ChannelErrorBanner(
+                    locale: locale,
+                    text: errorMessage,
+                    onDismiss: { channels.dismissError() }
+                )
             }
             ConversationTimeline(
                 messages: messages,
@@ -896,6 +882,9 @@ private struct ChannelConversationView: View {
                             members: channels.members,
                             message: message,
                             locale: locale,
+                            replyError: channels.failedReply(for: message.id).map {
+                                ChannelAlertPresentation.localizedReplyError($0.error, locale: locale)
+                            },
                             onAcceptProposal: { proposalID, projectID, execution in
                                 await channels.acceptProposal(
                                     channelID: channel.id,
@@ -1080,6 +1069,7 @@ private struct ChannelMessageRow: View {
     let onOpenAttachment: @MainActor (URL) -> Void
     let onToggleReaction: (String) async -> Void
     let onOpenThread: (() -> Void)?
+    let replyError: String?
     let projects: [ProjectsResponse.Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
@@ -1130,13 +1120,15 @@ private struct ChannelMessageRow: View {
             timestamp: message.createdAt,
             accessibilityIdentifier: "channel-message-\(message.id.uuidString.lowercased())"
         ) {
-            if let blocks = message.blocks, !blocks.isEmpty {
-                ChannelWebhookBlocksView(blocks: blocks)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                MentionText(text: messageBodyWithoutAttachments, handles: mentionHandles)
-                    .font(.body)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            ChannelAlertMessageBody(
+                locale: locale,
+                mentionHandles: mentionHandles,
+                message: message,
+                messageBodyWithoutAttachments: messageBodyWithoutAttachments
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let replyError {
+                ChannelReplyFailureView(error: replyError, locale: locale)
             }
                 if !message.attachments.isEmpty {
                     LazyVGrid(
@@ -1592,6 +1584,7 @@ private extension String {
 
 private struct ChannelWebhookBlocksView: View {
     let blocks: [ChannelMessageBlock]
+    let locale: CompanionLocale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -1601,16 +1594,32 @@ private struct ChannelWebhookBlocksView: View {
                     SelectableText(block.textObject?.text ?? "", style: .title3Bold)
                 case .section:
                     if let text = block.textObject {
-                        if text.type == .markdown {
-                            MarkdownText(
-                                markdown: ChannelWebhookBlockFormatting.slackMarkdown(text.text)
-                            )
-                        } else {
-                            SelectableText(text.text)
+                        ChannelCollapsibleDump(
+                            locale: locale,
+                            text: text.text,
+                            expand: block.expand == true
+                        ) {
+                            if text.type == .markdown {
+                                MarkdownText(
+                                    markdown: ChannelWebhookBlockFormatting.slackMarkdown(
+                                        ChannelAlertPresentation.formattedDump(text.text)
+                                    )
+                                )
+                            } else if let json = ChannelAlertPresentation.prettyJSON(text.text) {
+                                SelectableText(json, style: .footnoteMono)
+                            } else {
+                                SelectableText(text.text)
+                            }
                         }
                     }
                 case .markdown:
-                    MarkdownText(markdown: block.markdownText ?? "")
+                    ChannelCollapsibleDump(locale: locale, text: block.markdownText ?? "") {
+                        if let json = ChannelAlertPresentation.prettyJSON(block.markdownText ?? "") {
+                            SelectableText(json, style: .footnoteMono)
+                        } else {
+                            MarkdownText(markdown: block.markdownText ?? "")
+                        }
+                    }
                 case .divider:
                     Divider()
                 case .context:
@@ -1628,14 +1637,179 @@ private struct ChannelWebhookBlocksView: View {
                 case .richText:
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(Array((block.richTextElements ?? []).enumerated()), id: \.offset) { _, element in
-                            MarkdownText(
-                                markdown: ChannelWebhookBlockFormatting.richMarkdown(element)
-                            )
+                            if element.type == .preformatted {
+                                let text = ChannelWebhookBlockFormatting.richMarkdown(element)
+                                ChannelCollapsibleDump(locale: locale, text: text) {
+                                    MarkdownText(markdown: text)
+                                }
+                            } else {
+                                MarkdownText(
+                                    markdown: ChannelWebhookBlockFormatting.richMarkdown(element)
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+private struct ChannelAlertMessageBody: View {
+    let locale: CompanionLocale
+    let mentionHandles: Set<String>
+    let message: ChannelMessage
+    let messageBodyWithoutAttachments: String
+
+    var body: some View {
+        let tone = ChannelAlertPresentation.tone(from: message)
+        let content = Group {
+            if let blocks = message.blocks, !blocks.isEmpty {
+                ChannelWebhookBlocksView(blocks: blocks, locale: locale)
+            } else if let json = ChannelAlertPresentation.prettyJSON(messageBodyWithoutAttachments) {
+                ChannelCollapsibleDump(locale: locale, text: messageBodyWithoutAttachments) {
+                    SelectableText(json, style: .footnoteMono)
+                }
+            } else {
+                ChannelCollapsibleDump(locale: locale, text: messageBodyWithoutAttachments) {
+                    MentionText(text: messageBodyWithoutAttachments, handles: mentionHandles)
+                        .font(.body)
+                }
+            }
+        }
+        if let tone {
+            ChannelAlertCard(locale: locale, tone: tone) { content }
+        } else {
+            content
+        }
+    }
+}
+
+private struct ChannelAlertCard<Content: View>: View {
+    let locale: CompanionLocale
+    let tone: ChannelAlertTone
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(tone == .error
+                ? L10n.text("오류", locale: locale)
+                : L10n.text("경고", locale: locale)
+            )
+            .font(.caption2.weight(.bold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .foregroundStyle(tone == .error ? Color.red : Color.orange)
+            .background(
+                (tone == .error ? Color.red : Color.orange).opacity(0.12),
+                in: Capsule()
+            )
+            content
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            (tone == .error ? Color.red : Color.orange).opacity(0.08),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .fill(tone == .error ? Color.red : Color.orange)
+                .frame(width: 4)
+                .clipShape(UnevenRoundedRectangle(
+                    topLeadingRadius: 10,
+                    bottomLeadingRadius: 10,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 0
+                ))
+        }
+        .accessibilityIdentifier("channel-alert-card")
+    }
+}
+
+private struct ChannelCollapsibleDump<Content: View>: View {
+    let locale: CompanionLocale
+    let text: String
+    var expand = false
+    @ViewBuilder var content: Content
+    @State private var open = false
+
+    var body: some View {
+        let collapsed = ChannelAlertPresentation.shouldCollapse(text, expand: expand)
+        if collapsed {
+            VStack(alignment: .leading, spacing: 6) {
+                if open {
+                    content
+                } else {
+                    Text(ChannelAlertPresentation.preview(text).preview)
+                        .font(.system(.footnote, design: .monospaced))
+                        .textSelection(.enabled)
+                }
+                Button(
+                    open
+                        ? L10n.text("자세히 숨기기", locale: locale)
+                        : L10n.text("자세히 보기", locale: locale)
+                ) {
+                    open.toggle()
+                }
+                .font(.caption.weight(.semibold))
+                .buttonStyle(.plain)
+            }
+        } else {
+            content
+        }
+    }
+}
+
+private struct ChannelReplyFailureView: View {
+    let error: String
+    let locale: CompanionLocale
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L10n.text("Agent 답변을 만들지 못했습니다", locale: locale))
+                .font(.caption.weight(.semibold))
+            ChannelCollapsibleDump(locale: locale, text: error) {
+                Text(error)
+                    .font(.footnote)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.red.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
+        .accessibilityIdentifier("channel-reply-failure")
+    }
+}
+
+private struct ChannelErrorBanner: View {
+    let locale: CompanionLocale
+    let text: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+            ChannelCollapsibleDump(locale: locale, text: text) {
+                Text(text)
+                    .font(.caption)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.text("닫기", locale: locale))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(Color.red.opacity(0.08))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("channel-error-banner")
     }
 }
 

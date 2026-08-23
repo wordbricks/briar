@@ -105,7 +105,11 @@ import {
   mergeChannelMessages,
   mergeChannelMessageSnapshot,
 } from "../lib/channel-message-merge";
-import { channelReplyErrorText } from "../lib/channel-reply-error";
+import {
+  channelReplyErrorText,
+  failedChannelReplyErrors,
+} from "../lib/channel-reply-error";
+import { ChannelErrorNotice, ChannelReplyFailure } from "./ChannelAlertNotice";
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import {
   ChannelDraftImages,
@@ -2143,6 +2147,14 @@ export function Channels({
       reply.channelId === activeChannelId &&
       (reply.status === "queued" || reply.status === "running"),
   );
+  const failedReplyErrors = failedChannelReplyErrors(
+    replies,
+    activeChannelId,
+    {
+      fallback: t("run.failed"),
+      noAvailableWorker: t("agents.agentWorkerUnavailable"),
+    },
+  );
   const threadMessageIds = threadParentId
     ? new Set([threadParentId, ...threadMessages.map((message) => message.id)])
     : new Set<string>();
@@ -2260,7 +2272,9 @@ export function Channels({
               </div>
             </header>
 
-            {error ? <div className="channel-error">{error}</div> : null}
+            {error ? (
+              <ChannelErrorNotice className="channel-error" text={error} />
+            ) : null}
 
             <div
               className="channel-messages"
@@ -2338,6 +2352,7 @@ export function Channels({
                       onToggleReaction={(emoji) =>
                         void toggleReaction(message, emoji)
                       }
+                      replyError={failedReplyErrors.get(message.id) ?? null}
                       busy={busy}
                       acceptingProposal={
                         acceptingProposalId === message.proposal?.id
@@ -2498,6 +2513,7 @@ export function Channels({
                 onToggleReaction={(emoji) =>
                   void toggleReaction(message, emoji)
                 }
+                replyError={failedReplyErrors.get(message.id) ?? null}
                 busy={busy}
                 acceptingProposal={
                   acceptingProposalId === message.proposal?.id
@@ -3796,6 +3812,7 @@ const MessageRow = memo(function MessageRow({
   onIssueOpen,
   onProjectChange,
   onToggleReaction,
+  replyError,
   busy,
   projects,
   selectedProjectId,
@@ -3842,6 +3859,7 @@ const MessageRow = memo(function MessageRow({
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
   onProjectChange: (projectId: string) => void;
   onToggleReaction: (emoji: string) => void;
+  replyError?: string | null;
   busy: boolean;
   projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
   selectedProjectId: string | null;
@@ -3932,6 +3950,7 @@ const MessageRow = memo(function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
+        {replyError ? <ChannelReplyFailure error={replyError} /> : null}
         <ChannelMessageImages attachments={message.attachments} token={token} />
         {showTypingState ? (
           <ChannelTypingState
