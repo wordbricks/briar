@@ -5,11 +5,16 @@ import {
   type AgentModelCapability,
   type ModelEffort,
 } from "./agent-provider-contract";
-import { agentProviders, type AgentProvider } from "./agent-provider";
+import {
+  agentProviders,
+  sortAgentProviders,
+  type AgentProvider,
+} from "./agent-provider";
 
 export {
   agentProviderLabels,
   agentProviders,
+  sortAgentProviders,
   type AgentProvider,
 } from "./agent-provider";
 export type { ModelEffort } from "./agent-provider-contract";
@@ -48,6 +53,34 @@ export type AgentProviderModelCatalog = AgentProviderCapabilityCatalog;
 export const defaultAgentProviderModelCatalog: AgentProviderModelCatalog =
   emptyAgentProviderCapabilityCatalog();
 
+const effortMenuPositions = new Map(
+  ["low", "medium", "high", "xhigh", "max", "ultra"].map(
+    (effort, index) => [effort, index],
+  ),
+);
+
+function compareMenuText(left: string, right: string) {
+  const leftFolded = left.normalize("NFKD").toLocaleLowerCase("en-US");
+  const rightFolded = right.normalize("NFKD").toLocaleLowerCase("en-US");
+  return leftFolded < rightFolded
+    ? -1
+    : leftFolded > rightFolded
+      ? 1
+      : left < right
+        ? -1
+        : left > right
+          ? 1
+          : 0;
+}
+
+function compareAgentModels(
+  left: Pick<AgentModelCapability, "id" | "label">,
+  right: Pick<AgentModelCapability, "id" | "label">,
+) {
+  return compareMenuText(left.label, right.label) ||
+    compareMenuText(left.id, right.id);
+}
+
 export function sortAgentModelsByPreference<T extends { id: string }>(
   models: readonly T[],
   favoriteModels: readonly string[] = [],
@@ -56,7 +89,7 @@ export function sortAgentModelsByPreference<T extends { id: string }>(
     favoriteModels.map((model, index) => [model, index]),
   );
   return models
-    .map((model, index) => ({ model, index }))
+    .map((model) => ({ model }))
     .sort((left, right) => {
       const leftFavorite = favoriteOrder.get(left.model.id);
       const rightFavorite = favoriteOrder.get(right.model.id);
@@ -65,7 +98,13 @@ export function sortAgentModelsByPreference<T extends { id: string }>(
       }
       if (leftFavorite !== undefined) return -1;
       if (rightFavorite !== undefined) return 1;
-      return left.index - right.index;
+      if ("label" in left.model && "label" in right.model) {
+        return compareAgentModels(
+          left.model as T & { label: string },
+          right.model as T & { label: string },
+        );
+      }
+      return compareMenuText(left.model.id, right.model.id);
     })
     .map(({ model }) => model);
 }
@@ -117,7 +156,17 @@ export function agentEffortOptions(
   const efforts = reportedModel?.efforts?.length
     ? reportedModel.efforts
     : (entry.defaultEfforts ?? []);
-  const options = efforts.map((effort) => ({
+  const options = [...efforts].sort((left, right) => {
+    const leftPosition = effortMenuPositions.get(left.id);
+    const rightPosition = effortMenuPositions.get(right.id);
+    if (leftPosition !== undefined && rightPosition !== undefined) {
+      return leftPosition - rightPosition;
+    }
+    if (leftPosition !== undefined) return -1;
+    if (rightPosition !== undefined) return 1;
+    return compareMenuText(left.label, right.label) ||
+      compareMenuText(left.id, right.id);
+  }).map((effort) => ({
     value: effort.id,
     label: effort.label,
     description: effort.description ?? undefined,

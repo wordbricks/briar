@@ -19,6 +19,19 @@ enum AgentProvider: String, Codable, CaseIterable, Hashable, Identifiable, Senda
         default: rawValue.capitalized
         }
     }
+
+    static func stableMenuOrder(_ providers: [Self]) -> [Self] {
+        let positions = Dictionary(
+            uniqueKeysWithValues: allCases.enumerated().map { ($0.element, $0.offset) }
+        )
+        return providers.enumerated().sorted { left, right in
+            let leftPosition = positions[left.element] ?? .max
+            let rightPosition = positions[right.element] ?? .max
+            return leftPosition == rightPosition
+                ? left.offset < right.offset
+                : leftPosition < rightPosition
+        }.map(\.element)
+    }
 }
 
 struct ModelEffort: RawRepresentable, Codable, Hashable, Identifiable, Sendable {
@@ -61,12 +74,76 @@ struct AgentProviderCapability: Codable, Equatable, Sendable {
 struct AgentProviderCapabilityCatalog: Equatable, Sendable {
     private var entries: [String: AgentProviderCapability]
 
+    private static let effortMenuPositions = Dictionary(
+        uniqueKeysWithValues: ["low", "medium", "high", "xhigh", "max", "ultra"]
+            .enumerated()
+            .map { ($0.element, $0.offset) }
+    )
+
+    private static func compareMenuText(_ left: String, _ right: String) -> Bool {
+        let leftFolded = left.lowercased(with: Locale(identifier: "en_US_POSIX"))
+        let rightFolded = right.lowercased(with: Locale(identifier: "en_US_POSIX"))
+        return leftFolded == rightFolded ? left < right : leftFolded < rightFolded
+    }
+
+    private static func stableModelOrder(
+        _ models: [AgentModelCapability]
+    ) -> [AgentModelCapability] {
+        models.sorted { left, right in
+            if left.label != right.label {
+                return compareMenuText(left.label, right.label)
+            }
+            return compareMenuText(left.id, right.id)
+        }
+    }
+
+    private static func stableEffortOrder(
+        _ efforts: [AgentEffortCapability]
+    ) -> [AgentEffortCapability] {
+        efforts.sorted { left, right in
+            let leftPosition = effortMenuPositions[left.id]
+            let rightPosition = effortMenuPositions[right.id]
+            switch (leftPosition, rightPosition) {
+            case let (.some(leftPosition), .some(rightPosition)):
+                return leftPosition < rightPosition
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            case (.none, .none):
+                if left.label != right.label {
+                    return compareMenuText(left.label, right.label)
+                }
+                return compareMenuText(left.id, right.id)
+            }
+        }
+    }
+
+    private static func stableMenuOrder(
+        _ capability: AgentProviderCapability
+    ) -> AgentProviderCapability {
+        AgentProviderCapability(
+            models: stableModelOrder(capability.models.map { model in
+                AgentModelCapability(
+                    id: model.id,
+                    label: model.label,
+                    isDefault: model.isDefault,
+                    defaultEffortId: model.defaultEffortId,
+                    efforts: stableEffortOrder(model.efforts)
+                )
+            }),
+            defaultEfforts: stableEffortOrder(capability.defaultEfforts),
+            allowCustomModels: capability.allowCustomModels,
+            error: capability.error
+        )
+    }
+
     init(workers: [DashboardWorker]) {
         entries = [:]
         for worker in workers where worker.readiness != "offline" {
             for (provider, capability) in worker.capabilities?.providerCapabilities ?? [:] {
                 guard var existing = entries[provider] else {
-                    entries[provider] = capability
+                    entries[provider] = Self.stableMenuOrder(capability)
                     continue
                 }
                 var models = Dictionary(uniqueKeysWithValues: existing.models.map { ($0.id, $0) })
@@ -82,17 +159,17 @@ struct AgentProviderCapabilityCatalog: Equatable, Sendable {
                         label: saved.label,
                         isDefault: (saved.isDefault ?? false) || (model.isDefault ?? false),
                         defaultEffortId: saved.defaultEffortId ?? model.defaultEffortId,
-                        efforts: Array(efforts.values)
+                        efforts: Self.stableEffortOrder(Array(efforts.values))
                     )
                 }
                 var defaults = Dictionary(uniqueKeysWithValues: existing.defaultEfforts.map { ($0.id, $0) })
                 capability.defaultEfforts.forEach { defaults[$0.id] = $0 }
-                existing = AgentProviderCapability(
+                existing = Self.stableMenuOrder(AgentProviderCapability(
                     models: Array(models.values),
                     defaultEfforts: Array(defaults.values),
                     allowCustomModels: existing.allowCustomModels || capability.allowCustomModels,
                     error: existing.error == nil || capability.error == nil ? nil : existing.error
-                )
+                ))
                 entries[provider] = existing
             }
         }

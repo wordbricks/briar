@@ -265,6 +265,7 @@ import {
   agentModelOptions,
   agentProviderLabels,
   agentProviders,
+  sortAgentProviders,
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
@@ -1276,13 +1277,13 @@ export function HuntDashboard({
   );
   const availableProviders = useMemo<AgentProvider[]>(() => {
     if (dashboard?.organizationProviders?.length) {
-      return dashboard.organizationProviders;
+      return sortAgentProviders(dashboard.organizationProviders);
     }
-    return [
+    return sortAgentProviders([
       ...new Set(
         (dashboard?.workers ?? []).flatMap((worker) => worker.providers ?? []),
       ),
-    ];
+    ]);
   }, [dashboard?.organizationProviders, dashboard?.workers]);
   useEffect(() => {
     setSelectedRunInitialTab(null);

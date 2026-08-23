@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import {
   agentProviderLabels,
   agentProviders,
+  sortAgentProviders,
   type AgentProvider,
 } from "../lib/project-llm";
 import { AgentProviderIcon } from "./AgentIcons";
@@ -23,7 +24,7 @@ function providerSelectOptions(
   ) => Partial<Omit<SelectMenuOption, "label" | "leading" | "value">>,
   iconSize = 16,
 ): SelectMenuOption[] {
-  return providers.map((provider) => ({
+  return sortAgentProviders(providers).map((provider) => ({
     ...extras?.(provider),
     label: agentProviderLabels[provider],
     leading: <AgentProviderIcon provider={provider} size={iconSize} />,
