@@ -1,6 +1,7 @@
 import XCTest
 @testable import BriarCompanion
 
+@MainActor
 final class CompanionReadTests: XCTestCase {
     private let older = Date(timeIntervalSince1970: 1_700_000_000)
     private let middle = Date(timeIntervalSince1970: 1_700_000_100)
