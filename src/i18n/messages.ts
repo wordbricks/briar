@@ -229,6 +229,7 @@ export const ko = {
   "channel.messageActions": "메시지 동작",
   "channel.moreActions": "더 보기",
   "channel.copyLink": "링크 복사",
+  "channel.copyText": "텍스트 복사",
   "channel.copyMessage": "메시지 복사",
   "channel.linkCopied": "링크가 복사되었습니다",
   "channel.messageCopied": "메시지가 복사되었습니다",
@@ -2161,6 +2162,7 @@ export type Messages = Record<MessageKey, string>;
 export const en: Messages = {
   ...ko,
   "channel.startThread": "Start a thread",
+  "channel.copyText": "Copy text",
   "sidebar.dms": "DMs",
   "dm.conversations": "Direct message conversations",
   "dm.search": "Search DMs",
@@ -3387,6 +3389,7 @@ export const en: Messages = {
 export const zh: Messages = {
   ...en,
   "channel.startThread": "开始话题",
+  "channel.copyText": "复制文本",
   "onboarding.previous": "返回",
   "onboarding.chooseMethodTitle": "您想如何开始项目？",
   "onboarding.chooseMethodDescription": "连接已有代码，或从 Lovable 导入项目。",

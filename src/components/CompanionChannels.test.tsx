@@ -344,6 +344,7 @@ describe("CompanionChannels", () => {
       .querySelectorAll("[data-testid='toast-viewport']")
       .forEach((node) => node.remove());
     Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    Reflect.deleteProperty(navigator, "clipboard");
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -610,7 +611,12 @@ describe("CompanionChannels", () => {
     expect(container.textContent).toContain("Common channels");
   });
 
-  it("hides the empty reaction control and reacts from the long-press menu", async () => {
+  it("keeps thread and copy actions beside reactions in the long-press menu", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
     const item = message("m-quick-reaction", "React from long press");
     loadChannel.mockResolvedValue({
       channel: channel("c-common", "Welcome", null),
@@ -654,8 +660,46 @@ describe("CompanionChannels", () => {
       "😂",
       "🎉",
     ]);
+    expect(
+      container.querySelector<HTMLButtonElement>(".companion-channel-start-thread")
+        ?.textContent,
+    ).toBe("Start a thread");
+    expect(
+      container.querySelector<HTMLButtonElement>(".companion-channel-copy-link")
+        ?.textContent,
+    ).toBe("Copy link");
+    expect(
+      container.querySelector<HTMLButtonElement>(".companion-channel-copy-text")
+        ?.textContent,
+    ).toBe("Copy text");
+
     await act(async () => {
-      quickReactions[0]!.click();
+      container.querySelector<HTMLButtonElement>(".companion-channel-copy-text")!
+        .click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenLastCalledWith("React from long press");
+
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".companion-channel-copy-link")!
+        .click();
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenLastCalledWith(
+      "http://127.0.0.1:8787/open/channels/org-1/c-common/m-quick-reaction",
+    );
+
+    await act(async () => {
+      row!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    });
+    const reopenedQuickReactions = container.querySelectorAll<HTMLButtonElement>(
+      ".companion-channel-quick-reactions button",
+    );
+    await act(async () => {
+      reopenedQuickReactions[0]!.click();
       await Promise.resolve();
     });
 
