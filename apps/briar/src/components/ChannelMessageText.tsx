@@ -6,6 +6,15 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import {
+  ChannelAlertCard,
+  ChannelCollapsibleDump,
+} from "./ChannelAlertNotice";
+import {
+  channelAlertToneFromMessage,
+  prettyPrintJson,
+  shouldCollapseChannelText,
+} from "../lib/channel-alert-presentation";
 import type {
   ChannelAgentSummary,
   ChannelBlockTextObject,
@@ -101,8 +110,42 @@ function RichTextElementView({ element }: { element: RichTextElement }) {
   );
 }
 
-function ChannelMessageBlocks({ blocks }: { blocks: ChannelMessageBlock[] }) {
+function richInlinePlain(elements: RichTextInline[]) {
+  return elements.map((element) => {
+    if (element.type === "text") return element.text;
+    if (element.type === "link") return element.text ?? element.url;
+    return `:${element.name}:`;
+  }).join("");
+}
+
+function CollapsibleBlock({
+  text,
+  expand = false,
+  children,
+}: {
+  text: string;
+  expand?: boolean;
+  children: ReactNode;
+}) {
+  const json = prettyPrintJson(text);
+  const inner = json
+    ? <pre className="channel-alert-dump"><code>{json}</code></pre>
+    : children;
+  if (!shouldCollapseChannelText(text, expand) && !json) return <>{children}</>;
+  if (!shouldCollapseChannelText(text, expand)) return inner;
   return (
+    <ChannelCollapsibleDump text={json ?? text}>{inner}</ChannelCollapsibleDump>
+  );
+}
+
+function ChannelMessageBlocks({
+  blocks,
+  tone,
+}: {
+  blocks: ChannelMessageBlock[];
+  tone: ReturnType<typeof channelAlertToneFromMessage>;
+}) {
+  const content = (
     <div className="channel-message-blocks">
       {blocks.map((block, index) => {
         const key = block.block_id ?? `${block.type}-${index}`;
@@ -110,9 +153,21 @@ function ChannelMessageBlocks({ blocks }: { blocks: ChannelMessageBlock[] }) {
           case "header":
             return <h3 className="channel-message-block-header" key={key}>{block.text.text}</h3>;
           case "section":
-            return <section className="channel-message-block-section" key={key}><BlockText text={block.text} /></section>;
+            return (
+              <section className="channel-message-block-section" key={key}>
+                <CollapsibleBlock expand={block.expand === true} text={block.text.text}>
+                  <BlockText text={block.text} />
+                </CollapsibleBlock>
+              </section>
+            );
           case "markdown":
-            return <MarkdownContent className="channel-message-block-markdown" key={key}>{block.text}</MarkdownContent>;
+            return (
+              <div className="channel-message-block-markdown" key={key}>
+                <CollapsibleBlock text={block.text}>
+                  <MarkdownContent>{block.text}</MarkdownContent>
+                </CollapsibleBlock>
+              </div>
+            );
           case "divider":
             return <hr className="channel-message-block-divider" key={key} />;
           case "context":
@@ -126,15 +181,26 @@ function ChannelMessageBlocks({ blocks }: { blocks: ChannelMessageBlock[] }) {
           case "rich_text":
             return (
               <div className="channel-message-block-rich-text" key={key}>
-                {block.elements.map((element, elementIndex) => (
-                  <RichTextElementView element={element} key={elementIndex} />
-                ))}
+                {block.elements.map((element, elementIndex) => {
+                  if (element.type === "rich_text_preformatted") {
+                    const text = richInlinePlain(element.elements);
+                    return (
+                      <CollapsibleBlock key={elementIndex} text={text}>
+                        <RichTextElementView element={element} />
+                      </CollapsibleBlock>
+                    );
+                  }
+                  return (
+                    <RichTextElementView element={element} key={elementIndex} />
+                  );
+                })}
               </div>
             );
         }
       })}
     </div>
   );
+  return tone ? <ChannelAlertCard tone={tone}>{content}</ChannelAlertCard> : content;
 }
 
 export const ChannelMessageText = memo(function ChannelMessageText({
@@ -180,15 +246,19 @@ export const ChannelMessageText = memo(function ChannelMessageText({
     [profilesByHandle],
   );
   const body = channelBodyWithoutImages(message.body);
+  const tone = channelAlertToneFromMessage(message);
 
   if (message.blocks?.length) {
-    return <ChannelMessageBlocks blocks={message.blocks} />;
+    return <ChannelMessageBlocks blocks={message.blocks} tone={tone} />;
   }
 
   if (!body) return null;
 
-  return (
-    <>
+  const json = prettyPrintJson(body);
+  const markdown = (
+    json ? (
+      <pre className="channel-alert-dump"><code>{json}</code></pre>
+    ) : (
       <MarkdownContent
         className="channel-message-text"
         components={{
@@ -233,6 +303,15 @@ export const ChannelMessageText = memo(function ChannelMessageText({
       >
         {body}
       </MarkdownContent>
+    )
+  );
+  const content = (
+    <CollapsibleBlock text={body}>{markdown}</CollapsibleBlock>
+  );
+
+  return (
+    <>
+      {tone ? <ChannelAlertCard tone={tone}>{content}</ChannelAlertCard> : content}
       <ProfileDialog
         profile={profile}
         onOpenChange={(open) => {

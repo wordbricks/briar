@@ -8,6 +8,7 @@ enum SelectableTextStyle: String, Equatable {
     case headline
     case secondaryCaption
     case secondaryBody
+    case footnoteMono
 
     var font: UIFont {
         switch self {
@@ -21,6 +22,11 @@ enum SelectableTextStyle: String, Equatable {
             return .preferredFont(forTextStyle: .headline)
         case .secondaryCaption:
             return .preferredFont(forTextStyle: .caption1)
+        case .footnoteMono:
+            return .monospacedSystemFont(
+                ofSize: UIFont.preferredFont(forTextStyle: .footnote).pointSize,
+                weight: .medium
+            )
         }
     }
 
@@ -28,7 +34,7 @@ enum SelectableTextStyle: String, Equatable {
         switch self {
         case .secondaryBody, .secondaryCaption:
             return .secondaryLabel
-        case .body, .title2Bold, .title3Bold, .headline:
+        case .body, .title2Bold, .title3Bold, .headline, .footnoteMono:
             return .label
         }
     }

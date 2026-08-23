@@ -312,6 +312,7 @@ struct ChannelMessageBlock: Codable, Hashable, Sendable {
     let markdownText: String?
     let contextElements: [ChannelBlockText]?
     let richTextElements: [ChannelRichTextElement]?
+    let expand: Bool?
 
     enum Kind: String, Codable, Hashable, Sendable {
         case header
@@ -326,11 +327,13 @@ struct ChannelMessageBlock: Codable, Hashable, Sendable {
         case type
         case text
         case elements
+        case expand
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         type = try container.decode(Kind.self, forKey: .type)
+        expand = try container.decodeIfPresent(Bool.self, forKey: .expand)
         switch type {
         case .header, .section:
             textObject = try container.decode(ChannelBlockText.self, forKey: .text)
@@ -363,6 +366,7 @@ struct ChannelMessageBlock: Codable, Hashable, Sendable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(type, forKey: .type)
+        try container.encodeIfPresent(expand, forKey: .expand)
         switch type {
         case .header, .section:
             try container.encodeIfPresent(textObject, forKey: .text)
