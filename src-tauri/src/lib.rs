@@ -5365,7 +5365,11 @@ fn configure_execution_worker(
         .resource_dir()
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)?;
+    sync_auto_hunt_assets_and_restart_workers(
+        &resource_directory,
+        &home,
+        ExecutionWorkerRestartPolicy::WhenAssetsChange,
+    )?;
     let bun = bundled_bun_binary()
         .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
     let cli = home.join(".local/share/briar/briar.js");
@@ -5445,7 +5449,11 @@ fn sync_execution_worker_labels(app: AppHandle) -> Result<serde_json::Value, Str
         .resource_dir()
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)?;
+    sync_auto_hunt_assets_and_restart_workers(
+        &resource_directory,
+        &home,
+        ExecutionWorkerRestartPolicy::WhenAssetsChange,
+    )?;
     let bun = bundled_bun_binary()
         .ok_or_else(|| "Briar에 포함된 Bun runtime을 찾지 못했습니다.".to_string())?;
     let cli = home.join(".local/share/briar/briar.js");
@@ -5471,7 +5479,11 @@ fn refresh_execution_worker_runtime(app: AppHandle) -> Result<bool, String> {
         .resource_dir()
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)
+    sync_auto_hunt_assets_and_restart_workers(
+        &resource_directory,
+        &home,
+        ExecutionWorkerRestartPolicy::Always,
+    )
 }
 
 fn inspect_execution_workers_at(
@@ -5555,9 +5567,22 @@ fn should_manage_installed_auto_hunt_assets() -> bool {
     !cfg!(debug_assertions) && !cfg!(dev)
 }
 
+#[derive(Clone, Copy)]
+enum ExecutionWorkerRestartPolicy {
+    WhenAssetsChange,
+    Always,
+}
+
+impl ExecutionWorkerRestartPolicy {
+    fn should_restart(self, assets_updated: bool) -> bool {
+        assets_updated || matches!(self, Self::Always)
+    }
+}
+
 fn sync_auto_hunt_assets_and_restart_workers(
     resource_directory: &Path,
     home: &Path,
+    restart_policy: ExecutionWorkerRestartPolicy,
 ) -> Result<bool, String> {
     // Development apps share the production bundle identifier and home
     // directory. Letting one synchronize these global assets can restart the
@@ -5566,17 +5591,17 @@ fn sync_auto_hunt_assets_and_restart_workers(
         return Ok(false);
     }
     let updated = sync_auto_hunt_assets(resource_directory, home)?;
-    if !updated {
+    if !restart_policy.should_restart(updated) {
         return Ok(false);
     }
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     if let Err(error) = restart_execution_worker_services(home) {
-        // Keep the installed version stale so a transient service-manager
-        // failure is retried the next time the desktop app starts.
+        // Invalidate the installed version marker so the next app start retries
+        // both asset synchronization and the Worker service restart.
         let _ = fs::remove_file(home.join(".local/share/briar/VERSION"));
         return Err(error);
     }
-    Ok(true)
+    Ok(updated)
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -8889,9 +8914,11 @@ pub fn run() {
                 {
                     eprintln!("Auto Hunt dispatch recovery failed: {error}");
                 }
-                if let Err(error) =
-                    sync_auto_hunt_assets_and_restart_workers(&resource_directory, &home)
-                {
+                if let Err(error) = sync_auto_hunt_assets_and_restart_workers(
+                    &resource_directory,
+                    &home,
+                    ExecutionWorkerRestartPolicy::WhenAssetsChange,
+                ) {
                     eprintln!(
                         "Briar CLI and Auto Hunt skill automatic synchronization failed: {error}"
                     );
@@ -11007,11 +11034,21 @@ branch refs/heads/briar/second-11111111
         let home = std::env::temp_dir().join(format!("briar-dev-assets-test-{unique}"));
         let resources = home.join("missing-resources");
 
-        assert!(
-            !sync_auto_hunt_assets_and_restart_workers(&resources, &home)
-                .expect("development asset synchronization should be skipped")
-        );
+        assert!(!sync_auto_hunt_assets_and_restart_workers(
+            &resources,
+            &home,
+            ExecutionWorkerRestartPolicy::WhenAssetsChange,
+        )
+        .expect("development asset synchronization should be skipped"));
         assert!(!home.join(".local/share/briar").exists());
+    }
+
+    #[test]
+    fn explicit_worker_runtime_refresh_restarts_current_assets() {
+        assert!(ExecutionWorkerRestartPolicy::WhenAssetsChange.should_restart(true));
+        assert!(!ExecutionWorkerRestartPolicy::WhenAssetsChange.should_restart(false));
+        assert!(ExecutionWorkerRestartPolicy::Always.should_restart(true));
+        assert!(ExecutionWorkerRestartPolicy::Always.should_restart(false));
     }
 
     #[cfg(unix)]
