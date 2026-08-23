@@ -46,17 +46,15 @@ export const MergeBatchEnqueueInput = strictSchema(Schema.Struct({
   queueEntryId: trimmedText(1, 200),
 }));
 
-const MergeQueueAuthorityEntry = strictSchema(Schema.Struct({
-  queueEntryId: trimmedText(1, 200),
-  pullRequestNumber: integerBetween(1, Number.MAX_SAFE_INTEGER),
-}));
-
 export const MergeBatchAuthorityInput = strictSchema(Schema.Struct({
   ...MergeBatchClaimIdentity,
-  deliveryId: trimmedText(1, 200),
-  authorityEntries: mutableArray(MergeQueueAuthorityEntry).check(
-    Schema.isLengthBetween(1, 5),
+  integrationRef: Schema.String.check(
+    Schema.isPattern(
+      /^refs\/heads\/briar\/merge-queue\/[0-9a-f-]{36}$/u,
+    ),
   ),
+  integrationSha: GitObjectId,
+  baseSha: GitObjectId,
 }));
 
 const MergeBatchValidationResult = strictSchema(Schema.Struct({

@@ -10,6 +10,7 @@ import {
   observeSignedMergedBatchPullRequest,
   reconcileReadyMergeCandidates,
   recordMergeBatchCandidateEnqueued,
+  recordPreparedMergeBatch,
   recordMergeBatchValidationProof,
   recordSignedMergeQueuePullRequestObservation,
   recordSignedMergeGroupHead,
@@ -81,7 +82,7 @@ type ReadyRun = {
   baseSha: string;
 };
 
-describe("native merge queue coordinator", () => {
+describe("repository merge queue coordinator", () => {
   let fixture: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
   let db: D1Database;
   let runSequence = 0;
@@ -581,6 +582,51 @@ describe("native merge queue coordinator", () => {
       queueEntryId: "MQE_CURRENT",
       observedAt: at(3, 12),
     })).resolves.toMatchObject({ batch: { state: "waiting_tail" } });
+  });
+
+  it("claims waiting cohorts without merge_group input and seals an integration ref", async () => {
+    const lane = await setupLane(25);
+    const run = await createReadyRun(lane, { readyAt: at(25, 1) });
+    await registerRun(lane, run, at(25, 1));
+    const context = await claimAndEnqueue(lane, at(25, 3));
+    await expect(releaseMergeBatchLease(db, {
+      batchId: context.claim.batch.id,
+      projectId: lane.projectId,
+      workerId: lane.workerId,
+      claimTokenHash: context.claimTokenHash,
+      authenticatedAt: at(25, 4),
+    })).resolves.toBe(true);
+
+    const preparedClaim = await claimNextMergeBatch(db, lane.projectId, {
+      deviceId: lane.deviceId,
+      workerId: lane.workerId,
+      claimedBy: "integration-25",
+      claimTokenHash: tokenHash("e"),
+      claimedAt: at(25, 5),
+      leaseExpiresAt: at(25, 40),
+    });
+    expect(preparedClaim).toMatchObject({
+      phase: "tail_authority",
+      pendingHeads: [],
+      batch: { state: "waiting_tail" },
+    });
+    const integrationSha = sha("f");
+    await expect(recordPreparedMergeBatch(db, {
+      batchId: context.claim.batch.id,
+      projectId: lane.projectId,
+      workerId: lane.workerId,
+      claimTokenHash: tokenHash("e"),
+      integrationRef:
+        `refs/heads/briar/merge-queue/${context.claim.batch.id}`,
+      integrationSha,
+      baseSha: sha("1"),
+      observedAt: at(25, 6),
+    })).resolves.toMatchObject({
+      state: "validating",
+      final_delivery_id: `integration:${integrationSha}`,
+      merge_group_sha: integrationSha,
+      merge_group_base_sha: sha("1"),
+    });
   });
 
   it("blocks a sealed generation when its PR is force-pushed", async () => {

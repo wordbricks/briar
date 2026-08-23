@@ -356,18 +356,6 @@ const allBatchCandidatesHaveSignedMergeReceipts = (batch: string) => `
         or candidate.merged_at is null)
   )`;
 
-const pendingFinalHead = (batch: string) => `
-  exists (
-    select 1 from briar_merge_group_heads head
-    where head.batch_id = ${batch}.id and head.state = 'pending'
-      and head.tail_pull_request_number = (
-        select candidate.pull_request_number
-        from briar_merge_batch_candidates candidate
-        where candidate.batch_id = ${batch}.id
-        order by candidate.ordinal desc limit 1
-      )
-  )`;
-
 function addMilliseconds(timestamp: string, milliseconds: number) {
   const parsed = Date.parse(timestamp);
   if (!Number.isFinite(parsed)) {
@@ -1022,7 +1010,6 @@ export async function claimNextMergeBatch(
        select batch.id from briar_merge_batches batch
        where batch.project_id = ? and batch.state in (${claimableBatchStatesSql})
          and (batch.lease_expires_at is null or batch.lease_expires_at <= ?)
-         and (batch.state <> 'waiting_tail' or ${pendingFinalHead("batch")})
          and exists (
            select 1
            from briar_execution_workers selected_worker
@@ -1071,9 +1058,6 @@ export async function claimNextMergeBatch(
      )
        and project_id = ? and state in (${claimableBatchStatesSql})
        and (lease_expires_at is null or lease_expires_at <= ?)
-       and (state <> 'waiting_tail' or ${
-      pendingFinalHead("briar_merge_batches")
-    })
      returning *`,
   ).bind(
     input.claimTokenHash,
@@ -1176,7 +1160,62 @@ export async function releaseMergeBatchLease(
   return Boolean(released);
 }
 
-/** Records one idempotent, in-order exact-SHA GitHub merge-queue enqueue. */
+/**
+ * Seals the exact bors-style integration ref prepared by the local Worker.
+ * The ref is ordinary Git data: no GitHub merge-queue entry or merge_group
+ * webhook participates in this authority transition.
+ */
+export async function recordPreparedMergeBatch(
+  db: D1Database,
+  input: {
+    batchId: string;
+    projectId: string;
+    workerId: string;
+    claimTokenHash: string;
+    integrationRef: string;
+    integrationSha: string;
+    baseSha: string;
+    observedAt: string;
+  },
+) {
+  if (
+    input.integrationRef !==
+      `refs/heads/briar/merge-queue/${input.batchId}`
+  ) return null;
+  return db.prepare(
+    `update briar_merge_batches as batch
+     set state = 'validating',
+         final_delivery_id = 'integration:' || ?,
+         merge_group_ref = ?, merge_group_sha = ?,
+         merge_group_base_sha = ?, updated_at = ?
+     where ${liveLeaseFence} and batch.state = 'waiting_tail'
+       and batch.final_delivery_id is null
+       and ${completeBatchRunSets("batch")}
+       and not exists (
+         select 1 from briar_merge_batch_candidates candidate
+         where candidate.batch_id = batch.id
+           and (
+             candidate.state <> 'enqueued'
+             or candidate.queue_entry_id is null
+             or not (${currentReadyCandidate("candidate")})
+           )
+       )
+     returning *`,
+  ).bind(
+    input.integrationSha,
+    input.integrationRef,
+    input.integrationSha,
+    input.baseSha,
+    input.observedAt,
+    input.batchId,
+    input.projectId,
+    input.workerId,
+    input.claimTokenHash,
+    input.observedAt,
+  ).first<MergeBatchRow>();
+}
+
+/** Records one idempotent, in-order exact PR identity in the Briar lane. */
 export async function recordMergeBatchCandidateEnqueued(
   db: D1Database,
   input: {

@@ -66,15 +66,6 @@ export class MergeQueueRetryError extends Error {
   }
 }
 
-class ForeignQueuePrefixError extends Error {
-  constructor() {
-    super(
-      "The signed cumulative merge-group contains a queue entry outside the sealed Briar cohort",
-    );
-    this.name = "ForeignQueuePrefixError";
-  }
-}
-
 const runLocalCommand: MergeQueueCommandRunner = (command, options) => {
   if (command.length === 0) {
     throw new MergeQueueInfrastructureError("Local command argv is empty");
@@ -113,20 +104,6 @@ const PositiveInteger = Schema.Int.check(Schema.isGreaterThan(0));
 const GraphQlError = Schema.Struct({ message: Schema.String });
 const GraphQlErrors = Schema.optional(Schema.mutable(Schema.Array(GraphQlError)));
 
-const QueueEntrySchema = Schema.Struct({
-  id: Schema.NonEmptyString,
-  state: Schema.String,
-  pullRequest: Schema.Struct({
-    id: Schema.NonEmptyString,
-    databaseId: PositiveInteger,
-    number: PositiveInteger,
-    headRefOid: GitObjectId,
-    baseRefName: Schema.String,
-    baseRefOid: GitObjectId,
-  }),
-});
-export type MergeQueueEntry = typeof QueueEntrySchema.Type;
-
 const PullRequestSchema = Schema.Struct({
   id: Schema.NonEmptyString,
   databaseId: PositiveInteger,
@@ -136,10 +113,6 @@ const PullRequestSchema = Schema.Struct({
   headRefOid: GitObjectId,
   baseRefName: Schema.String,
   baseRefOid: GitObjectId,
-  mergeQueueEntry: Schema.NullOr(Schema.Struct({
-    id: Schema.NonEmptyString,
-    state: Schema.String,
-  })),
 });
 
 const RepositoryIdentity = {
@@ -158,51 +131,6 @@ const PullRequestQueryResponse = Schema.Struct({
 });
 const decodePullRequestQueryResponse = Schema.decodeUnknownSync(
   PullRequestQueryResponse,
-);
-
-const EnqueueMutationResponse = Schema.Struct({
-  data: Schema.NullOr(Schema.Struct({
-    enqueuePullRequest: Schema.NullOr(Schema.Struct({
-      mergeQueueEntry: Schema.NullOr(QueueEntrySchema),
-    })),
-  })),
-  errors: GraphQlErrors,
-});
-const decodeEnqueueMutationResponse = Schema.decodeUnknownSync(
-  EnqueueMutationResponse,
-);
-
-const DequeueMutationResponse = Schema.Struct({
-  data: Schema.NullOr(Schema.Struct({
-    dequeuePullRequest: Schema.NullOr(Schema.Struct({
-      clientMutationId: Schema.optional(Schema.NullOr(Schema.String)),
-    })),
-  })),
-  errors: GraphQlErrors,
-});
-const decodeDequeueMutationResponse = Schema.decodeUnknownSync(
-  DequeueMutationResponse,
-);
-
-const MergeQueuePageResponse = Schema.Struct({
-  data: Schema.NullOr(Schema.Struct({
-    repository: Schema.NullOr(Schema.Struct({
-      ...RepositoryIdentity,
-      mergeQueue: Schema.NullOr(Schema.Struct({
-        entries: Schema.Struct({
-          nodes: Schema.mutable(Schema.Array(QueueEntrySchema)),
-          pageInfo: Schema.Struct({
-            hasNextPage: Schema.Boolean,
-            endCursor: Schema.NullOr(Schema.String),
-          }),
-        }),
-      })),
-    })),
-  })),
-  errors: GraphQlErrors,
-});
-const decodeMergeQueuePageResponse = Schema.decodeUnknownSync(
-  MergeQueuePageResponse,
 );
 
 const MergeBatchClaimResponse = Schema.Struct({
@@ -230,64 +158,6 @@ const PULL_REQUEST_QUERY = `query BriarMergePullRequest(
       headRefOid
       baseRefName
       baseRefOid
-      mergeQueueEntry { id state }
-    }
-  }
-}`;
-
-const ENQUEUE_PULL_REQUEST_MUTATION = `mutation BriarEnqueuePullRequest(
-  $pullRequestId: ID!, $expectedHeadOid: GitObjectID!
-) {
-  enqueuePullRequest(input: {
-    pullRequestId: $pullRequestId,
-    expectedHeadOid: $expectedHeadOid,
-    jump: false
-  }) {
-    mergeQueueEntry {
-      id
-      state
-      pullRequest {
-        id
-        databaseId
-        number
-        headRefOid
-        baseRefName
-        baseRefOid
-      }
-    }
-  }
-}`;
-
-const DEQUEUE_PULL_REQUEST_MUTATION = `mutation BriarDequeuePullRequest(
-  $pullRequestId: ID!
-) {
-  dequeuePullRequest(input: { pullRequestId: $pullRequestId }) {
-    clientMutationId
-  }
-}`;
-
-const MERGE_QUEUE_PAGE_QUERY = `query BriarMergeQueuePage(
-  $owner: String!, $name: String!, $branch: String!, $cursor: String
-) {
-  repository(owner: $owner, name: $name) {
-    databaseId
-    nameWithOwner
-    mergeQueue(branch: $branch) {
-      entries(first: 100, after: $cursor) {
-        nodes {
-          id
-          state
-          pullRequest {
-            id
-            databaseId
-            number
-            headRefOid
-            baseRefName
-            baseRefOid
-          }
-        }
-        pageInfo { hasNextPage endCursor }
-      }
     }
   }
 }`;
@@ -509,69 +379,13 @@ async function enqueueMember(
   input: NormalizedMergeBatchExecutionInput,
   member: MergeBatchMember,
 ) {
-  const before = inspectPullRequest(
+  inspectPullRequest(
     input.claim,
     member,
     input.repositoryPath,
     input.runCommand,
   );
-  let queueEntryId = before.mergeQueueEntry?.id ?? null;
-  if (
-    member.queueEntryId !== null && queueEntryId !== null &&
-    member.queueEntryId !== queueEntryId
-  ) {
-    throw new MergeQueueAuthorityError(
-      `Pull request #${member.pullRequestNumber} is in a different merge-queue entry`,
-    );
-  }
-
-  if (queueEntryId === null) {
-    const response = runGraphQl(
-      input.repositoryPath,
-      ENQUEUE_PULL_REQUEST_MUTATION,
-      [
-        ["pullRequestId", member.pullRequestNodeId],
-        ["expectedHeadOid", member.headSha],
-      ],
-      decodeEnqueueMutationResponse,
-      input.runCommand,
-      `GitHub enqueue for pull request #${member.pullRequestNumber}`,
-    );
-    assertNoGraphQlErrors(
-      response.errors,
-      `GitHub enqueue for pull request #${member.pullRequestNumber}`,
-    );
-    const entry = response.data?.enqueuePullRequest?.mergeQueueEntry;
-    if (!entry) {
-      throw new MergeQueueAuthorityError(
-        `GitHub did not return a merge-queue entry for pull request #${member.pullRequestNumber}`,
-      );
-    }
-    if (
-      entry.pullRequest.id !== member.pullRequestNodeId ||
-      entry.pullRequest.databaseId !== member.pullRequestId ||
-      entry.pullRequest.number !== member.pullRequestNumber ||
-      entry.pullRequest.headRefOid !== member.headSha ||
-      entry.pullRequest.baseRefName !== "main"
-    ) {
-      throw new MergeQueueAuthorityError(
-        `GitHub enqueue result did not preserve pull request #${member.pullRequestNumber} identity`,
-      );
-    }
-    queueEntryId = entry.id;
-  }
-
-  const after = inspectPullRequest(
-    input.claim,
-    member,
-    input.repositoryPath,
-    input.runCommand,
-  );
-  if (!after.mergeQueueEntry || after.mergeQueueEntry.id !== queueEntryId) {
-    throw new MergeQueueAuthorityError(
-      `Pull request #${member.pullRequestNumber} enqueue readback did not match`,
-    );
-  }
+  const queueEntryId = `briar:${input.claim.workId}:${member.ordinal}`;
   await postClaimAction(
     input.api,
     input.claim,
@@ -596,104 +410,6 @@ async function enqueueMergeBatch(input: NormalizedMergeBatchExecutionInput) {
     }
     await enqueueMember(input, member);
   }
-}
-
-export async function listCompleteMergeQueue(
-  claim: ClaimedMergeBatch,
-  repositoryPath: string,
-  run: MergeQueueCommandRunner = runLocalCommand,
-): Promise<MergeQueueEntry[]> {
-  const target = repositoryTarget(claim.repository);
-  const entries: MergeQueueEntry[] = [];
-  const cursors = new Set<string>();
-  const entryIds = new Set<string>();
-  let cursor: string | null = null;
-  do {
-    const response: typeof MergeQueuePageResponse.Type = runGraphQl(
-      repositoryPath,
-      MERGE_QUEUE_PAGE_QUERY,
-      [
-        ["owner", target.owner],
-        ["name", target.name],
-        ["branch", "main"],
-        ["cursor", cursor],
-      ],
-      decodeMergeQueuePageResponse,
-      run,
-      "GitHub merge queue pagination",
-    );
-    assertNoGraphQlErrors(response.errors, "GitHub merge queue pagination");
-    const repository: NonNullable<
-      NonNullable<typeof response.data>["repository"]
-    > | null | undefined = response.data?.repository;
-    const connection: NonNullable<
-      NonNullable<typeof repository>["mergeQueue"]
-    >["entries"] | null | undefined = repository?.mergeQueue?.entries;
-    if (!repository || !connection) {
-      throw new MergeQueueAuthorityError(
-        "GitHub merge queue for protected branch main was not available",
-      );
-    }
-    assertRepositoryIdentity(repository, claim);
-    for (const entry of connection.nodes) {
-      if (entryIds.has(entry.id)) {
-        throw new MergeQueueAuthorityError(
-          `GitHub merge queue repeated entry ${entry.id} across pages`,
-        );
-      }
-      entryIds.add(entry.id);
-      entries.push(entry);
-    }
-    if (!connection.pageInfo.hasNextPage) return entries;
-    const next: string | null = connection.pageInfo.endCursor;
-    if (!next || cursors.has(next)) {
-      throw new MergeQueueInfrastructureError(
-        "GitHub merge queue pagination did not advance its cursor",
-      );
-    }
-    cursors.add(next);
-    cursor = next;
-  } while (true);
-}
-
-export function exactAwaitingChecksWindow(
-  claim: ClaimedMergeBatch,
-  entries: readonly MergeQueueEntry[],
-): MergeQueueEntry[] | null {
-  const memberCount = claim.members.length;
-  if (entries.length < memberCount) return null;
-  // A signed merge-group head is cumulative from the front of the lane
-  // through its tail PR. Accepting an arbitrary matching subwindow would let
-  // an unrelated earlier entry ride inside the signed head while Briar sends
-  // only its truncated cohort to the server. The sealed members must therefore
-  // be the exact authoritative queue prefix ending at the signed tail.
-  const window = entries.slice(0, memberCount);
-  const exact = window.every((entry, index) => {
-    const member = claim.members[index];
-    return member.queueEntryId !== null &&
-      entry.state === "AWAITING_CHECKS" &&
-      entry.id === member.queueEntryId &&
-      entry.pullRequest.number === member.pullRequestNumber &&
-      entry.pullRequest.headRefOid === member.headSha;
-  });
-  return exact ? window : null;
-}
-
-function sealedCohortStart(
-  claim: ClaimedMergeBatch,
-  entries: readonly MergeQueueEntry[],
-) {
-  for (let start = 0; start <= entries.length - claim.members.length; start += 1) {
-    if (claim.members.every((member, index) => {
-      const entry = entries[start + index];
-      return member.queueEntryId !== null &&
-        entry.state === "AWAITING_CHECKS" &&
-        entry.id === member.queueEntryId &&
-        entry.pullRequest.number === member.pullRequestNumber &&
-        entry.pullRequest.headRefOid === member.headSha;
-    })) return start;
-  }
-  return -1;
 }
 
 export function readRemoteRefs(
@@ -727,78 +443,113 @@ export function readRemoteRefs(
   return resolved;
 }
 
-export type TailAuthoritySelection = {
-  head: ClaimedMergeBatch["pendingHeads"][number];
-  authorityEntries: Array<{
-    queueEntryId: string;
-    pullRequestNumber: number;
-  }>;
-};
-
-export function selectTailAuthority(
-  claim: ClaimedMergeBatch,
-  entries: readonly MergeQueueEntry[],
-  remoteRefs: ReadonlyMap<string, string>,
-): TailAuthoritySelection | null {
-  const window = exactAwaitingChecksWindow(claim, entries);
-  if (!window) return null;
-  const tailPullRequestNumber = claim.members.at(-1)!.pullRequestNumber;
-  const protectedBase = remoteRefs.get("refs/heads/main");
-  const heads = claim.pendingHeads
-    .filter((head) => head.tailPullRequestNumber === tailPullRequestNumber)
-    .sort((left, right) =>
-      right.receivedAt.localeCompare(left.receivedAt) ||
-      right.deliveryId.localeCompare(left.deliveryId)
-    );
-  const head = heads.find((candidate) =>
-    protectedBase === candidate.baseSha &&
-    remoteRefs.get(candidate.headRef) === candidate.headSha
-  );
-  if (!head) return null;
-  return {
-    head,
-    authorityEntries: window.map((entry) => ({
-      queueEntryId: entry.id,
-      pullRequestNumber: entry.pullRequest.number,
-    })),
-  };
-}
-
 async function establishTailAuthority(input: NormalizedMergeBatchExecutionInput) {
-  const entries = await listCompleteMergeQueue(
-    input.claim,
-    input.repositoryPath,
-    input.runCommand,
-  );
-  const finalNumber = input.claim.members.at(-1)!.pullRequestNumber;
-  const finalHeads = input.claim.pendingHeads.filter((head) =>
-    head.tailPullRequestNumber === finalNumber
-  );
-  if (finalHeads.length === 0) {
-    // Signed intermediate deliveries are deliberately neutral. A later signed
-    // cumulative delivery will make this batch claimable again.
-    throw new MergeQueueRetryError(
-      "No signed merge-group delivery represents the final batch member yet",
+  for (const member of input.claim.members) {
+    inspectPullRequest(
+      input.claim,
+      member,
+      input.repositoryPath,
+      input.runCommand,
     );
   }
-  const remoteRefs = readRemoteRefs(
-    input.repositoryPath,
-    ["refs/heads/main", ...finalHeads.map((head) => head.headRef)],
-    input.runCommand,
+  const integrationRef =
+    `refs/heads/briar/merge-queue/${input.claim.workId}`;
+  const baseRef = `${MERGE_GROUP_CI_PROTECTED_BASE_REF_PREFIX}/${input.claim.workId}`;
+  const memberRefs = input.claim.members.map((member) =>
+    `${MERGE_GROUP_CI_SOURCE_REF_PREFIX}/${input.claim.workId}/${member.ordinal}`
   );
-  const selected = selectTailAuthority(input.claim, entries, remoteRefs);
-  if (!selected) {
-    if (!exactAwaitingChecksWindow(input.claim, entries)) {
-      if (sealedCohortStart(input.claim, entries) > 0) {
-        throw new ForeignQueuePrefixError();
-      }
-      throw new MergeQueueRetryError(
-        "The exact consecutive merge-queue cohort is not awaiting checks yet",
+  runGitCommand(
+    input.runCommand,
+    input.repositoryPath,
+    [
+      "fetch",
+      "--no-tags",
+      "--force",
+      "--no-write-fetch-head",
+      "origin",
+      `+refs/heads/main:${baseRef}`,
+      ...input.claim.members.map((member, index) =>
+        `+refs/pull/${member.pullRequestNumber}/head:${memberRefs[index]}`
+      ),
+    ],
+    120_000,
+  );
+  const baseSha = runGitCommand(input.runCommand, input.repositoryPath, [
+    "rev-parse",
+    "--verify",
+    `${baseRef}^{commit}`,
+  ]);
+  let integrationSha = baseSha;
+  for (const [index, member] of input.claim.members.entries()) {
+    const fetchedHead = runGitCommand(input.runCommand, input.repositoryPath, [
+      "rev-parse",
+      "--verify",
+      `${memberRefs[index]}^{commit}`,
+    ]);
+    if (fetchedHead !== member.headSha) {
+      throw new MergeQueueAuthorityError(
+        `Pull request #${member.pullRequestNumber} remote head changed during integration`,
       );
     }
-    throw new MergeQueueAuthorityError(
-      "No final signed delivery matched the live exact queue ref and protected main SHA",
+    const merged = input.runCommand(
+      ["git", "merge-tree", "--write-tree", "--no-messages", integrationSha, fetchedHead],
+      localOptions(input.repositoryPath, 120_000),
     );
+    if (merged.exitCode !== 0) {
+      throw new MergeQueueAuthorityError(
+        `Pull request #${member.pullRequestNumber} conflicts with the sealed cohort`,
+      );
+    }
+    const treeSha = merged.stdout.trim().split("\n", 1)[0];
+    if (!/^[0-9a-f]{40}$/u.test(treeSha)) {
+      throw new MergeQueueInfrastructureError("git merge-tree returned an invalid tree SHA");
+    }
+    const committed = input.runCommand(
+      [
+        "git", "commit-tree", treeSha,
+        "-p", integrationSha,
+        "-p", fetchedHead,
+        "-m",
+        `Merge pull request #${member.pullRequestNumber} for Briar batch ${input.claim.workId}`,
+      ],
+      {
+        ...localOptions(input.repositoryPath),
+        env: {
+          ...localCredentialEnvironment(),
+          GIT_AUTHOR_NAME: "Briar Merge Queue",
+          GIT_AUTHOR_EMAIL: "merge-queue@briar.local",
+          GIT_AUTHOR_DATE: "2000-01-01T00:00:00Z",
+          GIT_COMMITTER_NAME: "Briar Merge Queue",
+          GIT_COMMITTER_EMAIL: "merge-queue@briar.local",
+          GIT_COMMITTER_DATE: "2000-01-01T00:00:00Z",
+        },
+      },
+    );
+    if (committed.exitCode !== 0) commandFailure("git commit-tree", committed);
+    integrationSha = committed.stdout.trim();
+    if (!/^[0-9a-f]{40}$/u.test(integrationSha)) {
+      throw new MergeQueueInfrastructureError("git commit-tree returned an invalid commit SHA");
+    }
+  }
+  const liveRefs = readRemoteRefs(
+    input.repositoryPath,
+    ["refs/heads/main", integrationRef],
+    input.runCommand,
+  );
+  if (liveRefs.get("refs/heads/main") !== baseSha) {
+    throw new MergeQueueRetryError("Protected main advanced while the cohort was assembled");
+  }
+  const publishedIntegration = liveRefs.get(integrationRef);
+  if (publishedIntegration && publishedIntegration !== integrationSha) {
+    throw new MergeQueueAuthorityError("The batch integration ref has a foreign SHA");
+  }
+  if (!publishedIntegration) {
+    runGitCommand(input.runCommand, input.repositoryPath, [
+      "push",
+      `--force-with-lease=${integrationRef}:`,
+      "origin",
+      `${integrationSha}:${integrationRef}`,
+    ], 120_000);
   }
   await postClaimAction(
     input.api,
@@ -806,8 +557,9 @@ async function establishTailAuthority(input: NormalizedMergeBatchExecutionInput)
     "authority",
     {
       ...commonClaimBody(input.claim, input.workerId),
-      deliveryId: selected.head.deliveryId,
-      authorityEntries: selected.authorityEntries,
+      integrationRef,
+      integrationSha,
+      baseSha,
     },
   );
 }
@@ -838,11 +590,11 @@ export function fetchExactValidationRefs(
   const headSha = claim.batch.mergeGroupSha;
   const baseSha = claim.batch.mergeGroupBaseSha;
   if (
-    !headRef?.startsWith("refs/heads/gh-readonly-queue/main/") ||
+    headRef !== `refs/heads/briar/merge-queue/${claim.workId}` ||
     !headSha || !baseSha
   ) {
     throw new MergeQueueAuthorityError(
-      "Validation claim does not contain exact signed merge-group authority",
+      "Validation claim does not contain exact prepared integration authority",
     );
   }
   runGitCommand(
@@ -871,7 +623,7 @@ export function fetchExactValidationRefs(
   ]);
   if (fetchedHead !== headSha) {
     throw new MergeQueueAuthorityError(
-      "The live signed merge-group ref no longer resolves to its claimed SHA",
+      "The live integration ref no longer resolves to its claimed SHA",
     );
   }
   if (fetchedBase !== baseSha) {
@@ -979,11 +731,11 @@ async function validateMergeBatch(input: NormalizedMergeBatchExecutionInput) {
 function assertPublishAuthorityValues(claim: ClaimedMergeBatch) {
   const { mergeGroupRef, mergeGroupSha, mergeGroupBaseSha } = claim.batch;
   if (
-    !mergeGroupRef?.startsWith("refs/heads/gh-readonly-queue/main/") ||
+    mergeGroupRef !== `refs/heads/briar/merge-queue/${claim.workId}` ||
     !mergeGroupSha || !mergeGroupBaseSha
   ) {
     throw new MergeQueueAuthorityError(
-      "Publication claim lacks exact signed merge-group authority",
+      "Publication claim lacks exact prepared integration authority",
     );
   }
   return { mergeGroupRef, mergeGroupSha, mergeGroupBaseSha };
@@ -992,17 +744,13 @@ function assertPublishAuthorityValues(claim: ClaimedMergeBatch) {
 async function reFencePublication(input: NormalizedMergeBatchExecutionInput) {
   await renewMergeBatchClaim(input.api, input.claim, input.workerId);
   const authority = assertPublishAuthorityValues(input.claim);
-  const entries = await listCompleteMergeQueue(
-    input.claim,
-    input.repositoryPath,
-    input.runCommand,
-  );
-  if (!exactAwaitingChecksWindow(input.claim, entries)) {
-    if (sealedCohortStart(input.claim, entries) > 0) {
-      throw new ForeignQueuePrefixError();
-    }
-    throw new MergeQueueAuthorityError(
-      "The live merge queue no longer contains the exact consecutive cohort",
+  for (const member of input.claim.members) {
+    if (member.state === "merged") continue;
+    inspectPullRequest(
+      input.claim,
+      member,
+      input.repositoryPath,
+      input.runCommand,
     );
   }
   const refs = readRemoteRefs(
@@ -1010,17 +758,49 @@ async function reFencePublication(input: NormalizedMergeBatchExecutionInput) {
     [authority.mergeGroupRef, "refs/heads/main"],
     input.runCommand,
   );
-  if (refs.get(authority.mergeGroupRef) !== authority.mergeGroupSha) {
+  const liveMain = refs.get("refs/heads/main");
+  if (
+    refs.get(authority.mergeGroupRef) !== authority.mergeGroupSha &&
+    liveMain !== authority.mergeGroupSha
+  ) {
     throw new MergeQueueAuthorityError(
-      "The live merge-group ref no longer matches the claimed publication SHA",
+      "The live integration ref no longer matches the claimed publication SHA",
     );
   }
-  if (refs.get("refs/heads/main") !== authority.mergeGroupBaseSha) {
+  if (
+    liveMain !== authority.mergeGroupBaseSha &&
+    liveMain !== authority.mergeGroupSha
+  ) {
     throw new MergeQueueAuthorityError(
-      "Protected main advanced beyond the signed publication base SHA",
+      "Protected main advanced beyond the prepared publication base SHA",
     );
   }
-  return authority;
+  return { ...authority, alreadyPublished: liveMain === authority.mergeGroupSha };
+}
+
+function publishIntegrationRef(
+  input: NormalizedMergeBatchExecutionInput,
+  authority: ReturnType<typeof assertPublishAuthorityValues>,
+) {
+  const pushed = input.runCommand(
+    [
+      "git",
+      "push",
+      `--force-with-lease=refs/heads/main:${authority.mergeGroupBaseSha}`,
+      "origin",
+      `${authority.mergeGroupSha}:refs/heads/main`,
+    ],
+    localOptions(input.repositoryPath, 120_000),
+  );
+  if (pushed.exitCode === 0) return;
+  const main = readRemoteRefs(
+    input.repositoryPath,
+    ["refs/heads/main"],
+    input.runCommand,
+  ).get("refs/heads/main");
+  if (main !== authority.mergeGroupSha) {
+    commandFailure("Exact integration publish", pushed);
+  }
 }
 
 function publishStatus(
@@ -1033,8 +813,8 @@ function publishStatus(
   const state = result.passed ? "success" : "failure";
   const context = `signoff/${result.context}`;
   const description = result.passed
-    ? `Briar exact merge-group validation passed: ${result.context}`
-    : `Briar exact merge-group validation failed: ${result.context}`;
+    ? `Briar exact integration validation passed: ${result.context}`
+    : `Briar exact integration validation failed: ${result.context}`;
   const command = [
     "gh",
     "api",
@@ -1067,28 +847,8 @@ async function publishMergeBatch(input: NormalizedMergeBatchExecutionInput) {
   const byContext = new Map<MergeGroupCiContext, typeof proof[number]>();
   for (const result of proof) byContext.set(result.context, result);
   const failed = proof.some((result) => !result.passed);
-  const signedMergeAlreadyObserved = input.claim.members.some((member) =>
-    member.state === "merged"
-  );
-  if (!failed && signedMergeAlreadyObserved) {
-    // A required status can merge one or more cohort entries before the
-    // publication receipt reaches Briar. Once a signed merged webhook has
-    // been durably projected into this exact claim, the queue ref is expected
-    // to be gone and cannot be re-fenced. The immutable successful proof plus
-    // signed merge evidence is sufficient to finish the lease-fenced receipt.
-    await renewMergeBatchClaim(input.api, input.claim, input.workerId);
-    const authority = assertPublishAuthorityValues(input.claim);
-    await postClaimAction(
-      input.api,
-      input.claim,
-      "published",
-      {
-        ...commonClaimBody(input.claim, input.workerId),
-        mergeGroupSha: authority.mergeGroupSha,
-      },
-    );
-    return;
-  }
+  let publicationAuthority: ReturnType<typeof assertPublishAuthorityValues> | null = null;
+  let alreadyPublished = false;
   for (const context of MERGE_GROUP_CI_CONTEXTS) {
     if (input.signal.aborted) throw input.signal.reason;
     const result = byContext.get(context);
@@ -1097,21 +857,26 @@ async function publishMergeBatch(input: NormalizedMergeBatchExecutionInput) {
         `Publication proof is missing ${context}`,
       );
     }
-    // GitHub may remove a merge-group ref as soon as the first required
-    // failure is published. A failed durable proof is already safe to replay
-    // against its immutable SHA: it can never make a replacement head green.
-    // Keep the lease live before every status, while retaining the stronger
-    // queue/ref/main fence for an all-success proof.
+    // A failed durable proof is safe to replay against its immutable SHA: it
+    // can never publish the integration ref to main. Keep the lease live
+    // before every status, while retaining the stronger ref/main fence for an
+    // all-success proof.
     let authority: ReturnType<typeof assertPublishAuthorityValues>;
     if (failed) {
       await renewMergeBatchClaim(input.api, input.claim, input.workerId);
       authority = assertPublishAuthorityValues(input.claim);
     } else {
-      authority = await reFencePublication(input);
+      const fenced = await reFencePublication(input);
+      authority = fenced;
+      publicationAuthority = fenced;
+      alreadyPublished = fenced.alreadyPublished;
     }
     publishStatus(input, authority.mergeGroupSha, result);
   }
   const authority = assertPublishAuthorityValues(input.claim);
+  if (!failed && !alreadyPublished) {
+    publishIntegrationRef(input, publicationAuthority ?? authority);
+  }
   await postClaimAction(
     input.api,
     input.claim,
@@ -1121,55 +886,6 @@ async function publishMergeBatch(input: NormalizedMergeBatchExecutionInput) {
       mergeGroupSha: authority.mergeGroupSha,
     },
   );
-}
-
-function dequeuePullRequest(
-  input: NormalizedMergeBatchExecutionInput,
-  member: MergeBatchMember,
-) {
-  const before = inspectPullRequest(
-    input.claim,
-    member,
-    input.repositoryPath,
-    input.runCommand,
-  );
-  if (!before.mergeQueueEntry) return;
-  if (
-    member.queueEntryId === null ||
-    before.mergeQueueEntry.id !== member.queueEntryId
-  ) {
-    throw new MergeQueueAuthorityError(
-      `Refusing to dequeue pull request #${member.pullRequestNumber} from an unsealed queue entry`,
-    );
-  }
-  const response = runGraphQl(
-    input.repositoryPath,
-    DEQUEUE_PULL_REQUEST_MUTATION,
-    [["pullRequestId", member.pullRequestNodeId]],
-    decodeDequeueMutationResponse,
-    input.runCommand,
-    `GitHub dequeue for pull request #${member.pullRequestNumber}`,
-  );
-  assertNoGraphQlErrors(
-    response.errors,
-    `GitHub dequeue for pull request #${member.pullRequestNumber}`,
-  );
-  if (!response.data?.dequeuePullRequest) {
-    throw new MergeQueueAuthorityError(
-      `GitHub did not acknowledge dequeue for pull request #${member.pullRequestNumber}`,
-    );
-  }
-  const after = inspectPullRequest(
-    input.claim,
-    member,
-    input.repositoryPath,
-    input.runCommand,
-  );
-  if (after.mergeQueueEntry !== null) {
-    throw new MergeQueueAuthorityError(
-      `Pull request #${member.pullRequestNumber} remained queued after dequeue`,
-    );
-  }
 }
 
 function blockCode(claim: ClaimedMergeBatch) {
@@ -1189,11 +905,6 @@ async function drainMergeBatch(
   input: NormalizedMergeBatchExecutionInput,
   failure?: { code: string; detail: string },
 ) {
-  for (const member of input.claim.members) {
-    if (input.signal.aborted) throw input.signal.reason;
-    if (member.state === "merged" || member.state === "dequeued") continue;
-    dequeuePullRequest(input, member);
-  }
   await postClaimAction(
     input.api,
     input.claim,
@@ -1253,28 +964,6 @@ export async function executeClaimedMergeBatch(
     // A planned update uses the Worker loop's dedicated release handoff. It
     // must not race this retry release with a second protocol.
     if (input.signal.aborted) throw error;
-    if (error instanceof ForeignQueuePrefixError) {
-      try {
-        await drainMergeBatch(input, {
-          code: "foreign_queue_prefix",
-          detail: error.message,
-        });
-        return;
-      } catch (drainError) {
-        try {
-          await releaseMergeBatchClaim(input.api, input.claim, input.workerId);
-        } catch (releaseError) {
-          throw new AggregateError(
-            [error, drainError, releaseError],
-            "Foreign merge-queue membership could not be drained, blocked, or released",
-          );
-        }
-        throw new AggregateError(
-          [error, drainError],
-          "Foreign merge-queue membership could not be drained and blocked",
-        );
-      }
-    }
     try {
       await releaseMergeBatchClaim(input.api, input.claim, input.workerId);
     } catch (releaseError) {
@@ -1343,7 +1032,11 @@ const DetailedRulesetSchema = Schema.Struct({
   id: PositiveInteger,
   target: Schema.String,
   enforcement: Schema.String,
-  bypass_actors: Schema.mutable(Schema.Array(Schema.Unknown)),
+  bypass_actors: Schema.mutable(Schema.Array(Schema.Struct({
+    actor_id: PositiveInteger,
+    actor_type: Schema.Literals(["Integration", "Team"]),
+    bypass_mode: Schema.Literal("always"),
+  }))),
   conditions: Schema.Struct({
     ref_name: Schema.Struct({
       include: Schema.mutable(Schema.Array(Schema.String)),
@@ -1352,16 +1045,6 @@ const DetailedRulesetSchema = Schema.Struct({
   }),
 });
 const decodeDetailedRuleset = Schema.decodeUnknownSync(DetailedRulesetSchema);
-
-const MergeQueueRuleParameters = Schema.Struct({
-  grouping_strategy: Schema.String,
-  max_entries_to_build: PositiveInteger,
-  max_entries_to_merge: PositiveInteger,
-  merge_method: Schema.String,
-});
-const decodeMergeQueueRuleParameters = Schema.decodeUnknownSync(
-  MergeQueueRuleParameters,
-);
 
 const RequiredStatusChecksParameters = Schema.Struct({
   required_status_checks: Schema.mutable(Schema.Array(Schema.Struct({
@@ -1588,7 +1271,6 @@ export function inspectMergeQueueDoctor(input: {
     );
     const rules = pages.flat();
     const relevantTypes = new Set([
-      "merge_queue",
       "pull_request",
       "deletion",
       "non_fast_forward",
@@ -1601,30 +1283,6 @@ export function inspectMergeQueueDoctor(input: {
       current.push(rule);
       byType.set(rule.type, current);
     }
-
-    const mergeQueueRules = byType.get("merge_queue") ?? [];
-    const mergeQueueParameters = mergeQueueRules.map((rule) =>
-      ruleParameters(
-        rule,
-        decodeMergeQueueRuleParameters,
-        "GitHub merge_queue",
-      )
-    );
-    const mergeQueueReady = mergeQueueParameters.length > 0 &&
-      mergeQueueParameters.every((parameters) =>
-        parameters.grouping_strategy === "HEADGREEN" &&
-        parameters.merge_method === "SQUASH" &&
-        parameters.max_entries_to_build >= input.profile!.maxBatchSize &&
-        parameters.max_entries_to_merge >= input.profile!.maxBatchSize
-      );
-    doctorCheck(
-      checks,
-      "merge-queue-rule",
-      mergeQueueReady,
-      mergeQueueReady
-        ? "HEADGREEN/SQUASH capacity covers the configured batch size"
-        : "merge_queue must be HEADGREEN/SQUASH with build and merge capacity at least maxBatchSize",
-    );
 
     const protectionsReady = [
       "pull_request",
@@ -1670,7 +1328,8 @@ export function inspectMergeQueueDoctor(input: {
       statusReady,
       statusReady
         ? "exact four signoff contexts are required with strict=false"
-        : "required_status_checks must contain only the four signoff contexts, strict=false, without integration pinning",
+        : "required_status_checks must contain only the four signoff " +
+          "contexts, strict=false, without integration pinning",
     );
 
     const rulesetIds = [...new Set(
@@ -1690,21 +1349,31 @@ export function inspectMergeQueueDoctor(input: {
         `GitHub ruleset ${rulesetId} inspection`,
       )
     );
-    const rulesetsReady = rulesets.length > 0 && rulesets.every((ruleset) =>
-      ruleset.target === "branch" &&
-      ruleset.enforcement === "active" &&
-      ruleset.bypass_actors.length === 0 &&
-      ruleset.conditions.ref_name.include.length === 1 &&
-      ruleset.conditions.ref_name.include[0] === "refs/heads/main" &&
-      ruleset.conditions.ref_name.exclude.length === 0
+    const publisherActors = new Set(
+      rulesets.flatMap((ruleset) =>
+        ruleset.bypass_actors.map((actor) =>
+          `${actor.actor_type}:${actor.actor_id}`
+        )
+      ),
     );
+    const rulesetsReady = rulesets.length > 0 && publisherActors.size === 1 &&
+      rulesets.every((ruleset) =>
+        ruleset.target === "branch" &&
+        ruleset.enforcement === "active" &&
+        ruleset.bypass_actors.length === 1 &&
+        ruleset.conditions.ref_name.include.length === 1 &&
+        ruleset.conditions.ref_name.include[0] === "refs/heads/main" &&
+        ruleset.conditions.ref_name.exclude.length === 0
+      );
     doctorCheck(
       checks,
-      "active-no-bypass-rulesets",
+      "active-publisher-bypass-rulesets",
       rulesetsReady,
       rulesetsReady
-        ? "all effective coordinator rules come from exact-main active rulesets without bypass actors"
-        : "effective coordinator rules must come from exact refs/heads/main active rulesets with no bypass actors",
+        ? "all effective coordinator rules come from exact-main active " +
+          "rulesets with one publisher bypass actor"
+        : "effective coordinator rules must come from exact refs/heads/main " +
+          "active rulesets with exactly one publisher bypass actor",
     );
   } catch (error) {
     doctorCheck(
