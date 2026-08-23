@@ -297,6 +297,7 @@ export async function runManagedInstance(
     organizationId: string;
     campaignId: string;
     nonce: string;
+    clientToken?: string;
   },
   fetcher?: typeof fetch,
 ) {
@@ -319,7 +320,7 @@ export async function runManagedInstance(
     ["briar-campaign", input.campaignId],
   ] as const;
   const parameters: Record<string, string> = {
-    ClientToken: input.managedComputerId,
+    ClientToken: input.clientToken ?? input.managedComputerId,
     MinCount: "1",
     MaxCount: "1",
     "LaunchTemplate.LaunchTemplateId": config.launchTemplateId,

@@ -108,6 +108,8 @@ async function ensureProvisioningWorkflow(
     managedComputerId: string;
     provisioningJobId: string;
     workflowInstanceId: string;
+    previousInstanceId?: string | null;
+    previousInstanceRegion?: string | null;
   },
 ) {
   try {
@@ -116,6 +118,8 @@ async function ensureProvisioningWorkflow(
       params: {
         managedComputerId: input.managedComputerId,
         provisioningJobId: input.provisioningJobId,
+        previousInstanceId: input.previousInstanceId ?? null,
+        previousInstanceRegion: input.previousInstanceRegion ?? null,
       },
       retention: { successRetention: "30 days", errorRetention: "30 days" },
     });
@@ -321,6 +325,11 @@ export async function retryManagedComputerProvisioning(
     enrollmentExpiresAt: new Date(
       Date.parse(input.observedAt) + config.enrollmentTtlMinutes * 60_000,
     ).toISOString(),
+    region: config.region ?? "",
+    instanceType: config.instanceType,
+    launchTemplateId: config.launchTemplateId ?? "",
+    launchTemplateVersion: config.launchTemplateVersion ?? "",
+    bootstrapApiOrigin: config.apiOrigin ?? "",
   });
   if (!result) {
     throw new ManagedComputerServiceError(
@@ -333,6 +342,10 @@ export async function retryManagedComputerProvisioning(
     managedComputerId: input.managedComputerId,
     provisioningJobId: result.job.id,
     workflowInstanceId: result.job.workflow_instance_id,
+    previousInstanceId: result.created ? result.previousInstanceId : null,
+    previousInstanceRegion: result.created
+      ? result.previousInstanceRegion
+      : null,
   });
   return result;
 }

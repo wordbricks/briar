@@ -157,6 +157,12 @@ describe("managed computer repository", () => {
       detail: "limited",
       observedAt: "2026-08-22T00:02:00.000Z",
     });
+    await db.prepare(
+      `update briar_managed_computers
+       set aws_account_id = '123456789012', aws_instance_id = 'i-0123456789abcdef0',
+           aws_volume_id = 'vol-0123456789abcdef0'
+       where id = '33333333-3333-4333-8333-333333333333'`,
+    ).run();
     const retry = await createManagedComputerRetry(db, {
       managedComputerId: "33333333-3333-4333-8333-333333333333",
       organizationId,
@@ -165,9 +171,19 @@ describe("managed computer repository", () => {
       provisioningJobId: "77777777-7777-4777-8777-777777777777",
       workflowInstanceId: "managed-computer-retry-1",
       enrollmentExpiresAt: "2026-08-22T00:33:00.000Z",
+      region: "us-east-1",
+      instanceType: "m7i.large",
+      launchTemplateId: "lt-0123456789abcdef0",
+      launchTemplateVersion: "8",
+      bootstrapApiOrigin: "https://briar-new.example",
       observedAt: "2026-08-22T00:03:00.000Z",
     });
-    expect(retry).toMatchObject({ created: true, job: { attempt: 2 } });
+    expect(retry).toMatchObject({
+      created: true,
+      job: { attempt: 2 },
+      previousInstanceId: "i-0123456789abcdef0",
+      previousInstanceRegion: "us-east-1",
+    });
     const duplicate = await createManagedComputerRetry(db, {
       managedComputerId: "33333333-3333-4333-8333-333333333333",
       organizationId,
@@ -176,6 +192,11 @@ describe("managed computer repository", () => {
       provisioningJobId: "88888888-8888-4888-8888-888888888888",
       workflowInstanceId: "managed-computer-retry-duplicate",
       enrollmentExpiresAt: "2026-08-22T00:34:00.000Z",
+      region: "us-east-1",
+      instanceType: "m7i.large",
+      launchTemplateId: "lt-0123456789abcdef0",
+      launchTemplateVersion: "8",
+      bootstrapApiOrigin: "https://briar-new.example",
       observedAt: "2026-08-22T00:04:00.000Z",
     });
     expect(duplicate).toMatchObject({ created: false, job: { attempt: 2 } });
@@ -186,6 +207,11 @@ describe("managed computer repository", () => {
       state: "requested",
       retry_count: 1,
       provisioning_job_id: "77777777-7777-4777-8777-777777777777",
+      aws_account_id: null,
+      aws_instance_id: null,
+      aws_volume_id: null,
+      aws_launch_template_version: "8",
+      bootstrap_api_origin: "https://briar-new.example",
     });
   });
 });

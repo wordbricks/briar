@@ -5,6 +5,7 @@ import {
   describeManagedInstance,
   managedInstanceIsSsmOnline,
   runManagedInstance,
+  terminateManagedInstance,
   verifyManagedInstance,
 } from "./aws-managed-computer";
 import { managedComputerEnrollmentNonce } from "./managed-computer-crypto";
@@ -26,6 +27,8 @@ import {
 export type ManagedComputerWorkflowParams = {
   managedComputerId: string;
   provisioningJobId: string;
+  previousInstanceId?: string | null;
+  previousInstanceRegion?: string | null;
 };
 
 const awsRetry = {
@@ -51,7 +54,12 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
     event: Readonly<WorkflowEvent<ManagedComputerWorkflowParams>>,
     step: WorkflowStep,
   ) {
-    const { managedComputerId, provisioningJobId } = event.payload;
+    const {
+      managedComputerId,
+      provisioningJobId,
+      previousInstanceId,
+      previousInstanceRegion,
+    } = event.payload;
     try {
       const started = await step.do("reserve provisioning job", async () => {
         const config = managedComputerConfig(this.env);
@@ -88,6 +96,34 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
         };
       });
 
+      if (previousInstanceId) {
+        await step.do(
+          "retire previous EC2 instance",
+          awsRetry,
+          async () => {
+            const config = managedComputerConfig(this.env);
+            const region = previousInstanceRegion ?? started.region;
+            const previous = await describeManagedInstance(
+              config,
+              region,
+              previousInstanceId,
+            );
+            if (!previous || previous.state === "terminated") return;
+            if (
+              previous.tags["briar-managed"] !== "true" ||
+              previous.tags["briar-managed-computer"] !== managedComputerId
+            ) {
+              throw new AwsManagedComputerError(
+                "AWS_PREVIOUS_INSTANCE_MISMATCH",
+                "Previous managed instance tags did not match the retry target",
+                false,
+              );
+            }
+            await terminateManagedInstance(config, region, previousInstanceId);
+          },
+        );
+      }
+
       const launched = await step.do(
         "create exactly one EC2 instance",
         awsRetry,
@@ -116,6 +152,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
               managedComputerId,
               organizationId: computer.organization_id,
               campaignId: "getbriar-pilot",
+              clientToken: provisioningJobId,
               nonce: await managedComputerEnrollmentNonce(
                 config.enrollmentSecret ?? "",
                 managedComputerId,
