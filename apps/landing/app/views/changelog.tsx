@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.154",
+        date: "2026년 8월 24일",
+        title: "⌘K 커맨드 팔레트로 Briar 어디든 빠르게 이동합니다",
+        summary:
+          "현재 작업의 맥락과 다음에 확인할 항목을 한곳에 모으고, 프로젝트·이슈·채널·DM을 키보드로 바로 검색하고 실행합니다.",
+        items: [
+          "⌘K를 눌러 현재 이슈·프로젝트·채널·DM에 맞는 명령과 자주 쓰는 화면 이동을 한곳에서 실행합니다.",
+          "확인이 필요한 이슈, 실행 중인 Agent 세션, 읽지 않은 Inbox·채널·DM과 최근 위치를 우선 표시해 작업을 빠르게 이어갑니다.",
+          "한글·영문·중문 키워드와 퍼지 검색을 지원하고 i:, p:, c:, d: 접두어로 이슈·프로젝트·채널·DM 범위를 좁힙니다.",
+          "방향키·Enter·Escape, IME 조합 입력, 포커스 복원과 스크린 리더 구조를 다듬고 단축키 설정과 기존 저장값 마이그레이션을 지원합니다.",
+        ],
+      },
+      {
         version: "1.2.153",
         date: "2026년 8월 24일",
         title: "데스크톱 투명 사이드바와 채널·모바일 협업을 더 안정적으로 다듬습니다",
@@ -1033,6 +1046,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.154",
+        date: "August 24, 2026",
+        title: "Move anywhere in Briar with the Cmd+K command palette",
+        summary:
+          "Bring the current work context and next items together, then search and run projects, issues, channels, and DMs entirely from the keyboard.",
+        items: [
+          "Press Cmd+K to run commands and common navigation tailored to the current issue, project, channel, or direct message.",
+          "Continue quickly from issues needing attention, running Agent sessions, unread Inbox items, channels, DMs, and recent places.",
+          "Search Korean, English, and Chinese keywords with normalized fuzzy matching, or narrow results with i:, p:, c:, and d: scopes.",
+          "Use polished Arrow, Enter, and Escape behavior with IME safety, focus restoration, screen-reader semantics, configurable shortcuts, and legacy shortcut migration.",
+        ],
+      },
       {
         version: "1.2.153",
         date: "August 24, 2026",
@@ -2128,7 +2154,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-153">
+          <a href="#v1-2-154">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2150,7 +2176,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.153"
+                      entry.version === "1.2.154"
+                        ? "2026-08-24"
+                        : entry.version === "1.2.153"
                         ? "2026-08-24"
                         : entry.version === "1.2.152"
                         ? "2026-08-23"
