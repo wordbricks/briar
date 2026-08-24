@@ -102,6 +102,7 @@ enum AppBadgeService {
 }
 
 struct InboxNotificationPreferences: Equatable, Sendable {
+    var playSound = true
     var urgent = false
     var actionRequired = false
     var important = false
@@ -134,6 +135,7 @@ struct InboxNotificationPreferences: Equatable, Sendable {
             return InboxNotificationPreferences()
         }
         return InboxNotificationPreferences(
+            playSound: decoded.play_sound ?? true,
             urgent: decoded.urgent,
             actionRequired: decoded.action_required,
             important: decoded.important,
@@ -143,6 +145,7 @@ struct InboxNotificationPreferences: Equatable, Sendable {
 
     func save(defaults: UserDefaults = .standard) {
         let storage = Storage(
+            play_sound: playSound,
             urgent: urgent,
             action_required: actionRequired,
             important: important,
@@ -156,6 +159,7 @@ struct InboxNotificationPreferences: Equatable, Sendable {
     private static let storageKey = "briar.settings.inbox-notifications.v1"
 
     private struct Storage: Codable {
+        var play_sound: Bool?
         var urgent: Bool
         var action_required: Bool
         var important: Bool
@@ -302,7 +306,7 @@ final class LocalNotificationService: ObservableObject {
         let content = UNMutableNotificationContent()
         content.title = presentation.title
         content.body = presentation.body
-        content.sound = .default
+        content.sound = preferences.playSound ? .default : nil
         content.userInfo = [
             "briarInboxTarget": [
                 "messageId": message.id,

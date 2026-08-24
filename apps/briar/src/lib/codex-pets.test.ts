@@ -4,6 +4,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import {
   codexPetPageUrl,
   codexPetSpriteSheetSourceUrl,
+  codexPetThumbnailUrl,
   loadCodexPetCatalog,
   maxCodexPetSpriteSheetBytes,
   projectAgentAvatarFromCodexPet,
@@ -169,6 +170,9 @@ describe("Codex Pet catalog", () => {
   it("only creates official URLs for safe slugs", () => {
     expect(codexPetPageUrl("firefly--lingxiaotian")).toBe(
       "https://codexpet.top/pets/firefly--lingxiaotian",
+    );
+    expect(codexPetThumbnailUrl("firefly--lingxiaotian")).toBe(
+      "https://codexpet.top/assets/previews/firefly--lingxiaotian/thumbnail.webp",
     );
     expect(codexPetSpriteSheetSourceUrl("firefly--lingxiaotian")).toContain(
       "/pets/firefly--lingxiaotian/spritesheet.webp",
