@@ -26,6 +26,9 @@
   "placement": {
     "mode": "smart"
   },
+  "vars": {
+    "MANAGED_COMPUTER_REMOTE_DESKTOP_ENABLED": "true"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
