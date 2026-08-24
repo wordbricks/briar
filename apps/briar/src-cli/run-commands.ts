@@ -127,7 +127,7 @@ async function listChannelMessagesCommand() {
     config.apiUrl,
     `/projects/${encodeURIComponent(project.id)}` +
       `/channels/${encodeURIComponent(input.channelId)}/messages?${searchParams}`,
-    process.env.BRIAR_AGENT_TOKEN ?? project.agentToken,
+    executionToken(project),
   );
   console.log(JSON.stringify(result));
 }

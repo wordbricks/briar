@@ -6,6 +6,7 @@ import {
 import {
   managedComputerCredential,
   managedComputerEnrollmentNonce,
+  managedComputerSetupToken,
   promotionCodesEqual,
   sha256Hex,
   verifyEc2IdentityDocumentSignature,
@@ -19,16 +20,26 @@ import {
   type ManagedComputerConfig,
 } from "./managed-computer-model";
 import {
+  bindManagedComputerSetupSession,
+  createManagedComputerSetupSessionRecord,
   createManagedComputerRetry,
   createPromotionalManagedComputer,
   enrollManagedComputerDevice,
+  latestManagedComputerSetupSession,
   managedComputerApplicationByRequest,
   managedComputerById,
   managedComputerCapacity,
   managedComputerProvisioningJob,
+  managedComputerSetupSessionByRequest,
+  managedComputerSetupSessionByTokenHash,
+  managedComputerSetupWorker,
   recordManagedComputerAuditEvent,
 } from "./managed-computer-repository";
 import { decodeInstanceIdentityDocument } from "./managed-computer-request-contract";
+import type { AgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
+import type { AgentProvider } from "../../src/lib/agent-provider";
+import type { ProviderHealthMap } from "./workers";
+import { workerJson } from "./worker-json";
 
 export class ManagedComputerServiceError extends Error {
   constructor(
@@ -476,4 +487,231 @@ export async function enrollManagedComputer(
     );
   }
   return { credential, deviceId, organizationId: computer.organization_id };
+}
+
+function requireSetupSecret(config: ManagedComputerConfig) {
+  if (!config.enrollmentSecret) {
+    throw new ManagedComputerServiceError(
+      503,
+      "MANAGED_COMPUTER_SETUP_NOT_CONFIGURED",
+      "Managed computer setup is not configured",
+    );
+  }
+  return config.enrollmentSecret;
+}
+
+export async function issueManagedComputerSetupSession(
+  db: D1Database,
+  env: Env,
+  input: {
+    managedComputerId: string;
+    organizationId: string;
+    projectId: string;
+    userId: string;
+    requestId: string;
+    observedAt: string;
+  },
+) {
+  const computer = await managedComputerById(db, input.managedComputerId);
+  if (!computer || computer.organization_id !== input.organizationId) {
+    throw new ManagedComputerServiceError(
+      404,
+      "MANAGED_COMPUTER_NOT_FOUND",
+      "Managed computer not found",
+    );
+  }
+  if (!computer.briar_device_id || !["needs_setup", "ready"].includes(computer.state)) {
+    throw new ManagedComputerServiceError(
+      409,
+      "MANAGED_COMPUTER_SETUP_UNAVAILABLE",
+      "Managed computer enrollment must complete before setup",
+    );
+  }
+  const project = await db.prepare(
+    `select id, organization_id from briar_projects where id = ?`,
+  ).bind(input.projectId).first<{ id: string; organization_id: string }>();
+  if (!project || project.organization_id !== input.organizationId) {
+    throw new ManagedComputerServiceError(
+      404,
+      "MANAGED_COMPUTER_SETUP_PROJECT_NOT_FOUND",
+      "Project not found in this organization",
+    );
+  }
+  const config = managedComputerConfig(env);
+  const token = await managedComputerSetupToken(
+    requireSetupSecret(config),
+    computer.id,
+    input.requestId,
+  );
+  const tokenHash = await sha256Hex(token);
+  const existing = await managedComputerSetupSessionByRequest(
+    db,
+    computer.id,
+    input.requestId,
+  );
+  if (existing) {
+    if (
+      existing.requested_by_user_id !== input.userId ||
+      existing.project_id !== input.projectId ||
+      existing.token_hash !== tokenHash
+    ) {
+      throw new ManagedComputerServiceError(
+        409,
+        "MANAGED_COMPUTER_SETUP_REQUEST_CONFLICT",
+        "This setup request ID is already in use",
+      );
+    }
+    if (existing.status === "pending" && existing.expires_at <= input.observedAt) {
+      throw new ManagedComputerServiceError(
+        410,
+        "MANAGED_COMPUTER_SETUP_EXPIRED",
+        "Managed computer setup ticket expired; create a new request",
+      );
+    }
+    return { session: existing, setupToken: token, duplicate: true };
+  }
+  const session = await createManagedComputerSetupSessionRecord(db, {
+    id: crypto.randomUUID(),
+    managedComputerId: computer.id,
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+    requestedByUserId: input.userId,
+    requestId: input.requestId,
+    tokenHash,
+    expiresAt: new Date(
+      Date.parse(input.observedAt) + config.setupTtlMinutes * 60_000,
+    ).toISOString(),
+    observedAt: input.observedAt,
+  });
+  if (!session) {
+    throw new ManagedComputerServiceError(
+      409,
+      "MANAGED_COMPUTER_SETUP_UNAVAILABLE",
+      "Managed computer setup is no longer available",
+    );
+  }
+  if (
+    session.requested_by_user_id !== input.userId ||
+    session.project_id !== input.projectId ||
+    session.token_hash !== tokenHash
+  ) {
+    throw new ManagedComputerServiceError(
+      409,
+      "MANAGED_COMPUTER_SETUP_REQUEST_CONFLICT",
+      "This setup request ID is already in use",
+    );
+  }
+  return { session, setupToken: token, duplicate: false };
+}
+
+export async function bindManagedComputerSetup(
+  db: D1Database,
+  input: {
+    managedComputerId: string;
+    organizationId: string;
+    deviceId: string;
+    setupToken: string;
+    worker: {
+      agentProvider: AgentProvider;
+      providers?: AgentProvider[];
+      providerHealth?: ProviderHealthMap;
+      providerCapabilities?: AgentProviderCapabilityCatalog;
+      versions: Record<string, string>;
+    };
+    observedAt: string;
+  },
+) {
+  const computer = await managedComputerById(db, input.managedComputerId);
+  if (
+    !computer || computer.organization_id !== input.organizationId ||
+    computer.briar_device_id !== input.deviceId ||
+    !["needs_setup", "ready"].includes(computer.state)
+  ) {
+    throw new ManagedComputerServiceError(
+      403,
+      "MANAGED_COMPUTER_SETUP_DEVICE_FORBIDDEN",
+      "Worker is not authorized for this managed computer",
+    );
+  }
+  const tokenHash = await sha256Hex(input.setupToken);
+  const session = await managedComputerSetupSessionByTokenHash(
+    db,
+    computer.id,
+    tokenHash,
+  );
+  if (!session || session.organization_id !== input.organizationId) {
+    throw new ManagedComputerServiceError(
+      403,
+      "MANAGED_COMPUTER_SETUP_TOKEN_INVALID",
+      "Managed computer setup ticket is invalid",
+    );
+  }
+  if (session.status === "pending" && session.expires_at <= input.observedAt) {
+    throw new ManagedComputerServiceError(
+      410,
+      "MANAGED_COMPUTER_SETUP_EXPIRED",
+      "Managed computer setup ticket expired",
+    );
+  }
+  if (session.status === "consumed") {
+    const worker = session.worker_id
+      ? await managedComputerSetupWorker(db, session.worker_id, input.deviceId)
+      : null;
+    if (!worker) {
+      throw new ManagedComputerServiceError(
+        409,
+        "MANAGED_COMPUTER_SETUP_INCOMPLETE",
+        "Managed computer setup ticket was consumed without a worker binding",
+      );
+    }
+    return { session, worker, duplicate: true };
+  }
+  const result = await bindManagedComputerSetupSession(db, {
+    setupSessionId: session.id,
+    setupTokenHash: tokenHash,
+    managedComputerId: computer.id,
+    organizationId: input.organizationId,
+    deviceId: input.deviceId,
+    ...input.worker,
+    observedAt: input.observedAt,
+  });
+  if (!result) {
+    throw new ManagedComputerServiceError(
+      409,
+      "MANAGED_COMPUTER_SETUP_STALE",
+      "Managed computer setup ticket is no longer active",
+    );
+  }
+  return { ...result, duplicate: false };
+}
+
+export async function managedComputerSetupStatus(
+  db: D1Database,
+  managedComputerId: string,
+  observedAt: string,
+) {
+  const session = await latestManagedComputerSetupSession(db, managedComputerId);
+  const worker = session?.worker_id
+    ? await db.prepare(
+      `select worker.*, device.max_concurrent_sessions,
+              device.icon_type, device.icon_value
+       from briar_execution_workers worker
+       join briar_execution_worker_devices device on device.id = worker.device_id
+       where worker.id = ?`,
+    ).bind(session.worker_id).first<Parameters<typeof workerJson>[0]>()
+    : null;
+  return {
+    session: session
+      ? {
+        id: session.id,
+        projectId: session.project_id,
+        status: session.status === "pending" && session.expires_at <= observedAt
+          ? "expired"
+          : session.status,
+        expiresAt: session.expires_at,
+        consumedAt: session.consumed_at,
+      }
+      : null,
+    worker: worker ? workerJson(worker, observedAt) : null,
+  };
 }
