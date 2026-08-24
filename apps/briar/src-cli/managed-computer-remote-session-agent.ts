@@ -1,6 +1,12 @@
 import { readFile } from "node:fs/promises";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import {
+  managedComputerRemoteHeartbeatIntervalMs,
+  managedComputerRemoteHeartbeatRequest,
+  managedComputerRemoteHeartbeatResponse,
+  managedComputerRemoteHeartbeatTimeoutMs,
+} from "../src/lib/managed-computer-remote-protocol";
 
 const RemoteAgentConfig = Schema.Struct({
   credential: Schema.String.check(
@@ -89,6 +95,8 @@ export class ManagedComputerRemoteSessionAgent {
   private localConnect: Promise<Bun.Socket<undefined>> | null = null;
   private activeSessionId: string | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private lastHeartbeatResponseAt = 0;
   private reconnectDelayMs = 1_000;
   private stopped = false;
   private pendingInput: Uint8Array[] = [];
@@ -110,6 +118,7 @@ export class ManagedComputerRemoteSessionAgent {
     this.stopped = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+    this.stopHeartbeat();
     this.closeDisplay("agent_stopped");
     this.websocket?.close(1000, "Remote session agent stopped");
     this.websocket = null;
@@ -123,16 +132,22 @@ export class ManagedComputerRemoteSessionAgent {
     socket.binaryType = "arraybuffer";
     this.websocket = socket;
     socket.addEventListener("open", () => {
+      if (this.websocket !== socket) return;
       this.reconnectDelayMs = 1_000;
+      this.startHeartbeat(socket);
       event("remote_relay_connected", {
         managedComputerId: this.config.managedComputerId,
       });
     });
     socket.addEventListener("message", (message) => {
-      void this.handleRelayMessage(message.data);
+      if (this.websocket === socket) {
+        void this.handleRelayMessage(message.data);
+      }
     });
     socket.addEventListener("close", (close) => {
-      if (this.websocket === socket) this.websocket = null;
+      if (this.websocket !== socket) return;
+      this.websocket = null;
+      this.stopHeartbeat();
       this.closeDisplay("relay_disconnected");
       event("remote_relay_disconnected", { code: close.code });
       this.scheduleReconnect();
@@ -144,6 +159,10 @@ export class ManagedComputerRemoteSessionAgent {
 
   private async handleRelayMessage(value: unknown) {
     if (typeof value === "string") {
+      if (value === managedComputerRemoteHeartbeatResponse) {
+        this.lastHeartbeatResponseAt = Date.now();
+        return;
+      }
       let parsed: unknown;
       try {
         parsed = JSON.parse(value);
@@ -262,6 +281,39 @@ export class ManagedComputerRemoteSessionAgent {
       this.reconnectTimer = null;
       if (!this.stopped) this.connectRelay();
     }, delay);
+    this.reconnectTimer.unref?.();
+  }
+
+  private startHeartbeat(socket: WebSocket) {
+    this.stopHeartbeat();
+    this.lastHeartbeatResponseAt = Date.now();
+    this.heartbeatTimer = setInterval(() => {
+      if (this.websocket !== socket || socket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      if (
+        Date.now() - this.lastHeartbeatResponseAt >=
+          managedComputerRemoteHeartbeatTimeoutMs
+      ) {
+        this.websocket = null;
+        this.stopHeartbeat();
+        this.closeDisplay("relay_heartbeat_timeout");
+        event("remote_relay_heartbeat_timeout", {
+          managedComputerId: this.config.managedComputerId,
+        });
+        socket.close(4008, "Remote relay heartbeat timed out");
+        this.scheduleReconnect();
+        return;
+      }
+      socket.send(managedComputerRemoteHeartbeatRequest);
+    }, managedComputerRemoteHeartbeatIntervalMs);
+    this.heartbeatTimer.unref?.();
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
+    this.lastHeartbeatResponseAt = 0;
   }
 }
 

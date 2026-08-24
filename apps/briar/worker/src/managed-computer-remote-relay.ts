@@ -1,5 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
 import {
+  managedComputerRemoteHeartbeatRequest,
+  managedComputerRemoteHeartbeatResponse,
+} from "../../src/lib/managed-computer-remote-protocol";
+import {
   expireManagedComputerRemoteSession,
   markManagedComputerRemoteSessionConnected,
   markManagedComputerRemoteSessionDisconnected,
@@ -38,6 +42,16 @@ function attachment(socket: WebSocket) {
 }
 
 export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.setWebSocketAutoResponse(
+      new WebSocketRequestResponsePair(
+        managedComputerRemoteHeartbeatRequest,
+        managedComputerRemoteHeartbeatResponse,
+      ),
+    );
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/status" && request.method === "GET") {
