@@ -251,14 +251,17 @@ export async function createManagedComputerRemoteSessionTicket(
     controllerUserId: input.controllerUserId,
     requestId: input.requestId,
   });
-  const activeSession = input.reconnectSessionId || existingByRequest
-    ? null
-    : await activeManagedComputerRemoteSession(db, input.managedComputerId);
-  const reconnectSessionId = input.reconnectSessionId ?? existingByRequest?.id ??
-    (activeSession?.state === "disconnected" &&
-        activeSession.controller_user_id === input.controllerUserId
+  const activeSession = await activeManagedComputerRemoteSession(
+    db,
+    input.managedComputerId,
+  );
+  const recoverableSessionId =
+    activeSession?.state === "disconnected" &&
+      activeSession.controller_user_id === input.controllerUserId
       ? activeSession.id
-      : undefined);
+      : undefined;
+  const reconnectSessionId = recoverableSessionId ??
+    input.reconnectSessionId ?? existingByRequest?.id;
   if (reconnectSessionId) {
     const reconnectCapacity = await managedComputerRemoteSessionCapacity(db, {
       organizationId: input.organizationId,
