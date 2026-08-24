@@ -160,9 +160,15 @@ build {
   name    = "briar-managed-computer"
   sources = ["source.amazon-ebs.managed_computer"]
 
+  provisioner "shell" {
+    inline = [
+      "install -d -m 0755 /tmp/briar-image"
+    ]
+  }
+
   provisioner "file" {
     source      = "${var.artifact_directory}/"
-    destination = "/tmp/briar-image"
+    destination = "/tmp/briar-image/"
   }
 
   provisioner "shell" {

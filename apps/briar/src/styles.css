@@ -2180,7 +2180,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .skill-execution-proposal-card>footer { display:flex; flex-wrap:wrap; gap:8px; }
 .skill-execution-proposal-card>footer button { width:max-content; max-width:100%; min-height:32px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px; border:0; border-radius:8px; color:var(--primary-foreground); background:#6f56c9; font-size:var(--text-xs); font-weight:650; }
 .skill-execution-proposal-card>footer button:disabled { opacity:.55; cursor:not-allowed; }
-.skill-execution-approval-dialog { width:min(560px,calc(100vw - 32px)); max-width:560px; max-height:calc(100dvh - 32px); padding:0; gap:0; overflow:hidden; grid-template-rows:minmax(0,1fr) auto; border-radius:12px; }
+.skill-execution-approval-dialog { width:min(560px,calc(100vw - 32px)); max-width:560px; max-height:calc(100dvh - 32px); padding:0; gap:0; overflow:visible; grid-template-rows:minmax(0,1fr) auto; border-radius:12px; }
 .skill-execution-approval-scroll { min-height:0; padding:24px; display:grid; align-content:start; gap:16px; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
 .skill-execution-approval-footer { position:sticky; z-index:1; bottom:0; padding:16px 24px calc(16px + env(safe-area-inset-bottom,0px)); border-top:1px solid var(--border); background:var(--card); box-shadow:0 -8px 18px color-mix(in srgb,var(--foreground) 6%,transparent); }
 .skill-execution-approval-runtime { padding:10px; border:1px solid var(--border); border-radius:9px; background:var(--muted); }
