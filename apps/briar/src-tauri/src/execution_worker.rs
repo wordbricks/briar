@@ -642,3 +642,6 @@ pub(super) async fn repair_auto_hunt(
     .await
     .map_err(|error| error.to_string())?
 }
+
+#[cfg(test)]
+mod tests;

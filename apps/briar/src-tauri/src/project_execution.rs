@@ -644,3 +644,6 @@ pub(super) fn project_agent_sandbox_mode(full_access: bool) -> agent::SandboxMod
         agent::SandboxMode::WorkspaceWrite
     }
 }
+
+#[cfg(test)]
+mod tests;

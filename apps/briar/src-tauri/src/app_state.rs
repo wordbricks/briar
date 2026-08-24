@@ -1006,3 +1006,6 @@ pub(super) fn set_app_badge_count(window: tauri::Window, count: u32) -> Result<(
         .set_badge_count((count > 0).then_some(i64::from(count)))
         .map_err(|error| format!("App badge count update failed: {error}"))
 }
+
+#[cfg(test)]
+mod tests;

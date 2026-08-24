@@ -1272,3 +1272,6 @@ pub(super) fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Pat
         })
     })
 }
+
+#[cfg(test)]
+mod tests;

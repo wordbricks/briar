@@ -1286,3 +1286,6 @@ pub(super) async fn clone_github_ssh_repository(
     .await
     .map_err(|error| error.to_string())?
 }
+
+#[cfg(test)]
+mod tests;
