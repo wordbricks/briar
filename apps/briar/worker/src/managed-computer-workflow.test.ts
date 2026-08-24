@@ -3,6 +3,7 @@ import { ManagedComputerProvisioningWorkflow } from "./managed-computer-workflow
 
 const mocks = vi.hoisted(() => ({
   awsAccountId: vi.fn(),
+  clearRetryInstance: vi.fn(),
   complete: vi.fn(),
   describe: vi.fn(),
   fail: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock("./managed-computer-model", () => ({
 }));
 
 vi.mock("./managed-computer-repository", () => ({
+  clearRetiredManagedComputerInstance: mocks.clearRetryInstance,
   completeManagedComputerProvisioning: mocks.complete,
   failManagedComputerProvisioning: mocks.fail,
   managedComputerById: mocks.managedComputer,
@@ -87,6 +89,7 @@ describe("managed computer provisioning workflow", () => {
     mocks.job.mockResolvedValue({ id: computer.provisioning_job_id });
     mocks.managedComputer.mockResolvedValue(computer);
     mocks.awsAccountId.mockResolvedValue("123456789012");
+    mocks.clearRetryInstance.mockResolvedValue(computer);
     mocks.runInstance.mockResolvedValue("i-0123456789abcdef0");
     const description = {
       state: "running",
@@ -184,6 +187,20 @@ describe("managed computer provisioning workflow", () => {
       expect.anything(),
       "us-east-1",
       "i-previous0123456789",
+    );
+    expect(mocks.clearRetryInstance).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        managedComputerId: computer.id,
+        provisioningJobId: computer.provisioning_job_id,
+        previousInstanceId: "i-previous0123456789",
+      }),
+    );
+    expect(mocks.terminate.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.clearRetryInstance.mock.invocationCallOrder[0]!,
+    );
+    expect(mocks.clearRetryInstance.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.runInstance.mock.invocationCallOrder[0]!,
     );
     expect(mocks.runInstance).toHaveBeenCalledTimes(1);
     expect(mocks.fail).not.toHaveBeenCalled();

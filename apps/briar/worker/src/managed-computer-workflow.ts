@@ -14,6 +14,7 @@ import {
   managedComputerInfrastructureIssues,
 } from "./managed-computer-model";
 import {
+  clearRetiredManagedComputerInstance,
   completeManagedComputerProvisioning,
   failManagedComputerProvisioning,
   managedComputerById,
@@ -108,18 +109,35 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
               region,
               previousInstanceId,
             );
-            if (!previous || previous.state === "terminated") return;
-            if (
-              previous.tags["briar-managed"] !== "true" ||
-              previous.tags["briar-managed-computer"] !== managedComputerId
-            ) {
+            if (previous && previous.state !== "terminated") {
+              if (
+                previous.tags["briar-managed"] !== "true" ||
+                previous.tags["briar-managed-computer"] !== managedComputerId
+              ) {
+                throw new AwsManagedComputerError(
+                  "AWS_PREVIOUS_INSTANCE_MISMATCH",
+                  "Previous managed instance tags did not match the retry target",
+                  false,
+                );
+              }
+              await terminateManagedInstance(config, region, previousInstanceId);
+            }
+            const cleared = await clearRetiredManagedComputerInstance(
+              this.env.DB,
+              {
+                managedComputerId,
+                provisioningJobId,
+                previousInstanceId,
+                observedAt: new Date().toISOString(),
+              },
+            );
+            if (!cleared) {
               throw new AwsManagedComputerError(
-                "AWS_PREVIOUS_INSTANCE_MISMATCH",
-                "Previous managed instance tags did not match the retry target",
+                "PROVISIONING_JOB_STALE",
+                "Previous managed instance is no longer owned by this retry",
                 false,
               );
             }
-            await terminateManagedInstance(config, region, previousInstanceId);
           },
         );
       }

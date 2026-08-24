@@ -528,7 +528,7 @@ export async function createManagedComputerRetry(
     input.organizationId,
     input.managedComputerId,
   );
-  if (!computer || computer.state !== "failed" || computer.retry_count >= 3) {
+  if (!computer || computer.state !== "failed") {
     return null;
   }
   const previousInstanceId = computer.aws_instance_id;
@@ -539,8 +539,7 @@ export async function createManagedComputerRetry(
       `update briar_managed_computers
        set state = 'requested', provisioning_job_id = ?,
            retry_count = retry_count + 1, last_retry_at = ?,
-           aws_account_id = null, aws_region = ?, aws_instance_type = ?,
-           aws_instance_id = null, aws_volume_id = null,
+           aws_region = ?, aws_instance_type = ?,
            aws_launch_template_id = ?, aws_launch_template_version = ?,
            bootstrap_api_origin = ?,
            state_updated_at = ?, error_code = null, error_detail = null,
@@ -602,6 +601,30 @@ export async function createManagedComputerRetry(
     previousInstanceId,
     previousInstanceRegion,
   };
+}
+
+export async function clearRetiredManagedComputerInstance(
+  db: D1Database,
+  input: {
+    managedComputerId: string;
+    provisioningJobId: string;
+    previousInstanceId: string;
+    observedAt: string;
+  },
+) {
+  return db.prepare(
+    `update briar_managed_computers
+     set aws_account_id = null, aws_instance_id = null, aws_volume_id = null,
+         updated_at = ?
+     where id = ? and provisioning_job_id = ? and state = 'provisioning'
+       and aws_instance_id = ?
+     returning *`,
+  ).bind(
+    input.observedAt,
+    input.managedComputerId,
+    input.provisioningJobId,
+    input.previousInstanceId,
+  ).first<ManagedComputerRow>();
 }
 
 export async function enrollManagedComputerDevice(
