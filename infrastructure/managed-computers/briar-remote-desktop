@@ -21,7 +21,6 @@ trap cleanup EXIT INT TERM
 
 rm -f "/tmp/.X${display_number}-lock" "/tmp/.X11-unix/X${display_number}"
 /usr/bin/Xtigervnc "$display" \
-  -fg \
   -localhost \
   -geometry "$geometry" \
   -SecurityTypes None \
