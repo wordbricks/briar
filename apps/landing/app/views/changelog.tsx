@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.156",
+        date: "2026년 8월 24일",
+        title: "바쁜 Worker에서도 DM 답변과 원격 컴퓨터 연결을 이어갑니다",
+        summary:
+          "일반 작업으로 Worker가 바쁜 동안에도 DM Agent 답변을 처리하고, 관리형 컴퓨터의 원격 화면 재연결과 macOS 데스크톱 사용성을 더 안정적으로 다듬습니다.",
+        items: [
+          "일반 작업 슬롯이 모두 사용 중인 Worker도 DM Agent 답변을 계속 claim하고 처리해 대화가 지연되지 않도록 했습니다.",
+          "관리형 컴퓨터의 재시도·오래된 reconnect ID·등록 정보를 복구하고, 원격 화면 연결이 올바른 로컬 listener와 foreground VNC 프로세스를 사용하도록 검증합니다.",
+          "앱 설정에서 알림 소리를 켜고 끌 수 있으며, Agent 템플릿의 선택적 아바타와 Ponytail Developer 템플릿 이미지를 지원합니다.",
+          "macOS 상태 표시줄 아이콘과 스크롤바·채팅 입력 영역을 정리하고, GUI로 실행한 환경에서도 설치된 CLI를 안정적으로 찾도록 개선했습니다.",
+        ],
+      },
+      {
         version: "1.2.155",
         date: "2026년 8월 24일",
         title: "macOS 사이드바에 실제 frosted glass를 되찾습니다",
@@ -1059,6 +1072,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.156",
+        date: "August 24, 2026",
+        title: "Keep DM replies and remote computers moving while Workers are busy",
+        summary:
+          "Process DM Agent replies while Workers are occupied with regular work, and make managed-computer reconnects and everyday macOS desktop details more dependable.",
+        items: [
+          "Let healthy Workers claim and process DM Agent replies even when every regular work slot is in use, so conversations are not delayed.",
+          "Recover managed-computer retry, stale reconnect-ID, and enrollment state, while validating that remote desktop connections use the correct local listener and foreground VNC process.",
+          "Add an app setting for notification sounds and support optional Agent template avatars, including the bundled Ponytail Developer template image.",
+          "Polish the macOS status-bar icon, scrollbars, and chat composer, and reliably discover installed CLIs when the app is launched from a GUI environment.",
+        ],
+      },
       {
         version: "1.2.155",
         date: "August 24, 2026",
@@ -2180,7 +2206,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-155">
+          <a href="#v1-2-156">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2202,7 +2228,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.155"
+                      entry.version === "1.2.156"
+                        ? "2026-08-24"
+                        : entry.version === "1.2.155"
                         ? "2026-08-24"
                         : entry.version === "1.2.154"
                         ? "2026-08-24"
