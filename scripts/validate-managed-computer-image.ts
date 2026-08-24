@@ -112,6 +112,14 @@ if (!installer.includes("sha256sum --check --strict artifact-manifest.sha256")) 
   fail("image installer does not verify the uploaded artifact manifest");
 }
 
+const remoteDesktop = await text(join(image, "briar-remote-desktop"));
+if (!remoteDesktop.includes('/usr/bin/Xtigervnc "$display"')) {
+  fail("remote desktop does not start Xtigervnc");
+}
+if (remoteDesktop.includes("-fg")) {
+  fail("Debian 13 Xtigervnc does not support the -fg option");
+}
+
 const cleanup = await text(join(image, "prepare-image-for-capture"));
 const verifier = await text(join(image, "verify-managed-image"));
 for (const forbidden of [
