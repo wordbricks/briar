@@ -24,19 +24,22 @@ systemctl is-active --quiet briar-managed-worker.service
 systemctl is-active --quiet briar-remote-desktop.service
 systemctl is-active --quiet briar-remote-session-agent.service
 
-listeners="$(ss -H -ltn "sport = :${expected_port}")"
-if [[ -z "$listeners" ]]; then
+mapfile -t listener_addresses < <(
+  ss -H -ltn "sport = :${expected_port}" | awk '{print $4}'
+)
+if ((${#listener_addresses[@]} == 0)); then
   echo "Remote display is not listening on port $expected_port" >&2
   exit 1
 fi
-if grep -Eq '(^|[[:space:]])(0\.0\.0\.0|\[::\]|\*):' <<< "$listeners"; then
-  echo "Remote display is exposed on a non-loopback interface" >&2
-  exit 1
-fi
-if grep -Evq '127\.0\.0\.1:|\[::1\]:' <<< "$listeners"; then
-  echo "Remote display has a non-loopback listener" >&2
-  exit 1
-fi
+for listener_address in "${listener_addresses[@]}"; do
+  case "$listener_address" in
+    "127.0.0.1:${expected_port}" | "[::1]:${expected_port}") ;;
+    *)
+      echo "Remote display has a non-loopback listener: $listener_address" >&2
+      exit 1
+      ;;
+  esac
+done
 
 if systemctl show briar-remote-desktop.service \
   --property=User --value | grep -Fxq root; then
