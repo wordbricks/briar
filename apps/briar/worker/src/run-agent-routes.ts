@@ -162,15 +162,18 @@ export async function handleRunAgentRoute(
             readyAt: lifecycleObservedAt,
           })
         : null;
-      return json({
+      const response = {
         runId: agentStageLifecycleMatch[1],
         requestId: input.requestId,
         ...result,
-        ...(githubAutoResume ? { githubAutoResume } : {}),
-        ...(mergeQueueRegistration
-          ? { mergeQueueRegistered: mergeQueueRegistration.length }
-          : {}),
-      });
+      };
+      if (githubAutoResume) Object.assign(response, { githubAutoResume });
+      if (mergeQueueRegistration) {
+        Object.assign(response, {
+          mergeQueueRegistered: mergeQueueRegistration.length,
+        });
+      }
+      return json(response);
     } catch (error) {
       if (error instanceof HuntTransitionError) {
         throw new HttpError(

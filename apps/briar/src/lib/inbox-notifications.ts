@@ -37,13 +37,13 @@ type NotificationActionPayload = {
   };
 };
 
-export const defaultInboxNotificationPreferences =
-  (): InboxNotificationPreferences => ({
+export const defaultInboxNotificationPreferences = () =>
+  ({
     urgent: false,
     action_required: false,
     important: false,
     activity: false,
-  });
+  }) satisfies InboxNotificationPreferences;
 
 export function readInboxNotificationPreferences(): InboxNotificationPreferences {
   const defaults = defaultInboxNotificationPreferences();

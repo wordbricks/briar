@@ -194,11 +194,7 @@ async function renderHarness(props: React.ComponentProps<typeof Harness>) {
 describe("useChannelComposer", () => {
   beforeEach(() => {
     window.localStorage.setItem("briar.locale.v1", "en");
-    (
-      globalThis as typeof globalThis & {
-        IS_REACT_ACT_ENVIRONMENT: boolean;
-      }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   });
 
   it("localizes candidates and picks the active mention with the keyboard", async () => {

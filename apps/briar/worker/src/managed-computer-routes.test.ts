@@ -98,7 +98,7 @@ describe("managed computer routes", () => {
     headers: {
       authorization: `Bearer ${token}`,
       "content-type": "application/json",
-      ...(requestId ? { "idempotency-key": requestId } : {}),
+      ...(requestId ? { "idempotency-key": requestId } : undefined),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });

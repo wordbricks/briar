@@ -81,13 +81,14 @@ export function productionUpdaterConfig(env: NodeJS.ProcessEnv) {
     throw new Error("BRIAR_UPDATE_ENDPOINT must end with /releases/latest.json.");
   }
   const signingIdentity = env.APPLE_SIGNING_IDENTITY?.trim();
+  const bundle = signingIdentity
+    ? {
+        createUpdaterArtifacts: true,
+        macOS: { signingIdentity },
+      }
+    : { createUpdaterArtifacts: true };
   return {
-    bundle: {
-      createUpdaterArtifacts: true,
-      ...(signingIdentity
-        ? { macOS: { signingIdentity } }
-        : {}),
-    },
+    bundle,
     plugins: { updater: { pubkey, endpoints: [endpoint] } },
   };
 }

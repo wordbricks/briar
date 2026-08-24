@@ -17,10 +17,10 @@ const rates = (
   output_cost_per_token: output,
   litellm_provider: provider,
   ...(cacheRead === undefined
-    ? {}
+    ? undefined
     : { cache_read_input_token_cost: cacheRead }),
   ...(cacheWrite === undefined
-    ? {}
+    ? undefined
     : { cache_creation_input_token_cost: cacheWrite }),
 });
 

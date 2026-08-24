@@ -35,7 +35,7 @@ async function writeCliConfig(configDirectory: string, velenOrg?: string) {
         repositoryPath: process.cwd(),
         agentToken: "briar_agent_test",
         autoHunt: {
-          ...(velenOrg ? { velenOrg } : {}),
+          ...(velenOrg ? { velenOrg } : undefined),
           linear: { enabled: false },
           workflow: repositoryWorkflow,
         },
@@ -70,8 +70,10 @@ function runCli(
         ...environment,
         HOME: home,
         PATH: "/usr/bin:/bin",
-        ...(configDirectory ? { BRIAR_CONFIG_HOME: configDirectory } : {}),
-        ...(worktreeHome ? { BRIAR_WORKTREE_HOME: worktreeHome } : {}),
+        ...(configDirectory
+          ? { BRIAR_CONFIG_HOME: configDirectory }
+          : undefined),
+        ...(worktreeHome ? { BRIAR_WORKTREE_HOME: worktreeHome } : undefined),
       },
       encoding: "utf8",
     },

@@ -551,11 +551,16 @@ export function resolveBaseRef(git: GitRunner, repositoryPath: string): string |
  * (possibly slightly stale) ref keeps `worktree add` viable, and a transient
  * network blip must not strand a claimed issue.
  */
+export type RemoteBaseRefreshResult = {
+  fetched: boolean;
+  warning?: string;
+};
+
 export function refreshRemoteBase(
   git: GitRunner,
   repositoryPath: string,
   base: { remote: string; branch: string; ref: string },
-): { fetched: boolean; warning?: string } {
+): RemoteBaseRefreshResult {
   const hadRef = refExistsIn(git, repositoryPath, base.ref);
   const fetch = git(
     [

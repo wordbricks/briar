@@ -23,11 +23,18 @@ export type WorkflowCheckpointTransitionOutcome =
   | "conflict"
   | "not_found";
 
+type WorkflowCheckpointConflict = {
+  outcome: "conflict";
+  checkpointKey: string;
+  attempt: number;
+  revision: number;
+};
+
 const checkpointTransitionConflict = (
   checkpointKey: string,
   attempt: number,
   revision: number,
-): { outcome: "conflict"; checkpointKey: string; attempt: number; revision: number } => ({
+): WorkflowCheckpointConflict => ({
   outcome: "conflict",
   checkpointKey,
   attempt,

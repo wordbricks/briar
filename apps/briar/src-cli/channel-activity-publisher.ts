@@ -26,13 +26,13 @@ type ChannelActivityPublisherOptions = {
 export const CHANNEL_ACTIVITY_MIN_INTERVAL_MS = 750;
 export const CHANNEL_ACTIVITY_HEARTBEAT_INTERVAL_MS = 10_000;
 
-const defaultHeadline: Record<ChannelAgentActivityDescriptor["kind"], string> = {
+const defaultHeadline = {
   message: "Working on a reply",
   command: "Running a command",
   fileChange: "Updating files",
   webSearch: "Searching the web",
   tool: "Using a tool",
-};
+} satisfies Record<ChannelAgentActivityDescriptor["kind"], string>;
 
 const sensitiveAssignment = /\b((?:[A-Z][A-Z0-9_]*_)?(?:TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE_KEY))\s*=\s*(?:"[^"]*"|'[^']*'|\S+)/giu;
 const bearerCredential = /\bBearer\s+[A-Za-z0-9._~+\/-]+=*/giu;

@@ -219,11 +219,7 @@ describe("AppSettings", () => {
     vi.mocked(updateBrowserAutomationSettings).mockReset();
     window.localStorage.clear();
     window.localStorage.setItem("briar.locale.v1", "en");
-    (
-      globalThis as typeof globalThis & {
-        IS_REACT_ACT_ENVIRONMENT: boolean;
-      }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   });
 
   it("checks ego (lite) and installs agent-browser from Browser settings", async () => {

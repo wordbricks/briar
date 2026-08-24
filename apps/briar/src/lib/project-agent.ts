@@ -36,10 +36,7 @@ type ProjectAgentRuntimeProfile = {
   skills: ProjectAgentSkill[];
 };
 
-const defaultProjectAgentCopyByLocale: Record<
-  ProjectAgentLocale,
-  DefaultProjectAgentCopy
-> = {
+const defaultProjectAgentCopyByLocale = {
   ko: {
     name: "개발자 에이전트",
     description: "프로젝트의 개발과 코드 관련 작업을 수행하는 에이전트입니다.",
@@ -55,12 +52,9 @@ const defaultProjectAgentCopyByLocale: Record<
     description: "负责项目开发和代码相关工作的智能体。",
     responsibility: "负责项目的开发和代码相关工作。",
   },
-};
+} satisfies Record<ProjectAgentLocale, DefaultProjectAgentCopy>;
 
-const defaultProjectAgentSkillCopyByLocale: Record<
-  ProjectAgentLocale,
-  DefaultProjectAgentSkillCopy
-> = {
+const defaultProjectAgentSkillCopyByLocale = {
   ko: {
     name: "이슈 처리",
     description: "프로젝트의 이슈를 구현하고 검증해야 할 때 사용합니다.",
@@ -76,7 +70,7 @@ const defaultProjectAgentSkillCopyByLocale: Record<
     description: "当需要实现并验证项目问题时使用。",
     body: "负责项目的开发和代码相关工作。",
   },
-};
+} satisfies Record<ProjectAgentLocale, DefaultProjectAgentSkillCopy>;
 
 export function normalizeProjectAgentLocale(
   value: string | null | undefined,

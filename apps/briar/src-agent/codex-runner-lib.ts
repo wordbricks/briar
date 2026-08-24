@@ -562,11 +562,18 @@ export function codexApprovalRequest(message: CodexRpcMessage): {
       : typeof input.command === "string"
         ? input.command
         : undefined;
+  if (title) {
+    return {
+      id: `codex-${String(message.id)}`,
+      toolName: message.method,
+      input,
+      title,
+    };
+  }
   return {
     id: `codex-${String(message.id)}`,
     toolName: message.method,
     input,
-    ...(title ? { title } : {}),
   };
 }
 

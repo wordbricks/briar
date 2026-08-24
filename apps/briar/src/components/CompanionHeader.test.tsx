@@ -40,8 +40,7 @@ const user = {
   email: "jay@example.com",
 };
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
-  .IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 describe("CompanionHeader", () => {
   it("opens account actions without logging out and switches organizations", async () => {

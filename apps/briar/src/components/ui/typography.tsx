@@ -60,10 +60,7 @@ type TypographyElement =
   | "em"
   | "code";
 
-const defaultElement: Record<
-  NonNullable<VariantProps<typeof typographyVariants>["variant"]>,
-  TypographyElement
-> = {
+const defaultElement = {
   display: "h1",
   title: "h1",
   heading: "h2",
@@ -75,7 +72,10 @@ const defaultElement: Record<
   caption: "p",
   micro: "span",
   mono: "code",
-};
+} satisfies Record<
+  NonNullable<VariantProps<typeof typographyVariants>["variant"]>,
+  TypographyElement
+>;
 
 export interface TypographyProps
   extends React.HTMLAttributes<HTMLElement>,

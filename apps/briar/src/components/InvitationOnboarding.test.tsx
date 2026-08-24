@@ -2,14 +2,14 @@
 
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import * as Predicate from "effect/Predicate";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadOrganizationInvitation } from "../lib/api";
 import { InvitationOnboarding } from "./InvitationOnboarding";
 
 vi.mock("../lib/api", () => ({
   isApiErrorStatus: (error: unknown, status: number) =>
-    typeof error === "object" &&
-    error !== null &&
+    Predicate.isObjectOrArray(error) &&
     "status" in error &&
     error.status === status,
   loadOrganizationInvitation: vi.fn(),
@@ -33,11 +33,7 @@ describe("InvitationOnboarding", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(loadOrganizationInvitation).mockResolvedValue({ invitation });
-    (
-      globalThis as typeof globalThis & {
-        IS_REACT_ACT_ENVIRONMENT: boolean;
-      }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   });
 
   it("shows the invited organization and project without developer setup", async () => {

@@ -30,8 +30,6 @@ const OPTIONAL_SECRET_GROUPS = [
   ["MANAGED_COMPUTER_AWS_SESSION_TOKEN"],
 ] as const;
 
-type Mode = "check" | "deploy" | "dev";
-
 function readSecrets(): Record<string, string> {
   const secrets = Object.fromEntries(
     REQUIRED_SECRETS.map((name) => {
@@ -86,8 +84,8 @@ export async function runWorkerDeploy(
 }
 
 async function main(): Promise<void> {
-  const mode = process.argv[2] as Mode | undefined;
-  if (!mode || !["check", "deploy", "dev"].includes(mode)) {
+  const mode = process.argv[2];
+  if (mode !== "check" && mode !== "deploy" && mode !== "dev") {
     throw new Error("Usage: with-worker-secrets.ts <check|deploy|dev>");
   }
 
@@ -116,15 +114,16 @@ async function main(): Promise<void> {
     );
 
     const workerDevPort = process.env.BRIAR_WORKER_DEV_PORT?.trim();
-    const parsedWorkerDevPort = workerDevPort ? Number(workerDevPort) : null;
-    if (
-      workerDevPort &&
-      (!/^\d{1,5}$/u.test(workerDevPort) ||
+    if (workerDevPort) {
+      const parsedWorkerDevPort = Number(workerDevPort);
+      if (
+        !/^\d{1,5}$/u.test(workerDevPort) ||
         !Number.isInteger(parsedWorkerDevPort) ||
-        parsedWorkerDevPort! < 1 ||
-        parsedWorkerDevPort! > 65_535)
-    ) {
-      throw new Error("BRIAR_WORKER_DEV_PORT must be a valid TCP port.");
+        parsedWorkerDevPort < 1 ||
+        parsedWorkerDevPort > 65_535
+      ) {
+        throw new Error("BRIAR_WORKER_DEV_PORT must be a valid TCP port.");
+      }
     }
     const exitCode = mode === "deploy"
       ? await runWorkerDeploy(secretsPath)

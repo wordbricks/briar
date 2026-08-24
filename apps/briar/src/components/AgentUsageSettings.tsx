@@ -46,7 +46,7 @@ import { AgentProviderIcon } from "./AgentIcons";
 
 const rangeOptions = [7, 30, 90] as const satisfies readonly UsageRangeDays[];
 
-const providerColors: Record<UsageAttribution, string> = {
+const providerColors = {
   claude: "#d97757",
   codex: "var(--usage-codex-color)",
   cursor: "#24241f",
@@ -55,7 +55,7 @@ const providerColors: Record<UsageAttribution, string> = {
   opencode: "#4f8a70",
   openrouter: "#6d5bd0",
   unknown: "var(--usage-unknown-color)",
-};
+} satisfies Record<UsageAttribution, string>;
 
 type ChartMetric = "tokens" | "cost" | "runs";
 type BreakdownMode = "model" | "day";
@@ -143,11 +143,12 @@ function formatDateRange(startAt: number, endAt: number, locale: string) {
   const start = new Date(startAt);
   const end = new Date(endAt);
   const sameYear = start.getFullYear() === end.getFullYear();
-  const formatter = new Intl.DateTimeFormat(locale, {
+  const options: Intl.DateTimeFormatOptions = {
     day: "numeric",
     month: "short",
-    ...(!sameYear ? { year: "numeric" as const } : {}),
-  });
+  };
+  if (!sameYear) options.year = "numeric";
+  const formatter = new Intl.DateTimeFormat(locale, options);
   return `${formatter.format(start)} – ${formatter.format(end)}`;
 }
 

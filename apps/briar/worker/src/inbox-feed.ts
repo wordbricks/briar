@@ -246,9 +246,9 @@ export function buildInboxFeedMessages(
       const status = run.paused_at ? "paused" : run.status;
       if (!notifyingRunStatuses.has(status)) continue;
       const stageLabel = workflowStageLabel(run);
-      messages.push({
+      const message = {
         id: `issue:${run.id}`,
-        kind: "issue",
+        kind: "issue" as const,
         projectId: project.id,
         projectName: project.name,
         targetId: run.id,
@@ -258,17 +258,20 @@ export function buildInboxFeedMessages(
         runNumber: run.run_number,
         status: status as InboxFeedMessage["status"],
         workflowStage: run.workflow_stage,
-        ...(stageLabel ? { workflowStageLabel: stageLabel } : {}),
+      };
+      if (stageLabel) Object.assign(message, { workflowStageLabel: stageLabel });
+      Object.assign(message, {
         priority: run.priority,
         structuredResult: structuredResult(run),
       });
+      messages.push(message);
     }
 
     for (const notification of conversationNotifications) {
       const runNumber = runNumbers.get(notification.run_id);
-      messages.push({
+      const message = {
         id: `conversation:${notification.id}`,
-        kind: "conversation",
+        kind: "conversation" as const,
         projectId: project.id,
         projectName: project.name,
         targetId: notification.run_id,
@@ -282,14 +285,16 @@ export function buildInboxFeedMessages(
         authorImage: notification.author_agent_provider
           ? notification.author_agent_image ?? null
           : notification.author_image ?? null,
-        ...(runNumber
-          ? {
-              issueKey:
-                `${project.issue_key_prefix.trim() || "AH"}-${runNumber}`,
-            }
-          : {}),
+      };
+      if (runNumber) {
+        Object.assign(message, {
+          issueKey: `${project.issue_key_prefix.trim() || "AH"}-${runNumber}`,
+        });
+      }
+      Object.assign(message, {
         reason: notification.notification_reason,
       });
+      messages.push(message);
     }
 
     for (const row of sessionSummaries) {

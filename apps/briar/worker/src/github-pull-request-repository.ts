@@ -7,12 +7,12 @@ import {
 import { stableJson } from "./hunt-run-codec";
 import { getHuntRunForProject } from "./hunt-run-repository";
 
-const githubPullRequestStateRank: Record<GithubPullRequestState, number> = {
+const githubPullRequestStateRank = {
   unknown: 0,
   open: 1,
   closed: 2,
   merged: 3,
-};
+} satisfies Record<GithubPullRequestState, number>;
 
 export const githubPullRequestUrlTarget = (value: string) => {
   let url: URL;

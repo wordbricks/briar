@@ -23,7 +23,7 @@ export function IssueWorkflowProgress({
   const issueBoundaries = new Set(issueCheckpoints.map(checkpointBoundaryKey));
   const effectiveBoundaries = new Set(run.workflow.execution.checkpoints.map(checkpointBoundaryKey));
   const editable = !run.fullAuto && Boolean(onCheckpointsChange) && canEditIssueCheckpoints(run);
-  const stateLabels: Record<IssueWorkflowProgressState, string> = {
+  const stateLabels = {
     complete: t("status.completed"),
     active: t("status.running"),
     paused: t("status.paused"),
@@ -31,7 +31,7 @@ export function IssueWorkflowProgress({
     failed: t("status.failed"),
     cancelled: t("status.cancelled"),
     upcoming: t("status.queued")
-  };
+  } satisfies Record<IssueWorkflowProgressState, string>;
   return <div className="issue-workflow-progress">
       <ol aria-label={t("run.totalProgress")} aria-live="polite">
         {run.workflow.stages.map((stage, index) => {

@@ -5,10 +5,15 @@ export type AgentProviderModelPreference = {
   favoriteModels: string[];
 };
 
-export type AgentProviderModelPreferences = Record<
-  AgentProvider,
-  AgentProviderModelPreference
->;
+export type AgentProviderModelPreferences = {
+  codex: AgentProviderModelPreference;
+  claude: AgentProviderModelPreference;
+  cursor: AgentProviderModelPreference;
+  grok: AgentProviderModelPreference;
+  agy: AgentProviderModelPreference;
+  opencode: AgentProviderModelPreference;
+  openrouter: AgentProviderModelPreference;
+};
 
 export const agentModelPreferencesStorageKey =
   "briar.settings.agent-model-preferences.v1";

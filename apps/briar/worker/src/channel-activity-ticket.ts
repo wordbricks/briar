@@ -23,7 +23,10 @@ export const CHANNEL_ACTIVITY_SOCKET_AUTHORIZATION_TTL_MS = 5 * 60_000;
 export const CHANNEL_ACTIVITY_PUBLISH_MAX_TTL_MS = 16 * 60_000;
 const channelActivityTokenDomain = "briar-channel-activity";
 
-async function signPayload(secret: string, payload: object) {
+async function signPayload<Payload extends object>(
+  secret: string,
+  payload: Payload,
+) {
   return signJsonToken(channelActivityTokenDomain, secret, payload);
 }
 

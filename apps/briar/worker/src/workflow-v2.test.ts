@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -25,6 +26,11 @@ import {
   HuntTransitionError,
 } from "./db";
 import { applyD1Migrations } from "./test-helpers/d1";
+
+type WorkflowSnapshots = {
+  readonly settings: string;
+  readonly run: string;
+};
 
 const baseTime = Date.parse("2026-08-01T00:00:00Z");
 const at = (minute: number) =>
@@ -110,10 +116,10 @@ describe("workflow v2 D1 persistence and transitions", () => {
   let db: D1Database;
   let projectId: string;
   let v2RunId: string;
-  let snapshotsBeforeMigration: { settings: string; run: string };
+  let snapshotsBeforeMigration: WorkflowSnapshots;
 
   const setProjectWorkflow = async (workflow: AutoHuntWorkflow | string) => {
-    const workflowJson = typeof workflow === "string"
+    const workflowJson = Predicate.isString(workflow)
       ? workflow
       : JSON.stringify(workflow);
     const checkpoints = (JSON.parse(workflowJson) as AutoHuntWorkflow)

@@ -592,11 +592,10 @@ export async function probeGrokUsage(
   const proxyBase =
     process.env.GROK_CLI_CHAT_PROXY_BASE_URL?.trim().replace(/\/+$/u, "") ||
     GROK_DEFAULT_PROXY_BASE;
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${session.accessToken}`,
-    "X-XAI-Token-Auth": "xai-grok-cli",
-    Accept: "application/json",
-  };
+  const headers: Record<string, string> = {};
+  headers.Authorization = `Bearer ${session.accessToken}`;
+  headers["X-XAI-Token-Auth"] = "xai-grok-cli";
+  headers.Accept = "application/json";
   if (session.userId) headers["x-userid"] = session.userId;
 
   try {

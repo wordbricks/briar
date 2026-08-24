@@ -21,19 +21,22 @@ export function mergeIssueMessages(
       previous?.skillExecutionProposal?.status === "accepted"
         ? previous.skillExecutionProposal
         : null;
-    return {
-      ...message,
-      ...(acceptedIssueExecution &&
+    const mergedMessage = { ...message };
+    if (
+      acceptedIssueExecution &&
       message.executionProposal?.id === acceptedIssueExecution.id &&
       message.executionProposal.status === "pending"
-        ? { executionProposal: acceptedIssueExecution }
-        : {}),
-      ...(acceptedSkillExecution &&
+    ) {
+      mergedMessage.executionProposal = acceptedIssueExecution;
+    }
+    if (
+      acceptedSkillExecution &&
       message.skillExecutionProposal?.id === acceptedSkillExecution.id &&
       message.skillExecutionProposal.status === "pending"
-        ? { skillExecutionProposal: acceptedSkillExecution }
-        : {}),
-    };
+    ) {
+      mergedMessage.skillExecutionProposal = acceptedSkillExecution;
+    }
+    return mergedMessage;
   });
   merged.push(
     ...current.filter(

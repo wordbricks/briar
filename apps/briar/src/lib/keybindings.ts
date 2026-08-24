@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import { remoteDesktopCapturesKeyboard } from "./remote-desktop-focus";
 
 export type KeybindingId = "commandPalette" | "sidebarToggle";
@@ -11,7 +12,10 @@ export type Shortcut = {
   shift: boolean;
 };
 
-export type Keybindings = Record<KeybindingId, Shortcut>;
+export type Keybindings = {
+  commandPalette: Shortcut;
+  sidebarToggle: Shortcut;
+};
 
 export const keybindingIds: KeybindingId[] = [
   "commandPalette",
@@ -56,15 +60,14 @@ export function getRecordingKeybinding(): KeybindingId | null {
 }
 
 function isShortcut(value: unknown): value is Shortcut {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
+  if (!Predicate.isObject(value)) return false;
   return (
-    typeof candidate.key === "string" &&
-    typeof candidate.code === "string" &&
-    typeof candidate.meta === "boolean" &&
-    typeof candidate.ctrl === "boolean" &&
-    typeof candidate.alt === "boolean" &&
-    typeof candidate.shift === "boolean"
+    Predicate.isString(value.key) &&
+    Predicate.isString(value.code) &&
+    Predicate.isBoolean(value.meta) &&
+    Predicate.isBoolean(value.ctrl) &&
+    Predicate.isBoolean(value.alt) &&
+    Predicate.isBoolean(value.shift)
   );
 }
 
@@ -79,11 +82,13 @@ function persist(keybindings: Keybindings) {
 export function loadKeybindings(): Keybindings {
   const result: Keybindings = { ...defaultKeybindings };
   try {
-    const stored = JSON.parse(
+    const parsed: unknown = JSON.parse(
       window.localStorage.getItem(keybindingsStorageKey) ?? "{}",
-    ) as Partial<Keybindings>;
+    );
+    const stored = Predicate.isObject(parsed) ? parsed : {};
     for (const id of keybindingIds) {
-      if (isShortcut(stored[id])) result[id] = stored[id]!;
+      const storedShortcut = stored[id];
+      if (isShortcut(storedShortcut)) result[id] = storedShortcut;
     }
     if (shortcutsEqual(result.commandPalette, result.sidebarToggle)) {
       if (

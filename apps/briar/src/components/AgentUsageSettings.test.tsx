@@ -196,11 +196,7 @@ describe("AgentUsageSettings", () => {
     vi.mocked(loadAgentUsage).mockResolvedValue(snapshot);
     window.localStorage.clear();
     window.localStorage.setItem("briar.locale.v1", "en");
-    (
-      globalThis as typeof globalThis & {
-        IS_REACT_ACT_ENVIRONMENT: boolean;
-      }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   });
 
   it("renders recorded token usage and switches chart and breakdown modes", async () => {

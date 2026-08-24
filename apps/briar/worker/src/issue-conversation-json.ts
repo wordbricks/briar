@@ -33,21 +33,29 @@ export const issueReworkProposalJson = (proposal: IssueReworkProposalRow) => ({
 
 export const issueActionProposalJson = (proposal: IssueActionProposalRow) => {
   const payload = JSON.parse(proposal.payload_json) as Record<string, unknown>;
-  return {
+  const result = {
     id: proposal.id,
     type: proposal.action_type,
     ...payload,
-    ...(proposal.action_type === "request_issue_update" && payload.changes &&
-      typeof payload.changes === "object" && !Array.isArray(payload.changes)
-      ? { changedFields: Object.keys(payload.changes) }
-      : {}),
+  };
+  if (
+    proposal.action_type === "request_issue_update" && payload.changes &&
+    typeof payload.changes === "object" && !Array.isArray(payload.changes)
+  ) {
+    Object.assign(result, { changedFields: Object.keys(payload.changes) });
+  }
+  Object.assign(result, {
     status: proposal.status,
-    ...(proposal.action_type === "request_issue_create"
-      ? { executeAfterCreate: proposal.execute_after_create === 1 }
-      : {}),
+  });
+  if (proposal.action_type === "request_issue_create") {
+    Object.assign(result, {
+      executeAfterCreate: proposal.execute_after_create === 1,
+    });
+  }
+  return Object.assign(result, {
     acceptedAt: proposal.accepted_at,
     resultRunId: proposal.result_run_id,
-  };
+  });
 };
 
 export const issueExecutionProposalJson = (

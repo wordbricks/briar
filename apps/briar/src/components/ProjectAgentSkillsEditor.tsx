@@ -29,17 +29,19 @@ function positioned(skills: ProjectAgentSkillInput[]) {
 export function projectAgentSkillInputs(
   skills: readonly ProjectAgentSkillInput[],
 ): ProjectAgentSkillInput[] {
-  const next = skills.map((skill, position) => ({
-    ...(skill.id ? { id: skill.id } : {}),
-    name: skill.name,
-    description: skill.description,
-    body: skill.body,
-    provider: skill.provider,
-    model: skill.model,
-    effort: skill.effort,
-    kind: skill.kind,
-    position,
-  }));
+  const next = skills.map((skill, position) => {
+    const input = {
+      name: skill.name,
+      description: skill.description,
+      body: skill.body,
+      provider: skill.provider,
+      model: skill.model,
+      effort: skill.effort,
+      kind: skill.kind,
+      position,
+    };
+    return skill.id ? { id: skill.id, ...input } : input;
+  });
   return next;
 }
 

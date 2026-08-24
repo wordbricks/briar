@@ -32,15 +32,20 @@ type RankedItem<Item extends CommandPaletteSearchItem> = {
   score: number;
 };
 
-const scopePrefixes: Partial<Record<string, CommandPaletteScope>> = {
-  a: "actions",
-  c: "channels",
-  d: "direct-messages",
-  i: "issues",
-  n: "navigation",
-  p: "projects",
-  s: "sessions",
+export type ParsedCommandPaletteQuery = {
+  query: string;
+  scope: CommandPaletteScope | null;
 };
+
+const scopePrefixes = new Map<string, CommandPaletteScope>([
+  ["a", "actions"],
+  ["c", "channels"],
+  ["d", "direct-messages"],
+  ["i", "issues"],
+  ["n", "navigation"],
+  ["p", "projects"],
+  ["s", "sessions"],
+]);
 
 export const commandPaletteRecentsStorageKey =
   "briar.command-palette.recents.v1";
@@ -54,10 +59,9 @@ export function normalizeCommandPaletteText(value: string): string {
     .trim();
 }
 
-export function parseCommandPaletteQuery(query: string): {
-  query: string;
-  scope: CommandPaletteScope | null;
-} {
+export function parseCommandPaletteQuery(
+  query: string,
+): ParsedCommandPaletteQuery {
   const normalizedWithSeparator = query
     .normalize("NFKD")
     .replace(/\p{Mark}+/gu, "")
@@ -71,7 +75,7 @@ export function parseCommandPaletteQuery(query: string): {
   }
   return {
     query: match[2]?.trim() ?? "",
-    scope: scopePrefixes[match[1]!] ?? null,
+    scope: scopePrefixes.get(match[1] ?? "") ?? null,
   };
 }
 

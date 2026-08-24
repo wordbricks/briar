@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import { sha256Hex } from "./managed-computer-crypto";
@@ -22,7 +23,7 @@ describe("managed computer remote desktop routes", () => {
   let database: IsolatedTestDatabase;
   let db: D1Database;
   const relayFetch = vi.fn(async (input: RequestInfo | URL) => {
-    const url = new URL(typeof input === "string" ? input : input.toString());
+    const url = new URL(Predicate.isString(input) ? input : input.toString());
     if (url.pathname === "/status") {
       return Response.json({ agentConnected: true, controllerConnected: false });
     }

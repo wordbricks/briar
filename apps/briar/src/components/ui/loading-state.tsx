@@ -33,14 +33,14 @@ const orbit = Array.from({ length: 9 }, (_, i) => {
 export const LOADING_STATE_VARIANTS = ["Drive", "Dots", "Orbit"] as const;
 export type LoadingStateVariant = (typeof LOADING_STATE_VARIANTS)[number];
 
-const PATTERNS: Record<
-  LoadingStateVariant,
-  { delays: (number | null)[]; dur: number; round: boolean }
-> = {
+const PATTERNS = {
   Drive: { delays: chevron, dur: 650, round: false },
   Dots: { delays: chevron, dur: 650, round: true },
   Orbit: { delays: orbit, dur: 950, round: false },
-};
+} satisfies Record<
+  LoadingStateVariant,
+  { delays: (number | null)[]; dur: number; round: boolean }
+>;
 
 export function formatElapsed(deciseconds: number) {
   const total = deciseconds / 10;

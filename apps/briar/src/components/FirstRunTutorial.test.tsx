@@ -12,8 +12,7 @@ function buttonWithText(label: string) {
 }
 
 function mountTutorial() {
-  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
-    .IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   const container = document.createElement("div");
   document.body.append(container);
   return { container, root: createRoot(container) };

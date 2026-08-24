@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as Predicate from "effect/Predicate";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   channelReplyCompleteRequestBody,
@@ -213,8 +214,10 @@ describe("channel reply agent attachments", () => {
       }).result,
       attachments: [],
     });
-    expect(typeof jsonBody).toBe("string");
-    expect(JSON.parse(jsonBody as string)).not.toHaveProperty("attachments");
+    if (!Predicate.isString(jsonBody)) {
+      throw new Error("attachment-free channel replies must use a JSON body");
+    }
+    expect(JSON.parse(jsonBody)).not.toHaveProperty("attachments");
 
     const form = channelReplyCompleteRequestBody({
       organizationId: "11111111-1111-4111-8111-111111111111",
