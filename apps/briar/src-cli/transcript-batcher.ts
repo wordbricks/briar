@@ -8,6 +8,7 @@ type TranscriptBatcherOptions = {
   send: (events: TranscriptBatchEvent[]) => Promise<void>;
   onError?: (error: unknown) => void;
   isPayloadTooLarge?: (error: unknown) => boolean;
+  shouldFlushImmediately?: (event: TranscriptBatchEvent) => boolean;
   measureBytes?: (events: TranscriptBatchEvent[]) => number;
   maxEvents?: number;
   maxBytes?: number;
@@ -16,9 +17,50 @@ type TranscriptBatcherOptions = {
   retryDelayMs?: number;
 };
 
-export const TRANSCRIPT_BATCH_MAX_EVENTS = 100;
-export const TRANSCRIPT_BATCH_MAX_BYTES = 512 * 1024;
-export const TRANSCRIPT_BATCH_FLUSH_INTERVAL_MS = 250;
+// Keep small margins below the Worker's 200 event and 1 MiB request limits.
+export const TRANSCRIPT_BATCH_MAX_EVENTS = 192;
+export const TRANSCRIPT_BATCH_MAX_BYTES = 896 * 1024;
+export const TRANSCRIPT_BATCH_FLUSH_INTERVAL_MS = 500;
+
+const immediatePayloadTypes = new Set([
+  "approval",
+  "blocked",
+  "error",
+  "result",
+]);
+
+const immediateNormalizedEventTypes = new Set([
+  "activityCompleted",
+  "activityStarted",
+  "conversationStarted",
+  "messageCompleted",
+  "messageStarted",
+  "turnCompleted",
+]);
+
+/** Status boundaries reach transcript-backed UI without waiting for the timer. */
+export function transcriptEventRequiresImmediateFlush(
+  event: TranscriptBatchEvent,
+) {
+  if (!event.payload || typeof event.payload !== "object") return false;
+  const payload = event.payload as Record<string, unknown>;
+  if (
+    typeof payload.type === "string" &&
+    immediatePayloadTypes.has(payload.type)
+  ) {
+    return true;
+  }
+  if (
+    payload.type !== "event" ||
+    !payload.event ||
+    typeof payload.event !== "object"
+  ) {
+    return false;
+  }
+  const normalizedType = (payload.event as Record<string, unknown>).type;
+  return typeof normalizedType === "string" &&
+    immediateNormalizedEventTypes.has(normalizedType);
+}
 
 /**
  * Buffers optional transcript events while preserving their send order.
@@ -65,7 +107,12 @@ export class TranscriptBatcher {
     }
     this.events.push(event);
     this.bytes = this.measureBytes(this.events);
-    if (this.events.length >= this.maxEvents || this.bytes >= this.maxBytes) {
+    if (
+      this.events.length >= this.maxEvents ||
+      this.bytes >= this.maxBytes ||
+      (this.options.shouldFlushImmediately ??
+        transcriptEventRequiresImmediateFlush)(event)
+    ) {
       await this.flush();
       return;
     }
@@ -107,6 +154,8 @@ export class TranscriptBatcher {
         await this.deliver(batch.slice(midpoint));
         return;
       }
+      // A single event cannot be split further. Its bounded retry/error path is
+      // the fallback for payloads that still exceed the server's event limit.
       try {
         this.options.onError?.(error);
       } catch {
