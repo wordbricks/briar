@@ -22,18 +22,6 @@
   background: var(--sidebar-fallback);
 }
 
-.dark .sidebar-brand,
-.dark .sidebar-project-window-brand,
-.dark .sidebar-primary-nav a,
-.dark .sidebar-channels-toggle,
-.dark .sidebar-channel-list button,
-.dark .sidebar-project-heading,
-.dark .sidebar-project-toggle,
-.dark .sidebar-project-view,
-.dark .sidebar-agent-session {
-  color: var(--sidebar-foreground);
-}
-
 .dark .sidebar-channel-list button.unread {
   color: var(--sidebar-accent-foreground);
 }
@@ -42,18 +30,27 @@
 .dark .sidebar-brand[aria-expanded="true"],
 .dark .sidebar-project-window-brand:hover:not(:disabled),
 .dark .sidebar-primary-nav a:hover,
-.dark .sidebar-primary-nav a.active,
 .dark .sidebar-channels-toggle:hover,
-.dark .sidebar-channel-list button:hover,
-.dark .sidebar-channel-list button.active,
 .dark .sidebar-project-heading:hover,
-.dark .sidebar-project-heading.active,
 .dark .sidebar-project-toggle:hover,
 .dark .sidebar-project-view:hover,
-.dark .sidebar-project-view.active,
-.dark .sidebar-agent-session:hover {
+.dark .sidebar-agent-session:hover,
+.dark .sidebar-project-menu-trigger:hover,
+.dark .sidebar-project-menu-trigger[aria-expanded="true"],
+.dark .sidebar-section-heading button:hover,
+.dark .sidebar-issue-add:hover,
+.dark .user-card:hover,
+.dark .user-card[aria-expanded="true"] {
   color: var(--sidebar-accent-foreground);
-  background: var(--sidebar-accent);
+  background: var(--sidebar-hover);
+}
+
+.dark .sidebar-primary-nav a.active,
+.dark .sidebar-channel-list button.active,
+.dark .sidebar-project-heading.active,
+.dark .sidebar-project-view.active {
+  color: var(--sidebar-accent-foreground);
+  background: var(--sidebar-active);
 }
 
 .dark .sidebar-organization-menu,
@@ -67,9 +64,9 @@
 .dark .health-popover,
 .dark .companion-account-popover,
 .dark .project-schedule-context-menu {
-  border-color: var(--border);
-  color: var(--popover-foreground);
-  background: var(--popover);
+  border-color: var(--sidebar-border);
+  color: var(--sidebar-popover-foreground);
+  background: var(--sidebar-popover);
 }
 
 .dark .app-toast {
