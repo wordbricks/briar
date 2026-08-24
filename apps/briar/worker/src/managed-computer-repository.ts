@@ -509,6 +509,7 @@ export async function createManagedComputerRetry(
     requestId: string;
     provisioningJobId: string;
     workflowInstanceId: string;
+    enrollmentNonceHash: string;
     enrollmentExpiresAt: string;
     region: string;
     instanceType: string;
@@ -552,7 +553,8 @@ export async function createManagedComputerRetry(
            aws_launch_template_id = ?, aws_launch_template_version = ?,
            bootstrap_api_origin = ?,
            state_updated_at = ?, error_code = null, error_detail = null,
-           enrollment_expires_at = ?,
+           enrollment_nonce_hash = ?, enrollment_expires_at = ?,
+           enrollment_consumed_at = null, enrollment_identity_hash = null,
            updated_at = ?
        where id = ? and organization_id = ? and state = 'failed'
          and retry_count = ?`,
@@ -565,6 +567,7 @@ export async function createManagedComputerRetry(
       input.launchTemplateVersion,
       input.bootstrapApiOrigin,
       input.observedAt,
+      input.enrollmentNonceHash,
       input.enrollmentExpiresAt,
       input.observedAt,
       input.managedComputerId,
@@ -661,22 +664,29 @@ export async function enrollManagedComputerDevice(
     computer.aws_region !== input.region ||
     computer.aws_instance_id !== input.instanceId
   ) return null;
+  const replacementEnrollment =
+    computer.state === "bootstrapping" &&
+    computer.enrollment_consumed_at !== null &&
+    computer.enrollment_identity_hash !== input.identityHash;
   if (
     computer.enrollment_consumed_at !== null &&
-    computer.enrollment_identity_hash !== input.identityHash
+    computer.enrollment_identity_hash !== input.identityHash &&
+    !replacementEnrollment
   ) return null;
-  const firstEnrollment = computer.enrollment_consumed_at === null;
+  const newEnrollmentIdentity =
+    computer.enrollment_identity_hash !== input.identityHash;
   await db.batch([
     db.prepare(
       `insert into briar_execution_worker_devices (
          id, organization_id, owner_user_id, label, device_identity_hash,
          state, max_concurrent_sessions, last_heartbeat_at, created_at, updated_at
        ) values (?, ?, ?, ?, ?, 'online', 1, ?, ?, ?)
-       on conflict (organization_id, device_identity_hash) do update set
+       on conflict (id) do update set
+         device_identity_hash = excluded.device_identity_hash,
          state = 'online', max_concurrent_sessions = 1,
          last_heartbeat_at = excluded.last_heartbeat_at,
          updated_at = excluded.updated_at
-       where briar_execution_worker_devices.id = excluded.id
+       where briar_execution_worker_devices.organization_id = excluded.organization_id
          and briar_execution_worker_devices.owner_user_id = excluded.owner_user_id`,
     ).bind(
       input.deviceId,
@@ -699,13 +709,18 @@ export async function enrollManagedComputerDevice(
     db.prepare(
       `update briar_managed_computers
        set state = 'needs_setup', state_updated_at = ?, briar_device_id = ?,
-           enrollment_consumed_at = coalesce(enrollment_consumed_at, ?),
+           enrollment_consumed_at = case
+             when enrollment_identity_hash is null
+               or enrollment_identity_hash != ? then ?
+             else enrollment_consumed_at
+           end,
            enrollment_identity_hash = ?, updated_at = ?
        where id = ? and enrollment_nonce_hash = ?
          and state in ('bootstrapping', 'needs_setup')`,
     ).bind(
       input.observedAt,
       input.deviceId,
+      input.identityHash,
       input.observedAt,
       input.identityHash,
       input.observedAt,
@@ -713,7 +728,7 @@ export async function enrollManagedComputerDevice(
       input.nonceHash,
     ),
   ]);
-  if (firstEnrollment) {
+  if (newEnrollmentIdentity) {
     await recordManagedComputerAuditEvent(db, {
       organizationId: computer.organization_id,
       managedComputerId: computer.id,

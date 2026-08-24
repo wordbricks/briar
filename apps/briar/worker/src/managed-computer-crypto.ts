@@ -64,8 +64,12 @@ export async function promotionCodesEqual(candidate: string, expected: string) {
 export async function managedComputerEnrollmentNonce(
   secret: string,
   managedComputerId: string,
+  provisioningJobId: string,
 ) {
-  return hmacBase64Url(secret, `managed-computer-enrollment:${managedComputerId}`);
+  return hmacBase64Url(
+    secret,
+    `managed-computer-enrollment:${managedComputerId}:${provisioningJobId}`,
+  );
 }
 
 export async function managedComputerCredential(

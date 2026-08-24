@@ -22,16 +22,24 @@ describe("managed computer promotion and enrollment crypto", () => {
     );
   });
 
-  it("derives retry-stable one-time material without storing a raw secret", async () => {
+  it("derives job-scoped one-time material without storing a raw secret", async () => {
     const first = await managedComputerEnrollmentNonce(
       "server-secret",
       "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
     );
     const second = await managedComputerEnrollmentNonce(
       "server-secret",
       "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+    );
+    const retry = await managedComputerEnrollmentNonce(
+      "server-secret",
+      "11111111-1111-4111-8111-111111111111",
+      "33333333-3333-4333-8333-333333333333",
     );
     expect(first).toBe(second);
+    expect(retry).not.toBe(first);
     expect(first).toMatch(/^[A-Za-z0-9_-]{43}$/u);
     const credential = await managedComputerCredential(
       "server-secret",
