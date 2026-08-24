@@ -46,7 +46,7 @@ export function codexPetPageUrl(slug: string) {
 
 export function codexPetThumbnailUrl(slug: string) {
   assertCodexPetSlug(slug);
-  return `${codexPetSiteUrl}/assets/previews/${slug}/thumbnail.png`;
+  return `${codexPetSiteUrl}/assets/previews/${slug}/thumbnail.webp`;
 }
 
 export function codexPetSpriteSheetSourceUrl(slug: string) {
