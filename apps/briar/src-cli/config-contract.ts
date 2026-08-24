@@ -185,6 +185,10 @@ const AutoHuntConfig = passthrough(Schema.Struct({
 }));
 
 const Uuid = Schema.String.check(Schema.isUUID());
+const ManagedComputerDeviceId = Schema.String.check(
+  Schema.isPattern(/^managed-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u),
+);
+const WorkerDeviceId = Schema.Union([Uuid, ManagedComputerDeviceId]);
 const UrlString = Schema.String.check(
   Schema.makeFilter((value) => URL.canParse(value) || "Expected a valid URL"),
 );
@@ -198,11 +202,11 @@ const LlmConfig = passthrough(Schema.Struct({
 }));
 
 const ExecutionWorkerConfig = strip(Schema.Struct({
-  deviceId: Schema.mutableKey(Uuid),
+  deviceId: Schema.mutableKey(WorkerDeviceId),
   workerId: Schema.mutableKey(Schema.NonEmptyString),
   organizationId: Schema.mutableKey(Uuid),
   token: Schema.mutableKey(
-    Schema.String.check(Schema.isStartsWith("briar_worker_")),
+    Schema.optional(Schema.String.check(Schema.isStartsWith("briar_worker_"))),
   ),
   label: Schema.mutableKey(
     Schema.String.check(Schema.isLengthBetween(1, 100)),
@@ -234,7 +238,7 @@ const ActiveClaim = strip(Schema.Struct({
 export const ProjectConfig = passthrough(Schema.Struct({
   id: Schema.mutableKey(Uuid),
   repositoryPath: Schema.mutableKey(Schema.String),
-  agentToken: Schema.mutableKey(Schema.String),
+  agentToken: Schema.mutableKey(Schema.optional(Schema.String)),
   apiUrl: Schema.mutableKey(Schema.optional(UrlString)),
   repositoryRemote: Schema.mutableKey(Schema.optional(Schema.String)),
   llm: Schema.mutableKey(Schema.optional(LlmConfig)),
@@ -245,6 +249,17 @@ export const ProjectConfig = passthrough(Schema.Struct({
   activeClaim: Schema.mutableKey(Schema.optional(ActiveClaim)),
 }));
 export type ProjectConfig = typeof ProjectConfig.Type;
+
+const ManagedComputerConfig = strip(Schema.Struct({
+  managedComputerId: Schema.mutableKey(Uuid),
+  deviceId: Schema.mutableKey(ManagedComputerDeviceId),
+  organizationId: Schema.mutableKey(Uuid),
+  credentialFile: Schema.mutableKey(Schema.String.check(
+    Schema.makeFilter((value) =>
+      value.startsWith("/") || "Managed computer credential path must be absolute"
+    ),
+  )),
+}));
 
 const AgentProviderSettings = strip(Schema.Struct({
   codex: Schema.mutableKey(defaulted(Schema.Boolean, true)),
@@ -303,6 +318,9 @@ export const Config = passthrough(Schema.Struct({
         Schema.isPattern(/^briar_device_[0-9a-f]{64}$/u),
       ),
     ),
+  ),
+  managedComputer: Schema.mutableKey(
+    Schema.optional(ManagedComputerConfig),
   ),
   projects: Schema.mutableKey(
     defaultedWith(mutableArray(ProjectConfig), () => []),

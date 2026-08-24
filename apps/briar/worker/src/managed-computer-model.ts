@@ -64,6 +64,22 @@ export type ManagedComputerProvisioningJobRow = {
   updated_at: string;
 };
 
+export type ManagedComputerSetupSessionRow = {
+  id: string;
+  managed_computer_id: string;
+  organization_id: string;
+  project_id: string;
+  requested_by_user_id: string;
+  request_id: string;
+  token_hash: string;
+  status: "pending" | "consumed";
+  expires_at: string;
+  consumed_at: string | null;
+  worker_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 const IntegerText = Schema.String.check(
   Schema.isPattern(/^\d+$/u),
 ).pipe(Schema.decodeTo(
@@ -119,6 +135,7 @@ export type ManagedComputerConfig = {
   lifetimeDays: number;
   stoppedRetentionDays: number;
   enrollmentTtlMinutes: number;
+  setupTtlMinutes: number;
   region: string | null;
   launchTemplateId: string | null;
   launchTemplateVersion: string | null;
@@ -207,6 +224,11 @@ export function managedComputerConfig(env: Env): ManagedComputerConfig {
     enrollmentTtlMinutes: positiveInteger(
       env.MANAGED_COMPUTER_ENROLLMENT_TTL_MINUTES,
       30,
+    ),
+    setupTtlMinutes: boundedPositiveInteger(
+      env.MANAGED_COMPUTER_SETUP_TTL_MINUTES,
+      10,
+      60,
     ),
     region: env.MANAGED_COMPUTER_AWS_REGION?.trim() || null,
     launchTemplateId:

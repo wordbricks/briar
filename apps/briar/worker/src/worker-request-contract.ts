@@ -105,17 +105,25 @@ const WorkerRegistrationFields = {
   versions: defaulted(Versions, {}),
 } as const;
 
+const WorkerRuntimeMetadataFields = {
+  agentProvider: WorkerRegistrationFields.agentProvider,
+  providers: WorkerRegistrationFields.providers,
+  providerHealth: WorkerRegistrationFields.providerHealth,
+  providerCapabilities: WorkerRegistrationFields.providerCapabilities,
+  versions: WorkerRegistrationFields.versions,
+} as const;
+
+export const WorkerRuntimeMetadata = strictSchema(Schema.Struct(
+  WorkerRuntimeMetadataFields,
+));
+
 export const WorkerRegister = strictSchema(Schema.Struct(
   WorkerRegistrationFields,
 ));
 
 export const WorkerBind = strictSchema(Schema.Struct({
   deviceIdentity: WorkerRegistrationFields.deviceIdentity,
-  agentProvider: WorkerRegistrationFields.agentProvider,
-  providers: WorkerRegistrationFields.providers,
-  providerHealth: WorkerRegistrationFields.providerHealth,
-  providerCapabilities: WorkerRegistrationFields.providerCapabilities,
-  versions: WorkerRegistrationFields.versions,
+  ...WorkerRuntimeMetadataFields,
 }));
 
 export const WorkerConcurrency = strictSchema(Schema.Struct({
