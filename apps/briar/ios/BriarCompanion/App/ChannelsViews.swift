@@ -227,7 +227,7 @@ struct ChannelMessagesView: View {
         .channelNavigationSubtitle(currentChannel.isDirectMessage ? nil : navigationSubtitle)
         .toolbar {
             if currentChannel.isDirectMessage {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .principal) {
                     DirectMessageNavigationTitle(
                         channel: currentChannel,
                         currentUserID: currentUserID,
