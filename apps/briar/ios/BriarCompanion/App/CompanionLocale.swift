@@ -750,6 +750,8 @@ enum L10n {
         case linkCopied
         case messageCopied
         case profileEmail
+        case notificationSound
+        case notificationSoundDescription
         case notificationHint
         case channelsCommon
         case channelsOtherProject
@@ -810,6 +812,8 @@ enum L10n {
             case .linkCopied: "링크를 복사했습니다"
             case .messageCopied: "메시지를 복사했습니다"
             case .profileEmail: "이메일"
+            case .notificationSound: "알림 소리"
+            case .notificationSoundDescription: "새 시스템 알림이 도착하면 소리를 재생합니다."
             case .channelsCommon: "공통 채널"
             case .channelsOtherProject: "다른 프로젝트"
             case .channelsEmpty: "채널이 없습니다."
@@ -872,6 +876,8 @@ enum L10n {
             case .linkCopied: "Link copied"
             case .messageCopied: "Message copied"
             case .profileEmail: "Email"
+            case .notificationSound: "Play sound"
+            case .notificationSoundDescription: "Play a sound when a new system notification arrives."
             case .channelsCommon: "Common channels"
             case .channelsOtherProject: "Other project"
             case .channelsEmpty: "No channels yet."
@@ -934,6 +940,8 @@ enum L10n {
             case .linkCopied: "链接已复制"
             case .messageCopied: "消息已复制"
             case .profileEmail: "电子邮件"
+            case .notificationSound: "播放声音"
+            case .notificationSoundDescription: "收到新的系统通知时播放声音。"
             case .channelsCommon: "公共频道"
             case .channelsOtherProject: "其他项目"
             case .channelsEmpty: "还没有频道。"

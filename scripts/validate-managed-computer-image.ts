@@ -97,6 +97,12 @@ if (
 if (!packer.includes("verify-managed-image --capture-ready")) {
   fail("Packer does not verify the final credential-free capture state");
 }
+if (
+  !packer.includes("install -d -m 0755 /tmp/briar-image") ||
+  !packer.includes('destination = "/tmp/briar-image/"')
+) {
+  fail("Packer must create the artifact upload directory before file provisioning");
+}
 
 const installer = await text(join(image, "install-image-runtime"));
 if (!installer.includes("--frozen-lockfile --production --ignore-scripts")) {
@@ -104,6 +110,25 @@ if (!installer.includes("--frozen-lockfile --production --ignore-scripts")) {
 }
 if (!installer.includes("sha256sum --check --strict artifact-manifest.sha256")) {
   fail("image installer does not verify the uploaded artifact manifest");
+}
+
+const remoteDesktop = await text(join(image, "briar-remote-desktop"));
+if (!remoteDesktop.includes('/usr/bin/Xtigervnc "$display"')) {
+  fail("remote desktop does not start Xtigervnc");
+}
+if (remoteDesktop.includes("-fg")) {
+  fail("Debian 13 Xtigervnc does not support the -fg option");
+}
+
+const remoteDesktopVerifier = await text(
+  join(image, "verify-remote-desktop"),
+);
+if (
+  !remoteDesktopVerifier.includes("awk '{print $4}'") ||
+  !remoteDesktopVerifier.includes('"127.0.0.1:${expected_port}"') ||
+  !remoteDesktopVerifier.includes('"[::1]:${expected_port}"')
+) {
+  fail("remote desktop verification must inspect only local listener addresses");
 }
 
 const cleanup = await text(join(image, "prepare-image-for-capture"));

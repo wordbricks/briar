@@ -20,7 +20,11 @@ pub const RUN_MENU_ID_PREFIX: &str = "status-tray:run:";
 pub const STATUS_TRAY_OPEN_RUN_EVENT: &str = "status-tray-open-run";
 
 const MAX_TITLE_CHARS: usize = 42;
-const TRAY_TEMPLATE_PNG: &[u8] = include_bytes!("../icons/tray-template.png");
+// Keep the canonical line-art mark as the template source. The macOS tray-icon
+// backend renders it at the existing 18pt status-item height, so using the
+// high-resolution asset fixes the collapsed silhouette without changing the
+// menu-bar footprint.
+const TRAY_TEMPLATE_PNG: &[u8] = include_bytes!("../../src/assets/brand/briar-mark-dark.png");
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -444,9 +448,9 @@ mod tests {
     }
 
     #[test]
-    fn tray_icon_is_a_large_filled_template() {
+    fn tray_icon_uses_the_transparent_line_art_mark() {
         let image = tray_icon_image().expect("tray icon should decode");
-        assert_eq!((image.width(), image.height()), (32, 32));
+        assert_eq!((image.width(), image.height()), (1000, 1000));
 
         let alpha = image
             .rgba()
@@ -455,13 +459,11 @@ mod tests {
             .iter()
             .map(|pixel| pixel[3])
             .collect::<Vec<_>>();
-        let opaque_pixels = alpha.iter().filter(|value| **value >= 240).count();
-        let center_alpha = alpha[16 * image.width() as usize + 16];
+        let center_alpha = alpha[500 * image.width() as usize + 500];
 
-        assert!(
-            opaque_pixels >= 350,
-            "tray icon should use a filled silhouette, found {opaque_pixels} opaque pixels"
+        assert_eq!(
+            center_alpha, 0,
+            "line-art mark center should stay transparent"
         );
-        assert_eq!(center_alpha, 255, "tray icon center should be filled");
     }
 }
