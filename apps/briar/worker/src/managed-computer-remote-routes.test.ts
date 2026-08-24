@@ -223,6 +223,27 @@ describe("managed computer remote desktop routes", () => {
     ).bind(payload.session.id).first<{ reason_code: string }>()).toMatchObject({
       reason_code: "token_expired_or_reused",
     });
+
+    await db.prepare(
+      `update briar_managed_computer_remote_sessions
+       set state = 'disconnected', disconnected_at = ?, updated_at = ?
+       where id = ?`,
+    ).bind(now, now, payload.session.id).run();
+    const recoveredResponse = await worker.fetch(
+      createRequest(ownerToken, "99999999-9999-4999-8999-999999999999"),
+      env(),
+    );
+    expect(recoveredResponse.status).toBe(201);
+    await expect(recoveredResponse.json<{
+      session: { id: string; connectionGeneration: number };
+      reconnected: boolean;
+    }>()).resolves.toMatchObject({
+      session: {
+        id: payload.session.id,
+        connectionGeneration: 2,
+      },
+      reconnected: true,
+    });
   });
 
   it("authenticates the outbound agent with the computer-scoped worker credential", async () => {
