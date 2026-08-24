@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   projectWindowLabel,
+  projectWindowPresentationOptions,
   projectWindowUrl,
   readProjectWindowProjectId,
 } from "./project-window";
@@ -35,6 +36,20 @@ describe("project window context", () => {
     expect(projectWindowLabel("project with spaces", 43)).not.toBe(
       projectWindowLabel("project with spaces", 42),
     );
+  });
+
+  it("uses the native sidebar material for macOS project windows", () => {
+    expect(projectWindowPresentationOptions(true)).toMatchObject({
+      backgroundColor: "#00000000",
+      transparent: true,
+      windowEffects: {
+        effects: ["sidebar"],
+        state: "followsWindowActiveState",
+      },
+    });
+    expect(projectWindowPresentationOptions(false)).toEqual({
+      backgroundColor: "#f7f7f3",
+    });
   });
 
   it("grants runtime project windows the desktop app capability", () => {

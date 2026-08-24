@@ -43,6 +43,22 @@ describe("sidebar frosted glass styles", () => {
     expect(styles).toContain("-webkit-backdrop-filter:blur(24px) saturate(155%)");
   });
 
+  it("leaves the native macOS material unobstructed by a second web tint", () => {
+    const macOSSidebarRule = styles.match(
+      /\.macos-vibrant-window \.sidebar \{[^}]+\}/,
+    )?.[0];
+
+    expect(macOSSidebarRule).toBe(
+      ".macos-vibrant-window .sidebar {\n  background:transparent;\n  box-shadow:none;\n  backdrop-filter:none;\n  -webkit-backdrop-filter:none;\n}",
+    );
+    expect(styles).toContain(
+      "@media (prefers-reduced-transparency: reduce) { .macos-vibrant-window .sidebar { background:var(--sidebar-fallback); } }",
+    );
+    expect(styles).toContain(
+      "@media (prefers-contrast: more) { .macos-vibrant-window .sidebar { border-right-color:var(--sidebar-border-strong); background:var(--sidebar-fallback); } }",
+    );
+  });
+
   it("composes the macOS main window over the native sidebar material", () => {
     const [mainWindow] = macosConfig.app.windows;
 
