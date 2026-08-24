@@ -2196,6 +2196,8 @@ export const ko = {
   "executionPolicy.noDefault": "기본값 없음 · 실행할 때 선택",
   "executionPolicy.permission": "조직 소유자 또는 관리자만 실행 정책을 변경할 수 있습니다.",
   "executionPolicy.registrationHint": "컴퓨터 등록과 프로젝트 저장소 연결은 조직 설정 → 컴퓨터에서 관리합니다.",
+  "worker.noneForSelection": "선택한 프로바이더·모델·effort 조합을 실행할 수 있는 현재 Worker가 없습니다.",
+  "worker.incompatibleSelection": "이 Worker는 선택한 프로바이더·모델·effort 조합을 지원하지 않습니다.",
 } as const;
 
 export type MessageKey = keyof typeof ko;
@@ -3469,6 +3471,8 @@ export const en = {
   "organization.githubBenefitPr": "Link Briar issues and pull requests",
   "organization.githubBenefitMerge": "Resume waiting work after a pull request is merged",
   "organization.githubBenefitScope": "Limit access to repositories you select",
+  "worker.noneForSelection": "No current Worker supports the selected provider, model, and effort.",
+  "worker.incompatibleSelection": "This Worker does not support the selected provider, model, and effort.",
 } satisfies Messages;
 export const zh = {
   ...en,
@@ -4707,4 +4711,6 @@ export const zh = {
   "organization.githubBenefitPr": "关联 Briar 问题和拉取请求",
   "organization.githubBenefitMerge": "拉取请求合并后自动恢复等待中的任务",
   "organization.githubBenefitScope": "将访问范围限制为所选仓库",
+  "worker.noneForSelection": "当前没有 Worker 支持所选的提供商、模型和 effort。",
+  "worker.incompatibleSelection": "此 Worker 不支持所选的提供商、模型和 effort。",
 } satisfies Messages;

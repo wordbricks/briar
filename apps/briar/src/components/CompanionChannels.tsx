@@ -2268,13 +2268,6 @@ function MessageRow({
           interactive={!showThreadSummary}
           token={token}
         />
-        {showTypingState ? (
-          <ChannelTypingState
-            agentNames={typingAgentNames}
-            activityByAgentName={typingActivityByAgentName}
-            className="companion-channel-typing"
-          />
-        ) : null}
         {message.document ? (
           <span className="companion-channel-document">
             <FileText size={13} />
@@ -2431,6 +2424,13 @@ function MessageRow({
             />
           )
           : null}
+        {showTypingState ? (
+          <ChannelTypingState
+            agentNames={typingAgentNames}
+            activityByAgentName={typingActivityByAgentName}
+            className="companion-channel-typing"
+          />
+        ) : null}
       </div>
       {showingThreadActions ? (
         <div

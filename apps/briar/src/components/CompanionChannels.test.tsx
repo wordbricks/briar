@@ -659,6 +659,50 @@ describe("CompanionChannels", () => {
     expect(container.querySelector(".conversation-reply-summary")).toBeNull();
   });
 
+  it("places the typing state below the visible reply summary", async () => {
+    const target = message("m-typing", "Hello team", 2);
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [agent],
+      messages: [target],
+      agentReplies: [
+        {
+          ...agentReply("running"),
+          triggerMessageId: target.id,
+          parentMessageId: target.id,
+        },
+      ],
+    });
+    await render();
+    await act(async () => {
+      [
+        ...container.querySelectorAll<HTMLButtonElement>(
+          ".companion-channel-group button",
+        ),
+      ]
+        .find((button) => button.textContent?.includes("Welcome"))!
+        .click();
+      await Promise.resolve();
+    });
+
+    const row = container.querySelector<HTMLElement>(
+      `[data-companion-channel-message-id="${target.id}"]`,
+    );
+    const summary = row?.querySelector<HTMLElement>(
+      ".conversation-reply-summary",
+    );
+    const typing = row?.querySelector<HTMLElement>(
+      ".companion-channel-typing",
+    );
+    expect(summary?.textContent).toContain("2 replies");
+    expect(typing?.textContent).toContain("Honey is writing a reply");
+    expect(
+      Boolean(summary && typing &&
+        (summary.compareDocumentPosition(typing) & Node.DOCUMENT_POSITION_FOLLOWING)),
+    ).toBe(true);
+  });
+
   it("keeps thread and copy actions beside reactions in the long-press menu", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
@@ -1832,8 +1876,10 @@ describe("CompanionChannels", () => {
       label: "Companion Mac",
       agentProvider: "codex",
       providers: ["codex"],
+      state: "online",
       readiness: "available",
       acceptingWork: true,
+      capabilities: {},
     };
     listChannels.mockResolvedValue({ channels: [selectedChannel], cursor: 1 });
     loadChannel.mockResolvedValue({

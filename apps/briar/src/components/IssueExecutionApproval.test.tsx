@@ -3,26 +3,13 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  defaultAgentProviderModelCatalog,
-  loadAgentProviderModels,
-} from "../lib/project-llm";
+import { defaultAgentProviderModelCatalog } from "../lib/project-llm";
 import type { ExecutionWorker, HuntRun } from "../types";
 import {
   IssueExecutionApproval,
   type ExecutionApprovalContext,
   type ExecutionProposalView,
 } from "./IssueExecutionApproval";
-
-vi.mock("../lib/project-llm", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../lib/project-llm")>();
-  return {
-    ...original,
-    loadAgentProviderModels: vi.fn(async () =>
-      original.defaultAgentProviderModelCatalog
-    ),
-  };
-});
 
 const worker: ExecutionWorker = {
   id: "worker-1",
@@ -90,21 +77,7 @@ describe("IssueExecutionApproval", () => {
   let root: ReturnType<typeof createRoot>;
 
   beforeEach(() => {
-Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    vi.mocked(loadAgentProviderModels).mockReset();
-    vi.mocked(loadAgentProviderModels).mockResolvedValue({
-      ...defaultAgentProviderModelCatalog,
-      opencode: {
-        models: [{
-          id: "openai/custom-agent",
-          label: "Custom Agent",
-          efforts: [{ id: "high", label: "high" }],
-        }],
-        defaultEfforts: [],
-        allowCustomModels: true,
-        error: null,
-      },
-    });
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -399,6 +372,21 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       label: "OpenCode Mac",
       agentProvider: "opencode" as const,
       providers: ["opencode"] as ExecutionWorker["providers"],
+      capabilities: {
+        providerCapabilities: {
+          ...defaultAgentProviderModelCatalog,
+          opencode: {
+            models: [{
+              id: "openai/custom-agent",
+              label: "Custom Agent",
+              efforts: [{ id: "high", label: "high" }],
+            }],
+            defaultEfforts: [],
+            allowCustomModels: true,
+            error: null,
+          },
+        },
+      },
     };
     const refreshedContext = (): ExecutionApprovalContext => ({
       run: { ...backlogRun },

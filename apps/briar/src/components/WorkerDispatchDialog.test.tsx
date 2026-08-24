@@ -5,23 +5,40 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   defaultAgentProviderModelCatalog,
-  loadAgentProviderModels,
 } from "../lib/project-llm";
+import type { AgentProviderCapabilityCatalog } from "../lib/agent-provider-contract";
 import type { ExecutionWorker } from "../types";
-import { writeAgentProviderModelPreference } from "../lib/agent-model-preferences";
 import { WorkerDispatchDialog } from "./WorkerDispatchDialog";
 
-vi.mock("../lib/project-llm", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../lib/project-llm")>();
-  return {
-    ...original,
-    loadAgentProviderModels: vi.fn(async () =>
-      original.defaultAgentProviderModelCatalog
-    ),
-  };
+const workerCatalog = (): AgentProviderCapabilityCatalog => ({
+  ...defaultAgentProviderModelCatalog,
+  codex: {
+    models: [{
+      id: "gpt-5.6-sol",
+      label: "GPT-5.6 Sol",
+      efforts: [{ id: "high", label: "high" }],
+    }],
+    defaultEfforts: [],
+    allowCustomModels: false,
+    error: null,
+  },
+  claude: {
+    models: [{
+      id: "opus",
+      label: "Claude Opus",
+      efforts: [{ id: "high", label: "high" }],
+    }],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
 });
 
-const worker = (id: string, label: string): ExecutionWorker => ({
+const worker = (
+  id: string,
+  label: string,
+  providerCapabilities = workerCatalog(),
+): ExecutionWorker => ({
   id,
   deviceId: `device-${id}`,
   ownerUserId: "owner",
@@ -33,7 +50,7 @@ const worker = (id: string, label: string): ExecutionWorker => ({
   readiness: "available",
   acceptingWork: true,
   readinessDetail: null,
-  capabilities: {},
+  capabilities: { providerCapabilities },
   maxConcurrentSessions: 1,
   activeSessions: 0,
   availableSessions: 1,
@@ -45,30 +62,6 @@ describe("WorkerDispatchDialog", () => {
   beforeEach(() => {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     window.localStorage.clear();
-    vi.mocked(loadAgentProviderModels).mockReset();
-    vi.mocked(loadAgentProviderModels).mockResolvedValue({
-      ...defaultAgentProviderModelCatalog,
-      codex: {
-        models: [{
-          id: "gpt-5.6-sol",
-          label: "GPT-5.6 Sol",
-          efforts: [{ id: "high", label: "high" }],
-        }],
-        defaultEfforts: [],
-        allowCustomModels: false,
-        error: null,
-      },
-      claude: {
-        models: [{
-          id: "opus",
-          label: "Claude Opus",
-          efforts: [{ id: "high", label: "high" }],
-        }],
-        defaultEfforts: [],
-        allowCustomModels: true,
-        error: null,
-      },
-    });
   });
 
 
@@ -391,7 +384,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   });
 
   it("searches OpenCode supported models and defaults to the provider model", async () => {
-    vi.mocked(loadAgentProviderModels).mockResolvedValue({
+    const providerCapabilities: AgentProviderCapabilityCatalog = {
       ...defaultAgentProviderModelCatalog,
       opencode: {
         models: [
@@ -403,9 +396,9 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         ],
         error: null,
       },
-    });
+    };
     const openCodeWorker = {
-      ...worker("worker-opencode", "OpenCode Mac"),
+      ...worker("worker-opencode", "OpenCode Mac", providerCapabilities),
       agentProvider: "opencode" as const,
       providers: ["opencode"] as ExecutionWorker["providers"],
     };
@@ -695,6 +688,118 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         effort: "high",
       }),
     );
+
+    await act(async () => root.unmount());
+  });
+
+  it("shows the deterministic model union advertised by project Workers", async () => {
+    const catalog = (
+      models: AgentProviderCapabilityCatalog["codex"]["models"],
+    ): AgentProviderCapabilityCatalog => ({
+      ...defaultAgentProviderModelCatalog,
+      codex: {
+        models,
+        defaultEfforts: [],
+        allowCustomModels: false,
+        error: null,
+      },
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          open
+          run={null}
+          workers={[
+            worker("worker-zeta", "Zeta Mac", catalog([
+              { id: "remote-zeta", label: "Remote Zeta" },
+              { id: "remote-shared", label: "Remote Shared" },
+            ])),
+            worker("worker-alpha", "Alpha Mac", catalog([
+              { id: "remote-alpha", label: "Remote Alpha" },
+              { id: "remote-shared", label: "Remote Shared" },
+            ])),
+          ]}
+        />,
+      );
+    });
+
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')
+        ?.click();
+    });
+    const modelValues = Array.from(
+      document.body.querySelectorAll<HTMLElement>(
+        ".select-menu-option[data-value]",
+      ),
+    ).map((option) => option.dataset.value);
+    expect(modelValues).toEqual([
+      "",
+      "remote-alpha",
+      "remote-shared",
+      "remote-zeta",
+    ]);
+    expect(modelValues).not.toContain("gpt-5.6-sol");
+
+    await act(async () => root.unmount());
+  });
+
+  it("rejects an explicitly selected Worker that does not support the model", async () => {
+    const catalog = (
+      modelId: string,
+    ): AgentProviderCapabilityCatalog => ({
+      ...defaultAgentProviderModelCatalog,
+      codex: {
+        models: [{ id: modelId, label: modelId }],
+        defaultEfforts: [],
+        allowCustomModels: false,
+        error: null,
+      },
+    });
+    const alpha = worker("worker-alpha", "Alpha Mac", catalog("model-alpha"));
+    const beta = worker("worker-beta", "Beta Mac", catalog("model-beta"));
+    const onSubmit = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          initialSelection={{
+            provider: "codex",
+            model: "model-beta",
+            effort: null,
+            workerId: alpha.id,
+          }}
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          open
+          run={null}
+          workers={[alpha, beta]}
+        />,
+      );
+    });
+
+    expect(document.body.querySelector('[role="alert"]')?.textContent).toContain(
+      "이 Worker는 선택한 프로바이더·모델·effort 조합을 지원하지 않습니다.",
+    );
+    const dispatch = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("실행 배정"))!;
+    expect(dispatch.disabled).toBe(true);
+    await act(async () => dispatch.click());
+    expect(onSubmit).not.toHaveBeenCalled();
 
     await act(async () => root.unmount());
   });

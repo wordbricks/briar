@@ -4,6 +4,7 @@ import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  ChannelAgentReply,
   ChannelAgentSummary,
   ChannelMember,
   ChannelMessage,
@@ -197,6 +198,23 @@ const message = (overrides: Partial<ChannelMessage> = {}): ChannelMessage => ({
   createdAt: "2026-08-01T01:00:00.000Z",
   ...overrides,
   executionProposal: overrides.executionProposal ?? null,
+});
+
+const agentReply = (
+  overrides: Partial<ChannelAgentReply> = {},
+): ChannelAgentReply => ({
+  id: "reply-1",
+  agentId: "agent-1",
+  channelId: "channel-1",
+  triggerMessageId: "message-1",
+  parentMessageId: "message-1",
+  replyMessageId: "reply-message-1",
+  status: "running",
+  attempts: 1,
+  error: null,
+  createdAt: "2026-08-01T01:00:01.000Z",
+  updatedAt: "2026-08-01T01:00:02.000Z",
+  ...overrides,
 });
 
 /**
@@ -1286,6 +1304,60 @@ describe("Channels", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(container.textContent).toContain("Requested reply");
+  });
+
+  it("places the typing state below the visible reply summary", async () => {
+    const target = message({ id: "message-1", replyCount: 2 });
+    listChannels.mockResolvedValue({ channels: [channel], cursor: 7 });
+    loadChannel.mockResolvedValue({
+      channel,
+      members: [member],
+      agents: [agent],
+      messages: [target],
+      agentReplies: [agentReply({ parentMessageId: target.id, triggerMessageId: target.id })],
+      nextCursor: null,
+    });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+
+    await act(async () => {
+      root.render(
+        <ToastProvider>
+          <Channels
+            activeChannelId={channel.id}
+            channels={[channel]}
+            currentUserId="user-1"
+            onChannelSelect={() => undefined}
+            onChannelsChange={() => undefined}
+            organizationId="org-1"
+            token="token"
+          />
+        </ToastProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const row = container.querySelector<HTMLElement>(
+      `[data-channel-message-id="${target.id}"]`,
+    );
+    const summary = row?.querySelector<HTMLElement>(
+      ".conversation-reply-summary",
+    );
+    const typing = row?.querySelector<HTMLElement>(".channel-typing");
+    expect(summary?.textContent).toContain("답글 2개");
+    expect(typing?.textContent).toContain("Honey님이 답변을 작성하고 있습니다");
+    expect(
+      Boolean(summary && typing &&
+        (summary.compareDocumentPosition(typing) & Node.DOCUMENT_POSITION_FOLLOWING)),
+    ).toBe(true);
   });
 
   it("subscribes and unsubscribes from the open channel thread", async () => {
