@@ -286,7 +286,10 @@ scripts/with-release-env.sh \
   bun run apps/briar/src-cli/production-release.ts config \
     --version "$version" \
     --output "$production_config"
-scripts/with-release-env.sh bun --cwd apps/briar tauri build --config "$production_config"
+# Tauri's DMG bundler invokes Finder AppleScript unless CI is set. Production
+# builds must remain reproducible in headless CI and agent environments.
+CI=true scripts/with-release-env.sh \
+  bun --cwd apps/briar tauri build --config "$production_config"
 
 dmg_directory="$BRIAR_RELEASE_CARGO_TARGET_DIR/release/bundle/dmg"
 dmg_path="$(

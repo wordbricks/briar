@@ -18,7 +18,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-CI=true bun --cwd apps/briar tauri signer generate \
+CI=true bun --cwd "$workspace_root/apps/briar" tauri signer generate \
   --password "$password" \
   --write-keys "$private_key" \
   --force >/dev/null
@@ -29,10 +29,13 @@ BRIAR_UPDATER_PUBLIC_KEY="$(cat "$public_key")" \
     --version "$version" \
     --output "$production_config"
 
+# Tauri's DMG bundler invokes Finder AppleScript unless CI is set. Keep the
+# updater QA build usable in headless CI and agent environments.
+CI=true \
 TAURI_SIGNING_PRIVATE_KEY="$private_key" \
 TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$password" \
   "$workspace_root/scripts/with-release-env.sh" \
-  bun --cwd apps/briar tauri build --config "$production_config"
+  bun --cwd "$workspace_root/apps/briar" tauri build --config "$production_config"
 
 shopt -s nullglob
 archives=("$bundle_root"/macos/*.app.tar.gz)
