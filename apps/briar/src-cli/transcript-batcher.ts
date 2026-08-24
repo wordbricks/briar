@@ -116,13 +116,13 @@ export class TranscriptBatcher {
   }
 
   private async sendWithRetry(batch: TranscriptBatchEvent[]) {
-    let lastError: unknown = null;
+    let lastFailure: TranscriptDeliveryFailure | null = null;
     for (let attempt = 1; attempt <= this.maxSendAttempts; attempt += 1) {
       try {
         await this.options.send(batch);
         return;
       } catch (error) {
-        lastError = error;
+        lastFailure = { error };
         if (this.options.isPayloadTooLarge?.(error)) throw error;
         if (attempt < this.maxSendAttempts && this.retryDelayMs > 0) {
           await new Promise((resolve) =>
@@ -131,7 +131,7 @@ export class TranscriptBatcher {
         }
       }
     }
-    throw lastError;
+    throw lastFailure?.error;
   }
 
   private clearTimer() {
@@ -139,4 +139,8 @@ export class TranscriptBatcher {
     clearTimeout(this.timer);
     this.timer = null;
   }
+}
+
+interface TranscriptDeliveryFailure {
+  error: unknown;
 }

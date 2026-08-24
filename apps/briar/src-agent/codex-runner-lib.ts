@@ -297,11 +297,20 @@ export function codexAppsInstalledRequest(): CodexRpcMessage {
   };
 }
 
+interface CodexThreadParams {
+  cwd: string;
+  approvalPolicy: CodexRunnerRequest["approvalPolicy"];
+  sandbox?: ReturnType<typeof sandboxModeValue>;
+  config?: NonNullable<ReturnType<typeof codexMcpSessionConfig>>;
+  developerInstructions?: string;
+  threadId?: string;
+}
+
 export function codexThreadRequest(
   request: CodexRunnerRequest,
   isolation: CodexMcpIsolation = emptyCodexMcpIsolation(),
 ): CodexRpcMessage {
-  const params: Record<string, unknown> = {
+  const params: CodexThreadParams = {
     cwd: request.workspaceRoot,
     approvalPolicy: request.approvalPolicy,
   };
@@ -324,18 +333,31 @@ export function codexThreadRequest(
   return { method: "thread/start", id: THREAD_REQUEST_ID, params };
 }
 
+interface CodexTurnParams {
+  threadId: string;
+  cwd: string;
+  approvalPolicy: CodexRunnerRequest["approvalPolicy"];
+  input: Array<
+    | { type: "text"; text: string }
+    | { type: "localImage"; path: string }
+  >;
+  outputSchema?: NonNullable<CodexRunnerRequest["outputSchema"]>;
+  model?: string;
+  effort?: string;
+}
+
 export function codexTurnRequest(
   request: CodexRunnerRequest,
   threadId: string,
 ): CodexRpcMessage {
-  const params: Record<string, unknown> = {
+  const params: CodexTurnParams = {
     threadId,
     cwd: request.workspaceRoot,
     approvalPolicy: request.approvalPolicy,
     input: [
       { type: "text", text: request.message },
       ...(request.attachments ?? []).map((attachment) => ({
-        type: "localImage",
+        type: "localImage" as const,
         path: attachment.path,
       })),
     ],

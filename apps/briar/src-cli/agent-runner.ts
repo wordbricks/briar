@@ -1167,14 +1167,18 @@ const promptSnapshotFields = (
   );
 };
 
+interface ChannelReplyPromptContext {
+  [key: string]: unknown;
+}
+
 /**
  * Defense-in-depth for rolling upgrades: even if an older API returns the full
  * display model, only semantic conversation data reaches the provider prompt.
  */
 export function channelReplyPromptSnapshot(
   snapshot: Record<string, unknown>,
-): Record<string, unknown> {
-  const context: Record<string, unknown> = {};
+): ChannelReplyPromptContext {
+  const context: ChannelReplyPromptContext = {};
   const channel = promptSnapshotFields(snapshot.channel, ["name", "topic"]);
   if (channel) context.channel = channel;
   const project = promptSnapshotFields(snapshot.project, ["id", "name"]);
@@ -1537,7 +1541,7 @@ export function detachedTranscriptPayload(payload: unknown, rawLine: string) {
 
 function boundedNormalizedTranscriptEvent(
   event: Record<string, unknown>,
-): Record<string, unknown> {
+) {
   const bounded = { ...event };
   const stringKeys = ["text", "title", "delta"] as const;
   while (Buffer.byteLength(JSON.stringify(bounded), "utf8") > 24_000) {

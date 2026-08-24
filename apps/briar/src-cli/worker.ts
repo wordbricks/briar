@@ -72,6 +72,14 @@ export type WorkerExecutionCheckpoint = {
   workspacePath?: string | null;
 };
 
+interface LeaseRenewalFailure {
+  error: unknown;
+}
+
+interface LeaseRenewalState {
+  failure: LeaseRenewalFailure | null;
+}
+
 export class WorkerUpdateDrainError extends Error {
   constructor() {
     super("Worker is draining for a planned update");
@@ -324,7 +332,7 @@ export async function runWorkerLoop(
     const key = executionKey(issue);
     activeControllers.set(key, execution);
     let checkpoint: WorkerExecutionCheckpoint = {};
-    let leaseFailure: unknown = null;
+    const leaseRenewal: LeaseRenewalState = { failure: null };
     const renewalLoop = (async () => {
       while (!renewal.signal.aborted) {
         await dependencies.sleep(
@@ -338,7 +346,7 @@ export async function runWorkerLoop(
             `lease renewed for ${issue.sourceKey} (${issue.runId})`,
           );
         } catch (error) {
-          leaseFailure = error;
+          leaseRenewal.failure = { error };
           dependencies.log(
             `lease renewal failed for ${issue.sourceKey}: ${describe(error)}`,
           );
@@ -375,7 +383,7 @@ export async function runWorkerLoop(
       if (execution.signal.aborted && updateDirective) {
         throw execution.signal.reason ?? new WorkerUpdateDrainError();
       }
-      if (leaseFailure) throw leaseFailure;
+      if (leaseRenewal.failure?.error) throw leaseRenewal.failure.error;
       dependencies.log(
         `execution started for ${issue.sourceKey} (${issue.runId}) attempt ${issue.claimAttempts ?? "unknown"}`,
       );
@@ -385,7 +393,7 @@ export async function runWorkerLoop(
       dependencies.log(
         `execution returned for ${issue.sourceKey} (${issue.runId})`,
       );
-      if (leaseFailure) throw leaseFailure;
+      if (leaseRenewal.failure?.error) throw leaseRenewal.failure.error;
       if (updateDirective && execution.signal.aborted) {
         if (!dependencies.handoff) {
           throw new Error("Worker update handoff is not configured");

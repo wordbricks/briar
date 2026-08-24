@@ -781,7 +781,11 @@ export function permissionToolName(params: unknown): string {
   return "tool";
 }
 
-export function permissionInput(params: unknown): Record<string, unknown> {
+export interface PermissionInput {
+  [key: string]: unknown;
+}
+
+export function permissionInput(params: unknown): PermissionInput {
   const record =
     typeof params === "object" && params !== null
       ? (params as Record<string, unknown>)

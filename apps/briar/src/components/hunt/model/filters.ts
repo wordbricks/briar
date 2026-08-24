@@ -3,8 +3,15 @@ import type { HuntRun, HuntSource } from "@/types";
 export type SourceFilter = "all" | HuntSource;
 export type StatusFilter = CompanionStatusFilter;
 export type DashboardView = "kanban" | "list";
-export type IssuePropertyFilterKey = "status" | "source" | "priority" | "assignee" | "agent" | "creator";
-export type IssuePropertyFilters = Record<IssuePropertyFilterKey, string[]>;
+export interface IssuePropertyFilters {
+  status: string[];
+  source: string[];
+  priority: string[];
+  assignee: string[];
+  agent: string[];
+  creator: string[];
+}
+export type IssuePropertyFilterKey = keyof IssuePropertyFilters;
 export const unsetIssuePropertyFilterValue = "__unset__";
 export function emptyIssuePropertyFilters(): IssuePropertyFilters {
   return {

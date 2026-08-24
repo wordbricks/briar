@@ -49,6 +49,15 @@ type AgyRunnerIo = ReturnType<
   typeof createRunnerIo<AgyRunnerRequest, AgyRunnerOutput>
 >;
 
+function parseAgyLine(line: string) {
+  try {
+    const parsed: unknown = JSON.parse(line);
+    return parsed;
+  } catch {
+    return { type: "diagnostic", text: line };
+  }
+}
+
 async function main(io: AgyRunnerIo) {
   const request = await io.request;
   const spec = agySpawnSpec(request);
@@ -77,12 +86,7 @@ async function main(io: AgyRunnerIo) {
 
   for await (const line of lines) {
     if (!line.trim()) continue;
-    let raw: unknown;
-    try {
-      raw = JSON.parse(line);
-    } catch {
-      raw = { type: "diagnostic", text: line };
-    }
+    const raw = parseAgyLine(line);
     const discoveredSessionId = agyConversationId(raw);
     if (discoveredSessionId && discoveredSessionId !== sessionId) {
       sessionId = discoveredSessionId;

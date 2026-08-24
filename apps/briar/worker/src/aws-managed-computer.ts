@@ -210,11 +210,15 @@ function awsError(xml: string, status: number) {
   return new AwsManagedComputerError(code, message.slice(0, 1_000), retryable);
 }
 
+interface Ec2QueryParameters {
+  [name: string]: string;
+}
+
 async function ec2Query(
   config: ManagedComputerConfig,
   region: string,
   action: string,
-  parameters: Record<string, string>,
+  parameters: Ec2QueryParameters,
   fetcher?: typeof fetch,
 ) {
   const body = new URLSearchParams({
@@ -319,7 +323,7 @@ export async function runManagedInstance(
     ["briar-managed-computer", input.managedComputerId],
     ["briar-campaign", input.campaignId],
   ] as const;
-  const parameters: Record<string, string> = {
+  const parameters: Ec2QueryParameters = {
     ClientToken: input.clientToken ?? input.managedComputerId,
     MinCount: "1",
     MaxCount: "1",
