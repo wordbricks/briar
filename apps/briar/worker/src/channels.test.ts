@@ -2745,7 +2745,7 @@ describe("organization channels", () => {
     expect(again).toHaveLength(2);
   });
 
-  it("creates idempotent direct messages and implicitly invokes a sole Agent", async () => {
+  it("creates idempotent DMs and lets a busy preferred Worker answer", async () => {
     const agentId = "aa000000-0000-4000-8000-000000000120";
     await createOrganizationAgent(db, {
       id: agentId,
@@ -2823,7 +2823,7 @@ describe("organization channels", () => {
       ).bind(claimedAt, claimedAt, deviceId),
       db.prepare(
         `update briar_execution_workers
-         set state = 'online', accepting_work = 1, readiness_state = 'ready',
+         set state = 'online', accepting_work = 1, readiness_state = 'busy',
              capabilities_json = ?, last_heartbeat_at = ?, updated_at = ?
          where id = ?`,
       ).bind(
@@ -2889,23 +2889,38 @@ describe("organization channels", () => {
           authorization: `Bearer ${ownerSessionToken}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ body: "Direct response without a mention" }),
+        body: JSON.stringify({
+          body: "Direct response without a mention",
+          preferredDeviceId: deviceId,
+        }),
       },
     ), apiEnv);
     expect(message.status).toBe(201);
     const messageBody = await message.json() as {
       message: { id: string; mentionedAgentIds: string[] };
-      agentReplies: Array<{ id: string; agentId: string }>;
+      agentReplies: Array<{
+        id: string;
+        agentId: string;
+        status: string;
+        error: string | null;
+      }>;
     };
     expect(messageBody.message.mentionedAgentIds).toEqual([]);
     expect(messageBody.agentReplies).toHaveLength(1);
-    expect(messageBody.agentReplies[0]?.agentId).toBe(agentId);
+    expect(messageBody.agentReplies[0]).toMatchObject({
+      agentId,
+      status: "queued",
+      error: null,
+    });
     const dmReplyJob = await getChannelAgentReplyJob(
       db,
       organizationId,
       messageBody.agentReplies[0]!.id,
     );
     expect(dmReplyJob).toMatchObject({
+      status: "queued",
+      error: null,
+      preferred_device_id: deviceId,
       skill_id: null,
       agent_provider: "claude",
     });
