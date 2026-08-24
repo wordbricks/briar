@@ -1876,8 +1876,10 @@ describe("CompanionChannels", () => {
       label: "Companion Mac",
       agentProvider: "codex",
       providers: ["codex"],
+      state: "online",
       readiness: "available",
       acceptingWork: true,
+      capabilities: {},
     };
     listChannels.mockResolvedValue({ channels: [selectedChannel], cursor: 1 });
     loadChannel.mockResolvedValue({

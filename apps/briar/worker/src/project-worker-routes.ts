@@ -1,9 +1,12 @@
-import * as Option from "effect/Option";
-import { decodeAgentProviderCapabilityCatalogOption, mergeAgentProviderCapabilityCatalogs } from "../../src/lib/agent-provider-contract";
-import { parseJsonObject } from "./agent-result-json";
 import { json } from "./http-response";
 import { workerJson } from "./worker-json";
-import { countLeasedRuns, listExecutionWorkers, reapStalledHuntRuns } from "./workers";
+import {
+  countLeasedRuns,
+  getProjectExecutionWorkerPolicy,
+  listExecutionWorkers,
+  projectExecutionWorkerCapabilityCatalog,
+  reapStalledHuntRuns,
+} from "./workers";
 
 export type ProjectWorkerRouteInput = {
   request: Request;
@@ -35,19 +38,12 @@ export async function handleProjectWorkerRoute(
     const projectId = projectAgentCapabilitiesMatch[1];
     await requireProjectAccess(auth, db, request, projectId);
     const observedAt = new Date().toISOString();
-    const workers = await listExecutionWorkers(db, projectId, observedAt);
-    const catalogs = workers.flatMap((worker) => {
-      if (worker.state !== "online") return [];
-      const capabilities = parseJsonObject(worker.capabilities_json) as
-        | Record<string, unknown>
-        | null;
-      const raw = capabilities?.providerCapabilities;
-      const parsed = decodeAgentProviderCapabilityCatalogOption(raw);
-      return Option.isSome(parsed) ? [parsed.value] : [];
-    });
+    const [workers, policy] = await Promise.all([
+      listExecutionWorkers(db, projectId, observedAt),
+      getProjectExecutionWorkerPolicy(db, projectId),
+    ]);
     return json({
-      capabilities: mergeAgentProviderCapabilityCatalogs(catalogs),
-      workerCount: catalogs.length,
+      ...projectExecutionWorkerCapabilityCatalog(workers, policy),
       observedAt,
     });
   }
