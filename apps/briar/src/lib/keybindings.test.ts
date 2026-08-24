@@ -22,8 +22,16 @@ describe("keybindings", () => {
     setRecordingKeybinding(null);
   });
 
-  it("defaults the sidebar toggle to command-b", () => {
+  it("defaults the command palette to command-k and sidebar toggle to command-b", () => {
     expect(loadKeybindings()).toEqual(defaultKeybindings);
+    expect(defaultKeybindings.commandPalette).toEqual({
+      key: "k",
+      code: "KeyK",
+      meta: true,
+      ctrl: false,
+      alt: false,
+      shift: false,
+    });
     expect(defaultKeybindings.sidebarToggle).toEqual({
       key: "b",
       code: "KeyB",
@@ -56,6 +64,25 @@ describe("keybindings", () => {
     expect(loadKeybindings().sidebarToggle).toEqual(
       defaultKeybindings.sidebarToggle,
     );
+  });
+
+  it("swaps conflicting shortcuts so every command remains reachable", () => {
+    expect(
+      saveKeybinding("sidebarToggle", defaultKeybindings.commandPalette),
+    ).toEqual({
+      commandPalette: defaultKeybindings.sidebarToggle,
+      sidebarToggle: defaultKeybindings.commandPalette,
+    });
+    expect(resetKeybinding("sidebarToggle")).toEqual(defaultKeybindings);
+
+    window.localStorage.setItem(
+      keybindingsStorageKey,
+      JSON.stringify({ sidebarToggle: defaultKeybindings.commandPalette }),
+    );
+    expect(loadKeybindings()).toEqual({
+      commandPalette: defaultKeybindings.sidebarToggle,
+      sidebarToggle: defaultKeybindings.commandPalette,
+    });
   });
 
   it("ignores malformed stored values", () => {
@@ -124,9 +151,26 @@ describe("keybindings", () => {
     expect(
       shortcutFromEvent(new KeyboardEvent("keydown", { key: "k", code: "KeyK" })),
     ).toBeNull();
+    const webkitCompositionEvent = new KeyboardEvent("keydown", {
+      key: "k",
+      code: "KeyK",
+      metaKey: true,
+    });
+    Object.defineProperty(webkitCompositionEvent, "keyCode", { value: 229 });
+    expect(shortcutFromEvent(webkitCompositionEvent)).toBeNull();
+    expect(
+      matchesShortcut(
+        webkitCompositionEvent,
+        defaultKeybindings.commandPalette,
+      ),
+    ).toBe(false);
   });
 
   it("formats shortcuts for macOS and other platforms", () => {
+    expect(formatShortcut(defaultKeybindings.commandPalette, true)).toBe("⌘K");
+    expect(formatShortcut(defaultKeybindings.commandPalette, false)).toBe(
+      "Cmd+K",
+    );
     expect(formatShortcut(defaultKeybindings.sidebarToggle, true)).toBe("⌘B");
     expect(formatShortcut(defaultKeybindings.sidebarToggle, false)).toBe(
       "Cmd+B",
@@ -152,6 +196,32 @@ describe("keybindings", () => {
     const fired: string[] = [];
     const uninstall = installKeybindingShortcuts((id) => fired.push(id));
 
+    const nestedTarget = document.createElement("button");
+    nestedTarget.addEventListener("keydown", (event) => event.stopPropagation());
+    document.body.append(nestedTarget);
+    nestedTarget.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        bubbles: true,
+        key: "k",
+        code: "KeyK",
+        metaKey: true,
+      }),
+    );
+    const webkitCompositionEvent = new KeyboardEvent("keydown", {
+      key: "k",
+      code: "KeyK",
+      metaKey: true,
+    });
+    Object.defineProperty(webkitCompositionEvent, "keyCode", { value: 229 });
+    window.dispatchEvent(webkitCompositionEvent);
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "k",
+        code: "KeyK",
+        metaKey: true,
+        repeat: true,
+      }),
+    );
     window.dispatchEvent(
       new KeyboardEvent("keydown", {
         key: "b",
@@ -159,7 +229,7 @@ describe("keybindings", () => {
         metaKey: true,
       }),
     );
-    expect(fired).toEqual(["sidebarToggle"]);
+    expect(fired).toEqual(["commandPalette", "sidebarToggle"]);
 
     setRecordingKeybinding("sidebarToggle");
     window.dispatchEvent(
@@ -169,9 +239,10 @@ describe("keybindings", () => {
         metaKey: true,
       }),
     );
-    expect(fired).toEqual(["sidebarToggle"]);
+    expect(fired).toEqual(["commandPalette", "sidebarToggle"]);
     expect(getRecordingKeybinding()).toBe("sidebarToggle");
 
+    nestedTarget.remove();
     uninstall();
   });
 });

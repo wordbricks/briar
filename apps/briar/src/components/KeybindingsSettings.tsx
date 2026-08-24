@@ -26,10 +26,12 @@ import {
 } from "../lib/keybindings";
 
 const bindingLabels: Record<KeybindingId, MessageKey> = {
+  commandPalette: "appSettings.keybindingsCommandPalette",
   sidebarToggle: "appSettings.keybindingsSidebarToggle",
 };
 
 const bindingDescriptions: Record<KeybindingId, MessageKey> = {
+  commandPalette: "appSettings.keybindingsCommandPaletteDescription",
   sidebarToggle: "appSettings.keybindingsSidebarToggleDescription",
 };
 
@@ -74,6 +76,7 @@ export function KeybindingsSettings() {
           return (
             <div
               className="grid min-h-[72px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-border/70 px-[18px] py-4 last:border-b-0"
+              data-keybinding-id={id}
               key={id}
             >
               <div className="grid min-w-0 gap-1">
