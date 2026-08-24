@@ -83,12 +83,16 @@ describe("command palette search", () => {
       query: "bri",
       scope: "issues",
     });
-    expect(parseCommandPaletteQuery("p ")).toEqual({
+    expect(parseCommandPaletteQuery("p:")).toEqual({
       query: "",
       scope: "projects",
     });
-    expect(groupCommandPaletteItems(items, "p bri")).toHaveLength(1);
-    expect(groupCommandPaletteItems(items, "p bri")[0]?.items[0]?.id).toBe(
+    expect(parseCommandPaletteQuery("a crash")).toEqual({
+      query: "a crash",
+      scope: null,
+    });
+    expect(groupCommandPaletteItems(items, "p:bri")).toHaveLength(1);
+    expect(groupCommandPaletteItems(items, "p:bri")[0]?.items[0]?.id).toBe(
       "project:briar",
     );
   });

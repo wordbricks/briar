@@ -192,7 +192,10 @@ export function SidebarOrganizationChannels({
         open={isCreateOpen}
       >
         <Dialog.Portal>
-          <Dialog.Overlay className="channel-create-overlay" />
+          <Dialog.Overlay
+            className="channel-create-overlay"
+            data-briar-dialog-overlay=""
+          />
           <Dialog.Content className="channel-create-dialog">
             <header>
               <Dialog.Title>{t("channel.createTitle")}</Dialog.Title>
@@ -549,7 +552,10 @@ function SidebarChannelButton({
         open={deleteOpen}
       >
         <Dialog.Portal>
-          <Dialog.Overlay className="channel-create-overlay" />
+          <Dialog.Overlay
+            className="channel-create-overlay"
+            data-briar-dialog-overlay=""
+          />
           <Dialog.Content className="channel-create-dialog channel-delete-dialog">
             <header>
               <Dialog.Title>

@@ -64,7 +64,7 @@ export function parseCommandPaletteQuery(query: string): {
     .toLocaleLowerCase()
     .trimStart();
   const match = normalizedWithSeparator.match(
-    /^([acdinps])(?:\s+|:)(.*)$/u,
+    /^([acdinps]):(.*)$/u,
   );
   if (!match) {
     return { query: normalizeCommandPaletteText(query), scope: null };
@@ -202,9 +202,9 @@ export function loadCommandPaletteRecents(): string[] {
       window.localStorage.getItem(commandPaletteRecentsStorageKey) ?? "[]",
     );
     if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((value): value is string => typeof value === "string")
-      .slice(0, commandPaletteRecentLimit);
+    return [...new Set(
+      parsed.filter((value): value is string => typeof value === "string"),
+    )].slice(0, commandPaletteRecentLimit);
   } catch {
     return [];
   }

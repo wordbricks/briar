@@ -43,6 +43,10 @@ const modifierOnlyKeys = new Set(["Meta", "Control", "Alt", "Shift", "OS"]);
 
 let recordingKeybinding: KeybindingId | null = null;
 
+function keyboardEventIsComposing(event: KeyboardEvent): boolean {
+  return event.isComposing || event.keyCode === 229;
+}
+
 export function setRecordingKeybinding(id: KeybindingId | null) {
   recordingKeybinding = id;
 }
@@ -81,6 +85,20 @@ export function loadKeybindings(): Keybindings {
     for (const id of keybindingIds) {
       if (isShortcut(stored[id])) result[id] = stored[id]!;
     }
+    if (shortcutsEqual(result.commandPalette, result.sidebarToggle)) {
+      if (
+        isShortcut(stored.sidebarToggle) &&
+        !isShortcut(stored.commandPalette)
+      ) {
+        result.commandPalette = defaultKeybindings.sidebarToggle;
+      } else {
+        result.sidebarToggle = defaultKeybindings.sidebarToggle;
+        if (shortcutsEqual(result.commandPalette, result.sidebarToggle)) {
+          result.sidebarToggle = defaultKeybindings.commandPalette;
+        }
+      }
+      persist(result);
+    }
   } catch {
     // Fall back to the defaults when stored keybindings are unreadable.
   }
@@ -88,15 +106,20 @@ export function loadKeybindings(): Keybindings {
 }
 
 export function saveKeybinding(id: KeybindingId, shortcut: Shortcut): Keybindings {
-  const next = { ...loadKeybindings(), [id]: shortcut };
+  const current = loadKeybindings();
+  const next = { ...current };
+  const conflict = keybindingIds.find(
+    (candidate) =>
+      candidate !== id && shortcutsEqual(current[candidate], shortcut),
+  );
+  if (conflict) next[conflict] = current[id];
+  next[id] = shortcut;
   persist(next);
   return next;
 }
 
 export function resetKeybinding(id: KeybindingId): Keybindings {
-  const next = { ...loadKeybindings(), [id]: defaultKeybindings[id] };
-  persist(next);
-  return next;
+  return saveKeybinding(id, defaultKeybindings[id]);
 }
 
 export function shortcutsEqual(a: Shortcut, b: Shortcut): boolean {
@@ -111,7 +134,7 @@ export function shortcutsEqual(a: Shortcut, b: Shortcut): boolean {
 }
 
 export function matchesShortcut(event: KeyboardEvent, shortcut: Shortcut): boolean {
-  if (event.isComposing) return false;
+  if (keyboardEventIsComposing(event)) return false;
   if (event.metaKey !== shortcut.meta) return false;
   if (event.ctrlKey !== shortcut.ctrl) return false;
   if (event.altKey !== shortcut.alt) return false;
@@ -123,7 +146,9 @@ export function matchesShortcut(event: KeyboardEvent, shortcut: Shortcut): boole
 }
 
 export function shortcutFromEvent(event: KeyboardEvent): Shortcut | null {
-  if (event.isComposing || modifierOnlyKeys.has(event.key)) return null;
+  if (keyboardEventIsComposing(event) || modifierOnlyKeys.has(event.key)) {
+    return null;
+  }
   if (event.key === "Escape") return null;
   if (!event.metaKey && !event.ctrlKey && !event.altKey) return null;
   return {
@@ -192,7 +217,7 @@ export function installKeybindingShortcuts(
 ): () => void {
   const handleKeyDown = (event: KeyboardEvent) => {
     if (
-      event.isComposing || getRecordingKeybinding() ||
+      event.repeat || keyboardEventIsComposing(event) || getRecordingKeybinding() ||
       remoteDesktopCapturesKeyboard()
     ) return;
     const keybindings = loadKeybindings();
@@ -204,6 +229,6 @@ export function installKeybindingShortcuts(
       }
     }
   };
-  window.addEventListener("keydown", handleKeyDown);
-  return () => window.removeEventListener("keydown", handleKeyDown);
+  window.addEventListener("keydown", handleKeyDown, true);
+  return () => window.removeEventListener("keydown", handleKeyDown, true);
 }
