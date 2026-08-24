@@ -174,6 +174,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
               nonce: await managedComputerEnrollmentNonce(
                 config.enrollmentSecret ?? "",
                 managedComputerId,
+                provisioningJobId,
               ),
             });
           await recordManagedComputerInstance(this.env.DB, {

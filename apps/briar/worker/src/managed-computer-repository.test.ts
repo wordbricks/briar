@@ -3,6 +3,7 @@ import { sha256Hex } from "./managed-computer-crypto";
 import {
   createManagedComputerRetry,
   createPromotionalManagedComputer,
+  enrollManagedComputerDevice,
   failManagedComputerProvisioning,
   managedComputerById,
   managedComputerCapacity,
@@ -140,6 +141,9 @@ describe("managed computer repository", () => {
   });
 
   it("enforces lifecycle transitions and keeps unlimited manual retries idempotent", async () => {
+    const oldIdentityHash = "b".repeat(64);
+    const newIdentityHash = "c".repeat(64);
+    const newCredentialHash = "d".repeat(64);
     await expect(db.prepare(
       `update briar_managed_computers set state = 'ready'
        where id = '33333333-3333-4333-8333-333333333333'`,
@@ -160,9 +164,11 @@ describe("managed computer repository", () => {
     await db.prepare(
       `update briar_managed_computers
        set aws_account_id = '123456789012', aws_instance_id = 'i-0123456789abcdef0',
-           aws_volume_id = 'vol-0123456789abcdef0'
+           aws_volume_id = 'vol-0123456789abcdef0',
+           enrollment_consumed_at = '2026-08-22T00:01:30.000Z',
+           enrollment_identity_hash = ?
        where id = '33333333-3333-4333-8333-333333333333'`,
-    ).run();
+    ).bind(oldIdentityHash).run();
     const retry = await createManagedComputerRetry(db, {
       managedComputerId: "33333333-3333-4333-8333-333333333333",
       organizationId,
@@ -170,6 +176,7 @@ describe("managed computer repository", () => {
       requestId: "66666666-6666-4666-8666-666666666666",
       provisioningJobId: "77777777-7777-4777-8777-777777777777",
       workflowInstanceId: "managed-computer-retry-1",
+      enrollmentNonceHash: "a".repeat(64),
       enrollmentExpiresAt: "2026-08-22T00:33:00.000Z",
       region: "us-east-1",
       instanceType: "m7i.large",
@@ -191,6 +198,7 @@ describe("managed computer repository", () => {
       requestId: "66666666-6666-4666-8666-666666666666",
       provisioningJobId: "88888888-8888-4888-8888-888888888888",
       workflowInstanceId: "managed-computer-retry-duplicate",
+      enrollmentNonceHash: "a".repeat(64),
       enrollmentExpiresAt: "2026-08-22T00:34:00.000Z",
       region: "us-east-1",
       instanceType: "m7i.large",
@@ -212,7 +220,74 @@ describe("managed computer repository", () => {
       aws_volume_id: "vol-0123456789abcdef0",
       aws_launch_template_version: "8",
       bootstrap_api_origin: "https://briar-new.example",
+      enrollment_nonce_hash: "a".repeat(64),
+      enrollment_consumed_at: null,
+      enrollment_identity_hash: null,
     });
+
+    await db.prepare(
+      `insert into briar_execution_worker_devices (
+         id, organization_id, owner_user_id, label, device_identity_hash,
+         state, max_concurrent_sessions, last_heartbeat_at, created_at, updated_at
+       ) values (
+         'managed-33333333-3333-4333-8333-333333333333', ?, ?,
+         'Managed computer', ?, 'online', 1, ?, ?, ?
+       )`,
+    ).bind(
+      organizationId,
+      userId,
+      oldIdentityHash,
+      "2026-08-22T00:03:30.000Z",
+      "2026-08-22T00:03:30.000Z",
+      "2026-08-22T00:03:30.000Z",
+    ).run();
+    await startManagedComputerProvisioning(
+      db,
+      "33333333-3333-4333-8333-333333333333",
+      "77777777-7777-4777-8777-777777777777",
+      "2026-08-22T00:04:00.000Z",
+    );
+    await db.prepare(
+      `update briar_managed_computers
+       set state = 'bootstrapping', aws_account_id = '123456789012',
+           aws_instance_id = 'i-0fedcba9876543210',
+           enrollment_consumed_at = '2026-08-22T00:04:10.000Z',
+           enrollment_identity_hash = ?
+       where id = '33333333-3333-4333-8333-333333333333'`,
+    ).bind(oldIdentityHash).run();
+    const replacementEnrollment = await enrollManagedComputerDevice(db, {
+      managedComputerId: "33333333-3333-4333-8333-333333333333",
+      nonceHash: "a".repeat(64),
+      identityHash: newIdentityHash,
+      credentialHash: newCredentialHash,
+      deviceId: "managed-33333333-3333-4333-8333-333333333333",
+      accountId: "123456789012",
+      region: "us-east-1",
+      instanceId: "i-0fedcba9876543210",
+      briarVersion: "1.2.155",
+      observedAt: "2026-08-22T00:05:00.000Z",
+    });
+    expect(replacementEnrollment).toMatchObject({
+      state: "needs_setup",
+      enrollment_consumed_at: "2026-08-22T00:05:00.000Z",
+      enrollment_identity_hash: newIdentityHash,
+    });
+    await expect(db.prepare(
+      `select device_identity_hash from briar_execution_worker_devices
+       where id = 'managed-33333333-3333-4333-8333-333333333333'`,
+    ).first()).resolves.toMatchObject({
+      device_identity_hash: newIdentityHash,
+    });
+    await expect(db.prepare(
+      `select token_hash from briar_execution_worker_credentials
+       where device_id = 'managed-33333333-3333-4333-8333-333333333333'`,
+    ).first()).resolves.toMatchObject({
+      token_hash: newCredentialHash,
+    });
+    await db.prepare(
+      `update briar_managed_computers set state = 'failed'
+       where id = '33333333-3333-4333-8333-333333333333'`,
+    ).run();
 
     for (const attempt of [3, 4, 5]) {
       await db.prepare(
@@ -226,6 +301,7 @@ describe("managed computer repository", () => {
         requestId: `retry-request-${attempt}`,
         provisioningJobId: `retry-job-${attempt}`,
         workflowInstanceId: `managed-computer-retry-${attempt}`,
+        enrollmentNonceHash: String(attempt).repeat(64),
         enrollmentExpiresAt: `2026-08-22T00:${35 + attempt}:00.000Z`,
         region: "us-east-1",
         instanceType: "m7i.large",

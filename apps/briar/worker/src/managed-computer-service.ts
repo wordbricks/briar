@@ -260,6 +260,7 @@ export async function applyForPromotionalManagedComputer(
   const nonce = await managedComputerEnrollmentNonce(
     config.enrollmentSecret ?? "",
     managedComputerId,
+    provisioningJobId,
   );
   const observedTime = Date.parse(input.observedAt);
   const computer = await createPromotionalManagedComputer(db, {
@@ -328,11 +329,17 @@ export async function retryManagedComputerProvisioning(
   const provisioningJobId = crypto.randomUUID();
   const workflowInstanceId =
     `managed-computer-${input.managedComputerId}-${input.requestId}`;
+  const nonce = await managedComputerEnrollmentNonce(
+    config.enrollmentSecret ?? "",
+    input.managedComputerId,
+    provisioningJobId,
+  );
   const result = await createManagedComputerRetry(db, {
     ...input,
     actorUserId: input.userId,
     provisioningJobId,
     workflowInstanceId,
+    enrollmentNonceHash: await sha256Hex(nonce),
     enrollmentExpiresAt: new Date(
       Date.parse(input.observedAt) + config.enrollmentTtlMinutes * 60_000,
     ).toISOString(),
