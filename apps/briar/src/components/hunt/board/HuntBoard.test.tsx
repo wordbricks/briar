@@ -11,6 +11,7 @@ import * as channelRealtime from "@/lib/channel-realtime";
 import * as issueActivityHook from "@/hooks/use-issue-agent-activity";
 import type { ExecutionWorker, HuntRun, IssueMessage, IssueMessageSendResult, ProjectAgent, RunEvidence, UpdateIssueInput } from "@/types";
 import { CreateIssueDialog, EditIssueDialog, HuntDashboard, IssueAgentActivityPanel, RunPage, runMatchesIssuePropertyFilters, type IssuePropertyFilters } from "@/components/HuntDashboard";
+import { createIssueDraftStorageKey } from "@/lib/create-issue-draft";
 import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 const dashboardProps = {
@@ -226,6 +227,54 @@ describe("HuntBoard", () => {
     });
     expect(shortcut.defaultPrevented).toBe(true);
     expect(container.querySelector('[aria-label="새 이슈"]')).not.toBeNull();
+    await act(async () => root.unmount());
+    container.remove();
+  });
+  it("adds a bottom drop space and opens issue creation for a kanban column", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={demoDashboard} />));
+    const implementingColumn = container.querySelector<HTMLElement>('[data-kanban-column-id="stage:implementing"]');
+    const addButton = implementingColumn?.querySelector<HTMLButtonElement>("[data-kanban-column-add]");
+    expect(implementingColumn?.querySelector(".kanban-column-content")).not.toBeNull();
+    expect(addButton?.getAttribute("aria-label")).toBe("구현에 이슈 추가");
+    await act(async () => addButton?.click());
+    expect(container.querySelector('[role="dialog"][aria-label="새 이슈"]')).not.toBeNull();
+    await act(async () => container.querySelector<HTMLButtonElement>(".issue-dialog-close")?.click());
+    await act(async () => root.unmount());
+    container.remove();
+  });
+  it("moves a newly created issue to the column that opened its add action", async () => {
+    window.localStorage.removeItem(createIssueDraftStorageKey);
+    const onCreateIssue = vi.fn(async () => ({
+      runId: "created-from-kanban"
+    }));
+    const onMoveRun = vi.fn(async () => undefined);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={demoDashboard} onCreateIssue={onCreateIssue} onMoveRun={onMoveRun} />));
+    const addButton = container.querySelector<HTMLButtonElement>('[data-kanban-column-id="stage:implementing"] [data-kanban-column-add]');
+    await act(async () => addButton?.click());
+    const titleInput = container.querySelector<HTMLInputElement>(".issue-title-input");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(titleInput, "Created in implementing");
+      titleInput?.dispatchEvent(new Event("input", {
+        bubbles: true
+      }));
+      container.querySelector<HTMLFormElement>(".issue-dialog")?.requestSubmit();
+    });
+    expect(onCreateIssue).toHaveBeenCalledWith(demoDashboard.project.id, expect.objectContaining({
+      status: "queued",
+      title: "Created in implementing"
+    }));
+    expect(onMoveRun).toHaveBeenCalledWith("created-from-kanban", {
+      status: "running",
+      workflowStage: "implementing"
+    });
+    expect(container.querySelector('[role="dialog"][aria-label="새 이슈"]')).toBeNull();
+    window.localStorage.removeItem(createIssueDraftStorageKey);
     await act(async () => root.unmount());
     container.remove();
   });

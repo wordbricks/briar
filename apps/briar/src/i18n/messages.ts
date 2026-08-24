@@ -1169,6 +1169,7 @@ export const ko = {
   "dashboard.queue": "작업 큐",
   "dashboard.taskCount": "{count}개 작업",
   "dashboard.createIssue": "이슈 만들기",
+  "dashboard.createIssueInColumn": "{label}에 이슈 추가",
   "dashboard.filter": "필터",
   "dashboard.propertyFilters": "프로퍼티 필터",
   "dashboard.clearFilters": "필터 모두 지우기",
@@ -3471,6 +3472,7 @@ export const en = {
   "organization.githubBenefitPr": "Link Briar issues and pull requests",
   "organization.githubBenefitMerge": "Resume waiting work after a pull request is merged",
   "organization.githubBenefitScope": "Limit access to repositories you select",
+  "dashboard.createIssueInColumn": "Add issue to {label}",
   "worker.noneForSelection": "No current Worker supports the selected provider, model, and effort.",
   "worker.incompatibleSelection": "This Worker does not support the selected provider, model, and effort.",
 } satisfies Messages;
@@ -4711,6 +4713,7 @@ export const zh = {
   "organization.githubBenefitPr": "关联 Briar 问题和拉取请求",
   "organization.githubBenefitMerge": "拉取请求合并后自动恢复等待中的任务",
   "organization.githubBenefitScope": "将访问范围限制为所选仓库",
+  "dashboard.createIssueInColumn": "在 {label} 中创建问题",
   "worker.noneForSelection": "当前没有 Worker 支持所选的提供商、模型和 effort。",
   "worker.incompatibleSelection": "此 Worker 不支持所选的提供商、模型和 effort。",
 } satisfies Messages;

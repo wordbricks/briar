@@ -22,6 +22,7 @@ export function CreateIssueDialog({
   availableProviders = agentProviders,
   compactHeader = false,
   defaultProjectId,
+  defaultStatus = "queued",
   isSubmitting,
   onClose,
   onCreate,
@@ -33,6 +34,7 @@ export function CreateIssueDialog({
   availableProviders?: readonly AgentProvider[];
   compactHeader?: boolean;
   defaultProjectId?: string;
+  defaultStatus?: CreateIssueInput["status"];
   isSubmitting: boolean;
   onClose: () => void;
   onCreate: (projectId: string, input: CreateIssueInput) => Promise<void>;
@@ -56,7 +58,7 @@ export function CreateIssueDialog({
   const titleLength = issueTitleLength(title);
   const titleTooLong = Boolean(title.trim()) && !isIssueTitleWithinLimit(title);
   const [description, setDescription] = useState(initialDraft?.description ?? "");
-  const [status, setStatus] = useState<"backlog" | "queued">(initialDraft?.status ?? "queued");
+  const [status, setStatus] = useState<"backlog" | "queued">(initialDraft?.status ?? defaultStatus);
   const [priority, setPriority] = useState(initialDraft?.priority ?? "2");
   const [assigneeUserId, setAssigneeUserId] = useState(initialDraft?.assigneeUserId ?? "");
   const [preferredProvider, setPreferredProvider] = useState(initialDraft?.preferredProvider ?? "");
