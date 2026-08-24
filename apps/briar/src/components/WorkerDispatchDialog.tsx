@@ -22,12 +22,16 @@ import type { MessageKey } from "../i18n/messages";
 import {
   agentEffortOptions,
   agentModelOptions,
-  agentProviders,
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
-import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import { useAgentProviderModelPreferences } from "../hooks/useAgentProviderModelPreferences";
+import {
+  executionWorkerSupportsSelection,
+  projectPolicyWorkers,
+  projectWorkerCapabilityCatalog,
+  projectWorkerProviders,
+} from "../lib/project-worker-capabilities";
 import type {
   ExecutionWorker,
   HuntRun,
@@ -79,34 +83,24 @@ export function WorkerDispatchDialog({
   const [model, setModel] = useState("");
   const [effort, setEffort] = useState("");
   const [workerId, setWorkerId] = useState("");
-  const providerModels = useAgentProviderModels(open);
   const providerModelPreferences = useAgentProviderModelPreferences();
   const selectionSessionRef = useRef<string | null>(null);
   const selectionDirtyRef = useRef(false);
   const initializingProviderRef = useRef<AgentProvider | null>(null);
   const policyWorkers = useMemo(
-    () =>
-      workers.filter(
-        (worker) =>
-          policy?.selectionMode !== "allowlist" ||
-          policy.allowedWorkerIds.includes(worker.id),
-      ),
+    () => projectPolicyWorkers(workers, policy),
+    [policy, workers],
+  );
+  const providerModels = useMemo(
+    () => projectWorkerCapabilityCatalog(workers, policy),
     [policy, workers],
   );
   const healthyProviders = useMemo(
-    () =>
-      agentProviders.filter((candidate) =>
-        policyWorkers.some(
-          (worker) =>
-            (worker.providers ?? []).includes(candidate) &&
-            worker.acceptingWork &&
-            (worker.readiness === "available" ||
-              worker.readiness === "busy"),
-        ),
-      ),
-    [policyWorkers],
+    () => projectWorkerProviders(workers, policy),
+    [policy, workers],
   );
-  const eligibleWorkers = useMemo(
+  const normalizedModel = model.trim();
+  const providerWorkers = useMemo(
     () =>
       policyWorkers.filter(
         (worker) =>
@@ -116,22 +110,57 @@ export function WorkerDispatchDialog({
       ),
     [policyWorkers, provider],
   );
+  const compatibleWorkers = useMemo(
+    () => providerWorkers.filter((worker) =>
+      executionWorkerSupportsSelection(
+        worker,
+        provider,
+        normalizedModel || null,
+        effort || null,
+      )
+    ),
+    [effort, normalizedModel, provider, providerWorkers],
+  );
+  const compatibleWorkerIds = useMemo(
+    () => new Set(compatibleWorkers.map((worker) => worker.id)),
+    [compatibleWorkers],
+  );
   const modelOptions = useMemo(
     () =>
       agentModelOptions(
         providerModels,
         provider,
         t("settings.providerDefaultModel"),
-        model,
+        null,
         providerModelPreferences[provider].favoriteModels,
       ),
-    [model, provider, providerModelPreferences, providerModels, t],
+    [provider, providerModelPreferences, providerModels, t],
   );
   const selectedModelKnown = modelOptions.some(
     (option) => option.value === model,
   );
-  const normalizedModel = model.trim();
+  const effortOptions = useMemo(
+    () =>
+      agentEffortOptions(
+        providerModels,
+        provider,
+        normalizedModel,
+      ),
+    [normalizedModel, provider, providerModels],
+  );
+  const selectedEffortKnown = !effort || effortOptions.some(
+    (option) => option.value === effort,
+  );
   const selectionSessionKey = run?.id ?? selectionKey ?? "__without-run__";
+
+  const defaultModelForProvider = (candidate: AgentProvider) => {
+    const configured = providerModelPreferences[candidate].defaultModel;
+    return configured && providerModels[candidate].models.some(
+        (modelCapability) => modelCapability.id === configured,
+      )
+      ? configured
+      : "";
+  };
 
   useEffect(() => {
     if (!open) {
@@ -172,8 +201,7 @@ export function WorkerDispatchDialog({
     setProvider(initialProvider);
     setModel(
       requestedModel ??
-        providerModelPreferences[initialProvider].defaultModel ??
-        "",
+        defaultModelForProvider(initialProvider),
     );
     setEffort(
       initialSelection
@@ -195,6 +223,7 @@ export function WorkerDispatchDialog({
     policy?.defaultWorkerId,
     policyWorkers,
     providerModelPreferences,
+    providerModels,
     run?.preferredEffort,
     run?.preferredModel,
     run?.preferredProvider,
@@ -219,28 +248,45 @@ export function WorkerDispatchDialog({
     if (healthyProviders.includes(provider)) return;
     const nextProvider = healthyProviders[0];
     setProvider(nextProvider);
-    setModel(providerModelPreferences[nextProvider].defaultModel ?? "");
+    setModel(defaultModelForProvider(nextProvider));
     setEffort("");
-  }, [healthyProviders, open, provider, providerModelPreferences]);
+  }, [
+    healthyProviders,
+    open,
+    provider,
+    providerModelPreferences,
+    providerModels,
+  ]);
 
   useEffect(() => {
     if (workerId === "") return;
-    const selectedWorker = eligibleWorkers.find(
+    const selectedWorker = providerWorkers.find(
       (worker) => worker.id === workerId && worker.readiness === "available",
     );
     if (selectedWorker) return;
     setWorkerId("");
-  }, [eligibleWorkers, workerId]);
+  }, [providerWorkers, workerId]);
 
   const providerIsHealthy = healthyProviders.includes(provider);
+  const hasCompatibleWorker = compatibleWorkers.some(
+    (worker) =>
+      worker.readiness === "available" || worker.readiness === "busy",
+  );
+  const selectedWorker = workerId
+    ? providerWorkers.find((worker) => worker.id === workerId)
+    : null;
+  const selectedWorkerIsCompatible = !selectedWorker ||
+    compatibleWorkerIds.has(selectedWorker.id);
   const canDispatch = providerIsHealthy && (workerId === ""
-    ? eligibleWorkers.some(
-        (worker) => worker.readiness === "available" ||
-          worker.readiness === "busy",
-      )
-    : eligibleWorkers.some(
+    ? hasCompatibleWorker
+    : compatibleWorkers.some(
         (worker) => worker.id === workerId && worker.readiness === "available",
       ));
+  const capabilityError = selectedWorker && !selectedWorkerIsCompatible
+    ? t("worker.incompatibleSelection")
+    : providerIsHealthy && !hasCompatibleWorker
+      ? t("worker.noneForSelection")
+      : null;
   const isReassign = Boolean(run?.dispatchedAt || run?.workerId);
   const isApproval = intent === "approve_execution";
   const isCreateAndExecute = intent === "create_and_execute";
@@ -279,9 +325,7 @@ export function WorkerDispatchDialog({
                 selectionDirtyRef.current = true;
                 const nextProvider = value as AgentProvider;
                 setProvider(nextProvider);
-                setModel(
-                  providerModelPreferences[nextProvider].defaultModel ?? "",
-                );
+                setModel(defaultModelForProvider(nextProvider));
                 setEffort("");
               }}
               providers={healthyProviders}
@@ -299,7 +343,11 @@ export function WorkerDispatchDialog({
               }}
               options={[
                 ...(!selectedModelKnown && model
-                  ? [{ label: model, value: model }]
+                  ? [{
+                      disabled: true,
+                      label: model,
+                      value: model,
+                    }]
                   : []),
                 ...modelOptions,
               ]}
@@ -323,12 +371,10 @@ export function WorkerDispatchDialog({
                   label: t("settings.providerDefaultEffort"),
                   value: "",
                 },
-                ...agentEffortOptions(
-                  providerModels,
-                  provider,
-                  normalizedModel,
-                  effort,
-                ),
+                ...(!selectedEffortKnown && effort
+                  ? [{ disabled: true, label: effort, value: effort }]
+                  : []),
+                ...effortOptions,
               ]}
               value={effort}
             />
@@ -346,8 +392,10 @@ export function WorkerDispatchDialog({
                   label: t("worker.anyAvailable"),
                   value: "",
                 },
-                ...eligibleWorkers.map((worker) => ({
-                  disabled: worker.readiness !== "available",
+                ...providerWorkers.map((worker) => ({
+                  disabled:
+                    worker.readiness !== "available" ||
+                    !compatibleWorkerIds.has(worker.id),
                   label: `${worker.icon?.type === "emoji" ? `${worker.icon.value} ` : ""}${worker.label} · ${t(`worker.readiness.${worker.readiness}` as MessageKey)}`,
                   value: worker.id,
                 })),
@@ -357,13 +405,14 @@ export function WorkerDispatchDialog({
           </label>
 
           <div className="worker-readiness-list">
-            {eligibleWorkers.length === 0 ? (
+            {providerWorkers.length === 0 ? (
               <p><CircleAlert size={15} />{t("worker.noneForProvider")}</p>
             ) : (
               <>
                 <ChoiceCard
                   className="worker-readiness-row"
                   description={t("worker.anyAvailableDetail")}
+                  disabled={!hasCompatibleWorker}
                   icon={<Waypoints />}
                   iconClassName="[&_svg]:size-[26px]"
                   layout="horizontal"
@@ -376,18 +425,21 @@ export function WorkerDispatchDialog({
                   title={t("worker.anyAvailable")}
                   trailing={workerId === "" ? <Check aria-hidden="true" /> : null}
                 />
-                {eligibleWorkers.map((worker) => (
+                {providerWorkers.map((worker) => (
                   <ChoiceCard
                     className="worker-readiness-row"
                     description={
-                      <>
+                      compatibleWorkerIds.has(worker.id) ? <>
                         {t(`worker.readiness.${worker.readiness}` as MessageKey)}
                         {worker.readinessDetail
                           ? ` · ${worker.readinessDetail}`
                           : ""}
-                      </>
+                      </> : t("worker.incompatibleSelection")
                     }
-                    disabled={worker.readiness !== "available"}
+                    disabled={
+                      worker.readiness !== "available" ||
+                      !compatibleWorkerIds.has(worker.id)
+                    }
                     icon={<WorkerIcon icon={worker.icon} size={30} />}
                     iconClassName="bg-transparent"
                     key={worker.id}
@@ -409,10 +461,10 @@ export function WorkerDispatchDialog({
               </>
             )}
           </div>
-          {error && (
+          {(capabilityError || error) && (
             <p className="run-status-error" role="alert">
               <CircleAlert aria-hidden="true" size={13} />
-              {error}
+              {capabilityError ?? error}
             </p>
           )}
         </div>

@@ -1,3 +1,4 @@
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import { agentProviders, type AgentProvider } from "./agent-provider";
@@ -152,48 +153,170 @@ export function agentProviderSupportsSelection(
   return efforts.some((candidate) => candidate.id === effort);
 }
 
+function compareCapabilityText(left: string, right: string) {
+  const leftFolded = left.normalize("NFKD").toLocaleLowerCase("en-US");
+  const rightFolded = right.normalize("NFKD").toLocaleLowerCase("en-US");
+  return leftFolded < rightFolded
+    ? -1
+    : leftFolded > rightFolded
+      ? 1
+      : left < right
+        ? -1
+        : left > right
+          ? 1
+          : 0;
+}
+
+function preferredCapabilityText(left: string, right: string) {
+  return compareCapabilityText(left, right) <= 0 ? left : right;
+}
+
+function preferredOptionalCapabilityText(
+  left: string | null | undefined,
+  right: string | null | undefined,
+) {
+  if (typeof left === "string" && typeof right === "string") {
+    return preferredCapabilityText(left, right);
+  }
+  return typeof left === "string"
+    ? left
+    : typeof right === "string"
+      ? right
+      : left === null || right === null
+        ? null
+        : undefined;
+}
+
+function mergeEffortCapabilities(
+  left: AgentEffortCapability,
+  right: AgentEffortCapability,
+): AgentEffortCapability {
+  const description = preferredOptionalCapabilityText(
+    left.description,
+    right.description,
+  );
+  const isDefault = left.isDefault === true || right.isDefault === true;
+  return {
+    id: left.id,
+    label: preferredCapabilityText(left.label, right.label),
+    ...(description !== undefined ? { description } : {}),
+    ...(isDefault
+      ? { isDefault: true }
+      : left.isDefault === false || right.isDefault === false
+        ? { isDefault: false }
+        : {}),
+  };
+}
+
+function sortedEffortCapabilities(efforts: Iterable<AgentEffortCapability>) {
+  return [...efforts].sort((left, right) =>
+    compareCapabilityText(left.label, right.label) ||
+    compareCapabilityText(left.id, right.id)
+  );
+}
+
+function mergeModelCapabilities(
+  left: AgentModelCapability,
+  right: AgentModelCapability,
+): AgentModelCapability {
+  const efforts = new Map<string, AgentEffortCapability>();
+  for (const effort of [...(left.efforts ?? []), ...(right.efforts ?? [])]) {
+    const existing = efforts.get(effort.id);
+    efforts.set(
+      effort.id,
+      existing ? mergeEffortCapabilities(existing, effort) : { ...effort },
+    );
+  }
+  const defaultEffortId = preferredOptionalCapabilityText(
+    left.defaultEffortId,
+    right.defaultEffortId,
+  );
+  const isDefault = left.isDefault === true || right.isDefault === true;
+  return {
+    id: left.id,
+    label: preferredCapabilityText(left.label, right.label),
+    ...(isDefault
+      ? { isDefault: true }
+      : left.isDefault === false || right.isDefault === false
+        ? { isDefault: false }
+        : {}),
+    ...(defaultEffortId !== undefined ? { defaultEffortId } : {}),
+    efforts: sortedEffortCapabilities(efforts.values()),
+  };
+}
+
 export function mergeAgentProviderCapabilityCatalogs(
-  catalogs: AgentProviderCapabilityCatalog[],
+  catalogs: ReadonlyArray<Partial<AgentProviderCapabilityCatalog>>,
 ) {
   const merged = emptyAgentProviderCapabilityCatalog();
   for (const provider of agentProviders) {
-    const entries = catalogs.map((catalog) => catalog[provider]);
+    const entries = catalogs.flatMap((catalog) => {
+      const entry = catalog[provider];
+      return entry ? [entry] : [];
+    });
     merged[provider].allowCustomModels = entries.some(
       (entry) => entry.allowCustomModels,
     );
     merged[provider].error = entries.length > 0 &&
         entries.every((entry) => entry.error)
-      ? entries.map((entry) => entry.error).filter(Boolean).join("; ").slice(
-        0,
-        2_000,
-      )
+      ? [...new Set(entries.flatMap((entry) =>
+        entry.error ? [entry.error] : []
+      ))]
+        .sort(compareCapabilityText).join("; ").slice(0, 2_000)
       : null;
     const defaultEfforts = new Map<string, AgentEffortCapability>();
     const models = new Map<string, AgentModelCapability>();
     for (const entry of entries) {
       for (const candidate of entry.defaultEfforts ?? []) {
-        defaultEfforts.set(candidate.id, candidate);
+        const existing = defaultEfforts.get(candidate.id);
+        defaultEfforts.set(
+          candidate.id,
+          existing
+            ? mergeEffortCapabilities(existing, candidate)
+            : { ...candidate },
+        );
       }
       for (const candidate of entry.models) {
         const existing = models.get(candidate.id);
-        if (!existing) {
-          models.set(candidate.id, {
-            ...candidate,
-            efforts: [...(candidate.efforts ?? [])],
-          });
-          continue;
-        }
-        const efforts = new Map(
-          (existing.efforts ?? []).map((item) => [item.id, item]),
+        models.set(
+          candidate.id,
+          existing
+            ? mergeModelCapabilities(existing, candidate)
+            : {
+                ...candidate,
+                efforts: sortedEffortCapabilities(candidate.efforts ?? []),
+              },
         );
-        for (const item of candidate.efforts ?? []) efforts.set(item.id, item);
-        existing.efforts = [...efforts.values()];
-        existing.isDefault ||= candidate.isDefault;
-        existing.defaultEffortId ??= candidate.defaultEffortId;
       }
     }
-    merged[provider].defaultEfforts = [...defaultEfforts.values()];
-    merged[provider].models = [...models.values()];
+    merged[provider].defaultEfforts = sortedEffortCapabilities(
+      defaultEfforts.values(),
+    );
+    merged[provider].models = [...models.values()].sort((left, right) =>
+      compareCapabilityText(left.label, right.label) ||
+      compareCapabilityText(left.id, right.id)
+    );
   }
   return merged;
+}
+
+export function mergeAgentProviderCapabilityAdvertisements(
+  advertisements: ReadonlyArray<{
+    providers: readonly AgentProvider[];
+    providerCapabilities: unknown;
+  }>,
+) {
+  const catalogs = advertisements.flatMap((advertisement) => {
+    const parsed = decodeAgentProviderCapabilityCatalogOption(
+      advertisement.providerCapabilities,
+    );
+    if (Option.isNone(parsed)) return [];
+    const advertised = new Set(advertisement.providers);
+    return [Object.fromEntries(
+      agentProviders.flatMap((provider) =>
+        advertised.has(provider) ? [[provider, parsed.value[provider]]] : []
+      ),
+    ) as Partial<AgentProviderCapabilityCatalog>];
+  });
+  return mergeAgentProviderCapabilityCatalogs(catalogs);
 }

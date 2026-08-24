@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
 import { demoDashboard, demoRunEvents } from "@/lib/demo-data";
+import { defaultAgentProviderModelCatalog } from "@/lib/project-llm";
 import * as api from "@/lib/api";
 import * as channelRealtime from "@/lib/channel-realtime";
 import * as issueActivityHook from "@/hooks/use-issue-agent-activity";
@@ -74,7 +75,21 @@ const dashboardWorker: ExecutionWorker = {
   readiness: "busy",
   acceptingWork: true,
   readinessDetail: null,
-  capabilities: {},
+  capabilities: {
+    providerCapabilities: {
+      ...defaultAgentProviderModelCatalog,
+      codex: {
+        models: [{
+          id: "gpt-5.6-sol",
+          label: "GPT-5.6 Sol",
+          efforts: [{ id: "xhigh", label: "xhigh" }],
+        }],
+        defaultEfforts: [],
+        allowCustomModels: false,
+        error: null,
+      },
+    },
+  },
   maxConcurrentSessions: 1,
   activeSessions: 1,
   availableSessions: 0,
