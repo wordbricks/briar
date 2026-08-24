@@ -13,6 +13,7 @@ import ponytailMarkdown from "../data/agent-templates/ponytail/skills/ponytail/S
 import ponytailAuditMarkdown from "../data/agent-templates/ponytail/skills/ponytail-audit/SKILL.md?raw";
 import ponytailDebtMarkdown from "../data/agent-templates/ponytail/skills/ponytail-debt/SKILL.md?raw";
 import ponytailReviewMarkdown from "../data/agent-templates/ponytail/skills/ponytail-review/SKILL.md?raw";
+import ponytailAvatar from "../data/agent-templates/ponytail/avatar.webp?inline";
 import agencyAgentsLicense from "../../../../third-party/agency-agents-LICENSE.md?raw";
 import ponytailLicense from "../../../../third-party/ponytail-LICENSE.md?raw";
 
@@ -27,6 +28,7 @@ import {
   agentSkillDescriptionMaxLength,
   agentSkillsMaxCount,
 } from "./agent-limits";
+import { isProjectAgentAvatarDataUrl } from "./project-agent-avatar";
 import type { AgentProvider, ModelEffort } from "./project-llm";
 
 export type ProjectAgentTemplate = {
@@ -42,6 +44,7 @@ export type ProjectAgentTemplate = {
   };
   division: "design" | "engineering" | "marketing" | "product";
   emoji: string;
+  avatar?: string;
   name: string;
   description: string;
   responsibility: string;
@@ -139,6 +142,7 @@ export const ponytailDeveloperAgentTemplate = {
   source: ponytailTemplateSource(),
   division: "engineering",
   emoji: "🐴",
+  avatar: ponytailAvatar,
   name: "Ponytail Developer",
   description:
     "Developer who applies Ponytail's minimal implementation discipline while preserving Briar's complete delivery contract.",
@@ -418,7 +422,7 @@ export const tiktokStrategistAgentTemplate = {
   ],
 } satisfies ProjectAgentTemplate;
 
-export const projectAgentTemplates = [
+export const projectAgentTemplates: readonly ProjectAgentTemplate[] = [
   ponytailDeveloperAgentTemplate,
   frontendDeveloperAgentTemplate,
   backendArchitectAgentTemplate,
@@ -431,7 +435,7 @@ export const projectAgentTemplates = [
   contentCreatorAgentTemplate,
   instagramCuratorAgentTemplate,
   tiktokStrategistAgentTemplate,
-] as const satisfies readonly ProjectAgentTemplate[];
+];
 
 export function projectAgentTemplateSkillInputs(
   template: ProjectAgentTemplate,
@@ -471,6 +475,9 @@ export function projectAgentTemplateValidationErrors(
   }
   if (!/^#[0-9a-f]{6}$/iu.test(template.calendarColor)) {
     errors.push("calendar color must be a six-digit hex value");
+  }
+  if (template.avatar && !isProjectAgentAvatarDataUrl(template.avatar)) {
+    errors.push("avatar must be a supported square image data URL");
   }
   const skillNames = new Set<string>();
   template.skills.forEach((skill, index) => {

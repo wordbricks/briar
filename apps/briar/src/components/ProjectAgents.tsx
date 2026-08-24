@@ -816,6 +816,7 @@ export function ProjectAgentDialog({
             responsibility: responsibility.trim(),
             ...(selectedTemplate
               ? {
+                  avatar: selectedTemplate.avatar ?? null,
                   skills: projectAgentTemplateSkillInputs(selectedTemplate, {
                     provider,
                     model: model || null,
@@ -931,7 +932,11 @@ export function ProjectAgentDialog({
                           aria-hidden="true"
                           style={{ "--template-color": template.calendarColor } as React.CSSProperties}
                         >
-                          {template.emoji}
+                          {template.avatar ? (
+                            <img alt="" src={template.avatar} />
+                          ) : (
+                            template.emoji
+                          )}
                         </span>
                         <div>
                           <h3>{template.name}</h3>
@@ -1013,7 +1018,11 @@ export function ProjectAgentDialog({
                     aria-hidden="true"
                     style={{ "--template-color": selectedTemplate.calendarColor } as React.CSSProperties}
                   >
-                    {selectedTemplate.emoji}
+                    {selectedTemplate.avatar ? (
+                      <img alt="" src={selectedTemplate.avatar} />
+                    ) : (
+                      selectedTemplate.emoji
+                    )}
                   </span>
                   <div>
                     <small>{t("agents.selectedTemplate")}</small>
