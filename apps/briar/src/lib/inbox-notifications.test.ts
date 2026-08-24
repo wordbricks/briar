@@ -11,9 +11,11 @@ import {
   listenForMacInboxNotificationClicks,
   listenForInboxNotificationClicks,
   readInboxNotificationPreferences,
+  readInboxNotificationSoundPreference,
   sendInboxNotification,
   targetFromNotificationAction,
   writeInboxNotificationPreferences,
+  writeInboxNotificationSoundPreference,
 } from "./inbox-notifications";
 
 const message: InboxMessage = {
@@ -69,6 +71,14 @@ describe("inbox notification preferences", () => {
       important: false,
       activity: true,
     });
+  });
+
+  it("enables notification sounds by default and persists an opt-out", () => {
+    expect(readInboxNotificationSoundPreference()).toBe(true);
+
+    writeInboxNotificationSoundPreference(false);
+
+    expect(readInboxNotificationSoundPreference()).toBe(false);
   });
 });
 
@@ -202,8 +212,10 @@ describe("inbox notification navigation", () => {
       static permission = "granted";
       onclick: (() => void) | null = null;
       close = vi.fn();
+      options: NotificationOptions;
 
-      constructor() {
+      constructor(_title: string, options: NotificationOptions) {
+        this.options = options;
         notifications.push(this);
       }
     }
@@ -214,11 +226,30 @@ describe("inbox notification navigation", () => {
 
     expect(await sendInboxNotification(message, "Important")).toBe(true);
     const [notification] = notifications;
+    expect(notification.options.silent).toBe(false);
     notification.onclick?.();
 
     expect(onOpen).toHaveBeenCalledWith(inboxNotificationTarget(message));
     expect(notification.close).toHaveBeenCalledOnce();
     stopListening();
+  });
+
+  it("requests a silent browser notification when sound is disabled", async () => {
+    const options: NotificationOptions[] = [];
+    class MockNotification {
+      static permission = "granted";
+      onclick: (() => void) | null = null;
+      close = vi.fn();
+
+      constructor(_title: string, nextOptions: NotificationOptions) {
+        options.push(nextOptions);
+      }
+    }
+    vi.stubGlobal("Notification", MockNotification);
+
+    expect(await sendInboxNotification(message, "Important", false)).toBe(true);
+    expect(options).toHaveLength(1);
+    expect(options[0]?.silent).toBe(true);
   });
 
   it("drains macOS notification clicks registered before the webview starts", async () => {

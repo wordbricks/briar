@@ -1,5 +1,9 @@
 import type { InboxCategory, InboxMessage } from "../hooks/useInbox";
-import { isDesktopTauri, isMacDesktopTauri } from "./platform";
+import {
+  getMobilePlatform,
+  isDesktopTauri,
+  isMacDesktopTauri,
+} from "./platform";
 
 export const inboxNotificationCategories = [
   "urgent",
@@ -11,6 +15,7 @@ export const inboxNotificationCategories = [
 export type InboxNotificationPreferences = Record<InboxCategory, boolean>;
 
 const storageKey = "briar.settings.inbox-notifications.v1";
+const soundStorageKey = "briar.settings.inbox-notification-sound.v1";
 const targetStorageKey = "briar.inbox.notification-targets.v1";
 const browserOpenEvent = "briar:inbox-notification-open";
 const desktopOpenEvent = "inbox-notification-open";
@@ -69,6 +74,23 @@ export function writeInboxNotificationPreferences(
 ) {
   try {
     window.localStorage.setItem(storageKey, JSON.stringify(preferences));
+  } catch {
+    // Keep the preference in the mounted settings screen when storage is unavailable.
+  }
+}
+
+export function readInboxNotificationSoundPreference() {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(soundStorageKey) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+export function writeInboxNotificationSoundPreference(enabled: boolean) {
+  try {
+    window.localStorage.setItem(soundStorageKey, String(enabled));
   } catch {
     // Keep the preference in the mounted settings screen when storage is unavailable.
   }
@@ -412,6 +434,7 @@ export function inboxNotificationContent(
 export async function sendInboxNotification(
   message: InboxMessage,
   notificationLabel: string,
+  playSound = readInboxNotificationSoundPreference(),
 ) {
   const { title, body } = inboxNotificationContent(message, notificationLabel);
   const target = inboxNotificationTarget(message);
@@ -419,21 +442,49 @@ export async function sendInboxNotification(
   if (isTauriRuntime()) {
     if (isDesktopTauri()) {
       const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("show_inbox_notification", { title, body, target });
+      await invoke("show_inbox_notification", {
+        title,
+        body,
+        target,
+        playSound,
+      });
       return true;
     }
 
-    const { isPermissionGranted, sendNotification } = await import(
+    const {
+      createChannel,
+      Importance,
+      isPermissionGranted,
+      sendNotification,
+    } = await import(
       "@tauri-apps/plugin-notification"
     );
     if (!(await isPermissionGranted())) return false;
     const id = inboxNotificationId(message.id);
     storeNotificationTarget(id, target);
+    const mobilePlatform = getMobilePlatform();
+    const channelId = playSound
+      ? "briar-inbox-sound-v1"
+      : "briar-inbox-silent-v1";
+    if (mobilePlatform === "android") {
+      try {
+        await createChannel({
+          id: channelId,
+          name: playSound ? "Briar inbox" : "Briar inbox (silent)",
+          description: "Briar inbox updates",
+          importance: playSound ? Importance.Default : Importance.Low,
+        });
+      } catch {
+        // Android versions before notification channels ignore channel IDs.
+      }
+    }
     await sendNotification({
       id,
       title,
       body,
       group: "briar-inbox",
+      ...(mobilePlatform === "android" ? { channelId } : {}),
+      ...(mobilePlatform === "ios" && playSound ? { sound: "default" } : {}),
       autoCancel: true,
       extra: {
         briarInboxTarget: JSON.stringify(target),
@@ -448,7 +499,11 @@ export async function sendInboxNotification(
   ) {
     return false;
   }
-  const notification = new Notification(title, { body, tag: message.id });
+  const notification = new Notification(title, {
+    body,
+    tag: message.id,
+    silent: !playSound,
+  });
   notification.onclick = () => {
     window.focus();
     dispatchBrowserNotificationOpen(target);

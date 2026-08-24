@@ -551,7 +551,7 @@ export function AppSettings({
             />
           ) : activeSection === "notifications" ? (
             <SettingsContent>
-              <SettingsGroupHeading title={t("notifications.inboxImportance")} />
+              <SettingsGroupHeading title={t("notifications.preferences")} />
               <InboxNotificationSettings />
             </SettingsContent>
           ) : activeSection === "general" ? (
