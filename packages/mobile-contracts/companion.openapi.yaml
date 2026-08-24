@@ -1507,6 +1507,54 @@
         }
       }
     },
+    "/organizations/{organizationId}/channels/{channelId}/messages/{messageId}": {
+      "delete": {
+        "operationId": "deleteChannelMessage",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChannelId"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message deletion result with any retained tombstone or refreshed parent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteChannelMessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/organizations/{organizationId}/channels/{channelId}/messages/{messageId}/reactions": {
       "put": {
         "operationId": "toggleChannelMessageReaction",
@@ -4606,6 +4654,13 @@
             "type": "string",
             "format": "date-time"
           },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
           "subscribers": {
             "type": "array",
             "items": {
@@ -4616,6 +4671,40 @@
                 "subscribedAt": { "type": "string", "format": "date-time" }
               }
             }
+          }
+        },
+        "additionalProperties": true
+      },
+      "DeleteChannelMessageResponse": {
+        "type": "object",
+        "required": [
+          "deleted",
+          "message",
+          "parentMessage"
+        ],
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          },
+          "message": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ChannelMessage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parentMessage": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ChannelMessage"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": true

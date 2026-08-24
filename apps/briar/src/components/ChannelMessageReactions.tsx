@@ -1,7 +1,7 @@
 import data from "@emoji-mart/data";
 import Picker from "@emoji-mart/react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Copy, EllipsisVertical, Link2, SmilePlus } from "lucide-react";
+import { Copy, EllipsisVertical, Link2, SmilePlus, Trash2 } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -51,6 +51,7 @@ type ChannelMessageReactionsProps = {
   /** When true, renders the hover toolbar with quick reactions. */
   showHoverActions?: boolean;
   onOpenThread?: () => void;
+  onDelete?: () => void;
   onToggle: (emoji: string) => void | Promise<void>;
   onReactingChange?: (reacting: boolean) => void;
 };
@@ -69,6 +70,7 @@ export function ChannelMessageReactions({
   alwaysShowAdd = false,
   showHoverActions = false,
   onOpenThread,
+  onDelete,
   onToggle,
   onReactingChange,
 }: ChannelMessageReactionsProps) {
@@ -219,6 +221,7 @@ export function ChannelMessageReactions({
           onMenuOpenChange={setMenuOpen}
           onOpenPicker={openPicker}
           onOpenThread={onOpenThread}
+          onDelete={onDelete}
           onToggle={handleToggle}
           organizationId={organizationId}
           pickerId={pickerId}
@@ -228,7 +231,7 @@ export function ChannelMessageReactions({
       <div
         className={`channel-message-reactions${hasReactions ? " has-reactions" : ""}${alwaysShowAdd ? " always-show-add" : ""}`}
       >
-        {hasReactions ? (
+        {hasReactions && !message.deletedAt ? (
           <TooltipProvider delayDuration={200}>
             <div className="channel-reaction-chips" role="list">
               {message.reactions.map((reaction) => (
@@ -283,6 +286,7 @@ function ChannelMessageHoverActions({
   onMenuOpenChange,
   onOpenPicker,
   onOpenThread,
+  onDelete,
   onToggle,
   organizationId,
   pickerId,
@@ -294,6 +298,7 @@ function ChannelMessageHoverActions({
   onMenuOpenChange: (open: boolean) => void;
   onOpenPicker: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   onOpenThread?: () => void;
+  onDelete?: () => void;
   onToggle: (emoji: string) => void;
   organizationId?: string;
   pickerId: string;
@@ -332,7 +337,7 @@ function ChannelMessageHoverActions({
       onClick={stop}
       role="toolbar"
     >
-      {channelQuickReactionEmojis.map((emoji) => (
+      {message.deletedAt ? null : channelQuickReactionEmojis.map((emoji) => (
         <button
           aria-label={t("channel.reactWith", { emoji })}
           className="channel-quick-reaction"
@@ -345,19 +350,23 @@ function ChannelMessageHoverActions({
           <span aria-hidden="true">{emoji}</span>
         </button>
       ))}
-      <span aria-hidden="true" className="channel-message-actions-divider" />
-      <button
-        aria-controls={pickerId}
-        aria-expanded={pickerOpen}
-        aria-label={t("channel.react")}
-        className="channel-quick-reaction open-picker"
-        disabled={busy}
-        onClick={onOpenPicker}
-        title={t("channel.react")}
-        type="button"
-      >
-        <SmilePlus aria-hidden="true" size={16} />
-      </button>
+      {message.deletedAt ? null : (
+        <>
+          <span aria-hidden="true" className="channel-message-actions-divider" />
+          <button
+            aria-controls={pickerId}
+            aria-expanded={pickerOpen}
+            aria-label={t("channel.react")}
+            className="channel-quick-reaction open-picker"
+            disabled={busy}
+            onClick={onOpenPicker}
+            title={t("channel.react")}
+            type="button"
+          >
+            <SmilePlus aria-hidden="true" size={16} />
+          </button>
+        </>
+      )}
       {onOpenThread ? (
         <button
           aria-label={t("channel.replyInThread")}
@@ -398,11 +407,21 @@ function ChannelMessageHoverActions({
             </DropdownMenu.Item>
             <DropdownMenu.Item
               className="run-page-actions-item"
+              disabled={Boolean(message.deletedAt)}
               onSelect={copyMessage}
             >
               <Copy size={14} />
               {t("channel.copyMessage")}
             </DropdownMenu.Item>
+            {onDelete ? (
+              <DropdownMenu.Item
+                className="run-page-actions-item danger"
+                onSelect={onDelete}
+              >
+                <Trash2 size={14} />
+                {t("channel.deleteMessage")}
+              </DropdownMenu.Item>
+            ) : null}
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>

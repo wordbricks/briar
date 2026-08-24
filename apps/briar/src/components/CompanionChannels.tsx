@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Plus,
   Send,
+  Trash2,
   Webhook,
 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
@@ -25,6 +26,7 @@ import {
   acceptChannelSkillExecutionProposal,
   acceptChannelExecutionProposal,
   acceptChannelProposal,
+  deleteChannelMessage,
   listChannelMessages,
   listChannels,
   loadChannel,
@@ -68,6 +70,7 @@ import {
   mergeChannelMessages,
   mergeChannelMessageSnapshot,
 } from "../lib/channel-message-merge";
+import { applyChannelMessageDeletion } from "../lib/channel-message-deletion";
 import {
   createOptimisticChannelMessage,
   removeOptimisticChannelMessage,
@@ -1639,6 +1642,55 @@ export function CompanionChannels({
     [channel, currentUserId, organizationId, toast, token],
   );
 
+  const removeMessage = useCallback(
+    async (item: ChannelMessage) => {
+      if (!channel || item.deletedAt) return;
+      if (!window.confirm(t("channel.deleteMessageConfirm"))) return;
+      const deletionContext = captureChannelSurface();
+      setBusy(true);
+      try {
+        const result = await deleteChannelMessage(
+          token,
+          organizationId,
+          channel.id,
+          item.id,
+        );
+        if (!channelSurfaceIsCurrent(deletionContext)) return;
+        setMessages((current) =>
+          applyChannelMessageDeletion(current, item.id, result)
+        );
+        setThread((current) => current
+          ? applyChannelMessageDeletion(current, item.id, result)
+          : current
+        );
+        if (result.deleted) {
+          setReplies((current) => current.filter((reply) =>
+            reply.triggerMessageId !== item.id && reply.replyMessageId !== item.id
+          ));
+          if (threadParentId === item.id && !result.message) {
+            setThreadParentId(null);
+          }
+        }
+      } catch (cause) {
+        if (channelSurfaceIsCurrent(deletionContext)) {
+          toast(message(cause), { tone: "error" });
+        }
+      } finally {
+        if (channelSurfaceIsCurrent(deletionContext)) setBusy(false);
+      }
+    },
+    [
+      captureChannelSurface,
+      channel,
+      channelSurfaceIsCurrent,
+      organizationId,
+      t,
+      threadParentId,
+      toast,
+      token,
+    ],
+  );
+
   const toggleThreadSubscription = useCallback(
     async (subscribed: boolean) => {
       if (!channel || !threadParentId || threadSubscriptionPending) return;
@@ -1776,6 +1828,7 @@ export function CompanionChannels({
                 }));
               }}
               onToggleReaction={(emoji) => void toggleReaction(item, emoji)}
+              onDelete={() => void removeMessage(item)}
               projects={projects}
               replyError={failedReplyErrors.get(item.id) ?? null}
               selectedProjectId={
@@ -1896,6 +1949,7 @@ export function CompanionChannels({
                 }));
               }}
               onToggleReaction={(emoji) => void toggleReaction(item, emoji)}
+              onDelete={() => void removeMessage(item)}
               projects={projects}
               replyError={failedReplyErrors.get(item.id) ?? null}
               selectedProjectId={
@@ -2110,6 +2164,7 @@ function MessageRow({
   onIssueOpen,
   onOpenThread,
   onProjectChange,
+  onDelete,
   onToggleReaction,
   projects,
   replyError,
@@ -2157,6 +2212,7 @@ function MessageRow({
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
   onOpenThread?: () => void;
   onProjectChange: (projectId: string) => void;
+  onDelete: () => void;
   onToggleReaction: (emoji: string) => void;
   projects: readonly ChannelGroupProject[];
   replyError?: string | null;
@@ -2171,6 +2227,8 @@ function MessageRow({
   const { toast } = useToast();
   const [reacting, setReacting] = useState(false);
   const [showingThreadActions, setShowingThreadActions] = useState(false);
+  const canDelete = message.author.type === "user" &&
+    message.author.id === currentUserId && !message.deletedAt && !message.optimistic;
   useMobileBackHandler(
     () => {
       if (!showingThreadActions) return false;
@@ -2411,7 +2469,7 @@ function MessageRow({
           >
             <span aria-hidden="true" className="companion-channel-action-handle" />
             <div className="companion-channel-quick-reactions">
-              {channelQuickReactionEmojis.map((emoji, index) => (
+              {message.deletedAt ? null : channelQuickReactionEmojis.map((emoji, index) => (
                 <button
                   aria-label={t("channel.reactWith", { emoji })}
                   autoFocus={!onOpenThread && index === 0}
@@ -2461,6 +2519,7 @@ function MessageRow({
             </button>
             <button
               className="companion-channel-message-button companion-channel-sheet-action companion-channel-copy-text"
+              disabled={Boolean(message.deletedAt)}
               onClick={() => {
                 setShowingThreadActions(false);
                 const text = channelBodyWithoutImages(message.body) || message.body.trim();
@@ -2473,6 +2532,19 @@ function MessageRow({
               <Copy aria-hidden="true" size={20} />
               <strong>{t("channel.copyText")}</strong>
             </button>
+            {canDelete ? (
+              <button
+                className="companion-channel-message-button companion-channel-sheet-action danger"
+                onClick={() => {
+                  setShowingThreadActions(false);
+                  onDelete();
+                }}
+                type="button"
+              >
+                <Trash2 aria-hidden="true" size={20} />
+                <strong>{t("channel.deleteMessage")}</strong>
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}

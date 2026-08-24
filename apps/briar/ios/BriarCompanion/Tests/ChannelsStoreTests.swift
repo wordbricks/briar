@@ -1402,6 +1402,158 @@ final class ChannelsStoreTests: XCTestCase {
         configured.store.applicationDidEnterBackground()
     }
 
+    @MainActor
+    func testDeleteMessageAppliesBothHardDeletionAndThreadTombstones() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let root = message(
+            id: rootID,
+            channelID: channelID,
+            body: "Sensitive root",
+            replyCount: 1
+        )
+        let standalone = message(
+            id: replyID,
+            channelID: channelID,
+            body: "Standalone"
+        )
+        let tombstone = message(
+            id: rootID,
+            channelID: channelID,
+            body: "[deleted]",
+            replyCount: 1,
+            deletedAt: Date(timeIntervalSince1970: 1_700_000_100)
+        )
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let standaloneDeletePath = MobileAPIContract.Endpoint.channelMessage(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageID: replyID
+        )
+        let rootDeletePath = MobileAPIContract.Endpoint.channelMessage(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageID: rootID
+        )
+        let api = ChannelPollingAPI(routes: [
+            listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+            detailPath: [try encoded(ChannelDetailResponse(
+                channel: channel,
+                members: [],
+                agents: [],
+                messages: [root, standalone]
+            ))],
+            standaloneDeletePath: [try encoded(DeleteChannelMessageResponse(
+                deleted: true,
+                message: nil,
+                parentMessage: nil
+            ))],
+            rootDeletePath: [try encoded(DeleteChannelMessageResponse(
+                deleted: true,
+                message: tombstone,
+                parentMessage: nil
+            ))],
+        ])
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+
+        let standaloneDeleted = await store.deleteMessage(
+            channelID: channelID,
+            messageID: replyID
+        )
+        XCTAssertTrue(standaloneDeleted)
+        XCTAssertEqual(store.messages.map(\.id), [rootID])
+        let rootDeleted = await store.deleteMessage(
+            channelID: channelID,
+            messageID: rootID
+        )
+        XCTAssertTrue(rootDeleted)
+        XCTAssertEqual(store.messages.map(\.id), [rootID])
+        XCTAssertEqual(store.messages.first?.body, "[deleted]")
+        XCTAssertNotNil(store.messages.first?.deletedAt)
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testDelayedDeletionCannotOverwriteANewlyFocusedChannel() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let otherChannel = summary(id: otherChannelID, name: "Other")
+        let root = message(id: rootID, channelID: channelID, body: "Sensitive root")
+        let otherRoot = message(
+            id: replyID,
+            channelID: otherChannelID,
+            body: "Keep the newly focused channel"
+        )
+        let tombstone = message(
+            id: rootID,
+            channelID: channelID,
+            body: "[deleted]",
+            deletedAt: Date(timeIntervalSince1970: 1_700_000_100)
+        )
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let otherDetailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: otherChannelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let deletePath = MobileAPIContract.Endpoint.channelMessage(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageID: rootID
+        )
+        let api = ChannelPollingAPI(
+            routes: [
+                listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+                detailPath: [try encoded(ChannelDetailResponse(
+                    channel: channel,
+                    members: [],
+                    agents: [],
+                    messages: [root]
+                ))],
+                otherDetailPath: [try encoded(ChannelDetailResponse(
+                    channel: otherChannel,
+                    members: [],
+                    agents: [],
+                    messages: [otherRoot]
+                ))],
+                deletePath: [try encoded(DeleteChannelMessageResponse(
+                    deleted: true,
+                    message: tombstone,
+                    parentMessage: nil
+                ))],
+            ],
+            delays: [deletePath: .milliseconds(100)]
+        )
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+
+        let deletion = Task {
+            await store.deleteMessage(channelID: channelID, messageID: rootID)
+        }
+        await waitForRequests(api, path: deletePath, count: 1)
+        await store.openChannel(otherChannelID)
+
+        let deletionResult = await deletion.value
+        XCTAssertTrue(deletionResult)
+        XCTAssertEqual(store.messages.map(\.id), [otherRoot.id])
+        XCTAssertEqual(store.messages.first?.body, "Keep the newly focused channel")
+        XCTAssertNil(store.errorMessage)
+        store.applicationDidEnterBackground()
+    }
+
     private func summary(
         id: UUID,
         name: String,
@@ -1436,7 +1588,8 @@ final class ChannelsStoreTests: XCTestCase {
         reactions: [ChannelMessageReaction] = [],
         proposal: ChannelMessage.Proposal? = nil,
         executionProposal: IssueExecutionProposal? = nil,
-        skillExecutionProposal: AgentSkillExecutionProposal? = nil
+        skillExecutionProposal: AgentSkillExecutionProposal? = nil,
+        deletedAt: Date? = nil
     ) -> ChannelMessage {
         ChannelMessage(
             id: id,
@@ -1456,7 +1609,8 @@ final class ChannelsStoreTests: XCTestCase {
             proposal: proposal,
             executionProposal: executionProposal,
             skillExecutionProposal: skillExecutionProposal,
-            createdAt: createdAt
+            createdAt: createdAt,
+            deletedAt: deletedAt
         )
     }
 

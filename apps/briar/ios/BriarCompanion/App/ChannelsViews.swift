@@ -882,9 +882,6 @@ private struct ChannelConversationView: View {
                             members: channels.members,
                             message: message,
                             locale: locale,
-                            replyError: channels.failedReply(for: message.id).map {
-                                ChannelAlertPresentation.localizedReplyError($0.error, locale: locale)
-                            },
                             onAcceptProposal: { proposalID, projectID, execution in
                                 await channels.acceptProposal(
                                     channelID: channel.id,
@@ -960,6 +957,12 @@ private struct ChannelConversationView: View {
                                 )
                             },
                             onOpenAttachment: { previewFile = PreviewFile(url: $0) },
+                            onDelete: {
+                                _ = await channels.deleteMessage(
+                                    channelID: channel.id,
+                                    messageID: message.id
+                                )
+                            },
                             onToggleReaction: { emoji in
                                 await channels.toggleReaction(
                                     channelID: channel.id,
@@ -970,6 +973,9 @@ private struct ChannelConversationView: View {
                             onOpenThread: showsThreadSummary
                                 ? { onOpenThread?(message) }
                                 : nil,
+                            replyError: channels.failedReply(for: message.id).map {
+                                ChannelAlertPresentation.localizedReplyError($0.error, locale: locale)
+                            },
                             projects: projects,
                             providers: providers,
                             workers: workers,
@@ -1067,6 +1073,7 @@ private struct ChannelMessageRow: View {
     let onIssueOpen: (UUID, UUID) async -> Void
     let onLoadAttachment: @MainActor (ChannelMessageAttachment) async throws -> URL
     let onOpenAttachment: @MainActor (URL) -> Void
+    let onDelete: () async -> Void
     let onToggleReaction: (String) async -> Void
     let onOpenThread: (() -> Void)?
     let replyError: String?
@@ -1077,6 +1084,7 @@ private struct ChannelMessageRow: View {
     @State private var showingThreadActions = false
     @State private var linkCopied = false
     @State private var messageCopied = false
+    @State private var confirmingDelete = false
 
     private var mentionHandles: Set<String> {
         MessageMentions.channelHandles(
@@ -1101,6 +1109,11 @@ private struct ChannelMessageRow: View {
         case .agent: "cpu"
         case .webhook: "point.3.connected.trianglepath.dotted"
         }
+    }
+
+    private var canDelete: Bool {
+        !isOptimistic && message.deletedAt == nil &&
+            message.author.type == .user && message.author.id == currentUserID
     }
 
     var body: some View {
@@ -1277,7 +1290,7 @@ private struct ChannelMessageRow: View {
         .sheet(isPresented: $showingThreadActions) {
             ChannelMessageActionsSheet(
                 locale: locale,
-                quickEmojis: Self.quickReactionEmojis,
+                quickEmojis: message.deletedAt == nil ? Self.quickReactionEmojis : [],
                 onToggleReaction: { emoji in
                     showingThreadActions = false
                     Task { await onToggleReaction(emoji) }
@@ -1294,14 +1307,20 @@ private struct ChannelMessageRow: View {
                     ClipboardService.copy(url.absoluteString)
                     linkCopied = true
                 },
-                onCopyText: {
+                onCopyText: message.deletedAt == nil ? {
                     showingThreadActions = false
                     let copyText = messageBodyWithoutAttachments.isEmpty
                         ? message.body.trimmingCharacters(in: .whitespacesAndNewlines)
                         : messageBodyWithoutAttachments
                     ClipboardService.copy(copyText)
                     messageCopied = true
-                },
+                } : nil,
+                onDelete: canDelete ? {
+                    showingThreadActions = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        confirmingDelete = true
+                    }
+                } : nil,
                 onStartThread: onOpenThread.map { openThread in
                     {
                         showingThreadActions = false
@@ -1323,6 +1342,17 @@ private struct ChannelMessageRow: View {
             isPresented: $messageCopied,
             message: L10n.text(.messageCopied, locale: locale)
         )
+        .alert(
+            L10n.text(.channelDeleteMessage, locale: locale),
+            isPresented: $confirmingDelete
+        ) {
+            Button(L10n.text(.channelDeleteMessage, locale: locale), role: .destructive) {
+                Task { await onDelete() }
+            }
+            Button(L10n.text("취소", locale: locale), role: .cancel) {}
+        } message: {
+            Text(L10n.text(.channelDeleteMessageConfirm, locale: locale))
+        }
     }
 }
 
@@ -1385,7 +1415,8 @@ private struct ChannelMessageActionsSheet: View {
     let quickEmojis: [String]
     let onToggleReaction: (String) -> Void
     let onCopyLink: () -> Void
-    let onCopyText: () -> Void
+    let onCopyText: (() -> Void)?
+    let onDelete: (() -> Void)?
     let onStartThread: (() -> Void)?
 
     var body: some View {
@@ -1431,12 +1462,24 @@ private struct ChannelMessageActionsSheet: View {
                 action: onCopyLink
             )
 
-            actionButton(
-                title: L10n.text(.channelCopyText, locale: locale),
-                systemImage: "doc.on.doc",
-                identifier: "channel-copy-text-action",
-                action: onCopyText
-            )
+            if let onCopyText {
+                actionButton(
+                    title: L10n.text(.channelCopyText, locale: locale),
+                    systemImage: "doc.on.doc",
+                    identifier: "channel-copy-text-action",
+                    action: onCopyText
+                )
+            }
+
+            if let onDelete {
+                actionButton(
+                    title: L10n.text(.channelDeleteMessage, locale: locale),
+                    systemImage: "trash",
+                    identifier: "channel-delete-message-action",
+                    role: .destructive,
+                    action: onDelete
+                )
+            }
         }
         .padding(.horizontal, 18)
         .padding(.top, 8)
@@ -1446,9 +1489,10 @@ private struct ChannelMessageActionsSheet: View {
         title: String,
         systemImage: String,
         identifier: String,
+        role: ButtonRole? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        Button(role: role, action: action) {
             Label(title, systemImage: systemImage)
                 .font(.body.weight(.semibold))
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1661,26 +1705,33 @@ private struct ChannelAlertMessageBody: View {
     let message: ChannelMessage
     let messageBodyWithoutAttachments: String
 
+    @ViewBuilder
     var body: some View {
-        let tone = ChannelAlertPresentation.tone(from: message)
-        let content = Group {
-            if let blocks = message.blocks, !blocks.isEmpty {
-                ChannelWebhookBlocksView(blocks: blocks, locale: locale)
-            } else if let json = ChannelAlertPresentation.prettyJSON(messageBodyWithoutAttachments) {
-                ChannelCollapsibleDump(locale: locale, text: messageBodyWithoutAttachments) {
-                    SelectableText(json, style: .footnoteMono)
-                }
-            } else {
-                ChannelCollapsibleDump(locale: locale, text: messageBodyWithoutAttachments) {
-                    MentionText(text: messageBodyWithoutAttachments, handles: mentionHandles)
-                        .font(.body)
+        if message.deletedAt != nil {
+            Text(L10n.text(.channelDeletedMessage, locale: locale))
+                .font(.body.italic())
+                .foregroundStyle(.secondary)
+        } else {
+            let tone = ChannelAlertPresentation.tone(from: message)
+            let content = Group {
+                if let blocks = message.blocks, !blocks.isEmpty {
+                    ChannelWebhookBlocksView(blocks: blocks, locale: locale)
+                } else if let json = ChannelAlertPresentation.prettyJSON(messageBodyWithoutAttachments) {
+                    ChannelCollapsibleDump(locale: locale, text: messageBodyWithoutAttachments) {
+                        SelectableText(json, style: .footnoteMono)
+                    }
+                } else {
+                    ChannelCollapsibleDump(locale: locale, text: messageBodyWithoutAttachments) {
+                        MentionText(text: messageBodyWithoutAttachments, handles: mentionHandles)
+                            .font(.body)
+                    }
                 }
             }
-        }
-        if let tone {
-            ChannelAlertCard(locale: locale, tone: tone) { content }
-        } else {
-            content
+            if let tone {
+                ChannelAlertCard(locale: locale, tone: tone) { content }
+            } else {
+                content
+            }
         }
     }
 }

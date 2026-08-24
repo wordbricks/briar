@@ -61,6 +61,7 @@ import type {
   ChannelMessage,
   ChannelMessageAttachment,
   ChannelMessageDocumentContent,
+  DeleteChannelMessageResponse,
   ChannelExecutionProposal,
   ChannelSummary,
   ChannelVisibility,
@@ -1682,6 +1683,19 @@ export async function sendChannelMessage(
     `/organizations/${organizationId}/channels/${channelId}/messages`,
     token,
     { method: "POST", body },
+  );
+}
+
+export async function deleteChannelMessage(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  messageId: string,
+) {
+  return request<DeleteChannelMessageResponse>(
+    `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}`,
+    token,
+    { method: "DELETE" },
   );
 }
 

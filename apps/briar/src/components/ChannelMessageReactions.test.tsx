@@ -117,4 +117,40 @@ describe("ChannelMessageReactions", () => {
     });
     expect(onToggle).toHaveBeenCalledWith("👍");
   });
+
+  it("offers deletion only when the owning message row grants the action", async () => {
+    const onDelete = vi.fn();
+    await act(async () => {
+      root.render(
+        <TooltipProvider delayDuration={0}>
+          <ChannelMessageReactions
+            currentUserId="user-jay"
+            message={message([])}
+            onDelete={onDelete}
+            onToggle={vi.fn()}
+            showHoverActions
+          />
+        </TooltipProvider>,
+      );
+    });
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      '[aria-label="더 보기"]',
+    );
+    expect(trigger).not.toBeNull();
+    await act(async () => {
+      trigger?.dispatchEvent(new PointerEvent("pointerdown", {
+        bubbles: true,
+        button: 0,
+      }));
+    });
+    const deleteItem = Array.from(
+      document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    ).find((item) => /메시지 삭제|Delete message/u.test(item.textContent ?? ""));
+    expect(deleteItem).not.toBeUndefined();
+    await act(async () => {
+      deleteItem?.click();
+    });
+    expect(onDelete).toHaveBeenCalledOnce();
+  });
 });

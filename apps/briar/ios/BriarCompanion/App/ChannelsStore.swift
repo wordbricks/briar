@@ -990,6 +990,77 @@ final class ChannelsStore: ObservableObject {
         }
     }
 
+    func deleteMessage(channelID: UUID, messageID: UUID) async -> Bool {
+        guard let organizationID, let token, focusedChannelID == channelID else {
+            return false
+        }
+        guard let deletionTarget = messages.first(where: { $0.id == messageID }) ??
+                thread.first(where: { $0.id == messageID })
+        else { return false }
+        let expectedGeneration = generation
+        let expectedFocusRevision = authoritativeLoadRevision
+        let expectedThreadParentID = focusedThreadParentID
+        let expectedParentMessageID = deletionTarget.parentMessageId
+        let focusIsCurrent = {
+            expectedGeneration == self.generation &&
+                expectedFocusRevision == self.authoritativeLoadRevision &&
+                self.focusedChannelID == channelID &&
+                self.focusedThreadParentID == expectedThreadParentID
+        }
+        do {
+            let response: DeleteChannelMessageResponse = try await api.send(
+                MobileAPIContract.Endpoint.channelMessage(
+                    organizationID: organizationID,
+                    channelID: channelID,
+                    messageID: messageID
+                ),
+                method: "DELETE",
+                token: token,
+                body: nil,
+                as: DeleteChannelMessageResponse.self
+            )
+            guard response.message?.channelId == nil ||
+                    (response.message?.channelId == channelID &&
+                        response.message?.id == messageID &&
+                        response.message?.parentMessageId == nil),
+                  response.parentMessage?.channelId == nil ||
+                    (response.parentMessage?.channelId == channelID &&
+                        response.parentMessage?.id == expectedParentMessageID &&
+                        response.parentMessage?.parentMessageId == nil)
+            else { throw MobileAPIError.invalidResponse }
+            guard focusIsCurrent() else { return response.deleted }
+            let updates = [response.message, response.parentMessage].compactMap { $0 }
+            let removed = response.deleted && response.message == nil
+                ? Set([messageID])
+                : Set<UUID>()
+            let messageIDs = Set(messages.map(\.id))
+            let threadIDs = Set(thread.map(\.id))
+            messages = Self.mergeMessages(
+                messages,
+                updates: updates.filter { messageIDs.contains($0.id) },
+                removing: removed
+            )
+            thread = Self.mergeMessages(
+                thread,
+                updates: updates.filter { threadIDs.contains($0.id) },
+                removing: removed
+            )
+            agentReplies.removeAll {
+                response.deleted &&
+                    ($0.triggerMessageId == messageID || $0.replyMessageId == messageID)
+            }
+            updateCachedThreads(with: updates, removing: removed)
+            cacheFocusedConversation()
+            cacheFocusedThread()
+            errorMessage = nil
+            return response.deleted
+        } catch {
+            guard focusIsCurrent() else { return false }
+            errorMessage = CompanionStore.message(for: error)
+            return false
+        }
+    }
+
     /// Downloads a channel message attachment for previewing.
     func download(path: String, filename: String) async throws -> URL {
         guard let token else { throw MobileAPIError.invalidRequest }

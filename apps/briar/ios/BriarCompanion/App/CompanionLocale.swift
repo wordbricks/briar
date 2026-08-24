@@ -777,6 +777,9 @@ enum L10n {
         case channelReact
         case channelReactWith
         case channelCopyText
+        case channelDeleteMessage
+        case channelDeleteMessageConfirm
+        case channelDeletedMessage
         case channelMessagePlaceholder
         case channelAgentTyping
         case channelHome
@@ -833,6 +836,9 @@ enum L10n {
             case .channelReact: "React"
             case .channelReactWith: "%@ 리액션"
             case .channelCopyText: "텍스트 복사"
+            case .channelDeleteMessage: "메시지 삭제"
+            case .channelDeleteMessageConfirm: "이 메시지를 삭제할까요? 답글이 있는 원문은 삭제 표시로 남아 스레드를 유지합니다."
+            case .channelDeletedMessage: "삭제된 메시지입니다."
             case .channelMessagePlaceholder: "#%@에 메시지 보내기"
             case .channelAgentTyping: "%@님이 답변을 작성하고 있습니다…"
             case .channelHome: "홈"
@@ -892,6 +898,9 @@ enum L10n {
             case .channelReact: "React"
             case .channelReactWith: "React with %@"
             case .channelCopyText: "Copy text"
+            case .channelDeleteMessage: "Delete message"
+            case .channelDeleteMessageConfirm: "Delete this message? A root with replies will remain as a deleted-message marker so the thread stays available."
+            case .channelDeletedMessage: "This message was deleted."
             case .channelMessagePlaceholder: "Message #%@"
             case .channelAgentTyping: "%@ is writing a reply…"
             case .channelHome: "Home"
@@ -951,6 +960,9 @@ enum L10n {
             case .channelReact: "React"
             case .channelReactWith: "用 %@ 回应"
             case .channelCopyText: "复制文本"
+            case .channelDeleteMessage: "删除消息"
+            case .channelDeleteMessageConfirm: "要删除这条消息吗？如果主消息仍有回复，将保留删除标记以维持话题结构。"
+            case .channelDeletedMessage: "这条消息已删除。"
             case .channelMessagePlaceholder: "发送消息到 #%@"
             case .channelAgentTyping: "%@ 正在撰写回复…"
             case .channelHome: "主页"

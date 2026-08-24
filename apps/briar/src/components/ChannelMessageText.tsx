@@ -40,6 +40,7 @@ import {
   MarkdownContent,
   defaultMarkdownUrlTransform,
 } from "./MarkdownContent";
+import { useI18n } from "../i18n";
 
 /** Converts the small Slack mrkdwn subset accepted by webhook blocks to GFM. */
 export function slackMrkdwnToMarkdown(value: string) {
@@ -212,6 +213,7 @@ export const ChannelMessageText = memo(function ChannelMessageText({
   members: readonly ChannelMember[];
   message: ChannelMessage;
 }) {
+  const { t } = useI18n();
   const [profile, setProfile] = useState<ProfileTarget | null>(null);
   const profilesByHandle = useMemo(() => {
     const profiles = new Map<string, ProfileTarget>();
@@ -247,6 +249,10 @@ export const ChannelMessageText = memo(function ChannelMessageText({
   );
   const body = channelBodyWithoutImages(message.body);
   const tone = channelAlertToneFromMessage(message);
+
+  if (message.deletedAt) {
+    return <p className="channel-message-deleted">{t("channel.deletedMessage")}</p>;
+  }
 
   if (message.blocks?.length) {
     return <ChannelMessageBlocks blocks={message.blocks} tone={tone} />;

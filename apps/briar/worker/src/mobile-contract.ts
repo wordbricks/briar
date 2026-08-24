@@ -685,6 +685,7 @@ export const mobileChannelMessageSchema = mutableStruct({
   ),
   subscribers: optional(mutableArray(mobileIssueSubscriberSchema)),
   createdAt: isoDateTime,
+  deletedAt: optionalNullable(isoDateTime),
 });
 
 export const mobileChannelsResponseSchema = mutableStruct({
@@ -754,6 +755,12 @@ export const mobileToggleChannelMessageReactionRequestSchema = mutableStruct({
 
 export const mobileToggleChannelMessageReactionResponseSchema = mutableStruct({
   message: mobileChannelMessageSchema,
+});
+
+export const mobileDeleteChannelMessageResponseSchema = mutableStruct({
+  deleted: Schema.Boolean,
+  message: nullable(mobileChannelMessageSchema),
+  parentMessage: nullable(mobileChannelMessageSchema),
 });
 
 export const mobileChannelThreadSubscriptionResponseSchema = mutableStruct({
@@ -1302,6 +1309,9 @@ export const mobileOperationSchemas = {
   createChannelMessage: {
     request: mobileCreateChannelMessageRequestSchema,
     response: mobileCreateChannelMessageResponseSchema,
+  },
+  deleteChannelMessage: {
+    response: mobileDeleteChannelMessageResponseSchema,
   },
   toggleChannelMessageReaction: {
     request: mobileToggleChannelMessageReactionRequestSchema,

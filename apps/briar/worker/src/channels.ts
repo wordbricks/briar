@@ -69,6 +69,7 @@ export type ChannelMessageRow = {
   webhook_event_id: string | null;
   body: string;
   blocks_json: string | null;
+  deleted_at: string | null;
   reply_count: number;
   last_reply_at: string | null;
   document_message_id: string | null;
@@ -329,7 +330,7 @@ const messageSelect = (
          message.author_agent_provider, agent.avatar as author_agent_image,
          message.author_webhook_id,
          message.author_webhook_name, message.webhook_event_id, message.body,
-         message.blocks_json,
+         message.blocks_json, message.deleted_at,
          (select count(*) from briar_channel_messages reply
           where reply.parent_message_id = message.id) as reply_count,
          (select max(reply.created_at) from briar_channel_messages reply
@@ -605,26 +606,26 @@ export const channelMessageJson = (
   channelId: row.channel_id,
   parentMessageId: row.parent_message_id,
   author: channelMessageAuthorJson(row),
-  body: row.body,
-  blocks: row.blocks_json
+  body: row.deleted_at ? "[deleted]" : row.body,
+  blocks: !row.deleted_at && row.blocks_json
     ? JSON.parse(row.blocks_json) as ChannelMessageBlock[]
     : null,
-  mentionedUserIds: mentions.users,
-  mentionedAgentIds: mentions.agents,
-  attachments,
-  reactions,
+  mentionedUserIds: row.deleted_at ? [] : mentions.users,
+  mentionedAgentIds: row.deleted_at ? [] : mentions.agents,
+  attachments: row.deleted_at ? [] : attachments,
+  reactions: row.deleted_at ? [] : reactions,
   replyCount: row.reply_count,
   lastReplyAt: row.last_reply_at,
   replyAuthors,
   subscribers,
-  document: row.document_message_id
+  document: !row.deleted_at && row.document_message_id
     ? {
         messageId: row.document_message_id,
         title: row.document_title ?? "",
         projectId: row.document_project_id,
       }
     : null,
-  proposal: row.proposal_id
+  proposal: !row.deleted_at && row.proposal_id
     ? {
         id: row.proposal_id,
         actionType: row.proposal_action_type ?? "request_issue_create",
@@ -637,9 +638,12 @@ export const channelMessageJson = (
         resultRunId: row.proposal_result_run_id,
     }
     : null,
-  executionProposal: channelExecutionProposalJson(row),
-  skillExecutionProposal: channelSkillExecutionProposalJson(row),
+  executionProposal: row.deleted_at ? null : channelExecutionProposalJson(row),
+  skillExecutionProposal: row.deleted_at
+    ? null
+    : channelSkillExecutionProposalJson(row),
   createdAt: row.created_at,
+  deletedAt: row.deleted_at,
 });
 
 /** One grapheme emoji, same rule as Worker icons so flags and ZWJ stay valid. */
@@ -1604,7 +1608,7 @@ export async function toggleChannelMessageReaction(
   },
 ) {
   const message = await getChannelMessage(db, input.channelId, input.messageId);
-  if (!message) return null;
+  if (!message || message.deletedAt) return null;
 
   const existing = await db
     .prepare(
@@ -1866,6 +1870,278 @@ export async function getChannelMessage(
   if (!row) return null;
   const [message] = await attachMessageRelations(db, [row]);
   return message ?? null;
+}
+
+type ChannelMessageDeletionTarget = {
+  id: string;
+  parent_message_id: string | null;
+  deleted_at: string | null;
+  can_delete: number;
+};
+
+async function getChannelMessageDeletionTarget(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    channelId: string;
+    messageId: string;
+    userId: string;
+  },
+) {
+  return db.prepare(
+    `select message.id, message.parent_message_id, message.deleted_at,
+            case when message.author_user_id = ?
+              or exists (
+                select 1 from briar_organization_members membership
+                where membership.organization_id = channel.organization_id
+                  and membership.user_id = ?
+                  and membership.role in ('owner', 'admin')
+              )
+              or exists (
+                select 1 from briar_channel_members membership
+                where membership.channel_id = channel.id
+                  and membership.user_id = ? and membership.role = 'owner'
+              ) then 1 else 0 end as can_delete
+     from briar_channel_messages message
+     join briar_channels channel on channel.id = message.channel_id
+     where channel.organization_id = ? and channel.id = ? and message.id = ?`,
+  ).bind(
+    input.userId,
+    input.userId,
+    input.userId,
+    input.organizationId,
+    input.channelId,
+    input.messageId,
+  ).first<ChannelMessageDeletionTarget>();
+}
+
+export type DeleteChannelMessageOutcome = {
+  outcome: "deleted" | "already_deleted" | "not_found" | "forbidden";
+  message: ChannelMessage | null;
+  parentMessage: ChannelMessage | null;
+};
+
+/**
+ * Delete one message without collapsing a live thread. Root messages with
+ * replies become scrubbed tombstones; standalone messages and replies are
+ * removed. Every mutating statement repeats the permission predicate so a
+ * role change between the route check and the atomic batch cannot authorize a
+ * stale request.
+ */
+export async function deleteChannelMessage(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    channelId: string;
+    messageId: string;
+    userId: string;
+    deletedAt: string;
+  },
+): Promise<DeleteChannelMessageOutcome> {
+  const target = await getChannelMessageDeletionTarget(db, input);
+  if (!target) {
+    return { outcome: "not_found", message: null, parentMessage: null };
+  }
+  if (!target.can_delete) {
+    return { outcome: "forbidden", message: null, parentMessage: null };
+  }
+  if (target.deleted_at) {
+    return {
+      outcome: "already_deleted",
+      message: await getChannelMessage(db, input.channelId, input.messageId),
+      parentMessage: null,
+    };
+  }
+
+  const authorizedTarget = `exists (
+    select 1 from briar_channel_messages target
+    join briar_channels channel on channel.id = target.channel_id
+    where target.id = ? and target.channel_id = ?
+      and channel.organization_id = ? and target.deleted_at is null
+      and (
+        target.author_user_id = ?
+        or exists (
+          select 1 from briar_organization_members membership
+          where membership.organization_id = channel.organization_id
+            and membership.user_id = ?
+            and membership.role in ('owner', 'admin')
+        )
+        or exists (
+          select 1 from briar_channel_members membership
+          where membership.channel_id = channel.id
+            and membership.user_id = ? and membership.role = 'owner'
+        )
+      )
+  )`;
+  const authorizationBindings = () => [
+    input.messageId,
+    input.channelId,
+    input.organizationId,
+    input.userId,
+    input.userId,
+    input.userId,
+  ] as const;
+  const statements = [
+    db.prepare(
+      `insert into briar_archive_cleanup_queue (
+         bucket, object_key, project_id, run_id, queued_at
+       )
+       select 'attachments', attachment.object_key,
+              'channel:' || attachment.channel_id, null, ?
+       from briar_channel_message_attachments attachment
+       where attachment.organization_id = ? and attachment.channel_id = ?
+         and attachment.message_id = ? and ${authorizedTarget}
+       on conflict (bucket, object_key) do update set
+         project_id = excluded.project_id,
+         run_id = excluded.run_id,
+         queued_at = excluded.queued_at,
+         attempts = 0,
+         last_attempt_at = null,
+         last_error = null,
+         generation = briar_archive_cleanup_queue.generation + 1,
+         next_attempt_at = null,
+         dead_lettered_at = null,
+         alert_state = 'none',
+         alert_detail_json = null`,
+    ).bind(
+      input.deletedAt,
+      input.organizationId,
+      input.channelId,
+      input.messageId,
+      ...authorizationBindings(),
+    ),
+    db.prepare(
+      `update briar_issue_execution_proposals
+       set status = 'invalidated', generation = generation + 1, updated_at = ?
+       where source_kind = 'channel' and status = 'pending'
+         and (trigger_message_id = ? or reply_message_id = ?)
+         and ${authorizedTarget}`,
+    ).bind(
+      input.deletedAt,
+      input.messageId,
+      input.messageId,
+      ...authorizationBindings(),
+    ),
+    db.prepare(
+      `update briar_agent_skill_execution_proposals
+       set status = 'invalidated', generation = generation + 1, updated_at = ?
+       where source_kind = 'channel' and status = 'pending'
+         and (trigger_message_id = ? or reply_message_id = ?)
+         and ${authorizedTarget}`,
+    ).bind(
+      input.deletedAt,
+      input.messageId,
+      input.messageId,
+      ...authorizationBindings(),
+    ),
+    db.prepare(
+      `delete from briar_channel_action_proposals
+       where channel_id = ? and status = 'pending'
+         and (trigger_message_id = ? or reply_message_id = ?)
+         and ${authorizedTarget}`,
+    ).bind(
+      input.channelId,
+      input.messageId,
+      input.messageId,
+      ...authorizationBindings(),
+    ),
+    db.prepare(
+      `delete from briar_channel_agent_reply_jobs
+       where channel_id = ?
+         and (trigger_message_id = ? or reply_message_id = ?)
+         and ${authorizedTarget}`,
+    ).bind(
+      input.channelId,
+      input.messageId,
+      input.messageId,
+      ...authorizationBindings(),
+    ),
+    ...[
+      "briar_channel_message_mentions",
+      "briar_channel_message_agent_mentions",
+      "briar_channel_message_reactions",
+      "briar_channel_message_documents",
+      "briar_channel_message_attachments",
+    ].map((table) => db.prepare(
+      `delete from ${table} where message_id = ? and ${authorizedTarget}`,
+    ).bind(input.messageId, ...authorizationBindings())),
+    db.prepare(
+      `update briar_channel_messages
+       set body = '[deleted]', blocks_json = null, deleted_at = ?, updated_at = ?
+       where id = ? and channel_id = ? and parent_message_id is null
+         and deleted_at is null
+         and exists (
+           select 1 from briar_channel_messages reply
+           where reply.parent_message_id = briar_channel_messages.id
+         )
+         and ${authorizedTarget}
+       returning id`,
+    ).bind(
+      input.deletedAt,
+      input.deletedAt,
+      input.messageId,
+      input.channelId,
+      ...authorizationBindings(),
+    ),
+    db.prepare(
+      `update briar_channel_messages
+       set updated_at = ?
+       where id = (
+         select parent_message_id from briar_channel_messages target
+         where target.id = ? and target.channel_id = ?
+       ) and ${authorizedTarget}`,
+    ).bind(
+      input.deletedAt,
+      input.messageId,
+      input.channelId,
+      ...authorizationBindings(),
+    ),
+    db.prepare(
+      `delete from briar_channel_messages
+       where id = ? and channel_id = ? and deleted_at is null
+         and (
+           parent_message_id is not null
+           or not exists (
+             select 1 from briar_channel_messages reply
+             where reply.parent_message_id = briar_channel_messages.id
+           )
+         )
+         and ${authorizedTarget}
+       returning id`,
+    ).bind(
+      input.messageId,
+      input.channelId,
+      ...authorizationBindings(),
+    ),
+  ];
+  const tombstoneResultIndex = statements.length - 3;
+  const deleteResultIndex = statements.length - 1;
+  const results = await db.batch(statements);
+  const deleted =
+    (results[tombstoneResultIndex]?.results?.length ?? 0) > 0 ||
+    (results[deleteResultIndex]?.results?.length ?? 0) > 0;
+
+  if (!deleted) {
+    const current = await getChannelMessageDeletionTarget(db, input);
+    if (current && !current.can_delete && !current.deleted_at) {
+      return { outcome: "forbidden", message: null, parentMessage: null };
+    }
+    return {
+      outcome: current?.deleted_at ? "already_deleted" : "not_found",
+      message: current
+        ? await getChannelMessage(db, input.channelId, input.messageId)
+        : null,
+      parentMessage: null,
+    };
+  }
+
+  return {
+    outcome: "deleted",
+    message: await getChannelMessage(db, input.channelId, input.messageId),
+    parentMessage: target.parent_message_id
+      ? await getChannelMessage(db, input.channelId, target.parent_message_id)
+      : null,
+  };
 }
 
 /**

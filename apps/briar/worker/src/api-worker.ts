@@ -219,6 +219,8 @@ async function route(
     auth,
     db,
     attachmentsBucket,
+    env,
+    context,
   });
   if (channelMessageResponse !== undefined) return channelMessageResponse;
 
