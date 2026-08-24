@@ -85,6 +85,29 @@ const normalizedEvent = (payload: unknown): NormalizedEvent | null => {
 };
 
 const string = (value: unknown) => typeof value === "string" ? value : null;
+
+/**
+ * Streaming deltas are projected into the recoverable D1 work log, but are not
+ * independently useful in the durable raw archive. Terminal snapshots contain
+ * the complete message/tool body, while an interrupted turn is recovered from
+ * the work-log projection. Keeping every other payload preserves user input,
+ * tool boundaries/results, state transitions, and provider audit records.
+ */
+export const retainedRawTranscriptEvents = (events: TranscriptEventInput[]) =>
+  events.filter((item) => {
+    const event = normalizedEvent(item.payload);
+    if (event?.type === "messageDelta" || event?.type === "activityDelta") {
+      return false;
+    }
+    const envelope = record(item.payload);
+    const raw = record(envelope?.raw);
+    const update = record(raw?.update);
+    const sessionUpdate = string(update?.sessionUpdate);
+    // Older Grok payloads may have no normalized event, but their chunk name
+    // still identifies append-only text/thought streaming unambiguously.
+    return sessionUpdate === null || !sessionUpdate.endsWith("_chunk");
+  });
+
 const boundedWorkLogText = (value: string) => {
   const bytes = utf8Bytes(value);
   return bytes.byteLength <= MAX_TRANSCRIPT_PAYLOAD_BYTES
@@ -639,14 +662,17 @@ export async function ingestAgentTranscript(
 ) {
   validateEvents(input.events);
   await ensureTranscriptSession(db, projectId, input);
-  const segment = await storeRawSegment(
-    db,
-    bucket,
-    input.sessionId,
-    projectId,
-    input.events,
-    input.observedAt,
-  );
+  const retainedEvents = retainedRawTranscriptEvents(input.events);
+  const segment = retainedEvents.length > 0
+    ? await storeRawSegment(
+      db,
+      bucket,
+      input.sessionId,
+      projectId,
+      retainedEvents,
+      input.observedAt,
+    )
+    : null;
   const projected = await projectWorkLog(
     db,
     input.sessionId,
@@ -655,9 +681,9 @@ export async function ingestAgentTranscript(
   );
   return {
     sessionId: input.sessionId,
-    stored: segment.stored ? input.events.length : 0,
-    storedBytes: segment.stored ? segment.row.uncompressed_bytes : 0,
-    compressedBytes: segment.stored ? segment.row.compressed_bytes : 0,
+    stored: segment?.stored ? retainedEvents.length : 0,
+    storedBytes: segment?.stored ? segment.row.uncompressed_bytes : 0,
+    compressedBytes: segment?.stored ? segment.row.compressed_bytes : 0,
     projected,
     pruned: [] as string[],
   };
