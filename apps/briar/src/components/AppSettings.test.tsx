@@ -222,6 +222,53 @@ describe("AppSettings", () => {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   });
 
+  it("shows notification sound enabled by default and persists an opt-out", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <AppSettings
+            error={null}
+            initialSection="notifications"
+            isSidebarOpen
+            loading={false}
+            onBack={() => undefined}
+            onRefresh={() => Promise.resolve(readiness)}
+            projectId="project-1"
+            projectName="Briar"
+            readiness={readiness}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    const soundToggle = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Play sound"]',
+    );
+    expect(
+      soundToggle?.getAttribute("data-state") ??
+        soundToggle?.getAttribute("aria-checked"),
+    ).toMatch(/checked|true/);
+
+    await act(async () => soundToggle?.click());
+
+    expect(
+      window.localStorage.getItem(
+        "briar.settings.inbox-notification-sound.v1",
+      ),
+    ).toBe("false");
+    expect(
+      soundToggle?.getAttribute("data-state") ??
+        soundToggle?.getAttribute("aria-checked"),
+    ).toMatch(/unchecked|false/);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("checks ego (lite) and installs agent-browser from Browser settings", async () => {
     vi.mocked(loadBrowserAutomationSettings).mockResolvedValue({
       provider: "ego-browser",

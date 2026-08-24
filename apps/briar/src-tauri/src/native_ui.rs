@@ -58,11 +58,12 @@ pub(super) fn show_inbox_notification(
     title: String,
     body: String,
     target: InboxNotificationTarget,
+    play_sound: bool,
 ) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let _ = app;
-        macos_inbox_notifications::show(title, body, target)
+        macos_inbox_notifications::show(title, body, target, play_sound)
     }
 
     #[cfg(all(desktop, not(target_os = "macos")))]
@@ -70,6 +71,16 @@ pub(super) fn show_inbox_notification(
         std::thread::spawn(move || {
             let mut notification = notify_rust::Notification::new();
             notification.summary(&title).body(&body).auto_icon();
+            #[cfg(unix)]
+            if play_sound {
+                notification.sound_name("message-new-instant");
+            } else {
+                notification.hint(notify_rust::Hint::SuppressSound(true));
+            }
+            #[cfg(windows)]
+            if play_sound {
+                notification.sound_name("Default");
+            }
             #[cfg(unix)]
             notification.action("default", "Open");
             #[cfg(windows)]
@@ -119,7 +130,7 @@ pub(super) fn show_inbox_notification(
     }
     #[cfg(mobile)]
     {
-        let _ = (app, title, body, target);
+        let _ = (app, title, body, target, play_sound);
         Err("Desktop inbox notifications are unavailable on mobile".to_string())
     }
 }

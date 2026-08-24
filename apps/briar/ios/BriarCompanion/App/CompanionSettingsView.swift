@@ -116,6 +116,15 @@ struct CompanionSettingsView: View {
                 }
 
                 Section {
+                    Toggle(isOn: soundPreferenceBinding) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.text(.notificationSound, locale: locale))
+                            Text(L10n.text(.notificationSoundDescription, locale: locale))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("notification-sound-toggle")
                     ForEach(InboxCategory.allCases) { category in
                         Toggle(category.title(locale: locale), isOn: preferenceBinding(category))
                             .accessibilityIdentifier("notification-toggle-\(category.rawValue)")
@@ -162,6 +171,17 @@ struct CompanionSettingsView: View {
                 if enabled {
                     Task { _ = await notifications.requestAuthorizationIfNeeded() }
                 }
+            }
+        )
+    }
+
+    private var soundPreferenceBinding: Binding<Bool> {
+        Binding(
+            get: { notifications.preferences.playSound },
+            set: { enabled in
+                var next = notifications.preferences
+                next.playSound = enabled
+                notifications.updatePreferences(next)
             }
         )
     }

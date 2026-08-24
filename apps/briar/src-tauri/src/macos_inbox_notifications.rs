@@ -13,7 +13,7 @@ use objc2_foundation::{NSBundle, NSError, NSObject, NSObjectProtocol, NSString};
 use objc2_user_notifications::{
     UNAuthorizationOptions, UNMutableNotificationContent, UNNotification,
     UNNotificationDefaultActionIdentifier, UNNotificationPresentationOptions,
-    UNNotificationRequest, UNNotificationResponse, UNUserNotificationCenter,
+    UNNotificationRequest, UNNotificationResponse, UNNotificationSound, UNUserNotificationCenter,
     UNUserNotificationCenterDelegate,
 };
 use tauri::{AppHandle, Emitter, Manager};
@@ -91,7 +91,8 @@ define_class!(
             _notification: &UNNotification,
             completion_handler: &DynBlock<dyn Fn(UNNotificationPresentationOptions)>,
         ) {
-            completion_handler.call((UNNotificationPresentationOptions::Banner,));
+            completion_handler.call((UNNotificationPresentationOptions::Banner
+                | UNNotificationPresentationOptions::Sound,));
         }
 
         #[unsafe(method(userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:))]
@@ -157,6 +158,7 @@ pub(crate) fn show(
     title: String,
     body: String,
     target: InboxNotificationTarget,
+    play_sound: bool,
 ) -> Result<(), String> {
     let center = notification_center()?;
     let identifier = notification_id(&target)?;
@@ -164,6 +166,10 @@ pub(crate) fn show(
     content.setTitle(&NSString::from_str(&title));
     content.setBody(&NSString::from_str(&body));
     content.setThreadIdentifier(&NSString::from_str("briar-inbox"));
+    if play_sound {
+        let sound = UNNotificationSound::defaultSound();
+        content.setSound(Some(&sound));
+    }
     let request = UNNotificationRequest::requestWithIdentifier_content_trigger(
         &NSString::from_str(&identifier),
         &content,
