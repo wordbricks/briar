@@ -120,6 +120,17 @@ if (remoteDesktop.includes("-fg")) {
   fail("Debian 13 Xtigervnc does not support the -fg option");
 }
 
+const remoteDesktopVerifier = await text(
+  join(image, "verify-remote-desktop"),
+);
+if (
+  !remoteDesktopVerifier.includes("awk '{print $4}'") ||
+  !remoteDesktopVerifier.includes('"127.0.0.1:${expected_port}"') ||
+  !remoteDesktopVerifier.includes('"[::1]:${expected_port}"')
+) {
+  fail("remote desktop verification must inspect only local listener addresses");
+}
+
 const cleanup = await text(join(image, "prepare-image-for-capture"));
 const verifier = await text(join(image, "verify-managed-image"));
 for (const forbidden of [
