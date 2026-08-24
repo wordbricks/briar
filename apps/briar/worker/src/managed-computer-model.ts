@@ -304,7 +304,7 @@ export function managedComputerJson(row: ManagedComputerRow) {
       ? { code: row.error_code, message: row.error_detail ?? row.error_code }
       : null,
     retryCount: row.retry_count,
-    retryAvailable: row.state === "failed" && row.retry_count < 3,
+    retryAvailable: row.state === "failed",
     createdAt: row.created_at,
     expiresAt: row.expires_at,
     updatedAt: row.updated_at,

@@ -139,7 +139,7 @@ describe("managed computer repository", () => {
     expect(rejected).toBeNull();
   });
 
-  it("enforces lifecycle transitions and limits retries to a new idempotent job", async () => {
+  it("enforces lifecycle transitions and keeps unlimited manual retries idempotent", async () => {
     await expect(db.prepare(
       `update briar_managed_computers set state = 'ready'
        where id = '33333333-3333-4333-8333-333333333333'`,
@@ -207,11 +207,45 @@ describe("managed computer repository", () => {
       state: "requested",
       retry_count: 1,
       provisioning_job_id: "77777777-7777-4777-8777-777777777777",
-      aws_account_id: null,
-      aws_instance_id: null,
-      aws_volume_id: null,
+      aws_account_id: "123456789012",
+      aws_instance_id: "i-0123456789abcdef0",
+      aws_volume_id: "vol-0123456789abcdef0",
       aws_launch_template_version: "8",
       bootstrap_api_origin: "https://briar-new.example",
+    });
+
+    for (const attempt of [3, 4, 5]) {
+      await db.prepare(
+        `update briar_managed_computers set state = 'failed'
+         where id = '33333333-3333-4333-8333-333333333333'`,
+      ).run();
+      const nextRetry = await createManagedComputerRetry(db, {
+        managedComputerId: "33333333-3333-4333-8333-333333333333",
+        organizationId,
+        actorUserId: userId,
+        requestId: `retry-request-${attempt}`,
+        provisioningJobId: `retry-job-${attempt}`,
+        workflowInstanceId: `managed-computer-retry-${attempt}`,
+        enrollmentExpiresAt: `2026-08-22T00:${35 + attempt}:00.000Z`,
+        region: "us-east-1",
+        instanceType: "m7i.large",
+        launchTemplateId: "lt-0123456789abcdef0",
+        launchTemplateVersion: "8",
+        bootstrapApiOrigin: "https://briar-new.example",
+        observedAt: `2026-08-22T00:0${attempt}:00.000Z`,
+      });
+      expect(nextRetry).toMatchObject({
+        created: true,
+        job: { attempt },
+      });
+    }
+    expect(await managedComputerById(
+      db,
+      "33333333-3333-4333-8333-333333333333",
+    )).toMatchObject({
+      state: "requested",
+      retry_count: 4,
+      provisioning_job_id: "retry-job-5",
     });
   });
 });
