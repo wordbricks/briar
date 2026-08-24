@@ -423,7 +423,7 @@ final class MobileAPIContractTests: XCTestCase {
                 #"""
                 [
                   {"type":"header","text":{"type":"plain_text","text":"Deploy complete"}},
-                  {"type":"section","expand":true,"text":{"type":"mrkdwn","text":"*Production* is healthy."}},
+                  {"type":"section","text":{"type":"mrkdwn","text":"*Production* is healthy."}},
                   {"type":"divider"},
                   {"type":"markdown","text":"- [x] Health checks"},
                   {
@@ -448,7 +448,6 @@ final class MobileAPIContractTests: XCTestCase {
 
         XCTAssertEqual(blocks.map(\.type), [.header, .section, .divider, .markdown, .richText])
         XCTAssertEqual(blocks[1].textObject?.type, .markdown)
-        XCTAssertEqual(blocks[1].expand, true)
         XCTAssertEqual(blocks[3].markdownText, "- [x] Health checks")
         XCTAssertEqual(blocks[4].richTextElements?.first?.sections?.first?.elements.first?.text, "Monitor metrics")
         XCTAssertEqual(blocks[4].richTextElements?.first?.sections?.first?.elements.first?.style?.bold, true)
