@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.157",
+        date: "2026년 8월 24일",
+        title: "Worker 업데이트와 원격 화면 연결을 더 안정적으로 이어갑니다",
+        summary:
+          "Worker handoff 지시를 놓치지 않고, 관리형 컴퓨터 원격 화면의 끊긴 연결을 복구하며, 라이트·다크 Sidebar의 대비와 접근성을 다듬습니다.",
+        items: [
+          "Worker heartbeat에 서버 업데이트 지시를 보존해 실행 중인 Provider 세션을 안전하게 중단하고 계획된 handoff를 시작할 수 있도록 했습니다.",
+          "관리형 컴퓨터 원격 relay에 heartbeat와 자동 응답을 추가하고, 60초 동안 응답하지 않는 half-open 연결과 오래된 소켓을 정리해 화면 연결이 계속 이어지도록 했습니다.",
+          "라이트·다크 Sidebar의 foreground·hover·active·disabled·focus·border 상태를 semantic token으로 통일하고, reduced-transparency와 브라우저 fallback 대비를 보강했습니다.",
+        ],
+      },
+      {
         version: "1.2.156",
         date: "2026년 8월 24일",
         title: "바쁜 Worker에서도 DM 답변과 원격 컴퓨터 연결을 이어갑니다",
@@ -1072,6 +1084,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.157",
+        date: "August 24, 2026",
+        title: "Make Worker handoffs and remote screens more dependable",
+        summary:
+          "Preserve Worker update directives, recover half-open managed-computer remote connections, and strengthen Sidebar contrast across light and dark themes.",
+        items: [
+          "Preserve server update directives in Worker heartbeats so active provider sessions can stop safely and enter the planned handoff flow.",
+          "Add heartbeats and automatic responses to the managed-computer remote relay, replacing connections that stop responding for 60 seconds and ignoring stale relay sockets.",
+          "Unify light and dark Sidebar foreground, hover, active, disabled, focus, and border states with semantic tokens, including stronger reduced-transparency and browser fallback contrast.",
+        ],
+      },
       {
         version: "1.2.156",
         date: "August 24, 2026",
@@ -2206,7 +2230,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-156">
+          <a href="#v1-2-157">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2228,7 +2252,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.156"
+                      entry.version === "1.2.157"
+                        ? "2026-08-24"
+                        : entry.version === "1.2.156"
                         ? "2026-08-24"
                         : entry.version === "1.2.155"
                         ? "2026-08-24"
