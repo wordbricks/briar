@@ -30,6 +30,21 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.153",
+        date: "2026년 8월 24일",
+        title: "데스크톱 투명 사이드바와 채널·모바일 협업을 더 안정적으로 다듬습니다",
+        summary:
+          "관리형 컴퓨터 재시도와 서버 병합 큐를 강화하고, macOS 유리 사이드바·창 이동·채널 오류 표시·모바일 DM과 스레드 흐름을 개선합니다.",
+        items: [
+          "실패한 관리형 컴퓨터를 제한 없이 다시 시도하고, 이전 EC2 인스턴스의 신원을 확인한 뒤 교체해 고아 인스턴스와 재시도 기록 손실을 막습니다.",
+          "GitHub native merge queue 의존성을 제거하고 Worker가 검증된 exact SHA만 main에 게시하도록 해 저장소 병합을 더 예측 가능하게 처리합니다.",
+          "macOS 메인 창에 실제 frosted glass 사이드바를 적용하고, 채널·DM·thread 헤더의 제목과 빈 공간에서도 창을 끌 수 있도록 합니다.",
+          "채널의 웹훅·Agent 오류를 심각도별 카드로 표시하고 긴 JSON과 스택 트레이스를 접어 데스크톱·Android·iOS에서 문제를 더 빨리 찾게 합니다.",
+          "iOS와 Android에서 채널 스레드 답글 수를 요약하고 Inbox 답글을 해당 스레드로 바로 이동하며, DM 헤더·길게 누르기 메뉴·메시지 전송 중 키보드 동작을 정리합니다.",
+          "AWS EC2 identity 응답의 nullable product-code 필드를 안전하게 허용하고, Turborepo workspace 구조에서 데스크톱·Worker·landing 빌드와 테스트 경계를 정리합니다.",
+        ],
+      },
+      {
         version: "1.2.152",
         date: "2026년 8월 23일",
         title: "Worker 재시작과 관리형 컴퓨터 재시도를 더 안정적으로 연결합니다",
@@ -1018,6 +1033,21 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.153",
+        date: "August 24, 2026",
+        title: "Make transparent desktop surfaces and channel collaboration more dependable",
+        summary:
+          "Strengthen managed-computer retries and the server merge queue, while improving the macOS frosted-glass sidebar, window dragging, channel errors, mobile DMs, and thread navigation.",
+        items: [
+          "Allow unlimited retries for failed managed computers and replace the previous EC2 instance only after verifying its identity, preserving retry history and preventing orphaned instances.",
+          "Remove the GitHub native merge-queue dependency and let the Worker publish only verified exact SHAs to main for predictable repository delivery.",
+          "Apply a real frosted-glass sidebar to the macOS window and make channel, DM, and thread headers draggable from their titles and empty space.",
+          "Present webhook and Agent errors in severity-aware channel cards, collapsing long JSON and stack traces so problems are easier to find on desktop, Android, and iOS.",
+          "Summarize channel thread replies and route Inbox replies directly to their thread on iOS and Android, while refining DM headers, long-press actions, and the keyboard during message sending.",
+          "Safely accept nullable EC2 identity product-code fields and clarify desktop, Worker, and landing build and test boundaries after the Turborepo workspace migration.",
+        ],
+      },
       {
         version: "1.2.152",
         date: "August 23, 2026",
@@ -2098,7 +2128,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-152">
+          <a href="#v1-2-153">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2120,7 +2150,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.152"
+                      entry.version === "1.2.153"
+                        ? "2026-08-24"
+                        : entry.version === "1.2.152"
                         ? "2026-08-23"
                         : entry.version === "1.2.151"
                         ? "2026-08-23"
