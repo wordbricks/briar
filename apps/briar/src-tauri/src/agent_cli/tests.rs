@@ -337,16 +337,42 @@ fn only_marks_a_cli_installed_when_its_version_probe_succeeds() {
         fs::set_permissions(binary, fs::Permissions::from_mode(0o700))
             .expect("fixture CLI should be executable");
     }
+    let execution_path = env::join_paths([directory.path()]).expect("fixture PATH should resolve");
 
-    let working_status = inspect_cli(Ok(working));
+    let working_status = inspect_cli(Ok(working), &execution_path);
     assert!(working_status.installed);
     assert!(working_status.authenticated);
     assert_eq!(working_status.version.as_deref(), Some("codex-cli 1.2.3"));
 
-    let broken_status = inspect_cli(Ok(broken));
+    let broken_status = inspect_cli(Ok(broken), &execution_path);
     assert!(!broken_status.installed);
     assert!(!broken_status.authenticated);
     assert_eq!(broken_status.version, None);
+}
+
+#[cfg(unix)]
+#[test]
+fn inspects_a_cli_with_a_runtime_from_the_execution_path() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = tempfile::tempdir().expect("fixture directory should exist");
+    let launcher = directory.path().join("script-cli");
+    let runtime = directory.path().join("script-runtime");
+    fs::write(&launcher, "#!/usr/bin/env script-runtime\n")
+        .expect("CLI launcher fixture should be written");
+    fs::write(&runtime, "#!/bin/sh\nprintf 'script-cli 1.2.3\\n'\n")
+        .expect("runtime fixture should be written");
+    for binary in [&launcher, &runtime] {
+        fs::set_permissions(binary, fs::Permissions::from_mode(0o700))
+            .expect("fixture binary should be executable");
+    }
+    let execution_path = env::join_paths([directory.path()]).expect("fixture PATH should resolve");
+
+    let status = inspect_cli(Ok(launcher), &execution_path);
+
+    assert!(status.installed);
+    assert!(status.authenticated);
+    assert_eq!(status.version.as_deref(), Some("script-cli 1.2.3"));
 }
 
 #[cfg(unix)]
