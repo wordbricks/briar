@@ -225,7 +225,7 @@ const demoOrganization: Organization = {
 };
 const demoMessageTime = new Date(Date.now() - 18 * 60_000).toISOString();
 const demoReplyTime = new Date(Date.now() - 8 * 60_000).toISOString();
-const initialDemoIssueMessages: Record<string, IssueMessage[]> = {
+const initialDemoIssueMessages = {
   "demo-1": [
     {
       id: "demo-message-1",
@@ -258,9 +258,9 @@ const initialDemoIssueMessages: Record<string, IssueMessage[]> = {
       updatedAt: demoReplyTime,
     },
   ],
-};
+} satisfies Record<string, IssueMessage[]>;
 
-const initialDemoRunEvidence: Record<string, RunEvidence[]> = {
+const initialDemoRunEvidence = {
   "demo-1": [
     {
       key: "BRIAR-12:analyzing:repository_findings",
@@ -297,7 +297,7 @@ const initialDemoRunEvidence: Record<string, RunEvidence[]> = {
       canonical: true,
     },
   ],
-};
+} satisfies Record<string, RunEvidence[]>;
 
 const emptyDashboard = (project: Project): DashboardPayload => ({
   project,

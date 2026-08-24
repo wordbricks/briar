@@ -19,6 +19,7 @@ import {
 import {
   agentProviderSupportsSelection,
   decodeAgentProviderCapabilityCatalogOption,
+  mergeAgentProviderCapabilityAdvertisements,
   type AgentProviderCapabilityCatalog,
   type ModelEffort,
 } from "../../src/lib/agent-provider-contract";
@@ -672,6 +673,38 @@ export function executionWorkerSupportsSelection(
   } catch {
     return false;
   }
+}
+
+export function projectExecutionWorkerCapabilityCatalog(
+  workers: readonly ExecutionWorkerRow[],
+  policy: ProjectExecutionWorkerPolicy,
+) {
+  const allowedWorkerIds = new Set(policy.allowedWorkerIds);
+  const eligibleWorkers = workers.filter((worker) =>
+    worker.state === "online" &&
+    worker.accepting_work === 1 &&
+    worker.readiness_state !== "needs_attention" &&
+    (policy.selectionMode !== "allowlist" || allowedWorkerIds.has(worker.id))
+  );
+  const advertisements = eligibleWorkers.flatMap((worker) => {
+    const providers = executionWorkerProviders(worker);
+    if (providers.length === 0) return [];
+    try {
+      const capabilities = JSON.parse(worker.capabilities_json) as {
+        providerCapabilities?: unknown;
+      };
+      return [{
+        providers,
+        providerCapabilities: capabilities.providerCapabilities,
+      }];
+    } catch {
+      return [];
+    }
+  });
+  return {
+    capabilities: mergeAgentProviderCapabilityAdvertisements(advertisements),
+    workerCount: advertisements.length,
+  };
 }
 
 /**
@@ -2188,7 +2221,8 @@ export async function assertExecutionSelectionAvailable(
 
   const eligible = await db
     .prepare(
-      `select worker.id, worker.agent_provider, worker.capabilities_json
+      `select worker.id, worker.agent_provider, worker.capabilities_json,
+              worker.state, worker.last_heartbeat_at
        from briar_execution_workers worker
        join briar_execution_worker_devices device on device.id = worker.device_id
        where worker.project_id = ? and device.organization_id = ?
@@ -2218,9 +2252,20 @@ export async function assertExecutionSelectionAvailable(
        limit 100`,
     )
     .bind(projectId, organizationId, input.provider)
-    .all<Pick<ExecutionWorkerRow, "id" | "agent_provider" | "capabilities_json">>();
+    .all<Pick<
+      ExecutionWorkerRow,
+      | "id"
+      | "agent_provider"
+      | "capabilities_json"
+      | "state"
+      | "last_heartbeat_at"
+    >>();
   if (!eligible.results.some((worker) =>
-    executionWorkerSupportsSelection(
+    workerStateAt(
+      worker.last_heartbeat_at,
+      input.observedAt,
+      worker.state,
+    ) === "online" && executionWorkerSupportsSelection(
       worker,
       input.provider,
       input.model,
@@ -2228,7 +2273,9 @@ export async function assertExecutionSelectionAvailable(
     )
   )) {
     throw new WorkerConflictError(
-      `No worker is configured for the ${input.provider} provider`,
+      input.model || input.effort
+        ? `No Worker supports ${input.provider}${input.model ? ` model ${input.model}` : ""}${input.effort ? ` with ${input.effort} effort` : ""}`
+        : `No Worker is configured for the ${input.provider} provider`,
     );
   }
 }

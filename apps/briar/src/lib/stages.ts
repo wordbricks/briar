@@ -12,10 +12,7 @@ const workflowStageMeta = Object.fromEntries(
   { label: string; tone: string }
 >;
 
-const statusMeta: Record<
-  AutoHuntRunStatus,
-  { label: string; tone: string }
-> = {
+const statusMeta = {
   backlog: { label: "백로그", tone: "slate" },
   queued: { label: "대기", tone: "slate" },
   running: { label: "진행 중", tone: "violet" },
@@ -24,7 +21,7 @@ const statusMeta: Record<
   failed: { label: "실패", tone: "red" },
   completed: { label: "완료", tone: "emerald" },
   cancelled: { label: "취소", tone: "slate" },
-};
+} satisfies Record<AutoHuntRunStatus, { label: string; tone: string }>;
 
 type DisplayStatus = AutoHuntRunStatus | AutoHuntWorkflowStageId;
 

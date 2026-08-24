@@ -35,6 +35,10 @@ import {
   type ProjectConfig,
 } from "./config-contract";
 import { httpErrorMessage } from "./command-contract";
+import {
+  configuredManagedComputerCredentialPath,
+  loadOptionalManagedComputerCredential,
+} from "./managed-computer-credential";
 
 const openRouterOpenCodeConfig = JSON.stringify({
   provider: {
@@ -63,10 +67,13 @@ function providerExecutionEnvironment(
     OPENCODE_CONFIG_CONTENT: openRouterOpenCodeConfig,
   };
 }
-const executionToken = (project: ProjectConfig) =>
-  process.env.BRIAR_WORKER_TOKEN ??
-  process.env.BRIAR_AGENT_TOKEN ??
-  project.agentToken;
+const executionToken = (project: ProjectConfig) => {
+  const token = process.env.BRIAR_WORKER_TOKEN ??
+    process.env.BRIAR_AGENT_TOKEN ??
+    project.agentToken;
+  if (!token) throw new Error("Briar execution credential is unavailable");
+  return token;
+};
 const configuredConfigDirectory = process.env.BRIAR_CONFIG_HOME?.trim();
 if (configuredConfigDirectory && !isAbsolute(configuredConfigDirectory)) {
   throw new Error("BRIAR_CONFIG_HOME must be an absolute path");
@@ -101,8 +108,10 @@ async function loadConfig(): Promise<Config> {
       "code" in error &&
       error.code === "ENOENT"
     ) {
+      const managedCredential = await loadOptionalManagedComputerCredential();
       return {
-        apiUrl: defaultApiUrl,
+        apiUrl: managedCredential?.apiOrigin ??
+          process.env.BRIAR_API_URL ?? defaultApiUrl,
         agentProviders: {
           codex: true,
           claude: true,
@@ -142,7 +151,12 @@ async function loadConfig(): Promise<Config> {
     );
   }
 
-  const apiUrl = process.env.BRIAR_API_URL ?? config.apiUrl;
+  const managedCredential = await loadOptionalManagedComputerCredential(
+    config.managedComputer?.credentialFile ??
+      configuredManagedComputerCredentialPath(),
+  );
+  const apiUrl = managedCredential?.apiOrigin ??
+    process.env.BRIAR_API_URL ?? config.apiUrl;
   return {
     ...config,
     apiUrl,
@@ -214,8 +228,17 @@ async function openBrowser(url: string) {
   await process.exited;
 }
 
-async function login() {
-  const config = await loadConfig();
+async function login(apiUrlOverride?: string) {
+  const loaded = await loadConfig();
+  const config = apiUrlOverride
+    ? {
+      ...loaded,
+      apiUrl: apiUrlOverride,
+      userToken: sameApiEnvironment(apiUrlOverride, loaded.apiUrl)
+        ? loaded.userToken
+        : undefined,
+    }
+    : loaded;
   const code = await request<{
     device_code: string;
     user_code: string;

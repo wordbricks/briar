@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { AgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
 import apiWorker from "./index";
 import { ingestAgentTranscript } from "./agent-worklog";
 import {
@@ -46,6 +47,7 @@ import {
   reapStalledHuntRuns,
   recordWorkerHeartbeat,
   registerExecutionWorker,
+  projectExecutionWorkerCapabilityCatalog,
   requestExecutionWorkerUpdate,
   renewHuntRunLease,
   unbindExecutionWorker,
@@ -1948,6 +1950,115 @@ describe("detached execution workers", () => {
         observedAt: atMinute(11),
       }),
     ).rejects.toBeInstanceOf(WorkerConflictError);
+  });
+
+  it("builds the project catalog from live, policy-allowed Worker heartbeats", async () => {
+    const first = await register("catalog-first", 1);
+    const second = await register("catalog-second", 1);
+    const capabilities = (
+      registered: Awaited<ReturnType<typeof register>>,
+      models: Array<{ id: string; label: string }>,
+    ) => {
+      const value = JSON.parse(registered.worker.capabilities_json) as {
+        providerCapabilities: AgentProviderCapabilityCatalog;
+      } & Record<string, unknown>;
+      value.providerCapabilities.codex.models = models;
+      return value;
+    };
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: first.worker.id,
+      capabilities: capabilities(first, [
+        { id: "remote-zeta", label: "Remote Zeta" },
+        { id: "remote-shared", label: "Remote Shared" },
+      ]),
+      observedAt: atMinute(2),
+    });
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: second.worker.id,
+      capabilities: capabilities(second, [
+        { id: "remote-alpha", label: "Remote Alpha" },
+        { id: "remote-shared", label: "Remote Shared" },
+      ]),
+      observedAt: atMinute(2),
+    });
+
+    const liveWorkers = await listExecutionWorkers(db, projectId, atMinute(3));
+    expect(projectExecutionWorkerCapabilityCatalog(liveWorkers, {
+      selectionMode: "any",
+      defaultWorkerId: null,
+      allowedWorkerIds: [],
+      updatedAt: null,
+    })).toMatchObject({
+      workerCount: 2,
+      capabilities: {
+        codex: {
+          models: [
+            { id: "remote-alpha" },
+            { id: "remote-shared" },
+            { id: "remote-zeta" },
+          ],
+        },
+      },
+    });
+
+    const policy = await updateProjectExecutionWorkerPolicy(db, projectId, {
+      selectionMode: "allowlist",
+      defaultWorkerId: second.worker.id,
+      allowedWorkerIds: [second.worker.id],
+      updatedByUserId: "owner",
+      observedAt: atMinute(3),
+    });
+    expect(
+      projectExecutionWorkerCapabilityCatalog(liveWorkers, policy).capabilities
+        .codex.models.map((model) => model.id),
+    ).toEqual(["remote-alpha", "remote-shared"]);
+
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: second.worker.id,
+      capabilities: capabilities(second, [
+        { id: "remote-after-heartbeat", label: "Remote After Heartbeat" },
+      ]),
+      observedAt: atMinute(8),
+    });
+    const refreshedWorkers = await listExecutionWorkers(
+      db,
+      projectId,
+      atMinute(9),
+    );
+    expect(refreshedWorkers.find((worker) => worker.id === first.worker.id)?.state)
+      .toBe("stale");
+    expect(
+      projectExecutionWorkerCapabilityCatalog(refreshedWorkers, {
+        selectionMode: "any",
+        defaultWorkerId: null,
+        allowedWorkerIds: [],
+        updatedAt: null,
+      }).capabilities.codex.models.map((model) => model.id),
+    ).toEqual(["remote-after-heartbeat"]);
+  });
+
+  it("rejects automatic dispatch when the last compatible Worker heartbeat expired", async () => {
+    await register("expired-auto", 1);
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("expired-auto-dispatch", 10),
+    );
+
+    await expect(
+      dispatchHuntRun(db, projectId, projectId, {
+        runId,
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        effort: "high",
+        workerId: null,
+        requestedByUserId: "member",
+        requestId: "12121212-aaaa-4121-8121-121212121212",
+        occurredAt: atMinute(10),
+      }),
+    ).rejects.toThrow(
+      "No Worker supports codex model gpt-5.6-sol with high effort",
+    );
   });
 
   it("keeps a disabled worker disabled through heartbeats", async () => {

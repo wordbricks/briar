@@ -324,13 +324,13 @@ const addUsage = (target: UsageTokenTotals, usage: UsageTokenTotals) => {
   target.uncachedInputTokens += usage.uncachedInputTokens;
 };
 
-const sourceRank: Record<UsageModelSource, number> = {
+const sourceRank = {
   providerReported: 4,
   providerConfig: 3,
   configuredFallback: 2,
   legacyConfigured: 2,
   unknown: 1,
-};
+} satisfies Record<UsageModelSource, number>;
 
 const compareBreakdownRows = (
   left: UsageBreakdownRow,

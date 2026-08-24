@@ -76,12 +76,9 @@ export class AcpJsonRpcConnection {
   async request(method: string, params?: unknown): Promise<unknown> {
     if (this.closed) throw new Error("ACP process is not running.");
     const id = ++this.nextId;
-    const payload: AcpJsonRpcMessage = {
-      jsonrpc: "2.0",
-      id,
-      method,
-      ...(params === undefined ? {} : { params }),
-    };
+    const payload: AcpJsonRpcMessage = params === undefined
+      ? { jsonrpc: "2.0", id, method }
+      : { jsonrpc: "2.0", id, method, params };
     const response = await new Promise<AcpJsonRpcMessage>((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
       this.child.stdin.write(`${JSON.stringify(payload)}\n`, (error) => {

@@ -27,10 +27,7 @@ const resendCooldownSeconds = 60;
 const hourlyWindowSeconds = 60 * 60;
 const hourlySendLimit = 5;
 
-const templates: Record<
-  AuthLocale,
-  { subject: string; heading: string; intro: string; expiry: string; ignore: string }
-> = {
+const templates = {
   ko: {
     subject: "Briar 로그인 인증코드",
     heading: "Briar 로그인 인증코드",
@@ -52,7 +49,10 @@ const templates: Record<
     expiry: "此验证码将在 5 分钟后失效。",
     ignore: "如果这不是您的操作，请忽略此邮件。",
   },
-};
+} satisfies Record<
+  AuthLocale,
+  { subject: string; heading: string; intro: string; expiry: string; ignore: string }
+>;
 
 const localeFromLanguage = (value: string | null | undefined): AuthLocale => {
   const normalized = value?.trim().toLowerCase() ?? "";

@@ -106,11 +106,7 @@ describe("OrganizationWorkersSettings", () => {
       targetVersion: "1.2.84",
     });
     localStorage.setItem("briar.locale.v1", "ko");
-    (
-      globalThis as typeof globalThis & {
-        IS_REACT_ACT_ENVIRONMENT: boolean;
-      }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   });
 
   it("syncs the hostname before loading Worker settings", async () => {

@@ -421,29 +421,3 @@
   border-color: var(--background);
   background: var(--secondary);
 }
-
-.dark .channel-error,
-.dark .companion-channel-error {
-  border-bottom-color: color-mix(in srgb, var(--destructive) 34%, var(--border));
-  color: var(--foreground);
-  background: color-mix(in srgb, var(--destructive) 12%, var(--card));
-}
-
-.dark .channel-alert-card {
-  border-color: color-mix(in srgb, var(--destructive) 34%, var(--border));
-  background: color-mix(in srgb, var(--destructive) 12%, var(--card));
-}
-
-.dark .channel-alert-card.warning {
-  border-color: color-mix(in srgb, var(--warning, #c48a1a) 40%, var(--border));
-  background: color-mix(in srgb, var(--warning, #c48a1a) 14%, var(--card));
-}
-
-.dark .channel-alert-label {
-  color: var(--foreground);
-}
-
-.dark .channel-reply-failure {
-  border-color: color-mix(in srgb, var(--destructive) 34%, var(--border));
-  background: color-mix(in srgb, var(--destructive) 12%, var(--card));
-}

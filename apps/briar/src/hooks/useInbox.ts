@@ -466,7 +466,7 @@ export function isInboxMessageUnread(
 export function mergeInboxReadVersions(
   local: Record<string, string>,
   remote: Record<string, string>,
-): Record<string, string> {
+) {
   return {
     ...local,
     ...remote,
@@ -476,7 +476,7 @@ export function mergeInboxReadVersions(
 export function inboxReadVersionsToPush(
   local: Record<string, string>,
   remote: Record<string, string>,
-): Record<string, string> {
+) {
   const pending: Record<string, string> = {};
   for (const [messageId, version] of Object.entries(local)) {
     if (remote[messageId] !== version) {

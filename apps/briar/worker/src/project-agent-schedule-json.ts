@@ -30,31 +30,32 @@ export const projectAgentScheduleJson = (row: ProjectAgentScheduleRow) => ({
 export const projectAgentScheduleRunJson = (
   row: ProjectAgentScheduleRunRow,
   claimToken?: string,
-) => ({
-  id: row.id,
-  projectId: row.project_id,
-  scheduleId: row.schedule_id,
-  scheduleName: row.schedule_name,
-  agent: {
-    id: row.agent_id,
-    name: row.agent_name,
-    provider: row.agent_provider,
-    model: row.agent_model,
-    effort: row.agent_effort,
-    description: row.agent_description,
-    responsibility: row.agent_responsibility,
-    skill: row.agent_skill_markdown,
-    skills: row.agent_skills.map(agentSkillJson),
-  },
-  workflow: normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json)),
-  status: row.status,
-  scheduledFor: row.scheduled_for,
-  leaseExpiresAt: row.lease_expires_at,
-  startedAt: row.started_at,
-  completedAt: row.completed_at,
-  resultSummary: row.result_summary,
-  structuredResult: parseStructuredResult(row.structured_result_json),
-  error: row.error,
-  ...(claimToken ? { claimToken } : {}),
-});
-
+) => {
+  const run = {
+    id: row.id,
+    projectId: row.project_id,
+    scheduleId: row.schedule_id,
+    scheduleName: row.schedule_name,
+    agent: {
+      id: row.agent_id,
+      name: row.agent_name,
+      provider: row.agent_provider,
+      model: row.agent_model,
+      effort: row.agent_effort,
+      description: row.agent_description,
+      responsibility: row.agent_responsibility,
+      skill: row.agent_skill_markdown,
+      skills: row.agent_skills.map(agentSkillJson),
+    },
+    workflow: normalizeAutoHuntWorkflow(JSON.parse(row.workflow_json)),
+    status: row.status,
+    scheduledFor: row.scheduled_for,
+    leaseExpiresAt: row.lease_expires_at,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    resultSummary: row.result_summary,
+    structuredResult: parseStructuredResult(row.structured_result_json),
+    error: row.error,
+  };
+  return claimToken ? { ...run, claimToken } : run;
+};

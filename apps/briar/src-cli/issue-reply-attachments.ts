@@ -9,13 +9,15 @@ import {
   replyCompleteRequestBody,
 } from "./reply-attachments";
 
+export type ParsedIssueReplyAgentResult = {
+  result: DetachedIssueReplyResult;
+  attachmentPaths: string[];
+};
+
 export function parseIssueReplyAgentResult(
   text: string,
   options: { allowSkillExecutionProposal?: boolean } = {},
-): {
-  result: DetachedIssueReplyResult;
-  attachmentPaths: string[];
-} {
+): ParsedIssueReplyAgentResult {
   let parsed: unknown;
   try {
     parsed = parseDetachedJsonResult(text);

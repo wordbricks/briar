@@ -13,12 +13,14 @@ sha256sum --check /opt/briar/remote-desktop-packages.lock.sha256
 
 for service in \
   briar-managed-enroll.service \
+  briar-managed-worker.service \
   briar-remote-desktop.service \
   briar-remote-session-agent.service; do
   systemctl is-enabled --quiet "$service"
 done
 
 systemctl is-active --quiet briar-managed-enroll.service
+systemctl is-active --quiet briar-managed-worker.service
 systemctl is-active --quiet briar-remote-desktop.service
 systemctl is-active --quiet briar-remote-session-agent.service
 
@@ -44,6 +46,15 @@ fi
 if systemctl show briar-remote-session-agent.service \
   --property=User --value | grep -Fxq root; then
   echo "Remote session agent must not run as root" >&2
+  exit 1
+fi
+if systemctl show briar-managed-worker.service \
+  --property=User --value | grep -Fxq root; then
+  echo "Managed worker must not run as root" >&2
+  exit 1
+fi
+if systemctl cat briar-managed-worker.service | grep -q 'briar_worker_'; then
+  echo "Managed worker unit must not contain a machine credential" >&2
   exit 1
 fi
 

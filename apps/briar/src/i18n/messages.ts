@@ -319,11 +319,6 @@ export const ko = {
   "channel.webhookRevoke": "{name} 폐기",
   "channel.webhookRevokeConfirm": "이 웹훅을 폐기할까요? 다시 활성화할 수 없습니다.",
   "channel.webhookBadge": "웹훅",
-  "channel.alertError": "오류",
-  "channel.alertWarning": "경고",
-  "channel.alertShowDetails": "자세히 보기",
-  "channel.alertHideDetails": "접기",
-  "channel.replyFailedTitle": "Agent 답변을 만들지 못했습니다",
   "channel.settingsDescription": "채널 정보와 멤버를 관리합니다.",
   "channel.settingsTabGeneral": "설정",
   "channel.settingsTabMembers": "멤버 {count}",
@@ -2202,12 +2197,14 @@ export const ko = {
   "executionPolicy.noDefault": "기본값 없음 · 실행할 때 선택",
   "executionPolicy.permission": "조직 소유자 또는 관리자만 실행 정책을 변경할 수 있습니다.",
   "executionPolicy.registrationHint": "컴퓨터 등록과 프로젝트 저장소 연결은 조직 설정 → 컴퓨터에서 관리합니다.",
+  "worker.noneForSelection": "선택한 프로바이더·모델·effort 조합을 실행할 수 있는 현재 Worker가 없습니다.",
+  "worker.incompatibleSelection": "이 Worker는 선택한 프로바이더·모델·effort 조합을 지원하지 않습니다.",
 } as const;
 
 export type MessageKey = keyof typeof ko;
 export type Messages = Record<MessageKey, string>;
 
-export const en: Messages = {
+export const en = {
   ...ko,
   "commandPalette.title": "Command palette",
   "commandPalette.description": "Search commands, pages, issues, projects, channels, and direct messages.",
@@ -2347,11 +2344,6 @@ export const en: Messages = {
   "channel.webhookRevoke": "Revoke {name}",
   "channel.webhookRevokeConfirm": "Revoke this webhook? It cannot be reactivated.",
   "channel.webhookBadge": "webhook",
-  "channel.alertError": "Error",
-  "channel.alertWarning": "Warning",
-  "channel.alertShowDetails": "Show details",
-  "channel.alertHideDetails": "Hide details",
-  "channel.replyFailedTitle": "The Agent could not reply",
   "channel.settingsDescription": "Manage channel details and members.",
   "channel.settingsTabGeneral": "Settings",
   "channel.settingsTabMembers": "Members {count}",
@@ -3481,8 +3473,10 @@ export const en: Messages = {
   "organization.githubBenefitMerge": "Resume waiting work after a pull request is merged",
   "organization.githubBenefitScope": "Limit access to repositories you select",
   "dashboard.createIssueInColumn": "Add issue to {label}",
-};
-export const zh: Messages = {
+  "worker.noneForSelection": "No current Worker supports the selected provider, model, and effort.",
+  "worker.incompatibleSelection": "This Worker does not support the selected provider, model, and effort.",
+} satisfies Messages;
+export const zh = {
   ...en,
   "commandPalette.title": "命令面板",
   "commandPalette.description": "搜索命令、页面、问题、项目、频道和私信。",
@@ -3600,11 +3594,6 @@ export const zh: Messages = {
   "channel.webhookRevoke": "撤销 {name}",
   "channel.webhookRevokeConfirm": "要撤销此 Webhook 吗？撤销后无法重新启用。",
   "channel.webhookBadge": "Webhook",
-  "channel.alertError": "错误",
-  "channel.alertWarning": "警告",
-  "channel.alertShowDetails": "查看详情",
-  "channel.alertHideDetails": "收起",
-  "channel.replyFailedTitle": "智能体未能回复",
   "channel.settingsDescription": "管理频道信息与成员。",
   "channel.settingsTabGeneral": "设置",
   "channel.settingsTabMembers": "成员 {count}",
@@ -4725,4 +4714,6 @@ export const zh: Messages = {
   "organization.githubBenefitMerge": "拉取请求合并后自动恢复等待中的任务",
   "organization.githubBenefitScope": "将访问范围限制为所选仓库",
   "dashboard.createIssueInColumn": "在 {label} 中创建问题",
-};
+  "worker.noneForSelection": "当前没有 Worker 支持所选的提供商、模型和 effort。",
+  "worker.incompatibleSelection": "此 Worker 不支持所选的提供商、模型和 effort。",
+} satisfies Messages;

@@ -1,6 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as Predicate from "effect/Predicate";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   collectIssueReplyAttachments,
@@ -105,7 +106,9 @@ describe("issue reply agent attachments", () => {
       attachments: [],
     });
 
-    expect(typeof body).toBe("string");
-    expect(JSON.parse(body as string)).toMatchObject({ body: "Answer" });
+    if (!Predicate.isString(body)) {
+      throw new Error("attachment-free issue replies must use a JSON body");
+    }
+    expect(JSON.parse(body)).toMatchObject({ body: "Answer" });
   });
 });

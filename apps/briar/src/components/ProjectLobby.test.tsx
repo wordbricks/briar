@@ -9,8 +9,7 @@ import { demoDashboard, demoRepositoryReadiness } from "../lib/demo-data";
 import type { ProjectUsageSummary } from "../types";
 import { ProjectLobby, projectTrackedDuration } from "./ProjectLobby";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
-  .IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 const emptyUsageSummary: ProjectUsageSummary = {
   period: "day",

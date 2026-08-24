@@ -72,7 +72,9 @@
     "worker:check": "turbo run worker:check --filter=@briar/app",
     "worker:build": "turbo run worker:build --filter=@briar/app",
     "worker:deploy": "turbo run worker:deploy --filter=@briar/app",
-    "worker:startup": "turbo run worker:startup --filter=@briar/app"
+    "worker:startup": "turbo run worker:startup --filter=@briar/app",
+    "managed-computer:image:check": "bun run scripts/validate-managed-computer-image.ts",
+    "managed-computer:image:build": "infrastructure/managed-computers/build-managed-computer-image"
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "2.19.2",

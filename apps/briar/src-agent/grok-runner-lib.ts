@@ -516,10 +516,15 @@ function completeActiveGrokMessage(
   return event;
 }
 
+export type NormalizedGrokSessionUpdate = {
+  raw: unknown;
+  events: NormalizedAgentEvent[];
+};
+
 export function normalizeGrokSessionUpdate(
   params: unknown,
   state: GrokEventState,
-): { raw: unknown; events: NormalizedAgentEvent[] } {
+): NormalizedGrokSessionUpdate {
   const record =
     typeof params === "object" && params !== null
       ? (params as Record<string, unknown>)

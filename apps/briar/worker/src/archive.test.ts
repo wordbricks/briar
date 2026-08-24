@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { HuntEventInput } from "./db";
@@ -912,7 +913,7 @@ describe("D1 to R2 log archives", () => {
     );
     const deletedKeys: string[] = [];
     const attachments = deleteOnlyBucket((keys) => {
-      const key = typeof keys === "string" ? keys : keys[0];
+      const key = Predicate.isString(keys) ? keys : keys[0];
       if (key === permanentKey) throw new Error("permanent R2 failure");
       deletedKeys.push(key);
     });

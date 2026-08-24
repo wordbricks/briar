@@ -21,6 +21,7 @@ const config: ManagedComputerConfig = {
   lifetimeDays: 30,
   stoppedRetentionDays: 7,
   enrollmentTtlMinutes: 30,
+  setupTtlMinutes: 10,
   region: "us-east-1",
   launchTemplateId: "lt-0123456789abcdef0",
   launchTemplateVersion: "7",

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
+import * as Predicate from "effect/Predicate";
 
 export type IOSImplementation = "tauri" | "native";
 export type IOSReleaseChannel = "internal" | "production";
@@ -19,7 +20,6 @@ export type IOSReleaseConfig = {
   };
 };
 
-const implementations = new Set<IOSImplementation>(["tauri", "native"]);
 const semanticVersion = /^\d+\.\d+\.\d+$/;
 const repositoryRoot = resolve(import.meta.dir, "..");
 
@@ -32,41 +32,44 @@ const fail = (message: string): never => {
 };
 
 export function parseIOSReleaseConfig(value: unknown): IOSReleaseConfig {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    fail("Configuration must be a JSON object.");
+  if (!Predicate.isObject(value)) {
+    return fail("Configuration must be a JSON object.");
   }
-  const config = value as Record<string, unknown>;
-  if (config.schemaVersion !== 1) fail("schemaVersion must be 1.");
-  if (!implementations.has(config.defaultImplementation as IOSImplementation)) {
-    fail("defaultImplementation must be tauri or native.");
+  const config = value;
+  if (config.schemaVersion !== 1) return fail("schemaVersion must be 1.");
+  if (
+    config.defaultImplementation !== "tauri" &&
+    config.defaultImplementation !== "native"
+  ) {
+    return fail("defaultImplementation must be tauri or native.");
   }
   if (config.bundleIdentifier !== "app.briar.companion") {
-    fail("bundleIdentifier must preserve the existing app.briar.companion App Store identity.");
+    return fail("bundleIdentifier must preserve the existing app.briar.companion App Store identity.");
   }
 
-  const rollback = config.rollback as Record<string, unknown> | undefined;
-  if (!rollback || rollback.implementation !== "tauri") {
-    fail("rollback.implementation must remain tauri for the first native release.");
+  const rollback = config.rollback;
+  if (!Predicate.isObject(rollback) || rollback.implementation !== "tauri") {
+    return fail("rollback.implementation must remain tauri for the first native release.");
   }
   if (
-    typeof rollback.preserveSourceThroughVersion !== "string" ||
+    !Predicate.isString(rollback.preserveSourceThroughVersion) ||
     !semanticVersion.test(rollback.preserveSourceThroughVersion)
   ) {
-    fail("rollback.preserveSourceThroughVersion must be a semantic version.");
+    return fail("rollback.preserveSourceThroughVersion must be a semantic version.");
   }
 
   let nativeStabilization: IOSReleaseConfig["nativeStabilization"] = null;
   if (config.nativeStabilization !== null) {
-    const stabilization = config.nativeStabilization as Record<string, unknown> | undefined;
+    const stabilization = config.nativeStabilization;
     if (
-      !stabilization ||
+      !Predicate.isObject(stabilization) ||
       stabilization.status !== "passed" ||
-      typeof stabilization.buildId !== "string" ||
+      !Predicate.isString(stabilization.buildId) ||
       stabilization.buildId.trim() === "" ||
-      typeof stabilization.approvedAt !== "string" ||
+      !Predicate.isString(stabilization.approvedAt) ||
       !Number.isFinite(Date.parse(stabilization.approvedAt))
     ) {
-      fail("nativeStabilization must record a passed App Store build ID and valid approval time.");
+      return fail("nativeStabilization must record a passed App Store build ID and valid approval time.");
     }
     nativeStabilization = {
       status: "passed",
@@ -76,16 +79,16 @@ export function parseIOSReleaseConfig(value: unknown): IOSReleaseConfig {
   }
 
   if (config.defaultImplementation === "native" && !nativeStabilization) {
-    fail("The default cannot switch to native before Internal TestFlight stabilization passes.");
+    return fail("The default cannot switch to native before Internal TestFlight stabilization passes.");
   }
 
   return {
     schemaVersion: 1,
-    defaultImplementation: config.defaultImplementation as IOSImplementation,
+    defaultImplementation: config.defaultImplementation,
     bundleIdentifier: config.bundleIdentifier,
     rollback: {
       implementation: "tauri",
-      preserveSourceThroughVersion: rollback.preserveSourceThroughVersion as string,
+      preserveSourceThroughVersion: rollback.preserveSourceThroughVersion,
     },
     nativeStabilization,
   };
@@ -97,9 +100,11 @@ export function resolveIOSRelease(
   override?: IOSImplementation,
 ) {
   const implementation = override ?? config.defaultImplementation;
-  if (!implementations.has(implementation)) fail("Implementation must be tauri or native.");
+  if (implementation !== "tauri" && implementation !== "native") {
+    return fail("Implementation must be tauri or native.");
+  }
   if (channel === "production" && implementation === "native" && !config.nativeStabilization) {
-    fail("Native Production is locked until the Internal TestFlight build is recorded as stabilized.");
+    return fail("Native Production is locked until the Internal TestFlight build is recorded as stabilized.");
   }
   return {
     channel,
@@ -112,7 +117,7 @@ export function resolveIOSRelease(
 }
 
 function readConfig(path: string) {
-  if (!existsSync(path)) fail(`Missing configuration: ${path}`);
+  if (!existsSync(path)) return fail(`Missing configuration: ${path}`);
   return parseIOSReleaseConfig(JSON.parse(readFileSync(path, "utf8")));
 }
 
@@ -120,7 +125,7 @@ function argumentValue(args: string[], name: string) {
   const index = args.indexOf(name);
   if (index === -1) return undefined;
   const value = args[index + 1];
-  if (!value || value.startsWith("--")) fail(`${name} requires a value.`);
+  if (!value || value.startsWith("--")) return fail(`${name} requires a value.`);
   return value;
 }
 
@@ -137,36 +142,42 @@ export function main(args = process.argv.slice(2)) {
         resolveRepositoryPath("apps/briar/ios/BriarCompanion/App/SessionStore.swift"),
       )
     ) {
-      fail("Native session migration source is missing.");
+      return fail("Native session migration source is missing.");
     }
     if (
       !existsSync(
         resolveRepositoryPath("apps/briar/src-tauri/gen/apple/project.yml"),
       )
     ) {
-      fail("Tauri iOS rollback source is missing.");
+      return fail("Tauri iOS rollback source is missing.");
     }
     process.stdout.write(`${JSON.stringify(config)}\n`);
     return;
   }
   if (command === "resolve") {
-    const channel = argumentValue(args, "--channel") as IOSReleaseChannel | undefined;
-    const override = argumentValue(args, "--implementation") as IOSImplementation | undefined;
+    const channel = argumentValue(args, "--channel");
+    const override = argumentValue(args, "--implementation");
     if (channel !== "internal" && channel !== "production") {
-      fail("--channel must be internal or production.");
+      return fail("--channel must be internal or production.");
     }
-    if (override && !implementations.has(override)) fail("--implementation must be tauri or native.");
+    if (
+      override !== undefined &&
+      override !== "tauri" &&
+      override !== "native"
+    ) {
+      return fail("--implementation must be tauri or native.");
+    }
     process.stdout.write(`${JSON.stringify(resolveIOSRelease(config, channel, override))}\n`);
     return;
   }
-  fail("Usage: ios-release-config.ts verify|resolve [--channel internal|production] [--implementation tauri|native]");
+  return fail("Usage: ios-release-config.ts verify|resolve [--channel internal|production] [--implementation tauri|native]");
 }
 
 if (import.meta.main) {
   try {
     main();
   } catch (error) {
-    console.error(error instanceof Error ? error.message : error);
+    console.error(Predicate.isError(error) ? error.message : error);
     process.exit(1);
   }
 }

@@ -1,5 +1,10 @@
 import type { AutoHuntWorkflow } from "./auto-hunt-contract";
 
+export type SharedWorkflowSyncPlan = {
+  sync: boolean;
+  key: string | null;
+};
+
 /**
  * Shared project workflows (including required tools) live in project settings.
  * Each connected worker machine keeps a local copy so health probes and the
@@ -10,7 +15,7 @@ export function shouldSyncSharedWorkflow(input: {
   sharedWorkflow: AutoHuntWorkflow | null | undefined;
   lastSyncedKey: string | null;
   projectId: string;
-}): { sync: boolean; key: string | null } {
+}): SharedWorkflowSyncPlan {
   if (!input.connectedLocally || !input.sharedWorkflow) {
     return { sync: false, key: null };
   }

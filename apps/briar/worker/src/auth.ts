@@ -22,6 +22,21 @@ export function createAuth(
   executionContext?: AuthExecutionContext,
   emailSender = authEmailSenderFromEnv(env),
 ) {
+  const advanced = executionContext
+    ? {
+        backgroundTasks: {
+          handler: (promise: Promise<unknown>) =>
+            executionContext.waitUntil(promise),
+        },
+        ipAddress: {
+          ipAddressHeaders: ["cf-connecting-ip"],
+        },
+      }
+    : {
+        ipAddress: {
+          ipAddressHeaders: ["cf-connecting-ip"],
+        },
+      };
   return betterAuth({
     appName: "Briar",
     baseURL: `${apiOrigin}/api/auth`,
@@ -43,19 +58,7 @@ export function createAuth(
       "tauri://localhost",
       "http://tauri.localhost",
     ],
-    advanced: {
-      ...(executionContext
-        ? {
-            backgroundTasks: {
-              handler: (promise: Promise<unknown>) =>
-                executionContext.waitUntil(promise),
-            },
-          }
-        : {}),
-      ipAddress: {
-        ipAddressHeaders: ["cf-connecting-ip"],
-      },
-    },
+    advanced,
     account: {
       accountLinking: {
         enabled: true,

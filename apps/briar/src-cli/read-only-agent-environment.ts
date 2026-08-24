@@ -51,7 +51,7 @@ const commonEnvironmentKeys = new Set([
   "NO_PROXY",
 ]);
 
-const providerPrefixes: Record<AgentProvider, string[]> = {
+const providerPrefixes = {
   codex: ["OPENAI_"],
   claude: ["ANTHROPIC_", "AWS_", "GOOGLE_", "VERTEX_"],
   cursor: ["CURSOR_"],
@@ -77,9 +77,9 @@ const providerPrefixes: Record<AgentProvider, string[]> = {
     "CEREBRAS_",
   ],
   openrouter: ["OPENROUTER_"],
-};
+} satisfies Record<AgentProvider, string[]>;
 
-const providerEnvironmentKeys: Record<AgentProvider, Set<string>> = {
+const providerEnvironmentKeys = {
   codex: new Set(["CODEX_ACCESS_TOKEN"]),
   claude: new Set(["CLAUDE_CODE_OAUTH_TOKEN"]),
   cursor: new Set(["CURSOR_API_KEY"]),
@@ -87,7 +87,7 @@ const providerEnvironmentKeys: Record<AgentProvider, Set<string>> = {
   agy: new Set(),
   opencode: new Set(),
   openrouter: new Set(["OPENCODE_CONFIG_CONTENT"]),
-};
+} satisfies Record<AgentProvider, Set<string>>;
 
 const grokReadOnlyProfile = "briar_read_only";
 

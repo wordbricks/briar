@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(git -C "$script_dir" rev-parse --show-toplevel)"
+# shellcheck disable=SC1091
+. "$script_dir/image-lock.env"
+
+for command in aws jq mise packer session-manager-plugin shasum; do
+  if ! command -v "$command" >/dev/null 2>&1; then
+    echo "Required image build command is missing: $command" >&2
+    exit 1
+  fi
+done
+actual_packer_version="$(packer version | sed -n 's/^Packer v\([0-9.]*\).*$/\1/p' | head -n 1)"
+if [[ "$actual_packer_version" != "$PACKER_VERSION" ]]; then
+  echo "Packer $PACKER_VERSION is required; found ${actual_packer_version:-unknown}" >&2
+  exit 1
+fi
+
+for variable in \
+  AWS_REGION SOURCE_AMI_ID VPC_ID SUBNET_ID SECURITY_GROUP_ID \
+  IAM_INSTANCE_PROFILE; do
+  if [[ -z "${!variable:-}" ]]; then
+    echo "Required image build variable is missing: $variable" >&2
+    exit 1
+  fi
+done
+if [[ ! "$SOURCE_AMI_ID" =~ ^ami-[0-9a-f]+$ ]]; then
+  echo "SOURCE_AMI_ID must be a pinned AMI ID" >&2
+  exit 1
+fi
+
+source_image_json="$(aws ec2 describe-images \
+  --region "$AWS_REGION" \
+  --owners 136693071363 \
+  --image-ids "$SOURCE_AMI_ID" \
+  --output json)"
+if ! jq -e \
+  --arg imageId "$SOURCE_AMI_ID" \
+  '.Images | length == 1 and .[0].ImageId == $imageId and
+   .[0].State == "available" and .[0].Architecture == "x86_64" and
+   .[0].RootDeviceType == "ebs" and
+   (.[0].Name | startswith("debian-13-amd64-"))' \
+  <<< "$source_image_json" >/dev/null; then
+  echo "SOURCE_AMI_ID is not an available official Debian 13 amd64 EBS image" >&2
+  exit 1
+fi
+
+source_commit="$(git -C "$repo_root" rev-parse HEAD)"
+briar_version="$(mise exec -- bun -e \
+  'console.log((await import("./package.json")).default.version)' \
+  --cwd "$repo_root")"
+release_dir="${BRIAR_IMAGE_RELEASE_DIR:-$repo_root/release-artifacts/managed-computers/$source_commit}"
+if [[ "$release_dir" != /* ]]; then
+  echo "BRIAR_IMAGE_RELEASE_DIR must be absolute" >&2
+  exit 1
+fi
+install -d -m 0755 "$release_dir"
+artifact_dir="$(mktemp -d /tmp/briar-managed-image.XXXXXX)"
+trap 'rm -rf "$artifact_dir"' EXIT
+"$script_dir/prepare-image-artifacts" "$artifact_dir"
+
+packer_manifest="$release_dir/packer-manifest.json"
+package_lock="$release_dir/remote-desktop-packages.lock"
+image_manifest="$release_dir/image-manifest.json"
+template="$script_dir/image.pkr.hcl"
+packer init "$template"
+packer validate \
+  -var "region=$AWS_REGION" \
+  -var "debian_snapshot=$DEBIAN_SNAPSHOT" \
+  -var "source_ami_id=$SOURCE_AMI_ID" \
+  -var "vpc_id=$VPC_ID" \
+  -var "subnet_id=$SUBNET_ID" \
+  -var "security_group_id=$SECURITY_GROUP_ID" \
+  -var "iam_instance_profile=$IAM_INSTANCE_PROFILE" \
+  -var "artifact_directory=$artifact_dir" \
+  -var "source_commit=$source_commit" \
+  -var "briar_version=$briar_version" \
+  -var "ssm_agent_version=$SSM_AGENT_VERSION" \
+  -var "ssm_agent_sha256=$SSM_AGENT_DEBIAN_AMD64_SHA256" \
+  -var "packer_manifest_path=$packer_manifest" \
+  -var "package_lock_output=$package_lock" \
+  -var "image_manifest_output=$image_manifest" \
+  "$template"
+packer build \
+  -var "region=$AWS_REGION" \
+  -var "debian_snapshot=$DEBIAN_SNAPSHOT" \
+  -var "source_ami_id=$SOURCE_AMI_ID" \
+  -var "vpc_id=$VPC_ID" \
+  -var "subnet_id=$SUBNET_ID" \
+  -var "security_group_id=$SECURITY_GROUP_ID" \
+  -var "iam_instance_profile=$IAM_INSTANCE_PROFILE" \
+  -var "artifact_directory=$artifact_dir" \
+  -var "source_commit=$source_commit" \
+  -var "briar_version=$briar_version" \
+  -var "ssm_agent_version=$SSM_AGENT_VERSION" \
+  -var "ssm_agent_sha256=$SSM_AGENT_DEBIAN_AMD64_SHA256" \
+  -var "packer_manifest_path=$packer_manifest" \
+  -var "package_lock_output=$package_lock" \
+  -var "image_manifest_output=$image_manifest" \
+  "$template"
+
+ami_id="$(jq -r '.builds[-1].artifact_id | split(":")[-1]' "$packer_manifest")"
+if [[ ! "$ami_id" =~ ^ami-[0-9a-f]+$ ]]; then
+  echo "Packer did not report a valid AMI ID" >&2
+  exit 1
+fi
+ami_json="$(aws ec2 describe-images \
+  --region "$AWS_REGION" --image-ids "$ami_id" --output json)"
+if ! jq -e --arg amiId "$ami_id" \
+  '.Images | length == 1 and .[0].ImageId == $amiId and
+   .[0].State == "available" and .[0].Architecture == "x86_64" and
+   .[0].RootDeviceType == "ebs"' <<< "$ami_json" >/dev/null; then
+  echo "Created AMI did not pass AWS metadata validation" >&2
+  exit 1
+fi
+
+jq -n \
+  --arg amiId "$ami_id" \
+  --arg region "$AWS_REGION" \
+  --arg sourceCommit "$source_commit" \
+  --arg sourceAmiId "$SOURCE_AMI_ID" \
+  --arg sourceAmiName "$(jq -r '.Images[0].Name' <<< "$source_image_json")" \
+  --arg packageLockSha256 "$(shasum -a 256 "$package_lock" | cut -d' ' -f1)" \
+  --arg imageManifestSha256 "$(shasum -a 256 "$image_manifest" | cut -d' ' -f1)" \
+  --arg artifactManifestSha256 "$(shasum -a 256 "$artifact_dir/artifact-manifest.sha256" | cut -d' ' -f1)" \
+  --slurpfile image "$image_manifest" \
+  '{
+    schemaVersion: 1,
+    amiId: $amiId,
+    region: $region,
+    sourceCommit: $sourceCommit,
+    sourceAmiId: $sourceAmiId,
+    sourceAmiName: $sourceAmiName,
+    packageLockSha256: $packageLockSha256,
+    imageManifestSha256: $imageManifestSha256,
+    artifactManifestSha256: $artifactManifestSha256,
+    image: $image[0]
+  }' > "$release_dir/release.json"
+
+echo "$ami_id"
+echo "$release_dir/release.json"

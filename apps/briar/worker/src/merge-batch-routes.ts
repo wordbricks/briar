@@ -142,10 +142,11 @@ export async function handleMergeBatchRoute(
       claimedAt: observedAt,
       leaseExpiresAt: leaseExpiryFrom(observedAt),
     });
-    return json({
+    const response = {
       work: claim ? mergeBatchWorkJson(claim, claimToken) : null,
-      ...(!claim ? { retryAfterMs: 15_000 } : {}),
-    });
+    };
+    if (!claim) Object.assign(response, { retryAfterMs: 15_000 });
+    return json(response);
   }
 
   const mergeBatchClaimMatch = pathname.match(

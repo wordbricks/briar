@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec > >(tee /var/log/briar-packer-bootstrap.log) 2>&1
+
+snapshot='${debian_snapshot}'
+install -d -m 0755 /etc/apt/sources.list.d/briar-disabled
+while IFS= read -r source; do
+  name="$(basename -- "$source")"
+  mv -- "$source" "/etc/apt/sources.list.d/briar-disabled/$name"
+done < <(find /etc/apt/sources.list.d -maxdepth 1 -type f \
+  \( -name '*.list' -o -name '*.sources' \) -print)
+install -m 0644 /dev/null /etc/apt/sources.list
+{
+  printf 'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/%s/ trixie main contrib non-free non-free-firmware\n' "$snapshot"
+  printf 'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/%s/ trixie-updates main contrib non-free non-free-firmware\n' "$snapshot"
+  printf 'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/%s/ trixie-security main contrib non-free non-free-firmware\n' "$snapshot"
+} > /etc/apt/sources.list.d/briar-snapshot.list
+printf '%s\n' \
+  'Acquire::Check-Valid-Until "false";' \
+  'Acquire::Retries "5";' \
+  'APT::Install-Recommends "false";' \
+  > /etc/apt/apt.conf.d/99briar-snapshot
+
+if ! command -v wget >/dev/null 2>&1; then
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    ca-certificates wget
+fi
+
+package=/tmp/amazon-ssm-agent.deb
+wget --quiet --tries=5 \
+  "https://s3.${region}.amazonaws.com/amazon-ssm-${region}/${ssm_version}/debian_amd64/amazon-ssm-agent.deb" \
+  --output-document "$package"
+printf '%s  %s\n' '${ssm_sha256}' "$package" \
+  | sha256sum --check --status
+dpkg --install "$package"
+systemctl enable --now amazon-ssm-agent.service
+rm -f "$package"

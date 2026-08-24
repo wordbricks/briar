@@ -25,15 +25,15 @@ import {
   type Keybindings,
 } from "../lib/keybindings";
 
-const bindingLabels: Record<KeybindingId, MessageKey> = {
+const bindingLabels = {
   commandPalette: "appSettings.keybindingsCommandPalette",
   sidebarToggle: "appSettings.keybindingsSidebarToggle",
-};
+} satisfies Record<KeybindingId, MessageKey>;
 
-const bindingDescriptions: Record<KeybindingId, MessageKey> = {
+const bindingDescriptions = {
   commandPalette: "appSettings.keybindingsCommandPaletteDescription",
   sidebarToggle: "appSettings.keybindingsSidebarToggleDescription",
-};
+} satisfies Record<KeybindingId, MessageKey>;
 
 export function KeybindingsSettings() {
   const { t } = useI18n();

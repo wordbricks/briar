@@ -107,11 +107,7 @@ import {
   mergeChannelMessageSnapshot,
 } from "../lib/channel-message-merge";
 import { applyChannelMessageDeletion } from "../lib/channel-message-deletion";
-import {
-  channelReplyErrorText,
-  failedChannelReplyErrors,
-} from "../lib/channel-reply-error";
-import { ChannelErrorNotice, ChannelReplyFailure } from "./ChannelAlertNotice";
+import { channelReplyErrorText } from "../lib/channel-reply-error";
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import {
   ChannelDraftImages,
@@ -2199,14 +2195,6 @@ export function Channels({
       reply.channelId === activeChannelId &&
       (reply.status === "queued" || reply.status === "running"),
   );
-  const failedReplyErrors = failedChannelReplyErrors(
-    replies,
-    activeChannelId,
-    {
-      fallback: t("run.failed"),
-      noAvailableWorker: t("agents.agentWorkerUnavailable"),
-    },
-  );
   const threadMessageIds = threadParentId
     ? new Set([threadParentId, ...threadMessages.map((message) => message.id)])
     : new Set<string>();
@@ -2324,9 +2312,7 @@ export function Channels({
               </div>
             </header>
 
-            {error ? (
-              <ChannelErrorNotice className="channel-error" text={error} />
-            ) : null}
+            {error ? <div className="channel-error">{error}</div> : null}
 
             <div
               className="channel-messages"
@@ -2405,7 +2391,6 @@ export function Channels({
                         void toggleReaction(message, emoji)
                       }
                       onDelete={() => void removeMessage(message)}
-                      replyError={failedReplyErrors.get(message.id) ?? null}
                       busy={busy}
                       acceptingProposal={
                         acceptingProposalId === message.proposal?.id
@@ -2567,7 +2552,6 @@ export function Channels({
                   void toggleReaction(message, emoji)
                 }
                 onDelete={() => void removeMessage(message)}
-                replyError={failedReplyErrors.get(message.id) ?? null}
                 busy={busy}
                 acceptingProposal={
                   acceptingProposalId === message.proposal?.id
@@ -3867,7 +3851,6 @@ const MessageRow = memo(function MessageRow({
   onProjectChange,
   onDelete,
   onToggleReaction,
-  replyError,
   busy,
   projects,
   selectedProjectId,
@@ -3915,7 +3898,6 @@ const MessageRow = memo(function MessageRow({
   onProjectChange: (projectId: string) => void;
   onDelete: () => void;
   onToggleReaction: (emoji: string) => void;
-  replyError?: string | null;
   busy: boolean;
   projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
   selectedProjectId: string | null;
@@ -4006,15 +3988,7 @@ const MessageRow = memo(function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
-        {replyError ? <ChannelReplyFailure error={replyError} /> : null}
         <ChannelMessageImages attachments={message.attachments} token={token} />
-        {showTypingState ? (
-          <ChannelTypingState
-            agentNames={typingAgentNames}
-            activityByAgentName={typingActivityByAgentName}
-          />
-        ) : null}
-
         {message.document ? (
           <ChannelDocumentPreview
             channelId={message.channelId}
@@ -4187,6 +4161,12 @@ const MessageRow = memo(function MessageRow({
               : null}
             onClick={onOpenThread}
             participants={channelReplyParticipants(message)}
+          />
+        ) : null}
+        {showTypingState ? (
+          <ChannelTypingState
+            agentNames={typingAgentNames}
+            activityByAgentName={typingActivityByAgentName}
           />
         ) : null}
       </div>

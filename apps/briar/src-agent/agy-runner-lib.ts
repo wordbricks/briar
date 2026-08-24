@@ -275,14 +275,23 @@ export function normalizeAgyEvent(
       started: true,
       completed,
     });
+    if (completed) {
+      return [{
+        type: "activityCompleted",
+        id,
+        kind: activityKind(stepType, toolName),
+        title,
+        text: activityText,
+        status: "completed",
+      }];
+    }
     return [{
-      type: completed ? "activityCompleted" : "activityStarted",
+      type: "activityStarted",
       id,
       kind: activityKind(stepType, toolName),
       title,
       text: activityText,
-      ...(completed ? { status: "completed" as const } : {}),
-    } as NormalizedAgentEvent];
+    }];
   }
   if (completed && !existing.completed) {
     existing.completed = true;
