@@ -461,6 +461,7 @@ private struct DirectMessageNavigationTitle: View {
                 }
                 .menuIndicator(.hidden)
                 .accessibilityHint(L10n.text("참여자 목록 열기", locale: locale))
+                .accessibilityIdentifier("channel-header-identity")
             } else {
                 Button {
                     guard let participant = participants.first else { return }
@@ -476,10 +477,10 @@ private struct DirectMessageNavigationTitle: View {
                 }
                 .disabled(participants.isEmpty)
                 .accessibilityHint(L10n.text("프로필 보기", locale: locale))
+                .accessibilityIdentifier("channel-header-identity")
             }
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("channel-header-identity")
     }
 
     private var identityPill: some View {
@@ -503,6 +504,7 @@ private struct DirectMessageNavigationTitle: View {
         .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(title)
+        .accessibilityIdentifier("channel-header-identity-content")
     }
 }
 
@@ -573,14 +575,15 @@ private struct ConversationProfileSheet: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(profile.name)
                                 .font(.title3.weight(.semibold))
-                                .accessibilityIdentifier("conversation-profile-name")
                             Text(roleLabel)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
                     }
                     .padding(.vertical, 4)
-                    .accessibilityIdentifier("conversation-profile-header")
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(profile.name)
+                    .accessibilityIdentifier("conversation-profile-name")
                 }
 
                 Section(L10n.text("프로필", locale: locale)) {
