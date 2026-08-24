@@ -67,6 +67,18 @@ export type WorkerLoopUpdateDirective = {
   handoffState?: "idle" | "draining" | "ready" | "failed";
 };
 
+export function createWorkerLoopHeartbeat(input: {
+  acceptingWork: boolean;
+  maxConcurrentSessions?: number;
+  updateDirective?: WorkerLoopUpdateDirective | null;
+}) {
+  return {
+    acceptingWork: input.acceptingWork,
+    maxConcurrentSessions: input.maxConcurrentSessions,
+    updateDirective: input.updateDirective ?? null,
+  };
+}
+
 export type WorkerExecutionCheckpoint = {
   conversationId?: string | null;
   workspacePath?: string | null;
