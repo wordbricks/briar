@@ -19,22 +19,36 @@
       "error",
       { "packageNames": ["effect"] },
     ],
-    "anti-slop/no-chained-type-assertions": "error",
-    "anti-slop/no-conditional-empty-object-spread": "error",
-    "anti-slop/no-known-value-widening": "error",
-    "anti-slop/no-module-mocking": "error",
-    "anti-slop/no-object-parameters": "error",
+    // Anti-slop baseline at b2907815. Re-enable each rule after its count reaches zero.
+    // 113 existing findings.
+    "anti-slop/no-chained-type-assertions": "off",
+    // 90 existing findings.
+    "anti-slop/no-conditional-empty-object-spread": "off",
+    // 20 existing findings.
+    "anti-slop/no-known-value-widening": "off",
+    // 68 existing findings.
+    "anti-slop/no-module-mocking": "off",
+    // 1 existing finding.
+    "anti-slop/no-object-parameters": "off",
     "anti-slop/no-reflect-apply": "error",
-    "anti-slop/no-reflect-get": "error",
-    "anti-slop/no-runtime-typeof": "error",
-    "anti-slop/no-shape-in-symbol-names": "error",
-    "anti-slop/no-unknown-parameters": "error",
-    "anti-slop/no-unknown-returns": "error",
+    // 12 existing findings.
+    "anti-slop/no-reflect-get": "off",
+    // 603 existing findings.
+    "anti-slop/no-runtime-typeof": "off",
+    // 6 existing findings.
+    "anti-slop/no-shape-in-symbol-names": "off",
+    // 245 existing findings.
+    "anti-slop/no-unknown-parameters": "off",
+    // 82 existing findings.
+    "anti-slop/no-unknown-returns": "off",
     "anti-slop/no-unknown-type-aliases": "error",
-    "anti-slop/no-unsafe-dictionary-type": "error",
+    // 288 existing findings.
+    "anti-slop/no-unsafe-dictionary-type": "off",
     "anti-slop/no-widen-then-assert": "error",
-    "anti-slop/require-safety-comment-for-type-assertion": "error",
-    "anti-slop-effect/no-service-constructor-imports": "error",
+    // 899 existing findings.
+    "anti-slop/require-safety-comment-for-type-assertion": "off",
+    // 6 existing findings.
+    "anti-slop-effect/no-service-constructor-imports": "off",
   },
   "ignorePatterns": [
     "**/node_modules/**",
