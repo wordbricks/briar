@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  managedComputerRemoteHeartbeatRequest,
+  managedComputerRemoteHeartbeatResponse,
+} from "../../src/lib/managed-computer-remote-protocol";
 import { ManagedComputerRemoteSessionHub } from "./managed-computer-remote-relay";
 
 type Attachment = {
@@ -30,7 +34,43 @@ class FakeSocket {
   }
 }
 
+class FakeWebSocketRequestResponsePair {
+  constructor(
+    readonly request: string,
+    readonly response: string,
+  ) {}
+}
+
+beforeEach(() => {
+  vi.stubGlobal(
+    "WebSocketRequestResponsePair",
+    FakeWebSocketRequestResponsePair,
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("ManagedComputerRemoteSessionHub", () => {
+  it("answers agent heartbeats without waking the relay", () => {
+    const setWebSocketAutoResponse = vi.fn();
+    new ManagedComputerRemoteSessionHub(
+      {
+        getWebSockets: () => [],
+        setWebSocketAutoResponse,
+      } as unknown as DurableObjectState,
+      {} as Env,
+    );
+
+    expect(setWebSocketAutoResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: managedComputerRemoteHeartbeatRequest,
+        response: managedComputerRemoteHeartbeatResponse,
+      }),
+    );
+  });
+
   it("relays only binary RFB frames between one controller and one agent", async () => {
     const sessionId = "11111111-1111-4111-8111-111111111111";
     const controller = new FakeSocket({
@@ -57,6 +97,7 @@ describe("ManagedComputerRemoteSessionHub", () => {
             : tag === "controller"
               ? [controller]
               : [agent, controller],
+        setWebSocketAutoResponse: vi.fn(),
       } as unknown as DurableObjectState,
       {} as Env,
     );
@@ -97,6 +138,7 @@ describe("ManagedComputerRemoteSessionHub", () => {
             : tag === "controller"
               ? [controller]
               : [agent, controller],
+        setWebSocketAutoResponse: vi.fn(),
       } as unknown as DurableObjectState,
       {} as Env,
     );
@@ -148,6 +190,7 @@ describe("ManagedComputerRemoteSessionHub", () => {
             : tag === "controller"
               ? [controller]
               : [oldAgent, replacementAgent, controller],
+        setWebSocketAutoResponse: vi.fn(),
       } as unknown as DurableObjectState,
       {} as Env,
     );
@@ -185,6 +228,7 @@ describe("ManagedComputerRemoteSessionHub", () => {
             : tag === "controller"
               ? [controller]
               : [agent, controller],
+        setWebSocketAutoResponse: vi.fn(),
       } as unknown as DurableObjectState,
       {} as Env,
     );
