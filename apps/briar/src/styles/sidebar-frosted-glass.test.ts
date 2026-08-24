@@ -5,6 +5,21 @@ import { describe, expect, it } from "vitest";
 const styles = readFileSync(resolve("src", "styles.css"), "utf8");
 const darkStyles = readFileSync(resolve("src", "styles", "dark.css"), "utf8");
 const tokens = readFileSync(resolve("src", "styles", "tokens.css"), "utf8");
+const appSource = readFileSync(resolve("src", "App.tsx"), "utf8");
+const mainSource = readFileSync(resolve("src", "main.tsx"), "utf8");
+const macosConfig = JSON.parse(
+  readFileSync(resolve("src-tauri", "tauri.macos.conf.json"), "utf8"),
+) as {
+  app: {
+    windows: Array<{
+      backgroundColor?: string;
+      titleBarStyle?: string;
+      trafficLightPosition?: { x: number; y: number };
+      transparent?: boolean;
+      windowEffects?: { effects: string[]; state?: string };
+    }>;
+  };
+};
 
 describe("sidebar frosted glass styles", () => {
   it("defines translucent and opaque surfaces for both themes", () => {
@@ -26,6 +41,37 @@ describe("sidebar frosted glass styles", () => {
     expect(styles).toContain("var(--sidebar-glass-highlight)");
     expect(styles).toContain("backdrop-filter:blur(24px) saturate(155%)");
     expect(styles).toContain("-webkit-backdrop-filter:blur(24px) saturate(155%)");
+  });
+
+  it("composes the macOS main window over the native sidebar material", () => {
+    const [mainWindow] = macosConfig.app.windows;
+
+    expect(mainWindow).toMatchObject({
+      backgroundColor: "#00000000",
+      titleBarStyle: "Overlay",
+      trafficLightPosition: { x: 16, y: 22 },
+      transparent: true,
+      windowEffects: {
+        effects: ["sidebar"],
+        state: "followsWindowActiveState",
+      },
+    });
+    expect(mainSource).toContain(
+      'document.documentElement.classList.add("macos-vibrant-window")',
+    );
+  });
+
+  it("keeps the native material visible only behind the sidebar", () => {
+    expect(styles).toContain(
+      ".macos-vibrant-window .app-shell { background:transparent; }",
+    );
+    expect(styles).toContain(
+      ".app-content-surface { min-width:0; min-height:0; height:100%; flex:1; display:flex; background:var(--background); }",
+    );
+    expect(appSource).toContain('<div className="app-content-surface">');
+    expect(darkStyles).toContain(".dark .app-content-surface,");
+    expect(darkStyles).not.toContain(".dark .desktop-app-frame,");
+    expect(darkStyles).not.toContain(".dark .app-shell,");
   });
 
   it("uses the themed opaque surface for accessibility preferences", () => {

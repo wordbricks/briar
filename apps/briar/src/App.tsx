@@ -1943,6 +1943,7 @@ export function App() {
             user={briar.user}
           />
         ) : null}
+        <div className="app-content-surface">
         {repositorySetupProjectId ? (
           <ProjectRepositorySetupDialog
             error={briar.projectReadinessError[repositorySetupProjectId] ?? null}
@@ -2407,6 +2408,7 @@ export function App() {
             token={briar.token}
           />
           )}
+        </div>
         </div>
         <div className="app-status-bar">
           <AgentUsageStatusBar
