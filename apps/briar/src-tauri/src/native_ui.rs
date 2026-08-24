@@ -655,3 +655,6 @@ pub(super) fn arm_macos_password_editor(webview: tauri::Webview) {
     #[cfg(not(target_os = "macos"))]
     let _ = webview;
 }
+
+#[cfg(test)]
+mod tests;

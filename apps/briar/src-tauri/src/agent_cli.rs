@@ -1744,3 +1744,6 @@ pub(super) fn cli_execution_path(home: &Path) -> Result<OsString, String> {
         .unwrap_or_default();
     cli_execution_path_with_runtime(home, runtime_directories)
 }
+
+#[cfg(test)]
+mod tests;

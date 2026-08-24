@@ -1287,3 +1287,6 @@ pub(super) async fn load_auto_hunt_dispatch(
     .await
     .map_err(|error| error.to_string())?
 }
+
+#[cfg(test)]
+mod tests;

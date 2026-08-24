@@ -129,4 +129,4 @@ pub fn run() {
 }
 
 #[cfg(test)]
-mod tests;
+mod test_support;
