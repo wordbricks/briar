@@ -549,7 +549,7 @@ export function detachedAgentContext(
   const scope = agent.scope?.kind === "organization"
     ? `Organization scope (${agent.scope.organizationId}). Repository access is unavailable. Use only Briar context explicitly attached to this invocation and say when project detail is unavailable.`
     : agent.scope?.kind === "project"
-      ? `Project scope (${agent.scope.projectId}) inside organization ${agent.scope.organizationId}. Use the repository opened for this project, never another project context, and target only this project.`
+      ? `Project scope (${agent.scope.projectId}) inside organization ${agent.scope.organizationId}. All project mutations—including code changes, configuration changes, commits, migrations, deployments, and other writes—must target your authoritative project ${agent.scope.projectId}. When relevant to work on this project, you may clone or inspect external public repositories for read-only research. Never modify, commit to, configure, migrate, or deploy an external repository or another project.`
       : "No additional Briar data scope was attached to this invocation.";
   const organizationContext = invocation.organizationContextManifestPath
     ? [

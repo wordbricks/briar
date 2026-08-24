@@ -458,6 +458,41 @@ describe("detached Agent runner", () => {
     expect(prompt.length).toBeLessThan(20_000);
   });
 
+  it("allows related external repository research without expanding project mutations", () => {
+    const projectId = "22222222-2222-4222-8222-222222222222";
+    const projectAgent = {
+      ...agent,
+      scope: {
+        kind: "project" as const,
+        organizationId: "11111111-1111-4111-8111-111111111111",
+        projectId,
+      },
+    };
+    const launch = detachedProviderRequest({
+      agent: projectAgent,
+      prompt: "Compare the current project with a related public repository.",
+      workspacePath: "/private/project",
+      fullAccess: false,
+      agentBinary: "/bin/codex",
+    });
+
+    expect(launch.request.instructions).toContain(
+      `All project mutations—including code changes, configuration changes, commits, migrations, deployments, and other writes—must target your authoritative project ${projectId}.`,
+    );
+    expect(launch.request.instructions).toContain(
+      "When relevant to work on this project, you may clone or inspect external public repositories for read-only research.",
+    );
+    expect(launch.request.instructions).toContain(
+      "Never modify, commit to, configure, migrate, or deploy an external repository or another project.",
+    );
+    expect(launch.request.instructions).toContain(
+      "Responsibility is the maximum scope of action",
+    );
+    expect(launch.request.instructions).not.toContain(
+      "Use the repository opened for this project",
+    );
+  });
+
   it("keeps organization and project channel scope authoritative", () => {
     const organizationAgent = {
       ...agent,
