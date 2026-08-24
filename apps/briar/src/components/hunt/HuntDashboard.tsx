@@ -36,6 +36,12 @@ import { EditIssueDialog } from "./editor/EditIssueDialog";
 import { DashboardView, IssuePropertyFilters, SourceFilter, StatusFilter, emptyIssuePropertyFilters, runMatchesIssuePropertyFilters } from "./model/filters";
 import { localizeWorkflowStage } from "./model/formatters";
 import { KanbanColumn, KanbanPointerDrag, kanbanAutoScrollEdge, kanbanAutoScrollInterval, kanbanColumnForRun, kanbanPointerDragThreshold, placementMatchesRun } from "./model/kanban";
+function runIdFromCreateIssueResult(value: unknown) {
+  if (typeof value !== "object" || value === null || !("runId" in value) || typeof value.runId !== "string") {
+    return null;
+  }
+  return value.runId;
+}
 export function HuntDashboard({
   agents = [],
   companionMode = false,
@@ -212,10 +218,15 @@ export function HuntDashboard({
   const [selectedRunInitialTab, setSelectedRunInitialTab] = useState<IssueDetailTab | null>(null);
   const [internalIsIssueDialogOpen, setInternalIsIssueDialogOpen] = useState(false);
   const isIssueDialogOpen = controlledIsIssueDialogOpen ?? internalIsIssueDialogOpen;
+  const [createIssuePlacement, setCreateIssuePlacement] = useState<HuntRunPlacement | null>(null);
   const setIsIssueDialogOpen = useCallback((isOpen: boolean) => {
     setInternalIsIssueDialogOpen(isOpen);
     onIssueDialogOpenChange?.(isOpen);
   }, [onIssueDialogOpenChange]);
+  const openCreateIssueDialog = useCallback((placement: HuntRunPlacement | null = null) => {
+    setCreateIssuePlacement(placement);
+    setIsIssueDialogOpen(true);
+  }, [setIsIssueDialogOpen]);
   const [editingRunId, setEditingRunId] = useState<string | null>(null);
   const [transferringRunFromMenuId, setTransferringRunFromMenuId] = useState<string | null>(null);
   const [transferTargetProjectId, setTransferTargetProjectId] = useState("");
@@ -326,11 +337,11 @@ export function HuntDashboard({
         return;
       }
       event.preventDefault();
-      setIsIssueDialogOpen(true);
+      openCreateIssueDialog();
     };
     window.addEventListener("keydown", openIssueCreation);
     return () => window.removeEventListener("keydown", openIssueCreation);
-  }, [noProject, setIsIssueDialogOpen]);
+  }, [noProject, openCreateIssueDialog]);
   useEffect(() => {
     setPropertyFilters(emptyIssuePropertyFilters());
   }, [dashboard?.project.id]);
@@ -601,8 +612,21 @@ export function HuntDashboard({
   }, [companionMode, dashboard, issuesLoading, selectedRunId, view]);
   const visibleKanbanColumns = useMemo(() => companionMode ? kanbanColumns : kanbanColumns.filter(column => !hiddenColumnIdSet.has(column.id)), [companionMode, hiddenColumnIdSet, kanbanColumns]);
   const hiddenKanbanColumns = useMemo(() => companionMode ? [] : kanbanColumns.filter(column => hiddenColumnIdSet.has(column.id)), [companionMode, hiddenColumnIdSet, kanbanColumns]);
-  const createIssueDialog = isIssueDialogOpen ? <CreateIssueDialog availableProviders={availableProviders} compactHeader={companionMode} defaultProjectId={createIssueDefaultProjectId ?? dashboard?.project.id} isSubmitting={isCreatingIssue} onClose={() => setIsIssueDialogOpen(false)} onCreate={async (projectId, input) => {
-    await onCreateIssue(projectId, input);
+  const createIssueDialog = isIssueDialogOpen ? <CreateIssueDialog availableProviders={availableProviders} compactHeader={companionMode} defaultProjectId={createIssueDefaultProjectId ?? dashboard?.project.id} defaultStatus={createIssuePlacement?.status === "backlog" ? "backlog" : "queued"} isSubmitting={isCreatingIssue} onClose={() => {
+    setCreateIssuePlacement(null);
+    setIsIssueDialogOpen(false);
+  }} onCreate={async (projectId, input) => {
+    const created = await onCreateIssue(projectId, input);
+    const createdRunId = runIdFromCreateIssueResult(created);
+    const placement = createIssuePlacement;
+    if (createdRunId && placement && (placement.status !== input.status || placement.workflowStage !== null)) {
+      try {
+        await onMoveRun(createdRunId, placement);
+      } catch {
+        // The issue has already been created. The move handler reports its own error.
+      }
+    }
+    setCreateIssuePlacement(null);
     setIsIssueDialogOpen(false);
   }} projects={projects.length > 0 ? projects : dashboard ? [dashboard.project] : []} members={dashboard?.members ?? []} workflow={dashboard ? {
     ...dashboard.settings.workflow,
@@ -661,7 +685,7 @@ export function HuntDashboard({
                   <span>{t("dashboard.list")}</span>
                 </button>
               </div>
-              <Button aria-keyshortcuts="Meta+N" aria-label={t("dashboard.createIssue")} className="create-issue-button" onClick={() => setIsIssueDialogOpen(true)} type="button">
+              <Button aria-keyshortcuts="Meta+N" aria-label={t("dashboard.createIssue")} className="create-issue-button" onClick={() => openCreateIssueDialog()} type="button">
                 <Plus size={16} />
                 {t("issue.newIssue")}
               </Button>
@@ -770,7 +794,7 @@ export function HuntDashboard({
                     <KanbanColumnMenu label={column.label} onHide={() => toggleKanbanColumnHidden(column.id)} />
                   </div>
                 </header> : null}
-              {isCollapsed ? null : <div>
+              {isCollapsed ? null : <div className="kanban-column-content">
                 {column.runs.length ? column.runs.map(run => <CompanionTaskSwipeAction disabled={!onProcessIssueNow || run.executionReadiness === "waiting" || run.status === "queued" && Boolean(run.leaseExpiresAt) && Date.parse(run.leaseExpiresAt!) > Date.now() || processingIssueIds.has(run.id)} enabled={companionMode && (run.status === "backlog" || run.status === "queued")} key={run.id} onProcessNow={() => onProcessIssueNow?.(run)}>
                     <KanbanCard availableProviders={availableProviders} issueKeyPrefix={dashboard?.project.issueKeyPrefix} activeAgent={agentAssociationsByRunId.activeAgents.get(run.id) ?? null} assignee={dashboard?.members?.find(member => member.userId === run.assigneeUserId) ?? null} assignedWorker={workerById.get(run.workerId ?? "") ?? workerById.get(run.requestedWorkerId ?? "") ?? null} hideAssignmentBadges={!companionMode && ["completed", "cancelled", "paused", "blocked", "failed"].includes(run.status)} contextMenuDisabled={companionMode} deletingIssueId={deletingIssueId} isDragging={draggedRunId === run.id} isMoving={recoveringRunId === run.id} onDelete={() => {
                       setContextDeleteError(null);
@@ -845,6 +869,14 @@ export function HuntDashboard({
                     <Bot size={18} />
                     <span>{t("dashboard.columnEmpty")}</span>
                   </div>}
+                {!companionMode && <button aria-label={t("dashboard.createIssueInColumn", {
+                  label: column.label
+                })} className="kanban-column-add" data-kanban-column-add="" onClick={() => openCreateIssueDialog(column.placement)} title={t("dashboard.createIssueInColumn", {
+                  label: column.label
+                })} type="button">
+                    <Plus aria-hidden="true" size={15} />
+                    <span>{t("dashboard.createIssue")}</span>
+                  </button>}
               </div>}
               </section>
             </div>;

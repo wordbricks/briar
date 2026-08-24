@@ -168,6 +168,17 @@
   background: color-mix(in srgb, var(--muted) 82%, #8068ce);
 }
 
+.dark .kanban-column-add {
+  border-color: var(--border);
+  color: var(--muted-foreground);
+}
+
+.dark .kanban-column-add:hover {
+  border-color: #8068ce;
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
 .dark .kanban-hidden-column {
   border-color: var(--border);
   color: var(--foreground);
