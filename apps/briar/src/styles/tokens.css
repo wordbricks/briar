@@ -167,6 +167,11 @@
   --input: #dcded8;
   --ring: #73585d;
 
+  /* Scrollbars */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(82, 83, 77, 0.18);
+  --scrollbar-thumb-hover: rgba(82, 83, 77, 0.32);
+
   --sidebar: rgba(244, 244, 242, 0.76);
   --sidebar-fallback: #f4f4f2;
   --sidebar-glass-highlight: rgba(255, 255, 255, 0.42);
@@ -248,6 +253,10 @@
   --border: #242428;
   --input: #2a2a30;
   --ring: #a894ff;
+
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(232, 232, 227, 0.2);
+  --scrollbar-thumb-hover: rgba(232, 232, 227, 0.34);
 
   --sidebar: rgba(20, 20, 23, 0.78);
   --sidebar-fallback: #161618;
