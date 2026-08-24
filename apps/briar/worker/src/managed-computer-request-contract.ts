@@ -24,13 +24,19 @@ export const InstanceIdentityDocument = strictSchema(Schema.Struct({
   accountId: Schema.String.check(Schema.isPattern(/^\d{12}$/u)),
   architecture: trimmedText(1, 40),
   availabilityZone: trimmedText(1, 40),
-  billingProducts: Schema.optional(Schema.Array(Schema.String)),
-  devpayProductCodes: Schema.optional(Schema.Array(Schema.String)),
+  billingProducts: Schema.optional(
+    Schema.NullOr(Schema.Array(Schema.String)),
+  ),
+  devpayProductCodes: Schema.optional(
+    Schema.NullOr(Schema.Array(Schema.String)),
+  ),
   imageId: Schema.String.check(Schema.isPattern(/^ami-[0-9a-f]+$/u)),
   instanceId: Schema.String.check(Schema.isPattern(/^i-[0-9a-f]+$/u)),
   instanceType: trimmedText(1, 80),
   kernelId: Schema.optional(Schema.NullOr(Schema.String)),
-  marketplaceProductCodes: Schema.optional(Schema.Array(Schema.String)),
+  marketplaceProductCodes: Schema.optional(
+    Schema.NullOr(Schema.Array(Schema.String)),
+  ),
   pendingTime: trimmedText(1, 80),
   privateIp: trimmedText(1, 80),
   ramdiskId: Schema.optional(Schema.NullOr(Schema.String)),
