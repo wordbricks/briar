@@ -1,5 +1,26 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "Briar",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 980,
+        "minHeight": 680,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 16, "y": 22 },
+        "transparent": true,
+        "backgroundColor": "#00000000",
+        "windowEffects": {
+          "effects": ["sidebar"],
+          "state": "followsWindowActiveState"
+        },
+        "dragDropEnabled": false
+      }
+    ]
+  },
   "bundle": {
     "externalBin": [
       "binaries/bun"
