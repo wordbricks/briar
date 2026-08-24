@@ -97,6 +97,12 @@ if (
 if (!packer.includes("verify-managed-image --capture-ready")) {
   fail("Packer does not verify the final credential-free capture state");
 }
+if (
+  !packer.includes("install -d -m 0755 /tmp/briar-image") ||
+  !packer.includes('destination = "/tmp/briar-image/"')
+) {
+  fail("Packer must create the artifact upload directory before file provisioning");
+}
 
 const installer = await text(join(image, "install-image-runtime"));
 if (!installer.includes("--frozen-lockfile --production --ignore-scripts")) {
