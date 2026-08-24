@@ -348,8 +348,9 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             payload = ##"""
             {"messages":[{"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","channelId":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","parentMessageId":null,"body":"상단 헤더 디자인을 함께 확인해 주세요.","author":{"type":"user","name":"Briar User","image":null,"provider":null},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":1,"lastReplyAt":"2026-08-02T01:03:00Z","document":null,"proposal":null,"createdAt":"2026-08-02T01:02:00Z"},{"id":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","channelId":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","parentMessageId":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","body":"스레드에서 확인했습니다.","author":{"type":"agent","id":"agent-ui-test","name":"Briar Agent","provider":"codex"},"mentionedUserIds":[],"mentionedAgentIds":[],"replyCount":0,"lastReplyAt":null,"document":null,"proposal":null,"createdAt":"2026-08-02T01:03:00Z"}]}
             """##
-        } else if path.hasSuffix(
-            "/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc/messages"
+        } else if (
+            path.hasSuffix("/channels/cccccccc-cccc-4ccc-8ccc-cccccccccccc/messages") ||
+            path.hasSuffix("/channels/12121212-1212-4212-8212-121212121212/messages")
         ) && method == "POST" {
             guard let body else { throw MobileAPIError.invalidRequest }
             let requestData = try JSONEncoder.mobileContract.encode(UITestAnyEncodable(body))
@@ -362,7 +363,11 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
             }
             let response = CreateChannelMessageResponse(message: ChannelMessage(
                 id: request.clientMessageId ?? UUID(),
-                channelId: UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!,
+                channelId: UUID(
+                    uuidString: path.contains("/channels/12121212-1212-4212-8212-121212121212/")
+                        ? "12121212-1212-4212-8212-121212121212"
+                        : "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+                )!,
                 parentMessageId: request.parentMessageId,
                 body: request.body,
                 author: ChannelMessage.Author(

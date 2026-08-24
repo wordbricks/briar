@@ -118,7 +118,7 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(conversation.waitForExistence(timeout: channelTransitionTimeout))
         conversation.tap()
 
-        let identity = app.descendants(matching: .any)["channel-header-identity"]
+        let identity = app.buttons["channel-header-identity"]
         XCTAssertTrue(identity.waitForExistence(timeout: channelTransitionTimeout))
         XCTAssertTrue(identity.label.contains("Honey"))
         XCTAssertFalse(identity.label.contains("비공개 대화"))
@@ -140,6 +140,7 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(
             app.descendants(matching: .any)["conversation-profile-name"].label.contains("Honey")
         )
+        app.swipeUp()
         XCTAssertTrue(app.staticTexts["Review mobile product work."].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-direct-message-profile")
         app.buttons["conversation-profile-close"].tap()
