@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$(id -u)" != "0" ]]; then
+  echo "prepare-image-for-capture must run as root" >&2
+  exit 1
+fi
+
+for forbidden in \
+  /var/lib/briar/worker-credential.json \
+  /var/lib/briar/managed-enrollment.json \
+  /home/briar/.config/briar/config.json \
+  /home/briar/.codex/auth.json \
+  /home/briar/.claude/.credentials.json \
+  /root/.aws \
+  /home/admin/.aws \
+  /home/briar/.aws \
+  /home/briar/.ssh \
+  /home/briar/.git-credentials \
+  /home/briar/.config/gh \
+  /home/briar/.npmrc \
+  /root/.npmrc \
+  /var/lib/amazon/ssm/credentials \
+  /var/lib/amazon/ssm/registration; do
+  if [[ -e "$forbidden" ]]; then
+    echo "Refusing to capture image with runtime credential state: $forbidden" >&2
+    exit 1
+  fi
+done
+
+find /var/lib/briar -mindepth 1 -delete
+rm -rf /home/admin/.ssh /root/.ssh
+rm -f /root/.bash_history /home/admin/.bash_history /home/briar/.bash_history
+rm -rf /root/.bun /root/.cache /root/.npm /tmp/briar-image
+apt-get clean
+find /var/lib/apt/lists -mindepth 1 -delete
+if command -v cloud-init >/dev/null 2>&1; then
+  cloud-init clean --logs --machine-id
+fi
+journalctl --rotate
+journalctl --vacuum-time=1s
+sync
+
+echo "managed computer image capture cleanup passed"

@@ -65,6 +65,10 @@ async function workerRestartServices() {
   for (const project of projects) {
     const registered = project.executionWorker;
     if (!registered || handoffs.has(registered.workerId)) continue;
+    const token = process.env.BRIAR_WORKER_TOKEN ?? registered.token;
+    if (!token) {
+      throw new Error("Worker machine credential is unavailable");
+    }
     const prepared = await request<{
       requestId: string;
       targetVersion: string;
@@ -74,7 +78,7 @@ async function workerRestartServices() {
     }>(
       config.apiUrl,
       `/workers/${registered.workerId}/update-handoff/prepare`,
-      registered.token,
+      token,
       {
         method: "POST",
         body: JSON.stringify({ targetVersion: cliVersion }),
@@ -82,7 +86,7 @@ async function workerRestartServices() {
     );
     handoffs.set(registered.workerId, {
       workerId: registered.workerId,
-      token: registered.token,
+      token,
       requestId: prepared.requestId,
     });
   }

@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$(id -u)" != "0" ]]; then
+  echo "install-image-runtime must run as root in the AMI builder" >&2
+  exit 1
+fi
+
+source_dir="${1:-/tmp/briar-image}"
+base_ami_id="${BRIAR_BASE_AMI_ID:-}"
+aws_region="${AWS_REGION:-us-east-1}"
+test -d "$source_dir"
+test -s "$source_dir/image-lock.env"
+test -s "$source_dir/source-commit"
+test -s "$source_dir/briar-version"
+test -s "$source_dir/artifact-manifest.sha256"
+(
+  cd "$source_dir"
+  sha256sum --check --strict artifact-manifest.sha256
+)
+
+# shellcheck disable=SC1091
+. "$source_dir/image-lock.env"
+for required in \
+  DEBIAN_SNAPSHOT BUN_VERSION BUN_LINUX_X64_SHA256 \
+  GOOGLE_CHROME_VERSION GOOGLE_CHROME_AMD64_SHA256 \
+  SSM_AGENT_VERSION SSM_AGENT_PACKAGE_VERSION \
+  SSM_AGENT_DEBIAN_AMD64_SHA256; do
+  if [[ -z "${!required:-}" ]]; then
+    echo "Missing image lock value: $required" >&2
+    exit 1
+  fi
+done
+if [[ ! "$base_ami_id" =~ ^ami-[0-9a-f]+$ ]]; then
+  echo "BRIAR_BASE_AMI_ID must be a pinned AMI ID" >&2
+  exit 1
+fi
+if [[ ! "$aws_region" =~ ^[a-z]{2}(-gov)?-[a-z]+-[0-9]+$ ]]; then
+  echo "AWS_REGION is invalid" >&2
+  exit 1
+fi
+
+"$source_dir/assert-debian-13-x86_64"
+"$source_dir/configure-debian-snapshot" "$DEBIAN_SNAPSHOT"
+"$source_dir/resolve-remote-desktop-packages" \
+  "$source_dir/remote-desktop-packages.txt" \
+  "$source_dir/remote-desktop-packages.lock"
+"$source_dir/install-remote-desktop" \
+  "$source_dir" \
+  "$source_dir/remote-desktop-packages.lock" \
+  "$source_dir/briar-remote-session-agent.js"
+
+download_dir="$(mktemp -d /tmp/briar-image-downloads.XXXXXX)"
+trap 'rm -rf "$download_dir"' EXIT
+
+download_checked() {
+  local url="$1"
+  local expected_sha="$2"
+  local output="$3"
+  curl --fail --silent --show-error --location \
+    --retry 5 --retry-all-errors --connect-timeout 20 \
+    "$url" --output "$output"
+  printf '%s  %s\n' "$expected_sha" "$output" | sha256sum --check --status
+}
+
+bun_zip="$download_dir/bun-linux-x64.zip"
+download_checked \
+  "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip" \
+  "$BUN_LINUX_X64_SHA256" \
+  "$bun_zip"
+unzip -q "$bun_zip" -d "$download_dir/bun"
+install -o root -g root -m 0755 \
+  "$download_dir/bun/bun-linux-x64/bun" /opt/briar/bin/bun
+
+chrome_deb="$download_dir/google-chrome-stable.deb"
+download_checked \
+  "https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${GOOGLE_CHROME_VERSION}_amd64.deb" \
+  "$GOOGLE_CHROME_AMD64_SHA256" \
+  "$chrome_deb"
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+  "$chrome_deb"
+test "$(dpkg-query --show --showformat='${Version}' google-chrome-stable)" = \
+  "$GOOGLE_CHROME_VERSION"
+find /etc/apt/sources.list.d -maxdepth 1 -type f \
+  -name 'google-chrome*.list' -delete
+
+ssm_deb="$download_dir/amazon-ssm-agent.deb"
+download_checked \
+  "https://s3.${aws_region}.amazonaws.com/amazon-ssm-${aws_region}/${SSM_AGENT_VERSION}/debian_amd64/amazon-ssm-agent.deb" \
+  "$SSM_AGENT_DEBIAN_AMD64_SHA256" \
+  "$ssm_deb"
+dpkg --install "$ssm_deb"
+test "$(dpkg-query --show --showformat='${Version}' amazon-ssm-agent)" = \
+  "$SSM_AGENT_PACKAGE_VERSION"
+systemctl enable amazon-ssm-agent.service
+
+install -d -o root -g root -m 0755 /opt/briar/lib/agent
+install -o root -g root -m 0644 "$source_dir/briar.js" \
+  /opt/briar/lib/briar.js
+for runner in "$source_dir"/agent/*-runner.js; do
+  test -s "$runner"
+  install -o root -g root -m 0644 "$runner" \
+    "/opt/briar/lib/agent/$(basename -- "$runner")"
+done
+install -o root -g root -m 0755 "$source_dir/briar" /opt/briar/bin/briar
+
+install -d -o root -g root -m 0755 /opt/briar/provider
+install -o root -g root -m 0644 \
+  "$source_dir/provider-runtime/package.json" \
+  "$source_dir/provider-runtime/bun.lock" \
+  /opt/briar/provider/
+HOME=/root /opt/briar/bin/bun install \
+  --cwd /opt/briar/provider --frozen-lockfile --production --ignore-scripts
+for binary in codex claude agent-browser; do
+  test -x "/opt/briar/provider/node_modules/.bin/$binary"
+  ln -sfn "/opt/briar/provider/node_modules/.bin/$binary" \
+    "/opt/briar/bin/$binary"
+done
+
+install -d -o briar -g briar -m 0700 \
+  /home/briar/.config /home/briar/.config/xfce4 /home/briar/Desktop
+install -o briar -g briar -m 0600 "$source_dir/xfce4-helpers.rc" \
+  /home/briar/.config/xfce4/helpers.rc
+install -o briar -g briar -m 0600 "$source_dir/mimeapps.list" \
+  /home/briar/.config/mimeapps.list
+install -o briar -g briar -m 0755 \
+  /usr/share/applications/google-chrome.desktop \
+  "/home/briar/Desktop/Google Chrome.desktop"
+update-alternatives --set x-www-browser /usr/bin/google-chrome-stable
+
+install -o root -g root -m 0755 \
+  "$source_dir/verify-managed-image" \
+  "$source_dir/prepare-image-for-capture" \
+  /opt/briar/bin/
+install -o root -g root -m 0644 "$source_dir/image-lock.env" \
+  /opt/briar/image-lock.env
+install -o root -g root -m 0644 "$source_dir/source-commit" \
+  /opt/briar/source-commit
+install -o root -g root -m 0644 "$source_dir/briar-version" \
+  /opt/briar/briar-version
+install -o root -g root -m 0644 "$source_dir/artifact-manifest.sha256" \
+  /opt/briar/artifact-manifest.sha256
+sha256sum /opt/briar/provider/bun.lock > /opt/briar/provider/bun.lock.sha256
+dpkg-query --show --showformat='${binary:Package}=${Version}\n' \
+  | LC_ALL=C sort > /opt/briar/debian-packages.lock
+sha256sum /opt/briar/debian-packages.lock \
+  > /opt/briar/debian-packages.lock.sha256
+
+source_commit="$(tr -d '\r\n' < /opt/briar/source-commit)"
+briar_version="$(tr -d '\r\n' < /opt/briar/briar-version)"
+jq -n \
+  --arg schemaVersion "1" \
+  --arg sourceCommit "$source_commit" \
+  --arg briarVersion "$briar_version" \
+  --arg baseAmiId "$base_ami_id" \
+  --arg debianSnapshot "$DEBIAN_SNAPSHOT" \
+  --arg bunVersion "$BUN_VERSION" \
+  --arg chromeVersion "$GOOGLE_CHROME_VERSION" \
+  --arg ssmAgentVersion "$SSM_AGENT_PACKAGE_VERSION" \
+  --arg packageLockSha256 "$(sha256sum /opt/briar/remote-desktop-packages.lock | cut -d' ' -f1)" \
+  --arg fullPackageLockSha256 "$(sha256sum /opt/briar/debian-packages.lock | cut -d' ' -f1)" \
+  --arg providerLockSha256 "$(sha256sum /opt/briar/provider/bun.lock | cut -d' ' -f1)" \
+  '{
+    schemaVersion: ($schemaVersion | tonumber),
+    sourceCommit: $sourceCommit,
+    briarVersion: $briarVersion,
+    baseAmiId: $baseAmiId,
+    debianSnapshot: $debianSnapshot,
+    runtime: {
+      bun: $bunVersion,
+      googleChrome: $chromeVersion,
+      amazonSsmAgent: $ssmAgentVersion
+    },
+    packageLockSha256: $packageLockSha256,
+    fullPackageLockSha256: $fullPackageLockSha256,
+    providerLockSha256: $providerLockSha256
+  }' > /opt/briar/image-manifest.json
+chmod 0444 /opt/briar/image-manifest.json
+
+/opt/briar/bin/verify-managed-image

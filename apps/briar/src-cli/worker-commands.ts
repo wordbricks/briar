@@ -83,6 +83,7 @@ import {
   runClaimedChannelReply,
   failClaimedChannelReply,
 } from "./reply-execution";
+import { loadManagedComputerCredential } from "./managed-computer-credential";
 
 async function workerRegisterCommand() {
   const config = await loadConfig();
@@ -139,7 +140,7 @@ async function workerRegisterCommand() {
       const existing = config.projects.find(
         (candidate) => candidate.executionWorker?.deviceId === binding.deviceId,
       )?.executionWorker;
-      if (existing) {
+      if (existing?.token) {
         registration = {
           ...binding,
           workerToken: existing.token,
@@ -251,7 +252,7 @@ async function workerSyncLabelCommand() {
   >();
   for (const project of config.projects) {
     const registered = project.executionWorker;
-    if (!registered) continue;
+    if (!registered?.token) continue;
     const registrations = registrationsByDevice.get(registered.deviceId) ?? [];
     registrations.push({
       workerId: registered.workerId,
@@ -325,7 +326,24 @@ async function workerCommand() {
       "이 프로젝트의 worker가 등록되지 않았습니다. `briar worker register`를 먼저 실행하세요.",
     );
   }
-  const workerToken = process.env.BRIAR_WORKER_TOKEN ?? registered.token;
+  const managedCredential =
+    !process.env.BRIAR_WORKER_TOKEN && !registered.token && config.managedComputer
+      ? await loadManagedComputerCredential(
+        config.managedComputer.credentialFile,
+      )
+      : null;
+  if (
+    managedCredential &&
+    (managedCredential.deviceId !== registered.deviceId ||
+      managedCredential.organizationId !== registered.organizationId)
+  ) {
+    throw new Error("Managed computer credential does not match this worker");
+  }
+  const workerToken = process.env.BRIAR_WORKER_TOKEN ??
+    registered.token ?? managedCredential?.credential;
+  if (!workerToken) {
+    throw new Error("이 worker의 machine credential을 읽지 못했습니다.");
+  }
   const label = registered.label;
   const workerId = registered.workerId;
   let sharedWorkflowRequirements:

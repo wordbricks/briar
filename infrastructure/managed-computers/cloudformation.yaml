@@ -1,10 +1,10 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Briar managed-computer remote desktop v2 launch template and least-privilege provisioner policy
+Description: Briar managed-computer Debian runtime v3 launch template and least-privilege provisioner policy
 
 Parameters:
   AmiId:
     Type: AWS::EC2::Image::Id
-    Description: Versioned Debian GNU/Linux 13 (trixie) x86_64 AMI containing Briar CLI, Bun, supported agent CLIs, SSM Agent, non-root XFCE/TigerVNC, Chromium, enrollment, and outbound remote session services.
+    Description: Versioned Debian GNU/Linux 13 (trixie) x86_64 AMI containing Briar CLI and runners, managed Worker supervision, Bun, supported agent CLIs, SSM Agent, non-root XFCE/TigerVNC, Google Chrome, enrollment, and outbound remote session services.
   VpcId:
     Type: AWS::EC2::VPC::Id
   SubnetId:
@@ -64,7 +64,7 @@ Resources:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateName: briar-managed-computer-pilot
-      VersionDescription: briar-managed-computer-remote-desktop-v2
+      VersionDescription: briar-managed-computer-runtime-v3
       LaunchTemplateData:
         ImageId: !Ref AmiId
         InstanceType: !Ref InstanceType

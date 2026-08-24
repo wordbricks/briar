@@ -79,6 +79,17 @@ export async function managedComputerCredential(
   )}`;
 }
 
+export async function managedComputerSetupToken(
+  secret: string,
+  managedComputerId: string,
+  requestId: string,
+) {
+  return `briar_setup_${await hmacBase64Url(
+    secret,
+    `managed-computer-setup:${managedComputerId}:${requestId}`,
+  )}`;
+}
+
 function base64Bytes(value: string) {
   const binary = atob(value.replace(/\s+/gu, ""));
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
