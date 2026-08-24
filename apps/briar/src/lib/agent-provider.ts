@@ -33,7 +33,7 @@ export function agentProviderBinaryName(provider: AgentProvider) {
   return provider;
 }
 
-export const agentProviderLabels: Record<AgentProvider, string> = {
+export const agentProviderLabels = {
   codex: "Codex",
   claude: "Claude",
   cursor: "Cursor",
@@ -41,4 +41,4 @@ export const agentProviderLabels: Record<AgentProvider, string> = {
   agy: "Antigravity",
   opencode: "OpenCode",
   openrouter: "OpenRouter",
-};
+} satisfies Record<AgentProvider, string>;

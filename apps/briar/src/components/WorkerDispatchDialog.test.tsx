@@ -43,11 +43,7 @@ const worker = (id: string, label: string): ExecutionWorker => ({
 
 describe("WorkerDispatchDialog", () => {
   beforeEach(() => {
-    (
-      globalThis as typeof globalThis & {
-        IS_REACT_ACT_ENVIRONMENT: boolean;
-      }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     window.localStorage.clear();
     vi.mocked(loadAgentProviderModels).mockReset();
     vi.mocked(loadAgentProviderModels).mockResolvedValue({

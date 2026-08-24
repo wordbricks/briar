@@ -9,6 +9,11 @@ export type ChannelReactionPerson = {
   isCurrentUser: boolean;
 };
 
+export type ChannelReactionPeoplePreview<T> = {
+  visible: T[];
+  hiddenCount: number;
+};
+
 export function resolveChannelReactionPeople({
   currentUserId,
   members,
@@ -35,7 +40,7 @@ export function resolveChannelReactionPeople({
 export function previewChannelReactionPeople<T>(
   people: readonly T[],
   limit = channelReactionPeoplePreviewLimit,
-): { visible: T[]; hiddenCount: number } {
+): ChannelReactionPeoplePreview<T> {
   if (people.length <= limit) {
     return { visible: [...people], hiddenCount: 0 };
   }

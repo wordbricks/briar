@@ -9,11 +9,7 @@ import { AccountProfileSettings } from "./AccountProfileSettings";
 
 describe("AccountProfileSettings", () => {
   it("edits and saves username and nickname", async () => {
-    (
-      globalThis as typeof globalThis & {
-        IS_REACT_ACT_ENVIRONMENT: boolean;
-      }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     window.localStorage.setItem("briar.locale.v1", "en");
     const onSave = vi.fn(async (input) => ({
       id: "user-1",
@@ -74,11 +70,7 @@ describe("AccountProfileSettings", () => {
   });
 
   it("does not submit an invalid username", async () => {
-    (
-      globalThis as typeof globalThis & {
-        IS_REACT_ACT_ENVIRONMENT: boolean;
-      }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     const onSave = vi.fn();
     const container = document.createElement("div");
     document.body.append(container);

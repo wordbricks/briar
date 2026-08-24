@@ -95,9 +95,7 @@ describe("ManagedComputersCard", () => {
         },
       }),
     );
-    (
-      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   });
 
   it("shows US$0 only after server validation and submits one stable request", async () => {

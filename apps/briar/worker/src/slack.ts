@@ -332,6 +332,17 @@ export function buildSlackCreateIssueModal(input: {
         ),
       )
     : undefined;
+  const titleElement = {
+    type: "plain_text_input" as const,
+    action_id: slackCreateIssueActions.title,
+    placeholder: plainText("Issue title"),
+    // Hard input ceiling is the highest language-aware budget (Latin).
+    // Submit validation still applies Hangul/Han/Kana-specific limits.
+    max_length: issueTitleInputMaxLength("A", "en"),
+  };
+  if (initialTitle) {
+    Object.assign(titleElement, { initial_value: initialTitle });
+  }
   return {
     type: "modal",
     callback_id: slackCreateIssueCallbackId,
@@ -360,15 +371,7 @@ export function buildSlackCreateIssueModal(input: {
         type: "input",
         block_id: slackCreateIssueBlocks.title,
         label: plainText("Title"),
-        element: {
-          type: "plain_text_input",
-          action_id: slackCreateIssueActions.title,
-          placeholder: plainText("Issue title"),
-          // Hard input ceiling is the highest language-aware budget (Latin).
-          // Submit validation still applies Hangul/Han/Kana-specific limits.
-          max_length: issueTitleInputMaxLength("A", "en"),
-          ...(initialTitle ? { initial_value: initialTitle } : {}),
-        },
+        element: titleElement,
       },
       {
         type: "input",

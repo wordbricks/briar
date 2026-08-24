@@ -13,10 +13,14 @@ const decodeChannelReplyCompletion = Schema.decodeUnknownSync(
 
 type ChannelReplyCompletion = typeof channelReplyCompletionSchema.Type;
 
-export function parseChannelReplyAgentResult(parsed: unknown): {
+export type ParsedChannelReplyAgentResult = {
   result: ChannelReplyCompletion;
   attachmentPaths: string[];
-} {
+};
+
+export function parseChannelReplyAgentResult(
+  parsed: unknown,
+): ParsedChannelReplyAgentResult {
   if (!Predicate.isObject(parsed)) {
     return {
       result: decodeChannelReplyCompletion(parsed),

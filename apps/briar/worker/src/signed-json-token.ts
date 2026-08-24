@@ -42,7 +42,11 @@ const hmacKeyEffect = Effect.fnUntraced(function*(
 });
 
 export const signJsonTokenEffect = Effect.fn("signJsonTokenEffect")(
-  function*(domain: string, secret: string, payload: object) {
+  function*<Payload extends object>(
+    domain: string,
+    secret: string,
+    payload: Payload,
+  ) {
     const encodedPayload = yield* Effect.try({
       try: () => base64UrlEncode(encoder.encode(JSON.stringify(payload))),
       catch: (cause) => new SignedJsonTokenError({ cause }),
@@ -103,10 +107,10 @@ export const verifyJsonTokenEffect = Effect.fn("verifyJsonTokenEffect")(
   },
 );
 
-export async function signJsonToken(
+export async function signJsonToken<Payload extends object>(
   domain: string,
   secret: string,
-  payload: object,
+  payload: Payload,
 ): Promise<string> {
   try {
     return await Effect.runPromise(signJsonTokenEffect(domain, secret, payload));

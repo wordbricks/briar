@@ -241,7 +241,7 @@ export async function handleDashboardRoute(input: {
       session.user.id,
     );
 
-    return json({
+    const response = {
       cursor: page.nextCursor,
       hasMore: page.hasMore,
       runs: changedRuns.map((run) =>
@@ -260,29 +260,32 @@ export async function handleDashboardRoute(input: {
       // so this small projection is refreshed on every delta request.
       workers: workers.map((worker) => workerJson(worker, observedAt)),
       organizationProviders,
-      ...(metadata
-        ? {
-            project: projectJson(project),
-            settings: settingsJson(
-              metadata[0],
-              checkpointPolicyJson(metadata[1]),
-            ),
-            executionPolicy: metadata[2],
-            members: metadata[3].map(organizationMemberJson),
-          }
-        : {}),
-      ...(conversationNotifications
-        ? {
-            conversationNotifications: conversationNotifications.map(
-              issueConversationNotificationJson,
-            ),
-          }
-        : {}),
+    };
+    if (metadata) {
+      Object.assign(response, {
+        project: projectJson(project),
+        settings: settingsJson(
+          metadata[0],
+          checkpointPolicyJson(metadata[1]),
+        ),
+        executionPolicy: metadata[2],
+        members: metadata[3].map(organizationMemberJson),
+      });
+    }
+    if (conversationNotifications) {
+      Object.assign(response, {
+        conversationNotifications: conversationNotifications.map(
+          issueConversationNotificationJson,
+        ),
+      });
+    }
+    Object.assign(response, {
       channelNotifications: channelNotifications.map(
         channelConversationNotificationJson,
       ),
       generatedAt: observedAt,
     });
+    return json(response);
   }
 
   const dashboardMatch = url.pathname.match(

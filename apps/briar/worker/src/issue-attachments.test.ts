@@ -74,7 +74,7 @@ const invalidMultipartRequest = (contentLength?: number) =>
     headers: {
       "Content-Type": "multipart/form-data; boundary=invalid",
       ...(contentLength === undefined
-        ? {}
+        ? undefined
         : { "Content-Length": String(contentLength) }),
     },
     body: "not multipart data",

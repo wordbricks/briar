@@ -27,11 +27,11 @@ export function AppearanceSettings({
 }) {
   const { t } = useI18n();
   const { setTheme, theme } = useTheme();
-  const labels: Record<ThemePreference, string> = {
+  const labels = {
     system: t("appSettings.themeSystem"),
     light: t("appSettings.themeLight"),
     dark: t("appSettings.themeDark"),
-  };
+  } satisfies Record<ThemePreference, string>;
 
   const choices = (
     <div

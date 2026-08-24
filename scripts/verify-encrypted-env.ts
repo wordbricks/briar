@@ -7,7 +7,7 @@ export type EncryptedEnvPolicy = {
   optionalSecrets?: readonly string[];
 };
 
-export const encryptedEnvPolicies: Readonly<Record<string, EncryptedEnvPolicy>> = {
+export const encryptedEnvPolicies = {
   ".env.production": {
     publicKey: "DOTENV_PUBLIC_KEY_PRODUCTION",
     secrets: [
@@ -50,7 +50,7 @@ export const encryptedEnvPolicies: Readonly<Record<string, EncryptedEnvPolicy>> 
       "ANDROID_KEY_PASSWORD",
     ],
   },
-};
+} satisfies Readonly<Record<string, EncryptedEnvPolicy>>;
 
 function unquote(value: string) {
   if (

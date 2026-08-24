@@ -7,7 +7,7 @@ type Variables = Record<string, string | number>;
 type Translate = (key: MessageKey, variables?: Variables) => string;
 
 const storageKey = "briar.locale.v1";
-const resources: Record<Locale, Messages> = { ko, en, zh };
+const resources = { ko, en, zh } satisfies Record<Locale, Messages>;
 
 const interpolate = (message: string, variables?: Variables) =>
   message.replace(/\{([a-zA-Z0-9_]+)\}/gu, (_, key: string) =>

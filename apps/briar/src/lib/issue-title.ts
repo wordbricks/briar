@@ -22,10 +22,17 @@ export type IssueTitleScript = keyof typeof issueTitleMaxLengthByScript;
 export type IssueTitleLocale = "ko" | "en" | "zh";
 
 /** Default limit when the title is empty (UI maxLength before typing). */
-export const issueTitleMaxLengthByLocale: Record<IssueTitleLocale, number> = {
+export const issueTitleMaxLengthByLocale = {
   ko: issueTitleMaxLengthByScript.hangul,
   en: issueTitleMaxLengthByScript.latin,
   zh: issueTitleMaxLengthByScript.han,
+} satisfies Record<IssueTitleLocale, number>;
+
+type IssueTitleScriptCounts = {
+  hangul: number;
+  han: number;
+  kana: number;
+  latin: number;
 };
 
 const hangulLetter =
@@ -62,7 +69,7 @@ function scriptOfLetter(character: string): IssueTitleScript | null {
  * punctuation and digits do not skew mixed titles.
  */
 export function detectIssueTitleScript(title: string): IssueTitleScript {
-  const counts: Record<IssueTitleScript, number> = {
+  const counts: IssueTitleScriptCounts = {
     hangul: 0,
     han: 0,
     kana: 0,

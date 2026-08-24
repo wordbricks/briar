@@ -26,7 +26,9 @@ export type LinearImportPlacement = {
   workflowStage: AutoHuntWorkflowStageId | null;
 };
 
-export type LinearStatusMapping = Record<string, LinearImportPlacement>;
+export interface LinearStatusMapping {
+  [stateId: string]: LinearImportPlacement;
+}
 
 export type LinearImportConnectResult = {
   viewer: {

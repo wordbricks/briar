@@ -618,7 +618,7 @@ describe("useInbox read-state synchronization", () => {
   });
 
   it("refreshes account read state when the app regains focus", async () => {
-    let remote: Record<string, string> = {};
+    let remote: Awaited<ReturnType<typeof loadInboxReadStates>> = {};
     mockedLoadInboxReadStates.mockImplementation(async () => remote);
     await renderHarness({
       dashboard: dashboardAt(1),

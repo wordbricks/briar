@@ -660,13 +660,9 @@ export default {
         return json({ message: skillConflictMessage }, 409);
       }
       if (error instanceof HttpError) {
-        return json(
-          {
-            message: error.message,
-            ...(error.code ? { code: error.code } : {}),
-          },
-          error.status,
-        );
+        const body = { message: error.message };
+        if (error.code) Object.assign(body, { code: error.code });
+        return json(body, error.status);
       }
       if (error instanceof ManagedComputerServiceError) {
         return json(

@@ -2206,7 +2206,7 @@ export const ko = {
 export type MessageKey = keyof typeof ko;
 export type Messages = Record<MessageKey, string>;
 
-export const en: Messages = {
+export const en = {
   ...ko,
   "commandPalette.title": "Command palette",
   "commandPalette.description": "Search commands, pages, issues, projects, channels, and direct messages.",
@@ -3479,8 +3479,8 @@ export const en: Messages = {
   "organization.githubBenefitPr": "Link Briar issues and pull requests",
   "organization.githubBenefitMerge": "Resume waiting work after a pull request is merged",
   "organization.githubBenefitScope": "Limit access to repositories you select",
-};
-export const zh: Messages = {
+} satisfies Messages;
+export const zh = {
   ...en,
   "commandPalette.title": "命令面板",
   "commandPalette.description": "搜索命令、页面、问题、项目、频道和私信。",
@@ -4722,4 +4722,4 @@ export const zh: Messages = {
   "organization.githubBenefitPr": "关联 Briar 问题和拉取请求",
   "organization.githubBenefitMerge": "拉取请求合并后自动恢复等待中的任务",
   "organization.githubBenefitScope": "将访问范围限制为所选仓库",
-};
+} satisfies Messages;

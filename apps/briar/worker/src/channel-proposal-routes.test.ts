@@ -312,7 +312,7 @@ describe("channel issue proposal approval route", () => {
       {
         method: "POST",
         headers: {
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
+          ...(token ? { authorization: `Bearer ${token}` } : undefined),
           "content-type": "application/json",
         },
         body: JSON.stringify({ projectId, execution }),

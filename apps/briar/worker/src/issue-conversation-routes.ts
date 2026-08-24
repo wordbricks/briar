@@ -163,19 +163,23 @@ export async function handleIssueConversationRoute(input: {
     const changed = page.changes.some(
       (change) => change.entity_type === "notifications",
     );
-    return json({
+    const response = {
       cursor: page.nextCursor,
       hasMore: page.hasMore,
       changed,
-      ...(changed
-        ? await loadIssueConversationSnapshot(
-            db,
-            archivesBucket,
-            project.id,
-            run.id,
-          )
-        : {}),
-    });
+    };
+    if (changed) {
+      Object.assign(
+        response,
+        await loadIssueConversationSnapshot(
+          db,
+          archivesBucket,
+          project.id,
+          run.id,
+        ),
+      );
+    }
+    return json(response);
   }
   if (issueMessagesMatch && request.method === "GET") {
     const session = await requireSession(auth, request);

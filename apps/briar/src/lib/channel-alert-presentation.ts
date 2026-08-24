@@ -6,6 +6,11 @@ import {
 
 export type ChannelAlertTone = "error" | "warning";
 
+export type ChannelAlertPreview = {
+  preview: string;
+  collapsed: boolean;
+};
+
 const ERROR_KEYWORD =
   /\b(?:error|errors|exception|fatal|panic|critical|fail(?:ed|ure)?|traceback|alarm|alert)\b|에러|오류|실패|알람|치명|错误|失败|告警|报警|致命/iu;
 const WARNING_KEYWORD =
@@ -47,7 +52,7 @@ export function shouldCollapseChannelText(
 export function channelAlertPreview(
   value: string,
   options: { maxLines?: number; maxChars?: number; force?: boolean } = {},
-): { preview: string; collapsed: boolean } {
+): ChannelAlertPreview {
   const maxLines = options.maxLines ?? 4;
   const maxChars = options.maxChars ?? 280;
   const collapsed = options.force === true || shouldCollapseChannelText(value);

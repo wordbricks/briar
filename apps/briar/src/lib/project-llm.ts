@@ -26,7 +26,7 @@ export type ApprovalPolicy = (typeof approvalPolicies)[number];
 
 export type AppProviderSettings = Record<AgentProvider, boolean>;
 
-export const defaultAppProviderSettings: AppProviderSettings = {
+export const defaultAppProviderSettings = {
   codex: true,
   claude: true,
   cursor: true,
@@ -34,7 +34,7 @@ export const defaultAppProviderSettings: AppProviderSettings = {
   agy: true,
   opencode: true,
   openrouter: true,
-};
+} satisfies AppProviderSettings;
 
 export type OpenRouterCredentialStatus = {
   configured: boolean;

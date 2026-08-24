@@ -226,9 +226,14 @@ describe("inspectWorkerProviderHealth", () => {
 
   it("requires an API key before advertising OpenRouter as healthy", async () => {
     const onlyOpenRouter = {
-      ...Object.fromEntries(Object.keys(enabled).map((provider) => [provider, false])),
+      codex: false,
+      claude: false,
+      cursor: false,
+      grok: false,
+      agy: false,
+      opencode: false,
       openrouter: true,
-    } as Record<WorkerProvider, boolean>;
+    } satisfies Record<WorkerProvider, boolean>;
     const withoutKey = await inspectWorkerProviderHealth(onlyOpenRouter, {
       which: (provider) => provider === "openrouter" ? "/usr/local/bin/opencode" : null,
       openrouterApiKey: null,
