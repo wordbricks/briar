@@ -619,6 +619,9 @@ final class MobileAPIContractTests: XCTestCase {
         let channelMessages: ChannelMessagesResponse = try decodeResponse(
             "listChannelMessages"
         )
+        let deletedChannelMessage: DeleteChannelMessageResponse = try decodeResponse(
+            "deleteChannelMessage"
+        )
         let acceptedChannelProposal: AcceptChannelProposalResponse = try decodeResponse(
             "acceptChannelProposal"
         )
@@ -682,6 +685,10 @@ final class MobileAPIContractTests: XCTestCase {
             [UUID(uuidString: "66666666-6666-4666-8666-666666666666")!]
         )
         XCTAssertEqual(channelMessages.messages.last?.proposal?.status, .pending)
+        XCTAssertTrue(deletedChannelMessage.deleted)
+        XCTAssertEqual(deletedChannelMessage.message?.body, "[deleted]")
+        XCTAssertNotNil(deletedChannelMessage.message?.deletedAt)
+        XCTAssertNil(deletedChannelMessage.parentMessage)
         XCTAssertNil(channel.nextCursor)
         XCTAssertNil(channelMessages.nextCursor)
         XCTAssertEqual(
@@ -778,6 +785,14 @@ final class MobileAPIContractTests: XCTestCase {
             "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333?limit=20"
         )
         let messageCursor = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.channelMessage(
+                organizationID: organizationID,
+                channelID: channelID,
+                messageID: messageCursor
+            ),
+            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/messages/44444444-4444-4444-8444-444444444444"
+        )
         XCTAssertEqual(
             MobileAPIContract.Endpoint.channelMessages(
                 organizationID: organizationID,

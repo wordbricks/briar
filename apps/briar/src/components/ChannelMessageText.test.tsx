@@ -107,6 +107,27 @@ describe("ChannelMessageText", () => {
     expect(buttons[1].type).toBe("button");
   });
 
+  it("renders a localized tombstone without exposing the stored body", async () => {
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <ChannelMessageText
+            agents={[]}
+            members={[]}
+            message={{
+              ...message,
+              body: "private deleted text",
+              deletedAt: "2026-08-24T00:00:00.000Z",
+            }}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    expect(container.textContent).toContain("This message was deleted.");
+    expect(container.textContent).not.toContain("private deleted text");
+  });
+
   it("leaves duplicate Agent Names unlinked instead of opening the wrong profile", async () => {
     const duplicate = { ...agent, agentId: "agent-2", responsibility: "Research" };
     await act(async () => {

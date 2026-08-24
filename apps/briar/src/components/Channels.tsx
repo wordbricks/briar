@@ -50,6 +50,7 @@ import {
   acceptChannelExecutionProposal,
   acceptChannelProposal,
   createChannelWebhook,
+  deleteChannelMessage,
   listChannelMessages,
   listChannelWebhooks,
   listChannels,
@@ -105,6 +106,7 @@ import {
   mergeChannelMessages,
   mergeChannelMessageSnapshot,
 } from "../lib/channel-message-merge";
+import { applyChannelMessageDeletion } from "../lib/channel-message-deletion";
 import {
   channelReplyErrorText,
   failedChannelReplyErrors,
@@ -2105,6 +2107,56 @@ export function Channels({
     ],
   );
 
+  const removeMessage = useCallback(
+    async (message: ChannelMessage) => {
+      if (!activeChannelId || message.deletedAt) return;
+      if (!window.confirm(t("channel.deleteMessageConfirm"))) return;
+      const deletionContext = captureChannelSurface();
+      setBusy(true);
+      try {
+        const result = await deleteChannelMessage(
+          token,
+          organizationId,
+          activeChannelId,
+          message.id,
+        );
+        if (!channelSurfaceIsCurrent(deletionContext)) return;
+        updateRootMessages((current) =>
+          applyChannelMessageDeletion(current, message.id, result)
+        );
+        setThreadMessages((current) =>
+          applyChannelMessageDeletion(current, message.id, result)
+        );
+        if (result.deleted) {
+          setReplies((current) => current.filter((reply) =>
+            reply.triggerMessageId !== message.id &&
+            reply.replyMessageId !== message.id
+          ));
+          if (threadParentId === message.id && !result.message) {
+            setThreadParentId(null);
+          }
+        }
+      } catch (cause) {
+        if (channelSurfaceIsCurrent(deletionContext)) {
+          toast(errorMessage(cause), { tone: "error" });
+        }
+      } finally {
+        if (channelSurfaceIsCurrent(deletionContext)) setBusy(false);
+      }
+    },
+    [
+      activeChannelId,
+      captureChannelSurface,
+      channelSurfaceIsCurrent,
+      organizationId,
+      t,
+      threadParentId,
+      toast,
+      token,
+      updateRootMessages,
+    ],
+  );
+
   const toggleThreadSubscription = useCallback(
     async (subscribed: boolean) => {
       if (!activeChannelId || !threadParentId || threadSubscriptionPending) return;
@@ -2352,6 +2404,7 @@ export function Channels({
                       onToggleReaction={(emoji) =>
                         void toggleReaction(message, emoji)
                       }
+                      onDelete={() => void removeMessage(message)}
                       replyError={failedReplyErrors.get(message.id) ?? null}
                       busy={busy}
                       acceptingProposal={
@@ -2513,6 +2566,7 @@ export function Channels({
                 onToggleReaction={(emoji) =>
                   void toggleReaction(message, emoji)
                 }
+                onDelete={() => void removeMessage(message)}
                 replyError={failedReplyErrors.get(message.id) ?? null}
                 busy={busy}
                 acceptingProposal={
@@ -3811,6 +3865,7 @@ const MessageRow = memo(function MessageRow({
   onSkillExecutionProposalAccepted,
   onIssueOpen,
   onProjectChange,
+  onDelete,
   onToggleReaction,
   replyError,
   busy,
@@ -3858,6 +3913,7 @@ const MessageRow = memo(function MessageRow({
   ) => void;
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
   onProjectChange: (projectId: string) => void;
+  onDelete: () => void;
   onToggleReaction: (emoji: string) => void;
   replyError?: string | null;
   busy: boolean;
@@ -4111,6 +4167,7 @@ const MessageRow = memo(function MessageRow({
           currentUserId={currentUserId}
           members={members}
           message={message}
+          onDelete={isSelf && !message.deletedAt ? onDelete : undefined}
           onOpenThread={message.optimistic ? undefined : onOpenThread}
           onReactingChange={setReacting}
           onToggle={onToggleReaction}

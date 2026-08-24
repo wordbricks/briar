@@ -754,6 +754,16 @@ export type ChannelMessage = {
   /** Client-only state while a newly sent message awaits its server response. */
   optimistic?: boolean;
   createdAt: string;
+  /** Present only for a retained thread-root tombstone. */
+  deletedAt?: string | null;
+};
+
+export type DeleteChannelMessageResponse = {
+  deleted: boolean;
+  /** Retained tombstone for a root with replies; otherwise null. */
+  message: ChannelMessage | null;
+  /** Refreshed root summary when a reply was removed; otherwise null. */
+  parentMessage: ChannelMessage | null;
 };
 
 export function applyChannelThreadSubscribers(

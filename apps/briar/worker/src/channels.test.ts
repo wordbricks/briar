@@ -16,6 +16,7 @@ import {
   createChannelWebhook,
   createIncomingChannelWebhookMessage,
   deleteChannel,
+  deleteChannelMessage,
   enqueueChannelAgentReplies,
   failChannelReply,
   getChannelById,
@@ -3458,5 +3459,295 @@ describe("organization channels", () => {
       (message) => message.id === messageId,
     );
     expect(deltaMessage?.reactions).toEqual(removed?.reactions);
+  });
+
+  it("enforces deletion permissions and keeps a replied-to root as a scrubbed tombstone", async () => {
+    const channelId = "e0000000-0000-4000-8000-0000000000d1";
+    const rootId = "f0000000-0000-4000-8000-0000000000d1";
+    const replyId = "f0000000-0000-4000-8000-0000000000d2";
+    const attachmentId = "f0000000-0000-4000-8000-0000000000d3";
+    const objectKey = `channel-attachments/${organizationId}/${channelId}/${rootId}/${attachmentId}`;
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "deletion-thread",
+      name: "Deletion thread",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(60),
+    });
+    await archives.put(objectKey, "attachment");
+    await createChannelMessage(db, {
+      id: rootId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Sensitive root text",
+      mentionedUserIds: [outsiderId],
+      mentionedAgentIds: [],
+      attachments: [{
+        id: attachmentId,
+        organization_id: organizationId,
+        object_key: objectKey,
+        filename: "private.png",
+        content_type: "image/png",
+        byte_size: 10,
+      }],
+      createdAt: at(61),
+    });
+    await createChannelMessage(db, {
+      id: replyId,
+      channelId,
+      parentMessageId: rootId,
+      authorUserId: outsiderId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "The reply must survive",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(62),
+    });
+    const pendingProposalId = "f0000000-0000-4000-8000-0000000000a1";
+    await db.prepare(
+      `insert into briar_channel_action_proposals (
+         id, channel_id, project_id, trigger_message_id, reply_message_id,
+         action_type, payload_json, status, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, 'request_issue_create', ?, 'pending', ?, ?)`,
+    ).bind(
+      pendingProposalId,
+      channelId,
+      projectId,
+      rootId,
+      replyId,
+      JSON.stringify({ title: "Must not remain actionable" }),
+      at(62),
+      at(62),
+    ).run();
+    const beforeDelete = await getChannelSyncCursor(db, organizationId);
+
+    expect(await deleteChannelMessage(db, {
+      organizationId,
+      channelId,
+      messageId: rootId,
+      userId: outsiderId,
+      deletedAt: at(63),
+    })).toEqual({ outcome: "forbidden", message: null, parentMessage: null });
+    expect((await getChannelMessage(db, channelId, rootId))?.body).toBe(
+      "Sensitive root text",
+    );
+
+    const deleted = await deleteChannelMessage(db, {
+      organizationId,
+      channelId,
+      messageId: rootId,
+      userId: ownerId,
+      deletedAt: at(64),
+    });
+    expect(deleted.outcome).toBe("deleted");
+    expect(deleted.message).toMatchObject({
+      id: rootId,
+      body: "[deleted]",
+      deletedAt: at(64),
+      attachments: [],
+      mentionedUserIds: [],
+      reactions: [],
+      replyCount: 1,
+    });
+    expect(await listChannelThreadMessages(db, channelId, rootId)).toContainEqual(
+      expect.objectContaining({ id: replyId, body: "The reply must survive" }),
+    );
+    expect(await getChannelMessageAttachment(
+      db,
+      organizationId,
+      channelId,
+      rootId,
+      attachmentId,
+    )).toBeNull();
+    expect(await db.prepare(
+      `select id from briar_channel_action_proposals where id = ?`,
+    ).bind(pendingProposalId).first()).toBeNull();
+
+    const delta = await loadChannelDelta(
+      db,
+      organizationId,
+      outsiderId,
+      beforeDelete,
+    );
+    expect(delta.messages).toContainEqual(
+      expect.objectContaining({ id: rootId, deletedAt: at(64) }),
+    );
+    expect(delta.removedMessageIds).not.toContain(rootId);
+    expect((await listChannelRootMessages(db, channelId))[0]).toMatchObject({
+      id: rootId,
+      body: "[deleted]",
+      deletedAt: at(64),
+    });
+
+    const repeated = await deleteChannelMessage(db, {
+      organizationId,
+      channelId,
+      messageId: rootId,
+      userId: ownerId,
+      deletedAt: at(65),
+    });
+    expect(repeated.outcome).toBe("already_deleted");
+    await processArchiveCleanupQueue(db, archives, archives, at(65));
+    expect(await archives.head(objectKey)).toBeNull();
+  });
+
+  it("hard-deletes replies and standalone messages while refreshing sync state", async () => {
+    const channelId = "e0000000-0000-4000-8000-0000000000e1";
+    const rootId = "f0000000-0000-4000-8000-0000000000e1";
+    const replyId = "f0000000-0000-4000-8000-0000000000e2";
+    const standaloneId = "f0000000-0000-4000-8000-0000000000e3";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "deletion-hard",
+      name: "Deletion hard",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(66),
+    });
+    for (const [id, parentMessageId, authorUserId, body, createdAt] of [
+      [rootId, null, ownerId, "Root", at(67)],
+      [replyId, rootId, outsiderId, "Reply", at(68)],
+      [standaloneId, null, outsiderId, "Standalone", at(69)],
+    ] as const) {
+      await createChannelMessage(db, {
+        id,
+        channelId,
+        parentMessageId,
+        authorUserId,
+        authorAgentId: null,
+        authorAgentName: null,
+        authorAgentProvider: null,
+        body,
+        mentionedUserIds: [],
+        mentionedAgentIds: [],
+        createdAt,
+      });
+    }
+    const beforeDelete = await getChannelSyncCursor(db, organizationId);
+
+    const replyDeletion = await deleteChannelMessage(db, {
+      organizationId,
+      channelId,
+      messageId: replyId,
+      userId: outsiderId,
+      deletedAt: at(70),
+    });
+    expect(replyDeletion).toMatchObject({
+      outcome: "deleted",
+      message: null,
+      parentMessage: { id: rootId, replyCount: 0 },
+    });
+
+    const managerDeletion = await deleteChannelMessage(db, {
+      organizationId,
+      channelId,
+      messageId: standaloneId,
+      userId: ownerId,
+      deletedAt: at(71),
+    });
+    expect(managerDeletion).toEqual({
+      outcome: "deleted",
+      message: null,
+      parentMessage: null,
+    });
+    expect((await deleteChannelMessage(db, {
+      organizationId,
+      channelId,
+      messageId: standaloneId,
+      userId: ownerId,
+      deletedAt: at(72),
+    })).outcome).toBe("not_found");
+
+    const delta = await loadChannelDelta(
+      db,
+      organizationId,
+      outsiderId,
+      beforeDelete,
+    );
+    expect(delta.removedMessageIds).toEqual(
+      expect.arrayContaining([replyId, standaloneId]),
+    );
+    expect(delta.messages).toContainEqual(
+      expect.objectContaining({ id: rootId, replyCount: 0 }),
+    );
+    expect(await getChannelMessage(db, channelId, replyId)).toBeNull();
+    expect(await getChannelMessage(db, channelId, standaloneId)).toBeNull();
+  });
+
+  it("enforces message deletion through the authenticated HTTP route", async () => {
+    const channelId = "e0000000-0000-4000-8000-0000000000f1";
+    const messageId = "f0000000-0000-4000-8000-0000000000f1";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "deletion-route",
+      name: "Deletion route",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(73),
+    });
+    await createChannelMessage(db, {
+      id: messageId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Delete through HTTP",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: at(74),
+    });
+    const endpoint =
+      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}/messages/${messageId}`;
+    const apiEnv = {
+      DB: db,
+      ARCHIVES: archives,
+      ATTACHMENTS: archives,
+      BETTER_AUTH_SECRET: "channels-deletion-test-channels-deletion-test",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const remove = (token: string) => apiWorker.fetch(new Request(endpoint, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${token}` },
+    }), apiEnv);
+
+    const forbidden = await remove(outsiderSessionToken);
+    expect(forbidden.status).toBe(403);
+    expect(await getChannelMessage(db, channelId, messageId)).not.toBeNull();
+
+    const deleted = await remove(ownerSessionToken);
+    expect(deleted.status).toBe(200);
+    await expect(deleted.json()).resolves.toEqual({
+      deleted: true,
+      message: null,
+      parentMessage: null,
+    });
+    expect(await getChannelMessage(db, channelId, messageId)).toBeNull();
+
+    const repeated = await remove(ownerSessionToken);
+    expect(repeated.status).toBe(200);
+    await expect(repeated.json()).resolves.toEqual({
+      deleted: false,
+      message: null,
+      parentMessage: null,
+    });
   });
 });

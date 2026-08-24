@@ -1528,6 +1528,38 @@
         "subscribers": []
       }
     },
+    "deleteChannelMessage": {
+      "method": "DELETE",
+      "path": "/organizations/{organizationId}/channels/{channelId}/messages/{messageId}",
+      "status": 200,
+      "response": {
+        "deleted": true,
+        "message": {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "channelId": "33333333-3333-4333-8333-333333333333",
+          "parentMessageId": null,
+          "body": "[deleted]",
+          "author": {
+            "type": "user",
+            "id": "user-fixture-1",
+            "name": "Jay",
+            "email": "jay@example.com",
+            "image": null
+          },
+          "mentionedUserIds": [],
+          "mentionedAgentIds": [],
+          "attachments": [],
+          "reactions": [],
+          "replyCount": 1,
+          "lastReplyAt": "2026-08-06T00:04:00.000Z",
+          "document": null,
+          "proposal": null,
+          "createdAt": "2026-08-06T00:03:00.000Z",
+          "deletedAt": "2026-08-24T01:00:00.000Z"
+        },
+        "parentMessage": null
+      }
+    },
     "toggleChannelMessageReaction": {
       "method": "PUT",
       "path": "/organizations/{organizationId}/channels/{channelId}/messages/{messageId}/reactions",

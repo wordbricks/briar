@@ -407,6 +407,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
     var skillExecutionProposal: AgentSkillExecutionProposal?
     var subscribers: [IssueSubscriber]
     let createdAt: Date
+    let deletedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -428,6 +429,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         case skillExecutionProposal
         case subscribers
         case createdAt
+        case deletedAt
     }
 
     init(
@@ -449,7 +451,8 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         executionProposal: IssueExecutionProposal? = nil,
         skillExecutionProposal: AgentSkillExecutionProposal? = nil,
         subscribers: [IssueSubscriber] = [],
-        createdAt: Date
+        createdAt: Date,
+        deletedAt: Date? = nil
     ) {
         self.id = id
         self.channelId = channelId
@@ -470,6 +473,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         self.skillExecutionProposal = skillExecutionProposal
         self.subscribers = subscribers
         self.createdAt = createdAt
+        self.deletedAt = deletedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -502,6 +506,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
             forKey: .subscribers
         ) ?? []
         createdAt = try container.decode(Date.self, forKey: .createdAt)
+        deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
     }
 
     struct Author: Codable, Hashable, Sendable {
@@ -509,6 +514,21 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         let name: String
         let image: String?
         let provider: String?
+        let id: String?
+
+        init(
+            type: Kind,
+            name: String,
+            image: String?,
+            provider: String?,
+            id: String? = nil
+        ) {
+            self.type = type
+            self.name = name
+            self.image = image
+            self.provider = provider
+            self.id = id
+        }
 
         enum Kind: String, Codable, Hashable, Sendable {
             case user
@@ -922,6 +942,12 @@ struct ToggleChannelMessageReactionRequest: Codable, Sendable {
 
 struct ToggleChannelMessageReactionResponse: Codable, Sendable {
     let message: ChannelMessage
+}
+
+struct DeleteChannelMessageResponse: Codable, Sendable {
+    let deleted: Bool
+    let message: ChannelMessage?
+    let parentMessage: ChannelMessage?
 }
 
 struct AcceptChannelProposalRequest: Codable, Equatable, Sendable {

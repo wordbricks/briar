@@ -6,6 +6,7 @@ import {
   channelReplyNoAvailableWorkerError,
 } from "../../src/lib/channels-contract";
 import { hydrateAgentSkills } from "./agent-skills";
+import { processArchiveCleanupQueue } from "./archive";
 import type { BriarAuth } from "./auth";
 import {
   prepareStoredAttachments,
@@ -18,6 +19,7 @@ import {
   channelJson,
   channelReplyJson,
   createChannelMessage,
+  deleteChannelMessage,
   enqueueChannelAgentReplies,
   getChannelMessage,
   getChannelMessageAttachment,
@@ -58,6 +60,7 @@ import {
   hasAvailableChannelReplyWorker,
   userOwnsExecutionWorkerDevice,
 } from "./workers";
+import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
 
 const bearerToken = (request: Request) => {
   const authorization = request.headers.get("authorization") ?? "";
@@ -83,12 +86,14 @@ export type ChannelMessageRouteInput = {
   auth: BriarAuth;
   db: D1Database;
   attachmentsBucket: R2Bucket;
+  env: Env;
+  context?: ExecutionContext;
 };
 
 export async function handleChannelMessageRoute(
   routeInput: ChannelMessageRouteInput,
 ): Promise<Response | undefined> {
-  const { request, url, auth, db, attachmentsBucket } = routeInput;
+  const { request, url, auth, db, attachmentsBucket, env, context } = routeInput;
   const { pathname } = url;
 
   const projectChannelMessagesMatch = pathname.match(
@@ -147,6 +152,9 @@ export async function handleChannelMessageRoute(
 
   const channelMessagesMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages$/u,
+  );
+  const channelMessageMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)$/u,
   );
   const channelAttachmentMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
@@ -431,6 +439,48 @@ export async function handleChannelMessageRoute(
       message,
       agentReplies: agentReplies.map(channelReplyJson),
     }, 201);
+  }
+
+  if (channelMessageMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const organizationId = channelMessageMatch[1];
+    const channelId = channelMessageMatch[2];
+    await requireChannelAccess(
+      db,
+      organizationId,
+      channelId,
+      session.user.id,
+    );
+    const observedAt = new Date().toISOString();
+    const result = await deleteChannelMessage(db, {
+      organizationId,
+      channelId,
+      messageId: channelMessageMatch[3],
+      userId: session.user.id,
+      deletedAt: observedAt,
+    });
+    if (result.outcome === "forbidden") {
+      throw new HttpError(403, "Message author or channel manager access required");
+    }
+    return responseWithPostCommitCleanup(json({
+      deleted: result.outcome === "deleted",
+      message: result.message,
+      parentMessage: result.parentMessage,
+    }), {
+      context,
+      operation: "channel_message_delete",
+      observedAt,
+      tasks: [{
+        queue: "archive",
+        run: () => processArchiveCleanupQueue(
+          db,
+          env.ARCHIVES,
+          attachmentsBucket,
+          observedAt,
+          100,
+        ),
+      }],
+    });
   }
 
   const channelThreadSubscriptionMatch = pathname.match(

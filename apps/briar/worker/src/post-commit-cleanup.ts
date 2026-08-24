@@ -1,6 +1,7 @@
 type PostCommitCleanupOperation =
   | "account_delete"
   | "channel_delete"
+  | "channel_message_delete"
   | "issue_delete"
   | "project_delete"
   | "slack_uninstall";
