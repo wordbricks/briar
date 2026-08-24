@@ -749,14 +749,18 @@ export function App() {
     }
   }, [activePage, activeProjectForTabs, navigateToPage]);
   const createOrganizationChannel = useCallback(
-    async (name: string, visibility: ChannelVisibility) => {
+    async (
+      name: string,
+      visibility: ChannelVisibility,
+      defaultProjectId?: string | null,
+    ) => {
       if (!briar.activeOrganizationId || !briar.token) {
         throw new Error("Organization is not available");
       }
       const result = await createChannel(
         briar.token,
         briar.activeOrganizationId,
-        { name, visibility },
+        { name, visibility, defaultProjectId },
       );
       setOrganizationChannels((current) =>
         [

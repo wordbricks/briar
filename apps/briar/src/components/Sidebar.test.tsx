@@ -272,6 +272,77 @@ describe("Sidebar", () => {
     container.remove();
   });
 
+  it("opens project channel creation from the project Channels context menu", async () => {
+    const onChannelCreate = vi.fn().mockResolvedValue(undefined);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          activePage="channels"
+          channels={[sidebarChannel("channel-project", "Briar dev", "project-1")]}
+          onChannelCreate={onChannelCreate}
+          onChannelOpen={() => undefined}
+        />,
+      );
+    });
+
+    const projectToggle = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Briar 채널 접기"]',
+    )!;
+    await act(async () => {
+      projectToggle.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          button: 2,
+          cancelable: true,
+          clientX: 120,
+          clientY: 90,
+        }),
+      );
+    });
+
+    const addItem = document.body.querySelector<HTMLElement>(
+      ".sidebar-channel-context-menu-item",
+    );
+    expect(addItem?.textContent).toContain("채널 추가");
+    await act(async () => addItem?.click());
+
+    const dialog = document.body.querySelector<HTMLElement>(
+      ".channel-create-dialog",
+    )!;
+    const input = dialog.querySelector<HTMLInputElement>("input")!;
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    valueSetter.call(input, "제품 채널");
+    await act(async () => {
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      dialog
+        .querySelector("form")
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await act(async () => {
+      dialog
+        .querySelector("form")
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(onChannelCreate).toHaveBeenCalledWith(
+      "제품 채널",
+      "public",
+      "project-1",
+    );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("nests project-linked channels under that project and keeps unlinked ones at the top", async () => {
     const onChannelOpen = vi.fn();
     const container = document.createElement("div");

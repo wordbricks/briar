@@ -119,6 +119,7 @@ export function Sidebar({
   onChannelCreate?: (
     name: string,
     visibility: ChannelVisibility,
+    defaultProjectId?: string | null,
   ) => Promise<void>;
   onChannelDelete?: (channelId: string) => Promise<void>;
   onChannelOpen?: (channelId: string) => void;
@@ -533,6 +534,7 @@ export function Sidebar({
             channels={catalog}
             channelsLoading={channelsLoading}
             currentUserId={user.id}
+            onChannelCreate={onChannelCreate}
             onDeleteChannel={onChannelDelete}
             onOpen={onChannelOpen}
             onSettings={onChannelSettings}
@@ -939,6 +941,7 @@ export function Sidebar({
                         channels={catalog}
                         channelsLoading={channelsLoading}
                         currentUserId={user.id}
+                        onChannelCreate={onChannelCreate}
                         onDeleteChannel={onChannelDelete}
                         onOpen={onChannelOpen}
                         onSettings={onChannelSettings}
