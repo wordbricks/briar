@@ -3989,13 +3989,6 @@ const MessageRow = memo(function MessageRow({
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
         <ChannelMessageImages attachments={message.attachments} token={token} />
-        {showTypingState ? (
-          <ChannelTypingState
-            agentNames={typingAgentNames}
-            activityByAgentName={typingActivityByAgentName}
-          />
-        ) : null}
-
         {message.document ? (
           <ChannelDocumentPreview
             channelId={message.channelId}
@@ -4168,6 +4161,12 @@ const MessageRow = memo(function MessageRow({
               : null}
             onClick={onOpenThread}
             participants={channelReplyParticipants(message)}
+          />
+        ) : null}
+        {showTypingState ? (
+          <ChannelTypingState
+            agentNames={typingAgentNames}
+            activityByAgentName={typingActivityByAgentName}
           />
         ) : null}
       </div>
