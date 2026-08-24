@@ -173,26 +173,27 @@ export function isMacPlatform(): boolean {
   );
 }
 
-const specialKeys: Record<string, string> = {
-  " ": "Space",
-  Spacebar: "Space",
-  Enter: "Enter",
-  Escape: "Esc",
-  Tab: "Tab",
-  Backspace: "Backspace",
-  Delete: "Delete",
-  ArrowUp: "↑",
-  ArrowDown: "↓",
-  ArrowLeft: "←",
-  ArrowRight: "→",
-  Home: "Home",
-  End: "End",
-  PageUp: "PgUp",
-  PageDown: "PgDn",
-};
+const specialKeys = new Map([
+  [" ", "Space"],
+  ["Spacebar", "Space"],
+  ["Enter", "Enter"],
+  ["Escape", "Esc"],
+  ["Tab", "Tab"],
+  ["Backspace", "Backspace"],
+  ["Delete", "Delete"],
+  ["ArrowUp", "↑"],
+  ["ArrowDown", "↓"],
+  ["ArrowLeft", "←"],
+  ["ArrowRight", "→"],
+  ["Home", "Home"],
+  ["End", "End"],
+  ["PageUp", "PgUp"],
+  ["PageDown", "PgDn"],
+]);
 
 function displayKey(key: string): string {
-  if (specialKeys[key]) return specialKeys[key];
+  const specialKey = specialKeys.get(key);
+  if (specialKey) return specialKey;
   if (key.length === 1) return key.toUpperCase();
   return key;
 }

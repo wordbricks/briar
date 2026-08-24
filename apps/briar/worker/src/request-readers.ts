@@ -400,14 +400,15 @@ export async function readIssueRequest(request: Request) {
   const preferredEffort = form.get("preferredEffort");
   const fullAuto = form.get("fullAuto");
   const rawCheckpoints = form.get("checkpoints");
-  let checkpoints: unknown = [];
-  if (typeof rawCheckpoints === "string" && rawCheckpoints) {
+  const checkpoints = (() => {
+    if (typeof rawCheckpoints !== "string" || !rawCheckpoints) return [];
     try {
-      checkpoints = JSON.parse(rawCheckpoints);
+      const parsed: unknown = JSON.parse(rawCheckpoints);
+      return parsed;
     } catch {
       throw new HttpError(400, "Issue checkpoints are invalid");
     }
-  }
+  })();
   return {
     input: decodeIssueInput({
       title: form.get("title"),

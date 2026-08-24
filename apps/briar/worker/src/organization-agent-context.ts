@@ -210,10 +210,11 @@ const fitPageToByteBudget = <
   }
 };
 
-const parseJson = (value: string | null): unknown => {
+const parseJson = (value: string | null) => {
   if (!value) return null;
   try {
-    return JSON.parse(value) as unknown;
+    const parsed: unknown = JSON.parse(value);
+    return parsed;
   } catch {
     return null;
   }

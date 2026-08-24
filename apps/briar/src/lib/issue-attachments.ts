@@ -20,19 +20,19 @@ export const maxIssueMultipartBytes = maxIssueAttachmentTotalBytes + 1024 * 1024
 
 const allowedMimeTypes = new Set<string>(issueAttachmentMimeTypes);
 
-const mimeTypesByExtension: Record<string, (typeof issueAttachmentMimeTypes)[number]> = {
-  avif: "image/avif",
-  gif: "image/gif",
-  jpeg: "image/jpeg",
-  jpg: "image/jpeg",
-  m4v: "video/mp4",
-  mov: "video/quicktime",
-  mp4: "video/mp4",
-  png: "image/png",
-  svg: "image/svg+xml",
-  webm: "video/webm",
-  webp: "image/webp",
-};
+const mimeTypesByExtension = new Map<string, (typeof issueAttachmentMimeTypes)[number]>([
+  ["avif", "image/avif"],
+  ["gif", "image/gif"],
+  ["jpeg", "image/jpeg"],
+  ["jpg", "image/jpeg"],
+  ["m4v", "video/mp4"],
+  ["mov", "video/quicktime"],
+  ["mp4", "video/mp4"],
+  ["png", "image/png"],
+  ["svg", "image/svg+xml"],
+  ["webm", "video/webm"],
+  ["webp", "image/webp"],
+]);
 
 export type IssueAttachmentCandidate = {
   name: string;
@@ -44,7 +44,7 @@ export type IssueAttachmentCandidate = {
 export function issueAttachmentMimeTypeFromName(name: string): string | null {
   const extension = name.normalize("NFC").trim().split(".").pop()?.toLowerCase();
   if (!extension) return null;
-  return mimeTypesByExtension[extension] ?? null;
+  return mimeTypesByExtension.get(extension) ?? null;
 }
 
 /** True when content type or filename indicates an image preview is appropriate. */

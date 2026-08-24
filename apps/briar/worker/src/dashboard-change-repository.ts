@@ -5,7 +5,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import { runD1 } from "./d1-runtime";
-import { makeSqlQueryCache } from "./sql-query-cache";
+import { createSqlQueryCache } from "./sql-query-cache";
 
 const DASHBOARD_CHANGE_PAGE_SIZE = 500;
 
@@ -82,7 +82,7 @@ const makeDashboardChangeQueries = (sql: SqlClient.SqlClient) => {
     findOldestDashboardChange,
   };
 };
-const dashboardChangeQueries = makeSqlQueryCache(makeDashboardChangeQueries);
+const dashboardChangeQueries = createSqlQueryCache(makeDashboardChangeQueries);
 
 const getDashboardSyncCursorEffect = Effect.fn(
   "getDashboardSyncCursorEffect",

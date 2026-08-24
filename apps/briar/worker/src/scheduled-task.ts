@@ -23,6 +23,10 @@ export type ScheduledTaskDependencies = {
   reconcileManagedComputers: typeof reconcileManagedComputers;
 };
 
+interface DashboardChangePruneFailure {
+  error: unknown;
+}
+
 const scheduledTaskDependencies: ScheduledTaskDependencies = {
   archiveCompletedLogs,
   expireArchives,
@@ -83,16 +87,14 @@ export async function handleScheduledTask(
       let dashboardChanges: Awaited<
         ReturnType<typeof pruneExpiredDashboardChanges>
       > | null = null;
-      let dashboardChangePruneFailed = false;
-      let dashboardChangePruneError: unknown = null;
+      let dashboardChangePruneFailure: DashboardChangePruneFailure | null = null;
       try {
         dashboardChanges = await dependencies.pruneExpiredDashboardChanges(
           env.DB,
           observedAt,
         );
       } catch (error) {
-        dashboardChangePruneFailed = true;
-        dashboardChangePruneError = error;
+        dashboardChangePruneFailure = { error };
         console.error(JSON.stringify({
           message: "Dashboard change prune failed",
           observedAt,
@@ -119,8 +121,8 @@ export async function handleScheduledTask(
         dependencies.reconcileManagedComputers(env.DB, env, observedAt),
       ]);
       await flushOrganizationInboxRealtimeOutbox(env, env.DB);
-      if (dashboardChangePruneFailed) {
-        throw dashboardChangePruneError;
+      if (dashboardChangePruneFailure !== null) {
+        throw dashboardChangePruneFailure.error;
       }
       console.log(JSON.stringify({
         message: "log archive sweep completed",
@@ -143,4 +145,3 @@ export async function handleScheduledTask(
     }
   })());
 }
-

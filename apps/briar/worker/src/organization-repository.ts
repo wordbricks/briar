@@ -4,7 +4,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import { runD1 } from "./d1-runtime";
-import { makeSqlQueryCache } from "./sql-query-cache";
+import { createSqlQueryCache } from "./sql-query-cache";
 
 export const OrganizationRole = Schema.Literals(["owner", "admin", "member"]);
 export type OrganizationRole = typeof OrganizationRole.Type;
@@ -156,7 +156,7 @@ const makeOrganizationQueries = (sql: SqlClient.SqlClient) => {
     findOrganizations,
   };
 };
-const organizationQueries = makeSqlQueryCache(makeOrganizationQueries);
+const organizationQueries = createSqlQueryCache(makeOrganizationQueries);
 
 const listOrganizationsEffect = Effect.fn("listOrganizationsEffect")(
   function*(userId: string) {

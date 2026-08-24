@@ -512,7 +512,7 @@ export const OrganizationAgentContextSession = strict(Schema.Struct({
 export type OrganizationAgentContextSession =
   typeof OrganizationAgentContextSession.Type;
 
-const organizationAgentContextPageShape = {
+const organizationAgentContextPageFields = {
   schemaVersion: Schema.Literal(1),
   organizationId: OrganizationAgentContextId,
   workId: OrganizationAgentContextId,
@@ -555,7 +555,7 @@ const validateOrganizationAgentContextProjectPage = (
 };
 
 export const OrganizationAgentContextProjectsPage = strict(Schema.Struct({
-  ...organizationAgentContextPageShape,
+  ...organizationAgentContextPageFields,
   resource: Schema.Literal("projects"),
   projectId: Schema.Null,
   items: mutableArrayAtMost(OrganizationAgentContextProject, 50),
@@ -566,7 +566,7 @@ export type OrganizationAgentContextProjectsPage =
   typeof OrganizationAgentContextProjectsPage.Type;
 
 export const OrganizationAgentContextIssuesPage = strict(Schema.Struct({
-  ...organizationAgentContextPageShape,
+  ...organizationAgentContextPageFields,
   resource: Schema.Literal("issues"),
   projectId: OrganizationAgentContextId,
   items: mutableArrayAtMost(OrganizationAgentContextIssue, 50),
@@ -579,7 +579,7 @@ export type OrganizationAgentContextIssuesPage =
   typeof OrganizationAgentContextIssuesPage.Type;
 
 export const OrganizationAgentContextAgentsPage = strict(Schema.Struct({
-  ...organizationAgentContextPageShape,
+  ...organizationAgentContextPageFields,
   resource: Schema.Literal("agents"),
   projectId: OrganizationAgentContextId,
   items: mutableArrayAtMost(OrganizationAgentContextProjectAgent, 50),
@@ -591,7 +591,7 @@ export type OrganizationAgentContextAgentsPage =
 
 export const OrganizationAgentContextIssuePullRequestsPage = strict(
   Schema.Struct({
-    ...organizationAgentContextPageShape,
+    ...organizationAgentContextPageFields,
     resource: Schema.Literal("issue-pull-requests"),
     projectId: OrganizationAgentContextId,
     items: mutableArrayAtMost(OrganizationAgentContextIssuePullRequest, 50),
@@ -605,7 +605,7 @@ export type OrganizationAgentContextIssuePullRequestsPage =
   typeof OrganizationAgentContextIssuePullRequestsPage.Type;
 
 export const OrganizationAgentContextSessionsPage = strict(Schema.Struct({
-  ...organizationAgentContextPageShape,
+  ...organizationAgentContextPageFields,
   resource: Schema.Literal("agent-sessions"),
   projectId: OrganizationAgentContextId,
   items: mutableArrayAtMost(OrganizationAgentContextSession, 50),

@@ -1,6 +1,6 @@
 import type * as SqlClient from "effect/unstable/sql/SqlClient";
 
-export const makeSqlQueryCache = <Queries>(
+export const createSqlQueryCache = <Queries>(
   makeQueries: (sql: SqlClient.SqlClient) => Queries,
 ) => {
   const cache = new WeakMap<SqlClient.SqlClient, Queries>();

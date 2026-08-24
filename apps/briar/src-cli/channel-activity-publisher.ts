@@ -58,29 +58,33 @@ export function safeChannelActivityHeadline(
 }
 
 function normalizedEventFromPayload(payload: unknown): NormalizedAgentEvent | null {
-  if (!payload || typeof payload !== "object") return null;
-  const event = Reflect.get(payload, "event");
-  if (!event || typeof event !== "object") return null;
-  const type = Reflect.get(event, "type");
+  if (
+    payload === null || typeof payload !== "object" || !("event" in payload)
+  ) return null;
+  const event = payload.event;
+  if (event === null || typeof event !== "object" || !("type" in event)) {
+    return null;
+  }
+  const type = event.type;
   if (type === "messageStarted" || type === "messageCompleted") {
-    const id = Reflect.get(event, "id");
-    const phase = Reflect.get(event, "phase");
-    const text = Reflect.get(event, "text");
+    const id = "id" in event ? event.id : undefined;
+    const phase = "phase" in event ? event.phase : undefined;
+    const text = "text" in event ? event.text : undefined;
     if (
       typeof id !== "string" || phase !== "commentary" ||
       typeof text !== "string" || !text.trim()
     ) return null;
   } else if (type === "activityStarted") {
-    const id = Reflect.get(event, "id");
-    const kind = Reflect.get(event, "kind");
-    const title = Reflect.get(event, "title");
+    const id = "id" in event ? event.id : undefined;
+    const kind = "kind" in event ? event.kind : undefined;
+    const title = "title" in event ? event.title : undefined;
     if (
       typeof id !== "string" || typeof title !== "string" ||
       (kind !== "command" && kind !== "fileChange" &&
         kind !== "webSearch" && kind !== "tool")
     ) return null;
   } else if (type === "activityCompleted") {
-    if (typeof Reflect.get(event, "id") !== "string") return null;
+    if (!("id" in event) || typeof event.id !== "string") return null;
   } else if (type !== "turnCompleted") {
     return null;
   }

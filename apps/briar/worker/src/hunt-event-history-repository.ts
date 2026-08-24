@@ -4,7 +4,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import { runD1 } from "./d1-runtime";
 import { HuntEventRow } from "./hunt-event-model";
-import { makeSqlQueryCache } from "./sql-query-cache";
+import { createSqlQueryCache } from "./sql-query-cache";
 
 const HuntRunEventsRequest = Schema.Struct({
   projectId: Schema.String,
@@ -55,7 +55,7 @@ const makeHuntEventHistoryQueries = (sql: SqlClient.SqlClient) => {
 
   return { findHuntEventActorNames, findHuntRunEvents };
 };
-const huntEventHistoryQueries = makeSqlQueryCache(
+const huntEventHistoryQueries = createSqlQueryCache(
   makeHuntEventHistoryQueries,
 );
 
