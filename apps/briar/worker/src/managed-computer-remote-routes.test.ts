@@ -123,6 +123,7 @@ describe("managed computer remote desktop routes", () => {
     token: string,
     requestId: string,
     origin = "https://briar.example",
+    reconnectSessionId?: string,
   ) => new Request(
     `https://briar.example/organizations/${organizationId}/managed-computers/${computerId}/remote-sessions`,
     {
@@ -133,7 +134,10 @@ describe("managed computer remote desktop routes", () => {
         "idempotency-key": requestId,
         origin,
       },
-      body: JSON.stringify({ requestId }),
+      body: JSON.stringify({
+        requestId,
+        ...(reconnectSessionId ? { reconnectSessionId } : {}),
+      }),
     },
   );
 
@@ -230,7 +234,12 @@ describe("managed computer remote desktop routes", () => {
        where id = ?`,
     ).bind(now, now, payload.session.id).run();
     const recoveredResponse = await worker.fetch(
-      createRequest(ownerToken, "99999999-9999-4999-8999-999999999999"),
+      createRequest(
+        ownerToken,
+        "99999999-9999-4999-8999-999999999999",
+        "https://briar.example",
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      ),
       env(),
     );
     expect(recoveredResponse.status).toBe(201);
