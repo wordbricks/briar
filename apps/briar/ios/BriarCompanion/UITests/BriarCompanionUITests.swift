@@ -121,6 +121,11 @@ final class BriarCompanionUITests: XCTestCase {
         let identity = app.buttons["channel-header-identity"]
         XCTAssertTrue(identity.waitForExistence(timeout: channelTransitionTimeout))
         XCTAssertTrue(identity.label.contains("Honey"))
+        XCTAssertGreaterThan(
+            identity.frame.width,
+            64,
+            "DM 헤더가 아바타 너비로 축소되지 않고 상대 이름을 표시해야 합니다."
+        )
         XCTAssertFalse(identity.label.contains("비공개 대화"))
         XCTAssertTrue(
             element(withLabel: "iOS DM 화면을 검토해 주세요.", in: app)

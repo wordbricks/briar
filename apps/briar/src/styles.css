@@ -6465,6 +6465,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
   text-align: left;
 }
 .channel-header-identity-button h2 {
+  min-width: 0;
+  flex: 0 1 auto;
   margin: 0;
   overflow: hidden;
   font-size: 15px;

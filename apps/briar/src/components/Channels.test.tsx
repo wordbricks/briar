@@ -547,8 +547,10 @@ describe("Channels", () => {
     });
     await vi.waitFor(() => {
       expect(
-        container.querySelector(".channel-header-identity-button")?.textContent,
-      ).toContain("Honey");
+        container.querySelector<HTMLHeadingElement>(
+          ".channel-header-identity-button h2",
+        )?.textContent,
+      ).toBe("Honey");
     });
     const dmHeader = container.querySelector(".channel-header");
     expect(dmHeader?.getAttribute("data-tauri-drag-region")).toBe("deep");
