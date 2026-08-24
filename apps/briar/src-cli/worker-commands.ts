@@ -12,6 +12,7 @@ import {
 } from "./workflow-requirements";
 import {
   createWorkerDeviceIdentity,
+  createWorkerLoopHeartbeat,
   defaultWorkerLabel,
   interruptibleSleep,
   runWorkerLoop,
@@ -757,12 +758,13 @@ async function workerCommand() {
             }
           }
         }
-        return {
+        return createWorkerLoopHeartbeat({
           acceptingWork: effectiveAcceptingWork,
           maxConcurrentSessions:
             heartbeat.worker.maxConcurrentSessions ??
             registered.maxConcurrentSessions,
-        };
+          updateDirective: heartbeat.updateDirective,
+        });
       },
       handoff: async (issue, requestId, checkpoint) => {
         if (issue.workType === "mergeBatch") {

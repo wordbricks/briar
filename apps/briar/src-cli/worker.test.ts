@@ -4,6 +4,7 @@ import {
   DEFAULT_MAX_ERROR_DELAY_MS,
   DEFAULT_MAX_IDLE_DELAY_MS,
   createWorkerDeviceIdentity,
+  createWorkerLoopHeartbeat,
   defaultWorkerLabel,
   errorDelayMs,
   idleDelayWithBackoffMs,
@@ -537,6 +538,26 @@ describe("briar worker loop", () => {
     expect(test.logs).toContain(
       "handed off issue-update for planned Worker update",
     );
+  });
+
+  it("preserves the update directive for the worker loop", () => {
+    const updateDirective = {
+      id: "update-request",
+      targetVersion: "2.0.0",
+      status: "requested" as const,
+      requestedAt: new Date(0).toISOString(),
+      handoffState: "draining" as const,
+    };
+
+    expect(createWorkerLoopHeartbeat({
+      acceptingWork: false,
+      maxConcurrentSessions: 2,
+      updateDirective,
+    })).toEqual({
+      acceptingWork: false,
+      maxConcurrentSessions: 2,
+      updateDirective,
+    });
   });
 
   it("does not wait out the renewal interval after an issue finishes", async () => {
