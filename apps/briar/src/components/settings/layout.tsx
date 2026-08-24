@@ -122,7 +122,7 @@ export function SettingsNav({
   return (
     <nav
       className={cn(
-        "settings-nav grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-2.5 pb-5 [scrollbar-color:rgba(82,83,77,.18)_transparent] [scrollbar-width:thin]",
+        "settings-nav scrollbar-subtle grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-2.5 pb-5",
         className,
       )}
     >
@@ -231,7 +231,7 @@ export function SettingsScroll({
   return (
     <div
       className={cn(
-        "settings-scroll min-h-0 flex-1 overflow-auto px-[clamp(28px,5vw,80px)] pb-[72px] pt-2 [scrollbar-gutter:stable]",
+        "settings-scroll scrollbar-subtle min-h-0 flex-1 overflow-auto px-[clamp(28px,5vw,80px)] pb-[72px] pt-2 [scrollbar-gutter:stable]",
         className,
       )}
     >

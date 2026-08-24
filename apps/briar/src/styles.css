@@ -15,6 +15,93 @@ html.macos-vibrant-window,
 html.macos-vibrant-window body,
 html.macos-vibrant-window #root { background:transparent; }
 body { overflow: hidden; font-synthesis: none; }
+
+/*
+  Shared visible-scrollbar utility.
+  Legacy selectors are aliases so every established scroll container uses the
+  same theme tokens without changing its overflow, gutter, or keyboard behavior.
+*/
+:where(
+  .scrollbar-subtle,
+  .agent-usage-provider-list,
+  .agent-usage-history > div,
+  .usage-overview-table-wrap,
+  .sidebar-project-list,
+  .organization-settings,
+  .organization-create,
+  .project-settings-linear-import-teams,
+  .project-workflow-stages,
+  .project-lobby-scroll,
+  .health-popover,
+  .worker-readiness-list,
+  .kanban-board,
+  .kanban-column > div,
+  .issue-list,
+  .run-page-description,
+  .issue-workflow-progress,
+  .run-properties,
+  .issue-description-scroll,
+  .issue-status-history-panel,
+  .run-result-panel,
+  .run-evidence-panel,
+  .run-evidence-metadata pre,
+  .markdown-content pre,
+  .markdown-table-wrap,
+  .issue-message-list,
+  .skill-execution-approval-scroll,
+  .issue-attachment-list,
+  .login-shell,
+  .onboarding-shell,
+  .initial-onboarding,
+  .initial-prerequisites-card,
+  .select-menu-options,
+  .inbox-scroll,
+  .project-schedule-calendar-scroll,
+  .project-agent-template-actions pre,
+  .app-settings-nav,
+  .app-settings-scroll,
+  .dm-conversation-list,
+  .dm-candidate-popover,
+  .channel-messages,
+  .channel-document-dialog-body,
+  .companion-channels,
+  .companion-channel-mention-menu,
+  .channel-message-text pre
+) {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--scrollbar-thumb);
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+
+  @media (forced-colors: active) {
+    scrollbar-color: ButtonText Canvas;
+
+    &::-webkit-scrollbar-track {
+      background: Canvas;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      border: 1px solid Canvas;
+      background: ButtonText;
+    }
+  }
+}
 .brand { min-width:0; display:inline-flex; align-items:center; gap:9px; line-height:1; }
 .brand-mark { width:24px; height:24px; flex:0 0 24px; display:block; border-radius:6px; object-fit:contain; }
 .brand-mark-dark { display:none; }
@@ -236,7 +323,7 @@ body { overflow: hidden; font-synthesis: none; }
 .usage-overview-detail-grid { min-width:0; padding-top:30px; display:grid; grid-template-columns:minmax(0,2.05fr) minmax(255px,.82fr); align-items:start; gap:42px; }
 .usage-overview-breakdown { min-width:0; }
 .usage-overview-breakdown > header { min-height:32px; display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
-.usage-overview-table-wrap { max-height:420px; overflow:auto; scrollbar-width:thin; }
+.usage-overview-table-wrap { max-height:420px; overflow:auto; }
 .usage-overview-table-wrap:focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
 .usage-overview-breakdown table { width:100%; min-width:650px; border-collapse:collapse; table-layout:fixed; }
 .usage-overview-breakdown th,.usage-overview-breakdown td { height:48px; padding:8px 10px; border-bottom:1px solid var(--border); font-size:var(--text-xs); text-align:right; }
@@ -490,7 +577,7 @@ body { overflow: hidden; font-synthesis: none; }
 .sidebar-section-heading button:hover { color:var(--foreground); background: rgba(44,45,41,.07); }
 .sidebar-section-heading button:active { transform: scale(.95); }
 .sidebar-section-heading button:focus-visible, .sidebar-project-heading:focus-visible, .sidebar-project-toggle:focus-visible, .sidebar-project-menu-trigger:focus-visible, .sidebar-project-view:focus-visible, .sidebar-agent-session:focus-visible, .sidebar-issue-add:focus-visible { outline: 2px solid #8b70dd; outline-offset: -1px; }
-.sidebar-project-list { min-height: 0; padding: 0 10px 16px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(82,83,77,.2) transparent; }
+.sidebar-project-list { min-height: 0; padding: 0 10px 16px; overflow-x: hidden; overflow-y: auto; }
 .sidebar-project-window-tabs { padding-top:2px; }
 .sidebar-project-window-tabs .sidebar-project-list { padding-top:0; }
 .sidebar-project-window-tabs .sidebar-project-view { padding-left:20px; }
@@ -915,7 +1002,7 @@ body { overflow: hidden; font-synthesis: none; }
 .project-workflow-requirements li > p { margin:0; grid-column:2 / -1; }
 .project-workflow-requirements > p { margin:10px 0 0 24px; }
 .project-workflow-diagram { min-width:0; padding:18px; }
-.project-workflow-stages { margin:0; padding:0 0 6px; overflow-x:auto; display:flex; align-items:stretch; list-style:none; scrollbar-width:thin; }
+.project-workflow-stages { margin:0; padding:0 0 6px; overflow-x:auto; display:flex; align-items:stretch; list-style:none; }
 .project-workflow-stages > li { min-width:0; flex:0 0 auto; display:flex; align-items:center; }
 .project-workflow-stage { width:190px; min-height:184px; flex:0 0 190px; padding:13px; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:11px; background:var(--card); box-shadow:var(--shadow-xs); }
 .project-workflow-stage.optional { border-style:dashed; background:var(--muted); }
@@ -1229,10 +1316,6 @@ body { overflow: hidden; font-synthesis: none; }
 .kanban-checkpoint-marker > strong { min-width:10px; height:10px; padding:0 2px; position:absolute; top:-3px; right:-2px; display:grid; place-items:center; border:1px solid #f7f7f4; border-radius:999px; color:#fff; background:#a93347; font:700 7px/1 "DM Mono",monospace; }
 .kanban-checkpoint-marker:focus-visible { outline:2px solid #8a3142; outline-offset:1px; border-radius:3px; }
 @media (max-width:760px) { .kanban-column-shell { height:auto; } }
-.kanban-column > div { scrollbar-width:thin; scrollbar-color:rgba(82,83,77,.18) transparent; }
-.kanban-column > div::-webkit-scrollbar { width:6px; }
-.kanban-column > div::-webkit-scrollbar-track { background:transparent; }
-.kanban-column > div::-webkit-scrollbar-thumb { border-radius:999px; background:rgba(82,83,77,.18); }
 .kanban-column > .kanban-column-content { padding-bottom:14px; }
 .kanban-column-add { width:100%; min-height:42px; margin:2px 0 0; padding:0 10px; display:flex; align-items:center; justify-content:center; gap:6px; border:1px dashed #d6d5ce; border-radius:10px; color:#999b94; background:transparent; cursor:pointer; font-size:var(--text-2xs); font-weight:600; transition:border-color .12s ease,color .12s ease,background-color .12s ease; }
 .kanban-column-add:hover { border-color:#b7a8e4; color:#6650ae; background:rgba(128,104,206,.06); }
@@ -1330,7 +1413,7 @@ body { overflow: hidden; font-synthesis: none; }
 .run-page-title-row { min-width:0; display:flex; align-items:baseline; gap:10px; }
 .run-page-title-row small { flex:0 0 auto; color:#8068ce; }
 .run-page-title-row .run-page-inline-title { flex:1 1 auto; }
-.run-page-description { max-width:900px; max-height:3.2em; margin:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; white-space:pre-wrap; color:var(--muted-foreground); font-size:var(--text-xs); line-height:1.6; }
+.run-page-description { max-width:900px; max-height:3.2em; margin:0; overflow-y:auto; overscroll-behavior:contain; white-space:pre-wrap; color:var(--muted-foreground); font-size:var(--text-xs); line-height:1.6; }
 .run-page-shell .run-page-window-title { flex:1 1 auto; }
 .run-page-titlebar-actions { min-width:0; margin-left:auto; display:flex; align-items:center; gap:8px; }
 .run-page-titlebar-divider { width:1px; height:18px; flex:0 0 1px; background:color-mix(in srgb,var(--border) 88%,var(--foreground)); opacity:.9; }
@@ -1555,7 +1638,7 @@ body { overflow: hidden; font-synthesis: none; }
 .run-page-conversation-resizer:hover::after,.run-page-conversation-resizer:focus-visible::after,.run-page-layout.is-resizing-conversation .run-page-conversation-resizer::after { opacity:1; border-color:#a997df; background:#f1edfc; }
 .run-page-main { min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
 .run-page-content { width:100%; min-width:0; min-height:0; flex:1; display:flex; flex-direction:column; padding:16px 20px 22px 24px; overflow:hidden; }
-.issue-workflow-progress { min-width:0; min-height:70px; flex:0 0 auto; padding:11px 24px 9px; overflow-x:auto; border-top:1px solid var(--border); background:color-mix(in srgb,var(--card) 96%,var(--muted)); scrollbar-width:thin; }
+.issue-workflow-progress { min-width:0; min-height:70px; flex:0 0 auto; padding:11px 24px 9px; overflow-x:auto; border-top:1px solid var(--border); background:color-mix(in srgb,var(--card) 96%,var(--muted)); }
 .issue-workflow-progress ol { min-width:max-content; margin:0; padding:0; display:flex; list-style:none; }
 .issue-workflow-progress li { min-width:96px; position:relative; flex:1 0 96px; display:grid; grid-template-rows:24px auto; justify-items:center; align-items:start; gap:3px; color:var(--muted-foreground); }
 .issue-workflow-progress li::before { content:""; height:2px; position:absolute; z-index:0; top:10px; right:50%; left:-50%; background:var(--border); }
@@ -1613,7 +1696,7 @@ body { overflow: hidden; font-synthesis: none; }
 .issue-workflow-progress li[data-state="cancelled"] .issue-workflow-marker { border-color:var(--muted-foreground); }
 .issue-workflow-progress li[data-state="cancelled"] .issue-workflow-marker i { background:var(--muted-foreground); }
 .run-properties-layer { position:absolute; z-index:10; inset:0; }
-.run-properties { width:min(310px,100%); min-width:0; min-height:0; height:100%; position:absolute; z-index:10; top:0; right:0; display:grid; align-content:start; gap:24px; padding:0 16px 20px; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; border-left:1px solid var(--border); background:var(--card); box-shadow:-16px 0 40px rgba(0,0,0,.12); }
+.run-properties { width:min(310px,100%); min-width:0; min-height:0; height:100%; position:absolute; z-index:10; top:0; right:0; display:grid; align-content:start; gap:24px; padding:0 16px 20px; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; border-left:1px solid var(--border); background:var(--card); box-shadow:-16px 0 40px rgba(0,0,0,.12); }
 .run-properties-header { min-height:46px; position:sticky; z-index:1; top:0; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); background:var(--card); }
 .run-properties-header button { width:28px; height:28px; padding:0; display:grid; place-items:center; border:0; border-radius:7px; color:var(--muted-foreground); background:transparent; cursor:pointer; }.run-properties-header button:hover { color:var(--foreground); background:var(--accent); }.run-properties-header button:focus-visible { outline:2px solid var(--ring); outline-offset:1px; }
 .run-properties section { min-width:0; display:grid; gap:2px; }
@@ -1657,7 +1740,7 @@ body { overflow: hidden; font-synthesis: none; }
 .issue-detail-tabs button[aria-selected="true"] { color:var(--accent-foreground); }
 .issue-detail-tabs button[aria-selected="true"]::after { background:var(--primary); }
 .issue-detail-tabs button:focus-visible { z-index:1; outline:2px solid #8b70dd; outline-offset:-2px; border-radius:7px; }
-.issue-description-scroll { width:100%; min-height:0; flex:1; padding:7px 6px 8px 0; overflow-y:auto; display:flex; flex-direction:column; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
+.issue-description-scroll { width:100%; min-height:0; flex:1; padding:7px 6px 8px 0; overflow-y:auto; display:flex; flex-direction:column; overscroll-behavior:contain; scrollbar-gutter:stable; }
 .issue-dependencies { margin:0 0 16px; padding:14px; display:grid; gap:13px; border:1px solid var(--border); border-radius:12px; background:color-mix(in srgb,var(--card) 94%,var(--accent)); }
 .issue-dependencies > header { display:flex; align-items:flex-start; gap:9px; }
 .issue-dependencies > header > span { width:28px; height:28px; display:grid; place-items:center; flex:0 0 auto; border-radius:8px; color:var(--primary); background:color-mix(in srgb,var(--primary) 12%,transparent); }
@@ -1702,7 +1785,7 @@ body { overflow: hidden; font-synthesis: none; }
 .run-properties .issue-dependency-link strong { grid-column:1 / -1; grid-row:2; }
 .run-properties .issue-dependency-link small { justify-self:end; }
 .run-properties .issue-dependency-add-button { width:100%; }
-.issue-status-history-panel { width:100%; min-height:0; flex:1; overflow-y:auto; padding:10px 10px 12px 2px; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
+.issue-status-history-panel { width:100%; min-height:0; flex:1; overflow-y:auto; padding:10px 10px 12px 2px; overscroll-behavior:contain; scrollbar-gutter:stable; }
 .blocked-issue-card { margin:0 0 14px; padding:14px; border:1px solid color-mix(in srgb,var(--destructive) 38%,var(--border)); border-radius:12px; background:color-mix(in srgb,var(--destructive) 8%,var(--card)); box-shadow:0 1px 2px color-mix(in srgb,var(--destructive) 8%,transparent); }
 .blocked-issue-card-heading { display:flex; align-items:center; gap:8px; color:var(--destructive); }
 .blocked-issue-card-heading strong { color:var(--foreground); font-size:var(--text-xs); }
@@ -1778,7 +1861,7 @@ body { overflow: hidden; font-synthesis: none; }
 .run-result-review-error { margin:0; color:var(--destructive); font-size:var(--text-2xs); }
 .completed-issue-card > button { margin-top:12px; padding:7px 9px; display:flex; align-items:center; gap:6px; border:1px solid color-mix(in srgb,#4baa86 45%,var(--border)); border-radius:8px; color:#2d725b; background:var(--card); cursor:pointer; font-size:var(--text-2xs); font-weight:700; }
 .completed-issue-card > button:hover { background:color-mix(in srgb,#4baa86 12%,var(--card)); }
-.run-result-panel { width:100%; min-height:0; flex:1; overflow-y:auto; padding:0 4px 12px 0; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
+.run-result-panel { width:100%; min-height:0; flex:1; overflow-y:auto; padding:0 4px 12px 0; overscroll-behavior:contain; scrollbar-gutter:stable; }
 .run-result-panel .completed-issue-card { margin:0; padding:18px; }
 .paused-result-card { border-color:color-mix(in srgb,var(--warning) 34%,var(--border)); background:color-mix(in srgb,var(--warning) 7%,var(--card)); }
 .paused-review-content { margin-top:16px; display:grid; gap:12px; }
@@ -1880,7 +1963,7 @@ button.run-manual-qa-state { width:100%; border:0; border-radius:8px; cursor:poi
 .blocked-issue-details summary svg { flex:0 0 auto; transition:transform 140ms ease; }
 .blocked-issue-details[open] summary svg { transform:rotate(90deg); }
 .blocked-issue-details p { margin:9px 0 0; padding:10px 11px; border-radius:8px; color:var(--muted-foreground); background:color-mix(in srgb,var(--muted) 70%,transparent); font:500 var(--text-2xs)/1.6 "DM Mono",monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
-.run-evidence-panel { width:100%; min-height:0; flex:1; overflow-y:auto; padding:10px 10px 12px 2px; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
+.run-evidence-panel { width:100%; min-height:0; flex:1; overflow-y:auto; padding:10px 10px 12px 2px; overscroll-behavior:contain; scrollbar-gutter:stable; }
 .run-evidence-state,.run-evidence-empty { min-height:120px; display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted-foreground); font-size:var(--text-2xs); }
 .run-evidence-state.error { width:100%; border:0; border-radius:10px; color:var(--foreground); background:color-mix(in srgb,var(--destructive) 10%,var(--card)); cursor:pointer; }
 .run-evidence-state.error span { max-width:420px; overflow-wrap:anywhere; }
@@ -1975,7 +2058,7 @@ button.run-manual-qa-state { width:100%; border:0; border-radius:8px; cursor:poi
 .markdown-content a:not(.conversation-mention-button):hover { color:var(--primary-hover,#1f1717); }
 .markdown-content a:not(.conversation-mention-button):focus-visible { border-radius:3px; outline:2px solid var(--ring); outline-offset:2px; }
 .markdown-content code { padding:.14em .38em; border:1px solid var(--border); border-radius:5px; color:var(--accent-foreground); background:var(--accent); font:500 .92em var(--font-mono,"DM Mono",ui-monospace,monospace); overflow-wrap:anywhere; }
-.markdown-content pre { max-width:100%; margin:.75em 0; overflow-x:auto; padding:12px 14px; border:1px solid var(--border); border-radius:9px; color:var(--foreground); background:var(--muted); font:var(--text-xs)/1.55 var(--font-mono,"DM Mono",ui-monospace,monospace); scrollbar-width:thin; }
+.markdown-content pre { max-width:100%; margin:.75em 0; overflow-x:auto; padding:12px 14px; border:1px solid var(--border); border-radius:9px; color:var(--foreground); background:var(--muted); font:var(--text-xs)/1.55 var(--font-mono,"DM Mono",ui-monospace,monospace); }
 .markdown-content pre code { display:block; min-width:max-content; padding:0; border:0; border-radius:0; color:inherit; background:transparent; font:inherit; white-space:pre; overflow-wrap:normal; }
 .markdown-content ul { margin:.65em 0; padding-left:1.65em; list-style:disc; }
 .markdown-content ol { margin:.65em 0; padding-left:1.65em; list-style:decimal; }
@@ -1985,7 +2068,7 @@ button.run-manual-qa-state { width:100%; border:0; border-radius:8px; cursor:poi
 .markdown-content blockquote { margin:.8em 0; padding:.55em .9em; border-left:3px solid var(--accent-foreground); border-radius:0 8px 8px 0; color:var(--muted-foreground); background:color-mix(in srgb,var(--accent) 55%,transparent); overflow-wrap:anywhere; }
 .markdown-content blockquote > :first-child { margin-top:0; }
 .markdown-content blockquote > :last-child { margin-bottom:0; }
-.markdown-table-wrap { max-width:100%; margin:.75em 0; overflow-x:auto; border:1px solid var(--border); border-radius:9px; background:var(--card); scrollbar-width:thin; }
+.markdown-table-wrap { max-width:100%; margin:.75em 0; overflow-x:auto; border:1px solid var(--border); border-radius:9px; background:var(--card); }
 .markdown-table-wrap table { width:max-content; min-width:100%; border-collapse:collapse; font-size:var(--text-xs); }
 .markdown-table-wrap th { padding:7px 9px; border-bottom:1px solid var(--border); color:var(--foreground); background:var(--muted); font-weight:650; text-align:left; white-space:nowrap; }
 .markdown-table-wrap td { padding:7px 9px; border-top:1px solid var(--border); color:var(--foreground); text-align:left; vertical-align:top; white-space:nowrap; }
@@ -2038,7 +2121,7 @@ button.run-manual-qa-state { width:100%; border:0; border-radius:8px; cursor:poi
 .issue-subscribe-button.active { border-color:color-mix(in srgb,var(--primary) 32%,var(--border)); color:var(--primary); background:color-mix(in srgb,var(--primary) 9%,var(--card)); }
 .issue-subscribe-button:disabled { cursor:not-allowed; opacity:.62; }
 .issue-subscribe-button:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
-.issue-message-list { min-width:0; min-height:0; flex:1; margin:0 8px; display:grid; align-content:start; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; }
+.issue-message-list { min-width:0; min-height:0; flex:1; margin:0 8px; display:grid; align-content:start; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
 .conversation-scroll-region > .issue-message-list { width:100%; height:100%; margin:0; }
 .issue-message-list::before,.issue-message-list::after { content:""; height:10px; }
 .issue-message-list::after { height:12px; }
@@ -2561,7 +2644,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
   gap: 8px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  scrollbar-width: thin;
 }
 .issue-attachment-item {
   width: min(320px, 60vw);
@@ -3579,7 +3661,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
   max-height: var(--select-menu-max-height);
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
 }
 .select-menu-search {
   height: 38px;
@@ -3963,7 +4044,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-schedule-timezone { display:flex; align-items:center; gap:6px; color:var(--muted-foreground); font:500 var(--text-2xs) "DM Mono",monospace; white-space:nowrap; }
 .project-schedule-timezone svg { color:var(--muted-foreground); }
 .project-schedule-timezone span + span::before { content:"·"; margin-right:6px; color:var(--muted-foreground); }
-.project-schedule-calendar-scroll { min-height:0; flex:1; overflow:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:rgba(81,87,82,.24) transparent; }
+.project-schedule-calendar-scroll { min-height:0; flex:1; overflow:auto; overscroll-behavior:contain; }
 .project-schedule-grid { min-width:850px; position:relative; }
 .project-schedule-days { min-width:850px; height:64px; position:sticky; z-index:10; top:0; display:grid; grid-template-columns:64px repeat(7,minmax(112px,1fr)); border-bottom:1px solid var(--border); background:var(--card); box-shadow:0 2px 7px rgba(0,0,0,.06); backdrop-filter:blur(16px) saturate(150%); -webkit-backdrop-filter:blur(16px) saturate(150%); }
 .project-schedule-day-corner { border-right:1px solid var(--border); }
@@ -5517,8 +5598,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
   display:grid;
   align-content:start;
   gap:16px;
-  scrollbar-width:thin;
-  scrollbar-color:rgba(82,83,77,.18) transparent;
 }
 .app-settings-nav-group {
   display:grid;
@@ -7941,7 +8020,6 @@ button.issue-message-state { width:100%; cursor:pointer; }
   color:var(--foreground);
   background:var(--muted);
   font:var(--text-xs)/1.55 var(--font-mono,"DM Mono",ui-monospace,monospace);
-  scrollbar-width:thin;
 }
 .channel-message-text pre code {
   display:block;
