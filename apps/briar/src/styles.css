@@ -7992,7 +7992,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-channel-message header > svg { flex:0 0 auto; color:var(--muted-foreground,#777168); }
 .companion-channel-message header time { flex:0 0 auto; color: var(--muted-foreground, #777168); font-size: 12px; }
 .companion-channel-message p { margin: 1px 0 0; overflow-wrap:anywhere; font-size: 15px; line-height: 1.48; white-space:pre-wrap; }
-.channel-message-text p { margin:0; overflow-wrap:anywhere; }
+.channel-message-text p { margin:0; overflow-wrap:anywhere; white-space:pre-wrap; }
 .channel-message-text p + p { margin-top:.7em; }
 .channel-message-text a:not(.channel-mention-button) {
   color:var(--accent-foreground,#4a3594);
