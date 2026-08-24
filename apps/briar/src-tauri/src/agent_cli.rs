@@ -64,7 +64,10 @@ pub(super) fn parse_cli_version(stdout: &[u8]) -> Option<String> {
     trimmed.lines().next().map(str::trim).map(str::to_string)
 }
 
-pub(super) fn inspect_cli(binary: Result<PathBuf, String>) -> OnboardingPrerequisiteStatus {
+pub(super) fn inspect_cli(
+    binary: Result<PathBuf, String>,
+    execution_path: &OsStr,
+) -> OnboardingPrerequisiteStatus {
     let Ok(binary) = binary else {
         return OnboardingPrerequisiteStatus {
             installed: false,
@@ -73,6 +76,7 @@ pub(super) fn inspect_cli(binary: Result<PathBuf, String>) -> OnboardingPrerequi
         };
     };
     let version = Command::new(&binary)
+        .env("PATH", execution_path)
         .arg("--version")
         .output()
         .ok()
@@ -144,15 +148,18 @@ pub(super) fn inspect_onboarding_prerequisites_sync(
     openrouter_configured: bool,
 ) -> OnboardingPrerequisites {
     let execution_path = cli_execution_path(home).unwrap_or_default();
-    let mut codex = inspect_cli(agent::codex_binary(home, &execution_path));
+    let mut codex = inspect_cli(agent::codex_binary(home, &execution_path), &execution_path);
     let claude_binary = agent::claude_binary(home, &execution_path);
-    let mut claude = inspect_cli(claude_binary.clone());
+    let mut claude = inspect_cli(claude_binary.clone(), &execution_path);
     let cursor_binary = agent::cursor_binary(home, &execution_path);
-    let mut cursor = inspect_cli(cursor_binary.clone());
-    let mut grok = inspect_cli(agent::grok_binary(home, &execution_path));
+    let mut cursor = inspect_cli(cursor_binary.clone(), &execution_path);
+    let mut grok = inspect_cli(agent::grok_binary(home, &execution_path), &execution_path);
     let agy_binary = agent::agy_binary(home, &execution_path);
-    let mut agy = inspect_cli(agy_binary.clone());
-    let mut opencode = inspect_cli(agent::opencode_binary(home, &execution_path));
+    let mut agy = inspect_cli(agy_binary.clone(), &execution_path);
+    let mut opencode = inspect_cli(
+        agent::opencode_binary(home, &execution_path),
+        &execution_path,
+    );
     codex.authenticated = codex.installed && agent_usage::codex_locally_authenticated(home);
     claude.authenticated = claude.installed
         && claude_binary.as_deref().is_ok_and(|binary| {
@@ -177,7 +184,7 @@ pub(super) fn inspect_onboarding_prerequisites_sync(
         authenticated: opencode.installed && openrouter_configured,
     };
     OnboardingPrerequisites {
-        git: inspect_cli(git_binary(home)),
+        git: inspect_cli(git_binary(home), &execution_path),
         codex,
         claude,
         cursor,
@@ -1418,8 +1425,9 @@ pub(super) fn inspect_ego_browser_sync(home: &Path) -> EgoBrowserStatus {
             || home.join("Applications/ego lite.app").is_dir();
         let execution_path = cli_execution_path(home).unwrap_or_default();
         let cli = inspect_cli(
-            which::which_in("ego-browser", Some(execution_path), home)
+            which::which_in("ego-browser", Some(&execution_path), home)
                 .map_err(|_| "ego-browser가 설치되지 않았습니다.".to_string()),
+            &execution_path,
         );
         EgoBrowserStatus {
             supported: true,
