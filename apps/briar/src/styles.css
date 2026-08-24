@@ -2078,6 +2078,7 @@ button.conversation-reply-summary:focus-visible { outline:2px solid var(--ring);
 .mention-composer-mirror .conversation-mention-button { padding:.06em .12em .06em .36em; margin:-.06em -.12em -.06em -.36em; color:var(--mention-foreground); background:transparent; font-weight:inherit; pointer-events:auto; }
 .mention-composer-field > input,
 .mention-composer-field > textarea { position:relative; z-index:1; color:transparent !important; caret-color:var(--foreground); -webkit-text-fill-color:transparent; }
+.mention-composer-field > textarea { overflow:hidden; }
 .mention-composer-field > input::placeholder,
 .mention-composer-field > textarea::placeholder { -webkit-text-fill-color:var(--muted-foreground); }
 .issue-message-body ul,.issue-message-body ol { margin:.45em 0; padding-left:1.45em; }
