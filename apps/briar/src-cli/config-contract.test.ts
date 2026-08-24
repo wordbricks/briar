@@ -139,4 +139,34 @@ describe("CLI config contract", () => {
       })
     ).toThrow("version 2 execution.checkpoints is required");
   });
+
+  it("supports a managed worker without copying machine credentials into config", () => {
+    const managedComputerId = "44444444-4444-4444-8444-444444444444";
+    const config = decodeConfig({
+      apiUrl: "https://briar.example.com",
+      managedComputer: {
+        managedComputerId,
+        deviceId: `managed-${managedComputerId}`,
+        organizationId: "55555555-5555-4555-8555-555555555555",
+        credentialFile: "/var/lib/briar/worker-credential.json",
+      },
+      projects: [{
+        id: projectId,
+        repositoryPath: "/home/briar/project",
+        executionWorker: {
+          deviceId: `managed-${managedComputerId}`,
+          workerId: "managed-worker",
+          organizationId: "55555555-5555-4555-8555-555555555555",
+          label: "Managed computer",
+          maxConcurrentSessions: 1,
+        },
+      }],
+    });
+
+    expect(config.projects[0]).not.toHaveProperty("agentToken");
+    expect(config.projects[0]!.executionWorker).not.toHaveProperty("token");
+    expect(config.managedComputer?.credentialFile).toBe(
+      "/var/lib/briar/worker-credential.json",
+    );
+  });
 });

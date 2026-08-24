@@ -52,6 +52,11 @@ import {
   mergeQueueDoctorCommand,
   showSkillGuide,
 } from "./utility-commands";
+import {
+  managedComputerSetupCommand,
+  managedComputerStatusCommand,
+  managedComputerWorkerSupervisor,
+} from "./managed-computer-commands";
 
 type CommandHandler = () => void | Promise<void>;
 
@@ -472,6 +477,38 @@ const workerCommandTree = Command.make(
   ]),
 );
 
+const managedComputerCommand = Command.make("managed-computer").pipe(
+  Command.withDescription("Set up and inspect this Briar managed computer"),
+  Command.withSubcommands([
+    leaf(
+      "setup",
+      {
+        ...requiredStrings("project", "repository"),
+        ...optionalStrings(
+          "provider",
+          "computer",
+          "request-id",
+          "credential-file",
+        ),
+      },
+      managedComputerSetupCommand,
+      "Bind this enrolled computer to a Briar project",
+    ),
+    leaf(
+      "status",
+      optionalStrings("credential-file"),
+      managedComputerStatusCommand,
+      "Show managed computer setup and worker readiness",
+    ),
+    leaf(
+      "worker-supervisor",
+      {},
+      managedComputerWorkerSupervisor,
+      "Run managed project workers",
+    ).pipe(Command.unlisted),
+  ]),
+);
+
 const mergeQueueCommand = Command.make("merge-queue").pipe(
   Command.withDescription("Configure and inspect the merge queue"),
   Command.withSubcommands([
@@ -512,6 +549,7 @@ export const briarCommand = Command.make("briar").pipe(
     worktreeCommand,
     runCommand,
     workerCommandTree,
+    managedComputerCommand,
     mergeQueueCommand,
   ]),
 );

@@ -1,0 +1,36 @@
+[Unit]
+Description=Run Briar managed-computer project workers
+After=network-online.target briar-managed-enroll.service
+Wants=network-online.target
+Requires=briar-managed-enroll.service
+
+[Service]
+Type=simple
+User=briar
+Group=briar
+Environment=HOME=/home/briar
+Environment=BRIAR_CONFIG_HOME=/home/briar/.config/briar
+Environment=BRIAR_MANAGED_CREDENTIAL_FILE=/var/lib/briar/worker-credential.json
+Environment=BRIAR_CLI=/opt/briar/bin/briar
+Environment=PATH=/opt/briar/bin:/opt/briar/provider/node_modules/.bin:/home/briar/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/briar/bin/briar managed-computer worker-supervisor
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadOnlyPaths=/var/lib/briar
+ReadWritePaths=/home/briar
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+capture_ready=false
+if [[ "${1:-}" == "--capture-ready" ]]; then
+  capture_ready=true
+elif [[ $# -gt 0 ]]; then
+  echo "Usage: verify-managed-image [--capture-ready]" >&2
+  exit 2
+fi
+
+/opt/briar/bin/assert-debian-13-x86_64
+
+# shellcheck disable=SC1091
+. /opt/briar/image-lock.env
+briar_version="$(tr -d '\r\n' < /opt/briar/briar-version)"
+
+test "$(/opt/briar/bin/bun --version)" = "$BUN_VERSION"
+test "$(/opt/briar/bin/briar version)" = "briar $briar_version"
+test "$(dpkg-query --show --showformat='${Version}' google-chrome-stable)" = \
+  "$GOOGLE_CHROME_VERSION"
+test "$(dpkg-query --show --showformat='${Version}' amazon-ssm-agent)" = \
+  "$SSM_AGENT_PACKAGE_VERSION"
+
+/opt/briar/bin/codex --version | grep -Fq "$CODEX_CLI_VERSION"
+/opt/briar/bin/claude --version | grep -Fq "$CLAUDE_CODE_VERSION"
+/opt/briar/bin/agent-browser --version | grep -Fq "$AGENT_BROWSER_VERSION"
+command -v git >/dev/null
+command -v node >/dev/null
+test -x /usr/bin/google-chrome-stable
+test -r /usr/share/applications/google-chrome.desktop
+grep -Fq 'Icon=google-chrome' /usr/share/applications/google-chrome.desktop
+test -x "/home/briar/Desktop/Google Chrome.desktop"
+grep -Fq 'google-chrome.desktop' /home/briar/.config/mimeapps.list
+
+runner_count="$(find /opt/briar/lib/agent -maxdepth 1 -type f \
+  -name '*-runner.js' | wc -l)"
+test "$runner_count" = "6"
+
+sha256sum --check /opt/briar/remote-desktop-packages.lock.sha256
+sha256sum --check /opt/briar/debian-packages.lock.sha256
+sha256sum --check /opt/briar/provider/bun.lock.sha256
+jq -e \
+  --arg sourceCommit "$(tr -d '\r\n' < /opt/briar/source-commit)" \
+  --arg baseAmiId "${BRIAR_BASE_AMI_ID:-$(jq -r .baseAmiId /opt/briar/image-manifest.json)}" \
+  '.schemaVersion == 1 and .sourceCommit == $sourceCommit and
+   .baseAmiId == $baseAmiId and .runtime.googleChrome != ""' \
+  /opt/briar/image-manifest.json >/dev/null
+
+for service in \
+  amazon-ssm-agent.service \
+  briar-managed-enroll.service \
+  briar-managed-worker.service \
+  briar-remote-desktop.service \
+  briar-remote-session-agent.service; do
+  systemctl is-enabled --quiet "$service"
+done
+test "$(systemctl show briar-managed-worker.service --property=User --value)" = \
+  "briar"
+test "$(systemctl show briar-managed-worker.service --property=Group --value)" = \
+  "briar"
+if systemctl cat briar-managed-worker.service | grep -q 'briar_worker_'; then
+  echo "Managed worker unit contains credential material" >&2
+  exit 1
+fi
+systemd-analyze verify \
+  /etc/systemd/system/briar-managed-enroll.service \
+  /etc/systemd/system/briar-managed-worker.service \
+  /etc/systemd/system/briar-remote-desktop.service \
+  /etc/systemd/system/briar-remote-session-agent.service
+
+for forbidden in \
+  /var/lib/briar/worker-credential.json \
+  /var/lib/briar/managed-enrollment.json \
+  /home/briar/.config/briar/config.json \
+  /home/briar/.codex/auth.json \
+  /home/briar/.claude/.credentials.json \
+  /var/lib/amazon/ssm/credentials \
+  /var/lib/amazon/ssm/registration; do
+  if [[ -e "$forbidden" ]]; then
+    echo "Image contains forbidden runtime state: $forbidden" >&2
+    exit 1
+  fi
+done
+if find /opt/briar -type f \( -name '.env' -o -name '.env.*' \) \
+  -print -quit | grep -q .; then
+  echo "Image contains an environment credential file" >&2
+  exit 1
+fi
+if [[ "$capture_ready" == true ]]; then
+  for forbidden in \
+    /home/admin/.ssh \
+    /root/.ssh \
+    /root/.aws \
+    /home/admin/.aws \
+    /home/briar/.aws \
+    /home/briar/.ssh \
+    /home/briar/.git-credentials \
+    /home/briar/.config/gh \
+    /home/briar/.npmrc \
+    /root/.npmrc; do
+    if [[ -e "$forbidden" ]]; then
+      echo "Image contains forbidden build or user authentication state: $forbidden" >&2
+      exit 1
+    fi
+  done
+fi
+
+echo "managed computer image verification passed"

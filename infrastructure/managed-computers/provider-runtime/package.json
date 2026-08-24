@@ -1,0 +1,11 @@
+{
+  "name": "@briar/managed-computer-provider-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "bun@1.4.0",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.241",
+    "@openai/codex": "0.149.1",
+    "agent-browser": "0.34.0"
+  }
+}

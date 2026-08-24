@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(git -C "$script_dir" rev-parse --show-toplevel)"
+output="${1:-}"
+if [[ -z "$output" || "$output" != /* ]]; then
+  echo "prepare-image-artifacts requires an absolute output directory" >&2
+  exit 1
+fi
+if [[ -n "$(git -C "$repo_root" status --porcelain)" ]]; then
+  echo "Managed image artifacts must be built from a completely clean checkout" >&2
+  exit 1
+fi
+
+source_commit="$(git -C "$repo_root" rev-parse HEAD)"
+briar_version="$(mise exec -- bun -e \
+  'console.log((await import("./package.json")).default.version)' \
+  --cwd "$repo_root")"
+if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ||
+  ! "$briar_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Unable to resolve source commit or Briar version" >&2
+  exit 1
+fi
+
+mise exec -- bun run --cwd "$repo_root/apps/briar" cli:build
+mise exec -- bun run --cwd "$repo_root/apps/briar" agent:build
+
+install -d -m 0755 "$output" "$output/agent" "$output/provider-runtime"
+for file in \
+  assert-debian-13-x86_64 \
+  briar \
+  briar-managed-enroll \
+  briar-managed-enroll.service \
+  briar-managed-worker.service \
+  briar-remote-desktop \
+  briar-remote-desktop.service \
+  briar-remote-session-agent.service \
+  configure-debian-snapshot \
+  image-lock.env \
+  install-image-runtime \
+  install-remote-desktop \
+  mimeapps.list \
+  prepare-image-for-capture \
+  remote-desktop-packages.txt \
+  resolve-remote-desktop-packages \
+  verify-managed-image \
+  verify-remote-desktop \
+  xfce4-helpers.rc; do
+  install -m 0644 "$script_dir/$file" "$output/$file"
+done
+for executable in \
+  assert-debian-13-x86_64 briar briar-managed-enroll briar-remote-desktop \
+  configure-debian-snapshot install-image-runtime install-remote-desktop \
+  prepare-image-for-capture resolve-remote-desktop-packages \
+  verify-managed-image verify-remote-desktop; do
+  chmod 0755 "$output/$executable"
+done
+
+install -m 0644 "$repo_root/apps/briar/dist-cli/briar.js" "$output/briar.js"
+install -m 0644 \
+  "$repo_root/apps/briar/dist-cli/briar-remote-session-agent.js" \
+  "$output/briar-remote-session-agent.js"
+for runner in "$repo_root"/apps/briar/dist-agent/*-runner.js; do
+  install -m 0644 "$runner" "$output/agent/$(basename -- "$runner")"
+done
+install -m 0644 \
+  "$script_dir/provider-runtime/package.json" \
+  "$script_dir/provider-runtime/bun.lock" \
+  "$output/provider-runtime/"
+printf '%s\n' "$source_commit" > "$output/source-commit"
+printf '%s\n' "$briar_version" > "$output/briar-version"
+
+(
+  cd "$output"
+  while IFS= read -r file; do
+    shasum -a 256 "$file"
+  done < <(find . -type f ! -name artifact-manifest.sha256 \
+    -print | LC_ALL=C sort)
+) > "$output/artifact-manifest.sha256"
+
+echo "$output"

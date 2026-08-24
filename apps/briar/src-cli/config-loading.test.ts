@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -103,5 +103,56 @@ describe("CLI config loading", () => {
     expect(result.stderr).not.toContain(
       "이 컴퓨터에 연결된 프로젝트를 찾지 못했습니다",
     );
+  });
+
+  it("keeps the enrolled API origin authoritative over environment overrides", async () => {
+    const managedComputerId = "44444444-4444-4444-8444-444444444444";
+    const organizationId = "55555555-5555-4555-8555-555555555555";
+    const directory = await configDirectory({
+      apiUrl: "https://stored.example",
+      managedComputer: {
+        managedComputerId,
+        deviceId: `managed-${managedComputerId}`,
+        organizationId,
+        credentialFile: "/tmp/briar-managed-credential-placeholder.json",
+      },
+      projects: [],
+    });
+    const credentialFile = join(directory, "credential.json");
+    const configFile = join(directory, "config.json");
+    const config = JSON.parse(await readFile(configFile, "utf8"));
+    config.managedComputer.credentialFile = credentialFile;
+    await writeFile(configFile, `${JSON.stringify(config)}\n`);
+    await writeFile(credentialFile, JSON.stringify({
+      credential: `briar_worker_${"a".repeat(43)}`,
+      deviceId: `managed-${managedComputerId}`,
+      organizationId,
+      managedComputerId,
+      apiOrigin: "https://enrolled.example",
+    }), { mode: 0o600 });
+
+    const environment = { ...process.env };
+    delete environment.BRIAR_CONFIG_HOME;
+    delete environment.BRIAR_MANAGED_CREDENTIAL_FILE;
+    const result = spawnSync(
+      bunExecutable,
+      [
+        "-e",
+        'const { loadConfig } = await import("./src-cli/command-support.ts"); console.log((await loadConfig()).apiUrl);',
+      ],
+      {
+        cwd: process.cwd(),
+        env: {
+          ...environment,
+          BRIAR_API_URL: "https://override.example",
+          BRIAR_CONFIG_HOME: directory,
+          BRIAR_MANAGED_CREDENTIAL_FILE: credentialFile,
+        },
+        encoding: "utf8",
+      },
+    );
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout.trim()).toBe("https://enrolled.example");
   });
 });

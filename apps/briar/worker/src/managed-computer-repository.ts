@@ -1,8 +1,17 @@
 import type {
   ManagedComputerProvisioningJobRow,
   ManagedComputerRow,
+  ManagedComputerSetupSessionRow,
   ManagedComputerState,
 } from "./managed-computer-model";
+import type {
+  AgentProviderCapabilityCatalog,
+} from "../../src/lib/agent-provider-contract";
+import type { AgentProvider } from "../../src/lib/agent-provider";
+import type {
+  ExecutionWorkerRow,
+  ProviderHealthMap,
+} from "./workers";
 
 const activeStates: readonly ManagedComputerState[] = [
   "requested",
@@ -718,6 +727,220 @@ export async function enrollManagedComputerDevice(
     });
   }
   return managedComputerById(db, computer.id);
+}
+
+export async function managedComputerSetupSessionByRequest(
+  db: D1Database,
+  managedComputerId: string,
+  requestId: string,
+) {
+  return db.prepare(
+    `select * from briar_managed_computer_setup_sessions
+     where managed_computer_id = ? and request_id = ?`,
+  ).bind(managedComputerId, requestId).first<ManagedComputerSetupSessionRow>();
+}
+
+export async function managedComputerSetupSessionByTokenHash(
+  db: D1Database,
+  managedComputerId: string,
+  tokenHash: string,
+) {
+  return db.prepare(
+    `select * from briar_managed_computer_setup_sessions
+     where managed_computer_id = ? and token_hash = ?`,
+  ).bind(managedComputerId, tokenHash).first<ManagedComputerSetupSessionRow>();
+}
+
+export async function latestManagedComputerSetupSession(
+  db: D1Database,
+  managedComputerId: string,
+) {
+  return db.prepare(
+    `select * from briar_managed_computer_setup_sessions
+     where managed_computer_id = ?
+     order by created_at desc, id desc limit 1`,
+  ).bind(managedComputerId).first<ManagedComputerSetupSessionRow>();
+}
+
+export async function createManagedComputerSetupSessionRecord(
+  db: D1Database,
+  input: {
+    id: string;
+    managedComputerId: string;
+    organizationId: string;
+    projectId: string;
+    requestedByUserId: string;
+    requestId: string;
+    tokenHash: string;
+    expiresAt: string;
+    observedAt: string;
+  },
+) {
+  await db.prepare(
+    `insert into briar_managed_computer_setup_sessions (
+       id, managed_computer_id, organization_id, project_id,
+       requested_by_user_id, request_id, token_hash, status, expires_at,
+       consumed_at, worker_id, created_at, updated_at
+     )
+     select ?, ?, ?, ?, ?, ?, ?, 'pending', ?, null, null, ?, ?
+     where exists (
+       select 1 from briar_managed_computers computer
+       join briar_projects project on project.id = ?
+       where computer.id = ? and computer.organization_id = ?
+         and project.organization_id = computer.organization_id
+         and computer.state in ('needs_setup', 'ready')
+     )
+     on conflict (managed_computer_id, request_id) do nothing`,
+  ).bind(
+    input.id,
+    input.managedComputerId,
+    input.organizationId,
+    input.projectId,
+    input.requestedByUserId,
+    input.requestId,
+    input.tokenHash,
+    input.expiresAt,
+    input.observedAt,
+    input.observedAt,
+    input.projectId,
+    input.managedComputerId,
+    input.organizationId,
+  ).run();
+  return managedComputerSetupSessionByRequest(
+    db,
+    input.managedComputerId,
+    input.requestId,
+  );
+}
+
+export async function bindManagedComputerSetupSession(
+  db: D1Database,
+  input: {
+    setupSessionId: string;
+    setupTokenHash: string;
+    managedComputerId: string;
+    organizationId: string;
+    deviceId: string;
+    agentProvider: AgentProvider;
+    providers?: AgentProvider[];
+    providerHealth?: ProviderHealthMap;
+    providerCapabilities?: AgentProviderCapabilityCatalog;
+    versions: Record<string, string>;
+    observedAt: string;
+  },
+) {
+  const capabilitiesJson = JSON.stringify({
+    providers: input.providers ?? [],
+    providerHealth: input.providerHealth ?? {},
+    providerCapabilities: input.providerCapabilities,
+  });
+  const versionsJson = JSON.stringify(input.versions ?? {});
+  await db.batch([
+    db.prepare(
+      `insert into briar_execution_workers (
+         id, project_id, device_id, label, host_fingerprint, agent_provider,
+         versions_json, capabilities_json, state, accepting_work,
+         readiness_state, readiness_detail, last_heartbeat_at, created_at,
+         updated_at
+       )
+       select ?, setup.project_id, device.id, device.label,
+              device.device_identity_hash, ?, ?, ?, 'online', 0,
+              'needs_attention', 'Managed computer worker has not reported readiness',
+              ?, ?, ?
+       from briar_managed_computer_setup_sessions setup
+       join briar_managed_computers computer
+         on computer.id = setup.managed_computer_id
+       join briar_execution_worker_devices device
+         on device.id = computer.briar_device_id
+       join briar_projects project on project.id = setup.project_id
+       where setup.id = ? and setup.token_hash = ? and setup.status = 'pending'
+         and setup.expires_at > ? and setup.managed_computer_id = ?
+         and setup.organization_id = ? and computer.organization_id = ?
+         and computer.briar_device_id = ?
+         and computer.state in ('needs_setup', 'ready')
+         and device.organization_id = setup.organization_id
+         and device.state != 'disabled'
+         and project.organization_id = setup.organization_id
+       on conflict (project_id, device_id) do update set
+         agent_provider = excluded.agent_provider,
+         versions_json = excluded.versions_json,
+         capabilities_json = excluded.capabilities_json,
+         state = 'online',
+         accepting_work = 0,
+         readiness_state = 'needs_attention',
+         readiness_detail = 'Managed computer worker has not reported readiness',
+         updated_at = excluded.updated_at`,
+    ).bind(
+      input.setupSessionId,
+      input.agentProvider,
+      versionsJson,
+      capabilitiesJson,
+      input.observedAt,
+      input.observedAt,
+      input.observedAt,
+      input.setupSessionId,
+      input.setupTokenHash,
+      input.observedAt,
+      input.managedComputerId,
+      input.organizationId,
+      input.organizationId,
+      input.deviceId,
+    ),
+    db.prepare(
+      `update briar_managed_computer_setup_sessions
+       set status = 'consumed', consumed_at = ?, updated_at = ?,
+           worker_id = (
+             select worker.id from briar_execution_workers worker
+             where worker.project_id = briar_managed_computer_setup_sessions.project_id
+               and worker.device_id = ?
+           )
+       where id = ? and token_hash = ? and status = 'pending'
+         and expires_at > ? and managed_computer_id = ? and organization_id = ?
+         and exists (
+           select 1 from briar_execution_workers worker
+           where worker.project_id = briar_managed_computer_setup_sessions.project_id
+             and worker.device_id = ?
+         )`,
+    ).bind(
+      input.observedAt,
+      input.observedAt,
+      input.deviceId,
+      input.setupSessionId,
+      input.setupTokenHash,
+      input.observedAt,
+      input.managedComputerId,
+      input.organizationId,
+      input.deviceId,
+    ),
+  ]);
+  const session = await managedComputerSetupSessionByTokenHash(
+    db,
+    input.managedComputerId,
+    input.setupTokenHash,
+  );
+  if (!session?.worker_id || session.status !== "consumed") return null;
+  const worker = await db.prepare(
+    `select worker.*, device.max_concurrent_sessions,
+            device.icon_type, device.icon_value
+     from briar_execution_workers worker
+     join briar_execution_worker_devices device on device.id = worker.device_id
+     where worker.id = ? and worker.device_id = ?`,
+  ).bind(session.worker_id, input.deviceId).first<ExecutionWorkerRow>();
+  return worker ? { session, worker } : null;
+}
+
+export async function managedComputerSetupWorker(
+  db: D1Database,
+  workerId: string,
+  deviceId: string,
+) {
+  return db.prepare(
+    `select worker.*, device.max_concurrent_sessions,
+            device.icon_type, device.icon_value
+     from briar_execution_workers worker
+     join briar_execution_worker_devices device on device.id = worker.device_id
+     where worker.id = ? and worker.device_id = ?`,
+  ).bind(workerId, deviceId).first<ExecutionWorkerRow>();
 }
 
 export async function refreshManagedComputerReadiness(

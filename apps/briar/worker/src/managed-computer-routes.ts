@@ -1,11 +1,18 @@
 import type { BriarAuth } from "./auth";
-import { corsHeaders, HttpError, json } from "./http-response";
+import {
+  corsHeaders,
+  HttpError,
+  json,
+  privateNoStoreJson,
+} from "./http-response";
 import {
   decodeManagedComputerApplication,
   decodeManagedComputerEnrollment,
   decodeManagedComputerPromotionValidation,
   decodeManagedComputerRemoteSessionRequest,
   decodeManagedComputerRetry,
+  decodeManagedComputerSetupBind,
+  decodeManagedComputerSetupSession,
 } from "./managed-computer-request-contract";
 import { managedComputerConfig, managedComputerJson } from "./managed-computer-model";
 import {
@@ -16,8 +23,11 @@ import {
 } from "./managed-computer-repository";
 import {
   applyForPromotionalManagedComputer,
+  bindManagedComputerSetup,
   enrollManagedComputer,
+  issueManagedComputerSetupSession,
   managedComputerProductResponse,
+  managedComputerSetupStatus,
   retryManagedComputerProvisioning,
   validateManagedComputerPromotion,
 } from "./managed-computer-service";
@@ -35,6 +45,7 @@ import { getOrganizationRole } from "./organization-repository";
 import { readJson } from "./request-readers";
 import { requireSession } from "./session-auth";
 import { requireWorkerCredential } from "./worker-auth";
+import { workerJson } from "./worker-json";
 
 export type ManagedComputerRouteInput = {
   request: Request;
@@ -60,6 +71,34 @@ export async function handleManagedComputerRoute(
       observedAt: new Date().toISOString(),
     });
     return json(result);
+  }
+
+  const managedComputerSetupBindMatch = pathname.match(
+    /^\/managed-computers\/([0-9a-f-]+)\/setup\/bind$/u,
+  );
+  if (managedComputerSetupBindMatch && request.method === "POST") {
+    const principal = await requireWorkerCredential(db, request);
+    const input = decodeManagedComputerSetupBind(await readJson(request));
+    const observedAt = new Date().toISOString();
+    const result = await bindManagedComputerSetup(db, {
+      managedComputerId: managedComputerSetupBindMatch[1],
+      organizationId: principal.organizationId,
+      deviceId: principal.deviceId,
+      setupToken: input.setupToken,
+      worker: input.worker,
+      observedAt,
+    });
+    return Response.json({
+      managedComputerId: managedComputerSetupBindMatch[1],
+      organizationId: principal.organizationId,
+      projectId: result.session.project_id,
+      deviceId: principal.deviceId,
+      worker: workerJson(result.worker, observedAt),
+      duplicate: result.duplicate,
+    }, {
+      status: result.duplicate ? 200 : 201,
+      headers: { ...corsHeaders, "Cache-Control": "private, no-store" },
+    });
   }
 
   const managedComputerRemoteAgentMatch = pathname.match(
@@ -203,6 +242,98 @@ export async function handleManagedComputerRoute(
   const organizationManagedComputerRemoteSessionsMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/managed-computers\/([0-9a-f-]+)\/remote-sessions$/u,
   );
+
+  const organizationManagedComputerSetupSessionsMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/managed-computers\/([0-9a-f-]+)\/setup-sessions$/u,
+  );
+  if (
+    organizationManagedComputerSetupSessionsMatch && request.method === "POST"
+  ) {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationManagedComputerSetupSessionsMatch[1];
+    const managedComputerId = organizationManagedComputerSetupSessionsMatch[2];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    const computer = await organizationManagedComputer(
+      db,
+      organizationId,
+      managedComputerId,
+    );
+    if (
+      !computer ||
+      (!canManageOrganization(role) &&
+        computer.requester_user_id !== session.user.id)
+    ) {
+      throw new HttpError(
+        403,
+        "Managed computer setup access required",
+        "MANAGED_COMPUTER_SETUP_FORBIDDEN",
+      );
+    }
+    const input = decodeManagedComputerSetupSession(await readJson(request));
+    const idempotencyKey = request.headers.get("idempotency-key")?.trim();
+    if (!idempotencyKey || idempotencyKey !== input.requestId) {
+      throw new HttpError(
+        400,
+        "Idempotency-Key must match requestId",
+        "MANAGED_COMPUTER_SETUP_IDEMPOTENCY_REQUIRED",
+      );
+    }
+    const result = await issueManagedComputerSetupSession(db, env, {
+      organizationId,
+      managedComputerId,
+      projectId: input.projectId,
+      userId: session.user.id,
+      requestId: input.requestId,
+      observedAt: new Date().toISOString(),
+    });
+    return Response.json({
+      session: {
+        id: result.session.id,
+        managedComputerId: result.session.managed_computer_id,
+        organizationId: result.session.organization_id,
+        projectId: result.session.project_id,
+        status: result.session.status,
+        expiresAt: result.session.expires_at,
+      },
+      setupToken: result.setupToken,
+      duplicate: result.duplicate,
+    }, {
+      status: result.duplicate ? 200 : 201,
+      headers: { ...corsHeaders, "Cache-Control": "private, no-store" },
+    });
+  }
+
+  const organizationManagedComputerSetupMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/managed-computers\/([0-9a-f-]+)\/setup$/u,
+  );
+  if (organizationManagedComputerSetupMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationManagedComputerSetupMatch[1];
+    const managedComputerId = organizationManagedComputerSetupMatch[2];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    const computer = await organizationManagedComputer(
+      db,
+      organizationId,
+      managedComputerId,
+    );
+    if (
+      !computer ||
+      (!canManageOrganization(role) &&
+        computer.requester_user_id !== session.user.id)
+    ) {
+      throw new HttpError(
+        403,
+        "Managed computer setup access required",
+        "MANAGED_COMPUTER_SETUP_FORBIDDEN",
+      );
+    }
+    return privateNoStoreJson(await managedComputerSetupStatus(
+      db,
+      managedComputerId,
+      new Date().toISOString(),
+    ));
+  }
+
   if (
     organizationManagedComputerRemoteSessionsMatch && request.method === "POST"
   ) {
