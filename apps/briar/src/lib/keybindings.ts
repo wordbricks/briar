@@ -1,6 +1,6 @@
 import { remoteDesktopCapturesKeyboard } from "./remote-desktop-focus";
 
-export type KeybindingId = "sidebarToggle";
+export type KeybindingId = "commandPalette" | "sidebarToggle";
 
 export type Shortcut = {
   key: string;
@@ -13,9 +13,20 @@ export type Shortcut = {
 
 export type Keybindings = Record<KeybindingId, Shortcut>;
 
-export const keybindingIds: KeybindingId[] = ["sidebarToggle"];
+export const keybindingIds: KeybindingId[] = [
+  "commandPalette",
+  "sidebarToggle",
+];
 
 export const defaultKeybindings: Keybindings = {
+  commandPalette: {
+    key: "k",
+    code: "KeyK",
+    meta: true,
+    ctrl: false,
+    alt: false,
+    shift: false,
+  },
   sidebarToggle: {
     key: "b",
     code: "KeyB",

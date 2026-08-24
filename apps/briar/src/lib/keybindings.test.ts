@@ -22,8 +22,16 @@ describe("keybindings", () => {
     setRecordingKeybinding(null);
   });
 
-  it("defaults the sidebar toggle to command-b", () => {
+  it("defaults the command palette to command-k and sidebar toggle to command-b", () => {
     expect(loadKeybindings()).toEqual(defaultKeybindings);
+    expect(defaultKeybindings.commandPalette).toEqual({
+      key: "k",
+      code: "KeyK",
+      meta: true,
+      ctrl: false,
+      alt: false,
+      shift: false,
+    });
     expect(defaultKeybindings.sidebarToggle).toEqual({
       key: "b",
       code: "KeyB",
@@ -127,6 +135,10 @@ describe("keybindings", () => {
   });
 
   it("formats shortcuts for macOS and other platforms", () => {
+    expect(formatShortcut(defaultKeybindings.commandPalette, true)).toBe("⌘K");
+    expect(formatShortcut(defaultKeybindings.commandPalette, false)).toBe(
+      "Cmd+K",
+    );
     expect(formatShortcut(defaultKeybindings.sidebarToggle, true)).toBe("⌘B");
     expect(formatShortcut(defaultKeybindings.sidebarToggle, false)).toBe(
       "Cmd+B",

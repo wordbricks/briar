@@ -30,7 +30,7 @@ describe("KeybindingsSettings", () => {
     });
 
     const changeButton = container.querySelector<HTMLButtonElement>(
-      '[aria-label="Change"]',
+      '[data-keybinding-id="sidebarToggle"] [aria-label="Change"]',
     );
     await act(async () => changeButton?.click());
 
@@ -83,7 +83,7 @@ describe("KeybindingsSettings", () => {
     });
 
     const changeButton = container.querySelector<HTMLButtonElement>(
-      '[aria-label="Change"]',
+      '[data-keybinding-id="sidebarToggle"] [aria-label="Change"]',
     );
     await act(async () => changeButton?.click());
     expect(container.textContent).toContain("Press a new shortcut…");
@@ -116,7 +116,7 @@ describe("KeybindingsSettings", () => {
     });
 
     const changeButton = container.querySelector<HTMLButtonElement>(
-      '[aria-label="Change"]',
+      '[data-keybinding-id="sidebarToggle"] [aria-label="Change"]',
     );
     await act(async () => changeButton?.click());
     await act(async () => {
@@ -131,7 +131,7 @@ describe("KeybindingsSettings", () => {
     expect(loadKeybindings().sidebarToggle.key).toBe("s");
 
     const resetButton = container.querySelector<HTMLButtonElement>(
-      '[aria-label="Reset to default"]',
+      '[data-keybinding-id="sidebarToggle"] [aria-label="Reset to default"]',
     );
     expect(resetButton).not.toBeNull();
     await act(async () => resetButton?.click());
