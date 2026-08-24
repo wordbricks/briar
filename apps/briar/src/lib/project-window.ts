@@ -1,6 +1,7 @@
 import type { Project } from "../types";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
-import { isDesktopTauri } from "./platform";
+import { Effect, EffectState } from "@tauri-apps/api/window";
+import { isDesktopTauri, isMacDesktopTauri } from "./platform";
 
 export const projectWindowQueryParameter = "projectWindow";
 
@@ -28,6 +29,21 @@ export function projectWindowLabel(projectId: string, nonce = Date.now()) {
   return `project-${safeProjectId}-${nonce.toString(36)}`;
 }
 
+export function projectWindowPresentationOptions(isMacOS: boolean) {
+  if (!isMacOS) {
+    return { backgroundColor: "#f7f7f3" };
+  }
+
+  return {
+    backgroundColor: "#00000000",
+    transparent: true,
+    windowEffects: {
+      effects: [Effect.Sidebar],
+      state: EffectState.FollowsWindowActiveState,
+    },
+  };
+}
+
 export async function openProjectWindow(project: Project) {
   if (!isDesktopTauri()) {
     throw new Error("Project windows are only available in the desktop app.");
@@ -35,7 +51,6 @@ export async function openProjectWindow(project: Project) {
 
   const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
   const projectWindow = new WebviewWindow(projectWindowLabel(project.id), {
-    backgroundColor: "#f7f7f3",
     center: true,
     height: 820,
     hiddenTitle: true,
@@ -46,6 +61,7 @@ export async function openProjectWindow(project: Project) {
     trafficLightPosition: new LogicalPosition(16, 22),
     url: projectWindowUrl(project.id),
     width: 1280,
+    ...projectWindowPresentationOptions(isMacDesktopTauri()),
   });
 
   await new Promise<void>((resolve, reject) => {
