@@ -4217,7 +4217,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .project-agent-template-select { width:100%; padding:0; display:grid; grid-template-columns:minmax(0,1fr) 18px; grid-template-rows:auto auto; align-items:center; border:0; color:inherit; background:transparent; text-align:left; cursor:pointer; }
 .project-agent-template-select > svg { grid-column:2; grid-row:1 / 3; margin-right:13px; color:var(--muted-foreground); }
 .project-agent-template-identity { min-width:0; padding:14px 14px 8px; display:grid; grid-template-columns:38px minmax(0,1fr); align-items:start; gap:11px; }
-.project-agent-template-identity > span,.project-agent-selected-template > span { width:38px; height:38px; display:grid; place-items:center; border:1px solid color-mix(in srgb,var(--template-color,#06b6d4) 32%,var(--border)); border-radius:11px; background:color-mix(in srgb,var(--template-color,#06b6d4) 11%,var(--card)); font-size:19px; }
+.project-agent-template-identity > span,.project-agent-selected-template > span { width:38px; height:38px; overflow:hidden; display:grid; place-items:center; border:1px solid color-mix(in srgb,var(--template-color,#06b6d4) 32%,var(--border)); border-radius:11px; background:color-mix(in srgb,var(--template-color,#06b6d4) 11%,var(--card)); font-size:19px; }
+.project-agent-template-identity > span > img,.project-agent-selected-template > span > img { width:100%; height:100%; display:block; object-fit:cover; }
 .project-agent-template-identity > div { min-width:0; }
 .project-agent-template-identity h3 { margin:1px 0 4px; color:var(--foreground); font-size:var(--text-sm); line-height:1.3; }
 .project-agent-template-identity p { margin:0; color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.5; }

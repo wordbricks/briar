@@ -448,6 +448,14 @@ describe("ProjectAgents", () => {
     expect(
       container.querySelectorAll(".project-agent-template-select"),
     ).toHaveLength(12);
+    expect(
+      container.querySelectorAll(".project-agent-template-identity img"),
+    ).toHaveLength(1);
+    expect(
+      container.querySelector<HTMLImageElement>(
+        ".project-agent-template-identity img",
+      )?.src,
+    ).toBe(ponytailDeveloperAgentTemplate.avatar);
     expect(container.textContent).toContain("ponytail-review");
     expect(container.textContent).toContain("ponytail-audit");
     expect(container.textContent).toContain("ponytail-debt");
@@ -477,6 +485,11 @@ describe("ProjectAgents", () => {
     expect(container.textContent).toContain("ponytail-review");
     expect(container.textContent).toContain("ponytail-audit");
     expect(container.textContent).toContain("ponytail-debt");
+    expect(
+      container.querySelector<HTMLImageElement>(
+        ".project-agent-selected-template img",
+      )?.src,
+    ).toBe(ponytailDeveloperAgentTemplate.avatar);
     expect(container.textContent).toContain("원본 보기");
     expect(container.textContent).not.toContain("agency-agents 원본 보기");
     expect(container.textContent).not.toContain("Backend Architect");
@@ -495,6 +508,7 @@ describe("ProjectAgents", () => {
       provider: "codex",
       model: null,
       effort: null,
+      avatar: ponytailDeveloperAgentTemplate.avatar,
       description: ponytailDeveloperAgentTemplate.description,
       responsibility: ponytailDeveloperAgentTemplate.responsibility,
       skills: ponytailDeveloperAgentTemplate.skills.map((skill, position) => ({
