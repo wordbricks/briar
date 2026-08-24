@@ -381,7 +381,7 @@ export function agyFinalMessage(raw: unknown, fallback: string) {
 
 const transientUpstreamStatusCodes = new Set([502, 503, 504]);
 
-function agyProviderBlockPayload(value: unknown): unknown {
+function agyProviderBlockPayload(value: unknown) {
   if (typeof value === "string") return value.trim() || null;
   const root = recordValue(value);
   if (!root) return null;

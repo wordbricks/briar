@@ -229,7 +229,7 @@ describe("GitHub integration D1 state", () => {
   it("keeps a concurrent OAuth callback from moving an installation", async () => {
     let conflictInjected = false;
     const racingDb = new Proxy(db, {
-      get(target, property, receiver) {
+      get(target, property) {
         if (property === "batch") {
           return async (statements: D1PreparedStatement[]) => {
             if (!conflictInjected) {
@@ -256,7 +256,7 @@ describe("GitHub integration D1 state", () => {
             return db.batch(statements);
           };
         }
-        const value = Reflect.get(target, property, receiver);
+        const value = target[property as keyof D1Database];
         return typeof value === "function" ? value.bind(target) : value;
       },
     }) as D1Database;
@@ -313,7 +313,7 @@ describe("GitHub integration D1 state", () => {
 
     let disconnectInjected = false;
     const racingDb = new Proxy(db, {
-      get(target, property, receiver) {
+      get(target, property) {
         if (property === "batch") {
           return async (statements: D1PreparedStatement[]) => {
             if (!disconnectInjected) {
@@ -327,7 +327,7 @@ describe("GitHub integration D1 state", () => {
             return db.batch(statements);
           };
         }
-        const value = Reflect.get(target, property, receiver);
+        const value = target[property as keyof D1Database];
         return typeof value === "function" ? value.bind(target) : value;
       },
     }) as D1Database;

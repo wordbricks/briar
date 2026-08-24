@@ -4,7 +4,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import { runD1 } from "./d1-runtime";
 import { OrganizationRole } from "./organization-repository";
-import { makeSqlQueryCache } from "./sql-query-cache";
+import { createSqlQueryCache } from "./sql-query-cache";
 
 const ProjectRow = Schema.Struct({
   id: Schema.mutableKey(Schema.String),
@@ -85,7 +85,7 @@ const InboxProjectRow = Schema.Struct({
     findProjects,
   };
 };
-const projectQueries = makeSqlQueryCache(makeProjectQueries);
+const projectQueries = createSqlQueryCache(makeProjectQueries);
 
 const listProjectsEffect = Effect.fn("listProjectsEffect")(
   function*(userId: string) {

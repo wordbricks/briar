@@ -5,7 +5,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import { runD1 } from "./d1-runtime";
-import { makeSqlQueryCache } from "./sql-query-cache";
+import { createSqlQueryCache } from "./sql-query-cache";
 import {
   WorkerUpdateHandoffWorkType,
   type WorkerUpdateHandoffContext,
@@ -158,7 +158,7 @@ const makeWorkerUpdateQueries = (sql: SqlClient.SqlClient) => {
     findUpdateById,
   };
 };
-const workerUpdateQueries = makeSqlQueryCache(makeWorkerUpdateQueries);
+const workerUpdateQueries = createSqlQueryCache(makeWorkerUpdateQueries);
 
 const pendingExecutionWorkerUpdateEffect = Effect.fn(
   "pendingExecutionWorkerUpdateEffect",

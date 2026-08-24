@@ -4,7 +4,7 @@ import * as Schema from "effect/Schema";
 import type * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import { runD1 } from "./d1-runtime";
-import { makeSqlQueryCache } from "./sql-query-cache";
+import { createSqlQueryCache } from "./sql-query-cache";
 
 const InboxReadStateRow = Schema.Struct({
   message_id: Schema.String,
@@ -31,7 +31,7 @@ const makeInboxReadStateQueries = (sql: SqlClient.SqlClient) => {
 
   return { findInboxReadStates };
 };
-const inboxReadStateQueries = makeSqlQueryCache(makeInboxReadStateQueries);
+const inboxReadStateQueries = createSqlQueryCache(makeInboxReadStateQueries);
 
 const listInboxReadStatesEffect = Effect.fn("listInboxReadStatesEffect")(
   function*(userId: string) {

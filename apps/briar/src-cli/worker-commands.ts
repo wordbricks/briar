@@ -243,6 +243,10 @@ async function workerUnregisterCommand() {
   );
 }
 
+interface WorkerLabelSyncFailure {
+  error: unknown;
+}
+
 async function workerSyncLabelCommand() {
   const config = await loadConfig();
   const label = defaultWorkerLabel();
@@ -264,7 +268,7 @@ async function workerSyncLabelCommand() {
   const syncedDeviceIds = new Set<string>();
   let failedDevices = 0;
   for (const [deviceId, registrations] of registrationsByDevice) {
-    let lastError: unknown = null;
+    let lastFailure: WorkerLabelSyncFailure | null = null;
     for (const registration of registrations) {
       try {
         await request(
@@ -277,13 +281,13 @@ async function workerSyncLabelCommand() {
           },
         );
         syncedDeviceIds.add(deviceId);
-        lastError = null;
+        lastFailure = null;
         break;
       } catch (error) {
-        lastError = error;
+        lastFailure = { error };
       }
     }
-    if (lastError) failedDevices += 1;
+    if (lastFailure?.error) failedDevices += 1;
   }
 
   if (syncedDeviceIds.size > 0) {
@@ -460,8 +464,9 @@ async function workerCommand() {
         if (claim.work === null) {
           return { work: null, retryAfterMs: claim.retryAfterMs };
         }
-        const workType = typeof claim.work === "object" && claim.work !== null
-          ? Reflect.get(claim.work, "workType")
+        const workType = typeof claim.work === "object" && claim.work !== null &&
+            "workType" in claim.work
+          ? claim.work.workType
           : undefined;
         const work = workType === "mergeBatch"
           ? decodeClaimedMergeBatch(claim.work)

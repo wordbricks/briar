@@ -146,17 +146,17 @@ export type SlackIssueInstruction = {
   titleTooLong?: true;
 };
 
-const priorityByName: Record<string, number> = {
-  urgent: 1,
-  긴급: 1,
-  high: 2,
-  높음: 2,
-  medium: 3,
-  normal: 3,
-  보통: 3,
-  low: 4,
-  낮음: 4,
-};
+const priorityByName = new Map([
+  ["urgent", 1],
+  ["긴급", 1],
+  ["high", 2],
+  ["높음", 2],
+  ["medium", 3],
+  ["normal", 3],
+  ["보통", 3],
+  ["low", 4],
+  ["낮음", 4],
+]);
 
 export function parseSlackIssueInstruction(
   text: string,
@@ -191,7 +191,7 @@ export function parseSlackIssueInstruction(
       const key = rawPriority.toLocaleLowerCase();
       priority = /^p?[1-4]$/u.test(key)
         ? Number(key.replace(/^p/u, ""))
-        : (priorityByName[key] ?? null);
+        : (priorityByName.get(key) ?? null);
       return " ";
     },
   );
