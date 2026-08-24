@@ -49,7 +49,12 @@ function createMemoryStorage(): Storage {
   };
 }
 
-function installStorage(target: object) {
+interface StorageOwner {
+  localStorage: Storage;
+  sessionStorage: Storage;
+}
+
+function installStorage(target: StorageOwner) {
   const storage = createMemoryStorage();
   Object.defineProperty(target, "localStorage", {
     configurable: true,
