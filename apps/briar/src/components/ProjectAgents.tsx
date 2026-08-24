@@ -919,68 +919,72 @@ export function ProjectAgentDialog({
                 </em>
               </header>
               <div className="project-agent-template-list">
-                {projectAgentTemplates.map((template) => {
-                  const includedSkill = template.skills[0];
-                  return (
-                    <article key={template.id}>
-                      <button
-                        className="project-agent-template-select"
-                        onClick={() => applyTemplate(template)}
-                        type="button"
-                      >
-                        <div className="project-agent-template-identity">
-                          <span
-                            aria-hidden="true"
-                            style={{ "--template-color": template.calendarColor } as React.CSSProperties}
-                          >
-                            {template.emoji}
-                          </span>
-                          <div>
-                            <h3>{template.name}</h3>
-                            <p>{template.description}</p>
-                          </div>
-                        </div>
-                        <div className="project-agent-template-badges">
-                          <span>{templateDivisionLabel(template)}</span>
-                          <span>
-                            {t("agents.templateSkillCount", {
-                              count: template.skills.length,
-                            })}
-                          </span>
-                          <span>{t("agents.templateProviderNeutral")}</span>
-                        </div>
-                        <ChevronRight aria-hidden="true" size={17} />
-                      </button>
-                      <div className="project-agent-template-actions">
+                {projectAgentTemplates.map((template) => (
+                  <article key={template.id}>
+                    <button
+                      className="project-agent-template-select"
+                      onClick={() => applyTemplate(template)}
+                      type="button"
+                    >
+                      <div className="project-agent-template-identity">
+                        <span
+                          aria-hidden="true"
+                          style={{ "--template-color": template.calendarColor } as React.CSSProperties}
+                        >
+                          {template.emoji}
+                        </span>
                         <div>
-                          <a
-                            href={template.source.url}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            {t("agents.templateSource")}
-                            <ExternalLink aria-hidden="true" size={12} />
-                          </a>
-                          <details>
-                            <summary>{t("agents.templateLicense")}</summary>
-                            <pre>{template.source.licenseNotice}</pre>
-                          </details>
-                        </div>
-                        <div className="project-agent-template-skill">
-                          <Wrench aria-hidden="true" size={15} />
-                          <span>
-                            <strong>{includedSkill.name}</strong>
-                            <small>
-                              {t("agents.templateInstructionsCount", {
-                                count: includedSkill.body.length,
-                              })}
-                            </small>
-                          </span>
+                          <h3>{template.name}</h3>
+                          <p>{template.description}</p>
                         </div>
                       </div>
-                    </article>
-                  );
-                })}
+                      <div className="project-agent-template-badges">
+                        <span>{templateDivisionLabel(template)}</span>
+                        <span>
+                          {t("agents.templateSkillCount", {
+                            count: template.skills.length,
+                          })}
+                        </span>
+                        <span>{t("agents.templateProviderNeutral")}</span>
+                      </div>
+                      <ChevronRight aria-hidden="true" size={17} />
+                    </button>
+                    <div className="project-agent-template-actions">
+                      <div>
+                        <a
+                          href={template.source.url}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          {t("agents.templateSource")}
+                          <ExternalLink aria-hidden="true" size={12} />
+                        </a>
+                        <details>
+                          <summary>{t("agents.templateLicense")}</summary>
+                          <pre>{template.source.licenseNotice}</pre>
+                        </details>
+                      </div>
+                      <div className="project-agent-template-skills">
+                        {template.skills.map((skill) => (
+                          <div
+                            className="project-agent-template-skill"
+                            key={skill.name}
+                          >
+                            <Wrench aria-hidden="true" size={15} />
+                            <span>
+                              <strong>{skill.name}</strong>
+                              <small>
+                                {t("agents.templateInstructionsCount", {
+                                  count: skill.body.length,
+                                })}
+                              </small>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </article>
+                ))}
               </div>
             </section>
           )}
@@ -1015,7 +1019,7 @@ export function ProjectAgentDialog({
                     <small>{t("agents.selectedTemplate")}</small>
                     <strong>{selectedTemplate.name}</strong>
                     <p>
-                      {selectedTemplate.skills[0]?.name} · {t("agents.templateCopyHint")}
+                      {selectedTemplate.skills.map((skill) => skill.name).join(", ")} · {t("agents.templateCopyHint")}
                     </p>
                     <a
                       href={selectedTemplate.source.url}

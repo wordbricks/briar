@@ -9,7 +9,12 @@ import instagramCuratorMarkdown from "../data/agent-templates/agency-agents/mark
 import socialMediaStrategistMarkdown from "../data/agent-templates/agency-agents/marketing/marketing-social-media-strategist.md?raw";
 import tiktokStrategistMarkdown from "../data/agent-templates/agency-agents/marketing/marketing-tiktok-strategist.md?raw";
 import sprintPrioritizerMarkdown from "../data/agent-templates/agency-agents/product/product-sprint-prioritizer.md?raw";
+import ponytailMarkdown from "../data/agent-templates/ponytail/skills/ponytail/SKILL.md?raw";
+import ponytailAuditMarkdown from "../data/agent-templates/ponytail/skills/ponytail-audit/SKILL.md?raw";
+import ponytailDebtMarkdown from "../data/agent-templates/ponytail/skills/ponytail-debt/SKILL.md?raw";
+import ponytailReviewMarkdown from "../data/agent-templates/ponytail/skills/ponytail-review/SKILL.md?raw";
 import agencyAgentsLicense from "../../../../third-party/agency-agents-LICENSE.md?raw";
+import ponytailLicense from "../../../../third-party/ponytail-LICENSE.md?raw";
 
 import type {
   ProjectAgentSkillInput,
@@ -68,14 +73,32 @@ export function agentTemplateMarkdownDescription(markdown: string) {
   if (frontmatterEnd === -1) {
     throw new Error("Agent template frontmatter is not closed");
   }
-  const description = normalized
-    .slice(4, frontmatterEnd)
-    .split("\n")
-    .find((line) => line.startsWith("description:"))
+  const frontmatterLines = normalized.slice(4, frontmatterEnd).split("\n");
+  const descriptionIndex = frontmatterLines.findIndex((line) =>
+    line.startsWith("description:"),
+  );
+  const description = frontmatterLines[descriptionIndex]
     ?.slice("description:".length)
     .trim();
   if (!description) {
     throw new Error("Agent template description is missing");
+  }
+  if (/^>[+-]?$/u.test(description)) {
+    const foldedLines: string[] = [];
+    for (const line of frontmatterLines.slice(descriptionIndex + 1)) {
+      if (line && !/^\s/u.test(line)) break;
+      foldedLines.push(line.replace(/^\s+/u, ""));
+    }
+    const foldedDescription = foldedLines
+      .join("\n")
+      .split(/\n{2,}/u)
+      .map((paragraph) => paragraph.replace(/\n/gu, " ").trim())
+      .filter(Boolean)
+      .join("\n");
+    if (!foldedDescription) {
+      throw new Error("Agent template description is missing");
+    }
+    return foldedDescription;
   }
   return description;
 }
@@ -94,6 +117,61 @@ function agencyAgentsTemplateSource(path: string) {
     licenseNotice: agencyAgentsLicense.trim(),
   };
 }
+
+const ponytailRepository = "https://github.com/DietrichGebert/ponytail";
+const ponytailCommit = "2ed6c52c9d7e5e56942508591085fd45dea277d3";
+
+function ponytailTemplateSource() {
+  const path = "skills";
+  return {
+    repository: ponytailRepository,
+    commit: ponytailCommit,
+    path,
+    url: `${ponytailRepository}/tree/${ponytailCommit}/${path}`,
+    license: "MIT" as const,
+    licenseUrl: `${ponytailRepository}/blob/${ponytailCommit}/LICENSE`,
+    licenseNotice: ponytailLicense.trim(),
+  };
+}
+
+export const ponytailDeveloperAgentTemplate = {
+  id: "ponytail:developer",
+  source: ponytailTemplateSource(),
+  division: "engineering",
+  emoji: "🐴",
+  name: "Ponytail Developer",
+  description:
+    "Developer who applies Ponytail's minimal implementation discipline while preserving Briar's complete delivery contract.",
+  responsibility:
+    "Maintain code and deployment. Find the smallest correct implementation only after understanding the end-to-end flow. Explicit acceptance criteria, security, accessibility, required tests, deployments, workflow stages, evidence, and result-output contracts are mandatory and must never be omitted as YAGNI. Complexity-only reviews supplement rather than replace required correctness and security review. Briar workflow and structured result contracts take precedence over Ponytail output rules, including its limits on explanation length.",
+  calendarColor: "#EC4899",
+  skills: [
+    {
+      name: "ponytail",
+      description: agentTemplateMarkdownDescription(ponytailMarkdown),
+      body: agentTemplateMarkdownBody(ponytailMarkdown),
+      kind: "custom",
+    },
+    {
+      name: "ponytail-review",
+      description: agentTemplateMarkdownDescription(ponytailReviewMarkdown),
+      body: agentTemplateMarkdownBody(ponytailReviewMarkdown),
+      kind: "custom",
+    },
+    {
+      name: "ponytail-audit",
+      description: agentTemplateMarkdownDescription(ponytailAuditMarkdown),
+      body: agentTemplateMarkdownBody(ponytailAuditMarkdown),
+      kind: "custom",
+    },
+    {
+      name: "ponytail-debt",
+      description: agentTemplateMarkdownDescription(ponytailDebtMarkdown),
+      body: agentTemplateMarkdownBody(ponytailDebtMarkdown),
+      kind: "custom",
+    },
+  ],
+} satisfies ProjectAgentTemplate;
 
 export const frontendDeveloperAgentTemplate = {
   id: "agency-agents:engineering/engineering-frontend-developer",
@@ -341,6 +419,7 @@ export const tiktokStrategistAgentTemplate = {
 } satisfies ProjectAgentTemplate;
 
 export const projectAgentTemplates = [
+  ponytailDeveloperAgentTemplate,
   frontendDeveloperAgentTemplate,
   backendArchitectAgentTemplate,
   mobileAppBuilderAgentTemplate,

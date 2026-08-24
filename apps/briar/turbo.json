@@ -7,7 +7,8 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/config/merge-group-ci-image.json",
         "$TURBO_ROOT$/package.json",
-        "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md"
+        "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md",
+        "$TURBO_ROOT$/third-party/ponytail-LICENSE.md"
       ]
     },
     "build": {
@@ -22,7 +23,8 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.env*",
         "$TURBO_ROOT$/package.json",
-        "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md"
+        "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md",
+        "$TURBO_ROOT$/third-party/ponytail-LICENSE.md"
       ],
       "env": ["VITE_BRIAR_*"],
       "outputs": ["dist/**"],
@@ -35,7 +37,8 @@
         "$TURBO_ROOT$/.env*",
         "$TURBO_ROOT$/config/release.env",
         "$TURBO_ROOT$/scripts/with-release-env.sh",
-        "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md"
+        "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md",
+        "$TURBO_ROOT$/third-party/ponytail-LICENSE.md"
       ],
       "env": ["VITE_BRIAR_*"],
       "outputs": ["dist/**"],
@@ -55,7 +58,8 @@
         "$TURBO_ROOT$/config/release.env",
         "$TURBO_ROOT$/scripts/verify-release-config.sh",
         "$TURBO_ROOT$/scripts/with-release-env.sh",
-        "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md"
+        "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md",
+        "$TURBO_ROOT$/third-party/ponytail-LICENSE.md"
       ],
       "env": ["VITE_BRIAR_*"],
       "outputs": ["dist/**"],
