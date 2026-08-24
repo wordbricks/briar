@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
-import { frontendDeveloperAgentTemplate } from "../lib/agent-templates";
+import { ponytailDeveloperAgentTemplate } from "../lib/agent-templates";
 import { requestMobileNavigationBack } from "../lib/mobile-navigation";
 import { runProjectAgent } from "../lib/project-llm";
 import type { DashboardPayload, ProjectAgent } from "../types";
@@ -411,7 +411,7 @@ describe("ProjectAgents", () => {
     });
   });
 
-  it("prefills the Frontend Developer template and creates its Skill", async () => {
+  it("prefills the Ponytail Developer template and creates its four Skills", async () => {
     const onCreate = vi.fn(async () => undefined);
     const container = await mount(
       <ProjectAgentDialog
@@ -433,6 +433,7 @@ describe("ProjectAgents", () => {
     });
 
     const templateNames = [
+      "Ponytail Developer",
       "Frontend Developer",
       "Backend Architect",
       "Mobile App Builder",
@@ -450,7 +451,10 @@ describe("ProjectAgents", () => {
     }
     expect(
       container.querySelectorAll(".project-agent-template-select"),
-    ).toHaveLength(11);
+    ).toHaveLength(12);
+    expect(container.textContent).toContain("ponytail-review");
+    expect(container.textContent).toContain("ponytail-audit");
+    expect(container.textContent).toContain("ponytail-debt");
 
     await act(async () => {
       Array.from(
@@ -458,7 +462,7 @@ describe("ProjectAgents", () => {
           ".project-agent-template-select",
         ),
       )
-        .find((button) => button.textContent?.includes("Frontend Developer"))
+        .find((button) => button.textContent?.includes("Ponytail Developer"))
         ?.click();
     });
 
@@ -467,15 +471,18 @@ describe("ProjectAgents", () => {
     );
     const [description, responsibility] =
       container.querySelectorAll<HTMLTextAreaElement>("textarea");
-    expect(name?.value).toBe(frontendDeveloperAgentTemplate.name);
+    expect(name?.value).toBe(ponytailDeveloperAgentTemplate.name);
     expect(description?.value).toBe(
-      frontendDeveloperAgentTemplate.description,
+      ponytailDeveloperAgentTemplate.description,
     );
     expect(responsibility?.value).toBe(
-      frontendDeveloperAgentTemplate.responsibility,
+      ponytailDeveloperAgentTemplate.responsibility,
     );
-    expect(container.textContent).toContain("Frontend Development");
-    expect(container.textContent).toContain("agency-agents 원본 보기");
+    expect(container.textContent).toContain("ponytail-review");
+    expect(container.textContent).toContain("ponytail-audit");
+    expect(container.textContent).toContain("ponytail-debt");
+    expect(container.textContent).toContain("원본 보기");
+    expect(container.textContent).not.toContain("agency-agents 원본 보기");
     expect(container.textContent).not.toContain("Backend Architect");
 
     await act(async () => {
@@ -488,22 +495,20 @@ describe("ProjectAgents", () => {
     });
 
     expect(onCreate).toHaveBeenCalledWith({
-      name: frontendDeveloperAgentTemplate.name,
+      name: ponytailDeveloperAgentTemplate.name,
       provider: "codex",
       model: null,
       effort: null,
-      description: frontendDeveloperAgentTemplate.description,
-      responsibility: frontendDeveloperAgentTemplate.responsibility,
-      skills: [
-        {
-          ...frontendDeveloperAgentTemplate.skills[0],
-          provider: "codex",
-          model: null,
-          effort: null,
-          position: 0,
-        },
-      ],
-      calendarColor: frontendDeveloperAgentTemplate.calendarColor,
+      description: ponytailDeveloperAgentTemplate.description,
+      responsibility: ponytailDeveloperAgentTemplate.responsibility,
+      skills: ponytailDeveloperAgentTemplate.skills.map((skill, position) => ({
+        ...skill,
+        provider: "codex",
+        model: null,
+        effort: null,
+        position,
+      })),
+      calendarColor: ponytailDeveloperAgentTemplate.calendarColor,
     });
   });
 
