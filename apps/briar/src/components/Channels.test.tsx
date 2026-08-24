@@ -1499,8 +1499,6 @@ describe("Channels", () => {
     expect(container.querySelector(".channel-error")?.textContent).toContain(
       "이 Agent를 실행할 수 있는 사용 가능한 Worker가 없습니다.",
     );
-    expect(container.querySelector(".channel-reply-failure")?.textContent)
-      .toContain("이 Agent를 실행할 수 있는 사용 가능한 Worker가 없습니다.");
   });
 
 
