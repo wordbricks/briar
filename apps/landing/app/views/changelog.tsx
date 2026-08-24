@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.155",
+        date: "2026년 8월 24일",
+        title: "macOS 사이드바에 실제 frosted glass를 되찾습니다",
+        summary:
+          "native Sidebar material 위에 겹쳐진 웹 틴트를 제거해 외부 배경이 흐릿하게 비치도록 하고, 프로젝트 창과 접근성 fallback도 같은 기준으로 맞춥니다.",
+        items: [
+          "macOS native Sidebar material을 다시 불투명하게 만드는 사이드바 CSS 배경·그림자·backdrop blur를 제거했습니다.",
+          "본문과 상태 표시줄은 기존의 안정적인 불투명 surface로 유지해 읽기 편한 콘텐츠 영역을 보존합니다.",
+          "동적으로 열리는 프로젝트 보조 창에도 투명 창과 Sidebar material을 적용해 메인 창과 동일한 시각 동작을 제공합니다.",
+          "투명도 감소와 고대비 설정에서는 불투명 배경과 강한 경계로 전환해 대비와 가독성을 보장합니다.",
+        ],
+      },
+      {
         version: "1.2.154",
         date: "2026년 8월 24일",
         title: "⌘K 커맨드 팔레트로 Briar 어디든 빠르게 이동합니다",
@@ -1046,6 +1059,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.155",
+        date: "August 24, 2026",
+        title: "Bring real frosted glass back to the macOS sidebar",
+        summary:
+          "Remove the web tint stacked over the native Sidebar material so the outside background shows through softly, while aligning project windows and accessibility fallbacks.",
+        items: [
+          "Remove the sidebar CSS background, shadow, and backdrop blur that made the macOS native Sidebar material opaque again.",
+          "Keep the body and status bar on their stable opaque surfaces so the content area remains easy to read.",
+          "Apply the same transparent window and Sidebar material to dynamically opened project windows as the main window.",
+          "Use opaque backgrounds and a stronger boundary for Reduce Transparency and Increase Contrast so contrast and readability remain reliable.",
+        ],
+      },
       {
         version: "1.2.154",
         date: "August 24, 2026",
@@ -2154,7 +2180,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-154">
+          <a href="#v1-2-155">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2176,7 +2202,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.154"
+                      entry.version === "1.2.155"
+                        ? "2026-08-24"
+                        : entry.version === "1.2.154"
                         ? "2026-08-24"
                         : entry.version === "1.2.153"
                         ? "2026-08-24"
