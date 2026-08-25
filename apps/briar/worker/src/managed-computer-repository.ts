@@ -1047,6 +1047,17 @@ export async function listManagedComputersForReconciliation(db: D1Database) {
   return result.results ?? [];
 }
 
+export async function listDrainingManagedComputersForReconciliation(
+  db: D1Database,
+) {
+  const result = await db.prepare(
+    `select * from briar_managed_computers
+     where state = 'draining'
+     order by drained_at, created_at limit 500`,
+  ).all<ManagedComputerRow>();
+  return result.results ?? [];
+}
+
 async function transitionManagedComputerToDraining(
   db: D1Database,
   input: {

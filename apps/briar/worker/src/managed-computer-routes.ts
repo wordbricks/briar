@@ -15,6 +15,7 @@ import {
   decodeManagedComputerSetupSession,
 } from "./managed-computer-request-contract";
 import { managedComputerConfig, managedComputerJson } from "./managed-computer-model";
+import { reconcileDrainingManagedComputer } from "./managed-computer-reconciliation";
 import {
   beginManagedComputerRetirement,
   listOrganizationManagedComputers,
@@ -55,12 +56,13 @@ export type ManagedComputerRouteInput = {
   auth: BriarAuth;
   db: D1Database;
   env: Env;
+  context?: ExecutionContext;
 };
 
 export async function handleManagedComputerRoute(
   routeInput: ManagedComputerRouteInput,
 ): Promise<Response | undefined> {
-  const { request, auth, db, env } = routeInput;
+  const { request, auth, db, env, context } = routeInput;
   const { pathname } = new URL(request.url);
 
   const managedComputerEnrollmentMatch = pathname.match(
@@ -579,6 +581,23 @@ export async function handleManagedComputerRoute(
       reason: "computer_retired",
       observedAt,
     });
+    if (computer.state === "draining") {
+      const stopAttempt = reconcileDrainingManagedComputer(
+        db,
+        env,
+        managedComputerId,
+        observedAt,
+      ).catch((error) => {
+        console.error(JSON.stringify({
+          message: "Managed computer immediate stop failed",
+          managedComputerId,
+          observedAt,
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      });
+      if (context) context.waitUntil(stopAttempt);
+      else await stopAttempt;
+    }
     return json({
       computer: managedComputerJson(computer),
       duplicate: !transitioned,

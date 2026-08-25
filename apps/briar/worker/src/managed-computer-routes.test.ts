@@ -103,6 +103,18 @@ describe("managed computer routes", () => {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
+  const executionContext = () => {
+    const pending: Promise<unknown>[] = [];
+    return {
+      context: {
+        waitUntil(promise: Promise<unknown>) {
+          pending.push(promise);
+        },
+      } as ExecutionContext,
+      pending,
+    };
+  };
+
   const seedManagedComputer = async (input: {
     computerId: string;
     entitlementId: string;
@@ -261,16 +273,19 @@ describe("managed computer routes", () => {
     ), env());
     expect(memberAttempt.status).toBe(403);
 
+    const immediateStop = executionContext();
     const first = await worker.fetch(request(
       `/organizations/${organizationId}/managed-computers/${computerId}`,
       "DELETE",
       ownerToken,
-    ), env());
+    ), env(), immediateStop.context);
     expect(first.status).toBe(202);
     expect(await first.json()).toMatchObject({
       duplicate: false,
       computer: { id: computerId, state: "draining" },
     });
+    expect(immediateStop.pending).toHaveLength(1);
+    await Promise.all(immediateStop.pending);
 
     const replay = await worker.fetch(request(
       `/organizations/${organizationId}/managed-computers/${computerId}`,
@@ -280,7 +295,7 @@ describe("managed computer routes", () => {
     expect(replay.status).toBe(200);
     expect(await replay.json()).toMatchObject({
       duplicate: true,
-      computer: { id: computerId, state: "draining" },
+      computer: { id: computerId, state: "stopped" },
     });
 
     const audits = await db.prepare(
@@ -295,6 +310,10 @@ describe("managed computer routes", () => {
     expect(audits.results[0]?.actor_user_id).toBe(ownerId);
     expect(JSON.parse(audits.results[0]?.detail_json ?? "{}"))
       .toEqual({ reason: "user_retired" });
+    await expect(db.prepare(
+      `select count(*) as count from briar_managed_computer_audit_events
+       where managed_computer_id = ? and action = 'stopped'`,
+    ).bind(computerId).first()).resolves.toMatchObject({ count: 1 });
   });
 
   it("does not retire a computer while preparation is still running", async () => {

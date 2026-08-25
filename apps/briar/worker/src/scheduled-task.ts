@@ -8,7 +8,10 @@ import {
   reconcileGithubMergedRuns,
 } from "./db";
 import { reconcileEnabledMergeQueueRuns } from "./merge-queue-reconcile";
-import { reconcileManagedComputers } from "./managed-computer-reconciliation";
+import {
+  reconcileDrainingManagedComputers,
+  reconcileManagedComputers,
+} from "./managed-computer-reconciliation";
 import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { cleanupExpiredChannelReplySessions } from "./channels";
@@ -21,6 +24,7 @@ export type ScheduledTaskDependencies = {
   pruneExpiredDashboardChanges: typeof pruneExpiredDashboardChanges;
   reconcileGithubMergedRuns: typeof reconcileGithubMergedRuns;
   reconcileEnabledMergeQueueRuns: typeof reconcileEnabledMergeQueueRuns;
+  reconcileDrainingManagedComputers: typeof reconcileDrainingManagedComputers;
   reconcileManagedComputers: typeof reconcileManagedComputers;
   cleanupExpiredChannelReplySessions: typeof cleanupExpiredChannelReplySessions;
 };
@@ -37,6 +41,7 @@ const scheduledTaskDependencies: ScheduledTaskDependencies = {
   pruneExpiredDashboardChanges,
   reconcileGithubMergedRuns,
   reconcileEnabledMergeQueueRuns,
+  reconcileDrainingManagedComputers,
   reconcileManagedComputers,
   cleanupExpiredChannelReplySessions,
 };
@@ -53,20 +58,27 @@ export async function handleScheduledTask(
   if (controller.cron === GITHUB_RECONCILIATION_CRON) {
     ctx.waitUntil((async () => {
       try {
-        const [github, mergeQueue] = await Promise.all([
+        const [github, mergeQueue, managedComputerRetirements] =
+          await Promise.all([
           dependencies.reconcileGithubMergedRuns(env.DB),
           dependencies.reconcileEnabledMergeQueueRuns(env.DB, observedAt),
+          dependencies.reconcileDrainingManagedComputers(
+            env.DB,
+            env,
+            observedAt,
+          ),
         ]);
         await flushOrganizationInboxRealtimeOutbox(env, env.DB);
         console.log(JSON.stringify({
-          message: "GitHub merge reconciliation completed",
+          message: "Minute reconciliation completed",
           observedAt,
           github,
           mergeQueue,
+          managedComputerRetirements,
         }));
       } catch (error) {
         console.error(JSON.stringify({
-          message: "GitHub merge reconciliation failed",
+          message: "Minute reconciliation failed",
           observedAt,
           error: error instanceof Error ? error.message : String(error),
         }));

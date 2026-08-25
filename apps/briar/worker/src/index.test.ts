@@ -96,6 +96,10 @@ const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
     alreadyResumed: 0,
     deferred: 0,
   })),
+  reconcileDrainingManagedComputers: vi.fn(async () => ({
+    skipped: true as const,
+    reason: "not_configured" as const,
+  })),
   reconcileManagedComputers: vi.fn(async () => ({
     skipped: true as const,
     reason: "not_configured" as const,
@@ -322,6 +326,9 @@ describe("Worker HTTP contract", () => {
       minuteDependencies.reconcileEnabledMergeQueueRuns,
     ).toHaveBeenCalledOnce();
     expect(
+      minuteDependencies.reconcileDrainingManagedComputers,
+    ).toHaveBeenCalledOnce();
+    expect(
       minuteDependencies.pruneExpiredDashboardChanges,
     ).not.toHaveBeenCalled();
     expect(minuteDependencies.archiveCompletedLogs).not.toHaveBeenCalled();
@@ -346,6 +353,9 @@ describe("Worker HTTP contract", () => {
     expect(
       sweepDependencies.reconcileEnabledMergeQueueRuns,
     ).not.toHaveBeenCalled();
+    expect(
+      sweepDependencies.reconcileDrainingManagedComputers,
+    ).not.toHaveBeenCalled();
 
     const unknownDependencies = createScheduledTaskDependencies();
     const unknown = scheduledContext();
@@ -366,6 +376,9 @@ describe("Worker HTTP contract", () => {
       expect(unknownDependencies.reconcileGithubMergedRuns).not.toHaveBeenCalled();
       expect(
         unknownDependencies.reconcileEnabledMergeQueueRuns,
+      ).not.toHaveBeenCalled();
+      expect(
+        unknownDependencies.reconcileDrainingManagedComputers,
       ).not.toHaveBeenCalled();
     } finally {
       consoleError.mockRestore();
