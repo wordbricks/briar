@@ -230,11 +230,28 @@ async function workerUnregisterCommand() {
   if (!project?.executionWorker) {
     throw new Error("이 프로젝트에 등록된 worker가 없습니다.");
   }
+  const requestedLifecycleReason = value("--lifecycle-reason");
+  if (
+    requestedLifecycleReason &&
+    requestedLifecycleReason !== "managed-deprovision"
+  ) {
+    throw new Error("Worker lifecycle reason이 올바르지 않습니다.");
+  }
+  const lifecycleReason = requestedLifecycleReason === "managed-deprovision"
+    ? "managed_deprovision"
+    : "explicit_user_unlink";
   await request(
     config.apiUrl,
     `/projects/${project.id}/workers/${project.executionWorker.workerId}`,
     userToken,
-    { method: "DELETE" },
+    {
+      method: "DELETE",
+      headers: {
+        "Idempotency-Key":
+          `worker-unlink:${project.id}:${project.executionWorker.workerId}`,
+        "X-Briar-Worker-Lifecycle-Reason": lifecycleReason,
+      },
+    },
   );
   config.projects = config.projects.map((candidate) =>
     candidate.id === project.id

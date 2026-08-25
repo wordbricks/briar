@@ -58,6 +58,7 @@ import {
   TranscriptLimitError,
   WorkerConflictError,
 } from "./workers";
+import { WorkerLifecycleConflictError } from "./worker-lifecycle-repository";
 import { TranscriptRequestDecodeError } from "./transcript-request";
 import {
   RequestDecodeError,
@@ -672,6 +673,9 @@ export default {
         );
       }
       if (error instanceof WorkerConflictError) {
+        return json({ message: error.message }, 409);
+      }
+      if (error instanceof WorkerLifecycleConflictError) {
         return json({ message: error.message }, 409);
       }
       if (error instanceof TranscriptLimitError) {

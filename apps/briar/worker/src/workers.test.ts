@@ -248,6 +248,7 @@ describe("detached execution workers", () => {
         "0125_managed_computers.sql",
         "0128_agent_skill_documents.sql",
         "0136_issue_difficulty.sql",
+        "0137_execution_worker_lifecycle_telemetry.sql",
       ],
     });
     await executeD1Sql(
@@ -361,6 +362,7 @@ describe("detached execution workers", () => {
        delete from briar_execution_worker_update_handoffs;
        delete from briar_execution_worker_credentials;
        delete from briar_execution_audit_events;
+       delete from briar_execution_worker_lifecycle_events;
        delete from briar_project_agent_task_jobs;
        delete from briar_execution_workers;
        delete from briar_execution_worker_devices;
@@ -605,7 +607,6 @@ describe("detached execution workers", () => {
         },
       ]),
     );
-
     const lightweightCost = instrumentD1(db);
     const lightweight = await heartbeat(
       { refreshMaintenance: false },
@@ -625,6 +626,16 @@ describe("detached execution workers", () => {
     expect(lightweightCost.cost.rowsRead).toBeLessThan(
       maintenanceCost.cost.rowsRead,
     );
+    await expect(db.prepare(
+      `select reason, operation, outcome, hard_delete_rows_written, detail_json
+       from briar_execution_worker_lifecycle_events where worker_id = ?`,
+    ).bind(registered.worker.id).first()).resolves.toMatchObject({
+      reason: "restart",
+      operation: "binding_preserved",
+      outcome: "preserved",
+      hard_delete_rows_written: 0,
+      detail_json: expect.not.stringContaining(credential),
+    });
   });
 
   it("keeps a remote update pending until the target Worker version reports", async () => {
@@ -676,6 +687,16 @@ describe("detached execution workers", () => {
       atMinute(4),
     );
     expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toBeNull();
+    await expect(db.prepare(
+      `select reason, operation, outcome, hard_delete_rows_written, detail_json
+       from briar_execution_worker_lifecycle_events where request_id = ?`,
+    ).bind(`worker-update:${requested.id}`).first()).resolves.toMatchObject({
+      reason: "update",
+      operation: "binding_preserved",
+      outcome: "preserved",
+      hard_delete_rows_written: 0,
+      detail_json: expect.stringContaining('"bindingPreserved":true'),
+    });
   });
 
   it("restores availability on the target-version heartbeat after update drain", async () => {
@@ -1619,6 +1640,12 @@ describe("detached execution workers", () => {
       unbound.device.id,
       projectId,
       atMinute(7),
+      {
+        requestId: "worker-unlink:organization-list:unbound",
+        organizationId: projectId,
+        workerId: unbound.worker.id,
+        reason: "explicit_user_unlink",
+      },
     );
 
     const fullProjection = await listOrganizationExecutionWorkers(
@@ -1833,11 +1860,24 @@ describe("detached execution workers", () => {
         first.device.id,
         projectId,
         atMinute(3),
+        {
+          requestId: "worker-unlink:partially-shared",
+          organizationId: projectId,
+          workerId: first.worker.id,
+          reason: "explicit_user_unlink",
+        },
       ),
     ).toBe(true);
     expect(
       await executionWorkerBindingForProject(db, first.device.id, projectId),
     ).toBeNull();
+    await expect(db.prepare(
+      `select operation from briar_dashboard_changes
+       where project_id = ? and entity_type = 'worker' and entity_id = ?
+       order by version desc limit 1`,
+    ).bind(projectId, first.worker.id).first()).resolves.toEqual({
+      operation: "delete",
+    });
     expect(
       await executionWorkerBindingForProject(
         db,
@@ -1852,6 +1892,71 @@ describe("detached execution workers", () => {
         atMinute(4),
       ),
     ).not.toBeNull();
+    expect(
+      await unbindExecutionWorker(
+        db,
+        first.device.id,
+        projectId,
+        atMinute(4),
+        {
+          requestId: "worker-unlink:partially-shared",
+          organizationId: projectId,
+          workerId: first.worker.id,
+          reason: "explicit_user_unlink",
+        },
+      ),
+    ).toBe(true);
+    await expect(db.prepare(
+      `select reason, outcome, attempt_count, hard_delete_rows_written,
+              detail_json
+       from briar_execution_worker_lifecycle_events where request_id = ?`,
+    ).bind("worker-unlink:partially-shared").first()).resolves.toMatchObject({
+      reason: "explicit_user_unlink",
+      outcome: "deleted",
+      attempt_count: 2,
+      hard_delete_rows_written: expect.any(Number),
+      detail_json: expect.stringContaining('"remainingBindings":1'),
+    });
+  });
+
+  it("retries an abandoned unlink after its lifecycle lease expires", async () => {
+    const registered = await register("stale-unlink-retry");
+    const requestId = "worker-unlink:stale-unlink-retry";
+    await db.prepare(
+      `insert into briar_execution_worker_lifecycle_events (
+         request_id, organization_id, project_id, device_id, worker_id,
+         operation, reason, outcome, attempt_count, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, 'binding_delete', 'explicit_user_unlink',
+                 'started', 1, ?, ?)`,
+    ).bind(
+      requestId,
+      projectId,
+      projectId,
+      registered.device.id,
+      registered.worker.id,
+      atMinute(1),
+      atMinute(1),
+    ).run();
+
+    await expect(unbindExecutionWorker(
+      db,
+      registered.device.id,
+      projectId,
+      atMinute(7),
+      {
+        requestId,
+        organizationId: projectId,
+        workerId: registered.worker.id,
+        reason: "explicit_user_unlink",
+      },
+    )).resolves.toBe(true);
+    await expect(db.prepare(
+      `select outcome, attempt_count from
+         briar_execution_worker_lifecycle_events where request_id = ?`,
+    ).bind(requestId).first()).resolves.toEqual({
+      outcome: "deleted",
+      attempt_count: 2,
+    });
   });
 
   it("does not let another organization member adopt an enrolled device", async () => {
@@ -1999,7 +2104,13 @@ describe("detached execution workers", () => {
     });
 
     await expect(
-      deleteExecutionWorker(db, registered.device.id, atMinute(4)),
+      deleteExecutionWorker(db, registered.device.id, atMinute(4), {
+        requestId: "worker-deprovision:deleted",
+        organizationId: projectId,
+        projectId: null,
+        workerId: null,
+        reason: "explicit_user_deprovision",
+      }),
     ).resolves.toBe(true);
     await expect(
       authenticateExecutionWorker(
@@ -2024,6 +2135,16 @@ describe("detached execution workers", () => {
     await expect(
       listOrganizationExecutionWorkers(db, projectId, atMinute(5)),
     ).resolves.toEqual([]);
+    await expect(db.prepare(
+      `select reason, operation, outcome, hard_delete_rows_written, detail_json
+       from briar_execution_worker_lifecycle_events where request_id = ?`,
+    ).bind("worker-deprovision:deleted").first()).resolves.toMatchObject({
+      reason: "explicit_user_deprovision",
+      operation: "device_delete",
+      outcome: "deleted",
+      hard_delete_rows_written: expect.any(Number),
+      detail_json: expect.stringContaining('"bindingCount":2'),
+    });
   });
 
   it("disables but does not delete a Worker with an active session", async () => {
@@ -2044,7 +2165,13 @@ describe("detached execution workers", () => {
     });
 
     await expect(
-      deleteExecutionWorker(db, registered.device.id, atMinute(4)),
+      deleteExecutionWorker(db, registered.device.id, atMinute(4), {
+        requestId: "worker-deprovision:delete-active",
+        organizationId: projectId,
+        projectId: null,
+        workerId: null,
+        reason: "explicit_user_deprovision",
+      }),
     ).rejects.toThrow("active sessions");
     await expect(
       listOrganizationExecutionWorkers(db, projectId, atMinute(4)),

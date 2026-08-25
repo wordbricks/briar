@@ -270,13 +270,17 @@ describe("managed computer remote desktop routes", () => {
   });
 
   it("ends control when the managed computer Worker credential is removed", async () => {
-    const response = await worker.fetch(new Request(
+    const remove = () => worker.fetch(new Request(
       `https://briar.example/organizations/${organizationId}/workers/${deviceId}`,
       {
         method: "DELETE",
-        headers: { authorization: `Bearer ${ownerToken}` },
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+          "Idempotency-Key": `worker-deprovision:${deviceId}`,
+        },
       },
     ), env());
+    const response = await remove();
     expect(response.status).toBe(204);
     expect(relayFetch).toHaveBeenCalledWith(
       "https://managed-computer-remote.internal/disconnect",
@@ -290,5 +294,33 @@ describe("managed computer remote desktop routes", () => {
       state: "ended",
       end_reason: "worker_credential_revoked",
     });
+    expect((await remove()).status).toBe(204);
+    await db.prepare(
+      `update briar_execution_worker_lifecycle_events
+       set outcome = 'started', completed_at = null where request_id = ?`,
+    ).bind(`worker-deprovision:${deviceId}`).run();
+    expect((await remove()).status).toBe(204);
+    const lifecycle = await db.prepare(
+      `select reason, outcome, attempt_count, hard_delete_rows_written,
+              detail_json
+       from briar_execution_worker_lifecycle_events where request_id = ?`,
+    ).bind(`worker-deprovision:${deviceId}`).first<{
+      reason: string;
+      outcome: string;
+      attempt_count: number;
+      hard_delete_rows_written: number;
+      detail_json: string;
+    }>();
+    expect(lifecycle).toMatchObject({
+      reason: "managed_deprovision",
+      outcome: "deleted",
+      attempt_count: 3,
+      hard_delete_rows_written: expect.any(Number),
+      detail_json: expect.not.stringContaining(workerCredential),
+    });
+    expect(lifecycle?.hard_delete_rows_written).toBeGreaterThan(0);
+    expect(lifecycle?.detail_json).toContain(
+      '"recoveredAfterMissingTarget":true',
+    );
   });
 });
