@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.160",
+        date: "2026년 8월 25일",
+        title: "채널 스레드 세션과 관리형 컴퓨터 수명 주기를 더 안전하게 운영합니다",
+        summary:
+          "채널 스레드의 Worker·Worktree·Provider 대화를 재사용하고, 관리형 컴퓨터의 retirement와 최신 배포 구성을 안정적으로 처리합니다.",
+        items: [
+          "채널·스레드·Agent 조합별 실행 세션이 Worker, Worktree, Provider 대화를 재사용하고 활동마다 6시간 보존 시간을 갱신해 긴 작업을 자연스럽게 이어갑니다.",
+          "Worker 장애나 lease 만료 때 세션을 안전하게 재바인딩하고, 동시 claim과 스레드 격리를 검증해 답글 실행이 서로 섞이지 않도록 합니다.",
+          "관리자만 관리형 컴퓨터를 idempotent하게 retirement할 수 있으며, 새 작업과 원격 화면 접근은 즉시 막고 진행 중인 작업은 안전하게 drain합니다.",
+          "관리형 컴퓨터를 검증된 Debian 13 이미지 기반 Launch Template v6에 고정하고, Worker heartbeat가 retirement 상태를 계속 유지하도록 합니다.",
+        ],
+      },
+      {
         version: "1.2.159",
         date: "2026년 8월 25일",
         title: "Provider와 모델 선택, 채널 일괄 승인, 관리형 데스크톱을 더 안정적으로 연결합니다",
@@ -1109,6 +1122,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.160",
+        date: "August 25, 2026",
+        title: "Make channel thread sessions and managed-computer lifecycle safer",
+        summary:
+          "Reuse Worker, worktree, and Provider conversations for channel threads while making managed-computer retirement and deployment configuration more dependable.",
+        items: [
+          "Reuse a durable execution session for each channel, thread, and Agent combination, renewing its six-hour retention window with activity so long-running replies continue naturally.",
+          "Rebind sessions safely after Worker or lease failures, and isolate concurrent claims and threads so channel replies do not interfere with one another.",
+          "Let administrators retire managed computers idempotently, immediately block new work and remote-screen access, and drain active work safely.",
+          "Pin managed computers to the validated Debian 13 Launch Template v6 and keep retirement enforced when a managed Worker continues sending heartbeats.",
+        ],
+      },
       {
         version: "1.2.159",
         date: "August 25, 2026",
@@ -2280,7 +2306,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-159">
+          <a href="#v1-2-160">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2302,7 +2328,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.159"
+                      entry.version === "1.2.160"
+                        ? "2026-08-25"
+                        : entry.version === "1.2.159"
                         ? "2026-08-25"
                         : entry.version === "1.2.158"
                         ? "2026-08-25"
