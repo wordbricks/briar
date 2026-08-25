@@ -12,6 +12,10 @@ for forbidden in \
   /home/briar/.config/briar/config.json \
   /home/briar/.codex/auth.json \
   /home/briar/.claude/.credentials.json \
+  /home/briar/.cursor \
+  /home/briar/.grok \
+  /home/briar/.gemini \
+  /home/briar/.local/share/opencode/auth.json \
   /root/.aws \
   /home/admin/.aws \
   /home/briar/.aws \

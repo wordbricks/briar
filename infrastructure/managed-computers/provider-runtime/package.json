@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "bun@1.4.0",
   "dependencies": {
-    "@anthropic-ai/claude-code": "2.1.241",
+    "@anthropic-ai/claude-code": "2.1.243",
     "@openai/codex": "0.149.1",
     "agent-browser": "0.34.0"
   }
