@@ -214,7 +214,7 @@ fn opaque_bounds(image: &Image<'_>) -> Option<(u32, u32, u32, u32)> {
     let mut max_x = 0;
     let mut max_y = 0;
     let mut found = false;
-    for (index, pixel) in image.rgba().chunks_exact(4).enumerate() {
+    for (index, pixel) in image.rgba().as_chunks::<4>().0.iter().enumerate() {
         if pixel[3] == 0 {
             continue;
         }
@@ -559,7 +559,9 @@ mod tests {
     fn opaque_count(image: &Image<'_>) -> usize {
         image
             .rgba()
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .filter(|pixel| pixel[3] > 0)
             .count()
     }
