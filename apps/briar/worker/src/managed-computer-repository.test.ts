@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sha256Hex } from "./managed-computer-crypto";
 import {
+  beginManagedComputerRetirement,
   createManagedComputerRetry,
   createPromotionalManagedComputer,
   enrollManagedComputerDevice,
@@ -9,6 +10,7 @@ import {
   managedComputerCapacity,
   startManagedComputerProvisioning,
 } from "./managed-computer-repository";
+import { recordWorkerHeartbeat } from "./workers";
 import {
   createIsolatedTestDatabase,
   executeD1Sql,
@@ -323,5 +325,135 @@ describe("managed computer repository", () => {
       retry_count: 4,
       provisioning_job_id: "retry-job-5",
     });
+  });
+
+  it("keeps a retiring managed computer from accepting new work", async () => {
+    const secondOrganizationId = "99999999-9999-4999-8999-999999999999";
+    const secondUserId = "pilot-owner-2";
+    const computerId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab";
+    const jobId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc";
+    const projectId = "cccccccc-cccc-4ccc-8ccc-cccccccccccd";
+    const deviceId = `managed-${computerId}`;
+    const workerId = "dddddddd-dddd-4ddd-8ddd-ddddddddddde";
+    const retirementAt = "2026-08-22T00:20:00.000Z";
+    const computer = await createPromotionalManagedComputer(db, {
+      entitlementId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef",
+      managedComputerId: computerId,
+      provisioningJobId: jobId,
+      workflowInstanceId: `managed-computer-${computerId}`,
+      organizationId: secondOrganizationId,
+      userId: secondUserId,
+      campaignId: "getbriar-pilot",
+      requestId: "ffffffff-ffff-4fff-8fff-fffffffffff0",
+      organizationLimit: 1,
+      fleetLimit: 10,
+      region: "us-east-1",
+      instanceType: "m7i.large",
+      launchTemplateId: "lt-0123456789abcdef0",
+      launchTemplateVersion: "8",
+      bootstrapApiOrigin: "https://briar.example",
+      enrollmentNonceHash: "e".repeat(64),
+      enrollmentExpiresAt: "2026-08-22T00:30:00.000Z",
+      expiresAt: "2026-09-21T00:00:00.000Z",
+      observedAt,
+    });
+    expect(computer).toMatchObject({ state: "requested" });
+    await startManagedComputerProvisioning(db, computerId, jobId, observedAt);
+    await failManagedComputerProvisioning(db, {
+      managedComputerId: computerId,
+      provisioningJobId: jobId,
+      code: "PREPARATION_FAILED",
+      detail: "test retirement",
+      observedAt,
+    });
+    await db.batch([
+      db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, 'Retirement project', ?, ?, ?)`,
+      ).bind(
+        projectId,
+        secondUserId,
+        secondOrganizationId,
+        "f".repeat(64),
+        observedAt,
+        observedAt,
+      ),
+      db.prepare(
+        `insert into briar_execution_worker_devices (
+           id, organization_id, owner_user_id, label, device_identity_hash,
+           state, max_concurrent_sessions, last_heartbeat_at, created_at,
+           updated_at
+         ) values (?, ?, ?, 'Retiring computer', ?, 'online', 1, ?, ?, ?)`,
+      ).bind(
+        deviceId,
+        secondOrganizationId,
+        secondUserId,
+        "1".repeat(64),
+        observedAt,
+        observedAt,
+        observedAt,
+      ),
+      db.prepare(
+        `update briar_managed_computers set briar_device_id = ?, updated_at = ?
+         where id = ? and state = 'failed'`,
+      ).bind(deviceId, observedAt, computerId),
+      db.prepare(
+        `insert into briar_execution_workers (
+           id, project_id, device_id, label, host_fingerprint, agent_provider,
+           versions_json, capabilities_json, state, accepting_work,
+           readiness_state, readiness_detail, last_heartbeat_at, created_at,
+           updated_at
+         ) values (
+           ?, ?, ?, 'Retiring computer', ?, 'codex', '{}', '{}', 'online', 1,
+           'ready', null, ?, ?, ?
+         )`,
+      ).bind(
+        workerId,
+        projectId,
+        deviceId,
+        "2".repeat(64),
+        observedAt,
+        observedAt,
+        observedAt,
+      ),
+    ]);
+
+    const retired = await beginManagedComputerRetirement(db, {
+      managedComputerId: computerId,
+      organizationId: secondOrganizationId,
+      observedAt: retirementAt,
+    });
+    expect(retired).toMatchObject({ state: "draining" });
+    await expect(db.prepare(
+      `select accepting_work, readiness_state, readiness_detail
+       from briar_execution_workers where id = ?`,
+    ).bind(workerId).first()).resolves.toMatchObject({
+      accepting_work: 0,
+      readiness_state: "busy",
+      readiness_detail: "Managed computer is not accepting new work.",
+    });
+
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId,
+      acceptingWork: true,
+      readinessState: "ready",
+      readinessDetail: "Ready again",
+      observedAt: "2026-08-22T00:21:00.000Z",
+    });
+    await expect(db.prepare(
+      `select accepting_work, readiness_state, readiness_detail
+       from briar_execution_workers where id = ?`,
+    ).bind(workerId).first()).resolves.toMatchObject({
+      accepting_work: 0,
+      readiness_state: "busy",
+      readiness_detail: "Managed computer is not accepting new work.",
+    });
+    expect(await beginManagedComputerRetirement(db, {
+      managedComputerId: computerId,
+      organizationId: secondOrganizationId,
+      observedAt: "2026-08-22T00:22:00.000Z",
+    })).toBeUndefined();
   });
 });

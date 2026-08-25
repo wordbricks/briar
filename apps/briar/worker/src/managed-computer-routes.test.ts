@@ -89,7 +89,7 @@ describe("managed computer routes", () => {
 
   const request = (
     pathname: string,
-    method: "GET" | "POST",
+    method: "DELETE" | "GET" | "POST",
     token: string,
     body?: unknown,
     requestId?: string,
@@ -102,6 +102,55 @@ describe("managed computer routes", () => {
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+
+  const seedManagedComputer = async (input: {
+    computerId: string;
+    entitlementId: string;
+    nonce: string;
+    state: "failed" | "requested";
+  }) => {
+    await db.batch([
+      db.prepare(
+        `insert into briar_managed_computer_entitlements (
+           id, organization_id, requester_user_id, source, source_reference,
+           request_id, status, approved_at, created_at, updated_at
+         ) values (?, ?, ?, 'payment', ?, ?, 'approved', ?, ?, ?)`,
+      ).bind(
+        input.entitlementId,
+        organizationId,
+        ownerId,
+        `retirement-test:${input.computerId}`,
+        `retirement-test:${input.computerId}`,
+        now,
+        now,
+        now,
+      ),
+      db.prepare(
+        `insert into briar_managed_computers (
+           id, organization_id, requester_user_id, entitlement_id, state,
+           aws_region, aws_instance_type, aws_launch_template_id,
+           aws_launch_template_version, bootstrap_api_origin,
+           provisioning_job_id, enrollment_nonce_hash, enrollment_expires_at,
+           created_at, state_updated_at, expires_at, updated_at
+         ) values (
+           ?, ?, ?, ?, ?, 'us-east-1', 'm7i.large', 'lt-0123456789abcdef0',
+           '7', 'https://briar.example', ?, ?, '2026-08-22T00:30:00.000Z',
+           ?, ?, '2026-09-21T00:00:00.000Z', ?
+         )`,
+      ).bind(
+        input.computerId,
+        organizationId,
+        ownerId,
+        input.entitlementId,
+        input.state,
+        `retirement-job:${input.computerId}`,
+        input.nonce.repeat(64),
+        now,
+        now,
+        now,
+      ),
+    ]);
+  };
 
   it("shows product metadata to a member but forbids promotion approval", async () => {
     const product = await worker.fetch(request(
@@ -194,5 +243,80 @@ describe("managed computer routes", () => {
       computers: 1,
       jobs: 1,
     });
+  });
+
+  it("lets an organization admin retire a stable computer idempotently", async () => {
+    const computerId = "33333333-3333-4333-8333-333333333334";
+    await seedManagedComputer({
+      computerId,
+      entitlementId: "44444444-4444-4444-8444-444444444445",
+      nonce: "9",
+      state: "failed",
+    });
+
+    const memberAttempt = await worker.fetch(request(
+      `/organizations/${organizationId}/managed-computers/${computerId}`,
+      "DELETE",
+      memberToken,
+    ), env());
+    expect(memberAttempt.status).toBe(403);
+
+    const first = await worker.fetch(request(
+      `/organizations/${organizationId}/managed-computers/${computerId}`,
+      "DELETE",
+      ownerToken,
+    ), env());
+    expect(first.status).toBe(202);
+    expect(await first.json()).toMatchObject({
+      duplicate: false,
+      computer: { id: computerId, state: "draining" },
+    });
+
+    const replay = await worker.fetch(request(
+      `/organizations/${organizationId}/managed-computers/${computerId}`,
+      "DELETE",
+      ownerToken,
+    ), env());
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({
+      duplicate: true,
+      computer: { id: computerId, state: "draining" },
+    });
+
+    const audits = await db.prepare(
+      `select actor_user_id, detail_json
+       from briar_managed_computer_audit_events
+       where managed_computer_id = ? and action = 'draining_started'`,
+    ).bind(computerId).all<{
+      actor_user_id: string;
+      detail_json: string;
+    }>();
+    expect(audits.results).toHaveLength(1);
+    expect(audits.results[0]?.actor_user_id).toBe(ownerId);
+    expect(JSON.parse(audits.results[0]?.detail_json ?? "{}"))
+      .toEqual({ reason: "user_retired" });
+  });
+
+  it("does not retire a computer while preparation is still running", async () => {
+    const computerId = "33333333-3333-4333-8333-333333333335";
+    await seedManagedComputer({
+      computerId,
+      entitlementId: "44444444-4444-4444-8444-444444444446",
+      nonce: "8",
+      state: "requested",
+    });
+
+    const response = await worker.fetch(request(
+      `/organizations/${organizationId}/managed-computers/${computerId}`,
+      "DELETE",
+      ownerToken,
+    ), env());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "MANAGED_COMPUTER_RETIRE_UNAVAILABLE",
+    });
+    await expect(db.prepare(
+      `select state from briar_managed_computers where id = ?`,
+    ).bind(computerId).first()).resolves.toMatchObject({ state: "requested" });
   });
 });

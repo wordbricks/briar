@@ -539,6 +539,18 @@ export async function retryManagedComputer(
   );
 }
 
+export async function retireManagedComputer(
+  token: string,
+  organizationId: string,
+  managedComputerId: string,
+) {
+  return request<{ computer: ManagedComputer; duplicate: boolean }>(
+    `/organizations/${organizationId}/managed-computers/${managedComputerId}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
 export async function createManagedComputerRemoteSession(
   token: string,
   organizationId: string,
