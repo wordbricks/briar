@@ -47,7 +47,7 @@ const modifierOnlyKeys = new Set(["Meta", "Control", "Alt", "Shift", "OS"]);
 
 let recordingKeybinding: KeybindingId | null = null;
 
-function keyboardEventIsComposing(event: KeyboardEvent): boolean {
+export function keyboardEventIsComposing(event: KeyboardEvent): boolean {
   return event.isComposing || event.keyCode === 229;
 }
 
@@ -81,6 +81,7 @@ function persist(keybindings: Keybindings) {
 
 export function loadKeybindings(): Keybindings {
   const result: Keybindings = { ...defaultKeybindings };
+  let repaired = false;
   try {
     const parsed: unknown = JSON.parse(
       window.localStorage.getItem(keybindingsStorageKey) ?? "{}",
@@ -88,7 +89,14 @@ export function loadKeybindings(): Keybindings {
     const stored = Predicate.isObject(parsed) ? parsed : {};
     for (const id of keybindingIds) {
       const storedShortcut = stored[id];
-      if (isShortcut(storedShortcut)) result[id] = storedShortcut;
+      if (
+        isShortcut(storedShortcut) &&
+        !isNavigationHistoryShortcut(storedShortcut)
+      ) {
+        result[id] = storedShortcut;
+      } else if (isShortcut(storedShortcut)) {
+        repaired = true;
+      }
     }
     if (shortcutsEqual(result.commandPalette, result.sidebarToggle)) {
       if (
@@ -103,7 +111,9 @@ export function loadKeybindings(): Keybindings {
         }
       }
       persist(result);
+      repaired = false;
     }
+    if (repaired) persist(result);
   } catch {
     // Fall back to the defaults when stored keybindings are unreadable.
   }
@@ -112,6 +122,7 @@ export function loadKeybindings(): Keybindings {
 
 export function saveKeybinding(id: KeybindingId, shortcut: Shortcut): Keybindings {
   const current = loadKeybindings();
+  if (isNavigationHistoryShortcut(shortcut)) return current;
   const next = { ...current };
   const conflict = keybindingIds.find(
     (candidate) =>
@@ -138,6 +149,19 @@ export function shortcutsEqual(a: Shortcut, b: Shortcut): boolean {
   );
 }
 
+export function isNavigationHistoryShortcut(shortcut: Shortcut): boolean {
+  return (
+    shortcut.meta &&
+    !shortcut.ctrl &&
+    !shortcut.alt &&
+    !shortcut.shift &&
+    (shortcut.code === "BracketLeft" ||
+      shortcut.code === "BracketRight" ||
+      shortcut.key === "[" ||
+      shortcut.key === "]")
+  );
+}
+
 export function matchesShortcut(event: KeyboardEvent, shortcut: Shortcut): boolean {
   if (keyboardEventIsComposing(event)) return false;
   if (event.metaKey !== shortcut.meta) return false;
@@ -156,7 +180,7 @@ export function shortcutFromEvent(event: KeyboardEvent): Shortcut | null {
   }
   if (event.key === "Escape") return null;
   if (!event.metaKey && !event.ctrlKey && !event.altKey) return null;
-  return {
+  const shortcut = {
     key: event.key,
     code: event.code,
     meta: event.metaKey,
@@ -164,6 +188,7 @@ export function shortcutFromEvent(event: KeyboardEvent): Shortcut | null {
     alt: event.altKey,
     shift: event.shiftKey,
   };
+  return isNavigationHistoryShortcut(shortcut) ? null : shortcut;
 }
 
 export function isMacPlatform(): boolean {

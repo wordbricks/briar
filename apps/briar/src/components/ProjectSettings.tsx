@@ -102,15 +102,9 @@ import { ProjectExecutionSettings } from "./ProjectExecutionSettings";
 import { ProjectTabsSettings } from "./ProjectTabsSettings";
 import { ProviderSelect } from "./ProviderSelect";
 import { SelectMenu } from "./SelectMenu";
+import type { ProjectSettingsSection } from "../lib/app-navigation";
 
-export type ProjectSettingsSection =
-  | "general"
-  | "tabs"
-  | "integrations"
-  | "issue-import"
-  | "agent-configuration"
-  | "execution"
-  | "workflow";
+export type { ProjectSettingsSection } from "../lib/app-navigation";
 
 export function ProjectSettings({
   dashboard,

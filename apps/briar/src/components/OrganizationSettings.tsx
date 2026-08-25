@@ -64,14 +64,11 @@ import { OrganizationWorkersSettings } from "./OrganizationWorkersSettings";
 import { OrganizationIntegrationsSettings } from "./OrganizationIntegrationsSettings";
 import { OrganizationAgentsSettings } from "./OrganizationAgentsSettings";
 import { SelectMenu } from "./SelectMenu";
+import type { OrganizationSettingsSection } from "../lib/app-navigation";
+
+export type { OrganizationSettingsSection } from "../lib/app-navigation";
 
 type RoleFilter = "all" | OrganizationMember["role"];
-export type OrganizationSettingsSection =
-  | "general"
-  | "members"
-  | "agents"
-  | "workers"
-  | "integrations";
 
 const csvCell = (value: string) => `"${value.replaceAll('"', '""')}"`;
 

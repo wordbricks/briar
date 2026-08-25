@@ -364,7 +364,97 @@ describe("Channels", () => {
       .forEach((node) => node.remove());
   });
 
+  it("uses the fallback callback when the active channel disappears", async () => {
+    const onChannelFallback = vi.fn();
+    const onChannelSelect = vi.fn();
+    loadChannel.mockResolvedValue({
+      channel,
+      members: [member],
+      agents: [agent],
+      messages: [],
+    });
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
 
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId="deleted-channel"
+          channelCatalogCursor={7}
+          channels={[channel]}
+          currentUserId="user-1"
+          onChannelFallback={onChannelFallback}
+          onChannelSelect={onChannelSelect}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          token="token"
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(onChannelFallback).toHaveBeenCalledWith(channel.id);
+    expect(onChannelSelect).not.toHaveBeenCalled();
+  });
+
+  it("waits for the current channel catalog before choosing a fallback", async () => {
+    const onChannelFallback = vi.fn();
+    const renderChannels = (channelCatalogCursor: number | null) => (
+      <Channels
+        activeChannelId="channel-from-navigation-history"
+        channelCatalogCursor={channelCatalogCursor}
+        channels={[channel]}
+        currentUserId="user-1"
+        onChannelFallback={onChannelFallback}
+        onChannelSelect={vi.fn()}
+        onChannelsChange={() => undefined}
+        organizationId="org-1"
+        token="token"
+      />
+    );
+
+    await act(async () => {
+      root.render(renderChannels(null));
+      await Promise.resolve();
+    });
+    expect(onChannelFallback).not.toHaveBeenCalled();
+
+    await act(async () => {
+      root.render(renderChannels(7));
+      await Promise.resolve();
+    });
+    expect(onChannelFallback).toHaveBeenCalledWith(channel.id);
+  });
+
+  it("clears a missing active channel when the ready catalog is empty", async () => {
+    const onChannelFallback = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <Channels
+          activeChannelId="deleted-last-channel"
+          channelCatalogCursor={7}
+          channels={[]}
+          currentUserId="user-1"
+          onChannelFallback={onChannelFallback}
+          onChannelSelect={vi.fn()}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          token="token"
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(onChannelFallback).toHaveBeenCalledWith(null);
+  });
 
   it("uses Inbox channel changes as a delta recovery signal", async () => {
     vi.useFakeTimers();
@@ -687,6 +777,81 @@ describe("Channels", () => {
     expect(updateChannel).toHaveBeenCalledWith("token", "org-1", "channel-1", {
       defaultProjectId: null,
     });
+  });
+
+  it("does not carry channel-scoped UI or a draft into another channel", async () => {
+    const secondChannel: ChannelSummary = {
+      ...channel,
+      id: "channel-2",
+      name: "Design",
+      slug: "design",
+    };
+    let switchChannel!: (channelId: string) => void;
+    loadChannel.mockImplementation(
+      async (_token, _organizationId, channelId) => ({
+        channel: channelId === secondChannel.id ? secondChannel : channel,
+        members: [member],
+        agents: [agent],
+        messages: [],
+      }),
+    );
+    loadChannelDelta.mockResolvedValue({
+      cursor: 7,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [],
+    });
+
+    const Harness = () => {
+      const [activeChannelId, setActiveChannelId] = useState(channel.id);
+      switchChannel = setActiveChannelId;
+      return (
+        <Channels
+          activeChannelId={activeChannelId}
+          channelCatalogCursor={7}
+          channels={[channel, secondChannel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          token="token"
+        />
+      );
+    };
+
+    await act(async () => {
+      root.render(
+        <ToastProvider>
+          <Harness />
+        </ToastProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await typeInto(
+      container.querySelector<HTMLTextAreaElement>(".channel-composer textarea")!,
+      "draft for Welcome",
+    );
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        '.channel-header-icon[aria-label="더 보기"]',
+      )!.click();
+    });
+    expect(container.querySelector(".channel-settings-dialog")).not.toBeNull();
+
+    await act(async () => {
+      switchChannel(secondChannel.id);
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".channel-settings-dialog")).toBeNull();
+    expect(
+      container.querySelector<HTMLTextAreaElement>(".channel-composer textarea")
+        ?.value,
+    ).toBe("");
   });
 
 
