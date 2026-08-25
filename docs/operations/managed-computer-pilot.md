@@ -153,7 +153,7 @@ aws iam attach-user-policy \
 
 ## 3. D1 및 Cloudflare
 
-1. D1 migrations를 `0131_managed_computer_setup_sessions.sql`까지 순서대로 적용한다. `0131`은 setup bearer token 원문 대신 SHA-256만 저장한다.
+1. D1 migrations를 `0134_managed_computer_promotion_campaigns.sql`까지 순서대로 적용한다. `0131`은 setup bearer token 원문 대신 SHA-256만 저장하고, `0134`는 독립적으로 사용할 수 있는 추가 프로모션 캠페인을 등록한다.
 2. Wrangler 배포 dry-run에서 `MANAGED_COMPUTER_PROVISIONING` Workflow와 `MANAGED_COMPUTER_REMOTE` Durable Object binding을 확인한다.
 3. 일반 Worker 변수:
    - `MANAGED_COMPUTER_APPLICATIONS_ENABLED=true`
@@ -177,7 +177,7 @@ aws iam attach-user-policy \
    - `MANAGED_COMPUTER_REMOTE_DESKTOP_FLEET_SESSION_LIMIT=<승인된 전체 동시 세션 수>`
    - `MANAGED_COMPUTER_REMOTE_DESKTOP_RATE_LIMIT=10`
 4. Cloudflare secrets:
-   - `MANAGED_COMPUTER_PROMOTION_CODE=GETBRIAR`
+   - `MANAGED_COMPUTER_PROMOTION_CODE=<단일 레거시 코드 또는 {"campaign-id":"promotion-code"} JSON>`
    - `MANAGED_COMPUTER_ENROLLMENT_SECRET=<32바이트 이상 무작위 값>`
    - `MANAGED_COMPUTER_AWS_ACCESS_KEY_ID`
    - `MANAGED_COMPUTER_AWS_SECRET_ACCESS_KEY`
@@ -189,6 +189,13 @@ aws iam attach-user-policy \
    `secrets.json`으로 Wrangler에 전달한 뒤 파일을 삭제한다. 복호화된 값이나
    AWS access-key CSV를 PR, 로그, user-data, 명령 인자로 남기지 않는다.
    변경 전후에는 `bun run secrets:verify-encrypted`를 실행한다.
+
+   여러 프로모션을 운영할 때는 같은 secret 안에 캠페인 ID별 코드를 JSON
+   객체로 보관한다. 각 캠페인은 사용자와 조직마다 한 번씩만 사용할 수 있다.
+   `stopped` 또는 `terminated` 컴퓨터는 동시 보유 한도에서 제외되므로, 기존
+   컴퓨터가 완전히 중지된 뒤에는 사용하지 않은 다음 캠페인으로 새 컴퓨터를
+   신청할 수 있다. 캠페인 ID만 migration과 감사 로그에 저장하고 코드 원문은
+   저장하거나 응답하지 않는다.
 
 Identity public key는 AWS의 **해당 리전 RSA 인증서**를 공식 `regions-certs` 문서에서 받아 `openssl x509 -pubkey -noout -in certificate.pem`으로 추출한다. DSA/PKCS7이 아닌 `instance-identity/signature` 검증용 RSA 키여야 한다. 리전을 바꾸면 키도 함께 바꾸고 신규 신청을 다시 켜기 전 서명 음수 테스트를 수행한다.
 

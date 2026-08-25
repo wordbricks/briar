@@ -27,6 +27,42 @@ describe("managed computer remote desktop configuration", () => {
   });
 });
 
+describe("managed computer promotion configuration", () => {
+  it("keeps the legacy single-code configuration compatible", () => {
+    const config = managedComputerConfig({
+      MANAGED_COMPUTER_PROMOTION_CODE: "  LEGACY-PROMO  ",
+    } as Env);
+    expect(config.promotionCampaigns).toEqual([
+      { id: "getbriar-pilot", code: "LEGACY-PROMO" },
+    ]);
+  });
+
+  it("decodes independent campaign codes from one secret", () => {
+    const config = managedComputerConfig({
+      MANAGED_COMPUTER_PROMOTION_CODE: JSON.stringify({
+        "getbriar-jay-1": "  TEST-PROMO-ONE  ",
+        "getbriar-jay-2": "TEST-PROMO-TWO",
+      }),
+    } as Env);
+    expect(config.promotionCampaigns).toEqual([
+      { id: "getbriar-jay-1", code: "TEST-PROMO-ONE" },
+      { id: "getbriar-jay-2", code: "TEST-PROMO-TWO" },
+    ]);
+  });
+
+  it("fails closed for malformed or ambiguous campaign maps", () => {
+    expect(managedComputerConfig({
+      MANAGED_COMPUTER_PROMOTION_CODE: "{not-json",
+    } as Env).promotionCampaigns).toEqual([]);
+    expect(managedComputerConfig({
+      MANAGED_COMPUTER_PROMOTION_CODE: JSON.stringify({
+        "getbriar-jay-1": "same-code",
+        "getbriar-jay-2": " SAME-CODE ",
+      }),
+    } as Env).promotionCampaigns).toEqual([]);
+  });
+});
+
 describe("managed computer retry presentation", () => {
   const failedComputer: ManagedComputerRow = {
     id: "managed-computer",

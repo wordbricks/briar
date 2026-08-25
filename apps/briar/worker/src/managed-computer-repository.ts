@@ -21,7 +21,6 @@ const activeStates: readonly ManagedComputerState[] = [
   "ready",
   "failed",
   "draining",
-  "stopped",
 ];
 
 const activeStateSql = activeStates.map(() => "?").join(", ");

@@ -102,6 +102,16 @@ const BoolText = Schema.Literals(["true", "false"]).pipe(Schema.decodeTo(
 const decodePositiveInteger = Schema.decodeUnknownOption(PositiveIntegerText);
 const decodeBoolean = Schema.decodeUnknownOption(BoolText);
 
+const ManagedComputerPromotionCampaignMap = Schema.Record(
+  Schema.String.check(
+    Schema.isPattern(/^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/u),
+  ),
+  Schema.Trim.check(Schema.isLengthBetween(1, 100)),
+);
+const decodeManagedComputerPromotionCampaignMap = Schema.decodeUnknownOption(
+  ManagedComputerPromotionCampaignMap,
+);
+
 function positiveInteger(value: string | undefined, fallback: number) {
   return Option.getOrElse(decodePositiveInteger(value ?? ""), () => fallback);
 }
@@ -119,6 +129,37 @@ function booleanValue(value: string | undefined, fallback: boolean) {
   return Option.getOrElse(decodeBoolean(value ?? ""), () => fallback);
 }
 
+export type ManagedComputerPromotionCampaign = {
+  id: string;
+  code: string;
+};
+
+function promotionCampaigns(
+  value: string | undefined,
+): readonly ManagedComputerPromotionCampaign[] {
+  const configured = value?.trim();
+  if (!configured) return [];
+  if (!configured.startsWith("{")) {
+    return [{ id: "getbriar-pilot", code: configured }];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(configured) as unknown;
+  } catch {
+    return [];
+  }
+  const decoded = decodeManagedComputerPromotionCampaignMap(parsed);
+  if (Option.isNone(decoded)) return [];
+  const campaigns = Object.entries(decoded.value).map(([id, code]) => ({
+    id,
+    code,
+  }));
+  if (campaigns.length === 0 || campaigns.length > 50) return [];
+  const normalizedCodes = campaigns.map(({ code }) => code.toUpperCase());
+  if (new Set(normalizedCodes).size !== campaigns.length) return [];
+  return campaigns;
+}
+
 export type ManagedComputerConfig = {
   applicationsEnabled: boolean;
   remoteDesktopEnabled: boolean;
@@ -129,7 +170,7 @@ export type ManagedComputerConfig = {
   remoteDesktopFleetSessionLimit: number;
   remoteDesktopRateLimit: number;
   campaignId: string;
-  promotionCode: string | null;
+  promotionCampaigns: readonly ManagedComputerPromotionCampaign[];
   organizationLimit: number;
   fleetLimit: number;
   lifetimeDays: number;
@@ -210,7 +251,9 @@ export function managedComputerConfig(env: Env): ManagedComputerConfig {
       100,
     ),
     campaignId: "getbriar-pilot",
-    promotionCode: env.MANAGED_COMPUTER_PROMOTION_CODE?.trim() || null,
+    promotionCampaigns: promotionCampaigns(
+      env.MANAGED_COMPUTER_PROMOTION_CODE,
+    ),
     organizationLimit: positiveInteger(
       env.MANAGED_COMPUTER_ORGANIZATION_LIMIT,
       1,
@@ -271,7 +314,7 @@ export function managedComputerConfigurationIssues(
   config: ManagedComputerConfig,
 ) {
   return [
-    ...(config.promotionCode ? [] : ["promotion_code"]),
+    ...(config.promotionCampaigns.length > 0 ? [] : ["promotion_code"]),
     ...managedComputerInfrastructureIssues(config),
   ];
 }
