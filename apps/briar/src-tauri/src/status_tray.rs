@@ -20,10 +20,11 @@ pub const RUN_MENU_ID_PREFIX: &str = "status-tray:run:";
 pub const STATUS_TRAY_OPEN_RUN_EVENT: &str = "status-tray-open-run";
 
 const MAX_TITLE_CHARS: usize = 42;
+const TRAY_ICON_SCALE: f64 = 1.8;
 // Keep the canonical line-art mark as the template source. The macOS tray-icon
-// backend renders it at the existing 18pt status-item height, so using the
-// high-resolution asset fixes the collapsed silhouette without changing the
-// menu-bar footprint.
+// backend normalizes the complete image canvas to 18pt. Scale the artwork
+// inside that canvas so the visible mark, rather than its source resolution,
+// is 1.8 times larger.
 const TRAY_TEMPLATE_PNG: &[u8] = include_bytes!("../../src/assets/brand/briar-mark-dark.png");
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -197,8 +198,30 @@ pub fn parse_run_menu_id(id: &str) -> Option<(String, String)> {
 
 fn tray_icon_image() -> Result<Image<'static>, String> {
     Image::from_bytes(TRAY_TEMPLATE_PNG)
-        .map(|image| image.to_owned())
+        .map(|image| scale_image_about_center(&image, TRAY_ICON_SCALE))
         .map_err(|error| format!("Status tray icon decode failed: {error}"))
+}
+
+fn scale_image_about_center(image: &Image<'_>, scale: f64) -> Image<'static> {
+    let width = image.width();
+    let height = image.height();
+    let source = image.rgba();
+    let mut scaled = vec![0; source.len()];
+    let center_x = (width as f64 - 1.0) / 2.0;
+    let center_y = (height as f64 - 1.0) / 2.0;
+
+    for y in 0..height {
+        for x in 0..width {
+            let source_x = ((x as f64 - center_x) / scale + center_x).round() as u32;
+            let source_y = ((y as f64 - center_y) / scale + center_y).round() as u32;
+            let source_offset = ((source_y * width + source_x) * 4) as usize;
+            let target_offset = ((y * width + x) * 4) as usize;
+            scaled[target_offset..target_offset + 4]
+                .copy_from_slice(&source[source_offset..source_offset + 4]);
+        }
+    }
+
+    Image::new_owned(scaled, width, height)
 }
 
 fn build_menu(app: &AppHandle, snapshot: &StatusTraySnapshot) -> Result<Menu<tauri::Wry>, String> {
@@ -464,6 +487,34 @@ mod tests {
         assert_eq!(
             center_alpha, 0,
             "line-art mark center should stay transparent"
+        );
+    }
+
+    #[test]
+    fn tray_icon_artwork_is_scaled_up_by_one_point_eight() {
+        assert_eq!(TRAY_ICON_SCALE, 1.8);
+
+        let source = Image::from_bytes(TRAY_TEMPLATE_PNG).expect("source icon should decode");
+        let scaled = tray_icon_image().expect("tray icon should decode");
+        assert_eq!(
+            (scaled.width(), scaled.height()),
+            (source.width(), source.height()),
+            "the menu-bar canvas should retain its dimensions"
+        );
+
+        let source_opaque = source
+            .rgba()
+            .chunks_exact(4)
+            .filter(|pixel| pixel[3] > 0)
+            .count();
+        let scaled_opaque = scaled
+            .rgba()
+            .chunks_exact(4)
+            .filter(|pixel| pixel[3] > 0)
+            .count();
+        assert!(
+            scaled_opaque > source_opaque,
+            "scaled artwork should occupy more of the fixed tray canvas"
         );
     }
 }
