@@ -18,6 +18,7 @@ import {
   managedComputerProduct,
   managedComputerProvisioningConfigured,
   type ManagedComputerConfig,
+  type ManagedComputerPromotionCampaign,
 } from "./managed-computer-model";
 import {
   bindManagedComputerSetupSession,
@@ -103,14 +104,17 @@ function capacityError(capacity: Awaited<ReturnType<typeof managedComputerCapaci
   );
 }
 
-async function validatePromotionCode(
+async function resolvePromotionCampaign(
   config: ManagedComputerConfig,
   code: string,
-) {
-  return Boolean(
-    config.promotionCode &&
-      await promotionCodesEqual(code, config.promotionCode),
-  );
+): Promise<ManagedComputerPromotionCampaign | null> {
+  const matches = await Promise.all(config.promotionCampaigns.map(
+    async (campaign) =>
+      await promotionCodesEqual(code, campaign.code) ? campaign : null,
+  ));
+  return matches.find(
+    (campaign): campaign is ManagedComputerPromotionCampaign => campaign !== null,
+  ) ?? null;
 }
 
 async function ensureProvisioningWorkflow(
@@ -161,34 +165,37 @@ export async function validateManagedComputerPromotion(
   },
 ) {
   const config = managedComputerConfig(env);
-  const valid = await validatePromotionCode(config, input.code);
-  const capacity = await managedComputerCapacity(db, {
-    organizationId: input.organizationId,
-    userId: input.userId,
-    campaignId: config.campaignId,
-    organizationLimit: config.organizationLimit,
-    fleetLimit: config.fleetLimit,
-  });
-  if (valid) {
+  const campaign = await resolvePromotionCampaign(config, input.code);
+  const capacity = campaign
+    ? await managedComputerCapacity(db, {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        campaignId: campaign.id,
+        organizationLimit: config.organizationLimit,
+        fleetLimit: config.fleetLimit,
+      })
+    : null;
+  if (campaign && capacity) {
     await recordManagedComputerAuditEvent(db, {
       organizationId: input.organizationId,
       actorUserId: input.userId,
       action: "promotion_validated",
-      detail: { campaignId: config.campaignId, eligible: capacity.eligible },
+      detail: { campaignId: campaign.id, eligible: capacity.eligible },
       occurredAt: input.observedAt,
     });
   }
+  const valid = campaign !== null;
   return {
     valid,
     eligible: valid &&
       config.applicationsEnabled &&
       managedComputerProvisioningConfigured(config) &&
-      capacity.eligible,
+      capacity?.eligible === true,
     totalCents: valid ? 0 : 10_000,
     currency: "USD" as const,
     applicationsEnabled:
       config.applicationsEnabled && managedComputerProvisioningConfigured(config),
-    limitReason: !valid || capacity.eligible
+    limitReason: !valid || !capacity || capacity.eligible
       ? null
       : capacity.userRedeemed
         ? "user"
@@ -238,7 +245,8 @@ export async function applyForPromotionalManagedComputer(
   }
   const config = managedComputerConfig(env);
   requireApplicationsEnabled(config);
-  if (!await validatePromotionCode(config, input.code)) {
+  const campaign = await resolvePromotionCampaign(config, input.code);
+  if (!campaign) {
     throw new ManagedComputerServiceError(
       400,
       "MANAGED_COMPUTER_PROMOTION_INVALID",
@@ -248,7 +256,7 @@ export async function applyForPromotionalManagedComputer(
   const capacity = await managedComputerCapacity(db, {
     organizationId: input.organizationId,
     userId: input.userId,
-    campaignId: config.campaignId,
+    campaignId: campaign.id,
     organizationLimit: config.organizationLimit,
     fleetLimit: config.fleetLimit,
   });
@@ -270,7 +278,7 @@ export async function applyForPromotionalManagedComputer(
     workflowInstanceId,
     organizationId: input.organizationId,
     userId: input.userId,
-    campaignId: config.campaignId,
+    campaignId: campaign.id,
     requestId: input.requestId,
     organizationLimit: config.organizationLimit,
     fleetLimit: config.fleetLimit,
@@ -300,7 +308,7 @@ export async function applyForPromotionalManagedComputer(
     throw capacityError(await managedComputerCapacity(db, {
       organizationId: input.organizationId,
       userId: input.userId,
-      campaignId: config.campaignId,
+      campaignId: campaign.id,
       organizationLimit: config.organizationLimit,
       fleetLimit: config.fleetLimit,
     }));

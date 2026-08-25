@@ -15,7 +15,7 @@ const config: ManagedComputerConfig = {
   remoteDesktopFleetSessionLimit: 20,
   remoteDesktopRateLimit: 10,
   campaignId: "getbriar-pilot",
-  promotionCode: "GETBRIAR",
+  promotionCampaigns: [{ id: "getbriar-pilot", code: "GETBRIAR" }],
   organizationLimit: 1,
   fleetLimit: 10,
   lifetimeDays: 30,
