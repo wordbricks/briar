@@ -81,6 +81,8 @@ export type CachedAnalysisWorktreeRecord = {
   baseRef: string;
   baseSha: string;
   lastUsedAt: string;
+  /** Explicit conversation retention overrides the short default cache TTL. */
+  retainedUntil?: string;
 };
 
 function completedWorktreeRecordPath(root: string, runId: string): string {
@@ -191,6 +193,9 @@ export async function listCachedAnalysisWorktrees(
         typeof candidate.baseSha === "string" &&
         typeof candidate.lastUsedAt === "string" &&
         Number.isFinite(Date.parse(candidate.lastUsedAt)) &&
+        (candidate.retainedUntil === undefined ||
+          (typeof candidate.retainedUntil === "string" &&
+            Number.isFinite(Date.parse(candidate.retainedUntil)))) &&
         isPathWithinRoot(candidate.path, root) &&
         samePath(
           candidate.path,
@@ -914,6 +919,7 @@ export async function allocateCachedAnalysisWorktree(input: {
   settings: WorktreeSettings;
   git: GitRunner;
   nowMs?: number;
+  retainedUntil?: string;
 }): Promise<CachedAnalysisWorktree> {
   const path = analysisWorktreePath(
     input.settings.root,
@@ -940,6 +946,7 @@ async function allocateCachedAnalysisWorktreeUncoordinated(input: {
   settings: WorktreeSettings;
   git: GitRunner;
   nowMs?: number;
+  retainedUntil?: string;
 }): Promise<CachedAnalysisWorktree> {
   const projectRoot = projectWorktreeRoot(input.settings.root, input.projectId);
   const path = analysisWorktreePath(
@@ -1012,6 +1019,7 @@ async function allocateCachedAnalysisWorktreeUncoordinated(input: {
     baseRef: worktree.baseRef,
     baseSha: worktree.baseSha,
     lastUsedAt: new Date(input.nowMs ?? Date.now()).toISOString(),
+    ...(input.retainedUntil ? { retainedUntil: input.retainedUntil } : {}),
   });
   return worktree;
 }
@@ -1021,6 +1029,7 @@ export async function markCachedAnalysisWorktreeIdle(input: {
   runId: string;
   worktree: AnalysisWorktree;
   nowMs?: number;
+  retainedUntil?: string;
 }): Promise<void> {
   await recordCachedAnalysisWorktree(input.root, {
     runId: input.runId,
@@ -1028,7 +1037,31 @@ export async function markCachedAnalysisWorktreeIdle(input: {
     baseRef: input.worktree.baseRef,
     baseSha: input.worktree.baseSha,
     lastUsedAt: new Date(input.nowMs ?? Date.now()).toISOString(),
+    ...(input.retainedUntil ? { retainedUntil: input.retainedUntil } : {}),
   });
+}
+
+/** Persist a server-issued sliding deadline while a cached conversation is
+ * still running, so a hard-killed Worker cannot fall back to an older expiry. */
+export async function extendCachedAnalysisWorktreeRetention(input: {
+  root: string;
+  runId: string;
+  retainedUntil: string;
+  nowMs?: number;
+}): Promise<boolean> {
+  if (!Number.isFinite(Date.parse(input.retainedUntil))) {
+    throw new Error("분석 워크트리의 보존 시각이 올바르지 않습니다.");
+  }
+  const record = (await listCachedAnalysisWorktrees(input.root)).find(
+    (candidate) => candidate.runId === input.runId,
+  );
+  if (!record) return false;
+  await recordCachedAnalysisWorktree(input.root, {
+    ...record,
+    lastUsedAt: new Date(input.nowMs ?? Date.now()).toISOString(),
+    retainedUntil: input.retainedUntil,
+  });
+  return true;
 }
 
 export type AnalysisWorktreeMaintenanceResult = {
@@ -1063,6 +1096,10 @@ export async function maintainIdleAnalysisWorktrees(
   const results: AnalysisWorktreeMaintenanceResult[] = [];
 
   for (const record of records) {
+    if (
+      record.retainedUntil &&
+      Date.parse(record.retainedUntil) > nowMs
+    ) continue;
     if (Date.parse(record.lastUsedAt) > nowMs - idleTtlMs) continue;
     if (activePaths.some((path) => samePath(path, record.path))) {
       results.push({

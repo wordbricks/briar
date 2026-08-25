@@ -563,6 +563,21 @@ const ProjectScope = Schema.Struct({
 });
 const ChannelReplyScope = Schema.Union([OrganizationScope, ProjectScope]);
 
+const ChannelReplySession = strict(Schema.Struct({
+  id: Uuid,
+  threadId: Uuid,
+  conversationId: Schema.NullOr(Schema.String),
+  retainedUntil: IsoDateTimeWithOffset,
+  claimReason: Schema.Literals([
+    "session_created",
+    "worker_reused",
+    "worker_reused_runtime_changed",
+    "worker_failover_lease_expired",
+    "worker_failover_unavailable_or_incompatible",
+    "ttl_expired_reactivated",
+  ]),
+}));
+
 const ClaimedChannelReplyInput = Schema.Struct({
   workType: Schema.Literal("channelReply"),
   workId: Uuid,
@@ -599,6 +614,7 @@ const ClaimedChannelReplyInput = Schema.Struct({
     mutableArray(ChannelDelegationTarget),
     () => [],
   ),
+  session: defaulted(Schema.NullOr(ChannelReplySession), null),
   handoffContext: defaulted(Schema.NullOr(ClaimedHandoffContext), null),
   snapshot: StringRecord,
 }).check(

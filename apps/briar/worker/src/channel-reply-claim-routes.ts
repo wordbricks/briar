@@ -340,6 +340,13 @@ export async function claimNextChannelReplyWork(
         leaseExpiresAt: job.lease_expires_at,
         activity,
         handoffContext,
+        session: {
+          id: job.channel_reply_session.id,
+          threadId: job.channel_reply_session.thread_root_message_id,
+          conversationId: job.channel_reply_session.conversation_id,
+          retainedUntil: job.channel_reply_session.retained_until,
+          claimReason: job.session_claim_reason,
+        },
         organizationContext: agent.project_id === null
           ? decodeOrganizationAgentContextDescriptor({
               schemaVersion: 1,
