@@ -1090,6 +1090,64 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).rejects.toBeInstanceOf(EventKeyConflictError);
   });
 
+  it("does not let run event ingestion overwrite issue titles", async () => {
+    const sourceKey = "event-title-boundary";
+    await setStoredWorkflow(db, projectId, releaseWorkflow);
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 78.6, {
+        sourceKey,
+        eventKey: `${sourceKey}:backlog:intake`,
+        title: "User-authored title",
+        status: "backlog",
+      }),
+    );
+
+    expect(await getHuntRunForProject(db, projectId, runId)).toMatchObject({
+      title: "User-authored title",
+      status: "backlog",
+    });
+
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 78.7, {
+        sourceKey,
+        eventKey: `${sourceKey}:queued:worker`,
+        title: "Worker queue title",
+        status: "queued",
+      }),
+    );
+    expect(await getHuntRunForProject(db, projectId, runId)).toMatchObject({
+      title: "User-authored title",
+      status: "queued",
+    });
+
+    await updateIssue(db, projectId, runId, {
+      title: "User-edited title",
+      description: null,
+      priority: null,
+      updatedAt: atMinute(78.8),
+    });
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("blocked", 78.9, {
+        sourceKey,
+        eventKey: `${sourceKey}:blocked:worker`,
+        title: "Worker checkpoint title",
+        status: "blocked",
+        workflowStage: null,
+      }),
+    );
+    expect(await getHuntRunForProject(db, projectId, runId)).toMatchObject({
+      title: "User-edited title",
+      status: "blocked",
+    });
+    await setStoredWorkflow(db, projectId, repositoryWorkflowBootstrap);
+  });
+
   it("preserves the issue creator from intake across later events", async () => {
     const sourceKey = "creator-attribution";
     await setStoredWorkflow(db, projectId, releaseWorkflow);

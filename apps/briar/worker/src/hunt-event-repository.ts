@@ -485,11 +485,12 @@ export async function recordHuntEvent(
         normalizedInput.occurredAt,
         recordedAt,
       ),
+    // Only the initial insert owns the title. Existing issue titles are
+    // changed through explicit user or approved issue-edit paths.
     db
       .prepare(
         `update briar_hunt_runs
-         set title = case when ? >= last_event_at then ? else title end,
-             stage = case
+         set stage = case
                when ? < last_event_at then stage
                when status = 'completed' and ? <> 'completed' then stage
                else ?
@@ -551,8 +552,6 @@ export async function recordHuntEvent(
            )`,
       )
       .bind(
-        normalizedInput.occurredAt,
-        normalizedInput.title,
         normalizedInput.occurredAt,
         normalizedInput.status,
         normalizedInput.stage,
