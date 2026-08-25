@@ -2,48 +2,38 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  PROJECT_AGENT_SCHEDULE_POLL_EVENT,
   startProjectAgentSchedulePolling,
   type ProjectAgentScheduleRunnerDependencies,
 } from "./project-agent-schedule-runner";
-
-const eventMocks = vi.hoisted(() => ({
-  listen: vi.fn(),
-  unlisten: vi.fn(),
-}));
 
 type NativeTick = {
   current: (() => void) | null;
 };
 
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: eventMocks.listen,
-}));
-
-const dependencies = (): ProjectAgentScheduleRunnerDependencies => ({
+const dependencies = () => ({
   claim: vi.fn(async () => null),
   complete: vi.fn(),
   renew: vi.fn(),
   execute: vi.fn(),
   log: vi.fn(),
-});
+  listenForNativePoll: vi.fn(),
+}) satisfies ProjectAgentScheduleRunnerDependencies;
 
 afterEach(() => {
   Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
-  eventMocks.listen.mockReset();
-  eventMocks.unlisten.mockReset();
 });
 
-describe("project agent schedule polling", () => {
-  it("polls from the native timer while the desktop WebView is backgrounded", async () => {
+describe("project Agent schedule polling", () => {
+  it("uses the native tick while the desktop WebView is backgrounded", async () => {
     Object.assign(window, { __TAURI_INTERNALS__: {} });
     const nativeTick: NativeTick = { current: null };
-    eventMocks.listen.mockImplementation(async (eventName, callback) => {
-      expect(eventName).toBe(PROJECT_AGENT_SCHEDULE_POLL_EVENT);
-      nativeTick.current = () => callback();
-      return eventMocks.unlisten;
-    });
+    const unlisten = vi.fn();
     const current = dependencies();
+    current.listenForNativePoll.mockImplementation(async (callback) => {
+      nativeTick.current = callback;
+      return unlisten;
+    });
+
     const stop = startProjectAgentSchedulePolling(
       current,
       ["project-1"],
@@ -60,6 +50,6 @@ describe("project agent schedule polling", () => {
     await vi.waitFor(() => expect(current.claim).toHaveBeenCalledTimes(2));
 
     stop();
-    expect(eventMocks.unlisten).toHaveBeenCalledOnce();
+    expect(unlisten).toHaveBeenCalledOnce();
   });
 });

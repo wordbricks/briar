@@ -47,10 +47,43 @@ function errorDetail(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+const managedComputerWorkflowServices = {
+  awsAccountId,
+  clearRetiredManagedComputerInstance,
+  completeManagedComputerProvisioning,
+  describeManagedInstance,
+  failManagedComputerProvisioning,
+  managedComputerById,
+  managedComputerConfig,
+  managedComputerEnrollmentNonce,
+  managedComputerInfrastructureIssues,
+  managedComputerProvisioningJob,
+  managedInstanceIsSsmOnline,
+  markManagedComputerBootstrapping,
+  recordManagedComputerAuditEvent,
+  recordManagedComputerInstance,
+  runManagedInstance,
+  startManagedComputerProvisioning,
+  terminateManagedInstance,
+  verifyManagedInstance,
+};
+
+export type ManagedComputerWorkflowServices =
+  typeof managedComputerWorkflowServices;
+
 export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
   Env,
   ManagedComputerWorkflowParams
 > {
+  constructor(
+    ctx: ExecutionContext,
+    env: Env,
+    private readonly services: ManagedComputerWorkflowServices =
+      managedComputerWorkflowServices,
+  ) {
+    super(ctx, env);
+  }
+
   async run(
     event: Readonly<WorkflowEvent<ManagedComputerWorkflowParams>>,
     step: WorkflowStep,
@@ -63,8 +96,10 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
     } = event.payload;
     try {
       const started = await step.do("reserve provisioning job", async () => {
-        const config = managedComputerConfig(this.env);
-        const issues = managedComputerInfrastructureIssues(config);
+        const config = this.services.managedComputerConfig(this.env);
+        const issues = this.services.managedComputerInfrastructureIssues(
+          config,
+        );
         if (issues.length > 0) {
           throw new AwsManagedComputerError(
             "MANAGED_COMPUTER_DISABLED",
@@ -73,13 +108,16 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
           );
         }
         const [computer, job] = await Promise.all([
-          startManagedComputerProvisioning(
+          this.services.startManagedComputerProvisioning(
             this.env.DB,
             managedComputerId,
             provisioningJobId,
             new Date().toISOString(),
           ),
-          managedComputerProvisioningJob(this.env.DB, provisioningJobId),
+          this.services.managedComputerProvisioningJob(
+            this.env.DB,
+            provisioningJobId,
+          ),
         ]);
         if (!computer || !job || computer.provisioning_job_id !== job.id) {
           throw new AwsManagedComputerError(
@@ -102,9 +140,9 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
           "retire previous EC2 instance",
           awsRetry,
           async () => {
-            const config = managedComputerConfig(this.env);
+            const config = this.services.managedComputerConfig(this.env);
             const region = previousInstanceRegion ?? started.region;
-            const previous = await describeManagedInstance(
+            const previous = await this.services.describeManagedInstance(
               config,
               region,
               previousInstanceId,
@@ -120,17 +158,19 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
                   false,
                 );
               }
-              await terminateManagedInstance(config, region, previousInstanceId);
+              await this.services.terminateManagedInstance(
+                config,
+                region,
+                previousInstanceId,
+              );
             }
-            const cleared = await clearRetiredManagedComputerInstance(
-              this.env.DB,
-              {
+            const cleared = await this.services
+              .clearRetiredManagedComputerInstance(this.env.DB, {
                 managedComputerId,
                 provisioningJobId,
                 previousInstanceId,
                 observedAt: new Date().toISOString(),
-              },
-            );
+              });
             if (!cleared) {
               throw new AwsManagedComputerError(
                 "PROVISIONING_JOB_STALE",
@@ -146,8 +186,11 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
         "create exactly one EC2 instance",
         awsRetry,
         async () => {
-          const config = managedComputerConfig(this.env);
-          const computer = await managedComputerById(this.env.DB, managedComputerId);
+          const config = this.services.managedComputerConfig(this.env);
+          const computer = await this.services.managedComputerById(
+            this.env.DB,
+            managedComputerId,
+          );
           if (!computer) {
             throw new AwsManagedComputerError(
               "MANAGED_COMPUTER_NOT_FOUND",
@@ -156,7 +199,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
             );
           }
           const accountId = computer.aws_account_id ??
-            await awsAccountId(config);
+            await this.services.awsAccountId(config);
           const launchConfig = {
             ...config,
             region: computer.aws_region,
@@ -166,18 +209,18 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
             apiOrigin: computer.bootstrap_api_origin,
           };
           const instanceId = computer.aws_instance_id ??
-            await runManagedInstance(launchConfig, {
+            await this.services.runManagedInstance(launchConfig, {
               managedComputerId,
               organizationId: computer.organization_id,
               campaignId: "getbriar-pilot",
               clientToken: provisioningJobId,
-              nonce: await managedComputerEnrollmentNonce(
+              nonce: await this.services.managedComputerEnrollmentNonce(
                 config.enrollmentSecret ?? "",
                 managedComputerId,
                 provisioningJobId,
               ),
             });
-          await recordManagedComputerInstance(this.env.DB, {
+          await this.services.recordManagedComputerInstance(this.env.DB, {
             managedComputerId,
             provisioningJobId,
             accountId,
@@ -185,7 +228,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
             volumeId: computer.aws_volume_id,
             observedAt: new Date().toISOString(),
           });
-          await recordManagedComputerAuditEvent(this.env.DB, {
+          await this.services.recordManagedComputerAuditEvent(this.env.DB, {
             organizationId: computer.organization_id,
             managedComputerId,
             action: "instance_created",
@@ -202,8 +245,11 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
           "verify EC2 launch policy",
           awsRetry,
           async () => {
-            const config = managedComputerConfig(this.env);
-            const computer = await managedComputerById(this.env.DB, managedComputerId);
+            const config = this.services.managedComputerConfig(this.env);
+            const computer = await this.services.managedComputerById(
+              this.env.DB,
+              managedComputerId,
+            );
             if (!computer) {
               throw new AwsManagedComputerError(
                 "MANAGED_COMPUTER_NOT_FOUND",
@@ -211,7 +257,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
                 false,
               );
             }
-            const description = await describeManagedInstance(
+            const description = await this.services.describeManagedInstance(
               config,
               computer.aws_region,
               launched.instanceId,
@@ -224,7 +270,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
                 false,
               );
             }
-            return verifyManagedInstance(config, {
+            return this.services.verifyManagedInstance(config, {
               managedComputerId,
               organizationId: computer.organization_id,
               campaignId: "getbriar-pilot",
@@ -249,9 +295,12 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
 
       await step.do("begin secure bootstrap", async () => {
         const observedAt = new Date().toISOString();
-        const computer = await managedComputerById(this.env.DB, managedComputerId);
+        const computer = await this.services.managedComputerById(
+          this.env.DB,
+          managedComputerId,
+        );
         if (!computer) throw new Error("Managed computer not found");
-        await recordManagedComputerInstance(this.env.DB, {
+        await this.services.recordManagedComputerInstance(this.env.DB, {
           managedComputerId,
           provisioningJobId,
           accountId: launched.accountId,
@@ -259,12 +308,12 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
           volumeId: running?.volumeId ?? null,
           observedAt,
         });
-        await markManagedComputerBootstrapping(this.env.DB, {
+        await this.services.markManagedComputerBootstrapping(this.env.DB, {
           managedComputerId,
           provisioningJobId,
           observedAt,
         });
-        await recordManagedComputerAuditEvent(this.env.DB, {
+        await this.services.recordManagedComputerAuditEvent(this.env.DB, {
           organizationId: computer.organization_id,
           managedComputerId,
           action: "bootstrapping_started",
@@ -279,10 +328,13 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
           "verify SSM and one-time enrollment",
           awsRetry,
           async () => {
-            const config = managedComputerConfig(this.env);
-            const computer = await managedComputerById(this.env.DB, managedComputerId);
+            const config = this.services.managedComputerConfig(this.env);
+            const computer = await this.services.managedComputerById(
+              this.env.DB,
+              managedComputerId,
+            );
             if (!computer) throw new Error("Managed computer not found");
-            if (!await managedInstanceIsSsmOnline(
+            if (!await this.services.managedInstanceIsSsmOnline(
               config,
               computer.aws_region,
               launched.instanceId,
@@ -304,7 +356,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
       }
 
       await step.do("complete provisioning job", async () => {
-        await completeManagedComputerProvisioning(this.env.DB, {
+        await this.services.completeManagedComputerProvisioning(this.env.DB, {
           managedComputerId,
           provisioningJobId,
           observedAt: new Date().toISOString(),
@@ -316,7 +368,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
         "record provisioning failure",
         { retries: { limit: 3, delay: "2 seconds", backoff: "linear" } },
         async () => {
-          await failManagedComputerProvisioning(this.env.DB, {
+          await this.services.failManagedComputerProvisioning(this.env.DB, {
             managedComputerId,
             provisioningJobId,
             code: errorCode(error),

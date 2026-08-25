@@ -335,6 +335,48 @@ export type ProjectAgentRunResponse = {
 const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+export const projectLlmChatInvocation = (
+  input: ProjectLlmChatInput,
+  progressId: string | null,
+) => ({
+  command: "project_llm_chat",
+  payload: {
+    projectId: input.projectId,
+    fullAccess: input.fullAccess ?? false,
+    workspaceMode: input.workspaceMode ?? "connected",
+    workspaceRunId: input.workspaceRunId ?? null,
+    workspaceBranch: input.workspaceBranch ?? null,
+    request: {
+      message: input.message,
+      progressId,
+      conversationId: input.conversationId ?? null,
+      instructions: input.instructions ?? null,
+      outputSchema: input.outputSchema ?? null,
+    },
+  },
+});
+
+export const projectAgentRunInvocation = (input: ProjectAgentRunInput) => ({
+  command: "run_project_agent",
+  payload: {
+    projectId: input.projectId,
+    request: {
+      sessionId: input.sessionId,
+      agentId: input.agent.id,
+      agentName: input.agent.name,
+      agentProvider: input.agent.provider,
+      agentModel: input.agent.model,
+      agentEffort: input.agent.effort,
+      responsibility: input.agent.responsibility,
+      skill: input.agent.skill,
+      message: input.message,
+      conversationId: input.conversationId ?? null,
+      runs: input.runs ?? [],
+      resumeAfterUpdate: input.resumeAfterUpdate ?? false,
+    },
+  },
+});
+
 /**
  * The only Briar frontend gateway for model-backed project features.
  * The native layer resolves projectId and optional issue identity to a
@@ -406,20 +448,11 @@ export async function chatWithProjectLlm(
   }
 
   try {
-    return await invoke<ProjectLlmChatResponse>("project_llm_chat", {
-      projectId: input.projectId,
-      fullAccess: input.fullAccess ?? false,
-      workspaceMode: input.workspaceMode ?? "connected",
-      workspaceRunId: input.workspaceRunId ?? null,
-      workspaceBranch: input.workspaceBranch ?? null,
-      request: {
-        message: input.message,
-        progressId,
-        conversationId: input.conversationId ?? null,
-        instructions: input.instructions ?? null,
-        outputSchema: input.outputSchema ?? null,
-      },
-    });
+    const invocation = projectLlmChatInvocation(input, progressId);
+    return await invoke<ProjectLlmChatResponse>(
+      invocation.command,
+      invocation.payload,
+    );
   } finally {
     unlisten?.();
   }
@@ -438,23 +471,11 @@ export async function runProjectAgent(
     throw new Error("에이전트는 Briar 데스크톱 앱에서 실행할 수 있습니다.");
   }
   const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<ProjectAgentRunResponse>("run_project_agent", {
-    projectId: input.projectId,
-    request: {
-      sessionId: input.sessionId,
-      agentId: input.agent.id,
-      agentName: input.agent.name,
-      agentProvider: input.agent.provider,
-      agentModel: input.agent.model,
-      agentEffort: input.agent.effort,
-      responsibility: input.agent.responsibility,
-      skill: input.agent.skill,
-      message: input.message,
-      conversationId: input.conversationId ?? null,
-      runs: input.runs ?? [],
-      resumeAfterUpdate: input.resumeAfterUpdate ?? false,
-    },
-  });
+  const invocation = projectAgentRunInvocation(input);
+  return invoke<ProjectAgentRunResponse>(
+    invocation.command,
+    invocation.payload,
+  );
 }
 
 export async function stopProjectAgentSession(

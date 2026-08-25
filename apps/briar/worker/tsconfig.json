@@ -1,23 +1,14 @@
 {
   "$schema": "https://raw.githubusercontent.com/Effect-TS/tsgo/refs/heads/main/schema.json",
+  "extends": "../../../packages/tsconfig/base.json",
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022", "WebWorker"],
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "strict": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "types": [],
-    "plugins": [
-      {
-        "name": "@effect/language-service"
-      }
-    ]
+    "noUncheckedIndexedAccess": false,
+    "noImplicitOverride": false,
+    "types": []
   },
   "include": ["src", "../worker-configuration.d.ts"]
 }

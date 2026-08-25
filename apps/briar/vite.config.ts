@@ -31,6 +31,12 @@ export default defineConfig({
     },
   },
   test: {
+    alias: {
+      "cloudflare:workers": path.resolve(
+        __dirname,
+        "./src/test/cloudflare-workers-runtime.ts",
+      ),
+    },
     exclude: [...configDefaults.exclude, "**/.claude/worktrees/**"],
     // D1 integration fixtures apply the complete migration history before
     // seeding data; leave enough time for generated table-rebuild migrations.
