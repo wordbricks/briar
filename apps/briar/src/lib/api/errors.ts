@@ -18,23 +18,6 @@ export class ApiError extends Data.TaggedError("ApiError")<{
   }
 }
 
-export class ApiRequestError extends Data.TaggedError("ApiRequestError")<{
-  readonly method: string;
-  readonly path: string;
-  readonly cause: unknown;
-  readonly message: string;
-}> {
-  constructor(method: string, path: string, cause: unknown) {
-    const detail = Predicate.isError(cause) ? cause.message : String(cause);
-    super({
-      method,
-      path,
-      cause,
-      message: `Briar API ${method} ${path} 요청 실패: ${detail}`,
-    });
-  }
-}
-
 export class ApiResponseDecodeError extends Data.TaggedError(
   "ApiResponseDecodeError",
 )<{
