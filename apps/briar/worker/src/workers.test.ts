@@ -3433,6 +3433,183 @@ describe("detached execution workers", () => {
     ]);
   });
 
+  it("accepts terminal final metrics only for the exact live completion claim", async () => {
+    const credential = "briar_worker_terminal-metrics";
+    const claimToken = "briar_claim_terminal_metrics_first";
+    const worker = await register(
+      "terminal-metrics",
+      1,
+      createHash("sha256").update(credential).digest("hex"),
+    );
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      queuedEvent("issue-terminal-metrics", 1),
+    );
+    const claim = await claimNextQueuedHuntRun(db, projectId, {
+      claimTokenHash: createHash("sha256").update(claimToken).digest("hex"),
+      claimedBy: worker.worker.label,
+      claimedAt: atMinute(3),
+      leaseExpiresAt: leaseExpiryFrom(atMinute(3)),
+      runId,
+      workerId: worker.worker.id,
+      workerDeviceId: worker.device.id,
+    });
+    expect(claim?.last_execution_id).toEqual(expect.any(String));
+
+    // This is the state left by `briar run complete` before the worker's
+    // finally block uploads its final metrics payload.
+    await db
+      .prepare(
+        `update briar_hunt_runs
+         set status = 'completed', stage = 'completed', completed_at = ?,
+             last_event_at = ?, updated_at = ?
+         where id = ?`,
+      )
+      .bind(atMinute(4), atMinute(4), atMinute(4), runId)
+      .run();
+
+    const executionMetrics = {
+      inputTokens: 1_000,
+      outputTokens: 250,
+      cacheReadTokens: 800,
+      cacheWriteTokens: null,
+      reasoningOutputTokens: 100,
+      totalTokens: 1_250,
+      durationMs: 90_000,
+    };
+    const transcriptBody = {
+      sessionId: "terminal-metrics-session",
+      runId,
+      runAttempt: claim!.current_attempt,
+      executionId: claim!.last_execution_id,
+      projectId,
+      workerId: worker.worker.id,
+      agentProvider: "codex",
+      workType: "issue",
+      workId: runId,
+      claimToken,
+      executionMetrics,
+      usageRecords: [{
+        usageKey: "codex:terminal-metrics:usage",
+        sessionId: "terminal-metrics-session",
+        scopeId: "terminal",
+        turnId: "terminal",
+        agentProvider: "codex",
+        modelProvider: "openai",
+        model: "gpt-5.6-sol",
+        canonicalModel: null,
+        modelSource: "providerReported",
+        source: "codex.terminal.metrics",
+        uncachedInputTokens: 1_000,
+        cacheReadTokens: 800,
+        cacheWriteTokens: null,
+        outputTokens: 250,
+        reasoningOutputTokens: 100,
+        totalTokens: 1_250,
+        observedAt: atMinute(4),
+      }],
+      costRecords: [{
+        costKey: "codex:terminal-metrics:cost",
+        usageKey: "codex:terminal-metrics:usage",
+        sessionId: "terminal-metrics-session",
+        scopeId: "terminal",
+        turnId: "terminal",
+        agentProvider: "codex",
+        modelProvider: "openai",
+        model: "gpt-5.6-sol",
+        canonicalModel: null,
+        modelSource: "providerReported",
+        source: "codex.terminal.metrics",
+        amountUsdTicks: 12_345_678,
+        observedAt: atMinute(4),
+      }],
+      events: [{
+        sequence: 1,
+        direction: "server",
+        payload: { type: "execution.metrics", executionMetrics },
+      }],
+    };
+    const env = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "terminal-metrics-test-secret-terminal-metrics-test-secret",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const postTranscript = (body: Record<string, unknown>) =>
+      apiWorker.fetch(
+        new Request("https://briar-api.example/transcripts", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${credential}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }),
+        env,
+      );
+
+    const accepted = await postTranscript(transcriptBody);
+    expect(accepted.status).toBe(202);
+    expect(await accepted.json()).toMatchObject({
+      stored: 1,
+      usageStored: 1,
+      costStored: 1,
+    });
+
+    const retry = await postTranscript(transcriptBody);
+    expect(retry.status).toBe(202);
+    expect(await retry.json()).toMatchObject({
+      stored: 0,
+      usageStored: 0,
+      costStored: 0,
+    });
+
+    const storedMetrics = await db
+      .prepare(
+        `select execution_metrics_json from briar_hunt_runs where id = ?`,
+      )
+      .bind(runId)
+      .first<{ execution_metrics_json: string }>();
+    expect(JSON.parse(storedMetrics!.execution_metrics_json)).toEqual(
+      executionMetrics,
+    );
+    await expect(
+      listOrganizationUsageRecords(db, projectId, atMinute(0)),
+    ).resolves.toHaveLength(1);
+    await expect(
+      listOrganizationUsageCostRecords(db, projectId, atMinute(0)),
+    ).resolves.toHaveLength(1);
+
+    const ordinaryLateTranscript = await postTranscript({
+      ...transcriptBody,
+      sessionId: "terminal-metrics-ordinary-late-write",
+      executionMetrics: undefined,
+      usageRecords: undefined,
+      costRecords: undefined,
+      events: [{
+        sequence: 2,
+        direction: "server",
+        payload: { type: "ordinary.transcript" },
+      }],
+    });
+    expect(ordinaryLateTranscript.status).toBe(409);
+
+    const wrongClaim = await postTranscript({
+      ...transcriptBody,
+      claimToken: "briar_claim_terminal_metrics_wrong",
+    });
+    expect(wrongClaim.status).toBe(409);
+
+    await db
+      .prepare(`update briar_hunt_runs set completed_at = ? where id = ?`)
+      .bind(atMinute(20), runId)
+      .run();
+    const expiredCompletion = await postTranscript(transcriptBody);
+    expect(expiredCompletion.status).toBe(409);
+  });
+
   it("keeps cost-only runs and attempts inside the usage range", async () => {
     const runId = await recordHuntEvent(
       db,

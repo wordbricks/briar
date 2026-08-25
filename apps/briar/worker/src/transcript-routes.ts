@@ -21,6 +21,7 @@ import {
 import { HttpError, json } from "./http-response";
 import { decodeUuidOption } from "./query-contract";
 import { readTranscriptRequest } from "./request-readers";
+import { type TranscriptRequest } from "./transcript-request";
 import { pendingExecutionWorkerUpdate } from "./worker-update-repository";
 
 export type TranscriptRouteInput = {
@@ -40,6 +41,33 @@ export type TranscriptRouteInput = {
 const bearerToken = (request: Request) => {
   const authorization = request.headers.get("authorization") ?? "";
   return authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+};
+
+/**
+ * The detached issue worker sends one metrics-only request after the agent has
+ * recorded the terminal run event. Keep that narrow compatibility window
+ * separate from ordinary transcript writes so a completed run cannot become
+ * a general-purpose late-write channel.
+ */
+const isFinalExecutionMetricsPayload = (input: TranscriptRequest) => {
+  if (
+    input.workType !== "issue" ||
+    !input.runId ||
+    input.workId !== input.runId ||
+    !input.executionId ||
+    input.runAttempt === undefined ||
+    input.executionMetrics === undefined ||
+    input.events.length !== 1
+  ) {
+    return false;
+  }
+  const [event] = input.events;
+  if (event.direction !== "server") return false;
+  if (!event.payload || typeof event.payload !== "object") return false;
+  const payload = event.payload as Record<string, unknown>;
+  return payload.type === "execution.metrics" &&
+    JSON.stringify(payload.executionMetrics) ===
+      JSON.stringify(input.executionMetrics);
 };
 
 export async function handleTranscriptRoute(
@@ -156,7 +184,7 @@ export async function handleTranscriptRoute(
         throw new HttpError(400, "Worker transcript claim identity is incomplete");
       }
       const claimTokenHash = await sha256(input.claimToken);
-      const active = input.workType === "issue"
+      let active = input.workType === "issue"
         ? await db
             .prepare(
               `select 1 as active
@@ -164,7 +192,11 @@ export async function handleTranscriptRoute(
                where id = ? and project_id = ? and worker_id = ?
                  and claim_token_hash = ? and lease_expires_at > ?
                  and status not in
-                   ('backlog', 'completed', 'cancelled', 'blocked', 'failed')`,
+                   ('backlog', 'completed', 'cancelled', 'blocked', 'failed')
+                 and (
+                   ? = 0
+                   or (current_attempt = ? and last_execution_id = ?)
+                 )`,
             )
             .bind(
               input.workId,
@@ -172,6 +204,9 @@ export async function handleTranscriptRoute(
               authenticatedWorkerId,
               claimTokenHash,
               recordedAt,
+              input.executionId && input.runAttempt !== undefined ? 1 : 0,
+              input.runAttempt ?? 0,
+              input.executionId ?? "",
             )
             .first<{ active: number }>()
         : input.workType === "projectAgentTask"
@@ -225,6 +260,31 @@ export async function handleTranscriptRoute(
                   recordedAt,
                 )
                 .first<{ active: number }>();
+      if (!active && isFinalExecutionMetricsPayload(input)) {
+        active = await db
+          .prepare(
+            `select 1 as active
+             from briar_hunt_runs
+             where id = ? and project_id = ? and worker_id = ?
+               and claim_token_hash = ? and status = 'completed'
+               and current_attempt = ? and last_execution_id = ?
+               and claimed_at is not null and lease_expires_at is not null
+               and completed_at is not null
+               and completed_at >= claimed_at
+               and completed_at < lease_expires_at
+               and completed_at <= ?`,
+          )
+          .bind(
+            input.workId,
+            projectId,
+            authenticatedWorkerId,
+            claimTokenHash,
+            input.runAttempt,
+            input.executionId,
+            recordedAt,
+          )
+          .first<{ active: number }>();
+      }
       if (!active) {
         throw new HttpError(409, "Worker claim is no longer active");
       }
