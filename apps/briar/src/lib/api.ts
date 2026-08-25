@@ -28,7 +28,6 @@ import {
   decodeProjectAgentScheduleRunsResponse,
   decodeProjectAgentSchedulesResponse,
   decodeProjectAgentSessionResponse,
-  decodeProjectAgentSessionsResponse,
   decodeProjectAgentSessionSyncResponse,
   decodeProjectAgentsResponse,
 } from "./api/project-agent-contract";
@@ -77,7 +76,6 @@ import type {
   CreateProjectAgentInput,
   CreateProjectAgentScheduleInput,
   AgentUsageReport,
-  AgentUsageRun,
   AgentExecutionCostEstimate,
   DashboardPayload,
   DashboardDeltaPayload,
@@ -781,15 +779,6 @@ export async function loadDashboard(
   };
 }
 
-export async function loadAgentUsageRuns(
-  token: string,
-  organizationId: string,
-  days: UsageRangeDays = 90,
-  signal?: AbortSignal,
-): Promise<AgentUsageRun[]> {
-  return (await loadAgentUsageReport(token, organizationId, days, signal)).runs;
-}
-
 export async function loadAgentUsageReport(
   token: string,
   organizationId: string,
@@ -918,52 +907,6 @@ export async function loadProjectAgentTranscript(
   );
 }
 
-export type ProjectAgentRawTranscriptManifest = {
-  sessionId: string;
-  runId: string | null;
-  agentProvider: AgentProvider;
-  eventCount: number;
-  uncompressedBytes: number;
-  compressedBytes: number;
-  segments: Array<{
-    firstSequence: number;
-    lastSequence: number;
-    eventCount: number;
-    uncompressedBytes: number;
-    compressedBytes: number;
-    sha256: string;
-    recordedAt: string;
-    url: string;
-  }>;
-};
-
-export async function loadProjectAgentRawTranscriptManifest(
-  token: string,
-  projectId: string,
-  sessionId: string,
-): Promise<ProjectAgentRawTranscriptManifest> {
-  return request<ProjectAgentRawTranscriptManifest>(
-    `/projects/${projectId}/sessions/${encodeURIComponent(sessionId)}/raw-transcript`,
-    token,
-  );
-}
-
-export async function loadProjectAgentRawTranscriptSegment(
-  token: string,
-  segmentUrl: string,
-) {
-  if (!apiUrl || !segmentUrl.startsWith("/")) {
-    throw new Error("Transcript segment URL is invalid");
-  }
-  const response = await fetch(`${apiUrl}${segmentUrl}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) {
-    throw new Error(`Transcript segment could not be loaded (${response.status})`);
-  }
-  return response.blob();
-}
-
 export async function createProject(
   token: string,
   input: { name: string; organizationId?: string },
@@ -1036,22 +979,6 @@ export async function loadProjectAgents(
     token,
   );
   return decodeProjectAgentsResponse(result.agents);
-}
-
-export async function loadProjectAgentSessions(
-  token: string,
-  projectId: string,
-): Promise<AutoHuntSession[]> {
-  const result = await request<{ sessions: unknown[] }>(
-    `/projects/${projectId}/agent-sessions`,
-    token,
-  );
-  return decodeProjectAgentSessionsResponse(result.sessions).map(
-    (session) => ({
-      ...session,
-      localOwner: false,
-    } as AutoHuntSession),
-  );
 }
 
 export type ProjectAgentSessionSyncState = {
@@ -1304,20 +1231,6 @@ export async function loadProjectAgentScheduleRuns(
     token,
   );
   return decodeProjectAgentScheduleRunsResponse(result.runs);
-}
-
-export async function claimProjectAgentScheduleRun(
-  token: string,
-  projectId: string,
-): Promise<ClaimedProjectAgentScheduleRun | null> {
-  const result = await request<{ run: unknown }>(
-    `/projects/${projectId}/agent-schedule-runs/claim`,
-    token,
-    { method: "POST" },
-  );
-  return result.run === null
-    ? null
-    : decodeClaimedProjectAgentScheduleRunResponse(result.run);
 }
 
 export async function claimProjectAgentScheduleRuns(

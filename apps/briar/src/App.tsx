@@ -108,7 +108,6 @@ import {
   saveInboxPaneWidth,
 } from "./lib/inbox-pane-width";
 import { DASHBOARD_POLL_INTERVAL_MS } from "./lib/dashboard-polling";
-import { featureFlags } from "./lib/feature-flags";
 import {
   buildStatusTrayItems,
   buildStatusTraySnapshot,
