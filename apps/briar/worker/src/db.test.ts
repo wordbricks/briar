@@ -1027,6 +1027,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
        alter table briar_project_agent_schedules
          add column created_by_user_id text references "user" (id);`,
     );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0136_issue_difficulty.sql"), "utf8"),
+    );
     // The lifecycle suite intentionally uses a compact migration history, so
     // add the issue-reply job columns that production migration 0116 supplies
     // before exercising the shared DB helpers below.
@@ -4391,6 +4395,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
   it("updates issue fields without changing workflow state", async () => {
     const sourceKey = "editable-issue";
+    await setStoredWorkflow(db, projectId, releaseWorkflow);
     const runId = await recordHuntEvent(
       db,
       projectId,
@@ -4403,11 +4408,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         assigneeUserId: "owner",
       }),
     );
+    expect(
+      await db.prepare("select difficulty from briar_hunt_runs where id = ?")
+        .bind(runId)
+        .first<{ difficulty: string }>(),
+    ).toEqual({ difficulty: "normal" });
 
     const updated = await updateIssue(db, projectId, runId, {
       title: "Updated title",
       description: null,
       priority: 1,
+      difficulty: "hard",
       updatedAt: atMinute(19),
     });
 
@@ -4417,6 +4428,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         title: "Updated title",
         issue_description: null,
         priority: 1,
+        difficulty: "hard",
         assignee_user_id: "owner",
         status: "cancelled",
         workflow_stage: null,
@@ -4432,6 +4444,11 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       updatedAt: atMinute(20),
     });
     expect(unassigned?.assignee_user_id).toBeNull();
+    await expect(
+      db.prepare("update briar_hunt_runs set difficulty = ? where id = ?")
+        .bind("extreme", runId)
+        .run(),
+    ).rejects.toThrow();
   });
 
   it("records one result review per member and publishes a dashboard delta", async () => {

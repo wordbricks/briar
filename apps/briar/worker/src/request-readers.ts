@@ -393,6 +393,7 @@ export async function readIssueRequest(request: Request) {
 
   const description = form.get("description");
   const priority = form.get("priority");
+  const difficulty = form.get("difficulty");
   const assigneeUserId = form.get("assigneeUserId");
   const status = form.get("status");
   const preferredProvider = form.get("preferredProvider");
@@ -418,6 +419,10 @@ export async function readIssueRequest(request: Request) {
           : null,
       priority:
         typeof priority === "string" && priority ? Number(priority) : null,
+      difficulty:
+        typeof difficulty === "string" && difficulty
+          ? difficulty
+          : undefined,
       assigneeUserId:
         typeof assigneeUserId === "string" && assigneeUserId.trim()
           ? assigneeUserId
@@ -516,6 +521,7 @@ export async function readIssueUpdateRequest(request: Request) {
 
   const description = form.get("description");
   const priority = form.get("priority");
+  const difficulty = form.get("difficulty");
   const assigneeUserId = form.get("assigneeUserId");
   return {
     input: decodeIssueUpdateInput({
@@ -526,6 +532,7 @@ export async function readIssueUpdateRequest(request: Request) {
           : null,
       priority:
         typeof priority === "string" && priority ? Number(priority) : null,
+      difficulty,
       assigneeUserId:
         typeof assigneeUserId === "string" && assigneeUserId.trim()
           ? assigneeUserId

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { unstable_splitSqlQuery } from "wrangler";
 import { describe, expect, it } from "vitest";
+import { repositoryWorkflowBootstrap } from "../../src/lib/auto-hunt-contract";
 import {
   createChannel,
   reserveChannelActionProposalApproval,
@@ -259,6 +260,75 @@ describe("D1 migrations", () => {
       await miniflare.dispose();
     }
   });
+
+  it("backfills existing issues with normal difficulty and constrains new values", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-issue-difficulty-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db, {
+        through: "0135_incremental_transcript_session_totals.sql",
+      });
+      await executeD1Sql(db, `
+        insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+        values ('${migrationFixture.userId}', 'Migration Owner',
+                'migration@example.com', 1, '${migrationFixture.now}',
+                '${migrationFixture.now}');
+        insert into briar_organizations (id, name, handle, created_at, updated_at)
+        values ('${migrationFixture.organizationId}', 'Migration Organization',
+                'migration-organization', '${migrationFixture.now}',
+                '${migrationFixture.now}');
+        insert into briar_projects (
+          id, owner_user_id, organization_id, name, agent_token_hash,
+          created_at, updated_at
+        ) values (
+          '${migrationFixture.projectId}', '${migrationFixture.userId}',
+          '${migrationFixture.organizationId}', 'Migration Project',
+          '${"a".repeat(64)}', '${migrationFixture.now}', '${migrationFixture.now}'
+        );
+      `);
+      await db.prepare(
+        `insert into briar_hunt_runs (
+           id, project_id, source, source_key, title, stage, repository,
+           started_at, last_event_at, created_at, updated_at, status,
+           workflow_snapshot_json
+         ) values (?, ?, 'issue', 'migration-issue', 'Migration run',
+                   'implementing', 'example/repository', ?, ?, ?, ?, 'running', ?)`,
+      ).bind(
+        migrationFixture.runId,
+        migrationFixture.projectId,
+        migrationFixture.now,
+        migrationFixture.now,
+        migrationFixture.now,
+        migrationFixture.now,
+        JSON.stringify(repositoryWorkflowBootstrap),
+      ).run();
+      await executeD1Sql(
+        db,
+        await readFile(resolve("migrations/0136_issue_difficulty.sql"), "utf8"),
+      );
+      await expect(
+        db.prepare("select difficulty from briar_hunt_runs where id = ?")
+          .bind(migrationFixture.runId)
+          .first<{ difficulty: string }>(),
+      ).resolves.toEqual({ difficulty: "normal" });
+      await expect(
+        db.prepare("update briar_hunt_runs set difficulty = 'easy' where id = ?")
+          .bind(migrationFixture.runId)
+          .run(),
+      ).resolves.toBeDefined();
+      await expect(
+        db.prepare("update briar_hunt_runs set difficulty = 'extreme' where id = ?")
+          .bind(migrationFixture.runId)
+          .run(),
+      ).rejects.toThrow();
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
 
   it("moves legacy Agent replies to the trigger message timeline", async () => {
     const miniflare = new Miniflare({
@@ -1119,6 +1189,7 @@ describe("D1 migrations", () => {
         files: [
           "0099_project_usage_analytics.sql",
           "0102_channel_read_states.sql",
+          "0136_issue_difficulty.sql",
         ],
       });
       const ownerId = "channel-canonical-owner";
@@ -1433,6 +1504,7 @@ describe("D1 migrations", () => {
         files: [
           "0099_project_usage_analytics.sql",
           "0102_channel_read_states.sql",
+          "0136_issue_difficulty.sql",
         ],
       });
       const userId = "channel-upgrade-owner";

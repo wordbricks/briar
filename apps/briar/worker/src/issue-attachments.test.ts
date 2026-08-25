@@ -124,7 +124,12 @@ describe("shared multipart request envelope", () => {
       name: "issue update",
       read: readIssueUpdateRequest,
       emptyField: "attachments",
-      body: { title: "JSON update", description: null, priority: null },
+      body: {
+        title: "JSON update",
+        description: null,
+        priority: null,
+        difficulty: "normal",
+      },
     },
   ])("keeps non-multipart $name requests on the JSON path", async ({
     read,
@@ -277,6 +282,7 @@ describe("issue multipart input", () => {
       title: "Screenshot issue",
       description: "Please inspect the attachment",
       priority: 2,
+      difficulty: "normal",
       assigneeUserId: null,
       status: "backlog",
       preferredProvider: null,
@@ -459,6 +465,7 @@ describe("issue update multipart input", () => {
     form.set("title", "Edited screenshot issue");
     form.set("description", "Replaced description");
     form.set("priority", "3");
+    form.set("difficulty", "hard");
     form.set("assigneeUserId", "user-1");
     form.append("attachments", file, file.name);
     form.set("attachmentReferences", JSON.stringify(["draft-update-1"]));
@@ -483,6 +490,7 @@ describe("issue update multipart input", () => {
           title: "Updated issue",
           description: null,
           priority: 2,
+          difficulty: "easy",
           assigneeUserId: null,
         }),
       }),
@@ -492,6 +500,7 @@ describe("issue update multipart input", () => {
       title: "Updated issue",
       description: null,
       priority: 2,
+      difficulty: "easy",
       assigneeUserId: null,
     });
     expect(result.attachments).toEqual([]);
@@ -511,6 +520,7 @@ describe("issue update multipart input", () => {
       title: "Edited screenshot issue",
       description: "Replaced description",
       priority: 3,
+      difficulty: "hard",
       assigneeUserId: "user-1",
     });
     expect(result.attachments).toEqual([

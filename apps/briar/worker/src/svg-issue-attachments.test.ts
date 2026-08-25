@@ -30,6 +30,7 @@ describe("SVG issue attachment lifecycle", () => {
     await applyD1Migrations(db, {
       through: "0119_execution_worker_update_handoffs.sql",
     });
+    await applyD1Migrations(db, { files: ["0136_issue_difficulty.sql"] });
     await db.batch([
       db
         .prepare(

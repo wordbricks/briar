@@ -11,6 +11,7 @@ import { PullRequestIconLink } from "./PullRequestIconLink";
 import { RunStatusPill } from "../detail/RunStatusPill";
 import { localizeStatus, relativeTime } from "../model/formatters";
 import { hasResultReviews } from "../results/model";
+import { IssueDifficultyIcon } from "../IssueDifficultyIcon";
 export function IssueList({
   availableProviders,
   issueKeyPrefix,
@@ -82,6 +83,7 @@ export function IssueList({
                       {assignee ? ` · ${assignee.name}` : ""}
                     </small>
                     <PullRequestIconLink urls={run.pullRequestUrls} />
+                    <IssueDifficultyIcon difficulty={run.difficulty} size={12} />
                   </span>
                   <strong>{run.title}</strong>
                   {(run.detail || run.issueDescription) && <span>{run.detail || run.issueDescription}</span>}

@@ -1,4 +1,8 @@
 import { issueTitleAbsoluteMaxLength } from "./issue-title";
+import {
+  defaultIssueDifficulty,
+  type IssueDifficulty,
+} from "./issue-difficulty";
 
 export const createIssueDraftStorageKey = "briar.create-issue-draft.v1";
 
@@ -7,6 +11,7 @@ export type CreateIssueDraft = {
   description: string;
   status: "backlog" | "queued";
   priority: "1" | "2" | "3" | "4";
+  difficulty?: IssueDifficulty;
   projectId: string;
   assigneeUserId?: string | null;
   preferredProvider?: string | null;
@@ -33,6 +38,10 @@ function isCreateIssueDraft(value: unknown): value is CreateIssueDraft {
       draft.priority === "2" ||
       draft.priority === "3" ||
       draft.priority === "4") &&
+    (draft.difficulty === undefined ||
+      draft.difficulty === "easy" ||
+      draft.difficulty === "normal" ||
+      draft.difficulty === "hard") &&
     typeof draft.projectId === "string" &&
     (draft.fullAuto === undefined || typeof draft.fullAuto === "boolean") &&
     (draft.checkpoints === undefined ||
@@ -80,6 +89,8 @@ export function saveCreateIssueDraft(draft: CreateIssueDraft) {
     if (
       !draft.title.trim() &&
       !draft.description.trim() &&
+      (draft.difficulty === undefined ||
+        draft.difficulty === defaultIssueDifficulty) &&
       !draft.fullAuto &&
       !draft.checkpoints?.length
     ) {

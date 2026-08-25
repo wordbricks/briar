@@ -42,6 +42,7 @@ import {
 } from "./account-organization-request-contract";
 import {
   decodeExecutionPreferences,
+  decodeIssueInput,
   decodeIssueUpdateInput,
 } from "./issue-request-contract";
 import {
@@ -1702,19 +1703,31 @@ describe("Worker HTTP contract", () => {
         title: "  Updated issue  ",
         description: null,
         priority: 1,
+        difficulty: "hard",
         assigneeUserId: "member-1",
       }),
     ).toEqual({
       title: "Updated issue",
       description: null,
       priority: 1,
+      difficulty: "hard",
       assigneeUserId: "member-1",
     });
+    expect(
+      decodeIssueInput({
+        title: "New issue",
+        description: null,
+        priority: null,
+        assigneeUserId: null,
+        status: "backlog",
+      }).difficulty,
+    ).toBe("normal");
     expect(() =>
       decodeIssueUpdateInput({
         title: "",
         description: null,
         priority: 5,
+        difficulty: "extreme",
       }),
     ).toThrow();
   });

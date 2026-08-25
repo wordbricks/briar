@@ -11,6 +11,7 @@ import {
   mobileHealthResponseSchema,
   mobileInboxReadStatesSchema,
   mobileProjectsResponseSchema,
+  mobileUpdateIssueRequestSchema,
 } from "./mobile-contract";
 import {
   decodeMobileSchema,
@@ -160,6 +161,33 @@ describe("Effect mobile contract behavior", () => {
     expect(Option.isNone(decodeMobileSchemaOption(
       mobileAgentSkillExecutionApprovalResponseSchema,
       approval,
+    ))).toBe(true);
+  });
+
+  it("defaults omitted issue difficulty and rejects unsupported values", () => {
+    const request = fixture.operations.createIssue.request as Record<
+      string,
+      unknown
+    >;
+    const withoutDifficulty = { ...request };
+    delete withoutDifficulty.difficulty;
+    expect(
+      decodeMobileSchema(mobileCreateIssueRequestSchema, withoutDifficulty)
+        .difficulty,
+    ).toBe("normal");
+    expect(Option.isNone(decodeMobileSchemaOption(
+      mobileCreateIssueRequestSchema,
+      { ...request, difficulty: "extreme" },
+    ))).toBe(true);
+    expect(Option.isNone(decodeMobileSchemaOption(
+      mobileUpdateIssueRequestSchema,
+      {
+        title: "Updated issue",
+        description: null,
+        priority: null,
+        difficulty: "extreme",
+        assigneeUserId: null,
+      },
     ))).toBe(true);
   });
 });

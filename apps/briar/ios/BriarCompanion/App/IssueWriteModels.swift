@@ -272,6 +272,7 @@ struct IssueDraft: Codable, Equatable, Sendable {
     var title = ""
     var description = ""
     var priority: Int? = defaultPriority
+    var difficulty: IssueDifficulty = .normal
     var assigneeUserId: String? = nil
     var status: DashboardRun.Status = .queued
     var preferredProvider: AgentProvider? = nil
@@ -283,6 +284,7 @@ struct IssueDraft: Codable, Equatable, Sendable {
         title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             priority == Self.defaultPriority &&
+            difficulty == .normal &&
             assigneeUserId == nil &&
             preferredProvider == nil &&
             preferredModel == nil &&
@@ -295,6 +297,7 @@ struct CreateIssueRequest: Codable, Sendable {
     let title: String
     let description: String?
     let priority: Int?
+    let difficulty: IssueDifficulty
     let assigneeUserId: String?
     let status: DashboardRun.Status
     let preferredProvider: AgentProvider?
@@ -311,12 +314,14 @@ struct CreateIssueResponse: Codable, Sendable {
     let attachments: [IssueAttachment]
     let assigneeUserId: String?
     let createdByUserId: String
+    let difficulty: IssueDifficulty
 }
 
 struct UpdateIssueRequest: Codable, Sendable {
     let title: String
     let description: String?
     let priority: Int?
+    let difficulty: IssueDifficulty
     let assigneeUserId: String?
 }
 
@@ -325,6 +330,7 @@ struct UpdateIssueResponse: Codable, Sendable {
     let title: String
     let description: String?
     let priority: Int?
+    let difficulty: IssueDifficulty
     let assigneeUserId: String?
 }
 

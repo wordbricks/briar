@@ -165,6 +165,7 @@ describe("IssueEditor", () => {
         title: "인라인 제목",
         description: "인라인 본문",
         priority: run.priority,
+        difficulty: run.difficulty,
         attachments: []
       });
       expect(container.querySelector(".run-page-save-status")?.getAttribute("aria-label")).toBe("저장됨");
@@ -238,6 +239,7 @@ describe("IssueEditor", () => {
         title: run.title,
         description: "before\n\nafter",
         priority: run.priority,
+        difficulty: run.difficulty,
         attachments: [],
         keptAttachmentIds: ["attachment-gallery"]
       });
@@ -292,6 +294,7 @@ describe("IssueEditor", () => {
         title: run.title,
         description: run.issueDescription,
         priority: run.priority,
+        difficulty: run.difficulty,
         attachments: []
       });
       expect(container.querySelector(".run-page-save-status")?.getAttribute("aria-label")).toBe("저장됨");
@@ -303,12 +306,7 @@ describe("IssueEditor", () => {
     }
   });
   it("edits an issue title, description, and priority", async () => {
-    let updated: {
-      title: string;
-      description: string | null;
-      priority: number | null;
-      assigneeUserId?: string | null;
-    } | undefined;
+    let updated: UpdateIssueInput | undefined;
     const container = document.createElement("div");
     const root = createRoot(container);
     await act(async () => {
@@ -345,6 +343,12 @@ describe("IssueEditor", () => {
       container.querySelector<HTMLButtonElement>('[role="option"][data-value="user-1"]')?.click();
     });
     await act(async () => {
+      container.querySelector<HTMLButtonElement>(".issue-difficulty-select .select-menu-trigger")?.click();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[role="option"][data-value="hard"]')?.click();
+    });
+    await act(async () => {
       container.querySelector("form")?.dispatchEvent(new Event("submit", {
         bubbles: true,
         cancelable: true
@@ -355,6 +359,7 @@ describe("IssueEditor", () => {
       title: "수정된 이슈",
       description: "수정된 설명",
       priority: 3,
+      difficulty: "hard",
       assigneeUserId: "user-1",
       attachments: [],
       keptAttachmentIds: []

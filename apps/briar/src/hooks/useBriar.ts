@@ -2296,6 +2296,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             progress: input.status === "backlog" ? 0 : 5,
             detail,
             priority: input.priority,
+            difficulty: input.difficulty,
             assigneeUserId: input.assigneeUserId ?? null,
             preferredProvider: input.preferredProvider ?? null,
             preferredModel: input.preferredModel ?? null,
@@ -2410,6 +2411,7 @@ export function useBriar(options: UseBriarOptions = {}) {
                           title: input.title.trim(),
                           issueDescription: canonicalDescription,
                           priority: input.priority,
+                          difficulty: input.difficulty,
                           assigneeUserId:
                             input.assigneeUserId === undefined
                               ? run.assigneeUserId ?? null
@@ -2436,6 +2438,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             title: input.title.trim(),
             description: canonicalDescription,
             priority: input.priority,
+            difficulty: input.difficulty,
             assigneeUserId: input.assigneeUserId ?? null,
             attachments: [
               ...(input.keptAttachmentIds

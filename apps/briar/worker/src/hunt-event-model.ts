@@ -10,6 +10,7 @@ import {
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
 import type { StructuredAgentResult } from "../../src/lib/agent-result";
+import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
 import * as Schema from "effect/Schema";
 
 import {
@@ -62,6 +63,7 @@ export type HuntEventInput = {
   repository: string;
   detail: string | null;
   priority: number | null;
+  difficulty?: IssueDifficulty;
   branch: string | null;
   commitSha: string | null;
   tracker: TrackerInput;

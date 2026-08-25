@@ -35,6 +35,7 @@ const runDefaults = {
   currentAttempt: 1,
   currentRevision: 1,
   priority: null,
+  difficulty: "normal",
   createdByUserId: "demo-user",
   subscribers: [{ userId: "demo-user", subscribedAt: ago(10_000) }],
   tracker: null,
@@ -58,6 +59,7 @@ const runDefaults = {
 } satisfies Pick<
   HuntRun,
   | "priority"
+  | "difficulty"
   | "createdByUserId"
   | "subscribers"
   | "currentAttempt"
@@ -111,6 +113,7 @@ type DemoRunSeed = Omit<HuntRun, "eventCount" | "lastEventAt"> & {
 const runSeeds: DemoRunSeed[] = [
   {
     ...runDefaults,
+    difficulty: "easy",
     id: "demo-1",
     runNumber: 12,
     source: "issue",
@@ -159,6 +162,7 @@ const runSeeds: DemoRunSeed[] = [
   },
   {
     ...runDefaults,
+    difficulty: "normal",
     id: "demo-2",
     runNumber: 11,
     source: "feedback",
@@ -221,6 +225,7 @@ const runSeeds: DemoRunSeed[] = [
   },
   {
     ...runDefaults,
+    difficulty: "hard",
     id: "demo-3",
     runNumber: 10,
     source: "error",

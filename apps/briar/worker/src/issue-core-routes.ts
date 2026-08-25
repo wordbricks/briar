@@ -106,6 +106,7 @@ export async function handleIssueCoreRoute(input: {
         status: input.status,
         assigneeUserId: input.assigneeUserId ?? null,
         createdByUserId: session.user.id,
+        difficulty: input.difficulty,
         attachments: created.attachments.map(issueAttachmentJson),
       },
       201,
@@ -330,6 +331,7 @@ export async function handleIssueCoreRoute(input: {
       title: run.title,
       description: run.issue_description,
       priority: run.priority,
+      difficulty: run.difficulty,
       assigneeUserId: run.assignee_user_id,
       attachments: (await listIssueAttachments(
         db,

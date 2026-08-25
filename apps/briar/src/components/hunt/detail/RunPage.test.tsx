@@ -211,6 +211,7 @@ describe("RunPage", () => {
       title: run.title,
       description: run.issueDescription,
       priority: 1,
+      difficulty: run.difficulty,
       attachments: []
     });
     await act(async () => root.unmount());

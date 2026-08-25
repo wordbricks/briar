@@ -1,5 +1,27 @@
 import Foundation
 
+enum IssueDifficulty: String, Codable, CaseIterable, Sendable {
+    case easy
+    case normal
+    case hard
+
+    var displayName: String {
+        switch self {
+        case .easy: L10n.text("쉬움")
+        case .normal: L10n.text("보통")
+        case .hard: L10n.text("어려움")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .easy: "leaf"
+        case .normal: "gauge.with.dots.needle.50percent"
+        case .hard: "mountain.2"
+        }
+    }
+}
+
 struct IssueSubscriber: Codable, Equatable, Hashable, Sendable {
     let userId: String
     let subscribedAt: Date
@@ -22,6 +44,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let progress: Double?
     let detail: String?
     let priority: Int?
+    let difficulty: IssueDifficulty?
     let assigneeUserId: String?
     let createdByUserId: String?
     let subscribers: [IssueSubscriber]?
@@ -74,6 +97,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         progress: Double? = nil,
         detail: String? = nil,
         priority: Int? = nil,
+        difficulty: IssueDifficulty? = .normal,
         assigneeUserId: String? = nil,
         createdByUserId: String? = nil,
         subscribers: [IssueSubscriber]? = nil,
@@ -125,6 +149,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.progress = progress
         self.detail = detail
         self.priority = priority
+        self.difficulty = difficulty
         self.assigneeUserId = assigneeUserId
         self.createdByUserId = createdByUserId
         self.subscribers = subscribers
