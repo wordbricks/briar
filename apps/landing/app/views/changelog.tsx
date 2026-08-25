@@ -30,6 +30,31 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.159",
+        date: "2026년 8월 25일",
+        title: "Provider와 모델 선택, 채널 일괄 승인, 관리형 데스크톱을 더 안정적으로 연결합니다",
+        summary:
+          "실행 가능한 Provider·모델 선택을 간결하게 만들고, 여러 채널 이슈를 원자적으로 승인하며, 관리형 데스크톱의 cold start와 macOS 트레이 표시를 다듬습니다.",
+        items: [
+          "실제 Worker capability를 기준으로 이슈 생성·승인·Worker dispatch의 Provider, 모델, effort를 검색·즐겨찾기·키보드 단축키로 선택하고, 알 수 없는 기존 모델도 안전하게 표시합니다.",
+          "채널에서 여러 이슈 생성 제안을 한 번에 원자적으로 승인하고, 각 항목의 실행·의존성·결과를 데스크톱·Android·iOS에서 명확하게 확인합니다.",
+          "차가운 EBS 볼륨에서 시작하는 관리형 데스크톱이 TigerVNC를 최대 120초까지 기다리도록 해 정상적인 초기 부팅을 실패로 처리하지 않습니다.",
+          "Debian 관리형 컴퓨터 canary의 Bun·Bunx·GUI·패키지 검증을 강화하고, macOS 상태 표시줄 아이콘은 전체 Briar 마크를 유지하면서 커지도록 조정합니다.",
+        ],
+      },
+      {
+        version: "1.2.158",
+        date: "2026년 8월 25일",
+        title: "관리형 컴퓨터, transcript 비용, 탐색 흐름을 함께 개선합니다",
+        summary:
+          "관리형 컴퓨터 배포를 갱신하고 transcript 저장·전송 비용을 줄이며, 데스크톱 탐색과 모바일 DM·macOS 트레이를 다듬습니다.",
+        items: [
+          "관리형 컴퓨터 Launch Template v5와 Debian AMI toolchain을 고정하고, 패키지·remote desktop·이미지 검증을 강화합니다.",
+          "Project Agent가 외부 public repository를 read-only로 조사할 수 있도록 하고, transcript batch와 R2 archive를 조정해 저장·PutObject 비용을 줄입니다.",
+          "macOS 상태 표시줄 artwork를 확대하고, 데스크톱 navigation history를 보존하며, 모바일 DM 헤더에 Agent 이름을 표시합니다.",
+        ],
+      },
+      {
         version: "1.2.157",
         date: "2026년 8월 24일",
         title: "Worker 업데이트와 원격 화면 연결을 더 안정적으로 이어갑니다",
@@ -1084,6 +1109,31 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.159",
+        date: "August 25, 2026",
+        title: "Make provider choices, channel approvals, and managed desktops more dependable",
+        summary:
+          "Choose supported providers and models more naturally, approve multiple channel issues atomically, and make managed desktop startup and macOS tray branding more reliable.",
+        items: [
+          "Use live Worker capabilities to search, favorite, and select Provider, model, and effort choices across issue creation, approvals, and Worker dispatch, while keeping unknown legacy models visible safely.",
+          "Approve batches of channel issue proposals atomically and show each item's execution, dependency, and result state across desktop, Android, and iOS.",
+          "Let managed desktops wait up to 120 seconds for TigerVNC on cold EBS volumes so a normal first boot is not reported as a failure.",
+          "Strengthen Debian managed-computer canary checks for Bun, Bunx, GUI tools, packages, and desktop readiness, and enlarge the macOS status-bar artwork without cropping the full Briar mark.",
+        ],
+      },
+      {
+        version: "1.2.158",
+        date: "August 25, 2026",
+        title: "Make managed computers, transcript costs, and navigation more dependable",
+        summary:
+          "Refresh managed-computer deployment, reduce transcript storage and transfer costs, and polish desktop navigation, mobile DMs, and the macOS tray.",
+        items: [
+          "Pin managed-computer Launch Template v5 and the Debian AMI toolchain, while validating packages, remote desktop services, and captured image contents more thoroughly.",
+          "Allow Project Agents to research public external repositories read-only, and tune transcript batching and R2 archive writes to reduce storage and PutObject costs.",
+          "Enlarge the macOS status-bar artwork, preserve desktop navigation history, and show the Agent name in mobile DM headers.",
+        ],
+      },
       {
         version: "1.2.157",
         date: "August 24, 2026",
@@ -2230,7 +2280,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-157">
+          <a href="#v1-2-159">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2252,7 +2302,11 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.157"
+                      entry.version === "1.2.159"
+                        ? "2026-08-25"
+                        : entry.version === "1.2.158"
+                        ? "2026-08-25"
+                        : entry.version === "1.2.157"
                         ? "2026-08-24"
                         : entry.version === "1.2.156"
                         ? "2026-08-24"
