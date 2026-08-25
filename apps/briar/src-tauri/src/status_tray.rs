@@ -22,9 +22,10 @@ pub const STATUS_TRAY_OPEN_RUN_EVENT: &str = "status-tray-open-run";
 const MAX_TITLE_CHARS: usize = 42;
 const TRAY_ICON_SCALE: f64 = 1.8;
 // Keep the canonical line-art mark as the template source. The macOS tray-icon
-// backend normalizes the complete image canvas to 18pt. Scale the artwork
-// inside that canvas so the visible mark, rather than its source resolution,
-// is 1.8 times larger.
+// backend normalizes the complete image canvas to 18pt, so the visible mark can
+// only grow by occupying more of that slot. Zoom about the center by the
+// requested 1.8x, capped so the full silhouette still fits instead of cropping
+// into a square of inner lines.
 const TRAY_TEMPLATE_PNG: &[u8] = include_bytes!("../../src/assets/brand/briar-mark-dark.png");
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -198,8 +199,67 @@ pub fn parse_run_menu_id(id: &str) -> Option<(String, String)> {
 
 fn tray_icon_image() -> Result<Image<'static>, String> {
     Image::from_bytes(TRAY_TEMPLATE_PNG)
-        .map(|image| scale_image_about_center(&image, TRAY_ICON_SCALE))
+        .map(|image| {
+            let scale = applied_tray_icon_scale(&image);
+            scale_image_about_center(&image, scale)
+        })
         .map_err(|error| format!("Status tray icon decode failed: {error}"))
+}
+
+fn opaque_bounds(image: &Image<'_>) -> Option<(u32, u32, u32, u32)> {
+    let width = image.width();
+    let height = image.height();
+    let mut min_x = width;
+    let mut min_y = height;
+    let mut max_x = 0;
+    let mut max_y = 0;
+    let mut found = false;
+    for (index, pixel) in image.rgba().chunks_exact(4).enumerate() {
+        if pixel[3] == 0 {
+            continue;
+        }
+        found = true;
+        let x = index as u32 % width;
+        let y = index as u32 / width;
+        min_x = min_x.min(x);
+        min_y = min_y.min(y);
+        max_x = max_x.max(x);
+        max_y = max_y.max(y);
+    }
+    found.then_some((min_x, min_y, max_x, max_y))
+}
+
+fn scale_to_edge(center: f64, inner: f64, outer: f64) -> f64 {
+    let span = inner - center;
+    if span.abs() <= 0.0 {
+        f64::INFINITY
+    } else {
+        (outer - center) / span
+    }
+}
+
+fn max_unclipped_scale(image: &Image<'_>) -> f64 {
+    let Some((min_x, min_y, max_x, max_y)) = opaque_bounds(image) else {
+        return 1.0;
+    };
+    let width = image.width() as f64;
+    let height = image.height() as f64;
+    let center_x = (width - 1.0) / 2.0;
+    let center_y = (height - 1.0) / 2.0;
+    // Half-pixel inset keeps nearest-neighbor rounding from dropping the ring.
+    [
+        scale_to_edge(center_x, min_x as f64 - 0.5, 0.0),
+        scale_to_edge(center_x, max_x as f64 + 0.5, width - 1.0),
+        scale_to_edge(center_y, min_y as f64 - 0.5, 0.0),
+        scale_to_edge(center_y, max_y as f64 + 0.5, height - 1.0),
+    ]
+    .into_iter()
+    .fold(f64::INFINITY, f64::min)
+    .max(1.0)
+}
+
+fn applied_tray_icon_scale(image: &Image<'_>) -> f64 {
+    TRAY_ICON_SCALE.min(max_unclipped_scale(image))
 }
 
 fn scale_image_about_center(image: &Image<'_>, scale: f64) -> Image<'static> {
@@ -209,11 +269,17 @@ fn scale_image_about_center(image: &Image<'_>, scale: f64) -> Image<'static> {
     let mut scaled = vec![0; source.len()];
     let center_x = (width as f64 - 1.0) / 2.0;
     let center_y = (height as f64 - 1.0) / 2.0;
+    let max_x = width.saturating_sub(1) as f64;
+    let max_y = height.saturating_sub(1) as f64;
 
     for y in 0..height {
         for x in 0..width {
-            let source_x = ((x as f64 - center_x) / scale + center_x).round() as u32;
-            let source_y = ((y as f64 - center_y) / scale + center_y).round() as u32;
+            let source_x = ((x as f64 - center_x) / scale + center_x)
+                .round()
+                .clamp(0.0, max_x) as u32;
+            let source_y = ((y as f64 - center_y) / scale + center_y)
+                .round()
+                .clamp(0.0, max_y) as u32;
             let source_offset = ((source_y * width + source_x) * 4) as usize;
             let target_offset = ((y * width + x) * 4) as usize;
             scaled[target_offset..target_offset + 4]
@@ -490,31 +556,65 @@ mod tests {
         );
     }
 
+    fn opaque_count(image: &Image<'_>) -> usize {
+        image
+            .rgba()
+            .chunks_exact(4)
+            .filter(|pixel| pixel[3] > 0)
+            .count()
+    }
+
     #[test]
     fn tray_icon_artwork_is_scaled_up_by_one_point_eight() {
         assert_eq!(TRAY_ICON_SCALE, 1.8);
 
         let source = Image::from_bytes(TRAY_TEMPLATE_PNG).expect("source icon should decode");
+        let applied = applied_tray_icon_scale(&source);
+        assert_eq!(applied, TRAY_ICON_SCALE.min(max_unclipped_scale(&source)));
+        assert!(applied > 1.0, "artwork should grow inside the 18pt canvas");
+        assert!(
+            applied <= TRAY_ICON_SCALE,
+            "applied scale must not exceed the requested 1.8x"
+        );
+
         let scaled = tray_icon_image().expect("tray icon should decode");
         assert_eq!(
             (scaled.width(), scaled.height()),
             (source.width(), source.height()),
             "the menu-bar canvas should retain its dimensions"
         );
-
-        let source_opaque = source
-            .rgba()
-            .chunks_exact(4)
-            .filter(|pixel| pixel[3] > 0)
-            .count();
-        let scaled_opaque = scaled
-            .rgba()
-            .chunks_exact(4)
-            .filter(|pixel| pixel[3] > 0)
-            .count();
         assert!(
-            scaled_opaque > source_opaque,
+            opaque_count(&scaled) > opaque_count(&source),
             "scaled artwork should occupy more of the fixed tray canvas"
         );
+    }
+
+    #[test]
+    fn tray_icon_scale_keeps_the_complete_mark() {
+        let source = Image::from_bytes(TRAY_TEMPLATE_PNG).expect("source icon should decode");
+        let (min_x, min_y, max_x, max_y) =
+            opaque_bounds(&source).expect("mark should have opaque pixels");
+        let scale = applied_tray_icon_scale(&source);
+        let width = source.width() as f64;
+        let height = source.height() as f64;
+        let center_x = (width - 1.0) / 2.0;
+        let center_y = (height - 1.0) / 2.0;
+        let sampled_left = (0.0 - center_x) / scale + center_x;
+        let sampled_top = (0.0 - center_y) / scale + center_y;
+        let sampled_right = (width - 1.0 - center_x) / scale + center_x;
+        let sampled_bottom = (height - 1.0 - center_y) / scale + center_y;
+
+        assert!(sampled_left <= min_x as f64);
+        assert!(sampled_top <= min_y as f64);
+        assert!(sampled_right >= max_x as f64);
+        assert!(sampled_bottom >= max_y as f64);
+
+        let scaled = tray_icon_image().expect("tray icon should decode");
+        let (scaled_min_x, scaled_min_y, scaled_max_x, scaled_max_y) =
+            opaque_bounds(&scaled).expect("scaled mark should have opaque pixels");
+        assert!(scaled_min_x < min_x);
+        assert!(scaled_min_y < min_y);
+        assert!(scaled_max_x > max_x);
+        assert!(scaled_max_y > max_y);
     }
 }
