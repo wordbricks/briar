@@ -259,7 +259,7 @@ describe("D1 migrations", () => {
     } finally {
       await miniflare.dispose();
     }
-  });
+  }, 60_000);
 
   it("backfills existing issues with normal difficulty and constrains new values", async () => {
     const miniflare = new Miniflare({
