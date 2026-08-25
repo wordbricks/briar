@@ -8,6 +8,7 @@ import {
   Param,
 } from "effect/unstable/cli";
 import packageJson from "../../../package.json";
+import { whoami } from "./auth-commands";
 import { login } from "./command-support";
 import {
   configureProject,
@@ -107,6 +108,13 @@ const loginCommand = leaf(
   {},
   login,
   "Authenticate this machine with Briar",
+);
+
+const whoamiCommand = leaf(
+  "whoami",
+  {},
+  whoami,
+  "Show the currently authenticated Briar user",
 );
 
 const versionCommand = Command.make("version", {}, () =>
@@ -543,6 +551,7 @@ export const briarCommand = Command.make("briar").pipe(
   Command.withDescription("Briar project and worker command-line interface"),
   Command.withSubcommands([
     loginCommand,
+    whoamiCommand,
     versionCommand,
     skillsCommand,
     projectCommand,
