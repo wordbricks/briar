@@ -85,6 +85,36 @@ const normalizedEvent = (payload: unknown): NormalizedEvent | null => {
 };
 
 const string = (value: unknown) => typeof value === "string" ? value : null;
+
+/**
+ * Older Workers may still send one provider envelope per streaming delta.
+ * Project those into the recoverable D1 work log without creating R2 objects.
+ * New Workers annotate coalesced deltas, which remain useful for replaying an
+ * interrupted turn and are retained with every meaningful boundary/snapshot.
+ */
+export const retainedRawTranscriptEvents = (events: TranscriptEventInput[]) =>
+  events.filter((item) => {
+    const envelope = record(item.payload);
+    const event = normalizedEvent(item.payload);
+    if (event?.type === "messageDelta" || event?.type === "activityDelta") {
+      return record(envelope?.archiveCompaction)?.kind === "delta";
+    }
+    const raw = record(envelope?.raw);
+    const update = record(raw?.update);
+    const sessionUpdate = string(update?.sessionUpdate);
+    if (sessionUpdate?.endsWith("_chunk")) return false;
+    const streamEvent = record(raw?.event);
+    if (
+      raw?.type === "stream_event" &&
+      streamEvent?.type === "content_block_delta"
+    ) {
+      return false;
+    }
+    if (raw?.type === "message.part.delta") return false;
+    const method = string(raw?.method) ?? "";
+    return !/(?:delta|progress)$/iu.test(method);
+  });
+
 const boundedWorkLogText = (value: string) => {
   const bytes = utf8Bytes(value);
   return bytes.byteLength <= MAX_TRANSCRIPT_PAYLOAD_BYTES
@@ -306,7 +336,6 @@ async function storeRawSegment(
     return { row: existing, stored: false };
   }
 
-  const compressed = await gzip(plain);
   const objectKey = rawSegmentObjectKey(
     projectId,
     sessionId,
@@ -314,19 +343,40 @@ async function storeRawSegment(
     lastSequence,
     digest,
   );
-  await bucket.put(objectKey, compressed, {
-    httpMetadata: {
-      contentType: "application/x-ndjson",
-      contentEncoding: "gzip",
-    },
-    customMetadata: {
-      projectId,
-      sessionId,
-      firstSequence: String(firstSequence),
-      lastSequence: String(lastSequence),
-      sha256: digest,
-    },
-  });
+  const existingObject = await bucket.head(objectKey);
+  let compressedBytes: number;
+  if (existingObject) {
+    const metadata = existingObject.customMetadata;
+    if (
+      metadata?.projectId !== projectId ||
+      metadata.sessionId !== sessionId ||
+      metadata.firstSequence !== String(firstSequence) ||
+      metadata.lastSequence !== String(lastSequence) ||
+      metadata.sha256 !== digest
+    ) {
+      throw new WorkerConflictError(
+        "Transcript segment object metadata does not match its deterministic key",
+      );
+    }
+    compressedBytes = existingObject.size;
+  } else {
+    const compressed = await gzip(plain);
+    await bucket.put(objectKey, compressed, {
+      httpMetadata: {
+        contentType: "application/x-ndjson",
+        contentEncoding: "gzip",
+      },
+      customMetadata: {
+        projectId,
+        sessionId,
+        firstSequence: String(firstSequence),
+        lastSequence: String(lastSequence),
+        sha256: digest,
+        archivePolicy: "meaningful-events-coalesced-deltas-v1",
+      },
+    });
+    compressedBytes = compressed.byteLength;
+  }
   const row: AgentTranscriptSegmentRow = {
     session_id: sessionId,
     first_sequence: firstSequence,
@@ -334,7 +384,7 @@ async function storeRawSegment(
     object_key: objectKey,
     event_count: events.length,
     uncompressed_bytes: plain.byteLength,
-    compressed_bytes: compressed.byteLength,
+    compressed_bytes: compressedBytes,
     sha256: digest,
     recorded_at: recordedAt,
   };
@@ -639,14 +689,17 @@ export async function ingestAgentTranscript(
 ) {
   validateEvents(input.events);
   await ensureTranscriptSession(db, projectId, input);
-  const segment = await storeRawSegment(
-    db,
-    bucket,
-    input.sessionId,
-    projectId,
-    input.events,
-    input.observedAt,
-  );
+  const retainedEvents = retainedRawTranscriptEvents(input.events);
+  const segment = retainedEvents.length > 0
+    ? await storeRawSegment(
+      db,
+      bucket,
+      input.sessionId,
+      projectId,
+      retainedEvents,
+      input.observedAt,
+    )
+    : null;
   const projected = await projectWorkLog(
     db,
     input.sessionId,
@@ -655,9 +708,9 @@ export async function ingestAgentTranscript(
   );
   return {
     sessionId: input.sessionId,
-    stored: segment.stored ? input.events.length : 0,
-    storedBytes: segment.stored ? segment.row.uncompressed_bytes : 0,
-    compressedBytes: segment.stored ? segment.row.compressed_bytes : 0,
+    stored: segment?.stored ? retainedEvents.length : 0,
+    storedBytes: segment?.stored ? segment.row.uncompressed_bytes : 0,
+    compressedBytes: segment?.stored ? segment.row.compressed_bytes : 0,
     projected,
     pruned: [] as string[],
   };

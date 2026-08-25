@@ -1444,7 +1444,7 @@ describe("detached Agent runner", () => {
     });
   });
 
-  it("retains bounded raw and normalized deltas for the R2 archive", () => {
+  it("accepts normalized deltas for compaction and drops raw-only stream noise", () => {
     expect(
       shouldPersistDetachedTranscriptPayload({
         type: "event",
@@ -1469,6 +1469,45 @@ describe("detached Agent runner", () => {
         type: "activityDelta",
         id: "command-1",
         delta: "output",
+      }),
+    ).toBe(true);
+    expect(
+      shouldPersistDetachedTranscriptPayload({
+        type: "event",
+        raw: {
+          sessionId: "grok-session",
+          update: {
+            sessionUpdate: "agent_thought_chunk",
+            content: { type: "text", text: "private thought" },
+          },
+        },
+      }),
+    ).toBe(false);
+    expect(
+      shouldPersistDetachedTranscriptPayload({
+        type: "event",
+        raw: {
+          type: "stream_event",
+          event: {
+            type: "content_block_delta",
+            delta: { type: "thinking_delta", thinking: "private thought" },
+          },
+        },
+      }),
+    ).toBe(false);
+    expect(
+      shouldPersistDetachedTranscriptPayload({
+        type: "event",
+        raw: {
+          method: "item/reasoning/textDelta",
+          params: { delta: "private thought" },
+        },
+      }),
+    ).toBe(false);
+    expect(
+      shouldPersistDetachedTranscriptPayload({
+        type: "event",
+        raw: { method: "item/completed", params: { item: { type: "tool" } } },
       }),
     ).toBe(true);
     expect(
@@ -1513,8 +1552,16 @@ describe("detached Agent runner", () => {
     });
   });
 
-  it("assigns every archived payload a stable transcript sequence", () => {
+  it("assigns every accepted payload a stable transcript sequence", () => {
     const sequencer = createDetachedTranscriptSequencer(1);
+    expect(
+      sequencer.nextForPayload({
+        type: "event",
+        raw: {
+          update: { sessionUpdate: "agent_thought_chunk" },
+        },
+      }),
+    ).toBeNull();
     const delta = {
       type: "event",
       event: { type: "messageDelta", id: "message-1", delta: "x" },
