@@ -783,6 +783,10 @@ enum L10n {
         case channelIssueShowDescription
         case channelIssueHideDescription
         case channelCreateIssue
+        case channelCreateIssueBatch
+        case channelIssueBatchCount
+        case channelIssueBatchDependencies
+        case channelIssueBatchSafety
         case channelCreateAndExecute
         case channelRetryExecution
         case channelSelectProposalProject
@@ -844,6 +848,10 @@ enum L10n {
             case .channelIssueShowDescription: "설명 전체 보기"
             case .channelIssueHideDescription: "설명 접기"
             case .channelCreateIssue: "승인하고 이슈 만들기"
+            case .channelCreateIssueBatch: "승인하고 이슈 %d개 만들기"
+            case .channelIssueBatchCount: "한 번에 생성할 백로그 이슈 %d개"
+            case .channelIssueBatchDependencies: "이슈 의존성"
+            case .channelIssueBatchSafety: "모든 이슈와 의존성을 백로그에 원자적으로 생성하며 자동 실행하지 않습니다."
             case .channelCreateAndExecute: "승인하고 이슈 생성·실행"
             case .channelRetryExecution: "실행 예약 다시 시도"
             case .channelSelectProposalProject: "프로젝트 선택"
@@ -908,6 +916,10 @@ enum L10n {
             case .channelIssueShowDescription: "Show full description"
             case .channelIssueHideDescription: "Collapse description"
             case .channelCreateIssue: "Approve and create issue"
+            case .channelCreateIssueBatch: "Approve and create %d issues"
+            case .channelIssueBatchCount: "%d backlog issues will be created together"
+            case .channelIssueBatchDependencies: "Issue dependencies"
+            case .channelIssueBatchSafety: "Create every issue and dependency atomically in backlog without execution."
             case .channelCreateAndExecute: "Approve, create, and run"
             case .channelRetryExecution: "Retry execution scheduling"
             case .channelSelectProposalProject: "Select project"
@@ -972,6 +984,10 @@ enum L10n {
             case .channelIssueShowDescription: "查看完整说明"
             case .channelIssueHideDescription: "收起说明"
             case .channelCreateIssue: "批准并创建问题"
+            case .channelCreateIssueBatch: "批准并创建 %d 个问题"
+            case .channelIssueBatchCount: "将一次创建 %d 个待办问题"
+            case .channelIssueBatchDependencies: "问题依赖关系"
+            case .channelIssueBatchSafety: "以原子方式将所有问题和依赖关系创建到待办列表，不自动执行。"
             case .channelCreateAndExecute: "批准、创建并执行"
             case .channelRetryExecution: "重试执行调度"
             case .channelSelectProposalProject: "选择项目"

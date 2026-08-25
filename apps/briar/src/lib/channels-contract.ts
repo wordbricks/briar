@@ -661,6 +661,13 @@ export type ChannelMessageProposal = {
   projectId: string | null;
   payload: unknown;
   resultRunId: string | null;
+  /** Present for accepted batch proposals, ordered like the proposed items. */
+  resultItems?: ChannelIssueBatchResultItem[];
+};
+
+export type ChannelIssueBatchResultItem = {
+  localKey: string;
+  runId: string;
 };
 
 export type ChannelExecutionProposal = {
@@ -900,17 +907,121 @@ const channelReplyDocumentSchema = strict(Schema.Struct({
   projectId: nullableDefault(Uuid),
 }));
 
+const channelReplyIssueInputSchema = strict(Schema.Struct({
+  title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
+  description: Schema.NullOr(
+    Schema.Trim.check(Schema.isMaxLength(100_000)),
+  ),
+  priority: Schema.NullOr(between(1, 4)),
+  status: Schema.Literal("backlog"),
+}));
+
 const channelReplyIssueProposalSchema = strict(Schema.Struct({
   projectId: nullableDefault(Uuid),
   executeAfterCreate: defaulted(Schema.Boolean, false),
-  issue: strict(Schema.Struct({
-    title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
-    description: Schema.NullOr(
-      Schema.Trim.check(Schema.isMaxLength(100_000)),
-    ),
-    priority: Schema.NullOr(between(1, 4)),
-    status: Schema.Literal("backlog"),
-  })),
+  issue: channelReplyIssueInputSchema,
+}));
+
+const channelIssueBatchLocalKeySchema = Schema.Trim.check(
+  Schema.isLengthBetween(1, 64),
+  Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u),
+);
+
+const channelIssueBatchSchema = strict(Schema.Struct({
+  items: mutableArray(strict(Schema.Struct({
+    key: channelIssueBatchLocalKeySchema,
+    issue: channelReplyIssueInputSchema,
+  }))).check(Schema.isLengthBetween(1, 8)),
+  dependencies: defaultedWith(
+    mutableArray(strict(Schema.Struct({
+      prerequisiteKey: channelIssueBatchLocalKeySchema,
+      dependentKey: channelIssueBatchLocalKeySchema,
+    }))).check(Schema.isMaxLength(28)),
+    () => [],
+  ),
+})).check(
+  Schema.makeFilter((batch) => {
+    const issues: Array<Schema.FilterIssue> = [];
+    const keyIndexes = new Map<string, number>();
+    batch.items.forEach((item, index) => {
+      const previous = keyIndexes.get(item.key);
+      if (previous !== undefined) {
+        issues.push({
+          path: ["items", index, "key"],
+          issue: `Local key duplicates item ${previous + 1}`,
+        });
+      } else {
+        keyIndexes.set(item.key, index);
+      }
+    });
+
+    const edgeIndexes = new Map<string, number>();
+    batch.dependencies.forEach((dependency, index) => {
+      if (!keyIndexes.has(dependency.prerequisiteKey)) {
+        issues.push({
+          path: ["dependencies", index, "prerequisiteKey"],
+          issue: "Prerequisite key must reference a batch item",
+        });
+      }
+      if (!keyIndexes.has(dependency.dependentKey)) {
+        issues.push({
+          path: ["dependencies", index, "dependentKey"],
+          issue: "Dependent key must reference a batch item",
+        });
+      }
+      if (dependency.prerequisiteKey === dependency.dependentKey) {
+        issues.push({
+          path: ["dependencies", index],
+          issue: "An issue cannot depend on itself",
+        });
+      }
+      const edgeKey =
+        `${dependency.prerequisiteKey}\u0000${dependency.dependentKey}`;
+      const previous = edgeIndexes.get(edgeKey);
+      if (previous !== undefined) {
+        issues.push({
+          path: ["dependencies", index],
+          issue: `Dependency duplicates edge ${previous + 1}`,
+        });
+      } else {
+        edgeIndexes.set(edgeKey, index);
+      }
+    });
+
+    if (issues.length > 0) return issues;
+    const dependents = new Map<string, string[]>();
+    for (const key of keyIndexes.keys()) dependents.set(key, []);
+    for (const dependency of batch.dependencies) {
+      dependents.get(dependency.prerequisiteKey)!.push(
+        dependency.dependentKey,
+      );
+    }
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+    const visit = (key: string): boolean => {
+      if (visiting.has(key)) return true;
+      if (visited.has(key)) return false;
+      visiting.add(key);
+      for (const dependent of dependents.get(key) ?? []) {
+        if (visit(dependent)) return true;
+      }
+      visiting.delete(key);
+      visited.add(key);
+      return false;
+    };
+    if ([...keyIndexes.keys()].some(visit)) {
+      issues.push({
+        path: ["dependencies"],
+        issue: "Issue batch dependencies must form an acyclic graph",
+      });
+    }
+    return issues;
+  }),
+);
+
+const channelReplyIssueBatchProposalSchema = strict(Schema.Struct({
+  projectId: nullableDefault(Uuid),
+  batch: channelIssueBatchSchema,
 }));
 
 const channelReplyExecutionProposalSchema = strict(Schema.Struct({
@@ -932,6 +1043,7 @@ export const channelReplyCompletionSchema = strict(Schema.Struct({
   body: channelMessageBodySchema,
   document: nullableDefault(channelReplyDocumentSchema),
   issueProposal: nullableDefault(channelReplyIssueProposalSchema),
+  issueBatchProposal: nullableDefault(channelReplyIssueBatchProposalSchema),
   executionProposal: nullableDefault(channelReplyExecutionProposalSchema),
   skillExecutionProposal: nullableDefault(
     channelReplySkillExecutionProposalSchema,
@@ -947,8 +1059,8 @@ export const channelReplyCompletionSchema = strict(Schema.Struct({
     const issues: Array<Schema.FilterIssue> = [];
     if (
       reply.delegation &&
-      (reply.document || reply.issueProposal || reply.executionProposal ||
-        reply.skillExecutionProposal)
+      (reply.document || reply.issueProposal || reply.issueBatchProposal ||
+        reply.executionProposal || reply.skillExecutionProposal)
     ) {
       issues.push({
         path: ["delegation"],
@@ -962,8 +1074,19 @@ export const channelReplyCompletionSchema = strict(Schema.Struct({
       });
     }
     if (
+      reply.issueBatchProposal &&
+      (reply.issueProposal || reply.executionProposal ||
+        reply.skillExecutionProposal)
+    ) {
+      issues.push({
+        path: ["issueBatchProposal"],
+        issue: "A batch issue proposal cannot be combined with another proposal",
+      });
+    }
+    if (
       reply.skillExecutionProposal &&
-      (reply.document || reply.issueProposal || reply.executionProposal)
+      (reply.document || reply.issueProposal || reply.issueBatchProposal ||
+        reply.executionProposal)
     ) {
       issues.push({
         path: ["skillExecutionProposal"],
@@ -1012,3 +1135,12 @@ export const channelIssueProposalPayloadSchema = Schema.Struct({
 });
 export const decodeChannelIssueProposalPayloadOption =
   Schema.decodeUnknownOption(channelIssueProposalPayloadSchema);
+
+export const channelIssueBatchProposalPayloadSchema = strict(Schema.Struct({
+  batch: channelIssueBatchSchema,
+  executeAfterCreate: defaulted(Schema.Literal(false), false),
+}));
+export type ChannelIssueBatchProposalPayload =
+  typeof channelIssueBatchProposalPayloadSchema.Type;
+export const decodeChannelIssueBatchProposalPayloadOption =
+  Schema.decodeUnknownOption(channelIssueBatchProposalPayloadSchema);

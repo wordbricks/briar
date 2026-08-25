@@ -18,9 +18,11 @@ func channelProposalApprovalIsEnabled(
     acceptanceInFlight: Bool,
     channelArchived: Bool,
     targetProjectID: UUID?,
-    issue: ChannelMessage.Proposal.Payload.Issue?
+    issue: ChannelMessage.Proposal.Payload.Issue?,
+    batch: ChannelMessage.Proposal.Payload.Batch? = nil
 ) -> Bool {
-    !acceptanceInFlight && !channelArchived && targetProjectID != nil && issue != nil
+    !acceptanceInFlight && !channelArchived && targetProjectID != nil &&
+        (issue != nil || batch?.items.isEmpty == false)
 }
 
 func channelExecutionProposalApprovalIsEnabled(
@@ -1928,6 +1930,52 @@ private struct ChannelProposalCard: View {
                 )
             }
 
+            if let batch = proposal.payload?.batch {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(
+                        String(
+                            format: L10n.text(.channelIssueBatchCount, locale: locale),
+                            batch.items.count
+                        )
+                    )
+                    .font(.caption.weight(.semibold))
+                    ForEach(batch.items, id: \.key) { item in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(item.key)
+                                    .font(.caption2.monospaced().weight(.bold))
+                                    .foregroundStyle(Color.accentColor)
+                                Text(item.issue.title)
+                                    .font(.caption.weight(.medium))
+                            }
+                            if let result = proposal.resultItems.first(where: {
+                                $0.localKey == item.key
+                            }) {
+                                Text(result.runId.uuidString.lowercased())
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            }
+                        }
+                        .padding(7)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
+                    }
+                    if !batch.dependencies.isEmpty {
+                        Text(L10n.text(.channelIssueBatchDependencies, locale: locale))
+                            .font(.caption2.weight(.semibold))
+                        ForEach(batch.dependencies, id: \.self) { dependency in
+                            Text("\(dependency.prerequisiteKey) → \(dependency.dependentKey)")
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .accessibilityIdentifier(
+                    "channel-batch-proposal-details-\(proposal.id.uuidString.lowercased())"
+                )
+            }
+
             if let targetProjectName {
                 Label(
                     String(
@@ -1941,9 +1989,11 @@ private struct ChannelProposalCard: View {
             }
             Label(
                 L10n.text(
-                    requestsExecution
-                        ? .channelIssueCreationAndExecutionSafety
-                        : .channelIssueCreationSafety,
+                    proposal.payload?.batch != nil
+                        ? .channelIssueBatchSafety
+                        : requestsExecution
+                            ? .channelIssueCreationAndExecutionSafety
+                            : .channelIssueCreationSafety,
                     locale: locale
                 ),
                 systemImage: requestsExecution ? "checkmark.shield" : "tray"
@@ -2007,7 +2057,8 @@ private struct ChannelProposalCard: View {
                             acceptanceInFlight: acceptanceInFlight,
                             channelArchived: channel.archivedAt != nil,
                             targetProjectID: targetProjectID,
-                            issue: proposal.payload?.issue
+                            issue: proposal.payload?.issue,
+                            batch: proposal.payload?.batch
                         )
                     )
                     .accessibilityIdentifier(
@@ -2019,7 +2070,8 @@ private struct ChannelProposalCard: View {
                     guard let targetProjectID else { return }
                     Task {
                         if let result = await onAccept(targetProjectID, nil),
-                           result.executionProposal == nil {
+                           result.executionProposal == nil,
+                           proposal.payload?.batch == nil {
                             await onIssueOpen(result.projectId, result.resultRunId)
                         }
                     }
@@ -2027,7 +2079,19 @@ private struct ChannelProposalCard: View {
                     if accepting {
                         ProgressView().controlSize(.small)
                     } else {
-                        Text(L10n.text(.channelCreateIssue, locale: locale))
+                        if let batch = proposal.payload?.batch {
+                            Text(
+                                String(
+                                    format: L10n.text(
+                                        .channelCreateIssueBatch,
+                                        locale: locale
+                                    ),
+                                    batch.items.count
+                                )
+                            )
+                        } else {
+                            Text(L10n.text(.channelCreateIssue, locale: locale))
+                        }
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -2037,7 +2101,8 @@ private struct ChannelProposalCard: View {
                         acceptanceInFlight: acceptanceInFlight,
                         channelArchived: channel.archivedAt != nil,
                         targetProjectID: targetProjectID,
-                        issue: proposal.payload?.issue
+                        issue: proposal.payload?.issue,
+                        batch: proposal.payload?.batch
                     )
                 )
                 .accessibilityIdentifier(
@@ -2045,6 +2110,7 @@ private struct ChannelProposalCard: View {
                 )
             }
             if proposal.status == .accepted,
+               proposal.payload?.batch == nil,
                let projectID = proposal.projectId,
                let runID = proposal.resultRunId {
                 Button(L10n.text(.channelViewIssue, locale: locale)) {

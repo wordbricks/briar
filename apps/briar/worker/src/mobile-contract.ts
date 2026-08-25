@@ -596,23 +596,60 @@ export const mobileChannelSummarySchema = mutableStruct({
   hasUnread: optional(Schema.Boolean),
 });
 
+const mobileChannelIssueFields = {
+  title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
+  description: nullable(
+    Schema.Trim.check(Schema.isMaxLength(100_000)),
+  ),
+  priority: nullable(integerBetween(1, 4)),
+} as const;
+
 export const mobileChannelIssueProposalPayloadSchema = strict(mutableStruct({
   issue: strict(mutableStruct({
-    title: Schema.Trim.check(Schema.isLengthBetween(1, 300)),
-    description: nullable(
-      Schema.Trim.check(Schema.isMaxLength(100_000)),
-    ),
-    priority: nullable(integerBetween(1, 4)),
+    ...mobileChannelIssueFields,
     status: Schema.Literals(["backlog", "queued"]),
   })),
   executeAfterCreate: defaulted(Schema.Boolean, false),
 }));
+
+const mobileChannelIssueBatchResultItemSchema = strict(mutableStruct({
+  localKey: Schema.Trim.check(
+    Schema.isLengthBetween(1, 64),
+    Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u),
+  ),
+  runId: uuidString,
+}));
+
+const mobileChannelIssueBatchLocalKeySchema = Schema.Trim.check(
+  Schema.isLengthBetween(1, 64),
+  Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u),
+);
+
+export const mobileChannelIssueBatchProposalPayloadSchema = strict(
+  mutableStruct({
+    batch: strict(mutableStruct({
+      items: mutableArray(strict(mutableStruct({
+        key: mobileChannelIssueBatchLocalKeySchema,
+        issue: strict(mutableStruct({
+          ...mobileChannelIssueFields,
+          status: Schema.Literal("backlog"),
+        })),
+      }))).check(Schema.isLengthBetween(1, 8)),
+      dependencies: mutableArray(strict(mutableStruct({
+        prerequisiteKey: mobileChannelIssueBatchLocalKeySchema,
+        dependentKey: mobileChannelIssueBatchLocalKeySchema,
+      }))).check(Schema.isMaxLength(28)),
+    })),
+    executeAfterCreate: defaulted(Schema.Literal(false), false),
+  }),
+);
 
 const mobileChannelProposalBaseFields = {
   id: uuidString,
   status: Schema.Literals(["pending", "accepted"]),
   projectId: nullable(uuidString),
   resultRunId: nullable(uuidString),
+  resultItems: optional(mutableArray(mobileChannelIssueBatchResultItemSchema)),
 } as const;
 
 const mobileChannelMessageAuthorSchema = Schema.Union([
@@ -641,7 +678,10 @@ const mobileChannelProposalSchema = Schema.Union([
   mutableStruct({
     ...mobileChannelProposalBaseFields,
     actionType: Schema.Literal("request_issue_create"),
-    payload: mobileChannelIssueProposalPayloadSchema,
+    payload: Schema.Union([
+      mobileChannelIssueProposalPayloadSchema,
+      mobileChannelIssueBatchProposalPayloadSchema,
+    ]),
   }),
   // Retain decode compatibility for the never-produced legacy DB action.
   mutableStruct({
@@ -791,6 +831,7 @@ export const mobileAcceptChannelProposalResponseSchema = mutableStruct({
   outcome: Schema.Literals(["accepted", "already_accepted"]),
   projectId: uuidString,
   resultRunId: uuidString,
+  resultItems: optional(mutableArray(mobileChannelIssueBatchResultItemSchema)),
   executionProposal: optionalNullable(mobileIssueExecutionProposalSchema),
 });
 

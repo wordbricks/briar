@@ -2095,6 +2095,72 @@ describe("CompanionChannels", () => {
     expect(onIssueOpen).toHaveBeenCalledWith("project-1", "run-1");
   });
 
+  it("shows every accepted batch mapping and dependency without an ambiguous issue link", async () => {
+    const proposal = message("m-batch-accepted", "배치 이슈를 만들었습니다");
+    proposal.proposal = {
+      id: "proposal-batch",
+      actionType: "request_issue_create",
+      status: "accepted",
+      projectId: "project-1",
+      payload: {
+        batch: {
+          items: [
+            {
+              key: "api",
+              issue: {
+                title: "Batch API",
+                description: null,
+                priority: 1,
+                status: "backlog",
+              },
+            },
+            {
+              key: "ui",
+              issue: {
+                title: "Batch UI",
+                description: null,
+                priority: 2,
+                status: "backlog",
+              },
+            },
+          ],
+          dependencies: [{ prerequisiteKey: "api", dependentKey: "ui" }],
+        },
+      },
+      resultRunId: "run-api",
+      resultItems: [
+        { localKey: "api", runId: "run-api" },
+        { localKey: "ui", runId: "run-ui" },
+      ],
+    };
+    loadChannel.mockResolvedValue({
+      channel: channel("c-common", "Welcome", null),
+      members: [],
+      agents: [],
+      messages: [proposal],
+    });
+    const onIssueOpen = vi.fn();
+    await render(onIssueOpen);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".companion-channel-group button",
+      )!.click();
+    });
+    await act(async () => Promise.resolve());
+
+    expect(container.textContent).toContain("Batch API");
+    expect(container.textContent).toContain("Batch UI");
+    expect(container.textContent).toContain("run-api");
+    expect(container.textContent).toContain("run-ui");
+    expect(container.textContent).toContain("api→ui");
+    expect(container.textContent).toContain("do not execute");
+    expect(container.querySelector(
+      ".companion-channel-proposal button",
+    )).toBeNull();
+    expect(onIssueOpen).not.toHaveBeenCalled();
+  });
+
   it("uses the channel default project without showing a picker", async () => {
     const proposal = message("m-default", "이슈를 제안합니다");
     proposal.proposal = {

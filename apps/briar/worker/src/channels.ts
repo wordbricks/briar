@@ -4,6 +4,7 @@ import {
   type ChannelAgentProvider as AgentProvider,
   type ChannelAgentReply,
   type ChannelExecutionProposal,
+  type ChannelIssueBatchProposalPayload,
   type ChannelKind,
   type ChannelMessage,
   type ChannelMessageBlock,
@@ -82,6 +83,7 @@ export type ChannelMessageRow = {
   proposal_payload_json: string | null;
   proposal_execute_after_create: number | null;
   proposal_result_run_id: string | null;
+  proposal_result_items_json: string | null;
   execution_proposal_id: string | null;
   execution_proposal_project_id: string | null;
   execution_proposal_run_id: string | null;
@@ -322,6 +324,7 @@ const visibleToUser = `(
 const messageSelect = (
   withExecutionProposals: boolean,
   withSkillExecutionProposals: boolean,
+  withIssueBatchProposals: boolean,
 ) => `
   select message.id, message.channel_id, message.parent_message_id,
          message.author_user_id, author.name as author_name,
@@ -344,6 +347,20 @@ const messageSelect = (
          proposal.project_id as proposal_project_id,
          proposal.payload_json as proposal_payload_json,
          proposal.result_run_id as proposal_result_run_id,
+         ${withIssueBatchProposals
+           ? `(
+             select coalesce(json_group_array(json_object(
+               'localKey', batch_item.local_key,
+               'runId', batch_item.run_id
+             )), '[]')
+             from (
+               select local_key, run_id
+               from briar_channel_issue_batch_items
+               where proposal_id = proposal.id
+               order by position
+             ) batch_item
+           )`
+           : "null"} as proposal_result_items_json,
          ${withExecutionProposals ? `
          proposal.execute_after_create as proposal_execute_after_create,
          execution.id as execution_proposal_id,
@@ -460,10 +477,26 @@ export async function channelSkillExecutionProposalTablesAvailable(
     .first<{ available: number }>());
 }
 
-const messageSelectFor = async (db: D1Database) => messageSelect(
-  await channelExecutionProposalTablesAvailable(db),
-  await channelSkillExecutionProposalTablesAvailable(db),
-);
+export async function channelIssueBatchProposalTablesAvailable(
+  db: D1Database,
+) {
+  return Boolean(await db
+    .prepare(
+      `select 1 as available from sqlite_master
+       where type = 'table'
+         and name = 'briar_channel_issue_batch_items'`,
+    )
+    .first<{ available: number }>());
+}
+
+const messageSelectFor = async (db: D1Database) => {
+  const [execution, skillExecution, issueBatch] = await Promise.all([
+    channelExecutionProposalTablesAvailable(db),
+    channelSkillExecutionProposalTablesAvailable(db),
+    channelIssueBatchProposalTablesAvailable(db),
+  ]);
+  return messageSelect(execution, skillExecution, issueBatch);
+};
 
 const channelExecutionProposalJson = (
   row: ChannelMessageRow,
@@ -636,6 +669,9 @@ export const channelMessageJson = (
           executeAfterCreate: row.proposal_execute_after_create === 1,
         },
         resultRunId: row.proposal_result_run_id,
+        resultItems: row.proposal_result_items_json
+          ? JSON.parse(row.proposal_result_items_json)
+          : undefined,
     }
     : null,
   executionProposal: row.deleted_at ? null : channelExecutionProposalJson(row),
@@ -3165,6 +3201,10 @@ export type ChannelReplyCompletionInput = {
     issue: Record<string, unknown>;
     executeAfterCreate: boolean;
   } | null;
+  issueBatchProposal?: {
+    projectId: string | null;
+    batch: ChannelIssueBatchProposalPayload["batch"];
+  } | null;
   executionProposal: {
     projectId: string;
     runId: string;
@@ -3209,6 +3249,8 @@ export async function completeChannelReply(
     await channelExecutionProposalTablesAvailable(db);
   const skillExecutionApprovalsAvailable =
     await channelSkillExecutionProposalTablesAvailable(db);
+  const issueBatchProposalsAvailable =
+    await channelIssueBatchProposalTablesAvailable(db);
   if (
     !executionApprovalsAvailable &&
     (input.executionProposal || input.issueProposal?.executeAfterCreate)
@@ -3218,12 +3260,16 @@ export async function completeChannelReply(
   if (input.skillExecutionProposal && !skillExecutionApprovalsAvailable) {
     throw new Error("Agent Skill execution approval schema is unavailable");
   }
+  if (input.issueBatchProposal && !issueBatchProposalsAvailable) {
+    throw new Error("channel issue batch approval schema is unavailable");
+  }
   const delegation = input.delegation ?? null;
   if (
     job.project_id !== null &&
     [
       input.document?.projectId,
       input.issueProposal?.projectId,
+      input.issueBatchProposal?.projectId,
       input.executionProposal?.projectId,
     ].some(
       (projectId) => projectId !== undefined && projectId !== job.project_id,
@@ -3235,8 +3281,8 @@ export async function completeChannelReply(
     throw new Error("Only a top-level Organization Agent reply can delegate");
   }
   if (delegation && (
-    input.document || input.issueProposal || input.executionProposal ||
-    input.skillExecutionProposal
+    input.document || input.issueProposal || input.issueBatchProposal ||
+    input.executionProposal || input.skillExecutionProposal
   )) {
     throw new Error("A delegated reply cannot also create an artifact proposal");
   }
@@ -3261,8 +3307,18 @@ export async function completeChannelReply(
     throw new Error("Use executeAfterCreate for a create-and-execute request");
   }
   if (
+    input.issueBatchProposal &&
+    (input.issueProposal || input.executionProposal ||
+      input.skillExecutionProposal || delegation)
+  ) {
+    throw new Error(
+      "An issue batch cannot be combined with another proposal",
+    );
+  }
+  if (
     input.skillExecutionProposal &&
-    (input.document || input.issueProposal || input.executionProposal || delegation)
+    (input.document || input.issueProposal || input.issueBatchProposal ||
+      input.executionProposal || delegation)
   ) {
     throw new Error(
       "Agent Skill execution cannot be combined with another proposal",
@@ -3614,6 +3670,39 @@ export async function completeChannelReply(
                 input.completedAt,
               ]
         )),
+    );
+  }
+  if (input.issueBatchProposal) {
+    statements.push(
+      db
+        .prepare(
+          `insert into briar_channel_action_proposals (
+             id, channel_id, project_id, trigger_message_id, reply_message_id,
+             action_type, payload_json, execute_after_create,
+             execution_proposal_id, created_at, updated_at
+           )
+           select ?, ?, ?, ?, ?, 'request_issue_create', ?, 0, null, ?, ?
+           from briar_channel_agent_reply_jobs claim
+           where claim.id = ? and claim.claimed_device_id = ?
+             and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
+             and claim.status = 'completed' and claim.completed_at = ?
+           on conflict (channel_id, trigger_message_id) do nothing`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          job.channel_id,
+          input.issueBatchProposal.projectId,
+          job.trigger_message_id,
+          job.reply_message_id,
+          JSON.stringify({ batch: input.issueBatchProposal.batch }),
+          input.completedAt,
+          input.completedAt,
+          input.jobId,
+          input.deviceId,
+          input.workerId,
+          input.claimTokenHash,
+          input.completedAt,
+        ),
     );
   }
   if (input.executionProposal) {

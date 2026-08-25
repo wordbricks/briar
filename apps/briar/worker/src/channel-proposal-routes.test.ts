@@ -325,6 +325,7 @@ describe("channel issue proposal approval route", () => {
       actionType?: "request_issue_create" | "request_plan_document";
       projectId?: string | null;
       executeAfterCreate?: boolean;
+      payload?: unknown;
     } = {},
   ) => {
     const suffix = sequence.toString(16).padStart(12, "0");
@@ -371,7 +372,7 @@ describe("channel issue proposal approval route", () => {
       triggerId,
       replyId,
       options.actionType ?? "request_issue_create",
-      JSON.stringify({
+      JSON.stringify(options.payload ?? {
         issue: {
           title: `Approved issue ${sequence}`,
           description: "Create it, but do not execute it.",
@@ -467,9 +468,239 @@ describe("channel issue proposal approval route", () => {
     ).resolves.toMatchObject({ count: 0 });
   });
 
+  it("atomically creates a mapped issue batch and its dependency DAG", async () => {
+    const payload = {
+      batch: {
+        items: [
+          {
+            key: "api",
+            issue: {
+              title: "Batch API",
+              description: "Build the API boundary.",
+              priority: 1,
+              status: "backlog",
+            },
+          },
+          {
+            key: "web",
+            issue: {
+              title: "Batch web",
+              description: "Build the web client.",
+              priority: 2,
+              status: "backlog",
+            },
+          },
+          {
+            key: "qa",
+            issue: {
+              title: "Batch QA",
+              description: "Verify the integrated result.",
+              priority: 3,
+              status: "backlog",
+            },
+          },
+        ],
+        dependencies: [
+          { prerequisiteKey: "api", dependentKey: "web" },
+          { prerequisiteKey: "web", dependentKey: "qa" },
+        ],
+      },
+    };
+    const proposalId = await seedProposal(31, { payload });
+    const accepted = await worker.fetch(request(proposalId, projectAId), env());
+    expect(accepted.status).toBe(200);
+    const result = await accepted.json<{
+      outcome: string;
+      projectId: string;
+      resultRunId: string;
+      resultItems: Array<{ localKey: string; runId: string }>;
+    }>();
+    expect(result).toMatchObject({
+      outcome: "accepted",
+      projectId: projectAId,
+      resultRunId: result.resultItems[0]?.runId,
+      resultItems: [
+        { localKey: "api" },
+        { localKey: "web" },
+        { localKey: "qa" },
+      ],
+    });
+
+    const runs = await db.prepare(
+      `select id, source_key, title, status, project_id
+       from briar_hunt_runs
+       where json_extract(context_json, '$.proposalId') = ?
+       order by json_extract(context_json, '$.batchKey')`,
+    ).bind(proposalId).all<{
+      id: string;
+      source_key: string;
+      title: string;
+      status: string;
+      project_id: string;
+    }>();
+    expect(runs.results).toHaveLength(3);
+    expect(new Set(runs.results.map((run) => run.source_key)).size).toBe(3);
+    expect(runs.results.every(
+      (run) => run.status === "backlog" && run.project_id === projectAId,
+    )).toBe(true);
+
+    const mappings = await db.prepare(
+      `select local_key, run_id from briar_channel_issue_batch_items
+       where proposal_id = ? order by position`,
+    ).bind(proposalId).all<{ local_key: string; run_id: string }>();
+    expect(mappings.results).toEqual(result.resultItems.map((item) => ({
+      local_key: item.localKey,
+      run_id: item.runId,
+    })));
+    const runByKey = new Map(
+      result.resultItems.map((item) => [item.localKey, item.runId]),
+    );
+    const dependencies = await db.prepare(
+      `select prerequisite_run_id, dependent_run_id
+       from briar_issue_dependencies
+       where project_id = ? and prerequisite_run_id in (?, ?)
+       order by created_at, prerequisite_run_id`,
+    ).bind(
+      projectAId,
+      runByKey.get("api"),
+      runByKey.get("web"),
+    ).all<{ prerequisite_run_id: string; dependent_run_id: string }>();
+    expect(new Set(dependencies.results.map((edge) =>
+      `${edge.prerequisite_run_id}:${edge.dependent_run_id}`
+    ))).toEqual(new Set([
+      `${runByKey.get("api")}:${runByKey.get("web")}`,
+      `${runByKey.get("web")}:${runByKey.get("qa")}`,
+    ]));
+
+    const retried = await worker.fetch(request(proposalId, projectAId), env());
+    expect(retried.status).toBe(200);
+    await expect(retried.json()).resolves.toMatchObject({
+      outcome: "already_accepted",
+      resultItems: result.resultItems,
+    });
+    await expect(db.prepare(
+      `select count(*) as count from briar_hunt_runs
+       where json_extract(context_json, '$.proposalId') = ?`,
+    ).bind(proposalId).first<{ count: number }>()).resolves.toEqual({ count: 3 });
+
+    const channelResponse = await worker.fetch(new Request(
+      `https://briar.example/organizations/${organizationId}/channels/${channelId}/messages?parentMessageId=50000000-0000-4000-8000-00000000001f`,
+      { headers: { authorization: `Bearer ${ownerToken}` } },
+    ), env());
+    expect(channelResponse.status).toBe(200);
+    const channelBody = await channelResponse.json<{
+      messages: Array<{
+        proposal?: {
+          id: string;
+          resultItems?: Array<{ localKey: string; runId: string }>;
+        } | null;
+      }>;
+    }>();
+    expect(
+      channelBody.messages.find((message) => message.proposal?.id === proposalId)
+        ?.proposal?.resultItems,
+    ).toEqual(result.resultItems);
+  });
+
+  it("rolls back every batch issue and mapping when one dependency fails", async () => {
+    const payload = {
+      batch: {
+        items: [
+          {
+            key: "first",
+            issue: {
+              title: "Rollback first",
+              description: null,
+              priority: 2,
+              status: "backlog",
+            },
+          },
+          {
+            key: "second",
+            issue: {
+              title: "Rollback second",
+              description: null,
+              priority: 2,
+              status: "backlog",
+            },
+          },
+        ],
+        dependencies: [
+          { prerequisiteKey: "first", dependentKey: "second" },
+        ],
+      },
+    };
+    const proposalId = await seedProposal(32, { payload });
+    await db.prepare(
+      `create trigger test_reject_batch_dependency
+       before insert on briar_issue_dependencies
+       when new.created_at is not null
+       begin select raise(abort, 'forced batch dependency failure'); end`,
+    ).run();
+    const failed = await worker.fetch(request(proposalId, projectAId), env());
+    expect(failed.status).toBe(500);
+    await expect(db.prepare(
+      `select count(*) as count from briar_hunt_runs
+       where json_extract(context_json, '$.proposalId') = ?`,
+    ).bind(proposalId).first<{ count: number }>()).resolves.toEqual({ count: 0 });
+    await expect(db.prepare(
+      `select count(*) as count from briar_channel_issue_batch_items
+       where proposal_id = ?`,
+    ).bind(proposalId).first<{ count: number }>()).resolves.toEqual({ count: 0 });
+    await expect(db.prepare(
+      `select status, project_id from briar_channel_action_proposals
+       where id = ?`,
+    ).bind(proposalId).first()).resolves.toEqual({
+      status: "pending",
+      project_id: projectAId,
+    });
+
+    await db.prepare("drop trigger test_reject_batch_dependency").run();
+    const retried = await worker.fetch(request(proposalId, projectAId), env());
+    expect(retried.status).toBe(200);
+    await expect(retried.json()).resolves.toMatchObject({
+      outcome: "accepted",
+      resultItems: [{ localKey: "first" }, { localKey: "second" }],
+    });
+  });
+
+  it("rejects an invalid persisted batch before creating any issue", async () => {
+    const proposalId = await seedProposal(33, {
+      payload: {
+        issue: {
+          title: "Must not fall back to one issue",
+          description: null,
+          priority: 2,
+          status: "backlog",
+        },
+        batch: {
+          items: [{
+            key: "only",
+            issue: {
+              title: "Invalid batch",
+              description: null,
+              priority: null,
+              status: "backlog",
+            },
+          }],
+          dependencies: [
+            { prerequisiteKey: "missing", dependentKey: "only" },
+          ],
+        },
+      },
+    });
+    const response = await worker.fetch(request(proposalId, projectAId), env());
+    expect(response.status).toBe(400);
+    await expect(db.prepare(
+      `select count(*) as count from briar_hunt_runs
+       where json_extract(context_json, '$.proposalId') = ?`,
+    ).bind(proposalId).first<{ count: number }>()).resolves.toEqual({ count: 0 });
+  });
+
   it("prevents a project agent from preempting the approval identity namespace", async () => {
     for (const [index, sourceKey] of [
       `briar-channel-approved:${"f".repeat(64)}`,
+      `briar-channel-batch-approved:${"d".repeat(64)}`,
       "briar-channel-proposal:legacy-channel",
       `briar-conversation-approved:${"e".repeat(64)}`,
       "briar-conversation-proposal:legacy-conversation",

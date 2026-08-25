@@ -7747,6 +7747,19 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-proposal-card .channel-proposal-description-toggle,
 .companion-channel-proposal .channel-proposal-description-toggle { align-self:flex-start; border:0; background:transparent; padding:1px 0; color:var(--muted-foreground,#777168); font:inherit; font-size:11px; text-decoration:underline; }
 .channel-proposal-metadata { display:flex; flex-wrap:wrap; gap:3px 8px; }
+.channel-batch-proposal-details { gap:8px; }
+.channel-batch-proposal-summary { color:var(--foreground); font-size:12px; font-weight:650; }
+.channel-batch-proposal-items { margin:0; padding:0; display:grid; gap:5px; list-style:none; }
+.channel-batch-proposal-items li { min-width:0; padding:7px 8px; display:grid; grid-template-columns:auto minmax(0,1fr); gap:2px 7px; align-items:baseline; border:1px solid var(--border); border-radius:8px; background:color-mix(in srgb,var(--muted) 54%,transparent); }
+.channel-batch-proposal-items code { color:var(--primary); font-size:11px; font-weight:700; }
+.channel-batch-proposal-items li>span { min-width:0; color:var(--foreground); font-size:12px; font-weight:600; overflow-wrap:anywhere; }
+.channel-batch-proposal-items small { grid-column:2; min-width:0; color:var(--muted-foreground); font-size:10px; overflow-wrap:anywhere; }
+.channel-batch-proposal-result { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+.channel-batch-proposal-dependencies { display:grid; gap:4px; }
+.channel-batch-proposal-dependencies>strong { color:var(--foreground); font-size:11px; }
+.channel-batch-proposal-dependencies ul { margin:0; padding:0; display:flex; flex-wrap:wrap; gap:4px; list-style:none; }
+.channel-batch-proposal-dependencies li { padding:3px 6px; display:inline-flex; align-items:center; gap:4px; border-radius:6px; background:var(--muted); color:var(--muted-foreground); font-size:10px; }
+.channel-batch-proposal-dependencies code { color:inherit; font-size:inherit; }
 .channel-proposal-execution-intent { margin:4px 0 0; color:var(--foreground,#25221f); font-size:11px; line-height:1.4; overflow-wrap:anywhere; }
 .channel-proposal-card select {
   min-width:160px;

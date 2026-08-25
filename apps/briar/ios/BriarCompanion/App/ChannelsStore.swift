@@ -1173,6 +1173,7 @@ final class ChannelsStore: ObservableObject {
                 outcome: response.outcome,
                 projectId: response.projectId,
                 resultRunId: response.resultRunId,
+                resultItems: response.resultItems,
                 executionProposal: normalizedExecutionProposal,
                 dispatch: response.dispatch
             )
@@ -1199,6 +1200,7 @@ final class ChannelsStore: ObservableObject {
                         outcome: .alreadyAccepted,
                         projectId: projectID,
                         resultRunId: runID,
+                        resultItems: latest?.resultItems,
                         executionProposal: executionProposal(
                             forCreateProposalID: proposalID
                         ),
@@ -1786,7 +1788,8 @@ final class ChannelsStore: ObservableObject {
             status: .accepted,
             projectId: response.projectId,
             payload: proposal.payload,
-            resultRunId: response.resultRunId
+            resultRunId: response.resultRunId,
+            resultItems: response.resultItems ?? []
         )
     }
 

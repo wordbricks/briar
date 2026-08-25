@@ -14,6 +14,7 @@ import {
 } from "./channel-route-decoders";
 import {
   channelExecutionProposalTablesAvailable,
+  channelIssueBatchProposalTablesAvailable,
   channelReplyJson,
   channelSkillExecutionProposalTablesAvailable,
   completeChannelReply,
@@ -224,6 +225,16 @@ export async function handleChannelReplyResultRoute(
       );
     }
     if (
+      result.issueBatchProposal &&
+      !(await channelIssueBatchProposalTablesAvailable(db))
+    ) {
+      throw new HttpError(
+        503,
+        "Issue batch approval is not available during this upgrade",
+        "ISSUE_BATCH_APPROVAL_UNAVAILABLE",
+      );
+    }
+    if (
       result.delegation &&
       (agent.project_id !== null || job.delegated_by_reply_job_id !== null)
     ) {
@@ -232,6 +243,7 @@ export async function handleChannelReplyResultRoute(
     for (const projectId of [
       result.document?.projectId,
       result.issueProposal?.projectId,
+      result.issueBatchProposal?.projectId,
       result.executionProposal?.projectId,
     ]) {
       if (
@@ -253,6 +265,12 @@ export async function handleChannelReplyResultRoute(
       ? {
           ...result.issueProposal,
           projectId: result.issueProposal.projectId ?? agent.project_id,
+        }
+      : null;
+    const issueBatchProposal = result.issueBatchProposal
+      ? {
+          ...result.issueBatchProposal,
+          projectId: result.issueBatchProposal.projectId ?? agent.project_id,
         }
       : null;
     const executionProposal = result.executionProposal;
@@ -319,6 +337,7 @@ export async function handleChannelReplyResultRoute(
     for (const projectId of [
       document?.projectId,
       issueProposal?.projectId,
+      issueBatchProposal?.projectId,
       executionProposal?.projectId,
     ]) {
       if (!projectId) continue;
@@ -379,6 +398,7 @@ export async function handleChannelReplyResultRoute(
         body: result.body,
         document,
         issueProposal,
+        issueBatchProposal,
         executionProposal,
         skillExecutionProposal: Boolean(result.skillExecutionProposal),
         delegation,

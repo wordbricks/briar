@@ -277,6 +277,7 @@ describe("channel reply completion contract", () => {
       body: "Answer",
       document: null,
       issueProposal: null,
+      issueBatchProposal: null,
       executionProposal: null,
       skillExecutionProposal: null,
       delegation: null,
@@ -373,5 +374,73 @@ describe("channel reply completion contract", () => {
         issue: { ...proposal.issueProposal.issue, status: "queued" },
       },
     })).toBe(false);
+  });
+
+  it("accepts bounded acyclic issue batches and rejects invalid graphs", () => {
+    const issue = (title: string) => ({
+      title,
+      description: null,
+      priority: 2,
+      status: "backlog" as const,
+    });
+    const proposal = {
+      body: "Create the related backlog issues together.",
+      document: null,
+      issueProposal: null,
+      issueBatchProposal: {
+        projectId,
+        batch: {
+          items: [
+            { key: "api", issue: issue("Build API") },
+            { key: "ui", issue: issue("Build UI") },
+          ],
+          dependencies: [
+            { prerequisiteKey: "api", dependentKey: "ui" },
+          ],
+        },
+      },
+      executionProposal: null,
+      skillExecutionProposal: null,
+      delegation: null,
+    };
+    expect(accepts(channelReplyCompletionSchema, proposal)).toBe(true);
+
+    const invalidBatches = [
+      {
+        ...proposal.issueBatchProposal.batch,
+        items: [
+          { key: "same", issue: issue("A") },
+          { key: "same", issue: issue("B") },
+        ],
+      },
+      {
+        ...proposal.issueBatchProposal.batch,
+        dependencies: [{ prerequisiteKey: "missing", dependentKey: "ui" }],
+      },
+      {
+        ...proposal.issueBatchProposal.batch,
+        dependencies: [{ prerequisiteKey: "api", dependentKey: "api" }],
+      },
+      {
+        ...proposal.issueBatchProposal.batch,
+        dependencies: [
+          { prerequisiteKey: "api", dependentKey: "ui" },
+          { prerequisiteKey: "ui", dependentKey: "api" },
+        ],
+      },
+      {
+        items: Array.from({ length: 9 }, (_, index) => ({
+          key: `issue-${index}`,
+          issue: issue(`Issue ${index}`),
+        })),
+        dependencies: [],
+      },
+    ];
+    for (const batch of invalidBatches) {
+      expect(accepts(channelReplyCompletionSchema, {
+        ...proposal,
+        issueBatchProposal: { projectId, batch },
+      })).toBe(false);
+    }
   });
 });

@@ -243,6 +243,28 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-channel-attachment-preview")
     }
 
+    func testAcceptedIssueBatchShowsMappingsAndDependencies() {
+        let app = launchInsideCompanion(
+            additionalArguments: ["--ui-testing-batch-proposal"]
+        )
+
+        _ = openHomeChannel(in: app)
+
+        XCTAssertTrue(
+            app.staticTexts["한 번에 생성할 백로그 이슈 3개"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(app.staticTexts["승인 API 확장"].exists)
+        XCTAssertTrue(app.staticTexts["채널 결과 UI"].exists)
+        XCTAssertTrue(app.staticTexts["원자성 검증"].exists)
+        XCTAssertTrue(app.staticTexts["api → web"].exists)
+        XCTAssertTrue(app.staticTexts["web → qa"].exists)
+        XCTAssertTrue(
+            app.staticTexts["31313131-3131-4131-8131-313131313131"].exists
+        )
+        captureScreenshot(named: "companion-channel-accepted-issue-batch")
+    }
+
     func testChannelSentMessageAppearsImmediatelyWithoutSendingLabel() {
         let app = launchInsideCompanion(
             additionalArguments: ["--ui-testing-delayed-message-send"]
