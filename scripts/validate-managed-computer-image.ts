@@ -118,6 +118,19 @@ if (packages.includes("nodejs")) {
   fail("Debian Node.js must not replace the pinned Node.js runtime");
 }
 
+const remoteDesktopInstaller = await text(
+  join(image, "install-remote-desktop"),
+);
+if (remoteDesktopInstaller.includes("${binary:Package}=${Version}")) {
+  fail("package lock verification must not add Debian architecture qualifiers");
+}
+if (
+  !remoteDesktopInstaller.includes("--showformat='${Version}'") ||
+  !remoteDesktopInstaller.includes("printf '%s=%s\\n' \"$name\" \"$version\"")
+) {
+  fail("package lock verification must preserve requested package names");
+}
+
 const packer = await text(join(image, "image.pkr.hcl"));
 if (!packer.includes(`required_version = "= ${lock.PACKER_VERSION}"`)) {
   fail("Packer version differs from image lock");
