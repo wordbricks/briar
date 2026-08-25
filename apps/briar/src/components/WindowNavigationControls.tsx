@@ -6,6 +6,10 @@ import {
 } from "lucide-react";
 import { useEffect } from "react";
 import { useI18n } from "../i18n";
+import {
+  getRecordingKeybinding,
+  keyboardEventIsComposing,
+} from "../lib/keybindings";
 import { remoteDesktopCapturesKeyboard } from "../lib/remote-desktop-focus";
 
 export function WindowNavigationControls({
@@ -29,9 +33,9 @@ export function WindowNavigationControls({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (remoteDesktopCapturesKeyboard()) return;
+      if (getRecordingKeybinding() || remoteDesktopCapturesKeyboard()) return;
       if (
-        event.isComposing ||
+        keyboardEventIsComposing(event) ||
         !event.metaKey ||
         event.ctrlKey ||
         event.altKey ||
@@ -53,8 +57,8 @@ export function WindowNavigationControls({
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [canGoBack, canGoForward, onBack, onForward, onSettings]);
 
   return (

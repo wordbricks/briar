@@ -154,6 +154,7 @@ export function AppSettings({
   onAccountDelete,
   onAccountSave,
   onLoadUsageReport,
+  onSectionChange,
   onRefresh,
   projectId,
   projectName,
@@ -174,6 +175,7 @@ export function AppSettings({
     image: string | null;
   }) => Promise<SessionUser>;
   onLoadUsageReport?: () => Promise<AgentUsageReport>;
+  onSectionChange?: (section: SettingsSection) => void;
   onRefresh: () => Promise<unknown>;
   projectId: string;
   projectName: string;
@@ -232,6 +234,14 @@ export function AppSettings({
   useEffect(() => {
     setActiveSection(initialSection);
   }, [initialSection]);
+
+  const selectSection = useCallback(
+    (section: SettingsSection) => {
+      setActiveSection(section);
+      onSectionChange?.(section);
+    },
+    [onSectionChange],
+  );
 
   useEffect(() => {
     setGitEnabled(readProviderPreference(projectId, "git"));
@@ -508,7 +518,7 @@ export function AppSettings({
                   active={activeSection === item.id}
                   icon={item.icon}
                   key={item.id}
-                  onClick={() => setActiveSection(item.id)}
+                  onClick={() => selectSection(item.id)}
                 >
                   {item.label}
                 </SettingsNavItem>
@@ -545,7 +555,7 @@ export function AppSettings({
             </SettingsContent>
           ) : activeSection === "usage" ? (
             <AgentUsageSettings
-              onManageAccounts={() => setActiveSection("providers")}
+              onManageAccounts={() => selectSection("providers")}
               onLoadUsageReport={onLoadUsageReport}
               usageScopeKey={usageScopeKey}
             />

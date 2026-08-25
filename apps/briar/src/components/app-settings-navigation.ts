@@ -14,19 +14,8 @@ import {
 } from "lucide-react";
 
 import type { MessageKey } from "../i18n/messages";
-
-export type SettingsSection =
-  | "account"
-  | "general"
-  | "appearance"
-  | "notifications"
-  | "keybindings"
-  | "usage"
-  | "providers"
-  | "browser"
-  | "source-control"
-  | "connections"
-  | "archive";
+import type { AppSettingsSection as SettingsSection } from "../lib/app-navigation";
+export type { AppSettingsSection as SettingsSection } from "../lib/app-navigation";
 
 export type AppSettingsNavigationItem = {
   id: SettingsSection;
