@@ -13,7 +13,7 @@ gh
 git
 iproute2
 jq
-libappindicator3-dev
+libayatana-appindicator3-dev
 librsvg2-dev
 libssl-dev
 libwebkit2gtk-4.1-dev

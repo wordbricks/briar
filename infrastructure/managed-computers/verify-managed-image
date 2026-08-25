@@ -45,6 +45,7 @@ command -v make >/dev/null
 command -v pkg-config >/dev/null
 pkg-config --exists openssl
 pkg-config --exists webkit2gtk-4.1
+pkg-config --exists ayatana-appindicator3-0.1
 test -x /usr/bin/google-chrome-stable
 test -r /usr/share/applications/google-chrome.desktop
 grep -Fq 'Icon=google-chrome' /usr/share/applications/google-chrome.desktop

@@ -97,7 +97,7 @@ for (const required of [
   "fontconfig",
   "fonts-noto-cjk",
   "git",
-  "libappindicator3-dev",
+  "libayatana-appindicator3-dev",
   "librsvg2-dev",
   "libssl-dev",
   "libwebkit2gtk-4.1-dev",
