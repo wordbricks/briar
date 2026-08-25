@@ -31,10 +31,15 @@ import {
   type WorkerUpdateDirective,
 } from "./worker-update";
 import {
+  analysisWorktreePath,
+  extendCachedAnalysisWorktreeRetention,
   maintainIdleAnalysisWorktrees,
   projectWorktreeRoot,
 } from "./worktree";
-import { cleanupOrphanedOrganizationAgentWorkspaces } from "./organization-agent-context";
+import {
+  cleanupOrphanedOrganizationAgentWorkspaces,
+  prepareOrganizationAgentWorkspace,
+} from "./organization-agent-context";
 import {
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
@@ -510,6 +515,7 @@ async function workerCommand() {
           const reply = decodeClaimedChannelReply(issue);
           const renewed = await request<{
             leaseExpiresAt: string;
+            retainedUntil?: string | null;
             activity?: ChannelActivityCredential | null;
           }>(
             config.apiUrl,
@@ -527,6 +533,34 @@ async function workerCommand() {
           activeReplyActivityPublishers.get(reply.workId)?.updateCredential(
             renewed.activity ?? null,
           );
+          if (reply.session && renewed.retainedUntil) {
+            if (reply.projectId) {
+              const settings = worktreeSettings(project);
+              const root = projectWorktreeRoot(settings.root, project.id);
+              const path = analysisWorktreePath(
+                settings.root,
+                project.id,
+                reply.session.id,
+              );
+              if (activeCachedAnalysisWorktreePaths.has(path)) {
+                await extendCachedAnalysisWorktreeRetention({
+                  root,
+                  runId: reply.session.id,
+                  retainedUntil: renewed.retainedUntil,
+                });
+              }
+            } else {
+              await prepareOrganizationAgentWorkspace(
+                join(
+                  configDirectory,
+                  "worker-sessions",
+                  `channel-${reply.session.id}`,
+                ),
+                process.pid,
+                { reuse: true, retainedUntil: renewed.retainedUntil },
+              );
+            }
+          }
           return;
         }
         if (issue.workType === "issueReply") {
@@ -569,6 +603,9 @@ async function workerCommand() {
         if (Date.now() - lastAnalysisWorktreeSweepAt >= 5 * 60_000) {
           lastAnalysisWorktreeSweepAt = Date.now();
           try {
+            await cleanupOrphanedOrganizationAgentWorkspaces({
+              workerSessionsDirectory: join(configDirectory, "worker-sessions"),
+            });
             const maintenance = await maintainIdleAnalysisWorktrees(
               runGit,
               project.repositoryPath,

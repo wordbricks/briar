@@ -741,6 +741,7 @@ export async function hasAvailableChannelReplyWorker(
     organizationId: string;
     projectId: string | null;
     preferredDeviceId?: string | null;
+    preferredWorkerId?: string | null;
     provider: AgentProvider;
     model: string | null;
     effort: ModelEffort | null;
@@ -765,6 +766,7 @@ export async function hasAvailableChannelReplyWorker(
        where device.organization_id = ?
          and (? is null or worker.project_id = ?)
          and (? is null or device.id = ?)
+         and (? is null or worker.id = ?)
          and credential.revoked_at is null
          and (credential.expires_at is null or credential.expires_at > ?)
          and (
@@ -786,6 +788,8 @@ export async function hasAvailableChannelReplyWorker(
       input.projectId,
       input.preferredDeviceId ?? null,
       input.preferredDeviceId ?? null,
+      input.preferredWorkerId ?? null,
+      input.preferredWorkerId ?? null,
       input.observedAt,
       input.projectId,
       input.projectId,

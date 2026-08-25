@@ -12,6 +12,7 @@ import {
   channelReadInputSchema,
   channelReplyClaimInputSchema,
   channelReplyLeaseInputSchema,
+  channelReplySessionCheckpointInputSchema,
   channelUpdateInputSchema,
   channelWebhookInputSchema,
   directMessageInputSchema,
@@ -52,6 +53,9 @@ export const decodeChannelReplyClaimInput = decodeRequestSync(
 );
 export const decodeChannelReplyLeaseInput = decodeRequestSync(
   channelReplyLeaseInputSchema,
+);
+export const decodeChannelReplySessionCheckpointInput = decodeRequestSync(
+  channelReplySessionCheckpointInputSchema,
 );
 export const decodeChannelAgentActivityPublishInput = decodeRequestSync(
   ChannelAgentActivityPublishInput,

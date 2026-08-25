@@ -11,6 +11,7 @@ import { reconcileEnabledMergeQueueRuns } from "./merge-queue-reconcile";
 import { reconcileManagedComputers } from "./managed-computer-reconciliation";
 import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
 import { processSlackRevocationQueue } from "./slack-revocations";
+import { cleanupExpiredChannelReplySessions } from "./channels";
 
 export type ScheduledTaskDependencies = {
   archiveCompletedLogs: typeof archiveCompletedLogs;
@@ -21,6 +22,7 @@ export type ScheduledTaskDependencies = {
   reconcileGithubMergedRuns: typeof reconcileGithubMergedRuns;
   reconcileEnabledMergeQueueRuns: typeof reconcileEnabledMergeQueueRuns;
   reconcileManagedComputers: typeof reconcileManagedComputers;
+  cleanupExpiredChannelReplySessions: typeof cleanupExpiredChannelReplySessions;
 };
 
 interface DashboardChangePruneFailure {
@@ -36,6 +38,7 @@ const scheduledTaskDependencies: ScheduledTaskDependencies = {
   reconcileGithubMergedRuns,
   reconcileEnabledMergeQueueRuns,
   reconcileManagedComputers,
+  cleanupExpiredChannelReplySessions,
 };
 const GITHUB_RECONCILIATION_CRON = "* * * * *";
 const LOG_MAINTENANCE_CRON = "17 */6 * * *";
@@ -101,7 +104,8 @@ export async function handleScheduledTask(
           error: error instanceof Error ? error.message : String(error),
         }));
       }
-      const [archive, expired, cleanup, slackRevocations, github, managedComputers] =
+      const [archive, expired, cleanup, slackRevocations, github, managedComputers,
+        channelReplySessions] =
         await Promise.all([
         dependencies.archiveCompletedLogs(env.DB, env.ARCHIVES, observedAt),
         dependencies.expireArchives(
@@ -119,6 +123,7 @@ export async function handleScheduledTask(
         dependencies.processSlackRevocationQueue(env.DB, env, observedAt),
         dependencies.reconcileGithubMergedRuns(env.DB),
         dependencies.reconcileManagedComputers(env.DB, env, observedAt),
+        dependencies.cleanupExpiredChannelReplySessions(env.DB, { observedAt }),
       ]);
       await flushOrganizationInboxRealtimeOutbox(env, env.DB);
       if (dashboardChangePruneFailure !== null) {
@@ -134,6 +139,10 @@ export async function handleScheduledTask(
         slackRevocations,
         github,
         managedComputers,
+        channelReplySessions: channelReplySessions.map((session) => ({
+          sessionId: session.id,
+          reason: "ttl_expired",
+        })),
       }));
     } catch (error) {
       console.error(JSON.stringify({

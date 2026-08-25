@@ -37,6 +37,7 @@ import {
   allocateAnalysisWorktree,
   allocateCachedAnalysisWorktree,
   analysisWorktreePath,
+  extendCachedAnalysisWorktreeRetention,
   findExistingIssueWorktree,
   issueReplyWorkspaceMode,
   markCachedAnalysisWorktreeIdle,
@@ -648,24 +649,67 @@ async function runClaimedChannelReply(
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
   assertChannelReplyWorkspaceScope(reply, project.id);
+  const settings = worktreeSettings(project);
+  const worktreeRoot = projectWorktreeRoot(settings.root, project.id);
+  const sessionWorktreePath = reply.projectId && reply.session
+    ? analysisWorktreePath(settings.root, project.id, reply.session.id)
+    : null;
+  let sessionWorktree:
+    | Awaited<ReturnType<typeof allocateCachedAnalysisWorktree>>
+    | null = null;
+  if (sessionWorktreePath) {
+    retainCachedAnalysisWorktree(sessionWorktreePath);
+    try {
+      sessionWorktree = await allocateCachedAnalysisWorktree({
+        repositoryPath: project.repositoryPath,
+        projectId: project.id,
+        runId: reply.session!.id,
+        settings,
+        git: runGit,
+        retainedUntil: reply.session!.retainedUntil,
+      });
+    } catch (error) {
+      releaseCachedAnalysisWorktree(sessionWorktreePath);
+      throw error;
+    }
+  }
   const analysisWorktree = reply.projectId
-    ? await allocateAnalysisWorktree({
+    ? sessionWorktree ?? await allocateAnalysisWorktree({
         repositoryPath: project.repositoryPath,
         projectId: project.id,
         workId: reply.workId,
-        settings: worktreeSettings(project),
+        settings,
         git: runGit,
       })
     : null;
+  let retainedUntil = reply.session?.retainedUntil ?? null;
   const workspacePath =
     analysisWorktree?.path ??
-    join(configDirectory, "worker-sessions", `channel-${reply.workId}`);
+    join(
+      configDirectory,
+      "worker-sessions",
+      `channel-${reply.session?.id ?? reply.workId}`,
+    );
+  if (reply.session) {
+    console.log(`channel reply session: ${JSON.stringify({
+      sessionId: reply.session.id,
+      channelId: reply.channelId,
+      threadId: reply.session.threadId,
+      agentId: reply.agent?.id ?? null,
+      claimReason: reply.session.claimReason,
+      workspaceReused: sessionWorktree?.reused ?? false,
+      retainedUntil,
+    })}`);
+  }
   reportCheckpoint?.({ workspacePath });
   if (!analysisWorktree) {
     // A prior hard-killed attempt may have left a path behind. Recreate the
     // exact claim workspace so stale files or a planted symlink cannot become
     // trusted Organization Agent context.
-    await prepareOrganizationAgentWorkspace(workspacePath);
+    await prepareOrganizationAgentWorkspace(workspacePath, process.pid, {
+      reuse: Boolean(reply.session),
+      retainedUntil: retainedUntil ?? undefined,
+    });
   }
   const imageDirectory = channelReplyImageDirectory(workspacePath);
   let organizationContextCleaned = false;
@@ -720,22 +764,24 @@ async function runClaimedChannelReply(
           imagesCleaned = true;
         },
       },
-      {
-        label: analysisWorktree ? "analysis worktree" : "channel workspace",
-        run: async () => {
-          if (workspaceCleaned) return;
-          if (analysisWorktree) {
-            await removeAnalysisWorktree({
-              repositoryPath: project.repositoryPath,
-              path: analysisWorktree.path,
-              git: runGit,
-            });
-          } else {
-            await rm(workspacePath, { recursive: true, force: true });
-          }
-          workspaceCleaned = true;
-        },
-      },
+      ...(!reply.session
+        ? [{
+            label: analysisWorktree ? "analysis worktree" : "channel workspace",
+            run: async () => {
+              if (workspaceCleaned) return;
+              if (analysisWorktree) {
+                await removeAnalysisWorktree({
+                  repositoryPath: project.repositoryPath,
+                  path: analysisWorktree.path,
+                  git: runGit,
+                });
+              } else {
+                await rm(workspacePath, { recursive: true, force: true });
+              }
+              workspaceCleaned = true;
+            },
+          }]
+        : []),
     ]);
   try {
     const organizationContext = reply.scope.kind === "organization"
@@ -784,7 +830,8 @@ async function runClaimedChannelReply(
       delegation: reply.delegation,
       skillExecutionTarget: reply.skillExecutionTarget,
     });
-    let conversationId: string | null = reply.handoffContext?.conversationId ?? null;
+    let conversationId: string | null =
+      reply.session?.conversationId ?? reply.handoffContext?.conversationId ?? null;
     if (conversationId) reportCheckpoint?.({ conversationId });
     let lookupRounds = 0;
     let turnPrompt = prompt;
@@ -822,9 +869,39 @@ async function runClaimedChannelReply(
           workType: "channelReply",
         },
         onDiagnostic: logDetachedProviderTurnDiagnostic,
-        onConversationId: (nextConversationId) => {
+        onConversationId: async (nextConversationId) => {
           conversationId = nextConversationId;
           reportCheckpoint?.({ conversationId: nextConversationId });
+          if (reply.session) {
+            const checkpoint = await request<{ retainedUntil: string }>(
+              config.apiUrl,
+              `/channel-reply-claims/${reply.workId}/session`,
+              workerToken,
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  organizationId: reply.organizationId,
+                  workerId: registered.workerId,
+                  claimToken: reply.claimToken,
+                  conversationId: nextConversationId,
+                }),
+              },
+            );
+            retainedUntil = checkpoint.retainedUntil;
+            if (sessionWorktree) {
+              await extendCachedAnalysisWorktreeRetention({
+                root: worktreeRoot,
+                runId: reply.session.id,
+                retainedUntil,
+              });
+            } else if (!analysisWorktree) {
+              await prepareOrganizationAgentWorkspace(
+                workspacePath,
+                process.pid,
+                { reuse: true, retainedUntil },
+              );
+            }
+          }
         },
         onPayload: (payload) => {
           activityPublisher.observePayload(payload);
@@ -913,7 +990,9 @@ async function runClaimedChannelReply(
       ...generatedImages.files(),
     ], "Channel reply");
     await cleanupContext();
-    await request(
+    const completion = await request<{
+      session?: { retained_until?: string } | null;
+    }>(
       config.apiUrl,
       `/channel-reply-claims/${reply.workId}/complete`,
       workerToken,
@@ -923,17 +1002,45 @@ async function runClaimedChannelReply(
           organizationId: reply.organizationId,
           workerId: registered.workerId,
           claimToken: reply.claimToken,
+          conversationId,
           result,
           attachments: replyImages,
         }),
       },
     );
+    retainedUntil = completion.session?.retained_until ?? retainedUntil;
   } finally {
     activityPublisher.stop();
     if (activeReplyActivityPublishers.get(reply.workId) === activityPublisher) {
       activeReplyActivityPublishers.delete(reply.workId);
     }
-    await cleanupContext();
+    try {
+      await cleanupContext();
+    } finally {
+      if (sessionWorktree && sessionWorktreePath && reply.session) {
+        try {
+          await markCachedAnalysisWorktreeIdle({
+            root: worktreeRoot,
+            runId: reply.session.id,
+            worktree: sessionWorktree,
+            retainedUntil: retainedUntil ?? reply.session.retainedUntil,
+          });
+        } catch (error) {
+          console.error(
+            `channel session worktree retention update failed for ${reply.session.id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        } finally {
+          releaseCachedAnalysisWorktree(sessionWorktreePath);
+        }
+      } else if (!analysisWorktree && reply.session && retainedUntil) {
+        await prepareOrganizationAgentWorkspace(workspacePath, 0, {
+          reuse: true,
+          retainedUntil,
+        });
+      }
+    }
   }
 }
 

@@ -66,6 +66,7 @@ import { decodeTranscriptRequest } from "./transcript-request";
 import { slackCreateIssueShortcutCallbackId } from "./slack";
 
 const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
+  cleanupExpiredChannelReplySessions: vi.fn(async () => []),
   archiveCompletedLogs: vi.fn(async () => ({
     attemptedObjects: 0,
     completedObjects: 0,

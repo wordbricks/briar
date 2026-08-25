@@ -11,6 +11,7 @@ import { verifyChannelActivityPublishToken } from "./channel-activity-ticket";
 import {
   decodeChannelAgentActivityPublishInput,
   decodeChannelReplyLeaseInput,
+  decodeChannelReplySessionCheckpointInput,
 } from "./channel-route-decoders";
 import {
   channelExecutionProposalTablesAvailable,
@@ -18,11 +19,13 @@ import {
   channelReplyJson,
   channelSkillExecutionProposalTablesAvailable,
   completeChannelReply,
+  checkpointChannelReplySession,
   failChannelReply,
   getClaimedChannelReply,
   getClaimedChannelReplyAttachment,
   getChannelMessage,
   getOrganizationProject,
+  getChannelReplySession,
   listChannelAgents,
   renewChannelReplyLease,
 } from "./channels";
@@ -130,7 +133,7 @@ export async function handleChannelReplyResultRoute(
   }
 
   const channelReplyClaimMatch = pathname.match(
-    /^\/channel-reply-claims\/([0-9a-f-]+)\/(lease|complete)$/u,
+    /^\/channel-reply-claims\/([0-9a-f-]+)\/(lease|session|complete)$/u,
   );
   if (channelReplyClaimMatch && request.method === "POST") {
     if (channelReplyClaimMatch[2] === "lease") {
@@ -158,7 +161,37 @@ export async function handleChannelReplyResultRoute(
             deviceId: principal.deviceId,
           })
         : null;
-      return json({ leaseExpiresAt: renewed.lease_expires_at, activity });
+      const session = renewed.session_id
+        ? await getChannelReplySession(db, renewed.session_id)
+        : null;
+      return json({
+        leaseExpiresAt: renewed.lease_expires_at,
+        retainedUntil: session?.retained_until ?? null,
+        activity,
+      });
+    }
+
+    if (channelReplyClaimMatch[2] === "session") {
+      const input = decodeChannelReplySessionCheckpointInput(
+        await readJson(request),
+      );
+      const principal = await requireWorkerOrganization(
+        db,
+        request,
+        input.organizationId,
+      );
+      const session = await checkpointChannelReplySession(db, {
+        jobId: channelReplyClaimMatch[1],
+        deviceId: principal.deviceId,
+        workerId: input.workerId,
+        claimTokenHash: await sha256(input.claimToken),
+        conversationId: input.conversationId,
+        observedAt: new Date().toISOString(),
+      });
+      if (!session) {
+        throw new HttpError(409, "Reply claim is no longer active");
+      }
+      return json({ retainedUntil: session.retained_until });
     }
 
     const { input, attachments } = await readChannelReplyCompleteRequest(
@@ -405,6 +438,7 @@ export async function handleChannelReplyResultRoute(
         agentName: agent.name,
         agentProvider: job.agent_provider ?? agent.provider,
         completedAt: observedAt,
+        conversationId: input.conversationId,
         attachments: storedAttachments.map(({ file: _file, ...attachment }) =>
           attachment
         ),
@@ -421,6 +455,9 @@ export async function handleChannelReplyResultRoute(
     scheduleChannelActivityClear(env, completed, context);
     return json({
       agentReply: channelReplyJson(completed),
+      session: completed.session_id
+        ? await getChannelReplySession(db, completed.session_id)
+        : null,
       message: await getChannelMessage(
         db,
         job.channel_id,

@@ -12,6 +12,7 @@ import {
   COMPLETED_WORKTREE_RETENTION_MS,
   copyWorktreeIncludes,
   defaultWorktreeRoot,
+  extendCachedAnalysisWorktreeRetention,
   findExistingIssueWorktree,
   isPathWithinRoot,
   issueReplyWorkspaceMode,
@@ -19,6 +20,7 @@ import {
   listCompletedWorktrees,
   listIssueWorktrees,
   maintainIdleAnalysisWorktrees,
+  markCachedAnalysisWorktreeIdle,
   maintainTerminalIssueWorktree,
   parseRemoteTrackingBase,
   parseWorktreeIncludeFile,
@@ -783,9 +785,44 @@ describe("conversation worktree allocation", () => {
     }]);
     expect(calls.some((args) => args[1] === "remove")).toBe(false);
 
+    await markCachedAnalysisWorktreeIdle({
+      root: projectRoot,
+      runId,
+      worktree,
+      nowMs: 1_000,
+      retainedUntil: new Date(3_000).toISOString(),
+    });
     await expect(
       maintainIdleAnalysisWorktrees(git, "/repo", projectRoot, {
         nowMs: 2_000,
+        idleTtlMs: 500,
+      }),
+    ).resolves.toEqual([]);
+
+    await expect(extendCachedAnalysisWorktreeRetention({
+      root: projectRoot,
+      runId,
+      retainedUntil: new Date(5_000).toISOString(),
+      nowMs: 1_500,
+    })).resolves.toBe(true);
+    await expect(listCachedAnalysisWorktrees(projectRoot)).resolves.toEqual([
+      expect.objectContaining({
+        runId,
+        lastUsedAt: new Date(1_500).toISOString(),
+        retainedUntil: new Date(5_000).toISOString(),
+      }),
+    ]);
+
+    await expect(
+      maintainIdleAnalysisWorktrees(git, "/repo", projectRoot, {
+        nowMs: 4_000,
+        idleTtlMs: 500,
+      }),
+    ).resolves.toEqual([]);
+
+    await expect(
+      maintainIdleAnalysisWorktrees(git, "/repo", projectRoot, {
+        nowMs: 6_000,
         idleTtlMs: 500,
       }),
     ).resolves.toEqual([{

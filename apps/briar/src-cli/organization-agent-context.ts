@@ -116,14 +116,32 @@ export async function cleanupOrganizationAgentContext(workspacePath: string) {
 export async function prepareOrganizationAgentWorkspace(
   workspacePath: string,
   ownerPid = process.pid,
+  options: { reuse?: boolean; retainedUntil?: string } = {},
 ) {
-  await rm(workspacePath, { recursive: true, force: true });
+  if (!options.reuse) {
+    await rm(workspacePath, { recursive: true, force: true });
+  } else {
+    try {
+      const metadata = await lstat(workspacePath);
+      if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+        await rm(workspacePath, { recursive: true, force: true });
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
   await mkdir(workspacePath, { recursive: true, mode: 0o700 });
   await chmod(workspacePath, 0o700);
   const ownerPath = join(workspacePath, organizationAgentWorkspaceOwnerName);
+  const observedAt = new Date().toISOString();
   await writeFile(
     ownerPath,
-    `${JSON.stringify({ pid: ownerPid, createdAt: new Date().toISOString() })}\n`,
+    `${JSON.stringify({
+      pid: ownerPid,
+      createdAt: observedAt,
+      lastUsedAt: observedAt,
+      retainedUntil: options.retainedUntil ?? observedAt,
+    })}\n`,
     { mode: 0o600 },
   );
   await chmod(ownerPath, 0o600);
@@ -164,21 +182,29 @@ export async function cleanupOrphanedOrganizationAgentWorkspaces(input: {
     }
     if (!entry.isDirectory()) continue;
     let ownerPid: number | null = null;
+    let retainedUntil: number | null = null;
     try {
       const owner = JSON.parse(
         await readFile(
           join(workspacePath, organizationAgentWorkspaceOwnerName),
           "utf8",
         ),
-      ) as { pid?: unknown };
+      ) as { pid?: unknown; retainedUntil?: unknown };
       if (Number.isSafeInteger(owner.pid) && Number(owner.pid) > 0) {
         ownerPid = Number(owner.pid);
+      }
+      if (
+        typeof owner.retainedUntil === "string" &&
+        Number.isFinite(Date.parse(owner.retainedUntil))
+      ) {
+        retainedUntil = Date.parse(owner.retainedUntil);
       }
     } catch {
       const metadata = await lstat(workspacePath);
       if (now - metadata.mtimeMs < unownedWorkspaceGraceMs) continue;
     }
     if (ownerPid !== null && isProcessAlive(ownerPid)) continue;
+    if (retainedUntil !== null && retainedUntil > now) continue;
     await rm(workspacePath, { recursive: true, force: true });
   }
 }

@@ -48,6 +48,7 @@ export function channelReplyCompleteRequestBody(input: {
   organizationId: string;
   workerId: string;
   claimToken: string;
+  conversationId?: string | null;
   result: ChannelReplyCompletion;
   attachments: readonly File[];
 }) {
@@ -56,6 +57,7 @@ export function channelReplyCompleteRequestBody(input: {
       organizationId: input.organizationId,
       workerId: input.workerId,
       claimToken: input.claimToken,
+      conversationId: input.conversationId ?? null,
       result: input.result,
     },
     attachments: input.attachments,

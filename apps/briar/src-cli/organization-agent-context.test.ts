@@ -193,8 +193,16 @@ describe("Organization Agent context downloader", () => {
       workerSessionsDirectory,
       "channel-22222222-2222-4222-8222-222222222222",
     );
+    const retainedWorkspace = join(
+      workerSessionsDirectory,
+      "channel-33333333-3333-4333-8333-333333333333",
+    );
     await prepareOrganizationAgentWorkspace(deadWorkspace, 101);
     await prepareOrganizationAgentWorkspace(liveWorkspace, 202);
+    await prepareOrganizationAgentWorkspace(retainedWorkspace, 303, {
+      reuse: true,
+      retainedUntil: new Date(Date.now() + 6 * 60 * 60 * 1_000).toISOString(),
+    });
 
     await cleanupOrphanedOrganizationAgentWorkspaces({
       workerSessionsDirectory,
@@ -203,6 +211,7 @@ describe("Organization Agent context downloader", () => {
 
     await expect(access(deadWorkspace)).rejects.toThrow();
     await expect(access(liveWorkspace)).resolves.toBeUndefined();
+    await expect(access(retainedWorkspace)).resolves.toBeUndefined();
     expect((await stat(liveWorkspace)).mode & 0o777).toBe(0o700);
     expect(
       (await stat(join(liveWorkspace, ".briar-workspace-owner.json"))).mode &
