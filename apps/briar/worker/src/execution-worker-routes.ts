@@ -402,28 +402,26 @@ export async function handleExecutionWorkerRoute(
       db,
       principal.deviceId,
     );
-    const updateIsDraining = pendingBeforeHeartbeat?.handoffState === "draining";
+    const updateDirective = await completeExecutionWorkerUpdates(
+      db,
+      principal.deviceId,
+      input.versions?.briar,
+      observedAt,
+      pendingBeforeHeartbeat,
+    );
+    const updateIsPending = updateDirective !== null;
     const worker = await recordWorkerHeartbeat(db, binding.project_id, {
       workerId: workerHeartbeatMatch[1],
+      knownBinding: binding,
       versions: input.versions,
-      acceptingWork: updateIsDraining ? false : input.acceptingWork,
-      readinessState: updateIsDraining ? "busy" : input.readinessState,
-      readinessDetail: updateIsDraining
+      acceptingWork: updateIsPending ? false : input.acceptingWork,
+      readinessState: updateIsPending ? "busy" : input.readinessState,
+      readinessDetail: updateIsPending
         ? "계획된 업데이트 handoff를 진행 중입니다."
         : input.readinessDetail,
       capabilities: input.capabilities,
       observedAt,
     });
-    await completeExecutionWorkerUpdates(
-      db,
-      principal.deviceId,
-      input.versions?.briar,
-      observedAt,
-    );
-    const updateDirective = await pendingExecutionWorkerUpdate(
-      db,
-      principal.deviceId,
-    );
     if (hasExecutionWorkerReadinessChanged(binding, worker)) {
       await auditExecutionEvent(db, {
         organizationId: principal.organizationId,
@@ -439,19 +437,27 @@ export async function handleExecutionWorkerRoute(
         occurredAt: observedAt,
       });
     }
-    // A heartbeat is the cheapest regular touchpoint, so let it also recover
-    // runs whose holder stopped reporting.
-    const reaped = await reapStalledHuntRuns(db, binding.project_id, observedAt);
-    // Share the project workflow tool list so each worker can probe readiness
-    // against the same requirements, even when its local config is stale.
-    const projectSettings = await getProjectSettings(db, binding.project_id);
-    const projectWorkflow = projectSettings?.workflow_json
-      ? normalizeAutoHuntWorkflow(JSON.parse(projectSettings.workflow_json))
-      : null;
+    let reaped: Awaited<ReturnType<typeof reapStalledHuntRuns>> = [];
+    let workflowRequirements:
+      | ReturnType<typeof normalizeAutoHuntWorkflow>["requirements"]
+      | undefined;
+    // The client requests this on a five-minute cadence. Claims and dashboard
+    // reads remain independent reaper touchpoints for timely recovery.
+    if (input.refreshMaintenance === true) {
+      const [nextReaped, projectSettings] = await Promise.all([
+        reapStalledHuntRuns(db, binding.project_id, observedAt),
+        getProjectSettings(db, binding.project_id),
+      ]);
+      reaped = nextReaped;
+      const projectWorkflow = projectSettings?.workflow_json
+        ? normalizeAutoHuntWorkflow(JSON.parse(projectSettings.workflow_json))
+        : null;
+      workflowRequirements = projectWorkflow?.requirements ?? [];
+    }
     return json({
       worker: workerJson(worker, observedAt),
       reaped,
-      workflowRequirements: projectWorkflow?.requirements ?? [],
+      ...(workflowRequirements === undefined ? {} : { workflowRequirements }),
       updateDirective,
     });
   }

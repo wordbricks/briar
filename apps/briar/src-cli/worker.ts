@@ -99,6 +99,13 @@ export class WorkerUpdateDrainError extends Error {
   }
 }
 
+class WorkerHeartbeatError extends Error {
+  constructor(readonly cause: unknown) {
+    super(`Worker heartbeat failed: ${describe(cause)}`);
+    this.name = "WorkerHeartbeatError";
+  }
+}
+
 export const isReplyWork = (
   issue: Pick<ClaimedIssue, "workType">,
 ): boolean => issue.workType === "issueReply" || issue.workType === "channelReply";
@@ -148,6 +155,8 @@ export type WorkerLoopOptions = {
   idleDelayMs?: number;
   maxIdleDelayMs?: number;
   heartbeatIntervalMs?: number;
+  drainHeartbeatIntervalMs?: number;
+  maxHeartbeatErrorDelayMs?: number;
   leaseRenewIntervalMs?: number;
   maxErrorDelayMs?: number;
 };
@@ -160,7 +169,9 @@ export type WorkerLoopResult = {
 
 export const DEFAULT_IDLE_DELAY_MS = 15_000;
 export const DEFAULT_MAX_IDLE_DELAY_MS = 60_000;
-export const DEFAULT_HEARTBEAT_INTERVAL_MS = 60_000;
+export const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;
+export const DEFAULT_DRAIN_HEARTBEAT_INTERVAL_MS = 10_000;
+export const DEFAULT_MAX_HEARTBEAT_ERROR_DELAY_MS = 30_000;
 /** A 15-minute server lease leaves ample recovery margin at this cadence. */
 export const DEFAULT_LEASE_RENEW_INTERVAL_MS = 5 * 60_000;
 export const DEFAULT_MAX_ERROR_DELAY_MS = 5 * 60_000;
@@ -234,6 +245,24 @@ export function errorDelayMs(
   return Math.min(delay, maxDelayMs);
 }
 
+export function heartbeatErrorDelayMs(
+  consecutiveFailures: number,
+  maxDelayMs = DEFAULT_MAX_HEARTBEAT_ERROR_DELAY_MS,
+  random = Math.random,
+): number {
+  const delay = errorDelayMs(consecutiveFailures, maxDelayMs);
+  const jitter = 0.8 + Math.min(1, Math.max(0, random())) * 0.4;
+  return Math.max(1, Math.min(maxDelayMs, Math.round(delay * jitter)));
+}
+
+export function heartbeatDelayMs(
+  intervalMs = DEFAULT_HEARTBEAT_INTERVAL_MS,
+  random = Math.random,
+): number {
+  const jitter = 0.9 + Math.min(1, Math.max(0, random())) * 0.2;
+  return Math.max(1, Math.round(intervalMs * jitter));
+}
+
 /**
  * Empty queues back off separately from failures. A small jitter prevents a
  * fleet of workers that started together from polling in lockstep.
@@ -269,6 +298,10 @@ export async function runWorkerLoop(
   const idleDelayMs = options.idleDelayMs ?? DEFAULT_IDLE_DELAY_MS;
   const maxIdleDelayMs = options.maxIdleDelayMs ?? DEFAULT_MAX_IDLE_DELAY_MS;
   const heartbeatIntervalMs = options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
+  const drainHeartbeatIntervalMs =
+    options.drainHeartbeatIntervalMs ?? DEFAULT_DRAIN_HEARTBEAT_INTERVAL_MS;
+  const maxHeartbeatErrorDelayMs =
+    options.maxHeartbeatErrorDelayMs ?? DEFAULT_MAX_HEARTBEAT_ERROR_DELAY_MS;
   const leaseRenewIntervalMs =
     options.leaseRenewIntervalMs ?? DEFAULT_LEASE_RENEW_INTERVAL_MS;
   let maxConcurrentSessions = normalizeConcurrency(
@@ -280,9 +313,10 @@ export async function runWorkerLoop(
   let failures = 0;
   let consecutiveFailures = 0;
   let consecutiveEmptyClaims = 0;
-  // Negative infinity so the first iteration always beats: a worker that has
-  // not reported yet must not wait out a whole interval before appearing.
-  let lastHeartbeatAt = Number.NEGATIVE_INFINITY;
+  let consecutiveHeartbeatFailures = 0;
+  // Negative infinity makes the first iteration report immediately. Later
+  // deadlines are jittered so a fleet does not write to D1 in lockstep.
+  let nextHeartbeatAt = Number.NEGATIVE_INFINITY;
   const active = new Map<
     string,
     Promise<{ issue: ClaimedIssue; error: unknown | null; handedOff: boolean }>
@@ -317,8 +351,10 @@ export async function runWorkerLoop(
         heartbeat.maxConcurrentSessions,
       );
     }
-    if (heartbeat?.updateDirective) {
+    if (heartbeat && heartbeat.updateDirective !== undefined) {
       updateDirective = heartbeat.updateDirective;
+    }
+    if (updateDirective) {
       acceptingWork = false;
       for (const controller of activeControllers.values()) {
         if (!controller.signal.aborted) {
@@ -328,13 +364,22 @@ export async function runWorkerLoop(
     }
   };
   const reportState = async () => {
-    applyHeartbeat(
-      await dependencies.heartbeat(activeSlotCount > 0 ? "busy" : "ready"),
-    );
-    lastHeartbeatAt = dependencies.now();
+    try {
+      applyHeartbeat(
+        await dependencies.heartbeat(activeSlotCount > 0 ? "busy" : "ready"),
+      );
+      consecutiveHeartbeatFailures = 0;
+      nextHeartbeatAt = dependencies.now() + heartbeatDelayMs(
+        updateDirective ? drainHeartbeatIntervalMs : heartbeatIntervalMs,
+        dependencies.random,
+      );
+    } catch (error) {
+      consecutiveHeartbeatFailures += 1;
+      throw new WorkerHeartbeatError(error);
+    }
   };
   const beat = async () => {
-    if (dependencies.now() - lastHeartbeatAt < heartbeatIntervalMs) return;
+    if (dependencies.now() < nextHeartbeatAt) return;
     await reportState();
   };
 
@@ -512,14 +557,21 @@ export async function runWorkerLoop(
         );
       }
     } catch (error) {
+      const heartbeatFailed = error instanceof WorkerHeartbeatError;
       failures += 1;
-      consecutiveFailures += 1;
+      if (!heartbeatFailed) consecutiveFailures += 1;
       dependencies.log(`worker iteration failed: ${describe(error)}`);
       if (options.once && active.size === 0) {
         return { processed, failures, stoppedBecause: "once" };
       }
       await dependencies.sleep(
-        errorDelayMs(consecutiveFailures, options.maxErrorDelayMs),
+        heartbeatFailed
+          ? heartbeatErrorDelayMs(
+            consecutiveHeartbeatFailures,
+            maxHeartbeatErrorDelayMs,
+            dependencies.random,
+          )
+          : errorDelayMs(consecutiveFailures, options.maxErrorDelayMs),
       );
     }
 
@@ -530,7 +582,7 @@ export async function runWorkerLoop(
       if (queueWasEmpty) {
         const heartbeatDelayMs = Math.max(
           0,
-          heartbeatIntervalMs - (dependencies.now() - lastHeartbeatAt),
+          nextHeartbeatAt - dependencies.now(),
         );
         await dependencies.sleep(Math.min(emptyQueueDelayMs, heartbeatDelayMs));
       }
@@ -540,7 +592,7 @@ export async function runWorkerLoop(
     const executionFinished = Promise.race(active.values());
     const heartbeatDelayMs = Math.max(
       0,
-      heartbeatIntervalMs - (dependencies.now() - lastHeartbeatAt),
+      nextHeartbeatAt - dependencies.now(),
     );
     const waitDelayMs =
       queueWasEmpty && activeSlotCount < maxConcurrentSessions
