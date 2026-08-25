@@ -71,9 +71,8 @@ test "$(sudo -u briar -H bash -lc 'printf %s "$RUSTUP_HOME"')" = \
 sudo -u briar -H test -w /home/briar/.cargo
 sudo -u briar -H test -w /home/briar/.rustup/downloads
 sudo -u briar -H test -w /home/briar/.rustup/tmp
-test "$(sudo -u briar -H bash -lc \
-  'rustup run 1.96.0 rustc --version | awk '\''{print $2}'\'')" = \
-  "$RUST_TOOLCHAIN_VERSION"
+sudo -u briar -H bash -lc 'rustup run 1.96.0 rustc --version' \
+  | grep -Fq "rustc $RUST_TOOLCHAIN_VERSION "
 
 runner_count="$(find /opt/briar/lib/agent -maxdepth 1 -type f \
   -name '*-runner.js' | wc -l)"
