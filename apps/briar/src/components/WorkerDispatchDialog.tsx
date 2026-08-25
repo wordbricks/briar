@@ -39,7 +39,7 @@ import type {
   ProjectExecutionWorkerPolicy,
 } from "../types";
 import { NativeSelect } from "./NativeSelect";
-import { ProviderSelect } from "./ProviderSelect";
+import { ProviderModelSelector } from "./ProviderModelSelector";
 import { WorkerIcon } from "./WorkerIcon";
 
 export function WorkerDispatchDialog({
@@ -317,46 +317,41 @@ export function WorkerDispatchDialog({
         </DialogHeader>
 
         <div className="worker-dispatch-form">
-          <label>
-            <span><Waypoints size={15} />{t("worker.provider")}</span>
-            <ProviderSelect
-              label={t("worker.provider")}
-              onValueChange={(value) => {
-                selectionDirtyRef.current = true;
-                const nextProvider = value as AgentProvider;
-                setProvider(nextProvider);
-                setModel(defaultModelForProvider(nextProvider));
-                setEffort("");
-              }}
-              providers={healthyProviders}
-              value={provider}
-            />
-          </label>
-          <label>
-            <span><BrainCircuit size={15} />{t("issue.preferredModel")}</span>
-            <NativeSelect
-              label={t("issue.preferredModel")}
-              onValueChange={(value) => {
-                selectionDirtyRef.current = true;
-                setModel(value);
-                setEffort("");
-              }}
-              options={[
-                ...(!selectedModelKnown && model
-                  ? [{
-                      disabled: true,
-                      label: model,
-                      value: model,
-                    }]
-                  : []),
-                ...modelOptions,
-              ]}
-              searchable={provider === "opencode" || provider === "agy"}
-              searchEmptyMessage={t("issue.noModelsFound")}
-              searchPlaceholder={t("issue.searchModels")}
-              value={model}
-            />
-          </label>
+          <ProviderModelSelector
+            className="worker-provider-model-selector"
+            disabled={isDispatching || didDispatchSuccessfully}
+            groupLabel={`${t("worker.provider")} · ${t("issue.preferredModel")}`}
+            modelLabel={t("issue.preferredModel")}
+            modelOptions={[
+              ...(!selectedModelKnown && model
+                ? [{
+                    disabled: true,
+                    label: model,
+                    value: model,
+                  }]
+                : []),
+              ...modelOptions,
+            ]}
+            modelSearchable={provider === "opencode" || provider === "agy"}
+            modelSearchEmptyMessage={t("issue.noModelsFound")}
+            modelSearchPlaceholder={t("issue.searchModels")}
+            modelValue={model}
+            onModelChange={(value) => {
+              selectionDirtyRef.current = true;
+              setModel(value);
+              setEffort("");
+            }}
+            onProviderChange={(value) => {
+              selectionDirtyRef.current = true;
+              const nextProvider = value as AgentProvider;
+              setProvider(nextProvider);
+              setModel(defaultModelForProvider(nextProvider));
+              setEffort("");
+            }}
+            providerLabel={t("worker.provider")}
+            providers={healthyProviders}
+            providerValue={provider}
+          />
           <label>
             <span><BrainCircuit size={15} />{t("settings.effort")}</span>
             <NativeSelect
