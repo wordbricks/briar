@@ -8,7 +8,9 @@ import {
 import { managedComputerConfig } from "./managed-computer-model";
 import {
   beginManagedComputerDrain,
+  listDrainingManagedComputersForReconciliation,
   listManagedComputersForReconciliation,
+  managedComputerById,
   markManagedComputerReconciliationFailure,
   markManagedComputerStopped,
   markManagedComputerTerminated,
@@ -21,6 +23,141 @@ import {
   endManagedComputerRemoteSessionsAndDisconnect,
   expireStaleManagedComputerRemoteSessionsAndDisconnect,
 } from "./managed-computer-remote-service";
+
+export type ManagedComputerRetirementDependencies = {
+  managedComputerById: typeof managedComputerById;
+  listDrainingManagedComputersForReconciliation:
+    typeof listDrainingManagedComputersForReconciliation;
+  countExecutionWorkerDeviceSessions:
+    typeof countExecutionWorkerDeviceSessions;
+  stopManagedInstance: typeof stopManagedInstance;
+  markManagedComputerStopped: typeof markManagedComputerStopped;
+  endManagedComputerRemoteSessionsAndDisconnect:
+    typeof endManagedComputerRemoteSessionsAndDisconnect;
+  recordManagedComputerAuditEvent: typeof recordManagedComputerAuditEvent;
+};
+
+const managedComputerRetirementDependencies:
+  ManagedComputerRetirementDependencies = {
+    managedComputerById,
+    listDrainingManagedComputersForReconciliation,
+    countExecutionWorkerDeviceSessions,
+    stopManagedInstance,
+    markManagedComputerStopped,
+    endManagedComputerRemoteSessionsAndDisconnect,
+    recordManagedComputerAuditEvent,
+  };
+
+export type ManagedComputerStopAttempt =
+  | { outcome: "not_draining" }
+  | { outcome: "not_configured" }
+  | { outcome: "waiting"; activeSessions: number }
+  | { outcome: "stopped"; activeSessions: 0 }
+  | { outcome: "unchanged"; activeSessions: 0 };
+
+export async function reconcileDrainingManagedComputer(
+  db: D1Database,
+  env: Env,
+  managedComputerId: string,
+  observedAt: string,
+  dependencies = managedComputerRetirementDependencies,
+): Promise<ManagedComputerStopAttempt> {
+  const computer = await dependencies.managedComputerById(
+    db,
+    managedComputerId,
+  );
+  if (!computer || computer.state !== "draining") {
+    return { outcome: "not_draining" };
+  }
+  const config = managedComputerConfig(env);
+  if (!config.awsAccessKeyId || !config.awsSecretAccessKey) {
+    return { outcome: "not_configured" };
+  }
+  const activeSessions = computer.briar_device_id
+    ? await dependencies.countExecutionWorkerDeviceSessions(
+        db,
+        computer.briar_device_id,
+        observedAt,
+      )
+    : 0;
+  if (activeSessions > 0) return { outcome: "waiting", activeSessions };
+  if (computer.aws_instance_id) {
+    await dependencies.stopManagedInstance(
+      config,
+      computer.aws_region,
+      computer.aws_instance_id,
+    );
+  }
+  const updated = await dependencies.markManagedComputerStopped(
+    db,
+    computer.id,
+    observedAt,
+  );
+  if (!updated) return { outcome: "unchanged", activeSessions: 0 };
+  await dependencies.endManagedComputerRemoteSessionsAndDisconnect(db, env, {
+    managedComputerId: computer.id,
+    reason: "computer_stopped",
+    observedAt,
+  });
+  await dependencies.recordManagedComputerAuditEvent(db, {
+    organizationId: computer.organization_id,
+    managedComputerId: computer.id,
+    action: "stopped",
+    detail: { activeSessions: 0 },
+    occurredAt: observedAt,
+  });
+  return { outcome: "stopped", activeSessions: 0 };
+}
+
+export async function reconcileDrainingManagedComputers(
+  db: D1Database,
+  env: Env,
+  observedAt: string,
+  dependencies = managedComputerRetirementDependencies,
+) {
+  const config = managedComputerConfig(env);
+  if (!config.awsAccessKeyId || !config.awsSecretAccessKey) {
+    return { skipped: true, reason: "not_configured" as const };
+  }
+  const computers = await dependencies
+    .listDrainingManagedComputersForReconciliation(db);
+  let waiting = 0;
+  let stopped = 0;
+  let unchanged = 0;
+  let failed = 0;
+  for (const computer of computers) {
+    try {
+      const result = await reconcileDrainingManagedComputer(
+        db,
+        env,
+        computer.id,
+        observedAt,
+        dependencies,
+      );
+      if (result.outcome === "waiting") waiting += 1;
+      if (result.outcome === "stopped") stopped += 1;
+      if (["not_draining", "unchanged"].includes(result.outcome)) {
+        unchanged += 1;
+      }
+    } catch (error) {
+      failed += 1;
+      console.error(JSON.stringify({
+        message: "Managed computer stop retry failed",
+        managedComputerId: computer.id,
+        observedAt,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    }
+  }
+  return {
+    skipped: false,
+    checked: computers.length,
+    waiting,
+    stopped,
+    unchanged,
+    failed,
+  };
+}
 
 export async function reconcileManagedComputers(
   db: D1Database,
@@ -72,37 +209,22 @@ export async function reconcileManagedComputers(
       continue;
     }
     if (computer.state === "draining") {
-      const activeSessions = computer.briar_device_id
-        ? await countExecutionWorkerDeviceSessions(
-            db,
-            computer.briar_device_id,
-            observedAt,
-          )
-        : 0;
-      if (activeSessions === 0) {
-        if (computer.aws_instance_id) {
-          await stopManagedInstance(
-            config,
-            computer.aws_region,
-            computer.aws_instance_id,
-          );
-        }
-        const updated = await markManagedComputerStopped(db, computer.id, observedAt);
-        if (updated) {
-          stopped += 1;
-          await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
-            managedComputerId: computer.id,
-            reason: "computer_stopped",
-            observedAt,
-          });
-          await recordManagedComputerAuditEvent(db, {
-            organizationId: computer.organization_id,
-            managedComputerId: computer.id,
-            action: "stopped",
-            detail: { activeSessions },
-            occurredAt: observedAt,
-          });
-        }
+      try {
+        const result = await reconcileDrainingManagedComputer(
+          db,
+          env,
+          computer.id,
+          observedAt,
+        );
+        if (result.outcome === "stopped") stopped += 1;
+      } catch (error) {
+        failed += 1;
+        console.error(JSON.stringify({
+          message: "Managed computer stop reconciliation failed",
+          managedComputerId: computer.id,
+          observedAt,
+          error: error instanceof Error ? error.message : String(error),
+        }));
       }
       continue;
     }

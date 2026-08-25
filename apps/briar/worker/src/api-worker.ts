@@ -194,6 +194,7 @@ async function route(
     auth,
     db,
     env,
+    context,
   });
   if (managedComputerResponse !== undefined) return managedComputerResponse;
 
