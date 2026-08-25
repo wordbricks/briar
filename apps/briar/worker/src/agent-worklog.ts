@@ -282,6 +282,34 @@ const rawSegmentObjectKey = (
   `${String(firstSequence).padStart(12, "0")}-` +
   `${String(lastSequence).padStart(12, "0")}-${digest}.jsonl.gz`;
 
+/**
+ * Low-frequency recovery path for repairing session totals after manual data
+ * maintenance. Normal transcript ingest relies on the segment delta triggers
+ * installed by migration 0135 and must not call this full rescan.
+ */
+export async function recalculateAgentTranscriptSessionTotals(
+  db: D1Database,
+  sessionId: string,
+) {
+  await db
+    .prepare(
+      `update briar_agent_transcript_sessions
+       set event_count = coalesce((
+             select sum(event_count)
+             from briar_agent_transcript_segments
+             where session_id = ?
+           ), 0),
+           byte_count = coalesce((
+             select sum(uncompressed_bytes)
+             from briar_agent_transcript_segments
+             where session_id = ?
+           ), 0)
+       where session_id = ?`,
+    )
+    .bind(sessionId, sessionId, sessionId)
+    .run();
+}
+
 async function storeRawSegment(
   db: D1Database,
   bucket: R2Bucket,
@@ -306,33 +334,7 @@ async function storeRawSegment(
       "Transcript segment sequence range was reused with different content",
     );
   }
-  const refreshSessionTotals = async () => {
-    await db
-      .prepare(
-        `update briar_agent_transcript_sessions
-         set event_count = coalesce((
-               select sum(event_count)
-               from briar_agent_transcript_segments
-               where session_id = ?
-             ), 0),
-             byte_count = coalesce((
-               select sum(uncompressed_bytes)
-               from briar_agent_transcript_segments
-               where session_id = ?
-             ), 0),
-             last_event_at = max(last_event_at, ?)
-         where session_id = ?`,
-      )
-      .bind(
-        sessionId,
-        sessionId,
-        recordedAt,
-        sessionId,
-      )
-      .run();
-  };
   if (existing) {
-    await refreshSessionTotals();
     return { row: existing, stored: false };
   }
 
@@ -422,10 +424,8 @@ async function storeRawSegment(
         "Transcript segment changed while it was being stored",
       );
     }
-    await refreshSessionTotals();
     return { row: concurrent, stored: false };
   }
-  await refreshSessionTotals();
   return { row, stored: true };
 }
 
