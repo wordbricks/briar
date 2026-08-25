@@ -65,9 +65,15 @@ for binary in \
     "/opt/briar/bin/$binary"
 done
 test "$(sudo -u briar -H bash -lc 'printf %s "$CARGO_HOME"')" = \
-  "/opt/briar/cargo"
+  "/home/briar/.cargo"
 test "$(sudo -u briar -H bash -lc 'printf %s "$RUSTUP_HOME"')" = \
-  "/opt/briar/rustup"
+  "/home/briar/.rustup"
+sudo -u briar -H test -w /home/briar/.cargo
+sudo -u briar -H test -w /home/briar/.rustup/downloads
+sudo -u briar -H test -w /home/briar/.rustup/tmp
+test "$(sudo -u briar -H bash -lc \
+  'rustup run 1.96.0 rustc --version | awk '\''{print $2}'\'')" = \
+  "$RUST_TOOLCHAIN_VERSION"
 
 runner_count="$(find /opt/briar/lib/agent -maxdepth 1 -type f \
   -name '*-runner.js' | wc -l)"
@@ -107,9 +113,9 @@ test "$(systemctl show briar-managed-worker.service --property=User --value)" = 
 test "$(systemctl show briar-managed-worker.service --property=Group --value)" = \
   "briar"
 systemctl show briar-managed-worker.service --property=Environment --value \
-  | grep -Fq 'CARGO_HOME=/opt/briar/cargo'
+  | grep -Fq 'CARGO_HOME=/home/briar/.cargo'
 systemctl show briar-managed-worker.service --property=Environment --value \
-  | grep -Fq 'RUSTUP_HOME=/opt/briar/rustup'
+  | grep -Fq 'RUSTUP_HOME=/home/briar/.rustup'
 if systemctl cat briar-managed-worker.service | grep -q 'briar_worker_'; then
   echo "Managed worker unit contains credential material" >&2
   exit 1

@@ -1,9 +1,15 @@
 #!/bin/sh
 
-# Briar-managed runtime tools are immutable image inputs. Keep this directory
-# first so interactive terminals and Agent child shells use the pinned tools.
-export CARGO_HOME=/opt/briar/cargo
-export RUSTUP_HOME=/opt/briar/rustup
+# Briar-managed runtime tools are immutable image inputs. The managed user gets
+# writable Cargo and rustup state layered over the pinned toolchain so ordinary
+# issue work can build Rust projects without mutating the image installation.
+if [ "${HOME:-}" = "/home/briar" ]; then
+  export CARGO_HOME=/home/briar/.cargo
+  export RUSTUP_HOME=/home/briar/.rustup
+else
+  export CARGO_HOME=/opt/briar/cargo
+  export RUSTUP_HOME=/opt/briar/rustup
+fi
 export BUN_INSTALL_CACHE_DIR="${HOME}/.cache/bun"
 export BRIAR_CI_SERIAL_CONTEXTS=true
 export VITEST_MAX_WORKERS=2
@@ -11,5 +17,9 @@ export VITEST_MAX_WORKERS=2
 case ":${PATH:-}:" in
   *:/opt/briar/bin:*) ;;
   *) PATH="/opt/briar/bin${PATH:+:${PATH}}" ;;
+esac
+case ":${PATH:-}:" in
+  *:"${CARGO_HOME}/bin":*) ;;
+  *) PATH="${PATH:+${PATH}:}${CARGO_HOME}/bin" ;;
 esac
 export PATH

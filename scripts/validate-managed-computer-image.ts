@@ -165,6 +165,17 @@ if (!installer.includes("--frozen-lockfile --production --ignore-scripts")) {
 if (!installer.includes("agent-browser/bin/agent-browser-linux-x64")) {
   fail("agent-browser must install its pinned Linux native binary directly");
 }
+for (const required of [
+  "/home/briar/.cargo/bin",
+  "/home/briar/.rustup/downloads",
+  "/home/briar/.rustup/tmp",
+  "/home/briar/.rustup/toolchains",
+  'chown -h briar:briar "$user_toolchain"',
+]) {
+  if (!installer.includes(required)) {
+    fail(`image installer omits writable managed-user Rust state: ${required}`);
+  }
+}
 if (!installer.includes("sha256sum --check --strict artifact-manifest.sha256")) {
   fail("image installer does not verify the uploaded artifact manifest");
 }
@@ -183,8 +194,8 @@ for (const required of [
 
 const profile = await text(join(image, "briar-runtime-profile.sh"));
 for (const required of [
-  "CARGO_HOME=/opt/briar/cargo",
-  "RUSTUP_HOME=/opt/briar/rustup",
+  "CARGO_HOME=/home/briar/.cargo",
+  "RUSTUP_HOME=/home/briar/.rustup",
   "BRIAR_CI_SERIAL_CONTEXTS=true",
   "VITEST_MAX_WORKERS=2",
   "/opt/briar/bin",
@@ -236,6 +247,16 @@ if (!verifier.includes('export HOME="${HOME:-/root}"')) {
 if (!verifier.includes("command -v xfdesktop >/dev/null")) {
   fail("image verifier must require the XFCE desktop process");
 }
+for (const required of [
+  "test -w /home/briar/.cargo",
+  "test -w /home/briar/.rustup/downloads",
+  "test -w /home/briar/.rustup/tmp",
+  "rustup run 1.96.0 rustc --version",
+]) {
+  if (!verifier.includes(required)) {
+    fail(`image verifier omits managed-user Rust check: ${required}`);
+  }
+}
 for (const forbidden of [
   "/home/admin/.ssh",
   "/root/.aws",
@@ -258,8 +279,8 @@ for (const required of [
   "User=briar",
   "Group=briar",
   "BRIAR_MANAGED_CREDENTIAL_FILE=/var/lib/briar/worker-credential.json",
-  "CARGO_HOME=/opt/briar/cargo",
-  "RUSTUP_HOME=/opt/briar/rustup",
+  "CARGO_HOME=/home/briar/.cargo",
+  "RUSTUP_HOME=/home/briar/.rustup",
   "BRIAR_CI_SERIAL_CONTEXTS=true",
   "VITEST_MAX_WORKERS=2",
   "ExecStart=/opt/briar/bin/briar managed-computer worker-supervisor",
