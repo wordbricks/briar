@@ -160,15 +160,11 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(selector?.getAttribute("aria-label")).toContain("실행 프로바이더");
     expect(selector?.getAttribute("aria-label")).toContain("선호 모델");
     expect(
-      selector?.querySelector<HTMLButtonElement>('[aria-label="실행 프로바이더"]')
+      selector?.querySelector<HTMLButtonElement>(".provider-model-selector-trigger")
         ?.disabled,
     ).toBe(true);
     expect(
-      selector?.querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')
-        ?.disabled,
-    ).toBe(true);
-    expect(
-      selector?.querySelector(".provider-model-selector-model .select-menu-leading-icon svg"),
+      selector?.querySelector(".provider-model-selector-trigger-icon svg"),
     ).not.toBeNull();
 
     await act(async () => root.unmount());
@@ -356,18 +352,25 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
     await act(async () => {
       document.body
-        .querySelector<HTMLButtonElement>('[aria-label="실행 프로바이더"]')
+        .querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')
         ?.click();
     });
     expect(
       document.body.querySelector(
-        '.select-menu-option[data-value="grok"]',
+        '.provider-model-picker-provider[data-provider="grok"]',
       ),
     ).toBeNull();
     await act(async () => {
       document.body
         .querySelector<HTMLButtonElement>(
-          '.select-menu-option[data-value="claude"]',
+          '.provider-model-picker-provider[data-provider="claude"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document.body
+        .querySelector<HTMLElement>(
+          '.provider-model-picker-option[data-provider="claude"][data-value=""]',
         )
         ?.click();
     });
@@ -483,18 +486,18 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     });
     expect(
       document.body.querySelector(
-        '.select-menu-option[data-value="anthropic/claude-opus-4-6"]',
+        '.provider-model-picker-option[data-value="anthropic/claude-opus-4-6"]',
       ),
     ).not.toBeNull();
     expect(
       document.body.querySelector(
-        '.select-menu-option[data-value="openai/gpt-5.6"]',
+        '.provider-model-picker-option[data-value="openai/gpt-5.6"]',
       ),
     ).toBeNull();
     await act(async () => {
       document.body
         .querySelector<HTMLButtonElement>(
-          '.select-menu-option[data-value="anthropic/claude-opus-4-6"]',
+          '.provider-model-picker-option[data-value="anthropic/claude-opus-4-6"]',
         )
         ?.click();
     });
@@ -547,13 +550,13 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await act(async () => modelSelect.click());
     expect(
       document.body.querySelector(
-        '.select-menu-option[data-value="gpt-retired-preview"]',
+        '.provider-model-picker-option[data-value="gpt-retired-preview"]',
       ),
     ).not.toBeNull();
     await act(async () => {
       document.body
         .querySelector<HTMLButtonElement>(
-          '.select-menu-option[data-value="gpt-5.6-sol"]',
+          '.provider-model-picker-option[data-value="gpt-5.6-sol"]',
         )
         ?.click();
     });
@@ -596,13 +599,10 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       );
     });
 
-    const providerSelect = document.body.querySelector<HTMLButtonElement>(
-      '[aria-label="실행 프로바이더"]',
+    const providerModelSelect = document.body.querySelector<HTMLButtonElement>(
+      '[aria-label="선호 모델"]',
     )!;
-    await act(async () => providerSelect.click());
-    expect(
-      document.body.querySelector('.select-menu-option[data-value="codex"]'),
-    ).toBeNull();
+    expect(providerModelSelect.disabled).toBe(true);
     const approve = Array.from(
       document.body.querySelectorAll<HTMLButtonElement>("button"),
     ).find((button) => button.textContent?.includes("승인하고 실행"))!;
@@ -681,25 +681,20 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     });
     await act(async () => {
       document.body
-        .querySelector<HTMLButtonElement>('[aria-label="실행 프로바이더"]')
-        ?.click();
-    });
-    await act(async () => {
-      document.body
-        .querySelector<HTMLButtonElement>(
-          '.select-menu-option[data-value="claude"]',
-        )
-        ?.click();
-    });
-    await act(async () => {
-      document.body
         .querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')
         ?.click();
     });
     await act(async () => {
       document.body
         .querySelector<HTMLButtonElement>(
-          '.select-menu-option[data-value="opus"]',
+          '.provider-model-picker-provider[data-provider="claude"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document.body
+        .querySelector<HTMLElement>(
+          '.provider-model-picker-option[data-provider="claude"][data-value="opus"]',
         )
         ?.click();
     });
@@ -777,7 +772,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     });
     const modelValues = Array.from(
       document.body.querySelectorAll<HTMLElement>(
-        ".select-menu-option[data-value]",
+        ".provider-model-picker-option[data-value]",
       ),
     ).map((option) => option.dataset.value);
     expect(modelValues).toEqual([

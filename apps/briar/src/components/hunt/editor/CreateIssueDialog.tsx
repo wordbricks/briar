@@ -11,7 +11,7 @@ import { issueTitleInputMaxLength, issueTitleLength, isIssueTitleWithinLimit } f
 import { clearCreateIssueDraft, loadCreateIssueDraft, saveCreateIssueDraft } from "@/lib/create-issue-draft";
 import { removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
 import type { CreateIssueInput, OrganizationMember, Project } from "@/types";
-import { agentEffortOptions, agentModelOptions, agentProviders, type AgentProvider, type ModelEffort } from "@/lib/project-llm";
+import { agentEffortOptions, agentProviders, type AgentProvider, type ModelEffort } from "@/lib/project-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
 import { useAgentProviderModelPreferences } from "@/hooks/useAgentProviderModelPreferences";
 import { useI18n } from "@/i18n";
@@ -262,17 +262,17 @@ export function CreateIssueDialog({
             label: t("issue.priority4"),
             value: "4"
           }]} value={priority} />
-            <ProviderModelSelector className="issue-provider-model-selector" compact disabled={isSubmitting} groupLabel={`${t("issue.preferredProvider")} · ${t("issue.preferredModel")}`} modelClassName="issue-model-select" modelDisabled={!preferredProvider} modelLabel={t("issue.preferredModel")} modelOptions={preferredProvider ? agentModelOptions(providerModels, preferredProvider as AgentProvider, t("settings.providerDefaultModel"), preferredModel, providerModelPreferences[preferredProvider as AgentProvider].favoriteModels) : []} modelPlaceholder={t("issue.selectProviderFirst")} modelSearchEmptyMessage={t("issue.noModelsFound")} modelSearchPlaceholder={t("issue.searchModels")} modelSearchable={preferredProvider === "opencode" || preferredProvider === "agy"} modelValue={preferredModel} onModelChange={value => {
+            <ProviderModelSelector className="issue-provider-model-selector" compact disabled={isSubmitting} groupLabel={`${t("issue.preferredProvider")} · ${t("issue.preferredModel")}`} modelLabel={t("issue.preferredModel")} modelSearchEmptyMessage={t("issue.noModelsFound")} modelSearchPlaceholder={t("issue.searchModels")} modelValue={preferredModel} onModelChange={value => {
             setPreferredModel(value);
             setPreferredEffort("");
           }} onProviderChange={value => {
             setPreferredProvider(value);
             setPreferredModel(value ? providerModelPreferences[value as AgentProvider].defaultModel ?? "" : "");
             setPreferredEffort("high");
-          }} providerClassName="issue-provider-select" providerEmptyOption={{
+          }} providerDefaultModelLabel={t("settings.providerDefaultModel")} providerEmptyOption={{
             label: t("issue.agentDefault"),
             value: ""
-          }} providerLabel={t("issue.preferredProvider")} providers={availableProviders} providerValue={preferredProvider} />
+          }} providerLabel={t("issue.preferredProvider")} providerModels={providerModels} providers={availableProviders} providerValue={preferredProvider} />
             <NativeSelect className="issue-effort-select" disabled={!preferredProvider || !preferredModel} label={t("settings.effort")} onValueChange={setPreferredEffort} options={preferredProvider ? [{
             label: t("settings.providerDefaultEffort"),
             value: ""

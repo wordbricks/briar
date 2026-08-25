@@ -437,25 +437,20 @@ describe("IssueExecutionApproval", () => {
     });
     await act(async () => {
       document.body
-        .querySelector<HTMLButtonElement>('[aria-label="실행 프로바이더"]')
-        ?.click();
-    });
-    await act(async () => {
-      document.body
-        .querySelector<HTMLButtonElement>(
-          '.select-menu-option[data-value="opencode"]',
-        )
-        ?.click();
-    });
-    await act(async () => {
-      document.body
         .querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')
         ?.click();
     });
     await act(async () => {
       document.body
         .querySelector<HTMLButtonElement>(
-          '.select-menu-option[data-value="openai/custom-agent"]',
+          '.provider-model-picker-provider[data-provider="opencode"]',
+        )
+        ?.click();
+    });
+    await act(async () => {
+      document.body
+        .querySelector<HTMLElement>(
+          '.provider-model-picker-option[data-provider="opencode"][data-value="openai/custom-agent"]',
         )
         ?.click();
     });
@@ -493,13 +488,12 @@ describe("IssueExecutionApproval", () => {
 
     expect(
       document.body.querySelector<HTMLButtonElement>(
-        '[aria-label="실행 프로바이더"]',
-      )?.textContent,
-    ).toContain("OpenCode");
-    expect(
-      document.body.querySelector<HTMLButtonElement>(
         '[aria-label="선호 모델"]',
-      )?.textContent,
+      )?.dataset.provider,
+    ).toBe("opencode");
+    expect(
+      document.body.querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')
+        ?.textContent,
     ).toContain("Custom Agent");
     expect(workerCard.getAttribute("aria-pressed")).toBe("true");
     expect(onAccept).toHaveBeenCalledTimes(1);

@@ -303,26 +303,23 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(selector?.classList.contains("is-compact")).toBe(true);
     expect(selector?.getAttribute("aria-label")).toContain("선호 프로바이더");
     expect(selector?.getAttribute("aria-label")).toContain("선호 모델");
-    expect(selector?.querySelector(".issue-model-select .select-menu-leading-icon svg")).not.toBeNull();
+    expect(selector?.querySelector(".provider-model-selector-trigger-icon svg")).not.toBeNull();
     const titleInput = container.querySelector<HTMLInputElement>(".issue-title-input");
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(titleInput, "Preferred execution issue");
       titleInput?.dispatchEvent(new Event("input", {
         bubbles: true
       }));
-      container.querySelector<HTMLButtonElement>(".issue-provider-select .select-menu-trigger")?.click();
+      container.querySelector<HTMLButtonElement>(".provider-model-selector-trigger")?.click();
     });
     await act(async () => {
-      document.querySelector<HTMLButtonElement>('[role="option"][data-value="claude"]')?.click();
-    });
-    expect(container.querySelector<HTMLButtonElement>(".issue-provider-select .select-menu-trigger")?.textContent).toContain("Claude");
-    expect(container.querySelector(".issue-provider-select .select-menu-trigger-leading svg")).not.toBeNull();
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>(".issue-model-select .select-menu-trigger")?.click();
+      document.querySelector<HTMLButtonElement>('.provider-model-picker-provider[data-provider="claude"]')?.click();
     });
     await act(async () => {
-      document.querySelector<HTMLButtonElement>('[role="option"][data-value="sonnet"]')?.click();
+      document.querySelector<HTMLElement>('.provider-model-picker-option[data-provider="claude"][data-value="sonnet"]')?.click();
     });
+    expect(container.querySelector<HTMLButtonElement>(".provider-model-selector-trigger")?.textContent).toContain("Claude Sonnet");
+    expect(container.querySelector(".provider-model-selector-trigger-icon svg")).not.toBeNull();
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".issue-effort-select .select-menu-trigger")?.click();
     });
@@ -346,8 +343,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       root.render(<CreateIssueDialog {...projectProps} isSubmitting onClose={() => undefined} onCreate={async () => undefined} />);
     });
     const selector = container.querySelector('.issue-provider-model-selector[role="group"]');
-    expect(selector?.querySelector<HTMLButtonElement>('[aria-label="선호 프로바이더"]')?.disabled).toBe(true);
-    expect(selector?.querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')?.disabled).toBe(true);
+    expect(selector?.querySelector<HTMLButtonElement>('.provider-model-selector-trigger')?.disabled).toBe(true);
     await act(async () => root.unmount());
   });
   it("keeps provider, model, and effort menus in a stable order", async () => {
@@ -388,29 +384,27 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         error: null
       }
     });
-    const optionValues = () => Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'), option => option.dataset.value);
+    const modelValues = () => Array.from(document.querySelectorAll<HTMLElement>('.provider-model-picker-option[data-value]'), option => option.dataset.value);
+    const providerValues = () => Array.from(document.querySelectorAll<HTMLElement>('.provider-model-picker-provider[data-provider]'), option => option.dataset.provider);
     const root = createRoot(container);
     await act(async () => {
       root.render(<CreateIssueDialog {...projectProps} availableProviders={["openrouter", "grok", "claude", "codex"]} isSubmitting={false} onClose={() => undefined} onCreate={async () => undefined} />);
     });
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".issue-provider-select .select-menu-trigger")?.click();
+      container.querySelector<HTMLButtonElement>(".provider-model-selector-trigger")?.click();
     });
-    expect(optionValues()).toEqual(["", "codex", "claude", "grok", "openrouter"]);
+    expect(providerValues()).toEqual(["codex", "claude", "grok", "openrouter"]);
     await act(async () => {
-      document.querySelector<HTMLButtonElement>('[role="option"][data-value="codex"]')?.click();
+      document.querySelector<HTMLButtonElement>('.provider-model-picker-provider[data-provider="codex"]')?.click();
     });
+    expect(modelValues()).toEqual(["", "alpha", "beta", "zeta"]);
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".issue-model-select .select-menu-trigger")?.click();
-    });
-    expect(optionValues()).toEqual(["", "alpha", "beta", "zeta"]);
-    await act(async () => {
-      document.querySelector<HTMLButtonElement>('[role="option"][data-value="zeta"]')?.click();
+      document.querySelector<HTMLElement>('.provider-model-picker-option[data-value="zeta"]')?.click();
     });
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".issue-effort-select .select-menu-trigger")?.click();
     });
-    expect(optionValues()).toEqual(["", "low", "medium", "high", "xhigh", "max", "future"]);
+    expect(Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'), option => option.dataset.value)).toEqual(["", "low", "medium", "high", "xhigh", "max", "future"]);
     await act(async () => root.unmount());
   });
   it("defaults to the active project and can create in another organization project", async () => {

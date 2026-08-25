@@ -21,7 +21,6 @@ import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import {
   agentEffortOptions,
-  agentModelOptions,
   type AgentProvider,
   type ModelEffort,
 } from "../lib/project-llm";
@@ -124,20 +123,6 @@ export function WorkerDispatchDialog({
   const compatibleWorkerIds = useMemo(
     () => new Set(compatibleWorkers.map((worker) => worker.id)),
     [compatibleWorkers],
-  );
-  const modelOptions = useMemo(
-    () =>
-      agentModelOptions(
-        providerModels,
-        provider,
-        t("settings.providerDefaultModel"),
-        null,
-        providerModelPreferences[provider].favoriteModels,
-      ),
-    [provider, providerModelPreferences, providerModels, t],
-  );
-  const selectedModelKnown = modelOptions.some(
-    (option) => option.value === model,
   );
   const effortOptions = useMemo(
     () =>
@@ -320,19 +305,9 @@ export function WorkerDispatchDialog({
           <ProviderModelSelector
             className="worker-provider-model-selector"
             disabled={isDispatching || didDispatchSuccessfully}
+            disableUnknownSelectedModel
             groupLabel={`${t("worker.provider")} · ${t("issue.preferredModel")}`}
             modelLabel={t("issue.preferredModel")}
-            modelOptions={[
-              ...(!selectedModelKnown && model
-                ? [{
-                    disabled: true,
-                    label: model,
-                    value: model,
-                  }]
-                : []),
-              ...modelOptions,
-            ]}
-            modelSearchable={provider === "opencode" || provider === "agy"}
             modelSearchEmptyMessage={t("issue.noModelsFound")}
             modelSearchPlaceholder={t("issue.searchModels")}
             modelValue={model}
@@ -348,7 +323,9 @@ export function WorkerDispatchDialog({
               setModel(defaultModelForProvider(nextProvider));
               setEffort("");
             }}
+            providerDefaultModelLabel={t("settings.providerDefaultModel")}
             providerLabel={t("worker.provider")}
+            providerModels={providerModels}
             providers={healthyProviders}
             providerValue={provider}
           />
