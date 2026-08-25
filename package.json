@@ -9,7 +9,7 @@
     "packages": ["apps/*", "packages/*"],
     "catalog": {
       "@effect/tsgo": "0.36.5",
-      "effect": "4.0.0-rc.108",
+      "effect": "4.0.0-rc.112",
       "typescript": "7.0.2"
     }
   },
@@ -80,12 +80,12 @@
     "@dotenvx/dotenvx": "2.19.2",
     "@effect/eslint-plugin": "0.3.2",
     "@effect/tsgo": "catalog:",
-    "@oxlint/plugins": "1.79.0",
+    "@oxlint/plugins": "1.80.0",
     "@types/bun": "1.4.0",
     "@types/node": "24.10.1",
     "@typescript-eslint/utils": "8.67.0",
     "effect": "catalog:",
-    "oxlint": "1.79.0",
+    "oxlint": "1.80.0",
     "oxlint-tsgolint": "7.0.2001",
     "turbo": "2.10.9",
     "typescript": "catalog:",
@@ -93,7 +93,7 @@
     "wrangler": "4.118.0"
   },
   "overrides": {
-    "@effect/platform-node-shared": "4.0.0-rc.108",
+    "@effect/platform-node-shared": "4.0.0-rc.112",
     "@hono/node-server": "2.0.12",
     "fast-uri": "3.1.5",
     "hono": "4.12.34",

@@ -80,7 +80,12 @@ const optionalIntegers = (...names: ReadonlyArray<string>) =>
   );
 
 const switches = (...names: ReadonlyArray<string>) =>
-  Object.fromEntries(names.map((name) => [name, Flag.boolean(name)]));
+  Object.fromEntries(
+    names.map((name) => [
+      name,
+      Flag.boolean(name).pipe(Flag.withDefault(false)),
+    ]),
+  );
 
 const repeatedStrings = (...names: ReadonlyArray<string>) =>
   Object.fromEntries(
