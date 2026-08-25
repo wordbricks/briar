@@ -9,7 +9,13 @@ fi
 display_number="${BRIAR_REMOTE_DISPLAY_NUMBER:-1}"
 geometry="${BRIAR_REMOTE_DISPLAY_GEOMETRY:-1280x720}"
 rfb_port="${BRIAR_REMOTE_DISPLAY_PORT:-5901}"
+startup_timeout_seconds="${BRIAR_REMOTE_DISPLAY_STARTUP_TIMEOUT_SECONDS:-120}"
 display=":${display_number}"
+
+if ! [[ "$startup_timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
+  echo "BRIAR_REMOTE_DISPLAY_STARTUP_TIMEOUT_SECONDS must be a positive integer" >&2
+  exit 1
+fi
 
 cleanup() {
   if [[ -n "${vnc_pid:-}" ]]; then
@@ -28,14 +34,15 @@ rm -f "/tmp/.X${display_number}-lock" "/tmp/.X11-unix/X${display_number}"
   -desktop "Briar managed computer" &
 vnc_pid=$!
 
-for _ in {1..100}; do
+startup_deadline=$((SECONDS + startup_timeout_seconds))
+while ((SECONDS < startup_deadline)); do
   if /usr/bin/ss -ltn "sport = :${rfb_port}" | grep -q "127.0.0.1:${rfb_port}"; then
     break
   fi
   if ! kill -0 "$vnc_pid" 2>/dev/null; then
     wait "$vnc_pid"
   fi
-  sleep 0.1
+  sleep 0.2
 done
 if ! /usr/bin/ss -ltn "sport = :${rfb_port}" |
   grep -q "127.0.0.1:${rfb_port}"; then

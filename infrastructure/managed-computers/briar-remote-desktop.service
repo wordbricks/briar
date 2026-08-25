@@ -12,6 +12,7 @@ Group=briar
 Environment=HOME=/home/briar
 Environment=BRIAR_REMOTE_DISPLAY_PORT=5901
 Environment=BRIAR_REMOTE_DISPLAY_GEOMETRY=1280x720
+Environment=BRIAR_REMOTE_DISPLAY_STARTUP_TIMEOUT_SECONDS=120
 WorkingDirectory=/home/briar
 ExecStart=/opt/briar/bin/briar-remote-desktop
 Restart=always
