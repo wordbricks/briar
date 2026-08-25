@@ -1483,12 +1483,37 @@ export function detachedPayloadDirection(
 }
 
 /**
- * Every bounded provider payload is retained in compressed R2 segments. The
- * Worker projects normalized events into a small D1 work log, so retaining raw
- * deltas no longer creates one database row per token or tool update.
+ * Every bounded provider payload enters the archive policy. TranscriptBatcher
+ * preserves meaningful payloads verbatim, coalesces streaming deltas, and lets
+ * a complete full-text snapshot supersede deltas that have not been uploaded.
  */
-export function shouldPersistDetachedTranscriptPayload(_payload: unknown) {
-  return true;
+export function shouldPersistDetachedTranscriptPayload(payload: unknown) {
+  if (!payload || typeof payload !== "object") return true;
+  const envelope = payload as Record<string, unknown>;
+  if (envelope.type !== "event" || envelope.event !== undefined) return true;
+  const raw = envelope.raw && typeof envelope.raw === "object"
+    ? (envelope.raw as Record<string, unknown>)
+    : null;
+  if (!raw) return true;
+
+  const update = raw.update && typeof raw.update === "object"
+    ? (raw.update as Record<string, unknown>)
+    : null;
+  if (update?.sessionUpdate === "agent_thought_chunk") return false;
+
+  const streamEvent = raw.event && typeof raw.event === "object"
+    ? (raw.event as Record<string, unknown>)
+    : null;
+  if (
+    raw.type === "stream_event" &&
+    streamEvent?.type === "content_block_delta"
+  ) {
+    return false;
+  }
+  if (raw.type === "message.part.delta") return false;
+
+  const method = typeof raw.method === "string" ? raw.method : "";
+  return !/(?:delta|progress)$/iu.test(method);
 }
 
 export function createDetachedTranscriptSequencer(claimAttempt: number) {

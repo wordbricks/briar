@@ -87,25 +87,32 @@ const normalizedEvent = (payload: unknown): NormalizedEvent | null => {
 const string = (value: unknown) => typeof value === "string" ? value : null;
 
 /**
- * Streaming deltas are projected into the recoverable D1 work log, but are not
- * independently useful in the durable raw archive. Terminal snapshots contain
- * the complete message/tool body, while an interrupted turn is recovered from
- * the work-log projection. Keeping every other payload preserves user input,
- * tool boundaries/results, state transitions, and provider audit records.
+ * Older Workers may still send one provider envelope per streaming delta.
+ * Project those into the recoverable D1 work log without creating R2 objects.
+ * New Workers annotate coalesced deltas, which remain useful for replaying an
+ * interrupted turn and are retained with every meaningful boundary/snapshot.
  */
 export const retainedRawTranscriptEvents = (events: TranscriptEventInput[]) =>
   events.filter((item) => {
+    const envelope = record(item.payload);
     const event = normalizedEvent(item.payload);
     if (event?.type === "messageDelta" || event?.type === "activityDelta") {
-      return false;
+      return record(envelope?.archiveCompaction)?.kind === "delta";
     }
-    const envelope = record(item.payload);
     const raw = record(envelope?.raw);
     const update = record(raw?.update);
     const sessionUpdate = string(update?.sessionUpdate);
-    // Older Grok payloads may have no normalized event, but their chunk name
-    // still identifies append-only text/thought streaming unambiguously.
-    return sessionUpdate === null || !sessionUpdate.endsWith("_chunk");
+    if (sessionUpdate?.endsWith("_chunk")) return false;
+    const streamEvent = record(raw?.event);
+    if (
+      raw?.type === "stream_event" &&
+      streamEvent?.type === "content_block_delta"
+    ) {
+      return false;
+    }
+    if (raw?.type === "message.part.delta") return false;
+    const method = string(raw?.method) ?? "";
+    return !/(?:delta|progress)$/iu.test(method);
   });
 
 const boundedWorkLogText = (value: string) => {
@@ -329,7 +336,6 @@ async function storeRawSegment(
     return { row: existing, stored: false };
   }
 
-  const compressed = await gzip(plain);
   const objectKey = rawSegmentObjectKey(
     projectId,
     sessionId,
@@ -337,19 +343,40 @@ async function storeRawSegment(
     lastSequence,
     digest,
   );
-  await bucket.put(objectKey, compressed, {
-    httpMetadata: {
-      contentType: "application/x-ndjson",
-      contentEncoding: "gzip",
-    },
-    customMetadata: {
-      projectId,
-      sessionId,
-      firstSequence: String(firstSequence),
-      lastSequence: String(lastSequence),
-      sha256: digest,
-    },
-  });
+  const existingObject = await bucket.head(objectKey);
+  let compressedBytes: number;
+  if (existingObject) {
+    const metadata = existingObject.customMetadata;
+    if (
+      metadata?.projectId !== projectId ||
+      metadata.sessionId !== sessionId ||
+      metadata.firstSequence !== String(firstSequence) ||
+      metadata.lastSequence !== String(lastSequence) ||
+      metadata.sha256 !== digest
+    ) {
+      throw new WorkerConflictError(
+        "Transcript segment object metadata does not match its deterministic key",
+      );
+    }
+    compressedBytes = existingObject.size;
+  } else {
+    const compressed = await gzip(plain);
+    await bucket.put(objectKey, compressed, {
+      httpMetadata: {
+        contentType: "application/x-ndjson",
+        contentEncoding: "gzip",
+      },
+      customMetadata: {
+        projectId,
+        sessionId,
+        firstSequence: String(firstSequence),
+        lastSequence: String(lastSequence),
+        sha256: digest,
+        archivePolicy: "meaningful-events-coalesced-deltas-v1",
+      },
+    });
+    compressedBytes = compressed.byteLength;
+  }
   const row: AgentTranscriptSegmentRow = {
     session_id: sessionId,
     first_sequence: firstSequence,
@@ -357,7 +384,7 @@ async function storeRawSegment(
     object_key: objectKey,
     event_count: events.length,
     uncompressed_bytes: plain.byteLength,
-    compressed_bytes: compressed.byteLength,
+    compressed_bytes: compressedBytes,
     sha256: digest,
     recorded_at: recordedAt,
   };

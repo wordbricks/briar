@@ -292,7 +292,7 @@ describe("provider-independent agent work log", () => {
   });
 
   it("closes unfinished entries when a provider turn terminates", async () => {
-    await ingestAgentTranscript(db, bucket, projectId, {
+    const input: Parameters<typeof ingestAgentTranscript>[3] = {
       sessionId: "interrupted-session",
       runId: null,
       workerId: null,
@@ -317,20 +317,41 @@ describe("provider-independent agent work log", () => {
           direction: "server",
           payload: {
             type: "event",
+            event: {
+              type: "messageDelta",
+              id: "assistant-1",
+              delta: " output",
+            },
+            archiveCompaction: {
+              kind: "delta",
+              firstSequence: 2,
+              eventCount: 12,
+            },
+          },
+        },
+        {
+          sequence: 3,
+          direction: "server",
+          payload: {
+            type: "event",
             event: { type: "turnCompleted", status: "failed" },
           },
         },
       ],
-    });
+    };
+    await ingestAgentTranscript(db, bucket, projectId, input);
 
     expect(
       (await readAgentWorkLog(db, projectId, "interrupted-session"))
         ?.entries[0],
     ).toMatchObject({
-      body: "Partial",
+      body: "Partial output",
       status: "interrupted",
-      updated_sequence: 2,
+      updated_sequence: 3,
     });
+
+    const retry = await ingestAgentTranscript(db, bucket, projectId, input);
+    expect(retry).toMatchObject({ stored: 0, projected: 0 });
   });
 
   it("recovers an interrupted delta stream without duplicate raw archives", async () => {
@@ -381,4 +402,173 @@ describe("provider-independent agent work log", () => {
     )).toHaveLength(1);
   });
 
+  it("replays user messages, compacted tool output, and the final result", async () => {
+    const sessionId = "representative-compact-session";
+    const events: Parameters<typeof ingestAgentTranscript>[3]["events"] = [
+      {
+        sequence: 1,
+        direction: "client",
+        payload: {
+          type: "event",
+          direction: "client",
+          event: {
+            type: "messageCompleted",
+            id: "user-1",
+            phase: "user",
+            text: "Inspect the deployment",
+          },
+        },
+      },
+      {
+        sequence: 2,
+        direction: "server",
+        payload: {
+          type: "event",
+          event: {
+            type: "activityStarted",
+            id: "tool-1",
+            kind: "command",
+            title: "wrangler deployments list",
+            text: "",
+          },
+        },
+      },
+      {
+        sequence: 4,
+        direction: "server",
+        payload: {
+          type: "event",
+          event: {
+            type: "activityDelta",
+            id: "tool-1",
+            delta: "deployment-a\ndeployment-b",
+          },
+          archiveCompaction: {
+            kind: "delta",
+            firstSequence: 3,
+            eventCount: 2,
+          },
+        },
+      },
+      {
+        sequence: 5,
+        direction: "server",
+        payload: {
+          type: "event",
+          event: {
+            type: "activityCompleted",
+            id: "tool-1",
+            kind: "command",
+            title: "wrangler deployments list",
+            text: "deployment-a\ndeployment-b",
+            status: "completed",
+          },
+        },
+      },
+      {
+        sequence: 6,
+        direction: "server",
+        payload: {
+          type: "event",
+          event: {
+            type: "messageCompleted",
+            id: "assistant-1",
+            phase: "final",
+            text: "Deployment is healthy",
+          },
+        },
+      },
+      {
+        sequence: 7,
+        direction: "server",
+        payload: {
+          type: "event",
+          event: { type: "turnCompleted", status: "completed" },
+        },
+      },
+    ];
+    const input = {
+      sessionId,
+      runId: null,
+      workerId: null,
+      agentProvider: "codex" as const,
+      events,
+      observedAt,
+    };
+
+    await ingestAgentTranscript(db, bucket, projectId, input);
+    expect(await ingestAgentTranscript(db, bucket, projectId, input))
+      .toMatchObject({ stored: 0, projected: 0 });
+
+    const workLog = await readAgentWorkLog(db, projectId, sessionId);
+    expect(workLog?.entries).toEqual([
+      expect.objectContaining({
+        entry_id: "user-1",
+        entry_type: "message",
+        body: "Inspect the deployment",
+        status: "completed",
+      }),
+      expect.objectContaining({
+        entry_id: "tool-1",
+        entry_type: "activity",
+        activity_kind: "command",
+        body: "deployment-a\ndeployment-b",
+        status: "completed",
+      }),
+      expect.objectContaining({
+        entry_id: "assistant-1",
+        entry_type: "message",
+        body: "Deployment is healthy",
+        status: "completed",
+      }),
+    ]);
+    expect(await listAgentTranscriptSegments(db, projectId, sessionId))
+      .toEqual([
+        expect.objectContaining({
+          first_sequence: 1,
+          last_sequence: 7,
+          event_count: 6,
+        }),
+      ]);
+  });
+
+  it("reuses an exact R2 object when retry repairs a missing D1 manifest", async () => {
+    const sessionId = "manifest-recovery-session";
+    const input = {
+      sessionId,
+      runId: null,
+      workerId: null,
+      agentProvider: "codex" as const,
+      observedAt,
+      events: [{
+        sequence: 1,
+        direction: "server" as const,
+        payload: { type: "result", message: "done" },
+      }],
+    };
+    await ingestAgentTranscript(db, bucket, projectId, input);
+    const [firstSegment] =
+      (await listAgentTranscriptSegments(db, projectId, sessionId))!;
+    await db.prepare(
+      `delete from briar_agent_transcript_segments where session_id = ?`,
+    ).bind(sessionId).run();
+    const retryBucket = {
+      head: bucket.head.bind(bucket),
+      put: () => {
+        throw new Error("retry must not put the existing object again");
+      },
+      delete: bucket.delete.bind(bucket),
+    } as unknown as R2Bucket;
+
+    await expect(
+      ingestAgentTranscript(db, retryBucket, projectId, input),
+    ).resolves.toMatchObject({ stored: 1, projected: 0 });
+    expect(await listAgentTranscriptSegments(db, projectId, sessionId))
+      .toEqual([expect.objectContaining({ object_key: firstSegment.object_key })]);
+    await expect(bucket.head(firstSegment.object_key)).resolves.toMatchObject({
+      customMetadata: {
+        archivePolicy: "meaningful-events-coalesced-deltas-v1",
+      },
+    });
+  });
 });
