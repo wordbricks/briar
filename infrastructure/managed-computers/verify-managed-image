@@ -14,8 +14,17 @@ fi
 # shellcheck disable=SC1091
 . /opt/briar/image-lock.env
 briar_version="$(tr -d '\r\n' < /opt/briar/briar-version)"
+export CARGO_HOME=/opt/briar/cargo
+export RUSTUP_HOME=/opt/briar/rustup
+export PATH=/opt/briar/bin:/usr/local/bin:/usr/bin:/bin
 
 test "$(/opt/briar/bin/bun --version)" = "$BUN_VERSION"
+test "$(/opt/briar/bin/node --version)" = "v$NODE_VERSION"
+test "$(/opt/briar/bin/rustc --version | awk '{print $2}')" = \
+  "$RUST_TOOLCHAIN_VERSION"
+test "$(/opt/briar/bin/cargo-audit --version)" = \
+  "cargo-audit $CARGO_AUDIT_VERSION"
+test "$(/opt/briar/bin/gitleaks version)" = "$GITLEAKS_VERSION"
 test "$(/opt/briar/bin/briar version)" = "briar $briar_version"
 test "$(dpkg-query --show --showformat='${Version}' google-chrome-stable)" = \
   "$GOOGLE_CHROME_VERSION"
@@ -25,13 +34,37 @@ test "$(dpkg-query --show --showformat='${Version}' amazon-ssm-agent)" = \
 /opt/briar/bin/codex --version | grep -Fq "$CODEX_CLI_VERSION"
 /opt/briar/bin/claude --version | grep -Fq "$CLAUDE_CODE_VERSION"
 /opt/briar/bin/agent-browser --version | grep -Fq "$AGENT_BROWSER_VERSION"
+/opt/briar/bin/opencode --version | grep -Fxq "$OPENCODE_CLI_VERSION"
+/opt/briar/bin/grok --version | grep -Fq "grok $GROK_CLI_VERSION"
+/opt/briar/bin/cursor-agent --version | grep -Fxq "$CURSOR_AGENT_VERSION"
+/opt/briar/bin/agy --version | grep -Fxq "$ANTIGRAVITY_CLI_VERSION"
 command -v git >/dev/null
 command -v node >/dev/null
+command -v cc >/dev/null
+command -v make >/dev/null
+command -v pkg-config >/dev/null
+pkg-config --exists openssl
+pkg-config --exists webkit2gtk-4.1
+pkg-config --exists ayatana-appindicator3-0.1
 test -x /usr/bin/google-chrome-stable
 test -r /usr/share/applications/google-chrome.desktop
 grep -Fq 'Icon=google-chrome' /usr/share/applications/google-chrome.desktop
 test -x "/home/briar/Desktop/Google Chrome.desktop"
 grep -Fq 'google-chrome.desktop' /home/briar/.config/mimeapps.list
+grep -Fq 'FontName=Noto Sans Mono CJK KR 12' \
+  /home/briar/.config/xfce4/terminal/terminalrc
+fc-match -f '%{family}\n' ':lang=ko' | grep -Fq 'Noto Sans CJK KR'
+
+for binary in \
+  bun node cargo rustc rustfmt cargo-audit gitleaks \
+  briar codex claude agent-browser opencode grok cursor-agent agy; do
+  test "$(sudo -u briar -H bash -lc "command -v $binary")" = \
+    "/opt/briar/bin/$binary"
+done
+test "$(sudo -u briar -H bash -lc 'printf %s "$CARGO_HOME"')" = \
+  "/opt/briar/cargo"
+test "$(sudo -u briar -H bash -lc 'printf %s "$RUSTUP_HOME"')" = \
+  "/opt/briar/rustup"
 
 runner_count="$(find /opt/briar/lib/agent -maxdepth 1 -type f \
   -name '*-runner.js' | wc -l)"
@@ -43,8 +76,19 @@ sha256sum --check /opt/briar/provider/bun.lock.sha256
 jq -e \
   --arg sourceCommit "$(tr -d '\r\n' < /opt/briar/source-commit)" \
   --arg baseAmiId "${BRIAR_BASE_AMI_ID:-$(jq -r .baseAmiId /opt/briar/image-manifest.json)}" \
-  '.schemaVersion == 1 and .sourceCommit == $sourceCommit and
-   .baseAmiId == $baseAmiId and .runtime.googleChrome != ""' \
+  --arg nodeVersion "$NODE_VERSION" \
+  --arg rustVersion "$RUST_TOOLCHAIN_VERSION" \
+  --arg opencodeVersion "$OPENCODE_CLI_VERSION" \
+  --arg grokVersion "$GROK_CLI_VERSION" \
+  --arg cursorVersion "$CURSOR_AGENT_VERSION" \
+  --arg antigravityVersion "$ANTIGRAVITY_CLI_VERSION" \
+  '.schemaVersion == 2 and .sourceCommit == $sourceCommit and
+   .baseAmiId == $baseAmiId and .runtime.googleChrome != "" and
+   .runtime.node == $nodeVersion and .runtime.rust == $rustVersion and
+   .runtime.providers.opencode == $opencodeVersion and
+   .runtime.providers.grok == $grokVersion and
+   .runtime.providers.cursor == $cursorVersion and
+   .runtime.providers.antigravity == $antigravityVersion' \
   /opt/briar/image-manifest.json >/dev/null
 
 for service in \
@@ -59,6 +103,10 @@ test "$(systemctl show briar-managed-worker.service --property=User --value)" = 
   "briar"
 test "$(systemctl show briar-managed-worker.service --property=Group --value)" = \
   "briar"
+systemctl show briar-managed-worker.service --property=Environment --value \
+  | grep -Fq 'CARGO_HOME=/opt/briar/cargo'
+systemctl show briar-managed-worker.service --property=Environment --value \
+  | grep -Fq 'RUSTUP_HOME=/opt/briar/rustup'
 if systemctl cat briar-managed-worker.service | grep -q 'briar_worker_'; then
   echo "Managed worker unit contains credential material" >&2
   exit 1
@@ -75,6 +123,10 @@ for forbidden in \
   /home/briar/.config/briar/config.json \
   /home/briar/.codex/auth.json \
   /home/briar/.claude/.credentials.json \
+  /home/briar/.cursor \
+  /home/briar/.grok \
+  /home/briar/.gemini \
+  /home/briar/.local/share/opencode/auth.json \
   /var/lib/amazon/ssm/credentials \
   /var/lib/amazon/ssm/registration; do
   if [[ -e "$forbidden" ]]; then

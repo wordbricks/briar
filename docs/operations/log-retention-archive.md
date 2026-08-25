@@ -24,6 +24,53 @@ and recent records are never selected. The code-owned policy table in
 `apps/briar/worker/src/archive.ts` is authoritative; update this document and the tests in
 the same change when a retention decision changes.
 
+## Raw transcript preservation policy
+
+Detached-agent raw transcripts preserve the events needed to replay a run and
+audit its outcome:
+
+- client/user payloads, provider session starts, approvals, blocks, errors,
+  results, execution metrics, and otherwise unknown provider audit payloads;
+- message and activity start/completion snapshots, including tool calls,
+  results, status, and turn-completion boundaries; and
+- streaming message/activity delta text when no complete snapshot has replaced
+  it.
+
+Provider-only token, reasoning, and progress delta envelopes that have no
+normalized message or activity event are omitted. Their eventual user-visible
+message, tool result, error, or turn boundary remains covered by the rules
+above.
+
+High-frequency deltas with the same direction, event type, and stable message
+or activity ID are stored as one normalized delta with its first source
+sequence and source-event count. The repeated provider streaming envelope is
+not retained. If a full, non-truncated start or completion snapshot arrives
+before upload and ends with the pending delta text, that snapshot supersedes
+the pending delta. This keeps the terminal state without storing the same text
+twice.
+
+Uploads occur after 500 ms of inactivity, at a five-second maximum checkpoint,
+at the existing event/byte bounds, and immediately at meaningful status
+boundaries. A controlled failure or shutdown flushes pending compacted deltas,
+so an incomplete turn remains reconstructable; the D1 work-log projection also
+marks open entries interrupted at turn completion. Retry identity remains the
+deterministic sequence-range plus content-SHA object key. If R2 already has the
+exact object but its D1 segment manifest was not committed, retry reuses that
+object after checking its identity metadata instead of issuing another put.
+
+This changes only detached transcript representation and upload frequency. It
+does not change the retention period or storage policy for attachments,
+evidence, releases, issue messages, or any other archive kind.
+
+The regression fixture sends 1,000 one-character normalized message deltas at
+10 ms intervals. The prior fixed 500 ms flush model produces 20 objects with
+1,000 archived events, 212,893 uncompressed bytes, and 6,270 gzip-compressed
+bytes. The compacted policy produces 2 objects with 2 archived events, 1,397
+uncompressed bytes, and 320 compressed bytes: **90% fewer PutObject calls,
+99.34% fewer uncompressed bytes, and 94.90% fewer stored compressed bytes** for
+that same synthetic load. These are deterministic local regression-fixture
+measurements, not production billing observations.
+
 ## Archive format and safety properties
 
 Each object is gzip-compressed JSON Lines. The first line is a version 1

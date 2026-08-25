@@ -1,6 +1,8 @@
+import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   TRANSCRIPT_BATCH_FLUSH_INTERVAL_MS,
+  TRANSCRIPT_BATCH_MAX_BUFFER_MS,
   TRANSCRIPT_BATCH_MAX_BYTES,
   TRANSCRIPT_BATCH_MAX_EVENTS,
   TranscriptBatcher,
@@ -37,38 +39,229 @@ describe("TranscriptBatcher", () => {
     expect(TRANSCRIPT_BATCH_MAX_EVENTS).toBe(192);
     expect(TRANSCRIPT_BATCH_MAX_BYTES).toBe(896 * 1024);
     expect(TRANSCRIPT_BATCH_FLUSH_INTERVAL_MS).toBe(500);
+    expect(TRANSCRIPT_BATCH_MAX_BUFFER_MS).toBe(5_000);
   });
 
-  it("halves requests for a sustained stream of small deltas", async () => {
+  it("cuts sustained delta R2 puts and serialized bytes", async () => {
     vi.useFakeTimers();
-    const requestCount = async (flushIntervalMs: number) => {
-      let requests = 0;
-      const batcher = new TranscriptBatcher({
-        send: async () => {
-          requests += 1;
+    const sourceEvents = Array.from({ length: 1_000 }, (_, index) =>
+      event(index + 1, {
+        type: "event",
+        raw: {
+          method: "item/agentMessage/delta",
+          params: { itemId: "message-1", delta: "x" },
         },
-        flushIntervalMs,
-        maxEvents: 10_000,
-        maxBytes: 10 * 1024 * 1024,
-      });
-      for (let sequence = 1; sequence <= 1_000; sequence += 1) {
-        await batcher.enqueue(event(sequence, {
-          type: "event",
-          event: { type: "messageDelta", delta: "x" },
-        }));
-        await vi.advanceTimersByTimeAsync(10);
-      }
-      await batcher.flush();
-      return requests;
-    };
+        event: { type: "messageDelta", id: "message-1", delta: "x" },
+      })
+    );
+    const batches: TranscriptBatchEvent[][] = [];
+    const batcher = new TranscriptBatcher({
+      send: async (events) => {
+        batches.push(events);
+      },
+      flushIntervalMs: 500,
+      maxBufferMs: 5_000,
+      maxEvents: 10_000,
+      maxBytes: 10 * 1024 * 1024,
+    });
+    for (const sourceEvent of sourceEvents) {
+      await batcher.enqueue(sourceEvent);
+      await vi.advanceTimersByTimeAsync(10);
+    }
+    await batcher.flush();
 
-    const previousRequests = await requestCount(250);
-    const optimizedRequests = await requestCount(
-      TRANSCRIPT_BATCH_FLUSH_INTERVAL_MS,
+    const previousPutObjects = 20;
+    const previousBatches = Array.from(
+      { length: previousPutObjects },
+      (_, index) => sourceEvents.slice(index * 50, index * 50 + 50),
+    );
+    const previousBytes = sourceEvents.reduce(
+      (total, sourceEvent) =>
+        total + Buffer.byteLength(JSON.stringify(sourceEvent), "utf8"),
+      0,
+    );
+    const optimizedBytes = batches.flat().reduce(
+      (total, archivedEvent) =>
+        total + Buffer.byteLength(JSON.stringify(archivedEvent), "utf8"),
+      0,
     );
 
-    expect(previousRequests).toBe(40);
-    expect(optimizedRequests).toBe(20);
+    expect(batches).toHaveLength(2);
+    expect(batches.flat()).toHaveLength(2);
+    expect(batches.length).toBeLessThanOrEqual(previousPutObjects * 0.1);
+    expect(optimizedBytes).toBeLessThan(previousBytes * 0.05);
+    expect(
+      batches.flat().reduce((total, archivedEvent) => {
+        const payload = archivedEvent.payload as {
+          type: "event",
+          event: { delta: string };
+          archiveCompaction: { eventCount: number };
+        };
+        expect(payload.event.delta).toBe("x".repeat(
+          payload.archiveCompaction.eventCount,
+        ));
+        return total + payload.archiveCompaction.eventCount;
+      }, 0),
+    ).toBe(1_000);
+    const compressedBytes = (items: TranscriptBatchEvent[][]) =>
+      items.reduce(
+        (total, batch) =>
+          total + gzipSync(
+            `${
+              batch.map((archivedEvent) => JSON.stringify(archivedEvent)).join(
+                "\n",
+              )
+            }\n`,
+          ).byteLength,
+        0,
+      );
+    expect(compressedBytes(batches)).toBeLessThan(
+      compressedBytes(previousBatches) * 0.1,
+    );
+  });
+
+  it("coalesces consecutive deltas without retaining repeated raw envelopes", async () => {
+    const batches: TranscriptBatchEvent[][] = [];
+    const batcher = new TranscriptBatcher({
+      send: async (events) => {
+        batches.push(events);
+      },
+      flushIntervalMs: 60_000,
+    });
+
+    await batcher.enqueue(event(1, {
+      type: "event",
+      raw: { token: "hello" },
+      event: { type: "messageDelta", id: "message-1", delta: "hello" },
+    }));
+    await batcher.enqueue(event(2, {
+      type: "event",
+      raw: { token: " world" },
+      event: { type: "messageDelta", id: "message-1", delta: " world" },
+    }));
+    await batcher.flush();
+
+    expect(batches).toEqual([[
+      {
+        sequence: 2,
+        direction: "server",
+        payload: {
+          type: "event",
+          event: {
+            type: "messageDelta",
+            id: "message-1",
+            delta: "hello world",
+          },
+          archiveCompaction: {
+            kind: "delta",
+            firstSequence: 1,
+            eventCount: 2,
+          },
+        },
+      },
+    ]]);
+  });
+
+  it("lets a complete snapshot supersede pending deltas", async () => {
+    const batches: TranscriptBatchEvent[][] = [];
+    const batcher = new TranscriptBatcher({
+      send: async (events) => {
+        batches.push(events);
+      },
+      flushIntervalMs: 60_000,
+    });
+
+    await batcher.enqueue(event(1, {
+      type: "event",
+      event: { type: "messageDelta", id: "message-1", delta: "hello" },
+    }));
+    await batcher.enqueue(event(2, {
+      type: "event",
+      event: { type: "messageDelta", id: "message-1", delta: " world" },
+    }));
+    await batcher.enqueue(event(3, {
+      type: "event",
+      event: {
+        type: "messageCompleted",
+        id: "message-1",
+        phase: "final",
+        text: "hello world",
+      },
+    }));
+
+    expect(batches).toHaveLength(1);
+    expect(batches[0]).toEqual([event(3, {
+      type: "event",
+      event: {
+        type: "messageCompleted",
+        id: "message-1",
+        phase: "final",
+        text: "hello world",
+      },
+    })]);
+  });
+
+  it("keeps pending delta text when a terminal snapshot does not contain it", async () => {
+    const batches: TranscriptBatchEvent[][] = [];
+    const batcher = new TranscriptBatcher({
+      send: async (events) => {
+        batches.push(events);
+      },
+      flushIntervalMs: 60_000,
+    });
+
+    await batcher.enqueue(event(1, {
+      type: "event",
+      event: {
+        type: "activityDelta",
+        id: "activity-1",
+        delta: "diagnostic output",
+      },
+    }));
+    await batcher.enqueue(event(2, {
+      type: "event",
+      event: {
+        type: "activityCompleted",
+        id: "activity-1",
+        kind: "command",
+        title: "Run check",
+        text: "different summary",
+        status: "failed",
+      },
+    }));
+
+    expect(batches[0]).toHaveLength(2);
+    expect(batches[0]?.[0]).toMatchObject({
+      payload: { event: { delta: "diagnostic output" } },
+    });
+  });
+
+  it("splits coalesced deltas before the per-event payload limit", async () => {
+    const batches: TranscriptBatchEvent[][] = [];
+    const batcher = new TranscriptBatcher({
+      send: async (events) => {
+        batches.push(events);
+      },
+      flushIntervalMs: 60_000,
+    });
+
+    for (let sequence = 1; sequence <= 2; sequence += 1) {
+      await batcher.enqueue(event(sequence, {
+        type: "event",
+        event: {
+          type: "activityDelta",
+          id: "activity-1",
+          delta: "x".repeat(20_000),
+        },
+      }));
+    }
+    await batcher.flush();
+
+    expect(batches[0]).toHaveLength(2);
+    expect(batches[0]?.every((archivedEvent) =>
+      Buffer.byteLength(JSON.stringify(archivedEvent.payload), "utf8") <=
+        30 * 1024
+    )).toBe(true);
   });
 
   it.each([
@@ -167,6 +360,46 @@ describe("TranscriptBatcher", () => {
 
     expect(attempts).toEqual([[1], [1], [2]]);
     expect(errors).toHaveLength(0);
+  });
+
+  it("flushes a replayable compacted delta before an interrupted turn and retries it identically", async () => {
+    const attempts: TranscriptBatchEvent[][] = [];
+    const batcher = new TranscriptBatcher({
+      send: async (events) => {
+        attempts.push(structuredClone(events));
+        if (attempts.length === 1) throw new Error("response lost");
+      },
+      retryDelayMs: 0,
+      flushIntervalMs: 60_000,
+    });
+
+    await batcher.enqueue(event(1, {
+      type: "event",
+      event: { type: "messageDelta", id: "message-1", delta: "partial " },
+    }));
+    await batcher.enqueue(event(2, {
+      type: "event",
+      event: { type: "messageDelta", id: "message-1", delta: "answer" },
+    }));
+    await batcher.enqueue(event(3, {
+      type: "event",
+      event: { type: "turnCompleted", status: "failed" },
+    }));
+
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1]).toEqual(attempts[0]);
+    expect(attempts[0]).toHaveLength(2);
+    expect(attempts[0]?.[0]).toMatchObject({
+      sequence: 2,
+      payload: {
+        event: { type: "messageDelta", delta: "partial answer" },
+        archiveCompaction: { firstSequence: 1, eventCount: 2 },
+      },
+    });
+    expect(attempts[0]?.[1]).toEqual(event(3, {
+      type: "event",
+      event: { type: "turnCompleted", status: "failed" },
+    }));
   });
 
   it("splits a 413 batch without retrying the oversized request", async () => {

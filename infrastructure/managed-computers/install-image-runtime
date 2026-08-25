@@ -23,9 +23,19 @@ test -s "$source_dir/artifact-manifest.sha256"
 . "$source_dir/image-lock.env"
 for required in \
   DEBIAN_SNAPSHOT BUN_VERSION BUN_LINUX_X64_SHA256 \
+  NODE_VERSION NODE_LINUX_X64_SHA256 \
+  RUSTUP_VERSION RUSTUP_INIT_LINUX_X64_SHA256 RUST_TOOLCHAIN_VERSION \
+  CARGO_AUDIT_VERSION CARGO_AUDIT_LINUX_X64_SHA256 \
+  GITLEAKS_VERSION GITLEAKS_LINUX_X64_SHA256 \
   GOOGLE_CHROME_VERSION GOOGLE_CHROME_AMD64_SHA256 \
   SSM_AGENT_VERSION SSM_AGENT_PACKAGE_VERSION \
-  SSM_AGENT_DEBIAN_AMD64_SHA256; do
+  SSM_AGENT_DEBIAN_AMD64_SHA256 \
+  CODEX_CLI_VERSION CLAUDE_CODE_VERSION AGENT_BROWSER_VERSION \
+  OPENCODE_CLI_VERSION OPENCODE_CLI_LINUX_X64_SHA256 \
+  GROK_CLI_VERSION GROK_CLI_LINUX_X64_SHA256 \
+  CURSOR_AGENT_VERSION CURSOR_AGENT_LINUX_X64_SHA256 \
+  ANTIGRAVITY_CLI_VERSION ANTIGRAVITY_CLI_BUILD \
+  ANTIGRAVITY_CLI_LINUX_X64_SHA512; do
   if [[ -z "${!required:-}" ]]; then
     echo "Missing image lock value: $required" >&2
     exit 1
@@ -63,6 +73,16 @@ download_checked() {
   printf '%s  %s\n' "$expected_sha" "$output" | sha256sum --check --status
 }
 
+download_checked_sha512() {
+  local url="$1"
+  local expected_sha="$2"
+  local output="$3"
+  curl --fail --silent --show-error --location \
+    --retry 5 --retry-all-errors --connect-timeout 20 \
+    "$url" --output "$output"
+  printf '%s  %s\n' "$expected_sha" "$output" | sha512sum --check --status
+}
+
 bun_zip="$download_dir/bun-linux-x64.zip"
 download_checked \
   "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip" \
@@ -71,6 +91,55 @@ download_checked \
 unzip -q "$bun_zip" -d "$download_dir/bun"
 install -o root -g root -m 0755 \
   "$download_dir/bun/bun-linux-x64/bun" /opt/briar/bin/bun
+
+node_tar="$download_dir/node-linux-x64.tar.xz"
+download_checked \
+  "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
+  "$NODE_LINUX_X64_SHA256" \
+  "$node_tar"
+install -d -o root -g root -m 0755 /opt/briar/node
+tar -xJf "$node_tar" --strip-components=1 -C /opt/briar/node
+for binary in node npm npx corepack; do
+  test -x "/opt/briar/node/bin/$binary"
+  ln -sfn "/opt/briar/node/bin/$binary" "/opt/briar/bin/$binary"
+done
+
+rustup_init="$download_dir/rustup-init"
+download_checked \
+  "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/x86_64-unknown-linux-gnu/rustup-init" \
+  "$RUSTUP_INIT_LINUX_X64_SHA256" \
+  "$rustup_init"
+chmod 0755 "$rustup_init"
+CARGO_HOME=/opt/briar/cargo RUSTUP_HOME=/opt/briar/rustup \
+  "$rustup_init" -y --no-modify-path --profile minimal \
+  --default-toolchain "$RUST_TOOLCHAIN_VERSION"
+CARGO_HOME=/opt/briar/cargo RUSTUP_HOME=/opt/briar/rustup \
+  /opt/briar/cargo/bin/rustup component add \
+  --toolchain "$RUST_TOOLCHAIN_VERSION" rustfmt clippy
+for binary in cargo cargo-clippy cargo-fmt clippy-driver rustc rustdoc rustfmt rustup; do
+  test -x "/opt/briar/cargo/bin/$binary"
+  ln -sfn "/opt/briar/cargo/bin/$binary" "/opt/briar/bin/$binary"
+done
+chmod -R a+rX /opt/briar/cargo /opt/briar/rustup
+
+cargo_audit_tgz="$download_dir/cargo-audit.tgz"
+download_checked \
+  "https://github.com/RustSec/rustsec/releases/download/cargo-audit%2Fv${CARGO_AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-gnu-v${CARGO_AUDIT_VERSION}.tgz" \
+  "$CARGO_AUDIT_LINUX_X64_SHA256" \
+  "$cargo_audit_tgz"
+tar -xzf "$cargo_audit_tgz" -C "$download_dir"
+install -o root -g root -m 0755 \
+  "$download_dir/cargo-audit-x86_64-unknown-linux-gnu-v${CARGO_AUDIT_VERSION}/cargo-audit" \
+  /opt/briar/bin/cargo-audit
+
+gitleaks_tgz="$download_dir/gitleaks.tgz"
+download_checked \
+  "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+  "$GITLEAKS_LINUX_X64_SHA256" \
+  "$gitleaks_tgz"
+tar -xzf "$gitleaks_tgz" -C "$download_dir" gitleaks
+install -o root -g root -m 0755 "$download_dir/gitleaks" \
+  /opt/briar/bin/gitleaks
 
 chrome_deb="$download_dir/google-chrome-stable.deb"
 download_checked \
@@ -111,22 +180,78 @@ install -o root -g root -m 0644 \
   /opt/briar/provider/
 HOME=/root /opt/briar/bin/bun install \
   --cwd /opt/briar/provider --frozen-lockfile --production --ignore-scripts
-for binary in codex claude agent-browser; do
+for binary in codex claude; do
   test -x "/opt/briar/provider/node_modules/.bin/$binary"
   ln -sfn "/opt/briar/provider/node_modules/.bin/$binary" \
     "/opt/briar/bin/$binary"
 done
+agent_browser_binary="/opt/briar/provider/node_modules/agent-browser/bin/agent-browser-linux-x64"
+test -s "$agent_browser_binary"
+install -o root -g root -m 0755 "$agent_browser_binary" \
+  /opt/briar/bin/agent-browser
+
+opencode_tgz="$download_dir/opencode.tgz"
+download_checked \
+  "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_CLI_VERSION}/opencode-linux-x64-baseline.tar.gz" \
+  "$OPENCODE_CLI_LINUX_X64_SHA256" \
+  "$opencode_tgz"
+tar -xzf "$opencode_tgz" -C "$download_dir" opencode
+install -o root -g root -m 0755 "$download_dir/opencode" \
+  /opt/briar/bin/opencode
+
+grok_binary="$download_dir/grok"
+download_checked \
+  "https://x.ai/cli/grok-${GROK_CLI_VERSION}-linux-x86_64" \
+  "$GROK_CLI_LINUX_X64_SHA256" \
+  "$grok_binary"
+install -o root -g root -m 0755 "$grok_binary" /opt/briar/bin/grok
+
+cursor_tgz="$download_dir/cursor-agent.tgz"
+download_checked \
+  "https://downloads.cursor.com/lab/${CURSOR_AGENT_VERSION}/linux/x64/agent-cli-package.tar.gz" \
+  "$CURSOR_AGENT_LINUX_X64_SHA256" \
+  "$cursor_tgz"
+cursor_dir="/opt/briar/provider/cursor/${CURSOR_AGENT_VERSION}"
+install -d -o root -g root -m 0755 "$cursor_dir"
+tar -xzf "$cursor_tgz" --strip-components=1 --no-same-owner -C "$cursor_dir"
+test -x "$cursor_dir/cursor-agent"
+ln -sfn "$cursor_dir/cursor-agent" /opt/briar/bin/cursor-agent
+ln -sfn "$cursor_dir/cursor-agent" /opt/briar/bin/agent
+
+antigravity_tgz="$download_dir/antigravity.tgz"
+download_checked_sha512 \
+  "https://storage.googleapis.com/antigravity-public/antigravity-cli/${ANTIGRAVITY_CLI_VERSION}-${ANTIGRAVITY_CLI_BUILD}/linux-x64/cli_linux_x64.tar.gz" \
+  "$ANTIGRAVITY_CLI_LINUX_X64_SHA512" \
+  "$antigravity_tgz"
+tar -xzf "$antigravity_tgz" -C "$download_dir" antigravity
+install -o root -g root -m 0755 "$download_dir/antigravity" \
+  /opt/briar/bin/agy
 
 install -d -o briar -g briar -m 0700 \
-  /home/briar/.config /home/briar/.config/xfce4 /home/briar/Desktop
+  /home/briar/.config /home/briar/.config/xfce4 \
+  /home/briar/.config/xfce4/terminal /home/briar/Desktop
 install -o briar -g briar -m 0600 "$source_dir/xfce4-helpers.rc" \
   /home/briar/.config/xfce4/helpers.rc
+install -o briar -g briar -m 0600 "$source_dir/xfce4-terminalrc" \
+  /home/briar/.config/xfce4/terminal/terminalrc
 install -o briar -g briar -m 0600 "$source_dir/mimeapps.list" \
   /home/briar/.config/mimeapps.list
 install -o briar -g briar -m 0755 \
   /usr/share/applications/google-chrome.desktop \
   "/home/briar/Desktop/Google Chrome.desktop"
 update-alternatives --set x-www-browser /usr/bin/google-chrome-stable
+
+install -o root -g root -m 0644 "$source_dir/briar-runtime-profile.sh" \
+  /etc/profile.d/briar-runtime.sh
+for shell_profile in /home/briar/.profile /home/briar/.bashrc; do
+  touch "$shell_profile"
+  if ! grep -Fq '. /etc/profile.d/briar-runtime.sh' "$shell_profile"; then
+    printf '\n# Briar managed runtime\n. /etc/profile.d/briar-runtime.sh\n' \
+      >> "$shell_profile"
+  fi
+  chown briar:briar "$shell_profile"
+  chmod 0644 "$shell_profile"
+done
 
 install -o root -g root -m 0755 \
   "$source_dir/verify-managed-image" \
@@ -149,14 +274,25 @@ sha256sum /opt/briar/debian-packages.lock \
 source_commit="$(tr -d '\r\n' < /opt/briar/source-commit)"
 briar_version="$(tr -d '\r\n' < /opt/briar/briar-version)"
 jq -n \
-  --arg schemaVersion "1" \
+  --arg schemaVersion "2" \
   --arg sourceCommit "$source_commit" \
   --arg briarVersion "$briar_version" \
   --arg baseAmiId "$base_ami_id" \
   --arg debianSnapshot "$DEBIAN_SNAPSHOT" \
   --arg bunVersion "$BUN_VERSION" \
+  --arg nodeVersion "$NODE_VERSION" \
+  --arg rustVersion "$RUST_TOOLCHAIN_VERSION" \
+  --arg cargoAuditVersion "$CARGO_AUDIT_VERSION" \
+  --arg gitleaksVersion "$GITLEAKS_VERSION" \
   --arg chromeVersion "$GOOGLE_CHROME_VERSION" \
   --arg ssmAgentVersion "$SSM_AGENT_PACKAGE_VERSION" \
+  --arg codexVersion "$CODEX_CLI_VERSION" \
+  --arg claudeVersion "$CLAUDE_CODE_VERSION" \
+  --arg agentBrowserVersion "$AGENT_BROWSER_VERSION" \
+  --arg opencodeVersion "$OPENCODE_CLI_VERSION" \
+  --arg grokVersion "$GROK_CLI_VERSION" \
+  --arg cursorVersion "$CURSOR_AGENT_VERSION" \
+  --arg antigravityVersion "$ANTIGRAVITY_CLI_VERSION" \
   --arg packageLockSha256 "$(sha256sum /opt/briar/remote-desktop-packages.lock | cut -d' ' -f1)" \
   --arg fullPackageLockSha256 "$(sha256sum /opt/briar/debian-packages.lock | cut -d' ' -f1)" \
   --arg providerLockSha256 "$(sha256sum /opt/briar/provider/bun.lock | cut -d' ' -f1)" \
@@ -168,8 +304,21 @@ jq -n \
     debianSnapshot: $debianSnapshot,
     runtime: {
       bun: $bunVersion,
+      node: $nodeVersion,
+      rust: $rustVersion,
+      cargoAudit: $cargoAuditVersion,
+      gitleaks: $gitleaksVersion,
       googleChrome: $chromeVersion,
-      amazonSsmAgent: $ssmAgentVersion
+      amazonSsmAgent: $ssmAgentVersion,
+      providers: {
+        codex: $codexVersion,
+        claude: $claudeVersion,
+        agentBrowser: $agentBrowserVersion,
+        opencode: $opencodeVersion,
+        grok: $grokVersion,
+        cursor: $cursorVersion,
+        antigravity: $antigravityVersion
+      }
     },
     packageLockSha256: $packageLockSha256,
     fullPackageLockSha256: $fullPackageLockSha256,
