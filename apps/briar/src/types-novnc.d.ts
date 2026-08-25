@@ -13,9 +13,11 @@ declare module "@novnc/novnc" {
     resizeSession: boolean;
     compressionLevel: number;
     qualityLevel: number;
+    clipboardPasteFrom(text: string): void;
     disconnect(): void;
     focus(): void;
     blur(): void;
     sendCtrlAltDel(): void;
+    sendKey(keysym: number, code: string | null, down?: boolean): void;
   }
 }
