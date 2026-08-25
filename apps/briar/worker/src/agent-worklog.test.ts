@@ -4,6 +4,7 @@ import { agentProviders } from "../../src/lib/agent-provider";
 import {
   ingestAgentTranscript,
   listAgentTranscriptSegments,
+  recalculateAgentTranscriptSessionTotals,
   readAgentWorkLog,
   retainedRawTranscriptEvents,
 } from "./agent-worklog";
@@ -63,6 +64,28 @@ describe("provider-independent agent work log", () => {
       `delete from briar_agent_transcript_sessions;`,
     );
   });
+
+  const expectSessionTotalsToMatchSegments = async (sessionId: string) => {
+    const totals = await db.prepare(
+      `select session.event_count, session.byte_count,
+              coalesce(sum(segment.event_count), 0) as summed_event_count,
+              coalesce(sum(segment.uncompressed_bytes), 0) as summed_byte_count
+       from briar_agent_transcript_sessions session
+       left join briar_agent_transcript_segments segment
+         on segment.session_id = session.session_id
+       where session.session_id = ?
+       group by session.session_id`,
+    ).bind(sessionId).first<{
+      event_count: number;
+      byte_count: number;
+      summed_event_count: number;
+      summed_byte_count: number;
+    }>();
+    expect(totals).not.toBeNull();
+    expect(totals?.event_count).toBe(totals?.summed_event_count);
+    expect(totals?.byte_count).toBe(totals?.summed_byte_count);
+    return totals!;
+  };
 
   it.each(agentProviders)(
     "projects %s events into the same compact schema",
@@ -549,9 +572,15 @@ describe("provider-independent agent work log", () => {
     await ingestAgentTranscript(db, bucket, projectId, input);
     const [firstSegment] =
       (await listAgentTranscriptSegments(db, projectId, sessionId))!;
+    expect((await expectSessionTotalsToMatchSegments(sessionId)).event_count)
+      .toBe(1);
     await db.prepare(
       `delete from briar_agent_transcript_segments where session_id = ?`,
     ).bind(sessionId).run();
+    expect(await expectSessionTotalsToMatchSegments(sessionId)).toMatchObject({
+      event_count: 0,
+      byte_count: 0,
+    });
     const retryBucket = {
       head: bucket.head.bind(bucket),
       put: () => {
@@ -565,10 +594,90 @@ describe("provider-independent agent work log", () => {
     ).resolves.toMatchObject({ stored: 1, projected: 0 });
     expect(await listAgentTranscriptSegments(db, projectId, sessionId))
       .toEqual([expect.objectContaining({ object_key: firstSegment.object_key })]);
+    expect((await expectSessionTotalsToMatchSegments(sessionId)).event_count)
+      .toBe(1);
     await expect(bucket.head(firstSegment.object_key)).resolves.toMatchObject({
       customMetadata: {
         archivePolicy: "meaningful-events-coalesced-deltas-v1",
       },
     });
+  });
+
+  it("keeps incremental session totals exact across insert, duplicate, upsert, retry, and concurrent ingest", async () => {
+    const sessionId = "incremental-session-totals";
+    const inputFor = (sequence: number) => ({
+      sessionId,
+      runId: null,
+      workerId: null,
+      agentProvider: "codex" as const,
+      observedAt: `2026-08-13T00:00:0${sequence}.000Z`,
+      events: [{
+        sequence,
+        direction: "server" as const,
+        payload: { type: "result", message: `result-${sequence}` },
+      }],
+    });
+
+    const first = inputFor(1);
+    expect(await ingestAgentTranscript(db, bucket, projectId, first))
+      .toMatchObject({ stored: 1 });
+    const afterInsert = await expectSessionTotalsToMatchSegments(sessionId);
+    expect(afterInsert.event_count).toBe(1);
+
+    expect(await ingestAgentTranscript(db, bucket, projectId, first))
+      .toMatchObject({ stored: 0 });
+    expect(await expectSessionTotalsToMatchSegments(sessionId))
+      .toEqual(afterInsert);
+
+    const concurrent = await Promise.all([
+      ingestAgentTranscript(db, bucket, projectId, inputFor(2)),
+      ingestAgentTranscript(db, bucket, projectId, inputFor(2)),
+      ingestAgentTranscript(db, bucket, projectId, inputFor(3)),
+    ]);
+    expect(concurrent.map((result) => result.stored).sort()).toEqual([0, 1, 1]);
+    expect((await expectSessionTotalsToMatchSegments(sessionId)).event_count)
+      .toBe(3);
+
+    const [segment] = (await listAgentTranscriptSegments(
+      db,
+      projectId,
+      sessionId,
+    ))!;
+    await db.prepare(
+      `insert into briar_agent_transcript_segments (
+         session_id, first_sequence, last_sequence, object_key, event_count,
+         uncompressed_bytes, compressed_bytes, sha256, recorded_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       on conflict (session_id, first_sequence, last_sequence) do update set
+         event_count = excluded.event_count,
+         uncompressed_bytes = excluded.uncompressed_bytes`,
+    ).bind(
+      segment.session_id,
+      segment.first_sequence,
+      segment.last_sequence,
+      segment.object_key,
+      segment.event_count + 2,
+      segment.uncompressed_bytes + 11,
+      segment.compressed_bytes,
+      segment.sha256,
+      segment.recorded_at,
+    ).run();
+    const afterUpsert = await expectSessionTotalsToMatchSegments(sessionId);
+    expect(afterUpsert.event_count).toBe(5);
+    expect(afterUpsert.byte_count).toBe(afterInsert.byte_count * 3 + 11);
+
+    expect(await ingestAgentTranscript(db, bucket, projectId, inputFor(2)))
+      .toMatchObject({ stored: 0 });
+    expect(await expectSessionTotalsToMatchSegments(sessionId))
+      .toEqual(afterUpsert);
+
+    await db.prepare(
+      `update briar_agent_transcript_sessions
+       set event_count = 0, byte_count = 0
+       where session_id = ?`,
+    ).bind(sessionId).run();
+    await recalculateAgentTranscriptSessionTotals(db, sessionId);
+    expect(await expectSessionTotalsToMatchSegments(sessionId))
+      .toEqual(afterUpsert);
   });
 });
