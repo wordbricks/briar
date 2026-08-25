@@ -39,6 +39,12 @@
           "serviceNotAsClass": "suggestion",
           "unnecessaryArrowBlock": "suggestion",
           "unsafeEffectTypeAssertion": "error"
+          // Not enabled: strictBooleanExpressions requires a dedicated migration
+          // of existing React, DTO, and SDK-boundary truthiness checks.
+          // Not enabled: newPromise also reports legitimate browser, event, SDK,
+          // and test Promise bridges that are not owned by an Effect workflow.
+          // Not enabled: extendsNativeError covers established boundary error
+          // contracts whose migration needs runtime and serialization review.
         },
         "overrides": [
           {
