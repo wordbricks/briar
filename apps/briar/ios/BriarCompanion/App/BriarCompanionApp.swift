@@ -16,6 +16,9 @@ struct BriarCompanionApp: App {
                     ),
                     hasChannelHistory: ProcessInfo.processInfo.arguments.contains(
                         "--ui-testing-channel-history"
+                    ),
+                    showsBatchProposal: ProcessInfo.processInfo.arguments.contains(
+                        "--ui-testing-batch-proposal"
                     )
                 )
             } else {
@@ -71,7 +74,8 @@ private struct UITestCompanionFlow: View {
         locale: CompanionLocale,
         delaysMessageSend: Bool,
         delaysChannelLoad: Bool,
-        hasChannelHistory: Bool
+        hasChannelHistory: Bool,
+        showsBatchProposal: Bool
     ) {
         self.offline = offline
         self.locale = locale
@@ -82,7 +86,8 @@ private struct UITestCompanionFlow: View {
         _channels = StateObject(wrappedValue: ChannelsStore(
             api: UITestAPIClient(
                 delaysChannelLoad: delaysChannelLoad,
-                hasChannelHistory: hasChannelHistory
+                hasChannelHistory: hasChannelHistory,
+                showsBatchProposal: showsBatchProposal
             )
         ))
     }
@@ -284,15 +289,18 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
     private let delaysMessageSend: Bool
     private let delaysChannelLoad: Bool
     private let hasChannelHistory: Bool
+    private let showsBatchProposal: Bool
 
     init(
         delaysMessageSend: Bool = false,
         delaysChannelLoad: Bool = false,
-        hasChannelHistory: Bool = false
+        hasChannelHistory: Bool = false,
+        showsBatchProposal: Bool = false
     ) {
         self.delaysMessageSend = delaysMessageSend
         self.delaysChannelLoad = delaysChannelLoad
         self.hasChannelHistory = hasChannelHistory
+        self.showsBatchProposal = showsBatchProposal
     }
 
     func createdIssueStatus() -> DashboardRun.Status? { issueStatus }
@@ -326,6 +334,8 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
                     decoding: try JSONEncoder.mobileContract.encode(Self.channelHistory),
                     as: UTF8.self
                 )
+            } else if showsBatchProposal {
+                payload = Self.batchProposalChannelPayload
             } else {
                 payload = ##"""
                 {"channel":{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","organizationId":"22222222-2222-4222-8222-222222222222","slug":"design","name":"design","topic":"Mobile product design","visibility":"public","defaultProjectId":"11111111-1111-4111-8111-111111111111","archivedAt":null,"memberCount":4,"agentCount":3,"createdAt":"2026-08-02T01:00:00Z","updatedAt":"2026-08-02T01:00:00Z"},"members":[],"agents":[{"agentId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","name":"Issue processing agent","avatar":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","provider":"codex","model":"gpt-5.4","projectId":"11111111-1111-4111-8111-111111111111","responsibility":"Owns the project's development and code-related work.","createdAt":"2026-08-02T01:00:00Z"}],"messages":[{"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","channelId":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","parentMessageId":null,"body":"상단 헤더 디자인을 함께 확인해 주세요.","author":{"type":"user","name":"Briar User","image":null,"provider":null},"mentionedUserIds":[],"mentionedAgentIds":[],"attachments":[{"id":"abababab-abab-4bab-8bab-abababababab","filename":"channel-card.png","contentType":"image/png","byteSize":68,"url":"/ui-test/channel-card.png"}],"replyCount":1,"lastReplyAt":"2026-08-02T01:03:00Z","document":null,"proposal":null,"createdAt":"2026-08-02T01:02:00Z"}],"nextCursor":null}
@@ -465,6 +475,99 @@ private actor UITestAPIClient: MobileAPIClientProtocol {
         try png.write(to: destination, options: .atomic)
         return destination
     }
+
+    private static let batchProposalChannelPayload = ##"""
+    {
+      "channel": {
+        "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "organizationId": "22222222-2222-4222-8222-222222222222",
+        "slug": "design",
+        "name": "design",
+        "topic": "Mobile product design",
+        "visibility": "public",
+        "defaultProjectId": "11111111-1111-4111-8111-111111111111",
+        "archivedAt": null,
+        "memberCount": 4,
+        "agentCount": 3,
+        "createdAt": "2026-08-25T01:00:00Z",
+        "updatedAt": "2026-08-25T01:03:00Z"
+      },
+      "members": [],
+      "agents": [],
+      "messages": [
+        {
+          "id": "19191919-1919-4919-8919-191919191919",
+          "channelId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          "parentMessageId": null,
+          "body": "백로그 이슈 3개와 의존성을 한 번에 만들었습니다.",
+          "author": {
+            "type": "agent",
+            "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "name": "Issue processing agent",
+            "image": null,
+            "provider": "codex"
+          },
+          "mentionedUserIds": [],
+          "mentionedAgentIds": [],
+          "replyCount": 0,
+          "lastReplyAt": null,
+          "document": null,
+          "proposal": {
+            "id": "18181818-1818-4818-8818-181818181818",
+            "actionType": "request_issue_create",
+            "status": "accepted",
+            "projectId": "11111111-1111-4111-8111-111111111111",
+            "payload": {
+              "batch": {
+                "items": [
+                  {
+                    "key": "api",
+                    "issue": {
+                      "title": "승인 API 확장",
+                      "description": "배치 승인을 처리합니다.",
+                      "priority": 1,
+                      "status": "backlog"
+                    }
+                  },
+                  {
+                    "key": "web",
+                    "issue": {
+                      "title": "채널 결과 UI",
+                      "description": "생성 결과를 표시합니다.",
+                      "priority": 2,
+                      "status": "backlog"
+                    }
+                  },
+                  {
+                    "key": "qa",
+                    "issue": {
+                      "title": "원자성 검증",
+                      "description": "롤백과 재시도를 확인합니다.",
+                      "priority": 2,
+                      "status": "backlog"
+                    }
+                  }
+                ],
+                "dependencies": [
+                  {"prerequisiteKey": "api", "dependentKey": "web"},
+                  {"prerequisiteKey": "web", "dependentKey": "qa"}
+                ]
+              },
+              "executeAfterCreate": false
+            },
+            "resultRunId": "31313131-3131-4131-8131-313131313131",
+            "resultItems": [
+              {"localKey": "api", "runId": "31313131-3131-4131-8131-313131313131"},
+              {"localKey": "web", "runId": "32323232-3232-4232-8232-323232323232"},
+              {"localKey": "qa", "runId": "33333333-3333-4333-8333-333333333333"}
+            ]
+          },
+          "createdAt": "2026-08-25T01:03:00Z"
+        }
+      ],
+      "nextCursor": null
+    }
+    """##
 
     private static let channelHistory: ChannelDetailResponse = {
         let channelID = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!

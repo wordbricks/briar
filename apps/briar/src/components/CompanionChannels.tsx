@@ -118,7 +118,9 @@ import {
 } from "./ProfileDialog";
 import {
   ChannelIssueProposalDetails,
+  channelIssueBatchProposalDetails,
   channelIssueProposalDetails,
+  channelIssueProposalIsValid,
   channelIssueProposalRequestsExecution,
 } from "./ChannelIssueProposalDetails";
 import { IssueExecutionApproval } from "./IssueExecutionApproval";
@@ -1454,7 +1456,7 @@ export function CompanionChannels({
       if (
         !channel ||
         item.proposal?.actionType !== "request_issue_create" ||
-        !channelIssueProposalDetails(item.proposal)
+        !channelIssueProposalIsValid(item.proposal)
       ) return t("executionApproval.targetUnavailable");
       const proposalId = item.proposal.id;
       const requestsExecution = channelIssueProposalRequestsExecution(
@@ -1505,6 +1507,7 @@ export function CompanionChannels({
               status: "accepted",
               projectId: result.projectId,
               resultRunId: result.resultRunId,
+              resultItems: result.resultItems,
             },
             executionProposal:
               result.executionProposal ?? candidate.executionProposal,
@@ -1529,7 +1532,10 @@ export function CompanionChannels({
               (await refreshProposalState(item, proposalId)) ?? undefined;
           }
           if (!approvalContextIsCurrent()) return;
-          if (latest?.status === "accepted" && latest.projectId && latest.resultRunId) {
+          if (
+            latest?.status === "accepted" && latest.projectId &&
+            latest.resultRunId && channelIssueProposalIsValid(latest)
+          ) {
             if (hasExecutionFollowUp) {
               if (result.executionProposal) {
                 setMessages((current) => current.map(applyResult));
@@ -2230,6 +2236,8 @@ function MessageRow({
       proposalProjectId
     : null;
   const proposalIssue = channelIssueProposalDetails(issueProposal);
+  const proposalBatch = channelIssueBatchProposalDetails(issueProposal);
+  const proposalValid = channelIssueProposalIsValid(issueProposal);
   const requestsExecution = channelIssueProposalRequestsExecution(issueProposal);
   const executionProjectName = message.executionProposal
     ? projects.find(
@@ -2341,7 +2349,7 @@ function MessageRow({
                 className="channel-proposal-approve-button"
                 disabled={
                   busy || Boolean(channel.archivedAt) ||
-                  !proposalProjectId || !proposalIssue
+                  !proposalProjectId || !proposalValid
                 }
                 onClick={() => void onAcceptProposal()}
                 type="button"
@@ -2352,10 +2360,15 @@ function MessageRow({
                     {t("channel.creatingIssue")}
                   </>
                 ) : (
-                  t("channel.approveCreateIssue")
+                  proposalBatch
+                    ? t("channel.approveCreateIssueBatch", {
+                        count: proposalBatch.items.length,
+                      })
+                    : t("channel.approveCreateIssue")
                 )}
               </button>
-            ) : acceptedProjectId && acceptedRunId && onIssueOpen ? (
+            ) : acceptedProjectId && acceptedRunId && !proposalBatch &&
+              onIssueOpen ? (
               <button
                 className="channel-proposal-view-button"
                 onClick={() => {

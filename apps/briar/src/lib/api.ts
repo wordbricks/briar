@@ -1849,6 +1849,8 @@ export async function acceptChannelProposal(
     outcome: "accepted" | "already_accepted";
     projectId: string;
     resultRunId: string;
+    /** Present for an accepted issue batch, in proposal order. */
+    resultItems?: Array<{ localKey: string; runId: string }>;
     /** Present when create approval materializes or accepts execution. */
     executionProposal?: ChannelExecutionProposal | null;
     dispatch?: HuntDispatchResult | null;

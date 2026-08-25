@@ -856,6 +856,7 @@ async function runClaimedChannelReply(
         parsedRecord.attachments.length !== 0 ||
         parsedRecord.document !== null ||
         parsedRecord.issueProposal !== null ||
+        parsedRecord.issueBatchProposal !== null ||
         parsedRecord.executionProposal !== null ||
         parsedRecord.skillExecutionProposal !== null ||
         parsedRecord.delegation !== null

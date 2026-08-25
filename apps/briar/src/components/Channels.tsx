@@ -145,7 +145,9 @@ import {
 } from "./ConversationReplySummary";
 import {
   ChannelIssueProposalDetails,
+  channelIssueBatchProposalDetails,
   channelIssueProposalDetails,
+  channelIssueProposalIsValid,
   channelIssueProposalRequestsExecution,
 } from "./ChannelIssueProposalDetails";
 import { IssueExecutionApproval } from "./IssueExecutionApproval";
@@ -1998,6 +2000,7 @@ export function Channels({
                   status: "accepted",
                   projectId: result.projectId,
                   resultRunId: result.resultRunId,
+                  resultItems: result.resultItems,
                 },
                 executionProposal:
                   result.executionProposal ?? candidate.executionProposal,
@@ -2022,7 +2025,10 @@ export function Channels({
               (await refreshProposalState(message, proposalId)) ?? undefined;
           }
           if (!approvalContextIsCurrent()) return;
-          if (latest?.status === "accepted" && latest.projectId && latest.resultRunId) {
+          if (
+            latest?.status === "accepted" && latest.projectId &&
+            latest.resultRunId && channelIssueProposalIsValid(latest)
+          ) {
             if (hasExecutionFollowUp) {
               if (result.executionProposal) {
                 updateRootMessages((current) => current.map(applyResult));
@@ -3971,6 +3977,8 @@ const MessageRow = memo(function MessageRow({
     issueProposal?.status === "pending" && !issueProposal.projectId &&
     !channel.defaultProjectId;
   const proposalIssue = channelIssueProposalDetails(issueProposal);
+  const proposalBatch = channelIssueBatchProposalDetails(issueProposal);
+  const proposalValid = channelIssueProposalIsValid(issueProposal);
   const requestsExecution = channelIssueProposalRequestsExecution(issueProposal);
   const executionProjectName = message.executionProposal
     ? availableProjects.find(
@@ -4105,7 +4113,7 @@ const MessageRow = memo(function MessageRow({
                 className="channel-proposal-approve-button"
                 disabled={
                   busy || Boolean(channel.archivedAt) ||
-                  !proposalProjectId || !proposalIssue
+                  !proposalProjectId || !proposalValid
                 }
                 onClick={() => void onAcceptProposal()}
                 type="button"
@@ -4116,11 +4124,16 @@ const MessageRow = memo(function MessageRow({
                     {t("channel.creatingIssue")}
                   </>
                 ) : (
-                  t("channel.approveCreateIssue")
+                  proposalBatch
+                    ? t("channel.approveCreateIssueBatch", {
+                        count: proposalBatch.items.length,
+                      })
+                    : t("channel.approveCreateIssue")
                 )}
               </button>
             ) : issueProposal.projectId &&
               issueProposal.resultRunId &&
+              !proposalBatch &&
               onIssueOpen ? (
               <button
                 className="channel-proposal-view-button"

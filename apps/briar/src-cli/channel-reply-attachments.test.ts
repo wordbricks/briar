@@ -38,6 +38,7 @@ describe("channel reply agent attachments", () => {
         body: "Here is the screen.",
         document: null,
         issueProposal: null,
+        issueBatchProposal: null,
         executionProposal: null,
         skillExecutionProposal: null,
         delegation: null,

@@ -137,7 +137,10 @@ describe("Companion mobile API contract", () => {
     const proposal = channel.messages.find((message) => message.proposal)
       ?.proposal;
     expect(proposal?.actionType).toBe("request_issue_create");
-    if (proposal?.actionType === "request_issue_create") {
+    if (
+      proposal?.actionType === "request_issue_create" &&
+      "issue" in proposal.payload
+    ) {
       expect(proposal.payload.issue).toMatchObject({
         title: "온보딩 개편",
         priority: 3,

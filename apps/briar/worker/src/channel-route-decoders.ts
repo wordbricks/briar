@@ -3,6 +3,7 @@ import {
 } from "../../src/lib/channel-agent-activity";
 import {
   channelExecutionProposalAcceptInputSchema,
+  channelIssueBatchProposalPayloadSchema,
   channelInputSchema,
   channelIssueProposalPayloadSchema,
   channelMemberInputSchema,
@@ -39,6 +40,9 @@ export const decodeChannelProposalAcceptInput = decodeRequestSync(
 );
 export const decodeChannelIssueProposalPayload = decodeRequestSync(
   channelIssueProposalPayloadSchema,
+);
+export const decodeChannelIssueBatchProposalPayload = decodeRequestSync(
+  channelIssueBatchProposalPayloadSchema,
 );
 export const decodeChannelExecutionProposalAcceptInput = decodeRequestSync(
   channelExecutionProposalAcceptInputSchema,

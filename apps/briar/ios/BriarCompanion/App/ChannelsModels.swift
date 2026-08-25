@@ -546,6 +546,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         let projectId: UUID?
         let payload: Payload?
         let resultRunId: UUID?
+        let resultItems: [ResultItem]
 
         init(
             id: UUID,
@@ -553,7 +554,8 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
             status: Status,
             projectId: UUID?,
             payload: Payload? = nil,
-            resultRunId: UUID?
+            resultRunId: UUID?,
+            resultItems: [ResultItem] = []
         ) {
             self.id = id
             self.actionType = actionType
@@ -561,6 +563,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
             self.projectId = projectId
             self.payload = payload
             self.resultRunId = resultRunId
+            self.resultItems = resultItems
         }
 
         init(from decoder: Decoder) throws {
@@ -573,6 +576,10 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
             // a different shape. Neither should make the channel unreadable.
             payload = try? container.decodeIfPresent(Payload.self, forKey: .payload)
             resultRunId = try container.decodeIfPresent(UUID.self, forKey: .resultRunId)
+            resultItems = try container.decodeIfPresent(
+                [ResultItem].self,
+                forKey: .resultItems
+            ) ?? []
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -582,21 +589,46 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
             case projectId
             case payload
             case resultRunId
+            case resultItems
+        }
+
+        struct ResultItem: Codable, Hashable, Sendable {
+            let localKey: String
+            let runId: UUID
         }
 
         struct Payload: Codable, Hashable, Sendable {
             /// Present only for `request_issue_create` proposals.
             let issue: Issue?
+            /// Present only for an atomic multi-issue backlog proposal.
+            let batch: Batch?
             /// Compatibility for Agent payloads that place the follow-up intent
             /// next to the issue. It never contains execution preferences.
             let executeAfterCreate: Bool?
 
             init(
                 issue: Issue? = nil,
+                batch: Batch? = nil,
                 executeAfterCreate: Bool? = nil
             ) {
                 self.issue = issue
+                self.batch = batch
                 self.executeAfterCreate = executeAfterCreate
+            }
+
+            struct Batch: Codable, Hashable, Sendable {
+                let items: [Item]
+                let dependencies: [Dependency]
+
+                struct Item: Codable, Hashable, Sendable {
+                    let key: String
+                    let issue: Issue
+                }
+
+                struct Dependency: Codable, Hashable, Sendable {
+                    let prerequisiteKey: String
+                    let dependentKey: String
+                }
             }
 
             struct Issue: Codable, Hashable, Sendable {
@@ -980,6 +1012,7 @@ struct AcceptChannelProposalResponse: Codable, Equatable, Sendable {
     let outcome: Outcome
     let projectId: UUID
     let resultRunId: UUID
+    let resultItems: [ChannelMessage.Proposal.ResultItem]?
     /// Combined approval returns the materialized execution record. Older
     /// servers and create-only responses may omit this field.
     let executionProposal: IssueExecutionProposal?
@@ -989,12 +1022,14 @@ struct AcceptChannelProposalResponse: Codable, Equatable, Sendable {
         outcome: Outcome,
         projectId: UUID,
         resultRunId: UUID,
+        resultItems: [ChannelMessage.Proposal.ResultItem]? = nil,
         executionProposal: IssueExecutionProposal? = nil,
         dispatch: DispatchRunResponse? = nil
     ) {
         self.outcome = outcome
         self.projectId = projectId
         self.resultRunId = resultRunId
+        self.resultItems = resultItems
         self.executionProposal = executionProposal
         self.dispatch = dispatch
     }

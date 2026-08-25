@@ -5266,6 +5266,12 @@
               "null"
             ],
             "format": "uuid"
+          },
+          "resultItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelIssueBatchResultItem"
+            }
           }
         },
         "allOf": [
@@ -5283,7 +5289,14 @@
             "then": {
               "properties": {
                 "payload": {
-                  "$ref": "#/components/schemas/ChannelIssueProposalPayload"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ChannelIssueProposalPayload"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ChannelIssueBatchProposalPayload"
+                    }
+                  ]
                 }
               }
             }
@@ -5341,6 +5354,135 @@
             "type": "boolean",
             "default": false,
             "description": "Requests a separate execution proposal after backlog creation; never dispatches during create acceptance."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChannelIssueBatchResultItem": {
+        "type": "object",
+        "required": [
+          "localKey",
+          "runId"
+        ],
+        "properties": {
+          "localKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChannelIssueBatchProposalPayload": {
+        "type": "object",
+        "required": [
+          "batch"
+        ],
+        "properties": {
+          "batch": {
+            "type": "object",
+            "required": [
+              "items",
+              "dependencies"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "key",
+                    "issue"
+                  ],
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                    },
+                    "issue": {
+                      "type": "object",
+                      "required": [
+                        "title",
+                        "description",
+                        "priority",
+                        "status"
+                      ],
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        },
+                        "description": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "maxLength": 100000
+                        },
+                        "priority": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "minimum": 1,
+                          "maximum": 4
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "backlog"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "dependencies": {
+                "type": "array",
+                "maxItems": 28,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "prerequisiteKey",
+                    "dependentKey"
+                  ],
+                  "properties": {
+                    "prerequisiteKey": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                    },
+                    "dependentKey": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "executeAfterCreate": {
+            "type": "boolean",
+            "const": false,
+            "default": false
           }
         },
         "additionalProperties": false
@@ -5573,6 +5715,12 @@
           "resultRunId": {
             "type": "string",
             "format": "uuid"
+          },
+          "resultItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelIssueBatchResultItem"
+            }
           },
           "executionProposal": {
             "oneOf": [
