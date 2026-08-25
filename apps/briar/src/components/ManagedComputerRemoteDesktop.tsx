@@ -17,6 +17,10 @@ import {
 } from "../lib/api";
 import { ApiError } from "../lib/api/errors";
 import { setRemoteDesktopKeyboardCapture } from "../lib/remote-desktop-focus";
+import {
+  createRemoteDesktopPasteController,
+  isRemoteDesktopPasteShortcut,
+} from "../lib/remote-desktop-paste";
 import type { ManagedComputer } from "../types";
 import { Button } from "./ui/button";
 import {
@@ -82,6 +86,11 @@ export function ManagedComputerRemoteDesktop({
   const endingRef = useRef(false);
   const fitScreenRef = useRef(true);
   const generationRef = useRef(0);
+  const [pasteController] = useState(() =>
+    createRemoteDesktopPasteController({
+      getTarget: () => rfbRef.current,
+    }),
+  );
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("connecting");
   const [error, setError] = useState<string | null>(null);
@@ -90,10 +99,11 @@ export function ManagedComputerRemoteDesktop({
   const storageKey = `briar.remoteDesktop.${computer.id}`;
 
   const destroyRfb = useCallback(() => {
+    pasteController.reset();
     const rfb = rfbRef.current;
     rfbRef.current = null;
     rfb?.disconnect();
-  }, []);
+  }, [pasteController]);
 
   const connect = useCallback(async (reconnect: boolean) => {
     const generation = ++generationRef.current;
@@ -334,8 +344,25 @@ export function ManagedComputerRemoteDesktop({
           className="relative min-h-0 overflow-auto bg-black"
           data-briar-remote-desktop="true"
           data-tauri-drag-region="false"
+          onKeyDownCapture={(event) => {
+            if (
+              connectionState === "connected" &&
+              isRemoteDesktopPasteShortcut(event)
+            ) {
+              // Keep the shortcut out of noVNC while preserving the browser's
+              // native paste event and its synchronous clipboardData access.
+              event.stopPropagation();
+            }
+          }}
           onKeyDown={(event) => event.stopPropagation()}
           onKeyUp={(event) => event.stopPropagation()}
+          onPasteCapture={(event) => {
+            if (connectionState !== "connected") return;
+            const text = event.clipboardData.getData("text/plain");
+            if (!pasteController.enqueue(text)) return;
+            event.preventDefault();
+            event.stopPropagation();
+          }}
           tabIndex={-1}
         >
           <div className="size-full min-h-[360px]" ref={targetRef} />
