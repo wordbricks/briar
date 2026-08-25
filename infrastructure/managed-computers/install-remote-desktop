@@ -69,7 +69,8 @@ installed_lock="$(mktemp)"
 trap 'rm -f "$installed_lock"' EXIT
 for package in "${packages[@]}"; do
   name="${package%%=*}"
-  dpkg-query --show --showformat='${binary:Package}=${Version}\n' "$name"
+  version="$(dpkg-query --show --showformat='${Version}' "$name")"
+  printf '%s=%s\n' "$name" "$version"
 done | LC_ALL=C sort > "$installed_lock"
 LC_ALL=C sort "$package_lock" | sed '/^\s*#/d; /^\s*$/d' | cmp - "$installed_lock"
 sha256sum /opt/briar/remote-desktop-packages.lock \
