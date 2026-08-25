@@ -1,5 +1,5 @@
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
+  "$schema": "./node_modules/@effect/tsgo/schema.json",
   "compilerOptions": {
     "target": "ESNext",
     "lib": ["ESNext"],
@@ -19,7 +19,46 @@
     "resolveJsonModule": true,
     "plugins": [
       {
-        "name": "@effect/language-service"
+        "name": "@effect/language-service",
+        "ignoreEffectSuggestionsInTscExitCode": false,
+        "diagnosticSeverity": {
+          "anyUnknownInErrorContext": "error",
+          "cryptoRandomUUIDInEffect": "warning",
+          "deterministicKeys": "suggestion",
+          "effectDoNotation": "suggestion",
+          "globalConsoleInEffect": "warning",
+          "globalDateInEffect": "warning",
+          "globalFetchInEffect": "warning",
+          "globalRandomInEffect": "warning",
+          "globalTimersInEffect": "warning",
+          "instanceOfSchema": "warning",
+          "nestedEffectGenYield": "suggestion",
+          "preferSchemaTypeProperty": "suggestion",
+          "processEnvInEffect": "warning",
+          "schemaUnionOfLiterals": "suggestion",
+          "serviceNotAsClass": "suggestion",
+          "unnecessaryArrowBlock": "suggestion",
+          "unsafeEffectTypeAssertion": "error"
+          // Not enabled: strictBooleanExpressions requires a dedicated migration
+          // of existing React, DTO, and SDK-boundary truthiness checks.
+          // Not enabled: newPromise also reports legitimate browser, event, SDK,
+          // and test Promise bridges that are not owned by an Effect workflow.
+          // Not enabled: extendsNativeError covers established boundary error
+          // contracts whose migration needs runtime and serialization review.
+        },
+        "overrides": [
+          {
+            "include": [
+              "../../apps/**/*.test.ts",
+              "../../apps/**/*.test.tsx"
+            ],
+            "options": {
+              "diagnosticSeverity": {
+                "anyUnknownInErrorContext": "off"
+              }
+            }
+          }
+        ]
       }
     ]
   }

@@ -69,7 +69,7 @@ describe("Account API", () => {
   it("keeps the legacy optional account field semantics", () => {
     const input = { ...user, username: undefined, image: undefined };
 
-    expect(Schema.decodeUnknownSync(SessionUserSchema)(input)).toEqual(input);
+    expect(Schema.decodeSync(SessionUserSchema)(input)).toEqual(input);
   });
 
   it("aborts fetch when the Effect fiber is interrupted", async () => {

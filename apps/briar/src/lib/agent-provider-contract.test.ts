@@ -19,7 +19,7 @@ describe("agent provider contract", () => {
       efforts: [{ id: "xhigh", label: "Extra high" }],
     }];
     expect(decodeAgentProviderCapabilityCatalog(catalog)).toEqual(catalog);
-    expect(Schema.decodeUnknownSync(ModelEffort)("future-effort")).toBe(
+    expect(Schema.decodeSync(ModelEffort)("future-effort")).toBe(
       "future-effort",
     );
   });

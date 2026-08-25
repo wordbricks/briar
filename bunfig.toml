@@ -1,0 +1,13 @@
+[install]
+minimumReleaseAge = 259200
+minimumReleaseAgeExcludes = [
+  "@effect/platform-bun",
+  "@effect/platform-node-shared",
+  "@effect/sql-d1",
+  "@effect/tsgo",
+  "@oxlint/plugins",
+  "effect",
+  "oxlint",
+  "oxlint-tsgolint",
+  "typescript",
+]

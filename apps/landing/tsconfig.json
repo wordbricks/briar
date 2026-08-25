@@ -7,14 +7,6 @@
     "types": ["@cloudflare/workers-types"],
     "jsx": "react-jsx",
     "incremental": true,
-    "plugins": [
-      {
-        "name": "@effect/language-service"
-      },
-      {
-        "name": "next"
-      }
-    ],
     "paths": {
       "@/*": ["./*"]
     }

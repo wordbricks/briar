@@ -260,9 +260,8 @@ export function OrganizationAgentsSettings({
           aria-label={t("organization.agentsList")}
           className="grid gap-3"
         >
-          {agents.map((agent) => {
-            return (
-              <article
+          {agents.map((agent) => (
+            <article
               className="grid gap-4 rounded-xl border border-border bg-card p-5 shadow-xs md:grid-cols-[minmax(0,1fr)_auto]"
               key={agent.agentId}
             >
@@ -329,9 +328,8 @@ export function OrganizationAgentsSettings({
                   </Button>
                 </div>
               ) : null}
-              </article>
-            );
-          })}
+            </article>
+          ))}
         </section>
       )}
 
