@@ -190,6 +190,76 @@ async function createPreWebhookChannelMessage(
 }
 
 describe("D1 migrations", () => {
+  it("backfills existing transcript totals before incremental updates take over", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "briar-incremental-transcript-totals-migration-test" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db, {
+        through: "0134_managed_computer_promotion_campaigns.sql",
+      });
+      const now = "2026-08-25T00:00:00.000Z";
+      await executeD1Sql(
+        db,
+        `insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+         values ('totals-owner', 'Owner', 'totals@example.com', 1, '${now}', '${now}');
+         insert into briar_organizations (id, name, handle, created_at, updated_at)
+         values ('totals-org', 'Totals Org', 'totals-org', '${now}', '${now}');
+         insert into briar_organization_members (
+           organization_id, user_id, role, created_at, updated_at
+         ) values ('totals-org', 'totals-owner', 'owner', '${now}', '${now}');
+         insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (
+           'totals-project', 'totals-owner', 'totals-org', 'Totals Project',
+           '${"a".repeat(64)}', '${now}', '${now}'
+         );
+         insert into briar_agent_transcript_sessions (
+           session_id, project_id, agent_provider, started_at, last_event_at,
+           event_count, byte_count
+         ) values (
+           'totals-session', 'totals-project', 'codex', '${now}', '${now}',
+           99, 999
+         );
+         insert into briar_agent_transcript_segments (
+           session_id, first_sequence, last_sequence, object_key, event_count,
+           uncompressed_bytes, compressed_bytes, sha256, recorded_at
+         ) values
+           ('totals-session', 1, 2, 'totals/1-2', 2, 120, 80,
+            '${"b".repeat(64)}', '${now}'),
+           ('totals-session', 3, 5, 'totals/3-5', 3, 180, 100,
+            '${"c".repeat(64)}', '${now}');`,
+      );
+
+      await applyD1Migrations(db, {
+        files: ["0135_incremental_transcript_session_totals.sql"],
+      });
+
+      expect(await db.prepare(
+        `select event_count, byte_count
+         from briar_agent_transcript_sessions
+         where session_id = 'totals-session'`,
+      ).first()).toEqual({ event_count: 5, byte_count: 300 });
+
+      await db.prepare(
+        `update briar_agent_transcript_segments
+         set event_count = 4, uncompressed_bytes = 210
+         where session_id = 'totals-session' and first_sequence = 3`,
+      ).run();
+      expect(await db.prepare(
+        `select event_count, byte_count
+         from briar_agent_transcript_sessions
+         where session_id = 'totals-session'`,
+      ).first()).toEqual({ event_count: 6, byte_count: 330 });
+    } finally {
+      await miniflare.dispose();
+    }
+  });
+
   it("moves legacy Agent replies to the trigger message timeline", async () => {
     const miniflare = new Miniflare({
       modules: true,
