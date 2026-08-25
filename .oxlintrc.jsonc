@@ -19,6 +19,15 @@
       "error",
       { "packageNames": ["effect"] },
     ],
+    // Void callbacks are idiomatic in Effect, Match, finalizers, and tests.
+    "typescript/no-confusing-void-expression": "off",
+    // Explicit function-boundary types prevent semantic lint from widening
+    // defaulted parameters to `any`; inference brevity is lower priority.
+    "typescript/no-inferrable-types": "off",
+    // Effect.gen legitimately mixes `return yield*` failures with implicit void success.
+    "typescript/consistent-return": "off",
+    // Explicit Effect error and requirement channels document API contracts.
+    "typescript/no-unnecessary-type-arguments": "off",
     // Anti-slop baseline at b2907815. Re-enable each rule after its count reaches zero.
     // 113 existing findings.
     "anti-slop/no-chained-type-assertions": "off",

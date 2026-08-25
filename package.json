@@ -31,7 +31,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test //#test:repo-tools",
     "test:repo-tools": "vitest run scripts/apply-remote-d1-migrations.test.ts scripts/verify-encrypted-env.test.ts",
-    "prepare": "effect-tsgo patch",
+    "prepare": "effect-tsgo patch --typescript --no-oxlint",
     "ci:local": "bash scripts/ci-local.sh",
     "ci:signoff": "bash scripts/ci-local.sh --signoff",
     "mobile:contract": "turbo run mobile:contract --filter=@briar/app",

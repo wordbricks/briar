@@ -20,9 +20,7 @@ export const parseStructuredResult = (
   return Option.getOrNull(decodeStructuredAgentResultOption(parsed));
 };
 
-export const parseExecutionMetrics = (value: string | null) => {
-  return Option.getOrNull(
+export const parseExecutionMetrics = (value: string | null) =>
+  Option.getOrNull(
     decodeAgentExecutionMetricsOption(parseJsonObject(value)),
   );
-};
-

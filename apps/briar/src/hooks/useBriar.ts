@@ -1623,9 +1623,11 @@ export function useBriar(options: UseBriarOptions = {}) {
     }
   }, []);
 
-  const inspectLovableProject = useCallback(async (repositoryPath: string) => {
-    return inspectLovableRepositoryCompatibility(repositoryPath);
-  }, []);
+  const inspectLovableProject = useCallback(
+    async (repositoryPath: string) =>
+      inspectLovableRepositoryCompatibility(repositoryPath),
+    [],
+  );
 
   const connectProject = useCallback(async (
     autoHunt: LocalAutoHuntConfig,

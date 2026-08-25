@@ -1,13 +1,13 @@
 import * as Schema from "effect/Schema";
 
 const JsonRpcId = Schema.Union([
-  Schema.Number,
+  Schema.Finite,
   Schema.String,
   Schema.Null,
 ]);
 
 const JsonRpcError = Schema.Struct({
-  code: Schema.optional(Schema.Number),
+  code: Schema.optional(Schema.Finite),
   message: Schema.optional(Schema.String),
   data: Schema.optional(Schema.Unknown),
 });

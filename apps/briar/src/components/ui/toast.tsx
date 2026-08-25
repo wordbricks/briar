@@ -118,13 +118,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [dismiss],
   );
 
-  useEffect(() => {
-    return () => {
-      for (const timer of timers.current.values()) {
-        window.clearTimeout(timer);
-      }
-      timers.current.clear();
-    };
+  useEffect(() => () => {
+    for (const timer of timers.current.values()) {
+      window.clearTimeout(timer);
+    }
+    timers.current.clear();
   }, []);
 
   const value = useMemo(() => ({ toast }), [toast]);

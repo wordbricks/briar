@@ -10,6 +10,8 @@ class SignedJsonTokenError extends Schema.TaggedError<SignedJsonTokenError>()(
   { cause: Schema.Defect() },
 ) {}
 
+const isSignedJsonTokenError = Schema.is(SignedJsonTokenError);
+
 const base64UrlEncode = (bytes: Uint8Array) =>
   btoa(String.fromCharCode(...bytes))
     .replaceAll("+", "-")
@@ -101,7 +103,7 @@ export const verifyJsonTokenEffect = Effect.fn("verifyJsonTokenEffect")(
       });
     }).pipe(
       Effect.map(Option.some),
-      Effect.catch(() => Effect.succeed(Option.none())),
+      Effect.orElseSucceed(() => Option.none()),
     );
     return verified;
   },
@@ -115,7 +117,7 @@ export async function signJsonToken<Payload extends object>(
   try {
     return await Effect.runPromise(signJsonTokenEffect(domain, secret, payload));
   } catch (error) {
-    if (error instanceof SignedJsonTokenError) throw error.cause;
+    if (isSignedJsonTokenError(error)) throw error.cause;
     throw error;
   }
 }
