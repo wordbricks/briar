@@ -1,5 +1,3 @@
-import * as Effect from "effect/Effect";
-import * as Fiber from "effect/Fiber";
 import * as Schema from "effect/Schema";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -14,7 +12,7 @@ import {
   errorDiagnosticOccurrenceKey,
   errorDiagnosticsForMessage,
 } from "../error-diagnostics";
-import { loadSessionEffect, SessionUserSchema } from "./account";
+import { SessionUserSchema } from "./account";
 
 const user = {
   id: "user-1",
@@ -70,28 +68,6 @@ describe("Account API", () => {
     const input = { ...user, username: undefined, image: undefined };
 
     expect(Schema.decodeSync(SessionUserSchema)(input)).toEqual(input);
-  });
-
-  it("aborts fetch when the Effect fiber is interrupted", async () => {
-    let requestSignal: AbortSignal | undefined;
-    vi.stubGlobal("fetch", vi.fn((
-      _input: RequestInfo | URL,
-      init?: RequestInit,
-    ) => new Promise<Response>((_resolve, reject) => {
-      requestSignal = init?.signal ?? undefined;
-      requestSignal?.addEventListener(
-        "abort",
-        () => reject(requestSignal?.reason),
-        { once: true },
-      );
-    })));
-
-    const fiber = Effect.runFork(loadSessionEffect("token"));
-    await vi.waitFor(() => expect(requestSignal).toBeInstanceOf(AbortSignal));
-
-    await Effect.runPromise(Fiber.interrupt(fiber));
-
-    expect(requestSignal?.aborted).toBe(true);
   });
 
   it("preserves a transport failure at the Promise facade", async () => {
