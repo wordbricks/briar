@@ -12,6 +12,9 @@ Environment=HOME=/home/briar
 Environment=BRIAR_CONFIG_HOME=/home/briar/.config/briar
 Environment=BRIAR_MANAGED_CREDENTIAL_FILE=/var/lib/briar/worker-credential.json
 Environment=BRIAR_CLI=/opt/briar/bin/briar
+Environment=CARGO_HOME=/opt/briar/cargo
+Environment=RUSTUP_HOME=/opt/briar/rustup
+Environment=BUN_INSTALL_CACHE_DIR=/home/briar/.cache/bun
 Environment=PATH=/opt/briar/bin:/opt/briar/provider/node_modules/.bin:/home/briar/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/opt/briar/bin/briar managed-computer worker-supervisor
 Restart=always
