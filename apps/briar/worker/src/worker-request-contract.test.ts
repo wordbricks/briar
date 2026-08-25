@@ -10,6 +10,15 @@ import {
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 
 describe("Worker request contract", () => {
+  it("accepts only a boolean maintenance refresh hint", () => {
+    expect(decodeWorkerHeartbeat({ refreshMaintenance: true })).toMatchObject({
+      refreshMaintenance: true,
+    });
+    expect(() =>
+      decodeWorkerHeartbeat({ refreshMaintenance: "yes" })
+    ).toThrow(RequestDecodeError);
+  });
+
   it("rejects every overlong Worker version key without dropping it", () => {
     const firstKey = `first-${"a".repeat(64)}`;
     const secondKey = `second-${"b".repeat(64)}`;

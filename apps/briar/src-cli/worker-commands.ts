@@ -91,6 +91,8 @@ import {
 } from "./reply-execution";
 import { loadManagedComputerCredential } from "./managed-computer-credential";
 
+const WORKER_SERVER_MAINTENANCE_INTERVAL_MS = 5 * 60_000;
+
 async function workerRegisterCommand() {
   const config = await loadConfig();
   const userToken = process.env.BRIAR_USER_TOKEN ?? config.userToken;
@@ -433,6 +435,7 @@ async function workerCommand() {
   ) => request<T>(config.apiUrl, path, workerToken, init);
   let lastWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastAnalysisWorktreeSweepAt = Number.NEGATIVE_INFINITY;
+  let lastServerMaintenanceAt = Number.NEGATIVE_INFINITY;
   let lastTriggeredUpdateId: string | null = null;
   const result = await runWorkerLoop(
     {
@@ -672,6 +675,11 @@ async function workerCommand() {
         const nextReadinessDetail = !hasHealthyProvider
           ? providerHealthReadinessDetail(providerHealth)
           : requirementDetail;
+        // Reaper and workflow settings are not liveness data. Refresh them on
+        // a separate cadence while every heartbeat keeps dispatch state fresh.
+        const refreshMaintenance =
+          Date.now() - lastServerMaintenanceAt >=
+            WORKER_SERVER_MAINTENANCE_INTERVAL_MS;
         const heartbeat = await request<{
           worker: { maxConcurrentSessions?: number };
           updateDirective?: WorkerUpdateDirective | null;
@@ -690,6 +698,7 @@ async function workerCommand() {
             method: "POST",
             body: JSON.stringify({
               versions: { briar: cliVersion },
+              refreshMaintenance,
               acceptingWork,
               readinessState: nextReadinessState,
               readinessDetail: nextReadinessDetail,
@@ -712,6 +721,7 @@ async function workerCommand() {
             }),
           },
         );
+        if (refreshMaintenance) lastServerMaintenanceAt = Date.now();
         let effectiveAcceptingWork = acceptingWork;
         if (heartbeat.updateDirective) {
           effectiveAcceptingWork = false;
@@ -961,10 +971,6 @@ async function workerCommand() {
     {
       once: has("--once"),
       maxConcurrentSessions: registered.maxConcurrentSessions,
-      // Planned update drains are delivered through heartbeat. Keep the
-      // active Worker below the 30-second handoff budget even while a
-      // provider turn is occupying every execution slot.
-      heartbeatIntervalMs: 10_000,
       ...(Number.isInteger(maxIssues) && maxIssues > 0 ? { maxIssues } : {}),
     },
   );

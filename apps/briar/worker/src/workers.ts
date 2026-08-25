@@ -300,21 +300,27 @@ export async function completeExecutionWorkerUpdates(
   deviceId: string,
   currentVersion: string | undefined,
   observedAt: string,
-): Promise<void> {
-  if (!currentVersion || !isSemanticVersion(currentVersion)) return;
-  const pending = await pendingExecutionWorkerUpdate(db, deviceId);
+  knownPending?: WorkerUpdateRequest | null,
+): Promise<WorkerUpdateRequest | null> {
+  const pending = knownPending === undefined
+    ? await pendingExecutionWorkerUpdate(db, deviceId)
+    : knownPending;
   if (
     !pending ||
+    !currentVersion ||
+    !isSemanticVersion(currentVersion) ||
     compareSemanticVersions(currentVersion, pending.targetVersion) < 0
   ) {
-    return;
+    return pending;
   }
   const status = await executionWorkerUpdateStatus(db, {
     deviceId,
     requestId: pending.id,
     observedAt,
   });
-  if (!status?.ready || status.activeWorkCount > 0) return;
+  if (!status?.ready || status.activeWorkCount > 0) {
+    return status?.request.status === "requested" ? status.request : null;
+  }
   await db
     .prepare(
       `update briar_execution_worker_update_requests
@@ -323,6 +329,7 @@ export async function completeExecutionWorkerUpdates(
     )
     .bind(observedAt, observedAt, pending.id)
     .run();
+  return null;
 }
 
 export async function handoffExecutionWorkerClaim(
@@ -1144,6 +1151,7 @@ export async function recordWorkerHeartbeat(
   projectId: string,
   input: {
     workerId: string;
+    knownBinding?: ExecutionWorkerRow;
     versions?: Record<string, string>;
     acceptingWork?: boolean;
     readinessState?: ExecutionWorkerReadiness;
@@ -1152,14 +1160,21 @@ export async function recordWorkerHeartbeat(
     observedAt: string;
   },
 ) {
-  const binding = await db
+  const binding = input.knownBinding ?? await db
     .prepare(
-      `select * from briar_execution_workers
-       where id = ? and project_id = ?`,
+      `select worker.*, device.max_concurrent_sessions,
+              device.icon_type, device.icon_value
+       from briar_execution_workers worker
+       join briar_execution_worker_devices device on device.id = worker.device_id
+       where worker.id = ? and worker.project_id = ?`,
     )
     .bind(input.workerId, projectId)
     .first<ExecutionWorkerRow>();
-  if (!binding) {
+  if (
+    !binding ||
+    binding.id !== input.workerId ||
+    binding.project_id !== projectId
+  ) {
     throw new WorkerConflictError("Worker is not registered for this project");
   }
   let nextCapabilities = input.capabilities;
@@ -1176,7 +1191,7 @@ export async function recordWorkerHeartbeat(
       // A malformed legacy payload has no capability state worth preserving.
     }
   }
-  await db.batch([
+  const [, workerUpdate] = await db.batch<ExecutionWorkerRow>([
     db
       .prepare(
         `update briar_execution_worker_devices
@@ -1210,7 +1225,8 @@ export async function recordWorkerHeartbeat(
                when ? is null then readiness_detail else ? end,
              capabilities_json = coalesce(?, capabilities_json),
              state = case when state = 'disabled' then 'disabled' else 'online' end
-         where id = ? and project_id = ?`,
+         where id = ? and project_id = ?
+         returning *`,
       )
       .bind(
         input.observedAt,
@@ -1228,55 +1244,16 @@ export async function recordWorkerHeartbeat(
         projectId,
       ),
   ]);
-  const updated = await db
-    .prepare(
-      `select worker.*, device.max_concurrent_sessions,
-              device.icon_type, device.icon_value,
-              (
-                select count(*) from (
-                  select active.id
-                  from briar_hunt_runs active
-                  join briar_execution_workers holder
-                    on holder.id = active.worker_id
-                  where holder.device_id = device.id
-                    and active.claim_token_hash is not null
-                    and active.lease_expires_at is not null
-                    and active.lease_expires_at > ?
-                    and active.status not in (
-                      'backlog', 'completed', 'cancelled', 'blocked', 'failed'
-                    )
-                  union all
-                  select task.id
-                  from briar_project_agent_task_jobs task
-                  join briar_execution_workers holder
-                    on holder.id = task.claimed_worker_id
-                  where holder.device_id = device.id
-                    and task.status = 'running'
-                    and task.lease_expires_at > ?
-                  union all
-                  select batch.id
-                  from briar_merge_batches batch
-                  join briar_execution_workers holder
-                    on holder.id = batch.claimed_worker_id
-                  where holder.device_id = device.id
-                    and batch.claim_token_hash is not null
-                    and batch.lease_expires_at > ?
-                    and batch.state in (
-                      'enqueueing', 'waiting_tail', 'validating',
-                      'publishing', 'draining'
-                    )
-                ) active_work
-              ) as active_sessions
-       from briar_execution_workers worker
-       join briar_execution_worker_devices device on device.id = worker.device_id
-       where worker.id = ?`,
-    )
-    .bind(input.observedAt, input.observedAt, input.observedAt, input.workerId)
-    .first<ExecutionWorkerRow>();
+  const updated = workerUpdate.results?.[0];
   if (!updated) {
     throw new WorkerConflictError("Worker heartbeat update was not persisted");
   }
-  return updated;
+  return {
+    ...updated,
+    max_concurrent_sessions: binding.max_concurrent_sessions,
+    icon_type: binding.icon_type,
+    icon_value: binding.icon_value,
+  };
 }
 
 export async function executionWorkerBindingForProject(

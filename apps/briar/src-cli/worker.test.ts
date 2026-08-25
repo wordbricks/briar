@@ -1,12 +1,17 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_DRAIN_HEARTBEAT_INTERVAL_MS,
+  DEFAULT_HEARTBEAT_INTERVAL_MS,
   DEFAULT_MAX_ERROR_DELAY_MS,
+  DEFAULT_MAX_HEARTBEAT_ERROR_DELAY_MS,
   DEFAULT_MAX_IDLE_DELAY_MS,
   createWorkerDeviceIdentity,
   createWorkerLoopHeartbeat,
   defaultWorkerLabel,
   errorDelayMs,
+  heartbeatDelayMs,
+  heartbeatErrorDelayMs,
   idleDelayWithBackoffMs,
   issueWorkerSessionDirectory,
   isReplyWork,
@@ -148,6 +153,7 @@ describe("briar worker loop", () => {
     const result = await runWorkerLoop(test.dependencies, {
       maxIssues: 1,
       idleDelayMs: 15_000,
+      heartbeatIntervalMs: 10 * 60_000,
     });
 
     expect(result.processed).toBe(1);
@@ -595,6 +601,16 @@ describe("briar worker loop", () => {
     expect(errorDelayMs(50, 30_000)).toBe(30_000);
   });
 
+  it("jitters heartbeat and retry delays inside their configured bands", () => {
+    expect(heartbeatDelayMs(DEFAULT_HEARTBEAT_INTERVAL_MS, () => 0)).toBe(27_000);
+    expect(heartbeatDelayMs(DEFAULT_HEARTBEAT_INTERVAL_MS, () => 0.5)).toBe(
+      30_000,
+    );
+    expect(heartbeatDelayMs(DEFAULT_HEARTBEAT_INTERVAL_MS, () => 1)).toBe(33_000);
+    expect(heartbeatErrorDelayMs(1, 30_000, () => 0)).toBe(1_600);
+    expect(heartbeatErrorDelayMs(2, 30_000, () => 1)).toBe(4_800);
+  });
+
   it("jitters empty-queue backoff without exceeding its configured band", () => {
     expect(idleDelayWithBackoffMs(1, 15_000, 60_000, () => 0)).toBe(12_000);
     expect(idleDelayWithBackoffMs(2, 15_000, 60_000, () => 0.5)).toBe(30_000);
@@ -618,6 +634,65 @@ describe("briar worker loop", () => {
 
     // Initial readiness plus busy/ready transitions for each issue.
     expect(test.heartbeats).toBe(5);
+  });
+
+  it("uses the short heartbeat cadence only while an update is draining", async () => {
+    let heartbeats = 0;
+    const test = harness([], {
+      heartbeat: async () => {
+        heartbeats += 1;
+        if (heartbeats === 2) {
+          return {
+            acceptingWork: false,
+            updateDirective: {
+              id: "update-request",
+              targetVersion: "2.0.0",
+              status: "requested" as const,
+              requestedAt: new Date(0).toISOString(),
+              handoffState: "draining" as const,
+            },
+          };
+        }
+        if (heartbeats === 3) {
+          return { acceptingWork: true, updateDirective: null };
+        }
+        return { acceptingWork: true };
+      },
+      claim: async () => heartbeats >= 3 ? issue("issue-after-drain") : null,
+    });
+
+    const result = await runWorkerLoop(test.dependencies, { maxIssues: 1 });
+
+    expect(result.processed).toBe(1);
+    expect(test.sleeps).toEqual([
+      15_000,
+      15_000,
+      DEFAULT_DRAIN_HEARTBEAT_INTERVAL_MS,
+    ]);
+  });
+
+  it("backs off a disconnected heartbeat and reports promptly after reconnect", async () => {
+    let heartbeatAttempts = 0;
+    const test = harness([issue("issue-after-reconnect")], {
+      heartbeat: async () => {
+        heartbeatAttempts += 1;
+        if (heartbeatAttempts <= 6) throw new Error("network disconnected");
+        return { acceptingWork: true };
+      },
+    });
+
+    const result = await runWorkerLoop(test.dependencies, { maxIssues: 1 });
+
+    expect(result).toMatchObject({ processed: 1, failures: 6 });
+    expect(test.sleeps).toEqual([
+      2_000,
+      4_000,
+      8_000,
+      16_000,
+      DEFAULT_MAX_HEARTBEAT_ERROR_DELAY_MS,
+      DEFAULT_MAX_HEARTBEAT_ERROR_DELAY_MS,
+    ]);
+    expect(heartbeatAttempts).toBeGreaterThanOrEqual(7);
   });
 
   it("does not claim work until the heartbeat reports a healthy provider", async () => {

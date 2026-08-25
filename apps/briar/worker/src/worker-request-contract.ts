@@ -183,6 +183,7 @@ const WorkerHeartbeatCapabilities = Schema.StructWithRest(
 
 export const WorkerHeartbeat = strictSchema(Schema.Struct({
   versions: Schema.optional(Versions),
+  refreshMaintenance: Schema.optional(Schema.Boolean),
   acceptingWork: Schema.optional(Schema.Boolean),
   readinessState: Schema.optional(
     Schema.Literals(["ready", "busy", "needs_attention"]),

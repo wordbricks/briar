@@ -76,6 +76,59 @@ const fingerprint = (seed: string) =>
     .join("")
     .padEnd(64, "0");
 
+const instrumentD1 = (database: D1Database) => {
+  const cost = { rowsRead: 0, rowsWritten: 0 };
+  const statements = new WeakMap<object, D1PreparedStatement>();
+  const record = <T>(result: D1Result<T>) => {
+    cost.rowsRead += result.meta.rows_read;
+    cost.rowsWritten += result.meta.rows_written;
+    return result;
+  };
+  const wrapStatement = (statement: D1PreparedStatement): D1PreparedStatement => {
+    const wrapped = new Proxy(statement, {
+      get(target, property) {
+        if (property === "bind") {
+          return (...values: unknown[]) => wrapStatement(target.bind(...values));
+        }
+        if (property === "first") {
+          return async (column?: string) => {
+            const result = record(await target.all<Record<string, unknown>>());
+            const first = result.results[0] ?? null;
+            return column && first ? first[column] ?? null : first;
+          };
+        }
+        if (property === "all" || property === "run") {
+          return async () => record(await target[property]());
+        }
+        if (property === "raw") return target.raw.bind(target);
+        return undefined;
+      },
+    });
+    statements.set(wrapped, statement);
+    return wrapped;
+  };
+  const tracked = new Proxy(database, {
+    get(target, property) {
+      if (property === "prepare") {
+        return (query: string) => wrapStatement(target.prepare(query));
+      }
+      if (property === "batch") {
+        return async <T>(batch: D1PreparedStatement[]) => {
+          const results = await target.batch<T>(
+            batch.map((statement) => statements.get(statement) ?? statement),
+          );
+          return results.map(record);
+        };
+      }
+      if (property === "exec") return target.exec.bind(target);
+      if (property === "withSession") return target.withSession.bind(target);
+      if (property === "dump") return target.dump.bind(target);
+      return undefined;
+    },
+  });
+  return { database: tracked, cost };
+};
+
 const queuedEvent = (sourceKey: string, minute: number): HuntEventInput => ({
   source: "issue",
   sourceKey,
@@ -455,7 +508,10 @@ describe("detached execution workers", () => {
       GOOGLE_CLIENT_ID: "google-client-test",
       GOOGLE_CLIENT_SECRET: "google-secret-test",
     } as unknown as Env;
-    const heartbeat = async (body: Record<string, unknown>) => {
+    const heartbeat = async (
+      body: Record<string, unknown>,
+      routeDatabase: D1Database = db,
+    ) => {
       const response = await apiWorker.fetch(
         new Request(
           `https://briar-api.example/workers/${registered.worker.id}/heartbeat`,
@@ -468,9 +524,10 @@ describe("detached execution workers", () => {
             body: JSON.stringify(body),
           },
         ),
-        env,
+        { ...env, DB: routeDatabase },
       );
       expect(response.status).toBe(200);
+      return response;
     };
     const auditCount = async () => {
       const row = await db
@@ -548,6 +605,26 @@ describe("detached execution workers", () => {
         },
       ]),
     );
+
+    const lightweightCost = instrumentD1(db);
+    const lightweight = await heartbeat(
+      { refreshMaintenance: false },
+      lightweightCost.database,
+    );
+    expect(await lightweight.json()).not.toHaveProperty("workflowRequirements");
+    const maintenanceCost = instrumentD1(db);
+    const maintenance = await heartbeat(
+      { refreshMaintenance: true },
+      maintenanceCost.database,
+    );
+    expect(await maintenance.json()).toHaveProperty("workflowRequirements");
+    expect(lightweightCost.cost.rowsWritten).toBeGreaterThan(0);
+    expect(maintenanceCost.cost.rowsWritten).toBe(
+      lightweightCost.cost.rowsWritten,
+    );
+    expect(lightweightCost.cost.rowsRead).toBeLessThan(
+      maintenanceCost.cost.rowsRead,
+    );
   });
 
   it("keeps a remote update pending until the target Worker version reports", async () => {
@@ -598,6 +675,54 @@ describe("detached execution workers", () => {
       "1.2.84",
       atMinute(4),
     );
+    expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toBeNull();
+  });
+
+  it("restores availability on the target-version heartbeat after update drain", async () => {
+    const credential = "briar_worker_update-reconnect-test";
+    const worker = await register(
+      "update-reconnect",
+      1,
+      createHash("sha256").update(credential).digest("hex"),
+    );
+    await requestExecutionWorkerUpdate(db, {
+      id: "77777777-7777-4777-8777-777777777776",
+      organizationId: projectId,
+      deviceId: worker.device.id,
+      requestedByUserId: "owner",
+      targetVersion: "2.0.0",
+      requestedAt: atMinute(2),
+    });
+    const response = await apiWorker.fetch(
+      new Request(
+        `https://briar-api.example/workers/${worker.worker.id}/heartbeat`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${credential}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            versions: { briar: "2.0.0" },
+            acceptingWork: true,
+            readinessState: "ready",
+          }),
+        },
+      ),
+      {
+        DB: db,
+        ARCHIVES: archives,
+        BETTER_AUTH_SECRET: "update-reconnect-secret-update-reconnect-secret",
+        GOOGLE_CLIENT_ID: "google-client-test",
+        GOOGLE_CLIENT_SECRET: "google-secret-test",
+      } as unknown as Env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      updateDirective: null,
+      worker: { acceptingWork: true, readiness: "available" },
+    });
     expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toBeNull();
   });
 
