@@ -200,11 +200,22 @@ import {
 import { formatIssueKey } from "./lib/issue-key";
 import { listenForAppMenuSettings } from "./lib/app-menu";
 import {
+  channelIdFromNavigationLocation,
+  channelNavigationLocation,
+  channelPageNavigationLocation,
+  isProjectNavigationPage,
   issueNavigationLocation,
+  organizationNavigationLocation,
+  organizationIdFromNavigationLocation,
   pageFromNavigationLocation,
+  projectIdFromNavigationLocation,
+  projectNavigationLocation,
   runIdFromNavigationLocation,
+  settingsNavigationLocation,
+  settingsTargetFromNavigationLocation,
   type ActivePage,
   type AppNavigationLocation,
+  type ChannelNavigationPage,
 } from "./lib/app-navigation";
 import { useI18n } from "./i18n";
 import type { HuntRun, ProjectAgent, StatusTrayRun } from "./types";
@@ -216,6 +227,8 @@ type AgentAutoHuntOptions = {
   targetRunIds?: string[];
   retryReason?: string | null;
 };
+
+const CHANNEL_CATALOG_RETRY_MS = 3_000;
 
 export function App() {
   const { locale, t } = useI18n();
@@ -300,6 +313,7 @@ export function App() {
     organizationId: string;
     cursor: number;
   } | null>(null);
+  const [channelCatalogRetry, setChannelCatalogRetry] = useState(0);
   const channelCatalogCursorRef = useRef(0);
   const companionChannelCache = useRef<CompanionChannelCache>(new Map());
   useEffect(() => {
@@ -319,6 +333,7 @@ export function App() {
     }
 
     let cancelled = false;
+    let retryTimer: number | null = null;
     setChannelsLoading(true);
     void listChannels(token, organizationId)
       .then((result) => {
@@ -331,14 +346,21 @@ export function App() {
       .catch(() => {
         // The conversation view reports request errors when opened. Keep the
         // sidebar usable so channel creation can still be retried.
+        if (!cancelled) {
+          retryTimer = window.setTimeout(
+            () => setChannelCatalogRetry((retry) => retry + 1),
+            CHANNEL_CATALOG_RETRY_MS,
+          );
+        }
       })
       .finally(() => {
         if (!cancelled) setChannelsLoading(false);
       });
     return () => {
       cancelled = true;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
     };
-  }, [briar.activeOrganizationId, briar.token]);
+  }, [briar.activeOrganizationId, briar.token, channelCatalogRetry]);
   useEffect(() => {
     const organizationId = briar.activeOrganizationId;
     const token = briar.token;
@@ -721,33 +743,411 @@ export function App() {
     goBack,
     goForward,
     navigate: navigateToLocation,
+    replace: replaceNavigationLocation,
     reset: resetNavigationLocation,
   } = useNavigationHistory<AppNavigationLocation>("lobby");
   const activePage = pageFromNavigationLocation(activeNavigationLocation);
   const selectedRunId = runIdFromNavigationLocation(activeNavigationLocation);
+  const navigationProjectId = projectIdFromNavigationLocation(
+    activeNavigationLocation,
+  );
+  const navigationOrganizationId = organizationIdFromNavigationLocation(
+    activeNavigationLocation,
+  );
+  const navigationChannelId = channelIdFromNavigationLocation(
+    activeNavigationLocation,
+  );
+  const navigationSettingsTarget = settingsTargetFromNavigationLocation(
+    activeNavigationLocation,
+  );
+  const navigationHasChannelPageContext =
+    (activePage === "channels" || activePage === "dms") &&
+    navigationOrganizationId !== null;
+  const desktopActiveChannelId = navigationHasChannelPageContext
+    ? navigationChannelId
+    : activeChannelId;
+  const navigationActiveProjectIdRef = useRef(briar.activeProjectId);
+  navigationActiveProjectIdRef.current = briar.activeProjectId;
   const navigateToPage = useCallback(
-    (page: ActivePage) => navigateToLocation(page),
-    [navigateToLocation],
+    (
+      page: ActivePage,
+      projectId = navigationActiveProjectIdRef.current,
+    ) =>
+      navigateToLocation(
+        page === "inbox" && briar.activeOrganizationId
+          ? organizationNavigationLocation(briar.activeOrganizationId)
+          : (page === "channels" || page === "dms") &&
+          briar.activeOrganizationId
+          ? channelPageNavigationLocation(
+              page,
+              briar.activeOrganizationId,
+              projectId,
+            )
+          : projectId && isProjectNavigationPage(page)
+            ? projectNavigationLocation(page, projectId)
+            : page,
+      ),
+    [briar.activeOrganizationId, navigateToLocation],
   );
   const navigateToIssue = useCallback(
-    (runId: string) => navigateToLocation(issueNavigationLocation(runId)),
+    (runId: string, projectId = navigationActiveProjectIdRef.current) => {
+      if (!projectId) return;
+      navigateToLocation(issueNavigationLocation(projectId, runId));
+    },
     [navigateToLocation],
+  );
+  const navigateToChannel = useCallback(
+    (
+      channelId: string,
+      page: ChannelNavigationPage,
+      organizationId = briar.activeOrganizationId,
+      projectId = navigationActiveProjectIdRef.current,
+    ) => {
+      if (!organizationId) return;
+      startDesktopChannelTransition(channelId);
+      setActiveChannelId(channelId);
+      markOrganizationChannelRead(channelId);
+      navigateToLocation(
+        channelNavigationLocation(
+          page,
+          organizationId,
+          channelId,
+          projectId,
+        ),
+      );
+    },
+    [
+      briar.activeOrganizationId,
+      markOrganizationChannelRead,
+      navigateToLocation,
+    ],
+  );
+  const replaceChannelDestination = useCallback(
+    (
+      channelId: string | null,
+      page: ChannelNavigationPage,
+      organizationId = briar.activeOrganizationId,
+      projectId = navigationActiveProjectIdRef.current,
+    ) => {
+      setActiveChannelId(channelId);
+      if (!channelId || !organizationId) {
+        replaceNavigationLocation(
+          organizationId
+            ? channelPageNavigationLocation(page, organizationId, projectId)
+            : page,
+        );
+        return;
+      }
+      startDesktopChannelTransition(channelId);
+      markOrganizationChannelRead(channelId);
+      replaceNavigationLocation(
+        channelNavigationLocation(
+          page,
+          organizationId,
+          channelId,
+          projectId,
+        ),
+      );
+    },
+    [
+      briar.activeOrganizationId,
+      markOrganizationChannelRead,
+      replaceNavigationLocation,
+    ],
+  );
+  const handleDesktopChannelFallback = useCallback(
+    (channelId: string | null, page: ChannelNavigationPage) => {
+      if (
+        navigationChannelId &&
+        navigationOrganizationId !== briar.activeOrganizationId
+      ) {
+        return;
+      }
+      replaceChannelDestination(
+        channelId,
+        page,
+        navigationOrganizationId ?? briar.activeOrganizationId,
+        navigationProjectId ?? navigationActiveProjectIdRef.current,
+      );
+    },
+    [
+      briar.activeOrganizationId,
+      navigationChannelId,
+      navigationOrganizationId,
+      navigationProjectId,
+      replaceChannelDestination,
+    ],
   );
   const resetNavigation = useCallback(
     (page: ActivePage) => resetNavigationLocation(page),
     [resetNavigationLocation],
   );
+  const navigationUserIdRef = useRef<string | null | undefined>(undefined);
+  const navigationUserId = briar.user?.id ?? null;
+  const navigationUserBoundaryChanged =
+    navigationUserIdRef.current !== undefined &&
+    navigationUserIdRef.current !== navigationUserId;
+  useEffect(() => {
+    if (navigationUserIdRef.current === undefined) {
+      navigationUserIdRef.current = navigationUserId;
+      return;
+    }
+    if (navigationUserIdRef.current === navigationUserId) return;
+    navigationUserIdRef.current = navigationUserId;
+    resetNavigation("lobby");
+  }, [navigationUserId, resetNavigation]);
+  useEffect(() => {
+    if (
+      navigationUserBoundaryChanged ||
+      briar.companionMode ||
+      activePage !== "settings"
+    ) {
+      return;
+    }
+    if (navigationSettingsTarget) {
+      setSettingsTarget((current) =>
+        settingsNavigationLocation(current) === activeNavigationLocation
+          ? current
+          : navigationSettingsTarget,
+      );
+      return;
+    }
+    replaceNavigationLocation(settingsNavigationLocation(settingsTarget));
+  }, [
+    activeNavigationLocation,
+    activePage,
+    briar.companionMode,
+    navigationSettingsTarget,
+    navigationUserBoundaryChanged,
+    replaceNavigationLocation,
+    settingsTarget,
+  ]);
+  useEffect(() => {
+    if (
+      navigationUserBoundaryChanged ||
+      briar.companionMode ||
+      !briar.user ||
+      navigationProjectId ||
+      !briar.activeProjectId ||
+      !isProjectNavigationPage(activePage)
+    ) {
+      return;
+    }
+    replaceNavigationLocation(
+      projectNavigationLocation(activePage, briar.activeProjectId),
+    );
+  }, [
+    activePage,
+    briar.activeProjectId,
+    briar.companionMode,
+    briar.user,
+    navigationProjectId,
+    navigationUserBoundaryChanged,
+    replaceNavigationLocation,
+  ]);
+  useEffect(() => {
+    if (
+      navigationUserBoundaryChanged ||
+      briar.companionMode ||
+      !navigationProjectId
+    ) {
+      return;
+    }
+    const navigationProjectExists = briar.projects.some(
+      (project) => project.id === navigationProjectId,
+    );
+    if (navigationProjectExists) {
+      if (navigationProjectId !== briar.activeProjectId) {
+        briar.setActiveProjectId(navigationProjectId);
+      }
+      return;
+    }
+    if (briar.loading || !briar.user) return;
+
+    if (
+      (activePage === "channels" || activePage === "dms") &&
+      navigationOrganizationId
+    ) {
+      const fallbackProject = briar.projects.find(
+        (project) =>
+          project.organizationId === navigationOrganizationId &&
+          project.id === briar.activeProjectId,
+      ) ?? briar.projects.find(
+        (project) => project.organizationId === navigationOrganizationId,
+      );
+      replaceNavigationLocation(
+        navigationChannelId
+          ? channelNavigationLocation(
+              activePage,
+              navigationOrganizationId,
+              navigationChannelId,
+              fallbackProject?.id,
+            )
+          : channelPageNavigationLocation(
+              activePage,
+              navigationOrganizationId,
+              fallbackProject?.id,
+            ),
+      );
+      return;
+    }
+    if (activePage === "settings") {
+      replaceNavigationLocation(
+        settingsNavigationLocation({
+          scope: "application",
+          section: "account",
+        }),
+      );
+      return;
+    }
+    const fallbackProject =
+      briar.projects.find(
+        (project) => project.id === briar.activeProjectId,
+      ) ?? briar.projects[0];
+    replaceNavigationLocation(
+      fallbackProject && isProjectNavigationPage(activePage)
+        ? projectNavigationLocation(activePage, fallbackProject.id)
+        : "lobby",
+    );
+  }, [
+    activePage,
+    briar.activeProjectId,
+    briar.companionMode,
+    briar.loading,
+    briar.projects,
+    briar.setActiveProjectId,
+    briar.user,
+    navigationChannelId,
+    navigationOrganizationId,
+    navigationProjectId,
+    navigationUserBoundaryChanged,
+    replaceNavigationLocation,
+  ]);
+  useEffect(() => {
+    if (
+      navigationUserBoundaryChanged ||
+      briar.companionMode ||
+      !navigationOrganizationId
+    ) return;
+    const navigationOrganizationExists = briar.organizations.some(
+      (organization) => organization.id === navigationOrganizationId,
+    );
+    if (!navigationOrganizationExists) {
+      if (briar.loading || !briar.user) return;
+      const fallbackOrganization =
+        briar.organizations.find(
+          (organization) => organization.id === briar.activeOrganizationId,
+        ) ?? briar.organizations[0];
+      if (!fallbackOrganization) {
+        replaceNavigationLocation("lobby");
+        return;
+      }
+      if (activePage === "channels" || activePage === "dms") {
+        const fallbackProject = briar.projects.find(
+          (project) =>
+            project.organizationId === fallbackOrganization.id &&
+            project.id === briar.activeProjectId,
+        ) ?? briar.projects.find(
+          (project) => project.organizationId === fallbackOrganization.id,
+        );
+        replaceNavigationLocation(
+          channelPageNavigationLocation(
+            activePage,
+            fallbackOrganization.id,
+            fallbackProject?.id,
+          ),
+        );
+      } else if (activePage === "inbox") {
+        replaceNavigationLocation(
+          organizationNavigationLocation(fallbackOrganization.id),
+        );
+      } else {
+        replaceNavigationLocation(
+          settingsNavigationLocation({
+            scope: "application",
+            section: "account",
+          }),
+        );
+      }
+      return;
+    }
+    if (navigationOrganizationId !== briar.activeOrganizationId) {
+      briar.setActiveOrganizationId(navigationOrganizationId);
+      return;
+    }
+    if (!navigationChannelId) {
+      if (navigationHasChannelPageContext && activeChannelId !== null) {
+        setActiveChannelId(null);
+      }
+      return;
+    }
+    if (activeChannelId !== navigationChannelId) {
+      startDesktopChannelTransition(navigationChannelId);
+      setActiveChannelId(navigationChannelId);
+    }
+    markOrganizationChannelRead(navigationChannelId);
+  }, [
+    activeChannelId,
+    briar.activeOrganizationId,
+    briar.activeProjectId,
+    briar.companionMode,
+    briar.loading,
+    briar.organizations,
+    briar.projects,
+    briar.setActiveOrganizationId,
+    briar.user,
+    activePage,
+    markOrganizationChannelRead,
+    navigationChannelId,
+    navigationHasChannelPageContext,
+    navigationOrganizationId,
+    navigationUserBoundaryChanged,
+    replaceNavigationLocation,
+  ]);
   const activeProjectForTabs = briar.projects.find(
-    (project) => project.id === briar.activeProjectId,
+    (project) =>
+      project.id === (navigationProjectId ?? briar.activeProjectId),
   );
   useEffect(() => {
     if (
+      !navigationUserBoundaryChanged &&
       activePage === "schedule" &&
       !isProjectScheduleTabEnabled(activeProjectForTabs)
     ) {
-      navigateToPage("issues");
+      replaceNavigationLocation(
+        activeProjectForTabs
+          ? projectNavigationLocation("issues", activeProjectForTabs.id)
+          : "issues",
+      );
     }
-  }, [activePage, activeProjectForTabs, navigateToPage]);
+  }, [
+    activePage,
+    activeProjectForTabs,
+    navigationUserBoundaryChanged,
+    replaceNavigationLocation,
+  ]);
+  useEffect(() => {
+    if (
+      navigationUserBoundaryChanged ||
+      briar.companionMode ||
+      !selectedRunId ||
+      !navigationProjectId ||
+      briar.dashboard?.project.id !== navigationProjectId ||
+      briar.dashboard.runs.some((run) => run.id === selectedRunId)
+    ) {
+      return;
+    }
+    replaceNavigationLocation(
+      projectNavigationLocation("issues", navigationProjectId),
+    );
+  }, [
+    briar.companionMode,
+    briar.dashboard,
+    navigationProjectId,
+    navigationUserBoundaryChanged,
+    replaceNavigationLocation,
+    selectedRunId,
+  ]);
   const createOrganizationChannel = useCallback(
     async (
       name: string,
@@ -769,15 +1169,16 @@ export function App() {
         ].sort((left, right) => left.name.localeCompare(right.name)),
       );
       setInitialChannelInviteId(result.channel.id);
-      setActiveChannelId(result.channel.id);
-      markOrganizationChannelRead(result.channel.id);
-      navigateToPage("channels");
+      navigateToChannel(
+        result.channel.id,
+        "channels",
+        briar.activeOrganizationId,
+      );
     },
     [
       briar.activeOrganizationId,
       briar.token,
-      markOrganizationChannelRead,
-      navigateToPage,
+      navigateToChannel,
     ],
   );
   const openOrganizationChannel = useCallback(
@@ -788,19 +1189,17 @@ export function App() {
         organizationChannels.find((channel) => channel.id === channelId)
           ?.defaultProjectId !== projectWindowProjectId
       ) return;
-      startDesktopChannelTransition(channelId);
-      setActiveChannelId(channelId);
-      markOrganizationChannelRead(channelId);
-      navigateToPage(
-        organizationChannels.find((channel) => channel.id === channelId)?.kind === "dm"
+      navigateToChannel(
+        channelId,
+        organizationChannels.find((channel) => channel.id === channelId)
+          ?.kind === "dm"
           ? "dms"
           : "channels",
       );
     },
     [
       briar.activeOrganizationId,
-      markOrganizationChannelRead,
-      navigateToPage,
+      navigateToChannel,
       organizationChannels,
       projectWindowProjectId,
     ],
@@ -913,6 +1312,13 @@ export function App() {
         briar.setActiveOrganizationId(pendingBriarLink.organizationId);
         return;
       }
+      if (
+        channelsLoading ||
+        channelCatalogSnapshot?.organizationId !==
+          pendingBriarLink.organizationId
+      ) {
+        return;
+      }
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(null);
@@ -942,12 +1348,14 @@ export function App() {
             : "home",
         );
       } else {
-        navigateToPage(
+        navigateToChannel(
+          pendingBriarLink.channelId,
           organizationChannels.find(
-              (channel) => channel.id === pendingBriarLink.channelId,
-            )?.kind === "dm"
+            (channel) => channel.id === pendingBriarLink.channelId,
+          )?.kind === "dm"
             ? "dms"
             : "channels",
+          pendingBriarLink.organizationId,
         );
       }
       setPendingBriarLink(null);
@@ -970,13 +1378,13 @@ export function App() {
       setRequestedRunId(pendingBriarLink.runId);
       setCompanionPage("issues");
       setCompanionStatus("all");
-      navigateToIssue(pendingBriarLink.runId);
+      navigateToIssue(pendingBriarLink.runId, pendingBriarLink.projectId);
     } else {
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(pendingBriarLink.sessionId);
       if (briar.companionMode) setCompanionPage("dms");
-      else navigateToPage("agents");
+      else navigateToPage("agents", pendingBriarLink.projectId);
     }
     setPendingBriarLink(null);
   }, [
@@ -989,7 +1397,10 @@ export function App() {
     briar.setActiveOrganizationId,
     briar.setActiveProjectId,
     briar.user,
+    channelCatalogSnapshot?.organizationId,
+    channelsLoading,
     markOrganizationChannelRead,
+    navigateToChannel,
     navigateToIssue,
     navigateToPage,
     organizationChannels,
@@ -997,17 +1408,22 @@ export function App() {
   ]);
   useEffect(() => {
     if (!pendingInboxNotificationTarget || !briar.user || briar.loading) return;
-    if (
-      !briar.projects.some(
-        (project) => project.id === pendingInboxNotificationTarget.projectId,
-      )
-    ) {
-      return;
-    }
+    const targetProject = briar.projects.find(
+      (project) => project.id === pendingInboxNotificationTarget.projectId,
+    );
+    if (!targetProject) return;
 
     inbox.markRead(pendingInboxNotificationTarget.messageId);
     if (pendingInboxNotificationTarget.projectId !== briar.activeProjectId) {
       briar.setActiveProjectId(pendingInboxNotificationTarget.projectId);
+      return;
+    }
+    if (
+      pendingInboxNotificationTarget.kind === "channel" &&
+      (channelsLoading ||
+        channelCatalogSnapshot?.organizationId !== targetProject.organizationId)
+    ) {
+      return;
     }
     if (
       pendingInboxNotificationTarget.kind === "issue" ||
@@ -1024,7 +1440,10 @@ export function App() {
         setCompanionStatus("all");
         setCompanionPage("issues");
       } else {
-        navigateToIssue(pendingInboxNotificationTarget.targetId);
+        navigateToIssue(
+          pendingInboxNotificationTarget.targetId,
+          pendingInboxNotificationTarget.projectId,
+        );
       }
     } else if (pendingInboxNotificationTarget.kind === "channel") {
       const { channelMessageId, rootMessageId } = pendingInboxNotificationTarget;
@@ -1048,12 +1467,15 @@ export function App() {
             : "home",
         );
       } else {
-        navigateToPage(
+        navigateToChannel(
+          pendingInboxNotificationTarget.targetId,
           organizationChannels.find(
-              (channel) => channel.id === pendingInboxNotificationTarget.targetId,
-            )?.kind === "dm"
+            (channel) => channel.id === pendingInboxNotificationTarget.targetId,
+          )?.kind === "dm"
             ? "dms"
             : "channels",
+          targetProject.organizationId,
+          targetProject.id,
         );
       }
     } else {
@@ -1061,7 +1483,10 @@ export function App() {
       setRequestedRunId(null);
       setRequestedSessionId(pendingInboxNotificationTarget.targetId);
       if (briar.companionMode) setCompanionPage("dms");
-      else navigateToPage("agents");
+      else navigateToPage(
+        "agents",
+        pendingInboxNotificationTarget.projectId,
+      );
     }
     setPendingInboxNotificationTarget(null);
   }, [
@@ -1071,8 +1496,11 @@ export function App() {
     briar.projects,
     briar.setActiveProjectId,
     briar.user,
+    channelCatalogSnapshot?.organizationId,
+    channelsLoading,
     inbox.markRead,
     markOrganizationChannelRead,
+    navigateToChannel,
     navigateToIssue,
     navigateToPage,
     organizationChannels,
@@ -1745,16 +2173,12 @@ export function App() {
           project && project.id !== briar.activeProjectId,
         );
         if (changesProject && project) {
+          navigationActiveProjectIdRef.current = project.id;
           briar.setActiveProjectId(project.id);
         }
         setRequestedRunId(null);
         setRequestedSessionId(session.id);
-        if (changesProject) {
-          resetNavigation("lobby");
-          navigateToPage("agents");
-        } else {
-          navigateToPage("agents");
-        }
+        navigateToPage("agents", project?.id ?? briar.activeProjectId);
       },
       priority: 160,
       scope: "sessions",
@@ -2044,12 +2468,12 @@ export function App() {
       onSelect: () => {
         const changesProject = project.id !== briar.activeProjectId;
         if (changesProject) {
+          navigationActiveProjectIdRef.current = project.id;
           briar.setActiveProjectId(project.id);
         }
         setRequestedRunId(null);
         setRequestedSessionId(null);
-        if (changesProject) resetNavigation("lobby");
-        else navigateToPage("lobby");
+        navigateToPage("lobby", project.id);
       },
       priority: project.id === briar.activeProjectId ? 100 : 20,
       scope: "projects",
@@ -2072,10 +2496,10 @@ export function App() {
         ],
         label: t("commandPalette.createIssueIn", { project: project.name }),
         onSelect: () => {
+          navigationActiveProjectIdRef.current = project.id;
           briar.setActiveProjectId(project.id);
           setCreateIssueProjectId(project.id);
-          resetNavigation("lobby");
-          navigateToPage("issues");
+          navigateToPage("issues", project.id);
           setIsIssueDialogOpen(true);
         },
         priority: -50,
@@ -2202,6 +2626,7 @@ export function App() {
       onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
       onNavigate={(target) => {
         setSettingsTarget(target);
+        navigateToLocation(settingsNavigationLocation(target));
         const selection = settingsAccountSelection(
           target,
           briar.activeOrganizationId,
@@ -2290,7 +2715,7 @@ export function App() {
               ? "conversation"
               : null,
           );
-          navigateToIssue(inboxDetailRun.id);
+          navigateToIssue(inboxDetailRun.id, inboxDetailTarget.projectId);
         }}
         onProcessNow={() => {
           setInboxDetailTarget(null);
@@ -2382,7 +2807,7 @@ export function App() {
           setRequestedRunId(runId);
           setRequestedChannelMessage(null);
           setInboxDetailTarget(null);
-          navigateToIssue(runId);
+          navigateToIssue(runId, projectId);
         }}
         onSkillSessionAccepted={autoHunt.adoptRemoteSession}
         onViewingChannelChange={handleViewingChannelChange}
@@ -2483,7 +2908,7 @@ export function App() {
           />
         {activePage !== "settings" ? (
           <Sidebar
-            activeChannelId={activeChannelId}
+            activeChannelId={desktopActiveChannelId}
             activePage={activePage}
             activeOrganizationId={briar.activeOrganizationId}
             activeProjectId={briar.activeProjectId}
@@ -2503,13 +2928,11 @@ export function App() {
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
             onDmsOpen={() => {
-              const activeIsDirectMessage = organizationDirectMessages.some(
+              const directMessage = organizationDirectMessages.find(
                 (channel) => channel.id === activeChannelId,
-              );
-              if (!activeIsDirectMessage) {
-                setActiveChannelId(organizationDirectMessages[0]?.id ?? null);
-              }
-              navigateToPage("dms");
+              ) ?? organizationDirectMessages[0];
+              if (directMessage) openOrganizationChannel(directMessage.id);
+              else navigateToPage("dms");
             }}
             onChannelCreate={
               briar.activeOrganizationId && briar.token
@@ -2539,16 +2962,20 @@ export function App() {
             }}
             onAddOrganization={() => navigateToPage("organization-create")}
             onOrganizationChange={(organizationId) => {
+              const project = briar.projects.find(
+                (candidate) => candidate.organizationId === organizationId,
+              );
+              navigationActiveProjectIdRef.current = project?.id ?? null;
               briar.setActiveOrganizationId(organizationId);
               setRequestedRunId(null);
               setRequestedSessionId(null);
-              resetNavigation("lobby");
+              navigateToPage("lobby", project?.id ?? null);
             }}
             onProjectChange={(projectId) => {
+              navigationActiveProjectIdRef.current = projectId;
               briar.setActiveProjectId(projectId);
               setRequestedRunId(null);
               setRequestedSessionId(null);
-              resetNavigation("lobby");
             }}
             onProjectOpenInNewWindow={
               runsOnDesktopTauri && !projectWindowProjectId
@@ -2654,6 +3081,11 @@ export function App() {
                 : Promise.resolve(null)
             }
             onLoadUsageReport={loadUsageReport}
+            onSectionChange={(section) => {
+              const target = { scope: "application" as const, section };
+              setSettingsTarget(target);
+              navigateToLocation(settingsNavigationLocation(target));
+            }}
             projectId={activeProject?.id ?? ""}
             projectName={activeProject?.name ?? ""}
             readiness={
@@ -2688,7 +3120,7 @@ export function App() {
           briar.activeOrganizationId &&
           briar.token ? (
           <DirectMessages
-            activeChannelId={activeChannelId}
+            activeChannelId={desktopActiveChannelId}
             channelCatalogCursor={
               channelCatalogSnapshot?.organizationId === briar.activeOrganizationId
                 ? channelCatalogSnapshot.cursor
@@ -2697,7 +3129,17 @@ export function App() {
             channelInboxSyncSignal={channelInboxSyncSignal}
             channels={organizationDirectMessages}
             currentUserId={briar.user?.id ?? null}
-            onChannelSelect={setActiveChannelId}
+            key={`desktop-dms:${briar.activeOrganizationId}`}
+            onChannelFallback={(channelId) =>
+              handleDesktopChannelFallback(channelId, "dms")
+            }
+            onChannelSelect={(channelId) => {
+              if (channelId) navigateToChannel(channelId, "dms");
+              else {
+                setActiveChannelId(null);
+                navigateToPage("dms");
+              }
+            }}
             onChannelsChange={setOrganizationChannels}
             onCreateAgent={() => {
               setSettingsTarget({
@@ -2711,7 +3153,7 @@ export function App() {
             onIssueCreated={async (projectId, runId) => {
               await briar.ensureProjectSelected(projectId);
               setRequestedRunId(runId);
-              navigateToIssue(runId);
+              navigateToIssue(runId, projectId);
             }}
             onSkillSessionAccepted={autoHunt.adoptRemoteSession}
             onViewingChannelChange={handleViewingChannelChange}
@@ -2811,9 +3253,16 @@ export function App() {
               canGoBack ? goBack() : navigateToPage("issues")
             }
             onDelete={async () => {
+              const fallbackProject = briar.projects.find(
+                (project) => project.id !== activeProject.id,
+              );
               await briar.deleteProject(activeProject.id);
               autoHunt.removeProjectSessions(activeProject.id);
-              resetNavigation("issues");
+              replaceNavigationLocation(
+                fallbackProject
+                  ? projectNavigationLocation("issues", fallbackProject.id)
+                  : "lobby",
+              );
             }}
             onRegenerateWorkflow={() => briar.regenerateWorkflow(activeProject.id)}
             onAnalyzeWorkflowRequirements={() =>
@@ -2936,7 +3385,7 @@ export function App() {
           briar.activeOrganizationId &&
           briar.token ? (
           <Channels
-            activeChannelId={activeChannelId}
+            activeChannelId={desktopActiveChannelId}
             channelCatalogCursor={
               channelCatalogSnapshot?.organizationId === briar.activeOrganizationId
                 ? channelCatalogSnapshot.cursor
@@ -2946,7 +3395,17 @@ export function App() {
             channels={visibleOrganizationChannels}
             projects={activeOrganizationProjects}
             currentUserId={briar.user?.id ?? null}
-            onChannelSelect={setActiveChannelId}
+            key={`desktop-channels:${briar.activeOrganizationId}`}
+            onChannelFallback={(channelId) =>
+              handleDesktopChannelFallback(channelId, "channels")
+            }
+            onChannelSelect={(channelId) => {
+              if (channelId) navigateToChannel(channelId, "channels");
+              else {
+                setActiveChannelId(null);
+                navigateToPage("channels");
+              }
+            }}
             onChannelsChange={setOrganizationChannels}
             onSkillSessionAccepted={autoHunt.adoptRemoteSession}
             onViewingChannelChange={handleViewingChannelChange}
@@ -2971,7 +3430,7 @@ export function App() {
             onIssueCreated={async (projectId, runId) => {
               await briar.ensureProjectSelected(projectId);
               setRequestedRunId(runId);
-              navigateToIssue(runId);
+              navigateToIssue(runId, projectId);
             }}
           />
 
@@ -3006,8 +3465,22 @@ export function App() {
               if (runId) navigateToIssue(runId);
               else navigateToPage("issues");
             }}
-            onDeleteIssue={briar.deleteIssue}
-            onTransferIssue={briar.transferIssue}
+            onDeleteIssue={async (runId) => {
+              await briar.deleteIssue(runId);
+              if (runId === selectedRunId && navigationProjectId) {
+                replaceNavigationLocation(
+                  projectNavigationLocation("issues", navigationProjectId),
+                );
+              }
+            }}
+            onTransferIssue={async (runId, targetProjectId) => {
+              await briar.transferIssue(runId, targetProjectId);
+              if (runId === selectedRunId && navigationProjectId) {
+                replaceNavigationLocation(
+                  projectNavigationLocation("issues", navigationProjectId),
+                );
+              }
+            }}
             onAddIssueDependency={briar.addIssueDependency}
             onAcceptIssueAction={briar.acceptConversationIssueAction}
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}

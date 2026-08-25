@@ -242,6 +242,7 @@ type ChannelsProps = {
   activeChannelId: string | null;
   channelCatalogCursor?: number | null;
   onChannelSelect: (channelId: string | null) => void;
+  onChannelFallback?: (channelId: string | null) => void;
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
   channelInboxSyncSignal?: string;
   onIssueCreated?: (projectId: string, runId: string) => void | Promise<void>;
@@ -401,6 +402,7 @@ export function Channels({
   activeChannelId,
   channelCatalogCursor,
   onChannelSelect,
+  onChannelFallback = onChannelSelect,
   onChannelsChange,
   channelInboxSyncSignal,
   onIssueCreated,
@@ -625,6 +627,14 @@ export function Channels({
   useEffect(() => {
     setParticipantMenuOpen(false);
     setHeaderProfile(null);
+    setInviteOpen(false);
+    setInviteIsInitial(false);
+    setInviteError(null);
+    setSettingsOpen(false);
+    setSettingsError(null);
+    setWebhooksOpen(false);
+    setWebhooksError(null);
+    setRevealedWebhookUrl(null);
   }, [activeChannelId]);
   const showRequestedThreadOnly = Boolean(
     inboxDetail &&
@@ -652,6 +662,7 @@ export function Channels({
 
   const openInvite = useCallback((initial = false) => {
     if (!activeChannelId) return;
+    const channelId = activeChannelId;
     setInviteOpen(true);
     setInviteIsInitial(initial);
     setInviteLoading(true);
@@ -663,11 +674,20 @@ export function Channels({
       listOrganizationAgents(token, organizationId),
     ])
       .then(([organizationMembers, organizationAgents]) => {
+        if (activeChannelIdRef.current !== channelId) return;
         setInviteMembers(organizationMembers);
         setInviteAgents(organizationAgents.agents);
       })
-      .catch((cause) => setInviteError(errorMessage(cause)))
-      .finally(() => setInviteLoading(false));
+      .catch((cause) => {
+        if (activeChannelIdRef.current === channelId) {
+          setInviteError(errorMessage(cause));
+        }
+      })
+      .finally(() => {
+        if (activeChannelIdRef.current === channelId) {
+          setInviteLoading(false);
+        }
+      });
   }, [activeChannelId, organizationId, token]);
 
   useEffect(() => {
@@ -723,15 +743,28 @@ export function Channels({
 
   const openWebhooks = useCallback(() => {
     if (!activeChannelId) return;
+    const channelId = activeChannelId;
     setWebhooksOpen(true);
     setWebhooksLoading(true);
     setWebhooksError(null);
     setWebhooks([]);
     setRevealedWebhookUrl(null);
-    void listChannelWebhooks(token, organizationId, activeChannelId)
-      .then((result) => setWebhooks(result.webhooks))
-      .catch((cause) => setWebhooksError(errorMessage(cause)))
-      .finally(() => setWebhooksLoading(false));
+    void listChannelWebhooks(token, organizationId, channelId)
+      .then((result) => {
+        if (activeChannelIdRef.current === channelId) {
+          setWebhooks(result.webhooks);
+        }
+      })
+      .catch((cause) => {
+        if (activeChannelIdRef.current === channelId) {
+          setWebhooksError(errorMessage(cause));
+        }
+      })
+      .finally(() => {
+        if (activeChannelIdRef.current === channelId) {
+          setWebhooksLoading(false);
+        }
+      });
   }, [activeChannelId, organizationId, token]);
 
   const openSettings = useCallback(() => {
@@ -943,7 +976,7 @@ export function Channels({
         onChannelsChange(result.channels);
         setChannelListReady(true);
         if (!activeChannelIdRef.current) {
-          onChannelSelect(result.channels[0]?.id ?? null);
+          onChannelFallback(result.channels[0]?.id ?? null);
         }
       } catch (cause) {
         if (!cancelled) {
@@ -959,7 +992,7 @@ export function Channels({
     };
   }, [
     channelCatalogCursor,
-    onChannelSelect,
+    onChannelFallback,
     onChannelsChange,
     organizationId,
     token,
@@ -1380,12 +1413,12 @@ export function Channels({
   useEffect(() => {
     if (
       activeChannelId &&
-      channels.length > 0 &&
+      channelListReady &&
       !channels.some((channel) => channel.id === activeChannelId)
     ) {
-      onChannelSelect(channels[0]?.id ?? null);
+      onChannelFallback(channels[0]?.id ?? null);
     }
-  }, [activeChannelId, channels, onChannelSelect]);
+  }, [activeChannelId, channelListReady, channels, onChannelFallback]);
 
   const loadEarlierChannelMessages = useCallback(async () => {
     if (
@@ -2438,6 +2471,7 @@ export function Channels({
               members={members}
               currentUserId={currentUserId}
               channelName={activeChannelName}
+              key={`channel:${organizationId}:${activeChannelId}`}
               onInvite={() => openInvite()}
               placeholder={
                 surface === "dm"
@@ -2593,6 +2627,7 @@ export function Channels({
             members={members}
             currentUserId={currentUserId}
             channelName={activeChannelName}
+            key={`thread:${organizationId}:${activeChannelId}:${threadParentId}`}
             onInvite={() => openInvite()}
             placeholder={t("channel.threadPlaceholder")}
             onSend={(body, mentions, attachments, references, selectedSkill) =>

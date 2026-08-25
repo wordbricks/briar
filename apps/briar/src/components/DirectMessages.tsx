@@ -58,6 +58,7 @@ type DirectMessagesProps = {
   channelCatalogCursor?: number | null;
   channelInboxSyncSignal?: string;
   onChannelSelect: (channelId: string | null) => void;
+  onChannelFallback?: (channelId: string | null) => void;
   onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
   onIssueCreated?: (projectId: string, runId: string) => void | Promise<void>;
   onSkillSessionAccepted?: (session: AutoHuntSession) => void;
@@ -133,6 +134,7 @@ export function DirectMessages({
   channelCatalogCursor,
   channelInboxSyncSignal,
   onChannelSelect,
+  onChannelFallback,
   onChannelsChange,
   onIssueCreated,
   onSkillSessionAccepted,
@@ -408,6 +410,7 @@ export function DirectMessages({
             channelInboxSyncSignal={channelInboxSyncSignal}
             channels={directMessages}
             currentUserId={currentUserId}
+            onChannelFallback={onChannelFallback}
             onChannelSelect={onChannelSelect}
             onChannelsChange={onChannelsChange}
             onCreateAgent={onCreateAgent}

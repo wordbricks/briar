@@ -4,17 +4,20 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
+import { setRecordingKeybinding } from "../lib/keybindings";
 import { WindowNavigationControls } from "./WindowNavigationControls";
 
 describe("WindowNavigationControls", () => {
   let container: HTMLDivElement;
 
   beforeEach(() => {
+    setRecordingKeybinding(null);
     container = document.createElement("div");
     document.body.append(container);
   });
 
   afterEach(() => {
+    setRecordingKeybinding(null);
     container.remove();
   });
 
@@ -108,6 +111,96 @@ describe("WindowNavigationControls", () => {
 
     expect(onBack).toHaveBeenCalledOnce();
     expect(onForward).toHaveBeenCalledOnce();
+    await act(async () => root.unmount());
+  });
+
+  it("captures layout fallbacks while ignoring composition and modifiers", async () => {
+    const onBack = vi.fn();
+    const onForward = vi.fn();
+    const root = createRoot(container);
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <WindowNavigationControls
+            canGoBack
+            canGoForward
+            isSidebarOpen
+            onBack={onBack}
+            onForward={onForward}
+            onSettings={() => undefined}
+            onSidebarToggle={() => undefined}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    const editor = document.createElement("input");
+    editor.addEventListener("keydown", (event) => event.stopPropagation());
+    container.append(editor);
+    await act(async () => {
+      editor.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "[",
+          metaKey: true,
+        }),
+      );
+    });
+
+    const webkitComposition = new KeyboardEvent("keydown", {
+      key: "]",
+      metaKey: true,
+    });
+    Object.defineProperty(webkitComposition, "keyCode", { value: 229 });
+    await act(async () => {
+      window.dispatchEvent(webkitComposition);
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          code: "BracketRight",
+          key: "]",
+          metaKey: true,
+          shiftKey: true,
+        }),
+      );
+    });
+
+    expect(onBack).toHaveBeenCalledOnce();
+    expect(onForward).not.toHaveBeenCalled();
+    await act(async () => root.unmount());
+  });
+
+  it("does not navigate while a custom shortcut is being recorded", async () => {
+    const onBack = vi.fn();
+    const root = createRoot(container);
+    await act(async () =>
+      root.render(
+        <I18nProvider>
+          <WindowNavigationControls
+            canGoBack
+            canGoForward
+            isSidebarOpen
+            onBack={onBack}
+            onForward={() => undefined}
+            onSettings={() => undefined}
+            onSidebarToggle={() => undefined}
+          />
+        </I18nProvider>,
+      ),
+    );
+
+    setRecordingKeybinding("sidebarToggle");
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          code: "BracketLeft",
+          key: "[",
+          metaKey: true,
+        }),
+      );
+    });
+
+    expect(onBack).not.toHaveBeenCalled();
     await act(async () => root.unmount());
   });
 

@@ -6,6 +6,7 @@ import {
   formatShortcut,
   getRecordingKeybinding,
   installKeybindingShortcuts,
+  isNavigationHistoryShortcut,
   loadKeybindings,
   matchesShortcut,
   resetKeybinding,
@@ -164,6 +165,34 @@ describe("keybindings", () => {
         defaultKeybindings.commandPalette,
       ),
     ).toBe(false);
+  });
+
+  it("reserves Command-bracket shortcuts for navigation history", () => {
+    const back = {
+      key: "[",
+      code: "BracketLeft",
+      meta: true,
+      ctrl: false,
+      alt: false,
+      shift: false,
+    };
+    expect(isNavigationHistoryShortcut(back)).toBe(true);
+    expect(
+      shortcutFromEvent(
+        new KeyboardEvent("keydown", {
+          key: "[",
+          code: "BracketLeft",
+          metaKey: true,
+        }),
+      ),
+    ).toBeNull();
+    expect(saveKeybinding("sidebarToggle", back)).toEqual(defaultKeybindings);
+
+    window.localStorage.setItem(
+      keybindingsStorageKey,
+      JSON.stringify({ sidebarToggle: back }),
+    );
+    expect(loadKeybindings()).toEqual(defaultKeybindings);
   });
 
   it("formats shortcuts for macOS and other platforms", () => {
