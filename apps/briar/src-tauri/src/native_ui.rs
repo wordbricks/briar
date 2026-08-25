@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(any(target_os = "macos", test))]
 pub(super) fn launch_intro_bounds(
     monitor_x: i32,
     monitor_y: i32,
@@ -37,10 +38,12 @@ pub(super) fn main_window_min_size(compact: bool) -> (f64, f64) {
     }
 }
 
+#[cfg(any(target_os = "macos", test))]
 pub(super) fn main_window_decorated(compact: bool) -> bool {
     !compact
 }
 
+#[cfg(any(target_os = "macos", test))]
 pub(super) fn restored_main_window_title_bar_style(compact: bool) -> Option<tauri::TitleBarStyle> {
     (!compact).then_some(tauri::TitleBarStyle::Overlay)
 }
@@ -455,7 +458,9 @@ pub(super) fn sync_app_update_menu(
 /// menu event handler registered in [`run`] shows the confirmation dialog.
 #[cfg(desktop)]
 pub(super) fn install_app_menu(app: &AppHandle) -> Result<(), String> {
-    use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
+    #[cfg(any(target_os = "macos", windows))]
+    use tauri::menu::MenuItem;
+    use tauri::menu::{AboutMetadata, Menu, PredefinedMenuItem, Submenu};
 
     let pkg_info = app.package_info();
     let config = app.config();

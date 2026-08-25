@@ -91,6 +91,7 @@ download_checked \
 unzip -q "$bun_zip" -d "$download_dir/bun"
 install -o root -g root -m 0755 \
   "$download_dir/bun/bun-linux-x64/bun" /opt/briar/bin/bun
+ln -sfn /opt/briar/bin/bun /opt/briar/bin/bunx
 
 node_tar="$download_dir/node-linux-x64.tar.xz"
 download_checked \

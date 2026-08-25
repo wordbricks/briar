@@ -32,4 +32,5 @@ xfce4-panel
 xfce4-session
 xfce4-settings
 xfce4-terminal
+xfdesktop4
 xfwm4

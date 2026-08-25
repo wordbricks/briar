@@ -7,11 +7,13 @@ mod macos_inbox_notifications;
 #[cfg(target_os = "macos")]
 mod macos_secure_input;
 mod planned_update_recovery;
-#[cfg(desktop)]
+#[cfg(target_os = "macos")]
 mod status_tray;
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "macos")]
+use std::process::Child;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     env,
@@ -19,7 +21,7 @@ use std::{
     fs::{self, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
-    process::{Child, Command},
+    process::Command,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,

@@ -14,7 +14,6 @@ pub(super) fn run() {
     #[cfg(desktop)]
     let builder = builder
         .manage(ExitConfirmationState::default())
-        .manage(status_tray::StatusTrayState::default())
         .on_menu_event(|app, event| {
             if event.id() == APP_QUIT_MENU_ID {
                 request_exit_confirmation(app);
@@ -52,6 +51,8 @@ pub(super) fn run() {
                 .with_denylist(&["launch-intro"])
                 .build(),
         );
+    #[cfg(target_os = "macos")]
+    let builder = builder.manage(status_tray::StatusTrayState::default());
     #[cfg(target_os = "macos")]
     let builder = builder.manage(macos_secure_input::SecureInputState::default());
     let app = builder
