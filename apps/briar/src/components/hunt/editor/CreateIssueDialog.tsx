@@ -2,7 +2,7 @@ import { CircleAlert, Image as ImageIcon, Paperclip, X } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { useCallback, useEffect, useState } from "react";
 import { NativeSelect } from "@/components/NativeSelect";
-import { ProviderSelect } from "@/components/ProviderSelect";
+import { ProviderModelSelector } from "@/components/ProviderModelSelector";
 import { SelectMenu } from "@/components/SelectMenu";
 import { useIssueDialogAttachments } from "@/hooks/useIssueDialogAttachments";
 import { type AutoHuntWorkflow, type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
@@ -262,18 +262,17 @@ export function CreateIssueDialog({
             label: t("issue.priority4"),
             value: "4"
           }]} value={priority} />
-            <ProviderSelect className="issue-provider-select" emptyOption={{
-            label: t("issue.agentDefault"),
-            value: ""
-          }} label={t("issue.preferredProvider")} onValueChange={value => {
+            <ProviderModelSelector className="issue-provider-model-selector" compact disabled={isSubmitting} groupLabel={`${t("issue.preferredProvider")} · ${t("issue.preferredModel")}`} modelClassName="issue-model-select" modelDisabled={!preferredProvider} modelLabel={t("issue.preferredModel")} modelOptions={preferredProvider ? agentModelOptions(providerModels, preferredProvider as AgentProvider, t("settings.providerDefaultModel"), preferredModel, providerModelPreferences[preferredProvider as AgentProvider].favoriteModels) : []} modelPlaceholder={t("issue.selectProviderFirst")} modelSearchEmptyMessage={t("issue.noModelsFound")} modelSearchPlaceholder={t("issue.searchModels")} modelSearchable={preferredProvider === "opencode" || preferredProvider === "agy"} modelValue={preferredModel} onModelChange={value => {
+            setPreferredModel(value);
+            setPreferredEffort("");
+          }} onProviderChange={value => {
             setPreferredProvider(value);
             setPreferredModel(value ? providerModelPreferences[value as AgentProvider].defaultModel ?? "" : "");
             setPreferredEffort("high");
-          }} providers={availableProviders} value={preferredProvider} />
-            <NativeSelect className="issue-model-select" disabled={!preferredProvider} label={t("issue.preferredModel")} onValueChange={value => {
-            setPreferredModel(value);
-            setPreferredEffort("");
-          }} options={preferredProvider ? agentModelOptions(providerModels, preferredProvider as AgentProvider, t("settings.providerDefaultModel"), preferredModel, providerModelPreferences[preferredProvider as AgentProvider].favoriteModels) : []} placeholder={t("issue.selectProviderFirst")} searchEmptyMessage={t("issue.noModelsFound")} searchPlaceholder={t("issue.searchModels")} searchable={preferredProvider === "opencode" || preferredProvider === "agy"} value={preferredModel} />
+          }} providerClassName="issue-provider-select" providerEmptyOption={{
+            label: t("issue.agentDefault"),
+            value: ""
+          }} providerLabel={t("issue.preferredProvider")} providers={availableProviders} providerValue={preferredProvider} />
             <NativeSelect className="issue-effort-select" disabled={!preferredProvider || !preferredModel} label={t("settings.effort")} onValueChange={setPreferredEffort} options={preferredProvider ? [{
             label: t("settings.providerDefaultEffort"),
             value: ""

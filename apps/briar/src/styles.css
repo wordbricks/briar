@@ -1303,6 +1303,12 @@ body { overflow: hidden; font-synthesis: none; }
 .worker-dispatch-form { display:grid; gap:16px; padding:8px 0; }
 .worker-dispatch-form>label { display:grid; gap:7px; }
 .worker-dispatch-form>label>span { display:flex; align-items:center; gap:7px; color:var(--muted-foreground); font-size:var(--text-xs); font-weight:600; }
+.provider-model-selector { min-width:0; display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); gap:12px; }
+.provider-model-selector-field { min-width:0; display:grid; gap:7px; }
+.provider-model-selector-label { display:flex; align-items:center; gap:7px; color:var(--muted-foreground); font-size:var(--text-xs); font-weight:600; }
+.provider-model-selector .select-menu { min-width:0; width:100%; }
+.provider-model-selector .select-menu-trigger { width:100%; }
+.provider-model-selector-model .select-menu-leading-icon { color:var(--muted-foreground); }
 .worker-readiness-list { display:grid; gap:7px; max-height:190px; overflow:auto; }
 .worker-readiness-list>p { display:flex; align-items:center; gap:7px; margin:0; padding:10px; border-radius:8px; background:#fff7e6; color:#8a5b12; font-size:var(--text-xs); }
 .kanban-board { min-width:0; min-height:0; flex:1; padding:12px; display:flex; flex-direction:row; align-items:flex-start; gap:10px; overflow-x:auto; overflow-y:auto; background:#f7f7f4; scrollbar-gutter:stable; }
@@ -2879,6 +2885,48 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .issue-dialog .issue-effort-select.select-menu[data-open] .select-menu-trigger {
   border-color: #9f8cdf;
   box-shadow: 0 0 0 3px rgba(128, 104, 206, .12);
+}
+.issue-provider-model-selector {
+  width: min(328px, 100%);
+  min-width: 260px;
+  height: 34px;
+  flex: 0 1 328px;
+  grid-template-columns: minmax(118px, .88fr) minmax(140px, 1.12fr);
+  gap: 0;
+}
+.issue-provider-model-selector .provider-model-selector-field {
+  display: block;
+}
+.issue-provider-model-selector .provider-model-selector-label {
+  width: 1px;
+  height: 1px;
+  position: absolute;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+.issue-dialog .issue-provider-model-selector .issue-provider-select.select-menu,
+.issue-dialog .issue-provider-model-selector .issue-model-select.select-menu {
+  width: 100%;
+  max-width: none;
+}
+.issue-dialog .issue-provider-model-selector .issue-provider-select.select-menu .select-menu-trigger,
+.issue-dialog .issue-provider-model-selector .issue-model-select.select-menu .select-menu-trigger {
+  width: 100%;
+  min-width: 0;
+}
+.issue-dialog .issue-provider-model-selector .issue-provider-select.select-menu .select-menu-trigger {
+  border-radius: 9px 0 0 9px;
+}
+.issue-dialog .issue-provider-model-selector .issue-model-select.select-menu {
+  margin-left: -1px;
+}
+.issue-dialog .issue-provider-model-selector .issue-model-select.select-menu .select-menu-trigger {
+  border-radius: 0 9px 9px 0;
+}
+.issue-dialog .issue-provider-model-selector .select-menu:focus-within,
+.issue-dialog .issue-provider-model-selector .select-menu[data-open] {
+  z-index: 1;
 }
 .issue-attachment-trigger {
   margin-left: auto;
@@ -5247,6 +5295,13 @@ button.issue-message-state { width:100%; cursor:pointer; }
   scrollbar-width: none;
 }
 .companion-shell .issue-metadata-bar::-webkit-scrollbar { display: none; }
+.companion-shell .issue-provider-model-selector {
+  width: 330px;
+  min-width: 330px;
+  height: 42px;
+  flex-basis: 330px;
+  grid-template-columns: minmax(130px, .88fr) minmax(154px, 1.12fr);
+}
 .companion-shell .issue-attachment-trigger,
 .companion-shell .issue-full-auto-toggle,
 .companion-shell .issue-dialog .issue-status-select.select-menu .select-menu-trigger,
@@ -5395,6 +5450,13 @@ button.issue-message-state { width:100%; cursor:pointer; }
     scrollbar-width: none;
   }
   .issue-metadata-bar::-webkit-scrollbar { display: none; }
+  .issue-provider-model-selector {
+    width: 330px;
+    min-width: 330px;
+    height: 42px;
+    flex-basis: 330px;
+    grid-template-columns: minmax(130px, .88fr) minmax(154px, 1.12fr);
+  }
   .issue-attachment-trigger,
   .issue-full-auto-toggle,
   .issue-dialog .issue-status-select.select-menu .select-menu-trigger,
@@ -5477,6 +5539,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
     min-height: 58px;
     flex-basis: 58px;
   }
+}
+
+@media (max-width:560px) {
+  .worker-provider-model-selector { grid-template-columns:minmax(0,1fr); }
 }
 
 @media (max-width:760px) {

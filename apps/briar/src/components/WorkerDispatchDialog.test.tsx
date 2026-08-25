@@ -135,6 +135,45 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await act(async () => root.unmount());
   });
 
+  it("groups provider and model selection and locks both while dispatching", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          isDispatching
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          open
+          run={null}
+          workers={[worker("worker-loading", "Loading Mac")]}
+        />,
+      );
+    });
+
+    const selector = document.body.querySelector(
+      '.worker-provider-model-selector[role="group"]',
+    );
+    expect(selector?.getAttribute("aria-label")).toContain("실행 프로바이더");
+    expect(selector?.getAttribute("aria-label")).toContain("선호 모델");
+    expect(
+      selector?.querySelector<HTMLButtonElement>('[aria-label="실행 프로바이더"]')
+        ?.disabled,
+    ).toBe(true);
+    expect(
+      selector?.querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')
+        ?.disabled,
+    ).toBe(true);
+    expect(
+      selector?.querySelector(".provider-model-selector-model .select-menu-leading-icon svg"),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+  });
+
   it("announces an approval error inside the active dialog", async () => {
     const container = document.createElement("div");
     document.body.append(container);
