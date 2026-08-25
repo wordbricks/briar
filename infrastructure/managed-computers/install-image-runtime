@@ -123,6 +123,28 @@ for binary in cargo cargo-clippy cargo-fmt clippy-driver rustc rustdoc rustfmt r
 done
 chmod -R a+rX /opt/briar/cargo /opt/briar/rustup
 
+# Keep the pinned image toolchain immutable, but give the managed user writable
+# rustup metadata and Cargo cache directories. A symlink per pinned toolchain
+# lets rustup reuse the image toolchain while retaining the ability to install
+# additional toolchains beside it.
+install -d -o briar -g briar -m 0700 \
+  /home/briar/.cargo /home/briar/.cargo/bin \
+  /home/briar/.rustup /home/briar/.rustup/downloads \
+  /home/briar/.rustup/tmp /home/briar/.rustup/toolchains
+if [[ -d /opt/briar/rustup/update-hashes ]]; then
+  cp -a /opt/briar/rustup/update-hashes /home/briar/.rustup/
+  chown -R briar:briar /home/briar/.rustup/update-hashes
+fi
+if [[ -f /opt/briar/rustup/settings.toml ]]; then
+  install -o briar -g briar -m 0644 \
+    /opt/briar/rustup/settings.toml /home/briar/.rustup/settings.toml
+fi
+for toolchain in /opt/briar/rustup/toolchains/*; do
+  user_toolchain="/home/briar/.rustup/toolchains/$(basename -- "$toolchain")"
+  ln -sfn "$toolchain" "$user_toolchain"
+  chown -h briar:briar "$user_toolchain"
+done
+
 cargo_audit_tgz="$download_dir/cargo-audit.tgz"
 download_checked \
   "https://github.com/RustSec/rustsec/releases/download/cargo-audit%2Fv${CARGO_AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-gnu-v${CARGO_AUDIT_VERSION}.tgz" \
