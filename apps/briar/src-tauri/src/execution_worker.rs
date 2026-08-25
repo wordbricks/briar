@@ -64,7 +64,14 @@ pub(super) fn configure_execution_worker(
             // Registration and service installation are one user action. Do
             // not leave a project half-enabled when the service cannot start.
             let _ = run(&["worker", "uninstall-service", "--project", &project_id]);
-            let _ = run(&["worker", "unregister", "--project", &project_id]);
+            let _ = run(&[
+                "worker",
+                "unregister",
+                "--project",
+                &project_id,
+                "--lifecycle-reason",
+                "managed-deprovision",
+            ]);
             return Err(error);
         }
     } else {

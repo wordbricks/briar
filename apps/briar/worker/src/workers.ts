@@ -45,6 +45,16 @@ import {
   MAX_WORKER_CONCURRENT_SESSIONS,
   MIN_WORKER_CONCURRENT_SESSIONS,
 } from "./worker-limits";
+import {
+  addD1MutationMetrics,
+  beginWorkerHardDelete,
+  completeWorkerHardDelete,
+  d1MutationMetrics,
+  failWorkerHardDelete,
+  recordPreservedWorkerBinding,
+  type D1MutationMetrics,
+  type WorkerHardDeleteContext,
+} from "./worker-lifecycle-repository";
 
 export type ExecutionWorkerState = "online" | "stale" | "disabled";
 export type ExecutionWorkerReadiness = "ready" | "busy" | "needs_attention";
@@ -321,7 +331,7 @@ export async function completeExecutionWorkerUpdates(
   if (!status?.ready || status.activeWorkCount > 0) {
     return status?.request.status === "requested" ? status.request : null;
   }
-  await db
+  const completed = await db
     .prepare(
       `update briar_execution_worker_update_requests
        set status = 'completed', completed_at = ?, updated_at = ?
@@ -329,6 +339,36 @@ export async function completeExecutionWorkerUpdates(
     )
     .bind(observedAt, observedAt, pending.id)
     .run();
+  if ((completed.meta.changes ?? 0) > 0) {
+    const device = await db
+      .prepare(
+        `select organization_id from briar_execution_worker_devices where id = ?`,
+      )
+      .bind(deviceId)
+      .first<{ organization_id: string }>();
+    if (device) {
+      await recordPreservedWorkerBinding(db, {
+        requestId: `worker-update:${pending.id}`,
+        organizationId: device.organization_id,
+        projectId: null,
+        deviceId,
+        workerId: null,
+        reason: "update",
+        observedAt,
+        detail: {
+          bindingPreserved: true,
+          targetVersion: pending.targetVersion,
+          currentVersion,
+        },
+      }).catch(() => {
+        console.error(JSON.stringify({
+          message: "Execution Worker update lifecycle telemetry failed",
+          requestId: pending.id,
+          deviceId,
+        }));
+      });
+    }
+  }
   return null;
 }
 
@@ -1361,7 +1401,7 @@ export async function authenticateExecutionWorker(
   };
 }
 
-export async function disableExecutionWorker(
+async function disableExecutionWorkerMutation(
   db: D1Database,
   deviceId: string,
   observedAt: string,
@@ -1389,7 +1429,18 @@ export async function disableExecutionWorker(
       )
       .bind(observedAt, deviceId),
   ]);
-  return (results[0]?.meta.changes ?? 0) > 0;
+  return {
+    disabled: (results[0]?.meta.changes ?? 0) > 0,
+    metrics: d1MutationMetrics(results),
+  };
+}
+
+export async function disableExecutionWorker(
+  db: D1Database,
+  deviceId: string,
+  observedAt: string,
+) {
+  return (await disableExecutionWorkerMutation(db, deviceId, observedAt)).disabled;
 }
 
 /**
@@ -1404,69 +1455,207 @@ export async function deleteExecutionWorker(
   db: D1Database,
   deviceId: string,
   observedAt: string,
+  lifecycle: Omit<WorkerHardDeleteContext, "deviceId" | "observedAt" | "operation">,
 ) {
-  if (!(await disableExecutionWorker(db, deviceId, observedAt))) return false;
-  if ((await countExecutionWorkerDeviceSessions(db, deviceId, observedAt)) > 0) {
+  const context: WorkerHardDeleteContext = {
+    ...lifecycle,
+    deviceId,
+    observedAt,
+    operation: "device_delete",
+  };
+  const attempt = await beginWorkerHardDelete(db, context);
+  if (attempt.replayed) return true;
+  let metrics: D1MutationMetrics = { rowsRead: 0, rowsWritten: 0, changes: 0 };
+  let failureRecorded = false;
+  try {
+    const bindingCountResult = await db
+      .prepare(
+        `select count(*) as binding_count from briar_execution_workers
+         where device_id = ?`,
+      )
+      .bind(deviceId)
+      .all<{ binding_count: number }>();
+    const bindingCount = bindingCountResult.results[0]?.binding_count ?? 0;
+    metrics = addD1MutationMetrics(
+      metrics,
+      d1MutationMetrics([bindingCountResult]),
+    );
+    const disabled = await disableExecutionWorkerMutation(db, deviceId, observedAt);
+    metrics = addD1MutationMetrics(metrics, disabled.metrics);
+    if (!disabled.disabled) {
+      await failWorkerHardDelete(db, context, {
+        attemptCount: attempt.attemptCount,
+        outcome: "failed",
+        reasonCode: "mutation_failed",
+        metrics,
+      });
+      failureRecorded = true;
+      return false;
+    }
+    if ((await countExecutionWorkerDeviceSessions(db, deviceId, observedAt)) > 0) {
+      await failWorkerHardDelete(db, context, {
+        attemptCount: attempt.attemptCount,
+        outcome: "blocked",
+        reasonCode: "active_sessions",
+        metrics,
+      });
+      failureRecorded = true;
+      throw new WorkerConflictError(
+        "Worker has active sessions; wait for them to finish before deleting it",
+      );
+    }
+    const deleted = await db
+      .prepare(
+        `delete from briar_execution_worker_devices
+         where id = ?
+           and not exists (${executionWorkerDeviceSessionsQuery})`,
+      )
+      .bind(
+        deviceId,
+        ...executionWorkerDeviceSessionBindings(deviceId, observedAt),
+      )
+      .run();
+    const deletionMetrics = d1MutationMetrics([deleted]);
+    metrics = addD1MutationMetrics(metrics, deletionMetrics);
+    if (deleted.meta.changes > 0) {
+      await completeWorkerHardDelete(db, context, {
+        attemptCount: attempt.attemptCount,
+        metrics,
+        detail: {
+          bindingCount,
+          disableRowsWritten: disabled.metrics.rowsWritten,
+          deviceDeleteRowsWritten: deletionMetrics.rowsWritten,
+        },
+      });
+      return true;
+    }
+    const existing = await db
+      .prepare(`select 1 from briar_execution_worker_devices where id = ?`)
+      .bind(deviceId)
+      .first<number>();
+    if (!existing) {
+      await failWorkerHardDelete(db, context, {
+        attemptCount: attempt.attemptCount,
+        outcome: "failed",
+        reasonCode: "mutation_failed",
+        metrics,
+      });
+      failureRecorded = true;
+      return false;
+    }
+    await failWorkerHardDelete(db, context, {
+      attemptCount: attempt.attemptCount,
+      outcome: "blocked",
+      reasonCode: "active_sessions",
+      metrics,
+    });
+    failureRecorded = true;
     throw new WorkerConflictError(
       "Worker has active sessions; wait for them to finish before deleting it",
     );
+  } catch (error) {
+    if (!failureRecorded) {
+      await failWorkerHardDelete(db, context, {
+        attemptCount: attempt.attemptCount,
+        outcome: "failed",
+        reasonCode: "mutation_failed",
+        metrics,
+      });
+    }
+    throw error;
   }
-  const deleted = await db
-    .prepare(
-      `delete from briar_execution_worker_devices
-       where id = ?
-         and not exists (${executionWorkerDeviceSessionsQuery})`,
-    )
-    .bind(
-      deviceId,
-      ...executionWorkerDeviceSessionBindings(deviceId, observedAt),
-    )
-    .run();
-  if (deleted.meta.changes > 0) return true;
-  const existing = await db
-    .prepare(`select 1 from briar_execution_worker_devices where id = ?`)
-    .bind(deviceId)
-    .first<number>();
-  if (!existing) return false;
-  throw new WorkerConflictError(
-    "Worker has active sessions; wait for them to finish before deleting it",
-  );
 }
 
-/** Remove one project binding; revoke the device only after its last binding. */
+/**
+ * Remove one project binding for an explicit unlink operation; restart and
+ * update callers cannot construct this hard-delete lifecycle context.
+ */
 export async function unbindExecutionWorker(
   db: D1Database,
   deviceId: string,
   projectId: string,
   observedAt: string,
+  lifecycle: Omit<WorkerHardDeleteContext, "deviceId" | "projectId" | "observedAt" | "operation">,
 ) {
-  const deleted = await db
-    .prepare(
-      `delete from briar_execution_workers
-       where device_id = ? and project_id = ?`,
-    )
-    .bind(deviceId, projectId)
-    .run();
-  if (deleted.meta.changes < 1) return false;
-  const remaining = await db
-    .prepare(
-      `select count(*) as bindings from briar_execution_workers
-       where device_id = ?`,
-    )
-    .bind(deviceId)
-    .first<{ bindings: number }>();
-  if ((remaining?.bindings ?? 0) === 0) {
-    await disableExecutionWorker(db, deviceId, observedAt);
-  } else {
-    await db
+  const context: WorkerHardDeleteContext = {
+    ...lifecycle,
+    deviceId,
+    projectId,
+    observedAt,
+    operation: "binding_delete",
+  };
+  const attempt = await beginWorkerHardDelete(db, context);
+  if (attempt.replayed) return true;
+  let metrics: D1MutationMetrics = { rowsRead: 0, rowsWritten: 0, changes: 0 };
+  let failureRecorded = false;
+  try {
+    const deleted = await db
       .prepare(
-        `update briar_execution_worker_devices
-         set updated_at = ? where id = ?`,
+        `delete from briar_execution_workers
+         where device_id = ? and project_id = ?`,
       )
-      .bind(observedAt, deviceId)
+      .bind(deviceId, projectId)
       .run();
+    const bindingDeleteMetrics = d1MutationMetrics([deleted]);
+    metrics = addD1MutationMetrics(metrics, bindingDeleteMetrics);
+    if (deleted.meta.changes < 1) {
+      await failWorkerHardDelete(db, context, {
+        attemptCount: attempt.attemptCount,
+        outcome: "failed",
+        reasonCode: "mutation_failed",
+        metrics,
+      });
+      failureRecorded = true;
+      return false;
+    }
+    const remainingResult = await db
+      .prepare(
+        `select count(*) as bindings from briar_execution_workers
+         where device_id = ?`,
+      )
+      .bind(deviceId)
+      .all<{ bindings: number }>();
+    metrics = addD1MutationMetrics(metrics, d1MutationMetrics([remainingResult]));
+    const remainingBindings = remainingResult.results[0]?.bindings ?? 0;
+    let followupMetrics: D1MutationMetrics;
+    if (remainingBindings === 0) {
+      followupMetrics = (await disableExecutionWorkerMutation(
+        db,
+        deviceId,
+        observedAt,
+      )).metrics;
+    } else {
+      const touched = await db
+        .prepare(
+          `update briar_execution_worker_devices
+           set updated_at = ? where id = ?`,
+        )
+        .bind(observedAt, deviceId)
+        .run();
+      followupMetrics = d1MutationMetrics([touched]);
+    }
+    metrics = addD1MutationMetrics(metrics, followupMetrics);
+    await completeWorkerHardDelete(db, context, {
+      attemptCount: attempt.attemptCount,
+      metrics,
+      detail: {
+        bindingDeleteRowsWritten: bindingDeleteMetrics.rowsWritten,
+        remainingBindings,
+        deviceStateRowsWritten: followupMetrics.rowsWritten,
+      },
+    });
+    return true;
+  } catch (error) {
+    if (!failureRecorded) {
+      await failWorkerHardDelete(db, context, {
+        attemptCount: attempt.attemptCount,
+        outcome: "failed",
+        reasonCode: "mutation_failed",
+        metrics,
+      });
+    }
+    throw error;
   }
-  return true;
 }
 
 export async function listExecutionWorkers(

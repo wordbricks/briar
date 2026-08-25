@@ -603,7 +603,10 @@ export async function deleteOrganizationExecutionWorker(
   return request<void>(
     `/organizations/${organizationId}/workers/${encodeURIComponent(deviceId)}`,
     token,
-    { method: "DELETE" },
+    {
+      method: "DELETE",
+      headers: { "Idempotency-Key": `worker-deprovision:${deviceId}` },
+    },
   );
 }
 

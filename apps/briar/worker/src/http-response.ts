@@ -1,6 +1,6 @@
 export const corsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, content-type, idempotency-key, if-none-match, x-briar-claim-token, x-briar-channel-claim-token",
+    "authorization, content-type, idempotency-key, if-none-match, x-briar-claim-token, x-briar-channel-claim-token, x-briar-worker-lifecycle-reason",
   "Access-Control-Allow-Methods":
     "DELETE, GET, HEAD, PATCH, POST, PUT, OPTIONS",
   "Access-Control-Allow-Origin": "*",

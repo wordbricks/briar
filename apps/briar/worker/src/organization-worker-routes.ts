@@ -9,6 +9,8 @@ import { readLatestVersion } from "./releases";
 import { readJson } from "./request-readers";
 import { requireSession } from "./session-auth";
 import { decodeWorkerSettings } from "./worker-request-contract";
+import { recoverMissingWorkerHardDelete } from "./worker-lifecycle-repository";
+import { workerLifecycleRequestId } from "./worker-lifecycle-request";
 import {
   deleteExecutionWorker,
   listOrganizationExecutionWorkers,
@@ -165,6 +167,12 @@ export async function handleOrganizationWorkerRoute(
   if (organizationWorkerMatch && request.method === "DELETE") {
     const session = await requireSession(auth, request);
     const organizationId = organizationWorkerMatch[1];
+    const deviceId = organizationWorkerMatch[2];
+    const observedAt = new Date().toISOString();
+    const requestId = workerLifecycleRequestId(
+      request,
+      `worker-deprovision:${deviceId}`,
+    );
     const role = await getOrganizationRole(db, organizationId, session.user.id);
     if (!role) throw new HttpError(404, "Organization not found");
     const device = await db
@@ -173,9 +181,22 @@ export async function handleOrganizationWorkerRoute(
          from briar_execution_worker_devices
          where id = ? and organization_id = ?`,
       )
-      .bind(organizationWorkerMatch[2], organizationId)
+      .bind(deviceId, organizationId)
       .first<{ id: string; owner_user_id: string }>();
-    if (!device) throw new HttpError(404, "Worker not found");
+    if (!device) {
+      if (await recoverMissingWorkerHardDelete(db, {
+        requestId,
+        organizationId,
+        projectId: null,
+        deviceId,
+        workerId: null,
+        operation: "device_delete",
+        observedAt,
+      })) {
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+      throw new HttpError(404, "Worker not found");
+    }
     if (
       device.owner_user_id !== session.user.id &&
       !canManageOrganization(role)
@@ -186,10 +207,17 @@ export async function handleOrganizationWorkerRoute(
       );
     }
     const managedComputer = await managedComputerByDeviceId(db, device.id);
-    const observedAt = new Date().toISOString();
     let deleted: boolean;
     try {
-      deleted = await deleteExecutionWorker(db, device.id, observedAt);
+      deleted = await deleteExecutionWorker(db, device.id, observedAt, {
+        requestId,
+        organizationId,
+        projectId: null,
+        workerId: null,
+        reason: managedComputer
+          ? "managed_deprovision"
+          : "explicit_user_deprovision",
+      });
     } catch (error) {
       if (managedComputer) {
         await endManagedComputerRemoteSessionsAndDisconnect(db, env, {

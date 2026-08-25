@@ -24,6 +24,14 @@ import {
 import { pendingExecutionWorkerUpdate } from "./worker-update-repository";
 import { workerJson } from "./worker-json";
 import {
+  recoverMissingWorkerHardDelete,
+  recordPreservedWorkerBinding,
+} from "./worker-lifecycle-repository";
+import {
+  projectWorkerDeleteReason,
+  workerLifecycleRequestId,
+} from "./worker-lifecycle-request";
+import {
   auditExecutionEvent,
   bindExecutionWorkerProject,
   completeExecutionWorkerUpdates,
@@ -43,6 +51,7 @@ import {
   updateExecutionWorkerConcurrency,
   updateExecutionWorkerLabel,
   WorkerConflictError,
+  workerStateAt,
 } from "./workers";
 
 export type ExecutionWorkerRouteInput = {
@@ -200,10 +209,26 @@ export async function handleExecutionWorkerRoute(
     const projectId = workerDisableMatch[1];
     const workerId = workerDisableMatch[2];
     const session = await requireSession(auth, request);
+    const observedAt = new Date().toISOString();
+    const requestId = workerLifecycleRequestId(
+      request,
+      `worker-unlink:${projectId}:${workerId}`,
+    );
+    const lifecycleReason = projectWorkerDeleteReason(request);
     const project = await getProject(db, projectId, session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     const device = await executionWorkerDeviceForBinding(db, workerId);
     if (!device || device.organization_id !== project.organization_id) {
+      if (await recoverMissingWorkerHardDelete(db, {
+        requestId,
+        organizationId: project.organization_id,
+        projectId,
+        workerId,
+        operation: "binding_delete",
+        observedAt,
+      })) {
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
       throw new HttpError(404, "Worker not found");
     }
     if (
@@ -218,12 +243,17 @@ export async function handleExecutionWorkerRoute(
       `select count(*) binding_count from briar_execution_workers
        where device_id = ?`,
     ).bind(device.id).first<{ binding_count: number }>();
-    const observedAt = new Date().toISOString();
     await unbindExecutionWorker(
       db,
       device.id,
       projectId,
       observedAt,
+      {
+        requestId,
+        organizationId: project.organization_id,
+        workerId,
+        reason: lifecycleReason,
+      },
     );
     if (managedComputer && (remainingBindings?.binding_count ?? 0) <= 1) {
       await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
@@ -422,6 +452,30 @@ export async function handleExecutionWorkerRoute(
       capabilities: input.capabilities,
       observedAt,
     });
+    if (
+      !pendingBeforeHeartbeat &&
+      workerStateAt(binding.last_heartbeat_at, observedAt, binding.state) === "stale"
+    ) {
+      await recordPreservedWorkerBinding(db, {
+        requestId: `worker-restart:${binding.id}:${binding.last_heartbeat_at}`,
+        organizationId: principal.organizationId,
+        projectId: binding.project_id,
+        deviceId: principal.deviceId,
+        workerId: binding.id,
+        reason: "restart",
+        observedAt,
+        detail: {
+          bindingPreserved: true,
+          detection: "heartbeat_after_stale",
+        },
+      }).catch(() => {
+        console.error(JSON.stringify({
+          message: "Execution Worker restart lifecycle telemetry failed",
+          deviceId: principal.deviceId,
+          workerId: binding.id,
+        }));
+      });
+    }
     if (hasExecutionWorkerReadinessChanged(binding, worker)) {
       await auditExecutionEvent(db, {
         organizationId: principal.organizationId,

@@ -191,6 +191,41 @@ async function createPreWebhookChannelMessage(
 }
 
 describe("D1 migrations", () => {
+  it("adds credential-free Worker lifecycle telemetry", async () => {
+    const database = await createIsolatedTestDatabase({
+      suite: "worker-lifecycle-telemetry-migration",
+    });
+    try {
+      const columns = await database.db.prepare(
+        `pragma table_info(briar_execution_worker_lifecycle_events)`,
+      ).all<{ name: string }>();
+      const names = columns.results.map((column) => column.name);
+      expect(names).toEqual(expect.arrayContaining([
+        "request_id",
+        "reason",
+        "operation",
+        "outcome",
+        "attempt_count",
+        "hard_delete_rows_read",
+        "hard_delete_rows_written",
+        "detail_json",
+      ]));
+      expect(names.join("\n")).not.toMatch(/token|credential|secret/iu);
+
+      const indexes = await database.db.prepare(
+        `pragma index_list(briar_execution_worker_lifecycle_events)`,
+      ).all<{ name: string }>();
+      expect(indexes.results.map((index) => index.name)).toEqual(
+        expect.arrayContaining([
+          "briar_execution_worker_lifecycle_reason_idx",
+          "briar_execution_worker_lifecycle_device_idx",
+        ]),
+      );
+    } finally {
+      await database.dispose();
+    }
+  }, 30_000);
+
   it("backfills existing transcript totals before incremental updates take over", async () => {
     const miniflare = new Miniflare({
       modules: true,
