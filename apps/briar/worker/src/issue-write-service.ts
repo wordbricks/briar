@@ -15,12 +15,17 @@ import { HttpError } from "./http-response";
 import { deleteUnreferencedUploadedIssueObjects } from "./issue-attachment-service";
 import type { IssueInput, IssueUpdateInput } from "./issue-request-contract";
 import type { ProjectRow } from "./project-repository";
+import {
+  defaultIssueDifficulty,
+  type IssueDifficulty,
+} from "../../src/lib/issue-difficulty";
 
 export async function createIssueWithAttachments(input: {
   db: D1Database;
   attachmentsBucket: R2Bucket;
   project: Pick<ProjectRow, "id" | "name">;
-  issue: Omit<IssueInput, "fullAuto"> & {
+  issue: Omit<IssueInput, "difficulty" | "fullAuto"> & {
+    difficulty?: IssueDifficulty;
     fullAuto?: boolean;
   };
   attachments: File[];
@@ -78,6 +83,7 @@ export async function createIssueWithAttachments(input: {
       repository: settings?.github_repository ?? input.project.name,
       detail: input.detail,
       priority: input.issue.priority ?? null,
+      difficulty: input.issue.difficulty ?? defaultIssueDifficulty,
       assigneeUserId: input.issue.assigneeUserId ?? null,
       issueCheckpoints: input.issue.checkpoints,
       fullAuto: input.issue.fullAuto ?? false,
@@ -230,11 +236,12 @@ export async function updateIssueWithAttachments(input: {
       input.project.id,
       input.runId,
       {
-      title: input.issue.title,
-      description: issueDescription ?? null,
-      priority: input.issue.priority ?? null,
-      assigneeUserId: input.issue.assigneeUserId,
-      updatedAt: input.updatedAt,
+        title: input.issue.title,
+        description: issueDescription ?? null,
+        priority: input.issue.priority ?? null,
+        difficulty: input.issue.difficulty,
+        assigneeUserId: input.issue.assigneeUserId,
+        updatedAt: input.updatedAt,
         attachments: storedAttachments.map(
           ({ file: _file, ...attachment }) => attachment,
         ),

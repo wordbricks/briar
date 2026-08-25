@@ -190,6 +190,7 @@
             },
             "progress": 45,
             "detail": "Implementing",
+            "difficulty": "easy",
             "assigneeUserId": "fixture-user",
             "createdByUserId": "fixture-user",
             "subscribers": [
@@ -290,6 +291,7 @@
             "title": "Native dashboard sync",
             "status": "completed",
             "detail": null,
+            "difficulty": "hard",
             "createdByUserId": "fixture-user",
             "resultSummary": "The shared contract passed.",
             "structuredResult": {
@@ -404,6 +406,7 @@
         "title": "Native write flow",
         "description": "Create and run",
         "priority": 2,
+        "difficulty": "hard",
         "assigneeUserId": "fixture-user",
         "status": "queued",
         "preferredProvider": "codex",
@@ -418,6 +421,7 @@
         "status": "queued",
         "assigneeUserId": "fixture-user",
         "createdByUserId": "fixture-user",
+        "difficulty": "hard",
         "attachments": []
       }
     },
@@ -429,6 +433,7 @@
         "title": "Updated native flow",
         "description": null,
         "priority": null,
+        "difficulty": "easy",
         "assigneeUserId": null
       },
       "response": {
@@ -436,6 +441,7 @@
         "title": "Updated native flow",
         "description": null,
         "priority": null,
+        "difficulty": "easy",
         "assigneeUserId": null
       }
     },

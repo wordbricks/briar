@@ -682,6 +682,7 @@ struct RunRow: View {
                 Text(verbatim: "\(issueKeyPrefix)-\(runNumber)")
                     .fixedSize(horizontal: true, vertical: false)
             }
+            IssueDifficultyBadge(difficulty: run.difficulty ?? .normal)
             if let assignee {
                 ProfileImageView(
                     image: assignee.image,
@@ -704,6 +705,25 @@ struct RunRow: View {
         Text(L10n.relativeDate(run.updatedAt))
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+private struct IssueDifficultyBadge: View {
+    let difficulty: IssueDifficulty
+
+    private var label: String {
+        L10n.format("난이도 %@", difficulty.displayName)
+    }
+
+    var body: some View {
+        Image(systemName: difficulty.systemImage)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(difficulty == .hard ? Color.red : Color.accentColor)
+            .frame(width: 20, height: 20)
+            .background(Color.secondary.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .help(label)
+            .accessibilityLabel(label)
     }
 }
 

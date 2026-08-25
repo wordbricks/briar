@@ -59,6 +59,7 @@ final class IssueMutationStore: ObservableObject {
                         title: title,
                         description: description.isEmpty ? nil : description,
                         priority: draft.priority,
+                        difficulty: draft.difficulty,
                         assigneeUserId: draft.assigneeUserId,
                         status: draft.status,
                         preferredProvider: draft.preferredProvider,
@@ -77,6 +78,7 @@ final class IssueMutationStore: ObservableObject {
                     "title": title,
                     "description": description,
                     "priority": draft.priority.map(String.init) ?? "",
+                    "difficulty": draft.difficulty.rawValue,
                     "assigneeUserId": draft.assigneeUserId ?? "",
                     "status": draft.status.rawValue,
                     "preferredProvider": draft.preferredProvider?.rawValue ?? "",
@@ -115,6 +117,7 @@ final class IssueMutationStore: ObservableObject {
                     title: title,
                     description: description.isEmpty ? nil : description,
                     priority: draft.priority,
+                    difficulty: draft.difficulty,
                     assigneeUserId: draft.assigneeUserId
                 ),
                 as: UpdateIssueResponse.self

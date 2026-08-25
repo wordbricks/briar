@@ -163,6 +163,7 @@ final class IssueMutationTests: XCTestCase {
             title: "선호 실행 이슈",
             description: nil,
             priority: 2,
+            difficulty: .hard,
             assigneeUserId: nil,
             status: .queued,
             preferredProvider: .claude,
@@ -178,6 +179,7 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(object["preferredModel"] as? String, "sonnet")
         XCTAssertEqual(object["preferredEffort"] as? String, "high")
         XCTAssertEqual(object["fullAuto"] as? Bool, true)
+        XCTAssertEqual(object["difficulty"] as? String, "hard")
     }
 
     func testCreateIssueMessageRequestEncodesCanonicalParentMessageID() throws {
@@ -231,6 +233,7 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(body["preferredModel"] as? String, "sonnet")
         XCTAssertEqual(body["preferredEffort"] as? String, "high")
         XCTAssertEqual(body["fullAuto"] as? Bool, true)
+        XCTAssertEqual(body["difficulty"] as? String, "normal")
     }
 
     func testIssueSubscriptionUsesDedicatedPutAndDeleteEndpoint() async throws {
@@ -1355,7 +1358,7 @@ private actor MutationAPIRecorder: MobileAPIClientProtocol {
         if path.hasSuffix("/subscription") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","subscribers":[{"userId":"fixture-user","subscribedAt":"2026-08-12T01:00:00.000Z"}]}"#
         } else if path.hasSuffix("/issues") {
-            payload = #"{"runId":"33333333-3333-4333-8333-333333333333","sourceKey":"briar-issue:test","stage":"queued","status":"queued","attachments":[],"createdByUserId":"fixture-user"}"#
+            payload = #"{"runId":"33333333-3333-4333-8333-333333333333","sourceKey":"briar-issue:test","stage":"queued","status":"queued","difficulty":"normal","attachments":[],"createdByUserId":"fixture-user"}"#
         } else if path.hasSuffix("/status") {
             payload = #"{"runId":"33333333-3333-4333-8333-333333333333","outcome":"moved","status":"queued","workflowStage":null}"#
         } else if path.hasSuffix("/resume") {

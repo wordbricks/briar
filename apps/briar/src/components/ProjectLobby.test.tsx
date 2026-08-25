@@ -31,6 +31,47 @@ const emptyUsageSummary: ProjectUsageSummary = {
 };
 
 describe("ProjectLobby", () => {
+  it("shows an accessible difficulty icon for every recent issue", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <ProjectLobby
+            dashboard={demoDashboard}
+            isSidebarOpen
+            onLoadUsageSummary={async () => null}
+            onOpenAgents={() => undefined}
+            onOpenIssue={() => undefined}
+            onOpenIssues={() => undefined}
+            onOpenRepository={() => undefined}
+            onOpenSettings={() => undefined}
+            project={demoDashboard.project}
+            readiness={demoRepositoryReadiness}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    const icons = [...container.querySelectorAll<HTMLElement>(
+      ".project-lobby-activity-list [data-difficulty]",
+    )];
+    expect(icons).toHaveLength(demoDashboard.runs.length);
+    expect(icons.map((icon) => icon.dataset.difficulty).sort()).toEqual([
+      "easy",
+      "hard",
+      "normal",
+      "normal",
+    ]);
+    expect(icons.every((icon) => icon.getAttribute("role") === "img"))
+      .toBe(true);
+    expect(icons.every((icon) => icon.getAttribute("aria-label")))
+      .toBe(true);
+
+    await act(async () => root.unmount());
+  });
+
   it("summarizes only execution time inside the daily analytics window", () => {
     const now = Date.parse("2026-08-12T12:00:00.000Z");
     const run = (updatedAt: string, durationMs: number) => ({

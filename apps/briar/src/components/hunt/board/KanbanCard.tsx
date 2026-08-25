@@ -16,6 +16,7 @@ import { IssueAssigneeAvatar } from "../detail/IssueAssigneeAvatar";
 import { RunStatusPill } from "../detail/RunStatusPill";
 import { localizeStatus, relativeTime } from "../model/formatters";
 import { hasResultReviews } from "../results/model";
+import { IssueDifficultyIcon } from "../IssueDifficultyIcon";
 export function KanbanCard({
   availableProviders,
   activeAgent,
@@ -134,6 +135,7 @@ export function KanbanCard({
             count: run.waitingOnPrerequisiteCount ?? 0
           })}</i>}
           {run.priority !== null && <i className="kanban-priority">P{run.priority}</i>}
+          <IssueDifficultyIcon difficulty={run.difficulty} />
         </span>
         <span className="kanban-card-footer">
           <small>{isClaimed ? t("run.assigned", {

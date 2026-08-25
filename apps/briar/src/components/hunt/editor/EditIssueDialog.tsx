@@ -6,6 +6,7 @@ import { useIssueDialogAttachments } from "@/hooks/useIssueDialogAttachments";
 import { issueAttachmentAccept, maxIssueAttachmentCount } from "@/lib/issue-attachments";
 import { issueTitleInputMaxLength, issueTitleLength, isIssueTitleWithinLimit } from "@/lib/issue-title";
 import { removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
+import type { IssueDifficulty } from "@/lib/issue-difficulty";
 import type { HuntRun, IssueAttachment, OrganizationMember, UpdateIssueInput } from "@/types";
 import { useI18n } from "@/i18n";
 import { DraftIssueDescriptionEditor } from "./DraftIssueDescriptionEditor";
@@ -33,6 +34,7 @@ export function EditIssueDialog({
   const [title, setTitle] = useState(run.title);
   const [description, setDescription] = useState(run.issueDescription ?? "");
   const [priority, setPriority] = useState(run.priority === null ? "" : String(run.priority));
+  const [difficulty, setDifficulty] = useState<IssueDifficulty>(run.difficulty);
   const [assigneeUserId, setAssigneeUserId] = useState(run.assigneeUserId ?? "");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [keptAttachmentIds, setKeptAttachmentIds] = useState<string[]>(() => (run.attachments ?? []).map(attachment => attachment.id));
@@ -98,6 +100,7 @@ export function EditIssueDialog({
         title: title.trim(),
         description: description.trim() || null,
         priority: priority ? Number(priority) : null,
+        difficulty,
         assigneeUserId: assigneeUserId || null,
         attachments: attachments.map(({
           file
@@ -183,6 +186,16 @@ export function EditIssueDialog({
             label: t("issue.priority4"),
             value: "4"
           }]} value={priority} />
+            <NativeSelect className="issue-priority-select issue-difficulty-select" label={t("issue.difficulty")} onValueChange={value => setDifficulty(value as IssueDifficulty)} options={[{
+            label: t("issue.difficulty.easy"),
+            value: "easy"
+          }, {
+            label: t("issue.difficulty.normal"),
+            value: "normal"
+          }, {
+            label: t("issue.difficulty.hard"),
+            value: "hard"
+          }]} value={difficulty} />
             <label className="issue-attachment-trigger">
               <Paperclip size={13} />
               <span>

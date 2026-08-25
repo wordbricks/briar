@@ -10,6 +10,7 @@ import {
   type ModelEffort,
   type ProjectAgentProvider,
 } from "./project-agent-model";
+import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
 
 export type HuntRunRow = {
   id: string;
@@ -24,6 +25,7 @@ export type HuntRunRow = {
   issue_checkpoints_json: string;
   detail: string | null;
   priority: number | null;
+  difficulty: IssueDifficulty;
   assignee_user_id: string | null;
   created_by_user_id?: string | null;
   subscribers_json?: string;

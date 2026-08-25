@@ -25,6 +25,7 @@ import type {
   ProjectAgentScheduleNotificationLevel,
   ProjectAgentScheduleRecurrence,
 } from "./lib/project-agent-schedule";
+import type { IssueDifficulty } from "./lib/issue-difficulty";
 
 export type HuntStatus = AutoHuntRunStatus;
 export type HuntSource = AutoHuntSource;
@@ -50,6 +51,7 @@ export type CreateIssueInput = {
   title: string;
   description: string | null;
   priority: number | null;
+  difficulty: IssueDifficulty;
   assigneeUserId?: string | null;
   status: "backlog" | "queued";
   attachments: File[];
@@ -65,6 +67,7 @@ export type UpdateIssueInput = {
   title: string;
   description: string | null;
   priority: number | null;
+  difficulty: IssueDifficulty;
   assigneeUserId?: string | null;
   attachments: File[];
   attachmentReferences?: string[];
@@ -76,6 +79,7 @@ export type UpdateIssueResult = {
   title: string;
   description: string | null;
   priority: number | null;
+  difficulty: IssueDifficulty;
   assigneeUserId: string | null;
   attachments: IssueAttachment[];
 };
@@ -333,6 +337,7 @@ export type HuntRun = {
   fullAuto?: boolean;
   detail: string | null;
   priority: number | null;
+  difficulty: IssueDifficulty;
   assigneeUserId?: string | null;
   createdByUserId?: string | null;
   subscribers?: IssueSubscriber[];

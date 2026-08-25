@@ -183,6 +183,12 @@ struct CreateIssueSheet: View {
                     Text("P\(priority)").tag(Int?.some(priority))
                 }
             }
+            Picker(L10n.text("난이도"), selection: $draft.difficulty) {
+                ForEach(IssueDifficulty.allCases, id: \.self) { difficulty in
+                    Label(difficulty.displayName, systemImage: difficulty.systemImage)
+                        .tag(difficulty)
+                }
+            }
             Picker(L10n.text("등록 위치"), selection: $draft.status) {
                 Text(L10n.text("실행 대기")).tag(DashboardRun.Status.queued)
                 Text(L10n.text("백로그")).tag(DashboardRun.Status.backlog)
@@ -359,6 +365,7 @@ struct EditIssueSheet: View {
             title: run.title,
             description: run.issueDescription ?? "",
             priority: run.priority,
+            difficulty: run.difficulty ?? .normal,
             assigneeUserId: run.assigneeUserId,
             status: run.status
         ))
@@ -386,6 +393,12 @@ struct EditIssueSheet: View {
                 Picker(L10n.text("우선순위"), selection: $draft.priority) {
                     Text(L10n.text("없음")).tag(Int?.none)
                     ForEach(1...4, id: \.self) { Text("P\($0)").tag(Int?.some($0)) }
+                }
+                Picker(L10n.text("난이도"), selection: $draft.difficulty) {
+                    ForEach(IssueDifficulty.allCases, id: \.self) { difficulty in
+                        Label(difficulty.displayName, systemImage: difficulty.systemImage)
+                            .tag(difficulty)
+                    }
                 }
                 if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
             }

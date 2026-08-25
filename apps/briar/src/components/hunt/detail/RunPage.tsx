@@ -455,6 +455,7 @@ export function RunPage({
         title,
         description,
         priority: run.priority,
+        difficulty: run.difficulty,
         attachments: [],
         ...(attachmentsChanged ? {
           keptAttachmentIds
@@ -737,6 +738,7 @@ export function RunPage({
       title: run.title,
       description: run.issueDescription,
       priority: nextPriority,
+      difficulty: run.difficulty,
       attachments: []
     }));
   };

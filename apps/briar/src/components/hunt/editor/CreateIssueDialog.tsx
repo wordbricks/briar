@@ -10,6 +10,7 @@ import { issueAttachmentAccept, maxIssueAttachmentCount } from "@/lib/issue-atta
 import { issueTitleInputMaxLength, issueTitleLength, isIssueTitleWithinLimit } from "@/lib/issue-title";
 import { clearCreateIssueDraft, loadCreateIssueDraft, saveCreateIssueDraft } from "@/lib/create-issue-draft";
 import { removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
+import { defaultIssueDifficulty, type IssueDifficulty } from "@/lib/issue-difficulty";
 import type { CreateIssueInput, OrganizationMember, Project } from "@/types";
 import { agentEffortOptions, agentProviders, type AgentProvider, type ModelEffort } from "@/lib/project-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
@@ -60,6 +61,7 @@ export function CreateIssueDialog({
   const [description, setDescription] = useState(initialDraft?.description ?? "");
   const [status, setStatus] = useState<"backlog" | "queued">(initialDraft?.status ?? defaultStatus);
   const [priority, setPriority] = useState(initialDraft?.priority ?? "2");
+  const [difficulty, setDifficulty] = useState<IssueDifficulty>(initialDraft?.difficulty ?? defaultIssueDifficulty);
   const [assigneeUserId, setAssigneeUserId] = useState(initialDraft?.assigneeUserId ?? "");
   const [preferredProvider, setPreferredProvider] = useState(initialDraft?.preferredProvider ?? "");
   const [preferredModel, setPreferredModel] = useState(() => initialDraft?.preferredModel ?? (initialDraft?.preferredProvider ? providerModelPreferences[initialDraft.preferredProvider as AgentProvider].defaultModel : null) ?? "");
@@ -89,6 +91,7 @@ export function CreateIssueDialog({
     saveCreateIssueDraft({
       description: draftDescription,
       priority,
+      difficulty,
       projectId,
       status,
       title,
@@ -103,7 +106,7 @@ export function CreateIssueDialog({
         checkpoints
       } : {})
     });
-  }, [assigneeUserId, attachments, description, preferredModel, preferredProvider, preferredEffort, fullAuto, checkpoints, priority, projectId, status, title]);
+  }, [assigneeUserId, attachments, description, preferredModel, preferredProvider, preferredEffort, fullAuto, checkpoints, priority, difficulty, projectId, status, title]);
   const closeWithDraft = useCallback(() => {
     persistDraft();
     onClose();
@@ -139,6 +142,7 @@ export function CreateIssueDialog({
         title: title.trim(),
         description: description.trim() || null,
         priority: Number(priority),
+        difficulty,
         assigneeUserId: assigneeUserId || null,
         status,
         preferredProvider: (preferredProvider || null) as AgentProvider | null,
@@ -262,6 +266,16 @@ export function CreateIssueDialog({
             label: t("issue.priority4"),
             value: "4"
           }]} value={priority} />
+            <NativeSelect className="issue-priority-select issue-difficulty-select" label={t("issue.difficulty")} onValueChange={value => setDifficulty(value as IssueDifficulty)} options={[{
+            label: t("issue.difficulty.easy"),
+            value: "easy"
+          }, {
+            label: t("issue.difficulty.normal"),
+            value: "normal"
+          }, {
+            label: t("issue.difficulty.hard"),
+            value: "hard"
+          }]} value={difficulty} />
             <ProviderModelSelector className="issue-provider-model-selector" compact disabled={isSubmitting} groupLabel={`${t("issue.preferredProvider")} · ${t("issue.preferredModel")}`} modelLabel={t("issue.preferredModel")} modelSearchEmptyMessage={t("issue.noModelsFound")} modelSearchPlaceholder={t("issue.searchModels")} modelValue={preferredModel} onModelChange={value => {
             setPreferredModel(value);
             setPreferredEffort("");

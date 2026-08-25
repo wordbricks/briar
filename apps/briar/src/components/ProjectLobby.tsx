@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MainContent, PageHeader } from "./layout";
 import { ProjectIcon } from "./ProjectIcon";
+import { IssueDifficultyIcon } from "./hunt/IssueDifficultyIcon";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import { formatUsageDuration } from "../lib/agent-usage";
@@ -532,6 +533,7 @@ export function ProjectLobby({
                   {recentRuns.map((run) => (
                     <button key={run.id} onClick={() => onOpenIssue(run.id)} type="button">
                       <span className={`project-lobby-status-dot ${run.status}`} aria-hidden />
+                      <IssueDifficultyIcon difficulty={run.difficulty} size={12} />
                       <span>
                         <strong>{run.title}</strong>
                         <small>

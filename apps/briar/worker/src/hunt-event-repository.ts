@@ -37,6 +37,7 @@ import {
 } from "./run-identity";
 import { loadStageRevisionRequirements } from "./run-stage-revision-repository";
 import { assertWorkflowRunCompletion } from "./workflow-completion-repository";
+import { defaultIssueDifficulty } from "../../src/lib/issue-difficulty";
 
 type ComparableHuntEvent = Pick<
   HuntEventRow,
@@ -394,7 +395,7 @@ export async function recordHuntEvent(
         `insert into briar_hunt_runs (
            id, project_id, source, source_key, title, stage, status,
            workflow_stage, workflow_snapshot_json, issue_checkpoints_json,
-           detail, priority,
+           detail, priority, difficulty,
            assignee_user_id, created_by_user_id,
            repository, branch, commit_sha, tracker_provider,
            tracker_issue_id, tracker_issue_identifier, tracker_issue_url,
@@ -403,9 +404,9 @@ export async function recordHuntEvent(
            pull_request_urls, target_sha, source_created_at,
            staging_qa_status, production_qa_status, staging_qa_detail,
            production_qa_detail, context_json, started_at, completed_at,
-            last_event_at, created_at, updated_at,
-            preferred_agent_provider, preferred_agent_model, preferred_agent_effort
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           last_event_at, created_at, updated_at,
+           preferred_agent_provider, preferred_agent_model, preferred_agent_effort
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(project_id, source, source_key) do nothing`,
       )
       .bind(
@@ -421,6 +422,7 @@ export async function recordHuntEvent(
         stableJson(issueCheckpointSnapshot),
         normalizedInput.detail,
         normalizedInput.priority,
+        normalizedInput.difficulty ?? defaultIssueDifficulty,
         normalizedInput.assigneeUserId ?? null,
         normalizedInput.createdByUserId ?? null,
         normalizedInput.repository,
@@ -503,6 +505,7 @@ export async function recordHuntEvent(
              end,
              detail = case when ? >= last_event_at then ? else detail end,
              priority = case when ? >= last_event_at then coalesce(?, priority) else priority end,
+             difficulty = case when ? >= last_event_at then coalesce(?, difficulty) else difficulty end,
              repository = case when ? >= last_event_at then ? else repository end,
              branch = case when ? >= last_event_at then coalesce(?, branch) else branch end,
              commit_sha = case when ? >= last_event_at then coalesce(?, commit_sha) else commit_sha end,
@@ -562,6 +565,8 @@ export async function recordHuntEvent(
         normalizedInput.detail,
         normalizedInput.occurredAt,
         normalizedInput.priority,
+        normalizedInput.occurredAt,
+        normalizedInput.difficulty ?? null,
         normalizedInput.occurredAt,
         normalizedInput.repository,
         normalizedInput.occurredAt,

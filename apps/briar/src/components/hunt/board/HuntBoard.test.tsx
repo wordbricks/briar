@@ -125,6 +125,27 @@ function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
   return pending;
 }
 describe("HuntBoard", () => {
+  it("shows accessible difficulty icons in Kanban and list cards", async () => {
+    const runs = (["easy", "normal", "hard"] as const).map((difficulty, index) => ({
+      ...demoDashboard.runs[index]!,
+      difficulty
+    }));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={{
+      ...demoDashboard,
+      runs
+    }} />));
+    expect(Array.from(container.querySelectorAll<HTMLElement>(".kanban-card [data-difficulty]")).map(icon => icon.dataset.difficulty).sort()).toEqual(["easy", "hard", "normal"]);
+    expect(container.querySelector('[data-difficulty="easy"]')?.getAttribute("aria-label")).toBe("난이도: 쉬움");
+    expect(container.querySelector('[data-difficulty="normal"]')?.getAttribute("title")).toBe("난이도: 보통");
+    expect(container.querySelector('[data-difficulty="hard"]')?.getAttribute("aria-label")).toBe("난이도: 어려움");
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="리스트 보기"]')?.click());
+    expect(container.querySelectorAll(".issue-list-task [data-difficulty]")).toHaveLength(3);
+    await act(async () => root.unmount());
+    container.remove();
+  });
   it.each(["issue", "feedback", "error"] as const)("shows the assignee avatar immediately after the %s source label", async source => {
     const member = demoDashboard.members![0]!;
     const run = {

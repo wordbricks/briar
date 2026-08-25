@@ -1,4 +1,5 @@
 import { type HuntRunRow } from "./hunt-run-model";
+import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
 
 export type IssueAttachmentRow = {
   id: string;
@@ -113,6 +114,7 @@ export async function updateIssueWithAttachmentMetadata(
     title: string;
     description: string | null;
     priority: number | null;
+    difficulty: IssueDifficulty;
     assigneeUserId?: string | null;
     updatedAt: string;
     attachments: IssueAttachmentInput[];
@@ -124,7 +126,7 @@ export async function updateIssueWithAttachmentMetadata(
     db
       .prepare(
         `update briar_hunt_runs
-         set title = ?, issue_description = ?, priority = ?,
+         set title = ?, issue_description = ?, priority = ?, difficulty = ?,
              assignee_user_id = case when ? = 1 then ? else assignee_user_id end,
              updated_at = ?
          where id = ? and project_id = ?
@@ -134,6 +136,7 @@ export async function updateIssueWithAttachmentMetadata(
         input.title,
         input.description,
         input.priority,
+        input.difficulty,
         input.assigneeUserId === undefined ? 0 : 1,
         input.assigneeUserId ?? null,
         input.updatedAt,

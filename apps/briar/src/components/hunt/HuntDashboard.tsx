@@ -757,6 +757,7 @@ export function HuntDashboard({
         title: run.title,
         description: run.issueDescription,
         priority,
+        difficulty: run.difficulty,
         attachments: []
       }).catch(() => undefined)} onPreferencesChange={(run, preferences) => onUpdateIssuePreferences(run.id, preferences).catch(() => undefined)} onCheckpointsChange={(run, checkpoints) => onUpdateIssueCheckpoints(run.id, checkpoints).catch(() => undefined)} runs={filtered} members={dashboard?.members ?? []} processingIssueIds={processingIssueIds} updatingIssueId={updatingIssueId} /> : <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board" ref={kanbanBoardRef}>
           {kanbanColumns.length === 0 ? <div className="companion-no-runs">
@@ -863,6 +864,7 @@ export function HuntDashboard({
                       title: run.title,
                       description: run.issueDescription,
                       priority,
+                      difficulty: run.difficulty,
                       attachments: []
                     }).catch(() => undefined)} onPreferencesChange={preferences => onUpdateIssuePreferences(run.id, preferences).catch(() => undefined)} onCheckpointsChange={checkpoints => onUpdateIssueCheckpoints(run.id, checkpoints).catch(() => undefined)} run={run} isProcessing={processingIssueIds.has(run.id)} token={token} updatingIssueId={updatingIssueId} />
                   </CompanionTaskSwipeAction>) : <div className="kanban-column-empty">

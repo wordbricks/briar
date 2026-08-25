@@ -122,6 +122,7 @@ export function dashboardRunJson(
       (context as Record<string, unknown>).fullAuto === true,
     detail: run.detail,
     priority: run.priority,
+    difficulty: run.difficulty,
     assigneeUserId: run.assignee_user_id,
     createdByUserId: run.created_by_user_id ?? null,
     subscribers: issueSubscribers(run),
