@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.161",
+        date: "2026년 8월 26일",
+        title: "관리형 컴퓨터 운영과 이슈 탐색을 더 빠르고 안전하게 다듬습니다",
+        summary:
+          "관리형 컴퓨터의 운영 자동화와 Worker 비용을 개선하고, 이슈 난이도·CLI·원격 화면 사용성을 더 선명하게 연결합니다.",
+        items: [
+          "이슈 카드와 목록에 난이도 속성과 아이콘을 표시해 작업 규모를 한눈에 비교합니다.",
+          "관리형 컴퓨터 화면에서 클립보드 붙여넣기를 바로 사용할 수 있고, 관리자는 재사용 가능한 promotion campaign으로 파일럿 배포를 운영합니다.",
+          "retirement된 관리형 컴퓨터는 새 작업을 즉시 중단하고 Worker lifecycle telemetry와 보존 정책으로 삭제와 상태 전이를 추적합니다.",
+          "Worker heartbeat와 transcript session 합계를 증분 처리해 D1 읽기·쓰기와 비용을 줄이고, 터미널 실행 메트릭은 fenced payload만 수용해 안전성을 높입니다.",
+          "Briar CLI에 whoami 명령을 추가하고 계정 API·공통 TypeScript 설정·Effect/Oxlint 검증을 정리해 개발 환경을 안정화합니다.",
+        ],
+      },
+      {
         version: "1.2.160",
         date: "2026년 8월 25일",
         title: "채널 스레드 세션과 관리형 컴퓨터 수명 주기를 더 안전하게 운영합니다",
@@ -1122,6 +1136,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.161",
+        date: "August 26, 2026",
+        title: "Make managed-computer operations, issue triage, and the CLI faster and safer",
+        summary:
+          "Improve managed-computer operations and Worker cost, while connecting issue difficulty, the CLI, and remote-screen usability more clearly.",
+        items: [
+          "Show issue difficulty and an icon on cards and lists so teams can compare the size of work at a glance.",
+          "Paste directly into managed-computer screens, and let administrators run pilot deployments through reusable promotion campaigns.",
+          "Stop new work on retired managed computers promptly, and track deletion and lifecycle transitions with Worker telemetry and retention policy.",
+          "Update Worker heartbeats and transcript-session totals incrementally to reduce D1 reads, writes, and cost, while accepting terminal execution metrics only from fenced payloads.",
+          "Add the Briar CLI whoami command and tighten the account API, shared TypeScript configuration, and Effect/Oxlint checks for a more dependable development environment.",
+        ],
+      },
       {
         version: "1.2.160",
         date: "August 25, 2026",
@@ -2306,7 +2334,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-160">
+          <a href="#v1-2-161">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2328,7 +2356,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.160"
+                      entry.version === "1.2.161"
+                        ? "2026-08-26"
+                        : entry.version === "1.2.160"
                         ? "2026-08-25"
                         : entry.version === "1.2.159"
                         ? "2026-08-25"
