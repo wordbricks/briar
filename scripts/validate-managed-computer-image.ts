@@ -107,6 +107,7 @@ for (const required of [
   "tigervnc-standalone-server",
   "xfce4-panel",
   "xfce4-session",
+  "xfdesktop4",
   "xz-utils",
 ]) {
   if (!packages.includes(required)) fail(`package list omits ${required}`);
@@ -155,6 +156,9 @@ if (
 }
 
 const installer = await text(join(image, "install-image-runtime"));
+if (!installer.includes("ln -sfn /opt/briar/bin/bun /opt/briar/bin/bunx")) {
+  fail("image installer must provide the standard bunx command");
+}
 if (!installer.includes("--frozen-lockfile --production --ignore-scripts")) {
   fail("provider runtime install must be locked and ignore lifecycle scripts");
 }
@@ -181,6 +185,8 @@ const profile = await text(join(image, "briar-runtime-profile.sh"));
 for (const required of [
   "CARGO_HOME=/opt/briar/cargo",
   "RUSTUP_HOME=/opt/briar/rustup",
+  "BRIAR_CI_SERIAL_CONTEXTS=true",
+  "VITEST_MAX_WORKERS=2",
   "/opt/briar/bin",
 ]) {
   if (!profile.includes(required)) fail(`runtime profile omits ${required}`);
@@ -207,6 +213,12 @@ if (
 
 const cleanup = await text(join(image, "prepare-image-for-capture"));
 const verifier = await text(join(image, "verify-managed-image"));
+if (!verifier.includes('export HOME="${HOME:-/root}"')) {
+  fail("image verifier must provide HOME for non-login SSM commands");
+}
+if (!verifier.includes("command -v xfdesktop >/dev/null")) {
+  fail("image verifier must require the XFCE desktop process");
+}
 for (const forbidden of [
   "/home/admin/.ssh",
   "/root/.aws",
@@ -231,11 +243,29 @@ for (const required of [
   "BRIAR_MANAGED_CREDENTIAL_FILE=/var/lib/briar/worker-credential.json",
   "CARGO_HOME=/opt/briar/cargo",
   "RUSTUP_HOME=/opt/briar/rustup",
+  "BRIAR_CI_SERIAL_CONTEXTS=true",
+  "VITEST_MAX_WORKERS=2",
   "ExecStart=/opt/briar/bin/briar managed-computer worker-supervisor",
 ]) {
   if (!service.includes(required)) fail(`managed worker unit omits ${required}`);
 }
 if (service.includes("briar_worker_")) fail("managed worker unit embeds a token");
+
+const localCi = await text(join(root, "scripts", "ci-local.sh"));
+if (!localCi.includes('"${BRIAR_CI_SERIAL_CONTEXTS:-false}" == "true"')) {
+  fail("local CI must honor managed-computer serial context execution");
+}
+
+const viteConfig = await text(join(root, "apps", "briar", "vite.config.ts"));
+if (!viteConfig.includes("process.env.VITEST_MAX_WORKERS ?? 4")) {
+  fail("Vitest must honor the managed-computer worker limit");
+}
+const turboConfig = await Bun.file(join(root, "turbo.json")).json() as {
+  globalPassThroughEnv?: string[];
+};
+if (!turboConfig.globalPassThroughEnv?.includes("VITEST_MAX_WORKERS")) {
+  fail("Turborepo must pass the managed-computer Vitest worker limit");
+}
 
 for (const executable of [
   "briar",

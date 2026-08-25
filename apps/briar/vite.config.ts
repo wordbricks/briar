@@ -35,7 +35,7 @@ export default defineConfig({
     // D1 integration fixtures apply the complete migration history before
     // seeding data; leave enough time for generated table-rebuild migrations.
     hookTimeout: 60_000,
-    maxWorkers: 4,
+    maxWorkers: Number(process.env.VITEST_MAX_WORKERS ?? 4),
     setupFiles: ["./src/test/setup.ts"],
     testTimeout: 15_000,
     env: {

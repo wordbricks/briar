@@ -1486,6 +1486,7 @@ pub(super) fn aside_installed(home: &Path) -> bool {
     .any(|path| path.is_dir())
 }
 
+#[cfg(target_os = "macos")]
 pub(super) fn aside_browser_skill_ready(home: &Path) -> bool {
     [
         home.join(".codex/skills/browser/SKILL.md"),
@@ -1499,6 +1500,7 @@ pub(super) fn aside_browser_skill_ready(home: &Path) -> bool {
     .all(|path| path.is_file())
 }
 
+#[cfg(target_os = "macos")]
 pub(super) fn aside_output(
     home: &Path,
     binary: &Path,

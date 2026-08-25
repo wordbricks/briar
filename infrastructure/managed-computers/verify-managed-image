@@ -14,11 +14,13 @@ fi
 # shellcheck disable=SC1091
 . /opt/briar/image-lock.env
 briar_version="$(tr -d '\r\n' < /opt/briar/briar-version)"
+export HOME="${HOME:-/root}"
 export CARGO_HOME=/opt/briar/cargo
 export RUSTUP_HOME=/opt/briar/rustup
 export PATH=/opt/briar/bin:/usr/local/bin:/usr/bin:/bin
 
 test "$(/opt/briar/bin/bun --version)" = "$BUN_VERSION"
+test "$(/opt/briar/bin/bunx --version)" = "$BUN_VERSION"
 test "$(/opt/briar/bin/node --version)" = "v$NODE_VERSION"
 test "$(/opt/briar/bin/rustc --version | awk '{print $2}')" = \
   "$RUST_TOOLCHAIN_VERSION"
@@ -39,6 +41,7 @@ test "$(dpkg-query --show --showformat='${Version}' amazon-ssm-agent)" = \
 /opt/briar/bin/cursor-agent --version | grep -Fxq "$CURSOR_AGENT_VERSION"
 /opt/briar/bin/agy --version | grep -Fxq "$ANTIGRAVITY_CLI_VERSION"
 command -v git >/dev/null
+command -v xfdesktop >/dev/null
 command -v node >/dev/null
 command -v cc >/dev/null
 command -v make >/dev/null
@@ -56,7 +59,7 @@ grep -Fq 'FontName=Noto Sans Mono CJK KR 12' \
 fc-match -f '%{family}\n' ':lang=ko' | grep -Fq 'Noto Sans CJK KR'
 
 for binary in \
-  bun node cargo rustc rustfmt cargo-audit gitleaks \
+  bun bunx node cargo rustc rustfmt cargo-audit gitleaks \
   briar codex claude agent-browser opencode grok cursor-agent agy; do
   test "$(sudo -u briar -H bash -lc "command -v $binary")" = \
     "/opt/briar/bin/$binary"

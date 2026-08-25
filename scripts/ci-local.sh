@@ -198,6 +198,16 @@ run_selected_contexts() {
     done
   fi
 
+  if [[ "${BRIAR_CI_SERIAL_CONTEXTS:-false}" == "true" ]]; then
+    echo
+    echo "[local-ci] Running ${#contexts_to_run[@]} context(s) serially."
+    for context in "${contexts_to_run[@]}"; do
+      runner="$(context_runner "$context")"
+      run_context "$context" "$runner"
+    done
+    return
+  fi
+
   ci_temp="$(mktemp -d "$ci_temp_base/briar-local-ci.XXXXXX")"
   echo
   echo "[local-ci] Running ${#contexts_to_run[@]} context(s) in parallel."
