@@ -7,6 +7,7 @@ import {
   applyForManagedComputer,
   loadManagedComputerProduct,
   loadManagedComputers,
+  retireManagedComputer,
   validateManagedComputerPromotion,
 } from "../lib/api";
 import { ManagedComputersCard } from "./ManagedComputersCard";
@@ -15,6 +16,7 @@ vi.mock("../lib/api", () => ({
   applyForManagedComputer: vi.fn(),
   loadManagedComputerProduct: vi.fn(),
   loadManagedComputers: vi.fn(),
+  retireManagedComputer: vi.fn(),
   retryManagedComputer: vi.fn(),
   validateManagedComputerPromotion: vi.fn(),
 }));
@@ -142,6 +144,58 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
     );
     expect(container.textContent).toContain("코드 확인 완료");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("requires confirmation before retiring a managed computer", async () => {
+    const readyComputer = {
+      id: "44444444-4444-4444-8444-444444444444",
+      organizationId: "organization-1",
+      requesterUserId: "owner",
+      state: "ready" as const,
+      region: "us-east-1",
+      instanceId: "i-0123456789abcdef0",
+      volumeId: "vol-0123456789abcdef0",
+      deviceId: "managed-44444444-4444-4444-8444-444444444444",
+      error: null,
+      retryCount: 0,
+      retryAvailable: false,
+      createdAt: "2026-08-22T00:00:00.000Z",
+      expiresAt: "2026-09-21T00:00:00.000Z",
+      updatedAt: "2026-08-22T00:00:00.000Z",
+    };
+    vi.mocked(loadManagedComputers).mockResolvedValue({
+      computers: [readyComputer],
+      generatedAt: "2026-08-22T00:00:00.000Z",
+    });
+    vi.mocked(retireManagedComputer).mockResolvedValue({
+      computer: { ...readyComputer, state: "draining" },
+      duplicate: false,
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <ManagedComputersCard organizationId="organization-1" token="token" />,
+      );
+    });
+
+    await act(async () => buttonWithText("은퇴")?.click());
+    expect(retireManagedComputer).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("관리형 컴퓨터 44444444를 은퇴할까요?");
+    expect(document.body.textContent).toContain("새 작업과 원격 화면 연결이 즉시 차단됩니다");
+
+    await act(async () => buttonWithText("은퇴 시작")?.click());
+    expect(retireManagedComputer).toHaveBeenCalledWith(
+      "token",
+      "organization-1",
+      readyComputer.id,
+    );
+    expect(container.textContent).toContain("작업 종료 중");
+    expect(container.textContent).toContain("새 작업을 차단했습니다");
 
     await act(async () => root.unmount());
     container.remove();

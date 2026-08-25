@@ -26,6 +26,21 @@ const activeStates: readonly ManagedComputerState[] = [
 
 const activeStateSql = activeStates.map(() => "?").join(", ");
 
+const automaticDrainStates: readonly ManagedComputerState[] = [
+  "requested",
+  "provisioning",
+  "bootstrapping",
+  "needs_setup",
+  "ready",
+  "failed",
+];
+
+const userRetirementStates: readonly ManagedComputerState[] = [
+  "needs_setup",
+  "ready",
+  "failed",
+];
+
 export async function managedComputerById(
   db: D1Database,
   managedComputerId: string,
@@ -1032,30 +1047,72 @@ export async function listManagedComputersForReconciliation(db: D1Database) {
   return result.results ?? [];
 }
 
-export async function beginManagedComputerDrain(
+async function transitionManagedComputerToDraining(
+  db: D1Database,
+  input: {
+    managedComputerId: string;
+    organizationId?: string;
+    fromStates: readonly ManagedComputerState[];
+    observedAt: string;
+  },
+) {
+  const stateSql = input.fromStates.map(() => "?").join(", ");
+  const organizationSql = input.organizationId ? "and organization_id = ?" : "";
+  const organizationBindings = input.organizationId
+    ? [input.organizationId]
+    : [];
+  const [computer] = await db.batch([
+    db.prepare(
+      `update briar_managed_computers
+       set state = 'draining', state_updated_at = ?, drained_at = ?, updated_at = ?
+       where id = ? ${organizationSql} and state in (${stateSql})
+       returning *`,
+    ).bind(
+      input.observedAt,
+      input.observedAt,
+      input.observedAt,
+      input.managedComputerId,
+      ...organizationBindings,
+      ...input.fromStates,
+    ),
+    db.prepare(
+      `update briar_execution_workers
+       set accepting_work = 0, readiness_state = 'busy',
+           readiness_detail = 'Managed computer is not accepting new work.',
+           updated_at = ?
+       where device_id = (
+         select briar_device_id from briar_managed_computers
+         where id = ? and state = 'draining'
+       ) and state != 'disabled'`,
+    ).bind(input.observedAt, input.managedComputerId),
+  ]);
+  return computer.results?.[0] as ManagedComputerRow | undefined;
+}
+
+export function beginManagedComputerDrain(
   db: D1Database,
   managedComputerId: string,
   observedAt: string,
 ) {
-  const result = await db.prepare(
-    `update briar_managed_computers
-     set state = 'draining', state_updated_at = ?, drained_at = ?, updated_at = ?
-     where id = ? and state in (
-       'requested', 'provisioning', 'bootstrapping', 'needs_setup', 'ready', 'failed'
-     )
-     returning *`,
-  ).bind(observedAt, observedAt, observedAt, managedComputerId)
-    .first<ManagedComputerRow>();
-  if (result?.briar_device_id) {
-    await db.prepare(
-      `update briar_execution_workers
-       set accepting_work = 0, readiness_state = 'busy',
-           readiness_detail = '관리형 컴퓨터 만료로 새 작업을 받지 않습니다.',
-           updated_at = ?
-       where device_id = ? and state != 'disabled'`,
-    ).bind(observedAt, result.briar_device_id).run();
-  }
-  return result;
+  return transitionManagedComputerToDraining(db, {
+    managedComputerId,
+    fromStates: automaticDrainStates,
+    observedAt,
+  });
+}
+
+export function beginManagedComputerRetirement(
+  db: D1Database,
+  input: {
+    managedComputerId: string;
+    organizationId: string;
+    observedAt: string;
+  },
+) {
+  return transitionManagedComputerToDraining(db, {
+    ...input,
+    fromStates: userRetirementStates,
+  });
 }
 
 export async function markManagedComputerStopped(

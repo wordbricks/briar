@@ -16,9 +16,11 @@ import {
 } from "./managed-computer-request-contract";
 import { managedComputerConfig, managedComputerJson } from "./managed-computer-model";
 import {
+  beginManagedComputerRetirement,
   listOrganizationManagedComputers,
   managedComputerById,
   organizationManagedComputer,
+  recordManagedComputerAuditEvent,
   refreshManagedComputerReadiness,
 } from "./managed-computer-repository";
 import {
@@ -36,6 +38,7 @@ import {
   connectManagedComputerRemoteAgent,
   connectManagedComputerRemoteClient,
   createManagedComputerRemoteSessionTicket,
+  endManagedComputerRemoteSessionsAndDisconnect,
   endManagedComputerRemoteSessionAndDisconnect,
   managedComputerRemoteAgentToken,
   recordManagedComputerRemoteRejection,
@@ -521,6 +524,66 @@ export async function handleManagedComputerRoute(
   const organizationManagedComputerMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/managed-computers\/([0-9a-f-]+)$/u,
   );
+  if (organizationManagedComputerMatch && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationManagedComputerMatch[1];
+    const managedComputerId = organizationManagedComputerMatch[2];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const existing = await organizationManagedComputer(
+      db,
+      organizationId,
+      managedComputerId,
+    );
+    if (!existing) throw new HttpError(404, "Managed computer not found");
+    if (["requested", "provisioning", "bootstrapping"].includes(existing.state)) {
+      throw new HttpError(
+        409,
+        "Managed computer preparation must finish before retirement",
+        "MANAGED_COMPUTER_RETIRE_UNAVAILABLE",
+      );
+    }
+    const observedAt = new Date().toISOString();
+    const transitioned = await beginManagedComputerRetirement(db, {
+      managedComputerId,
+      organizationId,
+      observedAt,
+    });
+    const computer = transitioned ?? await organizationManagedComputer(
+      db,
+      organizationId,
+      managedComputerId,
+    );
+    if (!computer) throw new HttpError(404, "Managed computer not found");
+    if (!["draining", "stopped", "terminated"].includes(computer.state)) {
+      throw new HttpError(
+        409,
+        "Managed computer cannot be retired from its current state",
+        "MANAGED_COMPUTER_RETIRE_UNAVAILABLE",
+      );
+    }
+    if (transitioned) {
+      await recordManagedComputerAuditEvent(db, {
+        organizationId,
+        managedComputerId,
+        actorUserId: session.user.id,
+        action: "draining_started",
+        detail: { reason: "user_retired" },
+        occurredAt: observedAt,
+      });
+    }
+    await endManagedComputerRemoteSessionsAndDisconnect(db, env, {
+      managedComputerId,
+      reason: "computer_retired",
+      observedAt,
+    });
+    return json({
+      computer: managedComputerJson(computer),
+      duplicate: !transitioned,
+    }, transitioned ? 202 : 200);
+  }
   if (organizationManagedComputerMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const organizationId = organizationManagedComputerMatch[1];

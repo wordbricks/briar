@@ -1192,10 +1192,22 @@ export async function recordWorkerHeartbeat(
          set last_heartbeat_at = ?,
              updated_at = ?,
              versions_json = coalesce(?, versions_json),
-             accepting_work = coalesce(?, accepting_work),
-             readiness_state = coalesce(?, readiness_state),
-             readiness_detail = case when ? is null
-               then readiness_detail else ? end,
+             accepting_work = case when exists (
+               select 1 from briar_managed_computers computer
+               where computer.briar_device_id = ?
+                 and computer.state not in ('needs_setup', 'ready')
+             ) then 0 else coalesce(?, accepting_work) end,
+             readiness_state = case when exists (
+               select 1 from briar_managed_computers computer
+               where computer.briar_device_id = ?
+                 and computer.state not in ('needs_setup', 'ready')
+             ) then 'busy' else coalesce(?, readiness_state) end,
+             readiness_detail = case when exists (
+               select 1 from briar_managed_computers computer
+               where computer.briar_device_id = ?
+                 and computer.state not in ('needs_setup', 'ready')
+             ) then 'Managed computer is not accepting new work.'
+               when ? is null then readiness_detail else ? end,
              capabilities_json = coalesce(?, capabilities_json),
              state = case when state = 'disabled' then 'disabled' else 'online' end
          where id = ? and project_id = ?`,
@@ -1204,8 +1216,11 @@ export async function recordWorkerHeartbeat(
         input.observedAt,
         input.observedAt,
         input.versions ? JSON.stringify(input.versions) : null,
+        binding.device_id,
         input.acceptingWork === undefined ? null : input.acceptingWork ? 1 : 0,
+        binding.device_id,
         input.readinessState ?? null,
+        binding.device_id,
         input.readinessDetail === undefined ? null : 1,
         input.readinessDetail ?? null,
         nextCapabilities ? JSON.stringify(nextCapabilities) : null,

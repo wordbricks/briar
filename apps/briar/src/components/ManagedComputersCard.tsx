@@ -5,6 +5,7 @@ import {
   HardDrive,
   KeyRound,
   MonitorUp,
+  PowerOff,
   RefreshCw,
   ServerCog,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import {
   applyForManagedComputer,
   loadManagedComputerProduct,
   loadManagedComputers,
+  retireManagedComputer,
   retryManagedComputer,
   validateManagedComputerPromotion,
 } from "../lib/api";
@@ -43,11 +45,18 @@ type PromotionCheck = {
   limitReason: "user" | "organization" | "fleet" | null;
 };
 
-const activeProvisioningStates = new Set<ManagedComputer["state"]>([
+const pollingStates = new Set<ManagedComputer["state"]>([
   "requested",
   "provisioning",
   "bootstrapping",
   "needs_setup",
+  "draining",
+]);
+
+const userRetirementStates = new Set<ManagedComputer["state"]>([
+  "needs_setup",
+  "ready",
+  "failed",
 ]);
 
 const stateTone = (state: ManagedComputer["state"]) =>
@@ -72,7 +81,19 @@ function managedComputerErrorKey(error: unknown) {
       "managedComputer.error.promotionInvalid",
     MANAGED_COMPUTER_RETRY_UNAVAILABLE:
       "managedComputer.error.retryUnavailable",
+    MANAGED_COMPUTER_RETIRE_UNAVAILABLE:
+      "managedComputer.error.retireUnavailable",
   } as const)[error.code] ?? null;
+}
+
+function managedComputerDescriptionKey(state: ManagedComputer["state"]) {
+  return state === "draining"
+    ? "managedComputer.retiringDescription"
+    : state === "stopped"
+      ? "managedComputer.stoppedDescription"
+      : state === "terminated"
+        ? "managedComputer.terminatedDescription"
+        : "managedComputer.preparingDescription";
 }
 
 export function ManagedComputersCard({
@@ -92,6 +113,10 @@ export function ManagedComputersCard({
   const [promotion, setPromotion] = useState<PromotionCheck | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [retiringId, setRetiringId] = useState<string | null>(null);
+  const [retireCandidate, setRetireCandidate] = useState<ManagedComputer | null>(
+    null,
+  );
   const [remoteComputer, setRemoteComputer] = useState<ManagedComputer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
@@ -118,7 +143,7 @@ export function ManagedComputersCard({
 
   const shouldPoll = useMemo(
     () => computers.some((computer) =>
-      activeProvisioningStates.has(computer.state)
+      pollingStates.has(computer.state)
     ),
     [computers],
   );
@@ -196,6 +221,29 @@ export function ManagedComputersCard({
       displayError(caught);
     } finally {
       setRetryingId(null);
+    }
+  };
+
+  const retire = async () => {
+    const computer = retireCandidate;
+    if (!computer) return;
+    setRetiringId(computer.id);
+    setError(null);
+    try {
+      const result = await retireManagedComputer(
+        token,
+        organizationId,
+        computer.id,
+      );
+      setComputers((current) => current.map((candidate) =>
+        candidate.id === result.computer.id ? result.computer : candidate
+      ));
+      setRetireCandidate(null);
+    } catch (caught) {
+      setRetireCandidate(null);
+      displayError(caught);
+    } finally {
+      setRetiringId(null);
     }
   };
 
@@ -297,7 +345,7 @@ export function ManagedComputersCard({
                           ? t("managedComputer.readyDescription")
                           : computer.state === "failed"
                             ? computer.error?.message ?? t("managedComputer.failedDescription")
-                            : t("managedComputer.preparingDescription")}
+                            : t(managedComputerDescriptionKey(computer.state))}
                     </Typography>
                   </div>
                 </div>
@@ -328,6 +376,25 @@ export function ManagedComputersCard({
                         spinning={retryingId === computer.id}
                       />
                       {t("managedComputer.retry")}
+                    </Button>
+                  ) : null}
+                  {product?.canApply && userRetirementStates.has(computer.state) ? (
+                    <Button
+                      aria-label={t("managedComputer.retire", {
+                        id: computer.id.slice(0, 8),
+                      })}
+                      className="text-destructive hover:text-destructive"
+                      disabled={retiringId === computer.id}
+                      onClick={() => {
+                        setError(null);
+                        setRetireCandidate(computer);
+                      }}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <PowerOff size={14} />
+                      {t("managedComputer.retireAction")}
                     </Button>
                   ) : null}
                 </div>
@@ -451,6 +518,50 @@ export function ManagedComputersCard({
                   {t("managedComputer.preparing")}
                 </>
               ) : t("managedComputer.applyFree")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !retiringId) setRetireCandidate(null);
+        }}
+        open={retireCandidate !== null}
+      >
+        <DialogContent className="sm:max-w-md" showClose={!retiringId}>
+          <DialogHeader>
+            <div className="mb-2 grid size-10 place-items-center rounded-xl bg-destructive/10 text-destructive">
+              <PowerOff aria-hidden="true" size={20} strokeWidth={1.8} />
+            </div>
+            <DialogTitle>
+              {retireCandidate
+                ? t("managedComputer.retireTitle", {
+                    id: retireCandidate.id.slice(0, 8),
+                  })
+                : null}
+            </DialogTitle>
+            <DialogDescription>
+              {t("managedComputer.retireDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              disabled={Boolean(retiringId)}
+              onClick={() => setRetireCandidate(null)}
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              disabled={Boolean(retiringId)}
+              onClick={() => void retire()}
+              type="button"
+              variant="destructive"
+            >
+              {retiringId ? <Spinner size={15} /> : <PowerOff size={15} />}
+              {t("managedComputer.retireConfirm")}
             </Button>
           </DialogFooter>
         </DialogContent>
