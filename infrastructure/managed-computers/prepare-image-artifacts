@@ -33,6 +33,7 @@ for file in \
   briar-managed-enroll \
   briar-managed-enroll.service \
   briar-managed-worker.service \
+  briar-runtime-profile.sh \
   briar-remote-desktop \
   briar-remote-desktop.service \
   briar-remote-session-agent.service \
@@ -46,7 +47,8 @@ for file in \
   resolve-remote-desktop-packages \
   verify-managed-image \
   verify-remote-desktop \
-  xfce4-helpers.rc; do
+  xfce4-helpers.rc \
+  xfce4-terminalrc; do
   install -m 0644 "$script_dir/$file" "$output/$file"
 done
 for executable in \

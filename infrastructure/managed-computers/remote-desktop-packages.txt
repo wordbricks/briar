@@ -1,20 +1,30 @@
 # One Debian 13 (trixie) package per line. The AMI build must resolve this
 # list to exact package=version entries in remote-desktop-packages.lock before install.
 dbus-x11
+build-essential
 ca-certificates
 curl
 desktop-file-utils
+fontconfig
 fonts-liberation
+fonts-noto-cjk
 fonts-noto-color-emoji
 gh
 git
 iproute2
 jq
-nodejs
+libappindicator3-dev
+librsvg2-dev
+libssl-dev
+libwebkit2gtk-4.1-dev
+patchelf
+pkg-config
 procps
+sudo
 thunar
 tigervnc-standalone-server
 unzip
+xz-utils
 x11-xserver-utils
 xauth
 xdg-utils
