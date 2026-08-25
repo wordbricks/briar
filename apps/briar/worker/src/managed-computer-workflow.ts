@@ -47,7 +47,7 @@ function errorDetail(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export const managedComputerWorkflowServices = {
+const managedComputerWorkflowServices = {
   awsAccountId,
   clearRetiredManagedComputerInstance,
   completeManagedComputerProvisioning,
@@ -75,8 +75,13 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
   Env,
   ManagedComputerWorkflowParams
 > {
-  protected get services(): ManagedComputerWorkflowServices {
-    return managedComputerWorkflowServices;
+  constructor(
+    ctx: ExecutionContext,
+    env: Env,
+    private readonly services: ManagedComputerWorkflowServices =
+      managedComputerWorkflowServices,
+  ) {
+    super(ctx, env);
   }
 
   async run(

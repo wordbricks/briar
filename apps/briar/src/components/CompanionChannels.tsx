@@ -37,7 +37,6 @@ import {
   toggleChannelMessageReaction,
   updateChannelThreadSubscription,
 } from "../lib/api";
-import { companionDeltaResponseIsCurrent } from "../lib/channel-delta-fence";
 import {
   groupChannels,
   type ChannelGroupProject,
@@ -768,11 +767,10 @@ export function CompanionChannels({
               requestedCursor,
               abortController.signal,
             );
-            if (!companionDeltaResponseIsCurrent({
-              stopped,
-              requestedSelectionVersion: pollingSelectionVersion,
-              currentSelectionVersion: channelSelectionVersion.current,
-            })) return;
+            if (
+              stopped ||
+              pollingSelectionVersion !== channelSelectionVersion.current
+            ) return;
             cursor.current = delta.cursor;
 
             setChannels((current) =>

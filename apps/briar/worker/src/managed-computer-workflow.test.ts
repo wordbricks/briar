@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  ManagedComputerProvisioningJobRow,
-  ManagedComputerRow,
+import {
+  managedComputerConfig,
+  managedComputerInfrastructureIssues,
+  type ManagedComputerProvisioningJobRow,
+  type ManagedComputerRow,
 } from "./managed-computer-model";
 import type { ManagedInstanceDescription } from "./aws-managed-computer";
 import {
   ManagedComputerProvisioningWorkflow,
   type ManagedComputerWorkflowServices,
-  managedComputerWorkflowServices,
 } from "./managed-computer-workflow";
 
 const computer: ManagedComputerRow = {
@@ -88,14 +89,15 @@ const env = {
 } as Env;
 
 const createServices = () => ({
-  ...managedComputerWorkflowServices,
   awsAccountId: vi.fn(async () => "123456789012"),
   clearRetiredManagedComputerInstance: vi.fn(async () => computer),
   completeManagedComputerProvisioning: vi.fn(async () => undefined),
   describeManagedInstance: vi.fn(async () => description),
   failManagedComputerProvisioning: vi.fn(async () => undefined),
   managedComputerById: vi.fn(async () => computer),
+  managedComputerConfig,
   managedComputerEnrollmentNonce: vi.fn(async () => "n".repeat(43)),
+  managedComputerInfrastructureIssues,
   managedComputerProvisioningJob: vi.fn(async () => job),
   managedInstanceIsSsmOnline: vi.fn(async () => true),
   markManagedComputerBootstrapping: vi.fn(async () => undefined),
@@ -106,17 +108,6 @@ const createServices = () => ({
   terminateManagedInstance: vi.fn(async () => undefined),
   verifyManagedInstance: vi.fn(async () => description),
 }) satisfies ManagedComputerWorkflowServices;
-
-class TestManagedComputerProvisioningWorkflow
-  extends ManagedComputerProvisioningWorkflow {
-  constructor(private readonly testServices: ManagedComputerWorkflowServices) {
-    super({} as ExecutionContext, env);
-  }
-
-  protected override get services(): ManagedComputerWorkflowServices {
-    return this.testServices;
-  }
-}
 
 const workflowStep = () => ({
   do: async (
@@ -141,7 +132,11 @@ describe("managed computer provisioning workflow", () => {
   });
 
   it("launches once, verifies policy and enrollment, then completes the same job", async () => {
-    const workflow = new TestManagedComputerProvisioningWorkflow(services);
+    const workflow = new ManagedComputerProvisioningWorkflow(
+      {} as ExecutionContext,
+      env,
+      services,
+    );
 
     await expect(workflow.run({
       payload: {
@@ -180,7 +175,11 @@ describe("managed computer provisioning workflow", () => {
   });
 
   it("retires the previous instance before launching a retry", async () => {
-    const workflow = new TestManagedComputerProvisioningWorkflow(services);
+    const workflow = new ManagedComputerProvisioningWorkflow(
+      {} as ExecutionContext,
+      env,
+      services,
+    );
 
     await workflow.run({
       payload: {
