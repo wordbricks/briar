@@ -25,8 +25,7 @@
     // 90 existing findings.
     "anti-slop/no-conditional-empty-object-spread": "off",
     "anti-slop/no-known-value-widening": "error",
-    // 68 existing findings.
-    "anti-slop/no-module-mocking": "off",
+    "anti-slop/no-module-mocking": "error",
     "anti-slop/no-object-parameters": "error",
     "anti-slop/no-reflect-apply": "error",
     "anti-slop/no-reflect-get": "error",
