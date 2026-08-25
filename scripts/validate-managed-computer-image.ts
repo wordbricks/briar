@@ -199,6 +199,23 @@ if (!remoteDesktop.includes('/usr/bin/Xtigervnc "$display"')) {
 if (remoteDesktop.includes("-fg")) {
   fail("Debian 13 Xtigervnc does not support the -fg option");
 }
+if (
+  !remoteDesktop.includes("BRIAR_REMOTE_DISPLAY_STARTUP_TIMEOUT_SECONDS:-120") ||
+  !remoteDesktop.includes("startup_deadline=$((SECONDS + startup_timeout_seconds))")
+) {
+  fail("remote desktop must allow cold EBS starts to wait for TigerVNC");
+}
+
+const remoteDesktopService = await text(
+  join(image, "briar-remote-desktop.service"),
+);
+if (
+  !remoteDesktopService.includes(
+    "Environment=BRIAR_REMOTE_DISPLAY_STARTUP_TIMEOUT_SECONDS=120",
+  )
+) {
+  fail("remote desktop service omits the cold-start timeout");
+}
 
 const remoteDesktopVerifier = await text(
   join(image, "verify-remote-desktop"),
