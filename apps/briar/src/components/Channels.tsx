@@ -70,6 +70,7 @@ import {
   updateChannelThreadSubscription,
   updateChannelWebhook,
 } from "../lib/api";
+import { channelDeltaResponseIsCurrent } from "../lib/channel-delta-fence";
 import type {
   AgentSkillExecutionApprovalInput,
   AgentSkillExecutionProposal,
@@ -1251,12 +1252,15 @@ export function Channels({
               requestedCursor,
               abortController.signal,
             );
-            if (
-              stopped ||
-              requestedCursor !== cursor.current ||
-              requestedDataVersion !== channelDataVersion.current ||
-              authoritativeLoadVersion.current != null
-            ) return;
+            if (!channelDeltaResponseIsCurrent({
+              stopped,
+              requestedCursor,
+              currentCursor: cursor.current,
+              requestedDataVersion,
+              currentDataVersion: channelDataVersion.current,
+              authoritativeLoadPending:
+                authoritativeLoadVersion.current != null,
+            })) return;
             cursor.current = delta.cursor;
             if (delta.channels.length || delta.removedChannelIds.length) {
               onChannelsChange((current) => {

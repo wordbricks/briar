@@ -43,6 +43,12 @@ export type ProjectAgentScheduleRunnerDependencies = {
     ProjectLlmChatResponse & { structuredResult: StructuredAgentResult }
   >;
   log: (message: string, error?: unknown) => void;
+  listenForNativePoll?: (poll: () => void) => Promise<() => void>;
+};
+
+const listenForNativePoll = async (poll: () => void) => {
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen(PROJECT_AGENT_SCHEDULE_POLL_EVENT, poll);
 };
 
 const describe = (error: unknown) =>
@@ -153,10 +159,9 @@ export function startProjectAgentSchedulePolling(
   window.addEventListener("online", pollAfterResume);
   document.addEventListener("visibilitychange", pollAfterResume);
   if (desktop) {
-    void import("@tauri-apps/api/event")
-      .then(({ listen }) =>
-        listen(PROJECT_AGENT_SCHEDULE_POLL_EVENT, () => void poll(true)),
-      )
+    void (dependencies.listenForNativePoll ?? listenForNativePoll)(
+      () => void poll(true),
+    )
       .then((unlisten) => {
         if (stopped) {
           unlisten();

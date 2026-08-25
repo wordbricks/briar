@@ -183,6 +183,20 @@ type InboxFeedSyncIdentity = {
   token: string;
 };
 
+export type InboxSyncDependencies = {
+  loadFeed: typeof loadInboxFeed;
+  loadReadStates: typeof loadInboxReadStates;
+  saveReadStates: typeof saveInboxReadStates;
+  startPolling: typeof startDashboardPolling;
+};
+
+export const defaultInboxSyncDependencies = {
+  loadFeed: loadInboxFeed,
+  loadReadStates: loadInboxReadStates,
+  saveReadStates: saveInboxReadStates,
+  startPolling: startDashboardPolling,
+} satisfies InboxSyncDependencies;
+
 const emptyStorage = (): InboxStorage => ({ messages: [], readVersions: {} });
 
 export function buildCurrentInboxMessages(
@@ -623,6 +637,7 @@ export function useInbox(
   projects: Project[],
   token: string | null = null,
   realtime: RealtimeTransport | null = null,
+  dependencies: InboxSyncDependencies = defaultInboxSyncDependencies,
 ) {
   const storageKey = `${storagePrefix}:${userId ?? "signed-out"}`;
   const currentMessages = useMemo(
@@ -710,7 +725,7 @@ export function useInbox(
         let failed = false;
         let failedAtQueueRevision = generation.pushQueueRevision;
 
-        void saveInboxReadStates(generation.token, payload)
+        void dependencies.saveReadStates(generation.token, payload)
           .then((remote) => {
             if (
               !generation.active ||
@@ -767,7 +782,7 @@ export function useInbox(
 
       drain();
     },
-    [applyRemoteReadVersions],
+    [applyRemoteReadVersions, dependencies],
   );
 
   const queueReadStatePushForGeneration = useCallback(
@@ -824,7 +839,7 @@ export function useInbox(
           generation.storageKey,
         ).readVersions;
 
-        void loadInboxReadStates(generation.token)
+        void dependencies.loadReadStates(generation.token)
           .then((remote) => {
             if (
               !generation.active ||
@@ -877,6 +892,7 @@ export function useInbox(
     },
     [
       applyRemoteReadVersions,
+      dependencies,
       flushReadStatePush,
       queueReadStatePushForGeneration,
     ],
@@ -1000,7 +1016,7 @@ export function useInbox(
       }
       refreshInFlight = true;
       try {
-        const result = await loadInboxFeed(
+        const result = await dependencies.loadFeed(
           token,
           organizationId,
           feedSyncStateRef.current?.scope === feedScope
@@ -1093,7 +1109,7 @@ export function useInbox(
     // background, but this consumer deliberately keeps the shared socket
     // alive until the authenticated Inbox scope is disposed.
     realtime?.start();
-    const stopPolling = startDashboardPolling(
+    const stopPolling = dependencies.startPolling(
       () => void refresh(),
       undefined,
       realtime ? INBOX_REALTIME_FALLBACK_MS : undefined,
@@ -1108,7 +1124,15 @@ export function useInbox(
         window.clearTimeout(realtimeDebounce);
       }
     };
-  }, [organizationId, projects, realtime, storageKey, token, userId]);
+  }, [
+    dependencies,
+    organizationId,
+    projects,
+    realtime,
+    storageKey,
+    token,
+    userId,
+  ]);
 
   const feedScope = userId && organizationId
     ? `${userId}:${organizationId}`
