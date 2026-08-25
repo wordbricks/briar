@@ -299,6 +299,11 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await act(async () => {
       root.render(<CreateIssueDialog {...projectProps} availableProviders={["codex", "claude", "grok"]} isSubmitting={false} onClose={() => undefined} onCreate={onCreate} />);
     });
+    const selector = container.querySelector('.issue-provider-model-selector[role="group"]');
+    expect(selector?.classList.contains("is-compact")).toBe(true);
+    expect(selector?.getAttribute("aria-label")).toContain("선호 프로바이더");
+    expect(selector?.getAttribute("aria-label")).toContain("선호 모델");
+    expect(selector?.querySelector(".issue-model-select .select-menu-leading-icon svg")).not.toBeNull();
     const titleInput = container.querySelector<HTMLInputElement>(".issue-title-input");
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(titleInput, "Preferred execution issue");
@@ -333,6 +338,16 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       preferredEffort: "xhigh",
       title: "Preferred execution issue"
     }));
+    await act(async () => root.unmount());
+  });
+  it("disables the grouped provider and model selectors while creating", async () => {
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(<CreateIssueDialog {...projectProps} isSubmitting onClose={() => undefined} onCreate={async () => undefined} />);
+    });
+    const selector = container.querySelector('.issue-provider-model-selector[role="group"]');
+    expect(selector?.querySelector<HTMLButtonElement>('[aria-label="선호 프로바이더"]')?.disabled).toBe(true);
+    expect(selector?.querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')?.disabled).toBe(true);
     await act(async () => root.unmount());
   });
   it("keeps provider, model, and effort menus in a stable order", async () => {
