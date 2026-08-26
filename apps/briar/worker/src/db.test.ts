@@ -1914,6 +1914,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       usageProject.id,
       atMinute(100),
+      atMinute(1_000),
     );
     expect(projectRows).toHaveLength(208);
     expect(projectRows.every((row) => row.project_id === usageProject.id))
@@ -1925,10 +1926,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(
       projectRows.find((row) => row.id === "usage-cap-001"),
     ).toMatchObject({ has_usage_ledger: 1 });
+    expect(await listProjectUsageRuns(
+      db,
+      usageProject.id,
+      atMinute(100),
+      recentAt,
+    )).toEqual([]);
     const projectTotals = await listProjectUsageTotals(
       db,
       usageProject.id,
       atMinute(100),
+      atMinute(1_000),
     );
     expect(projectTotals).toHaveLength(1);
     expect(projectTotals[0]).toMatchObject({
@@ -1936,6 +1944,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       total_tokens: 37,
       usage_records: 1,
     });
+    expect(await listProjectUsageTotals(
+      db,
+      usageProject.id,
+      atMinute(100),
+      recentAt,
+    )).toEqual([]);
     const usagePlan = await db
       .prepare(
         `explain query plan
