@@ -95,7 +95,7 @@ export function RunManualQaGuide({
               <strong>{t("run.manualQaProcedureTitle")}</strong>
               <p>{t("run.manualQaLocalProcedure")}</p>
               {localChecks.length > 0 ? <div className="run-manual-qa-checks">
-                  {localChecks.map(check => <code key={check}>{check}</code>)}
+                  {localChecks.map(check => <pre key={check} tabIndex={0}><code>{check}</code></pre>)}
                 </div> : null}
             </div>
             <div>

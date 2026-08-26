@@ -877,7 +877,7 @@ export function RunPage({
   };
   const reviewed = hasResultReviews(run);
   const statusBadgeTitle = reviewed ? `${t("dashboard.status")}: ${t("run.resultReviewed")}` : t("dashboard.status");
-  const compactProperties = <div className="run-page-property-badges" aria-label={t("run.properties")}>
+  const compactProperties = <div aria-label={t("run.properties")} className="run-page-property-badges" role="group">
       <SelectMenu align="start" className={`run-page-property-select status ${meta.tone}${reviewed ? " reviewed" : ""}`} disabled={isRecovering} hideChevron label={t("dashboard.status")} leadingIcon={reviewed ? <BadgeCheck aria-hidden="true" className="status-pill-review-icon" size={13} /> : <Activity aria-hidden="true" size={13} />} onValueChange={value => {
       const placement = placementForId(value);
       if (!placement || placementMatchesRun(run, placement)) return;

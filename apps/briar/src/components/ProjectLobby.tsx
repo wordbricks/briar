@@ -384,7 +384,11 @@ export function ProjectLobby({
                   <p>{t("lobby.analyticsDescription")}</p>
                 </div>
               </div>
-              <div className="project-lobby-period-picker" aria-label={t("lobby.analyticsPeriod")}>
+              <div
+                aria-label={t("lobby.analyticsPeriod")}
+                className="project-lobby-period-picker"
+                role="group"
+              >
                 {(["day", "week", "month"] as const).map((value) => (
                   <button
                     aria-pressed={period === value}

@@ -794,7 +794,9 @@ export function Sidebar({
                     </button>
                   ) : null}
                   <button
-                    aria-controls={`project-menu-${project.id}`}
+                    aria-controls={
+                      isMenuOpen ? `project-menu-${project.id}` : undefined
+                    }
                     aria-expanded={isMenuOpen}
                     aria-haspopup="menu"
                     aria-label={t("sidebar.projectMenu", { name: project.name })}

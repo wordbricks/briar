@@ -64,7 +64,6 @@ export function AppVersionStatus({
 
   return (
     <div
-      aria-label={t("app.version", { version: label })}
       className="app-version-status"
       ref={containerRef}
       title={t("app.version", { version: label })}

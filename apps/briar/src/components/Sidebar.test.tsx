@@ -1176,11 +1176,14 @@ describe("Sidebar", () => {
       );
     });
 
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".sidebar-project-menu-trigger")
-        ?.click();
-    });
+    const menuTrigger = container.querySelector<HTMLButtonElement>(
+      ".sidebar-project-menu-trigger",
+    );
+    expect(menuTrigger?.hasAttribute("aria-controls")).toBe(false);
+    await act(async () => menuTrigger?.click());
+    expect(menuTrigger?.getAttribute("aria-controls")).toBe(
+      "project-menu-project-1",
+    );
     const openButton = Array.from(
       container.querySelectorAll<HTMLButtonElement>(
         ".sidebar-project-menu [role='menuitem']",
