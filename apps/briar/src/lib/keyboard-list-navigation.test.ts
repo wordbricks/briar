@@ -120,6 +120,67 @@ describe("keyboard list navigation", () => {
     expect(document.activeElement).toBe(middle);
   });
 
+  it("moves relative to the visible current item when focus is outside", () => {
+    const { items } = createList();
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    items[1].setAttribute("data-keyboard-list-current", "");
+    outside.focus();
+
+    expect(handle({ code: "KeyJ", key: "j" }, {}, outside).handled).toBe(true);
+    expect(document.activeElement).toBe(items[2]);
+
+    outside.focus();
+    expect(handle({ code: "KeyK", key: "k" }, {}, outside).handled).toBe(true);
+    expect(document.activeElement).toBe(items[0]);
+  });
+
+  it("ignores a hidden current item when resolving the cursor fallback", () => {
+    const { items } = createList();
+    items[1].hidden = true;
+    items[1].setAttribute("data-keyboard-list-current", "");
+
+    expect(handle({ code: "KeyJ", key: "j" }).handled).toBe(true);
+    expect(document.activeElement).toBe(items[0]);
+  });
+
+  it("activates an opted-in list item after keyboard focus moves", () => {
+    const { container, items } = createList();
+    container.setAttribute("data-keyboard-list-activate-on-navigation", "");
+    const activatedWhileFocused = vi.fn(() =>
+      document.activeElement === items[0]
+    );
+    items[0].addEventListener("click", activatedWhileFocused);
+
+    expect(handle({ code: "KeyJ", key: "j" }).handled).toBe(true);
+    expect(document.activeElement).toBe(items[0]);
+    expect(activatedWhileFocused).toHaveBeenCalledOnce();
+    expect(activatedWhileFocused).toHaveReturnedWith(true);
+  });
+
+  it("does not activate keyboard movement unless the list opts in", () => {
+    const { items } = createList();
+    const click = vi.spyOn(items[0], "click");
+
+    expect(handle({ code: "KeyJ", key: "j" }).handled).toBe(true);
+    expect(document.activeElement).toBe(items[0]);
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it("does not reactivate an opted-in item when movement is clamped", () => {
+    const { container, items } = createList();
+    container.setAttribute("data-keyboard-list-activate-on-navigation", "");
+    const click = vi.spyOn(items[0], "click");
+    items[0].focus();
+
+    const result = handle({ code: "KeyK", key: "k" }, {}, items[0]);
+
+    expect(result.handled).toBe(true);
+    expect(result.event.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(items[0]);
+    expect(click).not.toHaveBeenCalled();
+  });
+
   it("clamps at both boundaries instead of wrapping", () => {
     const { items, scrollSpies } = createList();
     const firstFocus = vi.spyOn(items[0], "focus");
@@ -249,7 +310,42 @@ describe("keyboard list navigation", () => {
     expect(document.activeElement).toBe(items[0]);
   });
 
-  it("ignores prevented, repeated, composing, legacy IME, and modified events", () => {
+  it("moves from a closed select-only combobox into the active list", () => {
+    const main = document.createElement("main");
+    const trigger = document.createElement("button");
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.setAttribute("role", "combobox");
+    main.append(trigger);
+    document.body.append(main);
+    const { items } = createList(["first", "second"], main);
+    trigger.focus();
+
+    const result = handle(
+      { code: "KeyJ", key: "j" },
+      {},
+      trigger,
+    );
+
+    expect(result.handled).toBe(true);
+    expect(document.activeElement).toBe(items[0]);
+  });
+
+  it("supports repeated navigation keydown events", () => {
+    const { items } = createList();
+    items[0].focus();
+
+    const result = handle(
+      { code: "KeyJ", key: "j", repeat: true },
+      {},
+      items[0],
+    );
+
+    expect(result.handled).toBe(true);
+    expect(result.event.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(items[1]);
+  });
+
+  it("ignores prevented, composing, legacy IME, and modified events", () => {
     createList();
     const prevented = new KeyboardEvent("keydown", {
       cancelable: true,
@@ -262,7 +358,6 @@ describe("keyboard list navigation", () => {
 
     const events = [
       prevented,
-      new KeyboardEvent("keydown", { code: "KeyJ", key: "j", repeat: true }),
       new KeyboardEvent("keydown", {
         code: "KeyJ",
         isComposing: true,

@@ -82,6 +82,7 @@ export function Inbox({
   onMarkRead,
   onOpen,
   projects,
+  selectedMessageId = null,
   unreadCount,
 }: {
   companionMode?: boolean;
@@ -91,6 +92,7 @@ export function Inbox({
   onMarkRead: (messageId: string) => void;
   onOpen: (message: InboxMessageWithReadState) => void;
   projects: Project[];
+  selectedMessageId?: string | null;
   unreadCount: number;
 }) {
   const { localeTag, t } = useI18n();
@@ -105,7 +107,7 @@ export function Inbox({
   );
   const [selectedProjectId, setSelectedProjectId] = useState("all");
   const [visibleCount, setVisibleCount] = useState(INBOX_PAGE_SIZE);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const projectsById = useMemo(
     () => new Map(projects.map((project) => [project.id, project])),
     [projects],
@@ -200,7 +202,7 @@ export function Inbox({
   // list either fills the scroll area or runs out of messages. Skip when the
   // element has not been laid out yet (common in unit tests).
   useLayoutEffect(() => {
-    const element = scrollRef.current;
+    const element = listRef.current;
     if (!element || !hasMore || element.clientHeight <= 0) return;
     if (
       element.scrollHeight <=
@@ -244,10 +246,6 @@ export function Inbox({
   const inboxContent = (
     <div
       className="inbox-scroll min-h-0 flex-1 overflow-auto"
-      data-has-more={hasMore ? "true" : "false"}
-      data-visible-count={visibleMessages.length}
-      onScroll={(event) => maybeLoadMoreFromScroll(event.currentTarget)}
-      ref={scrollRef}
     >
       <section
         className="inbox-content"
@@ -324,7 +322,16 @@ export function Inbox({
               title={t("inbox.filterEmptyTitle")}
             />
           ) : (
-            <div className="inbox-list" data-keyboard-list="">
+            <div
+              className="inbox-list"
+              data-has-more={hasMore ? "true" : "false"}
+              data-keyboard-list=""
+              data-keyboard-list-activate-on-navigation=""
+              data-visible-count={visibleMessages.length}
+              onScroll={(event) =>
+                maybeLoadMoreFromScroll(event.currentTarget)}
+              ref={listRef}
+            >
               {visibleMessages.map((message) => (
                 <InboxMessageRow
                   category={classifyInboxMessage(message)}
@@ -335,6 +342,7 @@ export function Inbox({
                   onMarkRead={onMarkRead}
                   onOpen={onOpen}
                   project={projectsById.get(message.projectId)}
+                  selected={message.id === selectedMessageId}
                   t={t}
                 />
               ))}
@@ -387,6 +395,7 @@ function InboxMessageRow({
   onMarkRead,
   onOpen,
   project,
+  selected,
   t,
 }: {
   category: InboxCategory;
@@ -396,9 +405,11 @@ function InboxMessageRow({
   onMarkRead: (messageId: string) => void;
   onOpen: (message: InboxMessageWithReadState) => void;
   project: Project | undefined;
+  selected: boolean;
   t: (key: MessageKey, values?: Record<string, string | number>) => string;
 }) {
   const showUnreadAction = message.isUnread && category !== "activity";
+  const openRef = useRef<HTMLButtonElement | null>(null);
 
   return (
     <div
@@ -406,12 +417,16 @@ function InboxMessageRow({
         "inbox-message",
         category,
         showUnreadAction && "unread",
+        selected && "selected",
       )}
     >
       <button
+        aria-current={selected ? "true" : undefined}
         className="inbox-message-open"
         data-keyboard-list-item=""
+        data-keyboard-list-current={selected ? "" : undefined}
         onClick={() => onOpen(message)}
+        ref={openRef}
         type="button"
       >
         <span
@@ -506,7 +521,10 @@ function InboxMessageRow({
         <button
           aria-label={t("inbox.markRead")}
           className="inbox-mark-read"
-          onClick={() => onMarkRead(message.id)}
+          onClick={() => {
+            openRef.current?.focus({ preventScroll: true });
+            onMarkRead(message.id);
+          }}
           title={t("inbox.markRead")}
           type="button"
         >

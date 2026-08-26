@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { act } from "react";
+import { StrictMode, act } from "react";
 import { createRoot } from "react-dom/client";
 import {
   afterEach,
@@ -143,6 +143,39 @@ describe("useKeyboardShortcuts", () => {
     await act(async () => root.render(<Harness enabled={false} />));
     const event = dispatch({ code: "KeyG", key: "g" });
     expect(event.defaultPrevented).toBe(false);
+    expect(container.textContent).toBe("idle");
+  });
+
+  it("clears a pending prefix when the preference becomes disabled", async () => {
+    await act(async () => root.render(<Harness />));
+    await act(async () => {
+      dispatch({ code: "KeyG", key: "g" });
+    });
+    expect(container.textContent).toBe("g");
+
+    await act(async () => root.render(<Harness enabled={false} />));
+    expect(container.textContent).toBe("idle");
+
+    const event = dispatch({ code: "KeyI", key: "i" });
+    expect(event.defaultPrevented).toBe(false);
+    expect(onInbox).not.toHaveBeenCalled();
+  });
+
+  it("keeps one shortcut listener through Strict Mode effect replay", async () => {
+    await act(async () =>
+      root.render(
+        <StrictMode>
+          <Harness />
+        </StrictMode>,
+      )
+    );
+
+    await act(async () => {
+      dispatch({ code: "KeyG", key: "g" });
+      dispatch({ code: "KeyI", key: "i" });
+    });
+
+    expect(onInbox).toHaveBeenCalledOnce();
     expect(container.textContent).toBe("idle");
   });
 

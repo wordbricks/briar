@@ -86,6 +86,7 @@ import {
   useMobileNavigationGestures,
 } from "./hooks/useMobileNavigation";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
+import { useSettingsEscape } from "./hooks/useSettingsEscape";
 import {
   type KeyboardShortcutAction,
   useKeyboardShortcuts,
@@ -767,6 +768,7 @@ export function App() {
     canGoBack,
     canGoForward,
     goBack,
+    goBackTo,
     goForward,
     navigate: navigateToLocation,
     replace: replaceNavigationLocation,
@@ -815,6 +817,17 @@ export function App() {
       ),
     [briar.activeOrganizationId, navigateToLocation],
   );
+  const closeSettings = useCallback(() => {
+    const projectId = navigationActiveProjectIdRef.current;
+    goBackTo(
+      (location) => pageFromNavigationLocation(location) !== "settings",
+      projectId ? projectNavigationLocation("issues", projectId) : "issues",
+    );
+  }, [goBackTo]);
+  useSettingsEscape({
+    enabled: activePage === "settings" && !briar.companionMode,
+    onClose: closeSettings,
+  });
   const navigateToIssue = useCallback(
     (runId: string, projectId = navigationActiveProjectIdRef.current) => {
       if (!projectId) return;
@@ -2819,7 +2832,7 @@ export function App() {
     <UnifiedSettingsSidebar
       activeTarget={settingsTarget}
       isOpen={isSidebarOpen}
-      onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
+      onBack={closeSettings}
       onNavigate={(target) => {
         setSettingsTarget(target);
         navigateToLocation(settingsNavigationLocation(target));
@@ -3266,7 +3279,7 @@ export function App() {
                 : false
             }
             navigationSidebar={unifiedSettingsSidebar}
-            onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
+            onBack={closeSettings}
             onAccountDelete={
               briar.demoMode ? undefined : briar.deleteAccount
             }
@@ -3300,9 +3313,7 @@ export function App() {
             isSidebarOpen={isSidebarOpen}
             key={settingsOrganization.id}
             navigationSidebar={unifiedSettingsSidebar}
-            onBack={() =>
-              canGoBack ? goBack() : navigateToPage("issues")
-            }
+            onBack={closeSettings}
             organization={settingsOrganization}
             onLogoChange={briar.changeOrganizationLogo}
             onRename={briar.renameOrganization}
@@ -3403,6 +3414,7 @@ export function App() {
                 setInboxDetailTarget(target);
               }}
               projects={activeOrganizationProjects}
+              selectedMessageId={inboxDetailTarget?.messageId ?? null}
               unreadCount={visibleInboxUnreadCount}
             />
             <div
@@ -3445,9 +3457,7 @@ export function App() {
             initialSection={settingsTarget.section}
             key={activeProject.id}
             navigationSidebar={unifiedSettingsSidebar}
-            onBack={() =>
-              canGoBack ? goBack() : navigateToPage("issues")
-            }
+            onBack={closeSettings}
             onDelete={async () => {
               const fallbackProject = briar.projects.find(
                 (project) => project.id !== activeProject.id,

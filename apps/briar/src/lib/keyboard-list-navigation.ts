@@ -6,6 +6,9 @@ import {
 
 const keyboardListSelector = "[data-keyboard-list]";
 const keyboardListItemSelector = "[data-keyboard-list-item]";
+const keyboardListCurrentItemAttribute = "data-keyboard-list-current";
+const keyboardListActivateOnNavigationAttribute =
+  "data-keyboard-list-activate-on-navigation";
 const mainSelector = 'main, [role="main"]';
 
 export type KeyboardListNavigationRoot = Document | HTMLElement;
@@ -192,7 +195,6 @@ function shouldIgnoreEvent(
 ): boolean {
   return (
     event.defaultPrevented ||
-    event.repeat ||
     keyboardShortcutEventIsComposing(event) ||
     hasUnsupportedModifier(event) ||
     isKeyboardShortcutEditableTarget(event.target) ||
@@ -228,9 +230,14 @@ export function handleKeyboardListNavigation(
   const activeItem = document.activeElement?.closest<HTMLElement>(
     keyboardListItemSelector,
   );
-  const currentIndex = activeItem && activeItem.closest(keyboardListSelector) === container
+  const activeIndex = activeItem?.closest(keyboardListSelector) === container
     ? items.indexOf(activeItem)
     : -1;
+  const currentIndex = activeIndex >= 0
+    ? activeIndex
+    : items.findIndex((item) =>
+      item.hasAttribute(keyboardListCurrentItemAttribute)
+    );
   const nextIndex = currentIndex < 0
     ? direction > 0 ? 0 : items.length - 1
     : Math.min(items.length - 1, Math.max(0, currentIndex + direction));
@@ -239,6 +246,12 @@ export function handleKeyboardListNavigation(
 
   nextItem.focus({ preventScroll: true });
   nextItem.scrollIntoView({ block: "nearest" });
+  if (
+    nextIndex !== currentIndex &&
+    container.hasAttribute(keyboardListActivateOnNavigationAttribute)
+  ) {
+    nextItem.click();
+  }
   event.preventDefault();
   return true;
 }

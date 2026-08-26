@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useAtomRef } from "@effect/atom-react";
+import { AtomRef } from "effect/unstable/reactivity";
+import { useCallback, useEffect, useRef } from "react";
 
 import { getRecordingKeybinding } from "../lib/keybindings";
 import {
@@ -32,22 +34,24 @@ export function useKeyboardShortcuts<CommandId extends string>({
 }): KeyboardShortcutHookResult<CommandId> {
   const commandsRef = useRef(commands);
   const enabledRef = useRef(enabled);
-  const stateRef = useRef<KeyboardShortcutState<CommandId>>(
-    idleKeyboardShortcutState,
-  );
-  const [pendingShortcut, setPendingShortcut] =
-    useState<KeyboardShortcutPendingState<CommandId> | null>(null);
+  const stateAtomRef = useRef<
+    AtomRef.AtomRef<KeyboardShortcutState<CommandId>> | undefined
+  >(undefined);
+  if (stateAtomRef.current === undefined) {
+    stateAtomRef.current = AtomRef.make<KeyboardShortcutState<CommandId>>(
+      idleKeyboardShortcutState,
+    );
+  }
+  const stateAtom = stateAtomRef.current;
+  const state = useAtomRef(stateAtom);
+  const pendingShortcut: KeyboardShortcutPendingState<CommandId> | null =
+    state.status === "pending" ? state : null;
   commandsRef.current = commands;
   enabledRef.current = enabled;
 
-  const updateState = useCallback((state: KeyboardShortcutState<CommandId>) => {
-    stateRef.current = state;
-    setPendingShortcut(state.status === "pending" ? state : null);
-  }, []);
-
   const cancelPendingShortcut = useCallback(() => {
-    updateState(idleKeyboardShortcutState);
-  }, [updateState]);
+    stateAtom.set(idleKeyboardShortcutState);
+  }, [stateAtom]);
 
   useEffect(() => {
     if (enabled) return;
@@ -79,8 +83,9 @@ export function useKeyboardShortcuts<CommandId extends string>({
         remoteKeyboardCaptured: remoteDesktopCapturesKeyboard(),
       };
       if (shouldIgnoreKeyboardShortcutEvent(event, eventOptions)) return;
+      const currentState = stateAtom.value;
       const result = advanceKeyboardShortcut(
-        stateRef.current,
+        currentState,
         activeCommands,
         event,
         {
@@ -89,7 +94,7 @@ export function useKeyboardShortcuts<CommandId extends string>({
         },
       );
       if (result.consumeEvent) event.preventDefault();
-      if (result.state !== stateRef.current) updateState(result.state);
+      if (result.state !== currentState) stateAtom.set(result.state);
       if (result.status !== "matched") return;
       activeCommands.find((command) => command.id === result.commandId)
         ?.onTrigger();
@@ -97,7 +102,7 @@ export function useKeyboardShortcuts<CommandId extends string>({
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [updateState]);
+  }, [stateAtom]);
 
   return { cancelPendingShortcut, pendingShortcut };
 }

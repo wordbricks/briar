@@ -241,6 +241,27 @@ describe("keyboard shortcuts", () => {
     }
   });
 
+  it("distinguishes select-only combobox buttons from editable comboboxes", () => {
+    const trigger = document.createElement("button");
+    trigger.setAttribute("role", "combobox");
+    trigger.setAttribute("aria-expanded", "false");
+    const triggerLabel = trigger.appendChild(document.createElement("span"));
+    document.body.append(trigger);
+
+    expect(isKeyboardShortcutEditableTarget(triggerLabel)).toBe(false);
+
+    trigger.setAttribute("aria-expanded", "true");
+    expect(isKeyboardShortcutEditableTarget(triggerLabel)).toBe(true);
+
+    const editable = document.createElement("div");
+    editable.setAttribute("role", "combobox");
+    document.body.append(editable);
+    expect(isKeyboardShortcutEditableTarget(editable)).toBe(true);
+
+    trigger.remove();
+    editable.remove();
+  });
+
   it("ignores events dispatched from editable targets", () => {
     const input = document.createElement("input");
     input.addEventListener("keydown", (event) => {

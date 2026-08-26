@@ -1,10 +1,11 @@
 /** @vitest-environment jsdom */
 
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InboxMessageWithReadState } from "../hooks/useInbox";
 import { I18nProvider } from "../i18n";
+import { installKeyboardListNavigation } from "../lib/keyboard-list-navigation";
 import type { Project } from "../types";
 import {
   Inbox,
@@ -119,6 +120,9 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       '[role="option"][data-value="project-2"]',
     );
     await act(async () => sproutOption?.click());
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
 
     expect(projectFilter?.textContent).toContain("Sprout");
     expect(container.textContent).not.toContain("Briar deployment failed");
@@ -132,6 +136,22 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       container.querySelector(".inbox-filter.important .inbox-filter-count")
         ?.textContent,
     ).toBe("1");
+
+    const stopKeyboardNavigation = installKeyboardListNavigation();
+    const firstMessage = container.querySelector<HTMLElement>(
+      ".inbox-message-open",
+    );
+    firstMessage!.scrollIntoView = vi.fn();
+    const navigationEvent = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      code: "KeyJ",
+      key: "j",
+    });
+    projectFilter?.dispatchEvent(navigationEvent);
+    expect(navigationEvent.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(firstMessage);
+    stopKeyboardNavigation();
   });
 
   it("marks one message as read without opening its destination", async () => {
@@ -168,6 +188,100 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(onMarkRead).toHaveBeenCalledOnce();
     expect(onMarkRead).toHaveBeenCalledWith(message.id);
     expect(onOpen).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(
+      container.querySelector(".inbox-message-open"),
+    );
+  });
+
+  it("keeps keyboard navigation and the selected detail message in sync", async () => {
+    const messages = [
+      issue("first", "First issue", { priority: 1, status: "failed" }),
+      issue("second", "Second issue", { priority: 1, status: "failed" }),
+      issue("third", "Third issue", { priority: 1, status: "failed" }),
+    ];
+    const onOpen = vi.fn();
+
+    function Harness() {
+      const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
+        null,
+      );
+      return (
+        <I18nProvider>
+          <Inbox
+            isSidebarOpen
+            messages={messages}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={(message) => {
+              onOpen(message);
+              setSelectedMessageId(message.id);
+            }}
+            projects={projects}
+            selectedMessageId={selectedMessageId}
+            unreadCount={messages.length}
+          />
+        </I18nProvider>
+      );
+    }
+
+    await act(async () => root.render(<Harness />));
+    const projectFilter = container.querySelector<HTMLButtonElement>(
+      '[aria-label="프로젝트 필터"]',
+    )!;
+    const messageButtons = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ".inbox-message-open",
+      ),
+    ];
+    for (const messageButton of messageButtons) {
+      messageButton.scrollIntoView = vi.fn();
+    }
+    expect(
+      container
+        .querySelector("[data-keyboard-list]")
+        ?.hasAttribute("data-keyboard-list-activate-on-navigation"),
+    ).toBe(true);
+
+    const stopKeyboardNavigation = installKeyboardListNavigation();
+    const navigate = async (
+      key: "j" | "k",
+      { repeat = false }: { repeat?: boolean } = {},
+    ) => {
+      const event = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        code: key === "j" ? "KeyJ" : "KeyK",
+        key,
+        repeat,
+      });
+      await act(async () => projectFilter.dispatchEvent(event));
+      expect(event.defaultPrevented).toBe(true);
+    };
+
+    projectFilter.focus();
+    await navigate("j");
+    expect(onOpen).toHaveBeenLastCalledWith(messages[0]);
+    expect(document.activeElement).toBe(messageButtons[0]);
+    expect(messageButtons[0]?.getAttribute("aria-current")).toBe("true");
+
+    projectFilter.focus();
+    await navigate("j");
+    expect(onOpen).toHaveBeenLastCalledWith(messages[1]);
+    expect(document.activeElement).toBe(messageButtons[1]);
+    expect(messageButtons[1]?.hasAttribute("data-keyboard-list-current")).toBe(
+      true,
+    );
+
+    projectFilter.focus();
+    await navigate("j", { repeat: true });
+    expect(onOpen).toHaveBeenLastCalledWith(messages[2]);
+    expect(document.activeElement).toBe(messageButtons[2]);
+
+    projectFilter.focus();
+    await navigate("k");
+    expect(onOpen).toHaveBeenLastCalledWith(messages[1]);
+    expect(document.activeElement).toBe(messageButtons[1]);
+    stopKeyboardNavigation();
   });
 
 
@@ -201,7 +315,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       ),
     );
 
-    const scroll = container.querySelector<HTMLDivElement>(".inbox-scroll");
+    const scroll = container.querySelector<HTMLDivElement>(".inbox-list");
     expect(scroll).not.toBeNull();
     expect(scroll?.getAttribute("data-visible-count")).toBe("50");
     expect(scroll?.getAttribute("data-has-more")).toBe("true");
@@ -300,7 +414,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       ),
     );
 
-    const scroll = container.querySelector<HTMLDivElement>(".inbox-scroll");
+    const scroll = container.querySelector<HTMLDivElement>(".inbox-list");
     Object.defineProperty(scroll!, "scrollHeight", {
       configurable: true,
       value: 4_000,

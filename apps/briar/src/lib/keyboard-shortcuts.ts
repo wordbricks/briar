@@ -172,7 +172,18 @@ export function isKeyboardShortcutEditableTarget(
   const element = eventTargetElement(target);
   if (!element) return false;
   if (element.closest("input,select,textarea")) return true;
-  if (element.closest('[role="combobox"],[role="textbox"]')) return true;
+  if (element.closest('[role="textbox"]')) return true;
+
+  const combobox = element.closest('[role="combobox"]');
+  if (
+    combobox &&
+    !(
+      combobox.localName === "button" &&
+      combobox.getAttribute("aria-expanded") !== "true"
+    )
+  ) {
+    return true;
+  }
 
   const contentEditable = element.closest("[contenteditable]");
   if (!contentEditable) return false;
