@@ -23,6 +23,11 @@ import type { MessageKey } from "../i18n/messages";
 import { formatUsageDuration } from "../lib/agent-usage";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import {
+  isLocalProjectRepositoryReady,
+  localProjectReadiness,
+  type LocalProjectConnectionState,
+} from "../lib/local-project-connection";
+import {
   projectTrackedDuration as trackedDurationForRange,
   summarizeProjectUsage,
   type ProjectUsageBreakdownItem,
@@ -105,6 +110,7 @@ function statusLabel(run: HuntRun, t: ReturnType<typeof useI18n>["t"]) {
 }
 
 export function ProjectLobby({
+  connectionState,
   dashboard,
   isSidebarOpen,
   onLoadUsageSummary,
@@ -115,7 +121,9 @@ export function ProjectLobby({
   onOpenSettings,
   project,
   readiness,
+  requiresLocalReadiness,
 }: {
+  connectionState: LocalProjectConnectionState;
   dashboard: DashboardPayload | null;
   isSidebarOpen: boolean;
   onLoadUsageSummary: (
@@ -130,6 +138,7 @@ export function ProjectLobby({
   onOpenSettings: () => void;
   project: Project;
   readiness: RepositoryReadiness | null;
+  requiresLocalReadiness: boolean;
 }) {
   const { localeTag, t } = useI18n();
   const [usageSummary, setUsageSummary] =
@@ -194,11 +203,41 @@ export function ProjectLobby({
         Date.parse(left.lastEventAt || left.updatedAt),
     )
     .slice(0, 5);
-  const githubRepository =
-    dashboard?.settings.githubRepository ?? readiness?.githubRepository ?? null;
-  const githubReady = Boolean(
-    githubRepository && (readiness ? readiness.prReady : true),
+  const inspectedReadiness = requiresLocalReadiness
+    ? localProjectReadiness(connectionState, readiness)
+    : readiness;
+  const githubRepository = inspectedReadiness?.githubRepository ??
+    (dashboard?.project.id === project.id
+      ? dashboard.settings.githubRepository
+      : null);
+  const localSetupReady = Boolean(
+    (!requiresLocalReadiness || connectionState === "connected") &&
+      (requiresLocalReadiness
+        ? isLocalProjectRepositoryReady(inspectedReadiness)
+        : true),
   );
+  const repositoryReady = Boolean(localSetupReady && githubRepository);
+  const connectsOnDesktop = !requiresLocalReadiness && !githubRepository;
+  const githubOptional = Boolean(
+    requiresLocalReadiness &&
+      connectionState === "connected" &&
+      inspectedReadiness &&
+      !inspectedReadiness.requiresGithub &&
+      !githubRepository,
+  );
+  const repositoryState = !requiresLocalReadiness
+    ? repositoryReady
+      ? "ready"
+      : "attention"
+    : connectionState === "disconnected"
+      ? "disconnected"
+      : connectionState === "unknown" || !inspectedReadiness
+        ? "unknown"
+        : githubOptional
+          ? "optional"
+        : repositoryReady
+          ? "ready"
+          : "attention";
   const dateFormatter = new Intl.DateTimeFormat(localeTag, {
     day: "numeric",
     month: "short",
@@ -468,8 +507,14 @@ export function ProjectLobby({
                   <h2>{t("lobby.githubTitle")}</h2>
                   <p>{t("lobby.githubDescription")}</p>
                 </div>
-                <span className={`project-lobby-state ${githubReady ? "ready" : "attention"}`}>
-                  {githubReady ? t("lobby.connected") : t("lobby.needsConnection")}
+                <span className={`project-lobby-state ${repositoryState}`}>
+                  {repositoryState === "ready"
+                    ? t("lobby.connected")
+                    : repositoryState === "optional"
+                      ? t("common.optional")
+                    : repositoryState === "unknown"
+                      ? t("common.checkNeeded")
+                      : t("lobby.needsConnection")}
                 </span>
               </header>
               <div className="project-lobby-repository">
@@ -477,17 +522,37 @@ export function ProjectLobby({
                   <small>{t("lobby.repository")}</small>
                   <strong>{githubRepository ?? t("lobby.noRepository")}</strong>
                   <span>
-                    {readiness?.ghAccount
-                      ? t("lobby.githubAccount", { account: readiness.ghAccount })
-                      : githubReady
-                        ? t("lobby.githubReady")
-                        : t("lobby.githubSetupHint")}
+                    {repositoryState === "unknown"
+                      ? t("common.checkNeeded")
+                      : repositoryState === "optional"
+                        ? t("lobby.githubOptional")
+                      : connectsOnDesktop
+                        ? t("health.desktopOnly")
+                      : inspectedReadiness?.ghAccount
+                        ? t("lobby.githubAccount", {
+                            account: inspectedReadiness.ghAccount,
+                          })
+                        : repositoryReady
+                          ? t("lobby.githubReady")
+                          : t("lobby.githubSetupHint")}
                   </span>
                 </div>
-                <button onClick={onOpenRepository} type="button">
-                  {githubReady ? t("lobby.manageConnection") : t("lobby.connectRepository")}
-                  <ArrowRight aria-hidden size={14} />
-                </button>
+                {!githubOptional ? (
+                  <button
+                    disabled={connectsOnDesktop}
+                    onClick={onOpenRepository}
+                    type="button"
+                  >
+                    {connectsOnDesktop
+                      ? t("lobby.connectOnDesktop")
+                      : repositoryState === "unknown"
+                      ? t("repositorySetup.recheck")
+                      : repositoryReady
+                        ? t("lobby.manageConnection")
+                        : t("lobby.connectRepository")}
+                    <ArrowRight aria-hidden size={14} />
+                  </button>
+                ) : null}
               </div>
             </section>
 

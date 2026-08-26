@@ -117,9 +117,12 @@ export type LocalProjectConnectionPreflight = {
 export async function preflightThenCreateProject<T>(
   preflight: () => Promise<T>,
   create?: () => Promise<unknown>,
+  assertCurrent: () => void = () => undefined,
 ) {
   const prepared = await preflight();
+  assertCurrent();
   await create?.();
+  assertCurrent();
   return prepared;
 }
 
@@ -315,11 +318,20 @@ export async function configureLocalExecutionWorker(
     throw new Error("Worker 설정은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
   const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("configure_execution_worker", {
-    projectId,
-    userToken,
-    enabled,
-  });
+  try {
+    return await invoke("configure_execution_worker", {
+      projectId,
+      userToken,
+      enabled,
+    });
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : String(caught);
+    const cleanupIncompletePrefix = "BRIAR_WORKER_CLEANUP_INCOMPLETE: ";
+    if (message.startsWith(cleanupIncompletePrefix)) {
+      throw new Error(message.slice(cleanupIncompletePrefix.length));
+    }
+    throw caught;
+  }
 }
 
 export async function disconnectLocalProject(projectId: string) {

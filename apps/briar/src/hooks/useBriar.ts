@@ -98,8 +98,11 @@ import {
 } from "../lib/project-connection";
 import { projectIconFromDataUrl } from "../lib/project-icon";
 import {
+  createLocalProjectReadinessCoordinator,
   isProjectConnectedLocally,
-  withConnectedProject,
+  localProjectConnectionState,
+  type LocalProjectInventoryObservation,
+  type LocalProjectReadinessObservation,
   withoutConnectedProject,
 } from "../lib/local-project-connection";
 import {
@@ -313,15 +316,6 @@ const emptyDashboard = (project: Project): DashboardPayload => ({
   generatedAt: new Date().toISOString(),
 });
 
-// null이면 로컬 연결 상태를 알 수 없다는 뜻입니다(웹·모바일 또는 조회 실패).
-async function readConnectedProjectIds() {
-  try {
-    return await loadConnectedProjectIds();
-  } catch {
-    return null;
-  }
-}
-
 export function useBriar(options: UseBriarOptions = {}) {
   const {
     adoptRemoteAgentSession,
@@ -351,7 +345,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   );
   const [connectedProjectIds, setConnectedProjectIds] = useState<
     string[] | null
-  >(null);
+  >(demoMode ? [demoDashboard.project.id] : null);
   const [dashboard, setDashboardState] = useState<DashboardPayload | null>(
     demoMode && (!lockedProjectId || lockedProjectId === demoDashboard.project.id)
       ? demoDashboard
@@ -361,6 +355,9 @@ export function useBriar(options: UseBriarOptions = {}) {
   const [restoringSession, setRestoringSession] = useState(!demoMode);
   const [loginCode, setLoginCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [localProjectInventoryError, setLocalProjectInventoryError] = useState<
+    string | null
+  >(null);
   const [projectConnection, setProjectConnection] =
     useState<ProjectConnection | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
@@ -393,12 +390,27 @@ export function useBriar(options: UseBriarOptions = {}) {
   const [projectReadinessError, setProjectReadinessError] = useState<
     Record<string, string>
   >({});
-  const [projectReadinessLoadingId, setProjectReadinessLoadingId] =
-    useState<string | null>(null);
+  const [projectReadinessLoadingProjects, setProjectReadinessLoadingProjects] =
+    useState<Set<string>>(() => new Set());
   const pollTimer = useRef<number | null>(null);
   const pollLoginNow = useRef<(() => void) | null>(null);
   const loginAttempt = useRef(0);
+  const reconnectRequest = useRef(0);
+  const healthRequest = useRef(0);
+  const activeProjectIdRef = useRef(activeProjectId);
+  activeProjectIdRef.current = activeProjectId;
+  const readinessCoordinatorRef = useRef<ReturnType<
+    typeof createLocalProjectReadinessCoordinator<RepositoryReadiness>
+  > | null>(null);
+  readinessCoordinatorRef.current ??= createLocalProjectReadinessCoordinator({
+    loadConnectedProjectIds,
+    loadReadiness: loadProjectRepositoryReadiness,
+  });
+  const readinessCoordinator = readinessCoordinatorRef.current;
   const workflowGenerationAttempts = useRef(new Set<string>());
+  const automaticWorkflowGenerations = useRef(
+    new Map<string, Promise<ProjectSettings["workflow"]>>(),
+  );
   const resumeRequestIds = useRef(new Map<string, string>());
   const reworkRequestIds = useRef(new Map<string, string>());
   const dashboardRef = useRef<DashboardPayload | null>(
@@ -433,6 +445,46 @@ export function useBriar(options: UseBriarOptions = {}) {
       return next;
     });
   }, []);
+
+  const setConnectedProjectInventory = useCallback((next: string[] | null) => {
+    setConnectedProjectIds((current) => {
+      if (current === next) return current;
+      if (!current || !next || current.length !== next.length) return next;
+      return current.every((projectId) => next.includes(projectId))
+        ? current
+        : next;
+    });
+  }, []);
+
+  const applyLocalProjectInventoryObservation = useCallback((
+    observation: LocalProjectInventoryObservation,
+  ) => {
+    setConnectedProjectInventory(observation.connectedProjectIds);
+    setLocalProjectInventoryError(
+      observation.status === "error"
+        ? `로컬 프로젝트 연결 목록을 읽지 못했습니다: ${
+            observation.error instanceof Error
+              ? observation.error.message
+              : String(observation.error)
+          }`
+        : null,
+    );
+    return observation.connectedProjectIds;
+  }, [setConnectedProjectInventory]);
+
+  const setProjectReadinessLoading = useCallback(
+    (projectId: string, loading: boolean) => {
+      setProjectReadinessLoadingProjects((current) => {
+        const alreadyLoading = current.has(projectId);
+        if (alreadyLoading === loading) return current;
+        const next = new Set(current);
+        if (loading) next.add(projectId);
+        else next.delete(projectId);
+        return next;
+      });
+    },
+    [],
+  );
 
   const clearLoginTimer = useCallback(() => {
     if (pollTimer.current === null) return;
@@ -607,15 +659,15 @@ export function useBriar(options: UseBriarOptions = {}) {
         if (!cancelled) scheduleRetry(caught);
         return;
       }
-      const nextConnectedProjectIds = remoteMode
-        ? null
-        : await readConnectedProjectIds();
+      const inventoryObservation: LocalProjectInventoryObservation = remoteMode
+        ? { status: "loaded", connectedProjectIds: null, error: null }
+        : await readinessCoordinator.inspectInventory();
       if (cancelled) return;
       setToken(result.token);
       setUser(result.user);
       setProjects(result.projects);
       setOrganizations(nextOrganizations);
-      setConnectedProjectIds(nextConnectedProjectIds);
+      applyLocalProjectInventoryObservation(inventoryObservation);
       const selection = resolveActiveAccountSelection(
         result.user.id,
         nextOrganizations,
@@ -741,6 +793,71 @@ export function useBriar(options: UseBriarOptions = {}) {
     token,
   ]);
 
+  const applyProjectReadinessObservation = useCallback((
+    projectId: string,
+    observation: LocalProjectReadinessObservation<RepositoryReadiness>,
+  ) => {
+    if (observation.status === "superseded") return null;
+    applyLocalProjectInventoryObservation(
+      observation.status === "unknown"
+        ? {
+            status: "error",
+            connectedProjectIds: null,
+            error: observation.error,
+          }
+        : {
+            status: "loaded",
+            connectedProjectIds: observation.connectedProjectIds,
+            error: null,
+          },
+    );
+    setProjectReadiness((current) => {
+      const next = { ...current };
+      if (observation.status === "ready") {
+        next[projectId] = observation.readiness;
+      } else {
+        delete next[projectId];
+      }
+      return next;
+    });
+    setProjectReadinessError((current) => {
+      const next = { ...current };
+      if (observation.status === "unknown" || observation.status === "error") {
+        next[projectId] = observation.error instanceof Error
+          ? observation.error.message
+          : String(observation.error);
+      } else {
+        delete next[projectId];
+      }
+      return next;
+    });
+    return observation.status === "ready" ? observation.readiness : null;
+  }, [applyLocalProjectInventoryObservation]);
+
+  const refreshProjectReadiness = useCallback(async (projectId: string) => {
+    if (demoMode || remoteMode) return null;
+    setProjectReadinessLoading(projectId, true);
+    setProjectReadinessError((current) => {
+      const next = { ...current };
+      delete next[projectId];
+      return next;
+    });
+    setProjectReadiness((current) => {
+      const next = { ...current };
+      delete next[projectId];
+      return next;
+    });
+    const observation = await readinessCoordinator.inspect(projectId);
+    if (observation.status === "superseded") return null;
+    const readiness = applyProjectReadinessObservation(projectId, observation);
+    setProjectReadinessLoading(projectId, false);
+    return readiness;
+  }, [
+    applyProjectReadinessObservation,
+    readinessCoordinator,
+    setProjectReadinessLoading,
+  ]);
+
   const lastSyncedSharedWorkflowKeys = useRef(new Map<string, string>());
 
   // Once the saved session and local project ids have been restored, mirror
@@ -776,6 +893,9 @@ export function useBriar(options: UseBriarOptions = {}) {
       for (const result of results) {
         if (result.status === "synced" || result.status === "unchanged") {
           lastSyncedSharedWorkflowKeys.current.set(result.projectId, result.key);
+          if (result.status === "synced") {
+            void refreshProjectReadiness(result.projectId);
+          }
         } else if (result.status === "failed") {
           console.warn(
             `Failed to mirror shared project workflow for ${result.projectId}`,
@@ -787,44 +907,58 @@ export function useBriar(options: UseBriarOptions = {}) {
     return () => {
       cancelled = true;
     };
-  }, [connectedProjectIds, lockedProjectId, projects, token]);
+  }, [
+    connectedProjectIds,
+    lockedProjectId,
+    projects,
+    refreshProjectReadiness,
+    token,
+  ]);
 
   const refreshHealth = useCallback(async () => {
+    const request = ++healthRequest.current;
+    const projectId = activeProjectId;
     if (
       demoMode ||
       remoteMode ||
-      !activeProjectId ||
+      !projectId ||
       // 이 기기에 저장소를 연결하기 전에는 로컬 상태를 검사할 대상이 없습니다.
-      !isProjectConnectedLocally(connectedProjectIds, activeProjectId)
+      !isProjectConnectedLocally(connectedProjectIds, projectId)
     ) {
       setHealth(null);
       setHealthError(null);
+      setHealthLoading(false);
       return null;
     }
+    const isCurrent = () =>
+      request === healthRequest.current &&
+      activeProjectIdRef.current === projectId;
     setHealthLoading(true);
     try {
       // Project workflow tools are shared via project settings. Mirror them
       // into the local config so this worker machine can probe readiness.
       const sharedWorkflow =
-        dashboardRef.current?.project.id === activeProjectId
+        dashboardRef.current?.project.id === projectId
           ? dashboardRef.current.settings.workflow
           : null;
       const syncPlan = shouldSyncSharedWorkflow({
         connectedLocally: true,
         sharedWorkflow,
         lastSyncedKey:
-          lastSyncedSharedWorkflowKeys.current.get(activeProjectId) ?? null,
-        projectId: activeProjectId,
+          lastSyncedSharedWorkflowKeys.current.get(projectId) ?? null,
+        projectId,
       });
       if (syncPlan.sync && sharedWorkflow) {
         try {
-          await updateLocalProjectWorkflow(activeProjectId, sharedWorkflow);
+          await updateLocalProjectWorkflow(projectId, sharedWorkflow);
           if (syncPlan.key) {
             lastSyncedSharedWorkflowKeys.current.set(
-              activeProjectId,
+              projectId,
               syncPlan.key,
             );
           }
+          if (!isCurrent()) return null;
+          await refreshProjectReadiness(projectId);
         } catch (syncError) {
           console.warn(
             "Failed to mirror shared project workflow for tool checks",
@@ -832,22 +966,25 @@ export function useBriar(options: UseBriarOptions = {}) {
           );
         }
       } else if (syncPlan.key) {
-        lastSyncedSharedWorkflowKeys.current.set(activeProjectId, syncPlan.key);
+        lastSyncedSharedWorkflowKeys.current.set(projectId, syncPlan.key);
       }
 
-      const result = await loadAutoHuntHealth(activeProjectId);
+      if (!isCurrent()) return null;
+      const result = await loadAutoHuntHealth(projectId);
+      if (!isCurrent()) return null;
       setHealth(result);
       setHealthError(null);
       return result;
     } catch (caught) {
+      if (!isCurrent()) return null;
       const message = caught instanceof Error ? caught.message : String(caught);
       setHealth(null);
       setHealthError(message);
       return null;
     } finally {
-      setHealthLoading(false);
+      if (isCurrent()) setHealthLoading(false);
     }
-  }, [activeProjectId, connectedProjectIds]);
+  }, [activeProjectId, connectedProjectIds, refreshProjectReadiness]);
 
   useEffect(() => {
     void refreshHealth();
@@ -881,69 +1018,31 @@ export function useBriar(options: UseBriarOptions = {}) {
     sharedWorkflowSyncKey,
   ]);
 
-  const refreshProjectReadiness = useCallback(async (projectId: string) => {
-    if (demoMode || remoteMode) return null;
-    setProjectReadinessLoadingId(projectId);
-    try {
-      const readiness = await loadProjectRepositoryReadiness(projectId);
-      if (!readiness) return null;
-      setProjectReadiness((current) => ({
-        ...current,
-        [projectId]: readiness,
-      }));
-      setProjectReadinessError((current) => {
-        const next = { ...current };
-        delete next[projectId];
-        return next;
-      });
-      return readiness;
-    } catch (caught) {
-      const message = caught instanceof Error ? caught.message : String(caught);
-      setProjectReadinessError((current) => ({
-        ...current,
-        [projectId]: message,
-      }));
-      return null;
-    } finally {
-      setProjectReadinessLoadingId((current) =>
-        current === projectId ? null : current,
-      );
-    }
-  }, []);
-
   useEffect(() => {
     if (demoMode || remoteMode || projects.length === 0) return;
     const relevantProjects = lockedProjectId
       ? projects.filter((project) => project.id === lockedProjectId)
       : projects;
     let cancelled = false;
-    void Promise.all(
-      relevantProjects.map(async (project) => {
-        if (!isProjectConnectedLocally(connectedProjectIds, project.id)) {
-          return null;
-        }
-        try {
-          const readiness = await loadProjectRepositoryReadiness(project.id);
-          return readiness ? ([project.id, readiness] as const) : null;
-        } catch {
-          return null;
-        }
-      }),
-    ).then((entries) => {
-      if (cancelled) return;
-      setProjectReadiness(
-        Object.fromEntries(
-          entries.filter(
-            (entry): entry is readonly [string, RepositoryReadiness] =>
-              entry !== null,
-          ),
-        ),
-      );
-    });
+    for (const project of relevantProjects) {
+      setProjectReadinessLoading(project.id, true);
+      void readinessCoordinator.inspect(project.id).then((observation) => {
+        if (cancelled || observation.status === "superseded") return;
+        applyProjectReadinessObservation(project.id, observation);
+        setProjectReadinessLoading(project.id, false);
+      });
+    }
     return () => {
       cancelled = true;
     };
-  }, [connectedProjectIds, lockedProjectId, projects]);
+  }, [
+    applyProjectReadinessObservation,
+    connectedProjectIds,
+    lockedProjectId,
+    projects,
+    readinessCoordinator,
+    setProjectReadinessLoading,
+  ]);
 
   const login = useCallback(async (
     options: {
@@ -996,9 +1095,10 @@ export function useBriar(options: UseBriarOptions = {}) {
                     loadOrganizations,
                   },
                 );
-            const nextConnectedProjectIds = remoteMode
-              ? null
-              : await readConnectedProjectIds();
+            const inventoryObservation: LocalProjectInventoryObservation =
+              remoteMode
+                ? { status: "loaded", connectedProjectIds: null, error: null }
+                : await readinessCoordinator.inspectInventory();
             if (attempt !== loginAttempt.current) return;
             await writeSessionToken(nextToken);
             if (attempt !== loginAttempt.current) {
@@ -1009,7 +1109,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             setUser(nextUser);
             setProjects(nextProjects);
             setOrganizations(nextOrganizations);
-            setConnectedProjectIds(nextConnectedProjectIds);
+            applyLocalProjectInventoryObservation(inventoryObservation);
             const selection = resolveActiveAccountSelection(
               nextUser.id,
               nextOrganizations,
@@ -1019,6 +1119,7 @@ export function useBriar(options: UseBriarOptions = {}) {
             setActiveOrganizationId(selection.activeOrganizationId);
             setActiveProjectId(selection.activeProjectId);
             setProjectConnection(null);
+            setError(null);
             setLoginCode(null);
             setLoading(false);
             pollLoginNow.current = null;
@@ -1060,6 +1161,7 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   const acceptInvitation = useCallback(
     async (invitationToken: string) => {
+      reconnectRequest.current += 1;
       if (!token) throw new Error("로그인이 필요합니다.");
       setLoading(true);
       setError(null);
@@ -1091,6 +1193,7 @@ export function useBriar(options: UseBriarOptions = {}) {
   );
 
   const logout = useCallback(async () => {
+    reconnectRequest.current += 1;
     cancelLogin();
     await clearSessionToken();
     setToken(null);
@@ -1098,6 +1201,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     setProjects([]);
     setOrganizations([]);
     setConnectedProjectIds(null);
+    setLocalProjectInventoryError(null);
     setActiveOrganizationId(null);
     setDashboard(null);
     setActiveProjectId(null);
@@ -1124,6 +1228,7 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   const deleteAccount = useCallback(
     async (confirmation: string) => {
+      reconnectRequest.current += 1;
       if (!token) throw new Error("로그인이 필요합니다.");
       await deleteRemoteAccount(token, confirmation);
       await Promise.allSettled(
@@ -1136,6 +1241,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       setProjects([]);
       setOrganizations([]);
       setConnectedProjectIds(null);
+      setLocalProjectInventoryError(null);
       setActiveOrganizationId(null);
       setDashboard(null);
       setActiveProjectId(null);
@@ -1146,11 +1252,13 @@ export function useBriar(options: UseBriarOptions = {}) {
   );
 
   const startProjectCreation = useCallback(() => {
+    reconnectRequest.current += 1;
     setError(null);
     setIsCreatingProject(true);
   }, []);
 
   const cancelProjectCreation = useCallback(() => {
+    reconnectRequest.current += 1;
     setError(null);
     setIsCreatingProject(false);
     setProjectConnection(null);
@@ -1167,6 +1275,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (lockedProjectId && projectId !== lockedProjectId) return;
       const project = projects.find((candidate) => candidate.id === projectId);
       if (!project) return;
+      reconnectRequest.current += 1;
       setActiveProjectId(projectId);
       setActiveOrganizationId((current) => project.organizationId ?? current);
       if (!demoMode) {
@@ -1186,6 +1295,7 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   const ensureProjectSelected = useCallback(
     async (projectId: string) => {
+      reconnectRequest.current += 1;
       if (lockedProjectId && projectId !== lockedProjectId) {
         throw new Error("이 윈도우에서는 다른 프로젝트를 열 수 없습니다.");
       }
@@ -1224,6 +1334,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           (project) => project.id === lockedProjectId,
         );
         if (lockedProject?.organizationId !== organizationId) return;
+        reconnectRequest.current += 1;
         setActiveOrganizationId(organizationId);
         setActiveProjectId(lockedProject.id);
         setError(null);
@@ -1232,6 +1343,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (!organizations.some((organization) => organization.id === organizationId)) {
         return;
       }
+      reconnectRequest.current += 1;
       const project =
         projects.find((candidate) => candidate.organizationId === organizationId) ??
         null;
@@ -1431,6 +1543,7 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   const addOrganization = useCallback(
     async (input: { name: string; handle: string }) => {
+      reconnectRequest.current += 1;
       let organization: Organization;
       if (demoMode) {
         if (
@@ -1523,6 +1636,7 @@ export function useBriar(options: UseBriarOptions = {}) {
 
   const removeProject = useCallback(
     async (projectId: string) => {
+      reconnectRequest.current += 1;
       const project = projects.find((candidate) => candidate.id === projectId);
       if (!project) throw new Error("삭제할 프로젝트가 없습니다.");
       setDeletingProjectId(projectId);
@@ -1668,9 +1782,23 @@ export function useBriar(options: UseBriarOptions = {}) {
         repositoryPath,
         autoHunt,
       });
-      setConnectedProjectIds((current) =>
-        withConnectedProject(current, connection.project.id),
+      // The local config write is the connection commit boundary. Reflect it
+      // immediately; later workflow analysis and optional worker setup may be
+      // retried without letting the UI disagree with disk.
+      const inventoryObservation = await readinessCoordinator.inspectInventory(
+        true,
       );
+      const connectedInventory = applyLocalProjectInventoryObservation(
+        inventoryObservation,
+      );
+      if (inventoryObservation.status === "error") {
+        throw inventoryObservation.error instanceof Error
+          ? inventoryObservation.error
+          : new Error(String(inventoryObservation.error));
+      }
+      if (!connectedInventory?.includes(connection.project.id)) {
+        throw new Error("저장된 로컬 프로젝트 연결을 다시 확인하지 못했습니다.");
+      }
       const {
         workflow: generatedWorkflow,
         shouldPersistProjectSettings,
@@ -1710,6 +1838,11 @@ export function useBriar(options: UseBriarOptions = {}) {
           initialSettings,
         );
         savedSettings = saved.settings;
+        setProjectConnection((current) =>
+          current?.project.id === connection.project.id
+            ? { ...current, workflow: generatedWorkflow }
+            : current,
+        );
       }
 
       let connectedProject = connection.project;
@@ -1742,11 +1875,6 @@ export function useBriar(options: UseBriarOptions = {}) {
               },
         );
       }
-      setProjectConnection((current) =>
-        current?.project.id === connection.project.id
-          ? { ...current, project: connectedProject, workflow: generatedWorkflow }
-          : current,
-      );
       if (connection.kind === "new" && token) {
         await configureLocalExecutionWorker(
           connection.project.id,
@@ -1754,8 +1882,12 @@ export function useBriar(options: UseBriarOptions = {}) {
           true,
         );
       }
+      setProjectConnection((current) =>
+        current?.project.id === connection.project.id
+          ? { ...current, project: connectedProject, workflow: generatedWorkflow }
+          : current,
+      );
       setError(null);
-      void refreshHealth();
       await refreshProjectReadiness(connection.project.id);
 
       return {
@@ -1769,10 +1901,19 @@ export function useBriar(options: UseBriarOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [projectConnection, refreshHealth, refreshProjectReadiness, token]);
+  }, [
+    applyLocalProjectInventoryObservation,
+    projectConnection,
+    refreshProjectReadiness,
+    readinessCoordinator,
+    token,
+  ]);
 
   const installGithubForProject = useCallback(async (projectId: string) => {
-    setProjectReadinessLoadingId(projectId);
+    const request = readinessCoordinator.begin(projectId);
+    const isCurrent = () =>
+      readinessCoordinator.isCurrent(projectId, request);
+    setProjectReadinessLoading(projectId, true);
     setProjectReadinessError((current) => {
       const next = { ...current };
       delete next[projectId];
@@ -1780,19 +1921,26 @@ export function useBriar(options: UseBriarOptions = {}) {
     });
     try {
       const readiness = await installProjectGithubCli(projectId);
+      if (!isCurrent()) return null;
       setProjectReadiness((current) => ({ ...current, [projectId]: readiness }));
       return readiness;
     } catch (caught) {
+      if (!isCurrent()) return null;
       const message = caught instanceof Error ? caught.message : String(caught);
       setProjectReadinessError((current) => ({ ...current, [projectId]: message }));
       throw caught;
     } finally {
-      setProjectReadinessLoadingId(null);
+      if (isCurrent()) {
+        setProjectReadinessLoading(projectId, false);
+      }
     }
-  }, []);
+  }, [readinessCoordinator, setProjectReadinessLoading]);
 
   const loginGithubForProject = useCallback(async (projectId: string) => {
-    setProjectReadinessLoadingId(projectId);
+    const request = readinessCoordinator.begin(projectId);
+    const isCurrent = () =>
+      readinessCoordinator.isCurrent(projectId, request);
+    setProjectReadinessLoading(projectId, true);
     setProjectReadinessError((current) => {
       const next = { ...current };
       delete next[projectId];
@@ -1800,47 +1948,86 @@ export function useBriar(options: UseBriarOptions = {}) {
     });
     try {
       const readiness = await loginProjectGithub(projectId);
+      if (!isCurrent()) return null;
       setProjectReadiness((current) => ({ ...current, [projectId]: readiness }));
       return readiness;
     } catch (caught) {
+      if (!isCurrent()) return null;
       const message = caught instanceof Error ? caught.message : String(caught);
       setProjectReadinessError((current) => ({ ...current, [projectId]: message }));
       throw caught;
     } finally {
-      setProjectReadinessLoadingId(null);
+      if (isCurrent()) {
+        setProjectReadinessLoading(projectId, false);
+      }
     }
-  }, []);
+  }, [readinessCoordinator, setProjectReadinessLoading]);
 
   const repairHealth = useCallback(async () => {
-    if (!activeProjectId) throw new Error("복구할 프로젝트가 없습니다.");
+    const projectId = activeProjectId;
+    if (!projectId) throw new Error("복구할 프로젝트가 없습니다.");
+    const request = ++healthRequest.current;
+    const isCurrent = () =>
+      request === healthRequest.current &&
+      activeProjectIdRef.current === projectId;
     setHealthLoading(true);
     setHealthError(null);
     try {
-      const result = await repairAutoHunt(activeProjectId);
+      const result = await repairAutoHunt(projectId);
+      if (!isCurrent()) return null;
       setHealth(result);
       return result;
     } catch (caught) {
+      if (!isCurrent()) return null;
       const message = caught instanceof Error ? caught.message : String(caught);
       setHealthError(message);
       return null;
     } finally {
-      setHealthLoading(false);
+      if (isCurrent()) setHealthLoading(false);
     }
   }, [activeProjectId]);
 
-  const reconnectProject = useCallback(() => {
-    const project = projects.find((candidate) => candidate.id === activeProjectId);
-    if (!project) return;
+  const reconnectProject = useCallback(async (projectId = activeProjectId) => {
+    const request = ++reconnectRequest.current;
+    const project = projects.find((candidate) => candidate.id === projectId);
+    if (!project) return "failed" as const;
     setError(null);
+    let workflow: ProjectSettings["workflow"];
+    try {
+      const automaticGeneration = automaticWorkflowGenerations.current.get(
+        project.id,
+      );
+      if (automaticGeneration) {
+        // Reuse the repository analysis already in flight. Opening reconnect
+        // must not launch a second LLM generation from the same pending
+        // workflow snapshot.
+        workflow = await automaticGeneration;
+      } else if (dashboard?.project.id === project.id) {
+        workflow = dashboard.settings.workflow;
+      } else {
+        if (!token) throw new Error("로그인이 필요합니다.");
+        workflow = (await loadDashboard(token, project.id)).settings.workflow;
+      }
+    } catch (caught) {
+      if (request === reconnectRequest.current) {
+        setError(caught instanceof Error ? caught.message : String(caught));
+        return "failed" as const;
+      }
+      return "superseded" as const;
+    }
+    if (request !== reconnectRequest.current) return "superseded" as const;
     setVelen(null);
+    setActiveProjectId(project.id);
+    setActiveOrganizationId((current) => project.organizationId ?? current);
     setIsCreatingProject(true);
     setProjectConnection({
       kind: "reconnect",
       project,
       agentToken: null,
-      workflow: dashboard?.settings.workflow,
+      workflow,
     });
-  }, [activeProjectId, dashboard?.settings.workflow, projects]);
+    return "opened" as const;
+  }, [activeProjectId, dashboard, projects, token]);
 
   const persistProjectWorkflow = useCallback(
     async (
@@ -2002,17 +2189,32 @@ export function useBriar(options: UseBriarOptions = {}) {
       !token ||
       !projectId ||
       !connectedProjectIds?.includes(projectId) ||
+      projectConnection?.project.id === projectId ||
       !isRepositoryWorkflowPending(dashboard.settings.workflow) ||
       workflowGenerationAttempts.current.has(projectId)
     ) {
       return;
     }
     workflowGenerationAttempts.current.add(projectId);
-    void regenerateWorkflow(projectId).catch((caught) => {
-      const message = caught instanceof Error ? caught.message : String(caught);
-      setError(`저장소 기반 워크플로우 생성에 실패했습니다: ${message}`);
-    });
-  }, [connectedProjectIds, dashboard, regenerateWorkflow, token]);
+    const generation = regenerateWorkflow(projectId);
+    automaticWorkflowGenerations.current.set(projectId, generation);
+    void generation
+      .catch((caught) => {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setError(`저장소 기반 워크플로우 생성에 실패했습니다: ${message}`);
+      })
+      .finally(() => {
+        if (automaticWorkflowGenerations.current.get(projectId) === generation) {
+          automaticWorkflowGenerations.current.delete(projectId);
+        }
+      });
+  }, [
+    connectedProjectIds,
+    dashboard,
+    projectConnection,
+    regenerateWorkflow,
+    token,
+  ]);
 
   const assertRepositoryReadyForLinearImport = useCallback(
     (projectId: string) => {
@@ -3730,7 +3932,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     cloneProjectRepository,
     connectProject,
     connectedProjectIds,
-    isActiveProjectConnectedLocally: isProjectConnectedLocally(
+    activeProjectConnectionState: localProjectConnectionState(
       connectedProjectIds,
       activeProjectId,
     ),
@@ -3745,7 +3947,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     companionMode,
     remoteMode,
     webMode,
-    error,
+    error: error ?? localProjectInventoryError,
     health,
     healthError,
     healthLoading,
@@ -3762,7 +3964,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     projectConnection,
     projectReadiness,
     projectReadinessError,
-    projectReadinessLoadingId,
+    projectReadinessLoadingProjects,
     reconnectProject,
     renameOrganization,
     analyzeWorkflowRequirements,

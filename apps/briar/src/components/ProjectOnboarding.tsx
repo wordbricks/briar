@@ -19,7 +19,13 @@ import {
   X,
 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import type { ProjectConnection } from "../hooks/useBriar";
 import { ApiError, apiErrorIssueMessages } from "../lib/api";
 import {
@@ -137,6 +143,8 @@ type OnboardingPhase =
   | "workflow-review"
   | "tools-loading"
   | "tools-review";
+
+type RepositoryOperation = "idle" | "preflight" | "commit";
 
 function Progress({ current, total }: { current: number; total: 3 | 4 }) {
   return (
@@ -331,7 +339,11 @@ export function ProjectOnboarding({
     useState<RepositoryReadiness | null>(null);
   const [repositoryError, setRepositoryError] = useState<string | null>(null);
   const [selectingRepository, setSelectingRepository] = useState(false);
-  const [preflightingRepository, setPreflightingRepository] = useState(false);
+  const [repositoryOperation, setRepositoryOperation] =
+    useState<RepositoryOperation>("idle");
+  const repositoryOperationRef = useRef<RepositoryOperation>("idle");
+  const repositoryRequest = useRef(0);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [connectionPreflight, setConnectionPreflight] =
     useState<LocalProjectConnectionPreflight | null>(null);
   const [workflow, setWorkflow] = useState<AutoHuntWorkflow | null>(null);
@@ -358,13 +370,42 @@ export function ProjectOnboarding({
   const [lovablePreset, setLovablePreset] =
     useState<AutoHuntWorkflow | null>(null);
 
+  const updateRepositoryOperation = useCallback(
+    (operation: RepositoryOperation) => {
+      repositoryOperationRef.current = operation;
+      setRepositoryOperation(operation);
+    },
+    [],
+  );
+  const cancelOnboarding = useCallback(() => {
+    if (
+      loading ||
+      lovableImporting ||
+      repositoryOperationRef.current === "commit"
+    ) {
+      return;
+    }
+    repositoryRequest.current += 1;
+    updateRepositoryOperation("idle");
+    onCancel();
+  }, [loading, lovableImporting, onCancel, updateRepositoryOperation]);
+
+  const preflightingRepository = repositoryOperation !== "idle";
+
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !loading && !lovableImporting) onCancel();
+      if (event.key === "Escape") cancelOnboarding();
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [loading, lovableImporting, onCancel]);
+  }, [cancelOnboarding]);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+    return () => {
+      repositoryRequest.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     if (connection && !name) setName(connection.project.name);
@@ -445,18 +486,21 @@ export function ProjectOnboarding({
   ]);
 
   const selectRepository = async () => {
+    const request = ++repositoryRequest.current;
+    const isCurrent = () => request === repositoryRequest.current;
     setSelectingRepository(true);
     setRepositoryError(null);
     setConnectionPreflight(null);
     try {
       const selected = await onRepositorySelect();
-      if (!selected) return;
+      if (!selected || !isCurrent()) return;
       setRepositoryPath(selected);
       setRepositoryReadiness(null);
       const readiness = await onRepositoryInspect(
         selected,
         connection?.workflow ?? repositoryWorkflowBootstrap,
       );
+      if (!isCurrent()) return;
       setRepositoryPath(readiness.repositoryPath);
       setRepositoryReadiness(readiness);
       if (!connection) setName(repositoryProjectName(readiness.repositoryPath));
@@ -468,21 +512,24 @@ export function ProjectOnboarding({
           ),
           readiness.repositoryPath,
         );
+        if (!isCurrent()) return;
         setRepositoryPath(preflight.repositoryPath);
         setConnectionPreflight(preflight);
       } catch (caught) {
+        if (!isCurrent()) return;
         setRepositoryError(
           caught instanceof Error ? caught.message : String(caught),
         );
       }
     } catch (caught) {
+      if (!isCurrent()) return;
       setRepositoryReadiness(null);
       setConnectionPreflight(null);
       setRepositoryError(
         caught instanceof Error ? caught.message : String(caught),
       );
     } finally {
-      setSelectingRepository(false);
+      if (isCurrent()) setSelectingRepository(false);
     }
   };
 
@@ -550,12 +597,26 @@ export function ProjectOnboarding({
       selectedWorkflow,
       repositoryReadiness,
     );
-    setPreflightingRepository(true);
+    const request = ++repositoryRequest.current;
+    const assertCurrent = () => {
+      if (request !== repositoryRequest.current) {
+        throw new Error("Project connection request was cancelled");
+      }
+    };
+    updateRepositoryOperation("preflight");
     setRepositoryError(null);
+    setConnectionPreflight(null);
     try {
       const preflight = await preflightThenCreateProject(
         () => onPreflight(settings, repositoryPath),
-        connection ? undefined : () => onCreate({ name: projectName }),
+        connection
+          ? undefined
+          : async () => {
+              assertCurrent();
+              updateRepositoryOperation("commit");
+              await onCreate({ name: projectName });
+            },
+        assertCurrent,
       );
       setRepositoryPath(preflight.repositoryPath);
       setConnectionPreflight(preflight);
@@ -563,18 +624,23 @@ export function ProjectOnboarding({
         connection?.workflow &&
         !isRepositoryWorkflowPending(connection.workflow)
       ) {
+        updateRepositoryOperation("commit");
         await onConnect(settings, preflight.repositoryPath);
+        assertCurrent();
         onFinish();
         return;
       }
       setWorkflowError(null);
       setPhase("workflow-loading");
     } catch (caught) {
+      if (request !== repositoryRequest.current) return;
       setRepositoryError(
         caught instanceof Error ? caught.message : String(caught),
       );
     } finally {
-      setPreflightingRepository(false);
+      if (request === repositoryRequest.current) {
+        updateRepositoryOperation("idle");
+      }
     }
   };
 
@@ -674,11 +740,7 @@ export function ProjectOnboarding({
     <div
       className="dialog-backdrop project-onboarding-modal-backdrop"
       onMouseDown={(event) => {
-        if (
-          event.currentTarget === event.target &&
-          !loading &&
-          !lovableImporting
-        ) onCancel();
+        if (event.currentTarget === event.target) cancelOnboarding();
       }}
     >
       <section
@@ -690,7 +752,20 @@ export function ProjectOnboarding({
         <header className="project-onboarding-dialog-toolbar">
           <span>
             {backAction ? (
-              <button onClick={backAction} type="button">
+              <button
+                disabled={
+                  loading ||
+                  lovableImporting ||
+                  repositoryOperation === "commit"
+                }
+                onClick={() => {
+                  repositoryRequest.current += 1;
+                  setSelectingRepository(false);
+                  updateRepositoryOperation("idle");
+                  backAction();
+                }}
+                type="button"
+              >
                 <ArrowLeft size={15} /> {t("onboarding.previous")}
               </button>
             ) : null}
@@ -698,8 +773,13 @@ export function ProjectOnboarding({
           <button
             aria-label={t("common.close")}
             className="project-onboarding-dialog-close"
-            disabled={loading || lovableImporting}
-            onClick={onCancel}
+            disabled={
+              loading ||
+              lovableImporting ||
+              repositoryOperation === "commit"
+            }
+            onClick={cancelOnboarding}
+            ref={closeButtonRef}
             type="button"
           >
             <X size={18} />

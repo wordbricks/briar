@@ -1168,6 +1168,7 @@ body { overflow: hidden; font-synthesis: none; }
 .project-lobby-state { min-width:max-content; margin-left:auto; padding:5px 8px; border-radius:999px; font-size:var(--text-2xs); font-weight:650; }
 .project-lobby-state.ready { color:#27795e; background:#e8f7f1; }
 .project-lobby-state.attention { color:#9b651d; background:#fff2dd; }
+.project-lobby-state.optional { color:var(--muted-foreground); background:var(--muted); }
 .project-lobby-repository { min-height:126px; padding:20px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
 .project-lobby-repository > div { min-width:0; display:grid; gap:6px; }
 .project-lobby-repository small { color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:600; }

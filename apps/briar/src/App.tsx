@@ -149,6 +149,11 @@ import {
   type BriarLinkTarget,
 } from "./lib/issue-links";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
+import {
+  localProjectConnectionState,
+  localProjectReadiness,
+  projectRepositoryDestination,
+} from "./lib/local-project-connection";
 import type { IssueDetailTab } from "./lib/issue-detail-tab";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./lib/agent-usage-pricing";
@@ -1574,10 +1579,98 @@ export function App({
   );
   const [repositorySetupProjectId, setRepositorySetupProjectId] =
     useState<string | null>(null);
+  const repositorySetupTriggerRef = useRef<HTMLElement | null>(null);
+  const repositoryReconnectRequestRef = useRef(0);
+  const rememberRepositorySetupTrigger = useCallback(() => {
+    const activeElement = document.activeElement;
+    repositorySetupTriggerRef.current =
+      activeElement instanceof HTMLElement && activeElement !== document.body
+        ? activeElement
+        : null;
+  }, []);
+  const restoreRepositorySetupTrigger = useCallback(() => {
+    const trigger = repositorySetupTriggerRef.current;
+    repositorySetupTriggerRef.current = null;
+    window.requestAnimationFrame(() => {
+      if (trigger?.isConnected) trigger.focus();
+    });
+  }, []);
+  const beginProjectReconnect = useCallback(
+    (projectId: string, rememberTrigger = true) => {
+      const request = ++repositoryReconnectRequestRef.current;
+      if (rememberTrigger) rememberRepositorySetupTrigger();
+      const trigger = repositorySetupTriggerRef.current;
+      void briar.reconnectProject(projectId).then((outcome) => {
+        if (
+          request !== repositoryReconnectRequestRef.current ||
+          repositorySetupTriggerRef.current !== trigger
+        ) {
+          return;
+        }
+        if (outcome === "opened") return;
+        repositorySetupTriggerRef.current = null;
+        if (outcome !== "failed") return;
+        const activeElement = document.activeElement;
+        if (
+          trigger?.isConnected &&
+          (activeElement === trigger || activeElement === document.body)
+        ) {
+          trigger.focus();
+        }
+      });
+    },
+    [briar.reconnectProject, rememberRepositorySetupTrigger],
+  );
   const hasCompactedWindowForOnboarding = useRef(false);
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
+  const openProjectRepository = useCallback((projectId: string) => {
+    if (!briar.projects.some((project) => project.id === projectId)) return;
+
+    const connectionState = localProjectConnectionState(
+      briar.connectedProjectIds,
+      projectId,
+    );
+    const readiness = briar.projectReadiness[projectId] ?? null;
+    const destination = projectRepositoryDestination({
+      connectionState,
+      readiness,
+      requiresLocalReadiness: !briar.remoteMode,
+    });
+
+    setRepositorySetupProjectId(null);
+    if (destination === "reconnect") {
+      beginProjectReconnect(projectId);
+      return;
+    }
+
+    briar.setActiveProjectId(projectId);
+    if (destination === "settings") {
+      repositorySetupTriggerRef.current = null;
+      setSettingsTarget({
+        scope: "project",
+        projectId,
+        section: "general",
+      });
+      navigateToPage("settings", projectId);
+      return;
+    }
+
+    rememberRepositorySetupTrigger();
+    setRepositorySetupProjectId(projectId);
+    void briar.refreshProjectReadiness(projectId);
+  }, [
+    briar.connectedProjectIds,
+    briar.projectReadiness,
+    briar.projects,
+    briar.remoteMode,
+    briar.refreshProjectReadiness,
+    briar.setActiveProjectId,
+    beginProjectReconnect,
+    rememberRepositorySetupTrigger,
+    navigateToPage,
+  ]);
   const projectWindowProject = projectWindowProjectId
     ? briar.projects.find((project) => project.id === projectWindowProjectId) ?? null
     : null;
@@ -3269,7 +3362,7 @@ export function App({
                 ? openProjectInNewWindow
                 : undefined
             }
-            onProjectReadinessOpen={setRepositorySetupProjectId}
+            onProjectRepositoryOpen={openProjectRepository}
             onProjectSettings={(projectId) => {
               briar.setActiveProjectId(projectId);
               setSettingsTarget({
@@ -3284,6 +3377,7 @@ export function App({
             organizations={briar.organizations}
             projects={visibleProjects}
             projectReadiness={briar.projectReadiness}
+            projectReadinessError={briar.projectReadinessError}
             projectWindowProjectId={projectWindowProjectId}
             sessions={autoHunt.sessions}
             token={briar.token}
@@ -3295,20 +3389,19 @@ export function App({
         <div className="app-content-surface">
         {repositorySetupProjectId ? (
           <ProjectRepositorySetupDialog
+            connectionState={localProjectConnectionState(
+              briar.connectedProjectIds,
+              repositorySetupProjectId,
+            )}
             error={briar.projectReadinessError[repositorySetupProjectId] ?? null}
             loading={
-              briar.projectReadinessLoadingId === repositorySetupProjectId
+              briar.projectReadinessLoadingProjects.has(
+                repositorySetupProjectId,
+              )
             }
             onClose={() => {
-              const projectId = repositorySetupProjectId;
               setRepositorySetupProjectId(null);
-              window.requestAnimationFrame(() => {
-                document
-                  .querySelector<HTMLButtonElement>(
-                    `[data-project-readiness="${projectId}"]`,
-                  )
-                  ?.focus();
-              });
+              restoreRepositorySetupTrigger();
             }}
             onInstallGithub={() =>
               briar.installGithubForProject(repositorySetupProjectId)
@@ -3316,6 +3409,11 @@ export function App({
             onLoginGithub={() =>
               briar.loginGithubForProject(repositorySetupProjectId)
             }
+            onReconnect={() => {
+              const projectId = repositorySetupProjectId;
+              setRepositorySetupProjectId(null);
+              beginProjectReconnect(projectId, false);
+            }}
             onRefresh={() =>
               briar.refreshProjectReadiness(repositorySetupProjectId)
             }
@@ -3344,6 +3442,7 @@ export function App({
           settingsTarget.scope === "application" &&
           briar.user ? (
           <AppSettings
+            connectionState={briar.activeProjectConnectionState}
             error={
               activeProject
                 ? briar.projectReadinessError[activeProject.id] ?? null
@@ -3353,7 +3452,7 @@ export function App({
             isSidebarOpen={isSidebarOpen}
             loading={
               activeProject
-                ? briar.projectReadinessLoadingId === activeProject.id
+                ? briar.projectReadinessLoadingProjects.has(activeProject.id)
                 : false
             }
             navigationSidebar={unifiedSettingsSidebar}
@@ -3380,6 +3479,7 @@ export function App({
                 ? briar.projectReadiness[activeProject.id] ?? null
                 : null
             }
+            requiresLocalReadiness={!briar.remoteMode}
             usageScopeKey={briar.activeOrganizationId ?? "none"}
             user={briar.user}
           />
@@ -3526,7 +3626,10 @@ export function App({
             dashboard={briar.dashboard}
             githubRepository={
               briar.dashboard?.settings.githubRepository ??
-              briar.projectReadiness[activeProject.id]?.githubRepository ??
+              localProjectReadiness(
+                briar.activeProjectConnectionState,
+                briar.projectReadiness[activeProject.id] ?? null,
+              )?.githubRepository ??
               null
             }
             health={briar.health}
@@ -3592,6 +3695,7 @@ export function App({
           />
         ) : activePage === "lobby" && activeProject ? (
           <ProjectLobby
+            connectionState={briar.activeProjectConnectionState}
             dashboard={briar.dashboard}
             isSidebarOpen={isSidebarOpen}
             onLoadUsageSummary={loadProjectHomeUsage}
@@ -3605,21 +3709,7 @@ export function App({
               setRequestedRunId(null);
               navigateToPage("issues");
             }}
-            onOpenRepository={() => {
-              if (
-                briar.projectReadiness[activeProject.id]?.githubRepository ||
-                briar.dashboard?.settings.githubRepository
-              ) {
-                setSettingsTarget({
-                  scope: "project",
-                  projectId: activeProject.id,
-                  section: "general",
-                });
-                navigateToPage("settings");
-                return;
-              }
-              setRepositorySetupProjectId(activeProject.id);
-            }}
+            onOpenRepository={() => openProjectRepository(activeProject.id)}
             onOpenSettings={() => {
               setSettingsTarget({
                 scope: "project",
@@ -3630,6 +3720,7 @@ export function App({
             }}
             project={activeProject}
             readiness={briar.projectReadiness[activeProject.id] ?? null}
+            requiresLocalReadiness={!briar.remoteMode}
           />
         ) : activePage === "agents" && activeProject ? (
           <ProjectAgents
@@ -3841,7 +3932,11 @@ export function App({
             error={briar.healthError}
             health={briar.health}
             loading={briar.healthLoading}
-            onReconnect={briar.reconnectProject}
+            onReconnect={() => {
+              if (briar.activeProjectId) {
+                beginProjectReconnect(briar.activeProjectId);
+              }
+            }}
             onRefresh={() => void briar.refreshHealth()}
             onRepair={() => void briar.repairHealth()}
           />
@@ -4164,6 +4259,7 @@ export function App({
           onCancel={() => {
             setDeveloperToolsProjectSetupRequested(false);
             briar.cancelProjectCreation();
+            restoreRepositorySetupTrigger();
           }}
           onAnalyzeRequirements={async (projectId, onProgress) => {
             const workflow = await briar.analyzeWorkflowRequirements(
@@ -4180,6 +4276,7 @@ export function App({
           onConnect={briar.connectProject}
           onCreate={briar.addProject}
           onFinish={() => {
+            repositorySetupTriggerRef.current = null;
             setDeveloperToolsProjectSetupRequested(false);
             briar.finishProjectCreation();
             setRequestedRunId(null);

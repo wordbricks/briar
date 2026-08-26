@@ -94,4 +94,18 @@ describe("project creation preflight", () => {
     expect(order).toEqual(["preflight"]);
     expect(create).toHaveBeenCalledOnce();
   });
+
+  it("does not create after the preflight request is cancelled", async () => {
+    const create = vi.fn<() => Promise<void>>();
+
+    await expect(preflightThenCreateProject(
+      () => Promise.resolve({ repositoryPath: "/repo" }),
+      create,
+      () => {
+        throw new Error("cancelled");
+      },
+    )).rejects.toThrow("cancelled");
+
+    expect(create).not.toHaveBeenCalled();
+  });
 });

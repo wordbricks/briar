@@ -27,7 +27,7 @@ const sidebarProps = {
   onLogout: () => undefined,
   onOrganizationChange: () => undefined,
   onProjectChange: () => undefined,
-  onProjectReadinessOpen: () => undefined,
+  onProjectRepositoryOpen: () => undefined,
   onProjectSettings: () => undefined,
   onSettings: () => undefined,
   organizations: [
@@ -51,6 +51,7 @@ const sidebarProps = {
     },
   ],
   projectReadiness: {},
+  projectReadinessError: {},
   sessions: [],
   token: null,
   unreadInboxCount: 0,
@@ -991,7 +992,7 @@ describe("Sidebar", () => {
   });
 
   it("opens PR readiness from the warning beside a project", async () => {
-    const onProjectReadinessOpen = vi.fn();
+    const onProjectRepositoryOpen = vi.fn();
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -999,7 +1000,7 @@ describe("Sidebar", () => {
       root.render(
         <Sidebar
           {...sidebarProps}
-          onProjectReadinessOpen={onProjectReadinessOpen}
+          onProjectRepositoryOpen={onProjectRepositoryOpen}
           projectReadiness={{
             "project-1": {
               repositoryPath: "/Users/jay/git/briar",
@@ -1030,10 +1031,76 @@ describe("Sidebar", () => {
     );
     expect(warning?.textContent).toBe("!");
     await act(async () => warning?.click());
-    expect(onProjectReadinessOpen).toHaveBeenCalledWith("project-1");
+    expect(onProjectRepositoryOpen).toHaveBeenCalledWith("project-1");
 
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it("routes a disconnected project to repository reconnect", async () => {
+    const onProjectRepositoryOpen = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <Sidebar
+          {...sidebarProps}
+          connectedProjectIds={[]}
+          onProjectRepositoryOpen={onProjectRepositoryOpen}
+          projectReadiness={{
+            "project-1": {
+              repositoryPath: "/stale/repository",
+              gitInstalled: true,
+              gitVersion: "git version 2.50.1",
+              repositoryHealthy: true,
+              remote: "git@github.com:wordbricks/briar.git",
+              remoteReachable: true,
+              pushAccess: true,
+              requiresGithub: true,
+              githubRepository: "wordbricks/briar",
+              ghInstalled: true,
+              ghVersion: "gh version 2.80.0",
+              ghAuthenticated: true,
+              ghAccount: "wordbricks",
+              githubWriteAccess: true,
+              gitReady: true,
+              prReady: true,
+              issues: [],
+            },
+          }}
+        />,
+      );
+    });
+
+    const reconnect = container.querySelector<HTMLButtonElement>(
+      '[data-project-reconnect="project-1"]',
+    );
+    expect(reconnect).not.toBeNull();
+    expect(container.querySelector('[data-project-readiness="project-1"]')).toBeNull();
+    await act(async () => reconnect?.click());
+    expect(onProjectRepositoryOpen).toHaveBeenCalledWith("project-1");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("exposes a retry entry after a readiness probe fails", () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider>
+        <Sidebar
+          {...sidebarProps}
+          connectedProjectIds={null}
+          projectReadiness={{}}
+          projectReadinessError={{
+            "project-1": "로컬 프로젝트 연결 목록을 읽지 못했습니다.",
+          }}
+        />
+      </I18nProvider>,
+    );
+
+    expect(markup).toContain('data-project-readiness="project-1"');
+    expect(markup).not.toContain('data-project-reconnect="project-1"');
   });
 
 

@@ -89,6 +89,10 @@ import { AgentUsageSettings } from "./AgentUsageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
 import type { RepositoryReadiness } from "../lib/project-connection";
+import {
+  localProjectReadiness,
+  type LocalProjectConnectionState,
+} from "../lib/local-project-connection";
 import type { AgentUsageReport, SessionUser } from "../types";
 import { AccountDeletionSettings } from "./AccountDeletionSettings";
 import { AccountProfileSettings } from "./AccountProfileSettings";
@@ -145,6 +149,7 @@ function writeProviderPreference(
 }
 
 export function AppSettings({
+  connectionState,
   error,
   initialSection = "source-control",
   isSidebarOpen,
@@ -159,9 +164,11 @@ export function AppSettings({
   projectId,
   projectName,
   readiness,
+  requiresLocalReadiness,
   usageScopeKey,
   user,
 }: {
+  connectionState: LocalProjectConnectionState;
   error: string | null;
   initialSection?: SettingsSection;
   isSidebarOpen: boolean;
@@ -180,10 +187,18 @@ export function AppSettings({
   projectId: string;
   projectName: string;
   readiness: RepositoryReadiness | null;
+  requiresLocalReadiness: boolean;
   usageScopeKey?: string;
   user?: SessionUser;
 }) {
   const { t } = useI18n();
+  const inspectedReadiness = requiresLocalReadiness
+    ? localProjectReadiness(connectionState, readiness)
+    : null;
+  const githubRequired = inspectedReadiness?.requiresGithub === true;
+  const unresolvedReadiness = connectionState === "disconnected"
+    ? t("common.notConnected")
+    : t("common.checkNeeded");
   const [activeSection, setActiveSection] =
     useState<SettingsSection>(initialSection);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1284,31 +1299,42 @@ export function AppSettings({
             <SettingsContent>
               <SettingsGroupHeading
                 action={
-                  <SettingsIconButton
-                    aria-label={t("appSettings.refresh")}
-                    disabled={loading}
-                    onClick={() => void onRefresh()}
-                    title={t("appSettings.refresh")}
-                  >
-                    {loading ? (
-                      <Spinner size={16} />
-                    ) : (
-                      <RefreshCw size={16} />
-                    )}
-                  </SettingsIconButton>
+                  requiresLocalReadiness ? (
+                    <SettingsIconButton
+                      aria-label={t("appSettings.refresh")}
+                      disabled={loading}
+                      onClick={() => void onRefresh()}
+                      title={t("appSettings.refresh")}
+                    >
+                      {loading ? (
+                        <Spinner size={16} />
+                      ) : (
+                        <RefreshCw size={16} />
+                      )}
+                    </SettingsIconButton>
+                  ) : undefined
                 }
                 title={t("appSettings.versionControl")}
               />
 
+              {requiresLocalReadiness ? (
+                <>
               <SettingsCard>
                 <ProviderRow
-                  available={readiness?.gitInstalled ?? false}
-                  description={
-                    readiness?.gitInstalled
-                      ? t("appSettings.available")
-                      : t("appSettings.notInstalled")
+                  available={inspectedReadiness?.gitInstalled ?? false}
+                  availabilityLabel={
+                    inspectedReadiness ? undefined : unresolvedReadiness
                   }
-                  enabled={Boolean(readiness?.gitInstalled && gitEnabled)}
+                  description={
+                    inspectedReadiness
+                      ? inspectedReadiness.gitInstalled
+                        ? t("appSettings.available")
+                        : t("appSettings.notInstalled")
+                      : unresolvedReadiness
+                  }
+                  enabled={Boolean(
+                    inspectedReadiness?.gitInstalled && gitEnabled,
+                  )}
                   icon={
                     <ProviderIcon tone="git">
                       <GitBranch size={18} strokeWidth={2.2} />
@@ -1319,16 +1345,17 @@ export function AppSettings({
                     setGitEnabled(enabled);
                     writeProviderPreference(projectId, "git", enabled);
                   }}
+                  statusTone={inspectedReadiness ? undefined : "neutral"}
                   title={
                     <>
                       Git
-                      {readiness?.gitVersion ? (
-                        <code>{readiness.gitVersion}</code>
+                      {inspectedReadiness?.gitVersion ? (
+                        <code>{inspectedReadiness.gitVersion}</code>
                       ) : null}
                     </>
                   }
                   trailing={
-                    readiness?.gitInstalled ? (
+                    inspectedReadiness?.gitInstalled ? (
                       <SettingsIconButton
                         aria-expanded={gitExpanded}
                         aria-label={t("appSettings.gitDetails")}
@@ -1342,7 +1369,7 @@ export function AppSettings({
                     ) : null
                   }
                 />
-                {gitExpanded && readiness ? (
+                {gitExpanded && inspectedReadiness ? (
                   <div className="mx-[18px] mb-0 mt-[-1px] grid grid-cols-2 gap-3.5 border-t border-border/80 py-3 pl-12">
                     <span className="grid min-w-0 gap-1">
                       <Typography
@@ -1354,7 +1381,7 @@ export function AppSettings({
                         {t("appSettings.repository")}
                       </Typography>
                       <code className="truncate font-mono text-xs font-medium text-muted-foreground">
-                        {readiness.repositoryPath}
+                        {inspectedReadiness.repositoryPath}
                       </code>
                     </span>
                     <span className="grid min-w-0 gap-1">
@@ -1367,7 +1394,8 @@ export function AppSettings({
                         {t("appSettings.remote")}
                       </Typography>
                       <code className="truncate font-mono text-xs font-medium text-muted-foreground">
-                        {readiness.remote ?? t("appSettings.notConnected")}
+                        {inspectedReadiness.remote ??
+                          t("appSettings.notConnected")}
                       </code>
                     </span>
                   </div>
@@ -1379,19 +1407,36 @@ export function AppSettings({
               />
               <SettingsCard>
                 <ProviderRow
-                  available={Boolean(readiness?.ghInstalled)}
-                  description={
-                    readiness?.ghAuthenticated
-                      ? t("appSettings.authenticatedAs", {
-                          account:
-                            readiness.ghAccount ??
-                            t("appSettings.unknownAccount"),
-                        })
-                      : readiness?.ghInstalled
-                        ? t("appSettings.authenticationRequired")
-                        : t("appSettings.githubUnavailable")
+                  available={Boolean(
+                    githubRequired && inspectedReadiness?.ghInstalled,
+                  )}
+                  availabilityLabel={
+                    !inspectedReadiness
+                      ? unresolvedReadiness
+                      : !githubRequired
+                        ? t("common.optional")
+                        : undefined
                   }
-                  enabled={Boolean(readiness?.ghInstalled && githubEnabled)}
+                  description={
+                    !inspectedReadiness
+                      ? unresolvedReadiness
+                      : !githubRequired
+                        ? t("appSettings.githubNotRequired")
+                        : inspectedReadiness.ghAuthenticated
+                        ? t("appSettings.authenticatedAs", {
+                            account:
+                              inspectedReadiness.ghAccount ??
+                              t("appSettings.unknownAccount"),
+                          })
+                        : inspectedReadiness.ghInstalled
+                          ? t("appSettings.authenticationRequired")
+                          : t("appSettings.githubUnavailable")
+                  }
+                  enabled={Boolean(
+                    githubRequired &&
+                      inspectedReadiness?.ghInstalled &&
+                      githubEnabled,
+                  )}
                   icon={
                     <ProviderIcon tone="github">
                       <Github size={20} strokeWidth={1.9} />
@@ -1402,11 +1447,16 @@ export function AppSettings({
                     setGithubEnabled(enabled);
                     writeProviderPreference(projectId, "github", enabled);
                   }}
+                  statusTone={
+                    !inspectedReadiness || !githubRequired
+                      ? "neutral"
+                      : undefined
+                  }
                   title={
                     <>
                       GitHub
-                      {readiness?.ghVersion ? (
-                        <code>{readiness.ghVersion}</code>
+                      {inspectedReadiness?.ghVersion ? (
+                        <code>{inspectedReadiness.ghVersion}</code>
                       ) : null}
                     </>
                   }
@@ -1417,6 +1467,10 @@ export function AppSettings({
               <SettingsNote>
                 {t("appSettings.projectScope", { project: projectName })}
               </SettingsNote>
+                </>
+              ) : (
+                <SettingsNote>{t("health.desktopOnly")}</SettingsNote>
+              )}
             </SettingsContent>
           ) : (
             <SettingsPlaceholder
