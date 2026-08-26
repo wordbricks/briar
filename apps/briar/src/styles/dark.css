@@ -90,7 +90,6 @@
 .dark .app-content-surface,
 .dark .main-content,
 .dark .organization-create,
-.dark .project-settings-page,
 .dark .kanban-board,
 .dark .issue-list {
   color: var(--foreground);
