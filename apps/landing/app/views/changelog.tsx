@@ -30,6 +30,22 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.165",
+        date: "2026년 8월 27일",
+        title: "데스크톱 준비 상태와 작업 탐색을 더 빠르고 안정적으로 연결합니다",
+        summary:
+          "패키지 앱의 로컬 도구 탐색과 프로젝트 연결을 안정화하고, Inbox·채널·설정 전반의 키보드 흐름과 화면 구성을 다듬습니다.",
+        items: [
+          "macOS 패키지 앱이 mise와 Nix 환경의 Git·GitHub CLI 등 로컬 도구를 일관되게 찾고, 프로젝트 연결 전에 필수 준비 상태를 확인합니다.",
+          "연결 도중 일부만 생성된 Worker 구성을 안전하게 되돌리고, GitHub가 선택 사항인 워크플로에서는 불필요한 원격 검사를 건너뜁니다.",
+          "Effect와 Atom 기반 키보드 상태를 통해 Inbox 선택과 포커스를 격리하고, G D로 DM을 열며 프로젝트 선택 뒤 이슈 목록으로 바로 이동합니다.",
+          "Inbox 항목을 다시 읽지 않음으로 표시할 수 있으며, 목록·상세 패널·팝업의 키보드 및 접근성 의미를 강화했습니다.",
+          "이슈 난이도에 맞는 실행 모델을 추천하고, 프로젝트 Overview의 사용량 분석 기간을 선택할 수 있습니다.",
+          "채널 에이전트의 사용량 소진 상태를 정확히 알리고, 채널과 이슈의 활동·대화 처리를 공통 기반으로 통합했습니다.",
+          "Inbox, DM, 채널, 로그인, 온보딩, 프로젝트·에이전트·계정·조직 설정 화면을 공통 Tailwind 구성요소로 정리했습니다.",
+        ],
+      },
+      {
         version: "1.2.164",
         date: "2026년 8월 26일",
         title: "프로젝트 워크플로와 병합 큐의 경계를 명확하게 연결합니다",
@@ -1180,6 +1196,22 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.165",
+        date: "August 27, 2026",
+        title: "Connect desktop readiness to faster, more dependable navigation",
+        summary:
+          "Stabilize local tool discovery and project connections in the packaged app while refining keyboard flow and shared UI across Inbox, channels, and settings.",
+        items: [
+          "Find local tools such as Git and GitHub CLI consistently from mise and Nix environments in the packaged macOS app, then verify required readiness before connecting a project.",
+          "Roll back partially created Worker configuration safely and skip unnecessary remote probes when GitHub is optional for the selected workflow.",
+          "Use Effect- and Atom-based keyboard state to isolate Inbox selection and focus, open DMs with G D, and go straight to a project's issue list after choosing it.",
+          "Mark Inbox items as unread and strengthen keyboard and accessibility semantics across lists, detail panels, and popups.",
+          "Recommend an execution model based on issue difficulty and choose the usage-analysis period shown in Project Overview.",
+          "Report exhausted channel-agent usage accurately and unify channel and issue activity and conversation handling on shared foundations.",
+          "Move Inbox, DMs, channels, login, onboarding, and project, agent, account, and organization settings onto shared Tailwind components.",
+        ],
+      },
       {
         version: "1.2.164",
         date: "August 26, 2026",
