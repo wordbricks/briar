@@ -705,6 +705,15 @@ export function executionWorkerSupportsSelection(
   effort: string | null,
 ) {
   if (!executionWorkerProviders(worker).includes(provider)) return false;
+  return executionWorkerAdvertisesSelection(worker, provider, model, effort);
+}
+
+function executionWorkerAdvertisesSelection(
+  worker: Pick<ExecutionWorkerRow, "capabilities_json">,
+  provider: AgentProvider,
+  model: string | null,
+  effort: string | null,
+) {
   // Provider defaults remain compatible with older workers. Any explicit
   // model/effort must be confirmed by the reporting worker.
   if (!model && !effort) return true;
@@ -717,6 +726,32 @@ export function executionWorkerSupportsSelection(
     );
     return Option.isSome(parsed) &&
       agentProviderSupportsSelection(parsed.value[provider], model, effort);
+  } catch {
+    return false;
+  }
+}
+
+function executionWorkerProviderUsageExhausted(
+  worker: Pick<ExecutionWorkerRow, "capabilities_json">,
+  provider: AgentProvider,
+) {
+  try {
+    const capabilities = JSON.parse(worker.capabilities_json) as {
+      providerHealth?: unknown;
+    };
+    if (
+      !capabilities.providerHealth ||
+      typeof capabilities.providerHealth !== "object" ||
+      Array.isArray(capabilities.providerHealth)
+    ) return false;
+    const health = (capabilities.providerHealth as Record<string, unknown>)[
+      provider
+    ];
+    return Boolean(
+      health && typeof health === "object" && !Array.isArray(health) &&
+        ((health as { reason?: unknown }).reason === "usage_exhausted" ||
+          (health as { usageExhausted?: unknown }).usageExhausted === true),
+    );
   } catch {
     return false;
   }
@@ -782,7 +817,12 @@ export function executionWorkerSupportsOrganizationAgentContext(
  * binding; Organization Agents additionally require the organization-context
  * protocol advertised by the claiming binding.
  */
-export async function hasAvailableChannelReplyWorker(
+export type ChannelReplyWorkerAvailability =
+  | "available"
+  | "usage_exhausted"
+  | "unavailable";
+
+export async function channelReplyWorkerAvailability(
   db: D1Database,
   input: {
     organizationId: string;
@@ -853,7 +893,7 @@ export async function hasAvailableChannelReplyWorker(
       device_last_heartbeat_at: string;
     }>();
 
-  return result.results.some((worker) =>
+  const liveWorkers = result.results.filter((worker) =>
     workerStateAt(
       worker.device_last_heartbeat_at,
       input.observedAt,
@@ -864,6 +904,10 @@ export async function hasAvailableChannelReplyWorker(
       input.observedAt,
       worker.worker_state,
     ) === "online" &&
+    (input.projectId !== null ||
+      executionWorkerSupportsOrganizationAgentContext(worker))
+  );
+  if (liveWorkers.some((worker) =>
     worker.accepting_work === 1 &&
     // Reply work is independent of regular execution slots. `busy` means
     // those slots are occupied, while `needs_attention` remains a hard stop.
@@ -873,10 +917,27 @@ export async function hasAvailableChannelReplyWorker(
       input.provider,
       input.model,
       input.effort,
-    ) &&
-    (input.projectId !== null ||
-      executionWorkerSupportsOrganizationAgentContext(worker))
-  );
+    )
+  )) return "available";
+
+  if (liveWorkers.some((worker) =>
+    executionWorkerProviderUsageExhausted(worker, input.provider) &&
+    executionWorkerAdvertisesSelection(
+      worker,
+      input.provider,
+      input.model,
+      input.effort,
+    )
+  )) return "usage_exhausted";
+
+  return "unavailable";
+}
+
+export async function hasAvailableChannelReplyWorker(
+  db: D1Database,
+  input: Parameters<typeof channelReplyWorkerAvailability>[1],
+) {
+  return await channelReplyWorkerAvailability(db, input) === "available";
 }
 
 export async function userOwnsExecutionWorkerDevice(
