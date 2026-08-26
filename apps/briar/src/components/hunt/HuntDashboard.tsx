@@ -12,6 +12,12 @@ import { NativeSelect } from "@/components/NativeSelect";
 import { CompanionBottomNavigation, type CompanionStatusFilter } from "@/components/CompanionBottomNavigation";
 import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
 import { inboxIssueMessageVersion } from "@/hooks/useInbox";
+import { useAppKeyboardCommandScope } from "@/hooks/appKeyboardCommands";
+import { useAppCollectionKeyboardCommandScope } from "@/hooks/useAppCollectionKeyboardCommandScope";
+import {
+  useControlledCollectionNavigation,
+  type CollectionNavigationDirection,
+} from "@/hooks/useControlledCollectionNavigation";
 import { useMobileBackHandler } from "@/hooks/useMobileNavigation";
 import { errorDiagnosticOccurrenceKey, errorDiagnosticsForMessage } from "@/lib/error-diagnostics";
 import { runMeta } from "@/lib/stages";
@@ -19,7 +25,6 @@ import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { type IssueDetailTab } from "@/lib/issue-detail-tab";
 import { readKanbanCollapsedColumnIds, toggleKanbanCollapsedColumnId, writeKanbanCollapsedColumnIds } from "@/lib/kanban-column-collapse";
 import { readKanbanHiddenColumnIds, toggleKanbanHiddenColumnId, writeKanbanHiddenColumnIds } from "@/lib/kanban-column-hide";
-import { remoteDesktopCapturesKeyboard } from "@/lib/remote-desktop-focus";
 import { formatIssueKey } from "@/lib/issue-key";
 import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, CreateIssueInput, DashboardPayload, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, Project, ProjectAgent, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
 import { sortAgentProviders, type AgentProvider } from "@/lib/project-llm";
@@ -42,6 +47,50 @@ function runIdFromCreateIssueResult(value: unknown) {
   }
   return value.runId;
 }
+
+type KeyboardKanbanColumn = {
+  readonly id: string;
+  readonly runIds: readonly string[];
+};
+
+function resolveKeyboardKanbanRunId(
+  columns: readonly KeyboardKanbanColumn[],
+  currentRunId: string | null,
+  direction: CollectionNavigationDirection,
+): string | null {
+  const runIds = columns.flatMap(column => column.runIds);
+  if (runIds.length === 0) return null;
+  if (currentRunId === null) {
+    return direction === "up" || direction === "left"
+      ? runIds.at(-1) ?? null
+      : runIds[0] ?? null;
+  }
+
+  const columnIndex = columns.findIndex(column =>
+    column.runIds.includes(currentRunId)
+  );
+  if (columnIndex < 0) return runIds[0] ?? null;
+  const column = columns[columnIndex]!;
+  const rowIndex = column.runIds.indexOf(currentRunId);
+
+  if (direction === "up" || direction === "down") {
+    const nextRowIndex = Math.min(
+      column.runIds.length - 1,
+      Math.max(0, rowIndex + (direction === "up" ? -1 : 1)),
+    );
+    return column.runIds[nextRowIndex] ?? currentRunId;
+  }
+  if (direction !== "left" && direction !== "right") return null;
+
+  const targetColumn = columns[
+    columnIndex + (direction === "left" ? -1 : 1)
+  ];
+  if (!targetColumn) return currentRunId;
+  return targetColumn.runIds[
+    Math.min(rowIndex, targetColumn.runIds.length - 1)
+  ] ?? currentRunId;
+}
+
 export function HuntDashboard({
   agents = [],
   companionMode = false,
@@ -208,6 +257,7 @@ export function HuntDashboard({
   const status = companionMode && companionStatus ? companionStatus : internalStatus;
   const setStatus = companionMode && onCompanionStatusChange ? onCompanionStatusChange : setInternalStatus;
   const [internalSelectedRunId, setInternalSelectedRunId] = useState<string | null>(null);
+  const [kanbanCursorRunId, setKanbanCursorRunId] = useState<string | null>(null);
   const selectedRunId = controlledSelectedRunId === undefined ? internalSelectedRunId : controlledSelectedRunId;
   const setSelectedRunId = useCallback((runId: string | null) => {
     if (controlledSelectedRunId === undefined) {
@@ -330,18 +380,21 @@ export function HuntDashboard({
     stopKanbanAutoScroll();
     pointerDragPreviewRef.current?.remove();
   }, [stopKanbanAutoScroll]);
-  useEffect(() => {
-    if (noProject) return;
-    const openIssueCreation = (event: KeyboardEvent) => {
-      if (remoteDesktopCapturesKeyboard() || event.isComposing || !event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.code !== "KeyN" && event.key.toLowerCase() !== "n") {
-        return;
-      }
-      event.preventDefault();
-      openCreateIssueDialog();
-    };
-    window.addEventListener("keydown", openIssueCreation);
-    return () => window.removeEventListener("keydown", openIssueCreation);
-  }, [noProject, openCreateIssueDialog]);
+  useAppKeyboardCommandScope({
+    fallthrough: true,
+    handlers: noProject
+      ? {}
+      : {
+          createIssueFromSystemShortcut: {
+            run: () => {
+              openCreateIssueDialog();
+              return "handled";
+            },
+          },
+        },
+    id: "hunt-dashboard-page",
+    priority: 50,
+  });
   useEffect(() => {
     setPropertyFilters(emptyIssuePropertyFilters());
   }, [dashboard?.project.id]);
@@ -612,6 +665,51 @@ export function HuntDashboard({
   }, [companionMode, dashboard, issuesLoading, selectedRunId, view]);
   const visibleKanbanColumns = useMemo(() => companionMode ? kanbanColumns : kanbanColumns.filter(column => !hiddenColumnIdSet.has(column.id)), [companionMode, hiddenColumnIdSet, kanbanColumns]);
   const hiddenKanbanColumns = useMemo(() => companionMode ? [] : kanbanColumns.filter(column => hiddenColumnIdSet.has(column.id)), [companionMode, hiddenColumnIdSet, kanbanColumns]);
+  const keyboardKanbanColumns = useMemo<KeyboardKanbanColumn[]>(() =>
+    visibleKanbanColumns.flatMap(column => {
+      const isCollapsed = !companionMode && collapsedColumnIdSet.has(column.id);
+      if (isCollapsed || column.runs.length === 0) return [];
+      return [{
+        id: column.id,
+        runIds: column.runs.map(run => run.id),
+      }];
+    }), [collapsedColumnIdSet, companionMode, visibleKanbanColumns]);
+  const keyboardKanbanRunIds = useMemo(
+    () => keyboardKanbanColumns.flatMap(column => column.runIds),
+    [keyboardKanbanColumns],
+  );
+  const kanbanNavigation = useControlledCollectionNavigation<string, HTMLDivElement>({
+    cursorId: kanbanCursorRunId,
+    itemIds: keyboardKanbanRunIds,
+    onCursorIdChange: setKanbanCursorRunId,
+    orientation: "both",
+    resolveNextId: ({ currentId, direction }) =>
+      resolveKeyboardKanbanRunId(
+        keyboardKanbanColumns,
+        currentId,
+        direction,
+      ),
+    selectedId: null,
+    selectionBehavior: "manual",
+  });
+  useAppCollectionKeyboardCommandScope({
+    enabled: !companionMode &&
+      view === "kanban" &&
+      selected === null &&
+      !issuesLoading &&
+      keyboardKanbanRunIds.length > 0,
+    id: "hunt-kanban-board",
+    move: kanbanNavigation.move,
+    orientation: "both",
+    rootRef: kanbanBoardRef,
+  });
+  useEffect(() => {
+    setKanbanCursorRunId(current =>
+      current !== null && !keyboardKanbanRunIds.includes(current)
+        ? null
+        : current
+    );
+  }, [keyboardKanbanRunIds]);
   const createIssueDialog = isIssueDialogOpen ? <CreateIssueDialog availableProviders={availableProviders} compactHeader={companionMode} defaultProjectId={createIssueDefaultProjectId ?? dashboard?.project.id} defaultStatus={createIssuePlacement?.status === "backlog" ? "backlog" : "queued"} isSubmitting={isCreatingIssue} onClose={() => {
     setCreateIssuePlacement(null);
     setIsIssueDialogOpen(false);
@@ -797,7 +895,7 @@ export function HuntDashboard({
                 </header> : null}
               {isCollapsed ? null : <div className="kanban-column-content">
                 {column.runs.length ? column.runs.map(run => <CompanionTaskSwipeAction disabled={!onProcessIssueNow || run.executionReadiness === "waiting" || run.status === "queued" && Boolean(run.leaseExpiresAt) && Date.parse(run.leaseExpiresAt!) > Date.now() || processingIssueIds.has(run.id)} enabled={companionMode && (run.status === "backlog" || run.status === "queued")} key={run.id} onProcessNow={() => onProcessIssueNow?.(run)}>
-                    <KanbanCard availableProviders={availableProviders} issueKeyPrefix={dashboard?.project.issueKeyPrefix} activeAgent={agentAssociationsByRunId.activeAgents.get(run.id) ?? null} assignee={dashboard?.members?.find(member => member.userId === run.assigneeUserId) ?? null} assignedWorker={workerById.get(run.workerId ?? "") ?? workerById.get(run.requestedWorkerId ?? "") ?? null} hideAssignmentBadges={!companionMode && ["completed", "cancelled", "paused", "blocked", "failed"].includes(run.status)} contextMenuDisabled={companionMode} deletingIssueId={deletingIssueId} isDragging={draggedRunId === run.id} isMoving={recoveringRunId === run.id} onDelete={() => {
+                    <KanbanCard availableProviders={availableProviders} issueKeyPrefix={dashboard?.project.issueKeyPrefix} activeAgent={agentAssociationsByRunId.activeAgents.get(run.id) ?? null} assignee={dashboard?.members?.find(member => member.userId === run.assigneeUserId) ?? null} assignedWorker={workerById.get(run.workerId ?? "") ?? workerById.get(run.requestedWorkerId ?? "") ?? null} cardRef={kanbanNavigation.getItemRef(run.id)} hideAssignmentBadges={!companionMode && ["completed", "cancelled", "paused", "blocked", "failed"].includes(run.status)} contextMenuDisabled={companionMode} deletingIssueId={deletingIssueId} isDragging={draggedRunId === run.id} isKeyboardCursor={kanbanCursorRunId === run.id} isMoving={recoveringRunId === run.id} onDelete={() => {
                       setContextDeleteError(null);
                       setDeletingRunFromMenuId(run.id);
                     }} onTransfer={onTransferIssue ? () => {
@@ -852,11 +950,12 @@ export function HuntDashboard({
                       clearKanbanDragState();
                       if (!targetColumn || placementMatchesRun(run, targetColumn.placement)) return;
                       void onMoveRun(run.id, targetColumn.placement).catch(() => undefined);
-                    }} onEdit={() => setEditingRunId(run.id)} onMove={placement => onMoveRun(run.id, placement).catch(() => undefined)} onOpen={() => {
+                    }} onEdit={() => setEditingRunId(run.id)} onFocus={() => setKanbanCursorRunId(run.id)} onMove={placement => onMoveRun(run.id, placement).catch(() => undefined)} onOpen={() => {
                       if (suppressCardClickRef.current) {
                         suppressCardClickRef.current = false;
                         return;
                       }
+                      setKanbanCursorRunId(run.id);
                       rememberKanbanScrollPosition();
                       setSelectedRunInitialTab(null);
                       setSelectedRunId(run.id);

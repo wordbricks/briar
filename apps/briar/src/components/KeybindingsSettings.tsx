@@ -9,6 +9,7 @@ import {
   SettingsToggleRow,
 } from "@/components/settings";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
@@ -125,12 +126,12 @@ export function KeybindingsSettings() {
                     {t("appSettings.keybindingsRecordHint")}
                   </Typography>
                 ) : (
-                  <kbd
+                  <Kbd
                     aria-label={t(bindingLabels[id])}
-                    className="shrink-0 rounded-md border border-border bg-muted px-2 py-1 font-mono text-xs font-medium text-foreground"
+                    className="h-auto shrink-0 rounded-md border border-border bg-muted px-2 py-1 font-mono text-xs font-medium text-foreground"
                   >
                     {formatShortcut(shortcut)}
-                  </kbd>
+                  </Kbd>
                 )}
                 {recording ? (
                   <Button

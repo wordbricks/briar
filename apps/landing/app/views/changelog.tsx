@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.163",
+        date: "2026년 8월 26일",
+        title: "키보드 탐색의 흐름과 포커스를 더 단단하게 다듬습니다",
+        summary:
+          "재사용 가능한 명령 시스템으로 키보드 모드와 포커스 이동을 통합해 Inbox와 이슈 작업을 더 예측 가능하게 이어갑니다.",
+        items: [
+          "G P로 프로젝트 선택기를 바로 열고, 기존 O P 단축키도 계속 사용할 수 있습니다.",
+          "Inbox, 이슈 목록, Kanban에서 J·K와 방향키 포커스가 선택 상태와 안정적으로 동기화됩니다.",
+          "이슈 편집 중 Escape를 누르면 Normal 모드로 돌아가 G 이동 명령을 바로 이어서 사용할 수 있고, 설정 화면에서는 Escape로 창을 닫습니다.",
+          "Effect와 Atom 기반 명령 컨트롤러가 모드, 시퀀스, 포커스 범위, 이벤트 소비를 한곳에서 관리해 앞으로 추가될 단축키의 일관성을 높입니다.",
+          "Worker 상태에서 연결된 관리형 컴퓨터를 바로 열고, 로컬 D1 테스트 템플릿을 고정된 Wrangler 흐름으로 더 안정적으로 준비합니다.",
+        ],
+      },
+      {
         version: "1.2.162",
         date: "2026년 8월 26일",
         title: "키보드로 Briar 어디든 더 빠르게 탐색합니다",
@@ -1150,6 +1164,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.163",
+        date: "August 26, 2026",
+        title: "Make keyboard focus and navigation more dependable",
+        summary:
+          "Unify keyboard modes and focus movement through a reusable command system so Inbox and issue workflows stay predictable.",
+        items: [
+          "Open the project selector with G P while keeping the existing O P shortcut available.",
+          "Keep J, K, and arrow-key focus synchronized with selection across Inbox, issue lists, and Kanban.",
+          "Press Escape while editing an issue to return to Normal mode and continue with G navigation commands, or press Escape in settings to close the view.",
+          "Manage modes, sequences, focus scopes, and event consumption in one Effect- and Atom-based command controller for consistent future shortcuts.",
+          "Open a connected managed computer directly from Worker status and prepare local D1 test templates through the pinned Wrangler flow.",
+        ],
+      },
       {
         version: "1.2.162",
         date: "August 26, 2026",
@@ -2362,7 +2390,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-162">
+          <a href="#v1-2-163">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2384,7 +2412,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.162"
+                      entry.version === "1.2.163"
+                        ? "2026-08-26"
+                        : entry.version === "1.2.162"
                         ? "2026-08-26"
                         : entry.version === "1.2.161"
                         ? "2026-08-26"

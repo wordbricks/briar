@@ -24,6 +24,7 @@ export type AppKeyboardShortcutCommandId =
 export type AppKeyboardShortcutGroupId = "general" | "go" | "open";
 
 export type AppKeyboardShortcutSpec = {
+  aliases?: readonly KeyboardShortcutSequence[];
   group: AppKeyboardShortcutGroupId;
   id: AppKeyboardShortcutCommandId;
   labelKey: MessageKey;
@@ -110,10 +111,11 @@ export const appKeyboardShortcutSpecs: readonly AppKeyboardShortcutSpec[] = [
     sequence: ["o", "i"],
   },
   {
-    group: "open",
+    aliases: [["o", "p"]],
+    group: "go",
     id: "openProject",
     labelKey: "keyboardShortcuts.openProject",
-    sequence: ["o", "p"],
+    sequence: ["g", "p"],
   },
   {
     group: "open",

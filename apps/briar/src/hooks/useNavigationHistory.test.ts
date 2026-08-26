@@ -28,6 +28,51 @@ describe("navigation history", () => {
     expect(history.entries[history.index]).toBe("auto-hunt");
   });
 
+  it("returns to a matching destination past contiguous route entries", () => {
+    let history = createNavigationHistory<string>("issues");
+    for (const value of [
+      "inbox",
+      "settings:account",
+      "settings:keybindings",
+      "settings:project",
+    ]) {
+      history = reduceNavigationHistory(history, { type: "navigate", value });
+    }
+
+    history = reduceNavigationHistory(history, {
+      type: "backTo",
+      predicate: (value) => !value.startsWith("settings:"),
+    });
+
+    expect(history.entries[history.index]).toBe("inbox");
+    expect(history.entries).toEqual([
+      "issues",
+      "inbox",
+      "settings:account",
+      "settings:keybindings",
+      "settings:project",
+    ]);
+
+    history = reduceNavigationHistory(history, { type: "forward" });
+    expect(history.entries[history.index]).toBe("settings:account");
+  });
+
+  it("uses a clean fallback when no earlier destination matches", () => {
+    let history = createNavigationHistory<string>("settings:account");
+    history = reduceNavigationHistory(history, {
+      type: "navigate",
+      value: "settings:keybindings",
+    });
+
+    history = reduceNavigationHistory(history, {
+      type: "backTo",
+      fallback: "issues",
+      predicate: (value) => !value.startsWith("settings:"),
+    });
+
+    expect(history).toEqual(createNavigationHistory("issues"));
+  });
+
   it("drops forward history after navigating from a previous destination", () => {
     let history = createNavigationHistory<string>("issues");
     history = reduceNavigationHistory(history, {

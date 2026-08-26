@@ -6,7 +6,7 @@ import {
   defaultKeyboardNavigationPreferences,
   formatShortcut,
   getRecordingKeybinding,
-  installKeybindingShortcuts,
+  isAppSystemShortcut,
   isKeyboardShortcutsGuideShortcut,
   isNavigationHistoryShortcut,
   loadKeybindings,
@@ -19,6 +19,7 @@ import {
   shortcutFromEvent,
   shortcutsEqual,
   subscribeKeyboardNavigationPreferences,
+  subscribeKeybindings,
   keybindingsStorageKey,
   keyboardNavigationPreferencesStorageKey,
 } from "./keybindings";
@@ -71,6 +72,37 @@ describe("keybindings", () => {
     expect(loadKeybindings().sidebarToggle).toEqual(
       defaultKeybindings.sidebarToggle,
     );
+  });
+
+  it("notifies keymap subscribers and keeps a volatile storage fallback", () => {
+    const onChange = vi.fn();
+    const unsubscribe = subscribeKeybindings(onChange);
+    const setItem = vi.spyOn(Storage.prototype, "setItem")
+      .mockImplementationOnce(() => {
+        throw new DOMException("Storage unavailable", "SecurityError");
+      });
+    const custom = {
+      key: "p",
+      code: "KeyP",
+      meta: true,
+      ctrl: false,
+      alt: true,
+      shift: false,
+    };
+
+    expect(saveKeybinding("commandPalette", custom).commandPalette).toEqual(
+      custom,
+    );
+    expect(loadKeybindings().commandPalette).toEqual(custom);
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ commandPalette: custom }),
+    );
+
+    unsubscribe();
+    setItem.mockRestore();
+    saveKeybinding("commandPalette", defaultKeybindings.commandPalette);
+    expect(onChange).toHaveBeenCalledOnce();
   });
 
   it("persists the Linear-style sequence shortcut preference", () => {
@@ -300,6 +332,55 @@ describe("keybindings", () => {
     expect(loadKeybindings()).toEqual(defaultKeybindings);
   });
 
+  it("reserves app-owned system chords and repairs old conflicts", () => {
+    const createIssue = {
+      key: "n",
+      code: "KeyN",
+      meta: true,
+      ctrl: false,
+      alt: false,
+      shift: false,
+    };
+    const zoomIn = {
+      key: "+",
+      code: "Equal",
+      meta: true,
+      ctrl: false,
+      alt: false,
+      shift: true,
+    };
+    expect(isAppSystemShortcut(createIssue)).toBe(true);
+    expect(isAppSystemShortcut(zoomIn)).toBe(true);
+    expect(saveKeybinding("commandPalette", createIssue)).toEqual(
+      defaultKeybindings,
+    );
+
+    window.localStorage.setItem(
+      keybindingsStorageKey,
+      JSON.stringify({ commandPalette: createIssue }),
+    );
+    expect(loadKeybindings()).toEqual(defaultKeybindings);
+  });
+
+  it("rejects persisted bindings without a configurable modifier", () => {
+    const shiftOnly = {
+      key: "?",
+      code: "Slash",
+      meta: false,
+      ctrl: false,
+      alt: false,
+      shift: true,
+    };
+    expect(saveKeybinding("sidebarToggle", shiftOnly)).toEqual(
+      defaultKeybindings,
+    );
+    window.localStorage.setItem(
+      keybindingsStorageKey,
+      JSON.stringify({ sidebarToggle: shiftOnly }),
+    );
+    expect(loadKeybindings()).toEqual(defaultKeybindings);
+  });
+
   it("formats shortcuts for macOS and other platforms", () => {
     expect(formatShortcut(defaultKeybindings.commandPalette, true)).toBe("⌘K");
     expect(formatShortcut(defaultKeybindings.commandPalette, false)).toBe(
@@ -326,57 +407,4 @@ describe("keybindings", () => {
     ).toBe(false);
   });
 
-  it("notifies registered handlers and ignores matches while recording", () => {
-    const fired: string[] = [];
-    const uninstall = installKeybindingShortcuts((id) => fired.push(id));
-
-    const nestedTarget = document.createElement("button");
-    nestedTarget.addEventListener("keydown", (event) => event.stopPropagation());
-    document.body.append(nestedTarget);
-    nestedTarget.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        bubbles: true,
-        key: "k",
-        code: "KeyK",
-        metaKey: true,
-      }),
-    );
-    const webkitCompositionEvent = new KeyboardEvent("keydown", {
-      key: "k",
-      code: "KeyK",
-      metaKey: true,
-    });
-    Object.defineProperty(webkitCompositionEvent, "keyCode", { value: 229 });
-    window.dispatchEvent(webkitCompositionEvent);
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key: "k",
-        code: "KeyK",
-        metaKey: true,
-        repeat: true,
-      }),
-    );
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key: "b",
-        code: "KeyB",
-        metaKey: true,
-      }),
-    );
-    expect(fired).toEqual(["commandPalette", "sidebarToggle"]);
-
-    setRecordingKeybinding("sidebarToggle");
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key: "b",
-        code: "KeyB",
-        metaKey: true,
-      }),
-    );
-    expect(fired).toEqual(["commandPalette", "sidebarToggle"]);
-    expect(getRecordingKeybinding()).toBe("sidebarToggle");
-
-    nestedTarget.remove();
-    uninstall();
-  });
 });

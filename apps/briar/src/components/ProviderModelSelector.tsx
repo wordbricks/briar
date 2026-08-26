@@ -10,6 +10,7 @@ import {
   type KeyboardEvent,
 } from "react";
 
+import { Kbd } from "@/components/ui/kbd";
 import { useAgentProviderModelPreferences } from "../hooks/useAgentProviderModelPreferences";
 import { useI18n } from "../i18n";
 import { writeAgentProviderModelPreference } from "../lib/agent-model-preferences";
@@ -444,7 +445,7 @@ export function ProviderModelSelector({
                             {option.description ? <span>{option.description}</span> : null}
                           </small>
                         </span>
-                        {index < 9 ? <kbd aria-hidden="true">⌘{index + 1}</kbd> : null}
+                        {index < 9 ? <Kbd aria-hidden="true">⌘{index + 1}</Kbd> : null}
                       </button>
                       {option.value && !option.disabled ? (
                         <button

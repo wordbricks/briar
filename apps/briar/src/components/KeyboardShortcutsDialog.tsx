@@ -7,6 +7,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
 
@@ -166,9 +167,9 @@ export function KeyboardShortcutsDialog({
                                   )}
                                 </span>
                               ) : null}
-                              <kbd className="min-w-6 rounded-md border border-border bg-card px-1.5 py-1 text-center font-mono text-[10px] font-semibold text-foreground shadow-xs">
+                              <Kbd className="h-auto min-w-6 rounded-md border border-border bg-card px-1.5 py-1 text-center font-mono text-[10px] font-semibold text-foreground shadow-xs">
                                 {key}
-                              </kbd>
+                              </Kbd>
                             </span>
                           ))}
                         </dd>
