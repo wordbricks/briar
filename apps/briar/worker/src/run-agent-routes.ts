@@ -24,6 +24,7 @@ import {
 } from "./db";
 import { HttpError, json } from "./http-response";
 import { registerReadyMergeCandidates } from "./merge-batches";
+import { getMergeQueueProfile } from "./merge-queue-profile";
 import { isReservedProposalIssueSourceKey } from "./proposal-issue-source";
 import { readJson, readRunEvidenceRequest, dashboardStageForProgress } from "./request-readers";
 import { evidenceImageJson, runEvidenceJson } from "./run-evidence-json";
@@ -144,9 +145,12 @@ export async function handleRunAgentRoute(
               agentStageLifecycleMatch[1],
             )
           : null;
+      const mergeQueueProfile = agentStageLifecycleMatch[3] === "complete"
+        ? await getMergeQueueProfile(db, projectId)
+        : null;
       const mergeQueueRun =
-        agentStageLifecycleMatch[3] === "complete" &&
-          agentStageLifecycleMatch[2] === "ci_qa"
+        mergeQueueProfile?.enabled === 1 &&
+          mergeQueueProfile.readiness_stage_id === agentStageLifecycleMatch[2]
           ? await getHuntRunForProject(
               db,
               projectId,

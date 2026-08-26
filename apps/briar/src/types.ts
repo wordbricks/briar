@@ -884,6 +884,66 @@ export type ProjectSettings = {
   };
 };
 
+export type MergeQueueProfile = {
+  projectId: string;
+  repositoryId: number;
+  repository: string;
+  baseBranch: "main";
+  enabled: boolean;
+  readinessStageId: string;
+  quietWindowMs: number;
+  maxBatchSize: number;
+  updatedAt: string;
+};
+
+export type MergeQueueBatchState =
+  | "collecting"
+  | "frozen"
+  | "enqueueing"
+  | "waiting_tail"
+  | "validating"
+  | "publishing"
+  | "awaiting_merge"
+  | "blocked"
+  | "draining"
+  | "completed"
+  | "failed";
+
+export type MergeQueueCandidateState =
+  | "ready"
+  | "frozen"
+  | "enqueued"
+  | "merged"
+  | "dequeued"
+  | "failed";
+
+export type MergeQueueStatus = {
+  batches: Array<{
+    id: string;
+    state: MergeQueueBatchState;
+    candidateCount: number;
+    quietUntil: string;
+    frozenAt: string | null;
+    mergeGroupSha: string | null;
+    failureCode: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  candidates: Array<{
+    id: string;
+    batchId: string | null;
+    runId: string;
+    pullRequestNumber: number;
+    pullRequestUrl: string;
+    state: MergeQueueCandidateState;
+    ordinal: number | null;
+    readyAt: string;
+    failureCode: string | null;
+    updatedAt: string;
+  }>;
+};
+
 export type DashboardPayload = {
   project: Project;
   settings: ProjectSettings;

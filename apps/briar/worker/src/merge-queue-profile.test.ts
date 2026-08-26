@@ -54,6 +54,7 @@ describe("merge queue profile", () => {
       repositoryId: 701,
       repository: "Wordbricks/Briar",
       enabled: true,
+      readinessStageId: "ci_qa",
       quietWindowMs: 30_000,
       maxBatchSize: 5,
       observedAt,
@@ -68,6 +69,7 @@ describe("merge queue profile", () => {
       repositoryId: 701,
       repository: "wordbricks/briar",
       enabled: true,
+      readinessStageId: "ci_qa",
       quietWindowMs: 30_000,
       maxBatchSize: 5,
       observedAt,
@@ -77,12 +79,13 @@ describe("merge queue profile", () => {
     });
   });
 
-  it("starts a fresh CI boundary when a profile changes repositories", async () => {
+  it("starts a fresh proof boundary when a profile changes repositories", async () => {
     await configureMergeQueueProfile(db, {
       projectId: secondProject,
       repositoryId: 702,
       repository: "wordbricks/first",
       enabled: false,
+      readinessStageId: "ci_qa",
       quietWindowMs: 30_000,
       maxBatchSize: 5,
       observedAt,
@@ -93,6 +96,7 @@ describe("merge queue profile", () => {
       repositoryId: 703,
       repository: "wordbricks/second",
       enabled: false,
+      readinessStageId: "ci_qa",
       quietWindowMs: 20_000,
       maxBatchSize: 4,
       observedAt: retargetedAt,
@@ -109,12 +113,32 @@ describe("merge queue profile", () => {
       repositoryId: 703,
       repository: "wordbricks/second",
       enabled: false,
+      readinessStageId: "ci_qa",
       quietWindowMs: 10_000,
       maxBatchSize: 3,
       observedAt: "2026-08-21T03:02:00.000Z",
     });
     await expect(getMergeQueueProfile(db, secondProject)).resolves
       .toMatchObject({ created_at: retargetedAt });
+  });
+
+  it("starts a fresh proof boundary when the readiness stage changes", async () => {
+    const changedAt = "2026-08-21T03:03:00.000Z";
+    await configureMergeQueueProfile(db, {
+      projectId: secondProject,
+      repositoryId: 703,
+      repository: "wordbricks/second",
+      enabled: false,
+      readinessStageId: "reviewing",
+      quietWindowMs: 10_000,
+      maxBatchSize: 3,
+      observedAt: changedAt,
+    });
+    await expect(getMergeQueueProfile(db, secondProject)).resolves
+      .toMatchObject({
+        readiness_stage_id: "reviewing",
+        created_at: changedAt,
+      });
   });
 
   it("will not disable a lane while an active batch holds it", async () => {
@@ -134,7 +158,18 @@ describe("merge queue profile", () => {
       projectId: firstProject,
       repositoryId: 701,
       repository: "wordbricks/briar",
+      enabled: true,
+      readinessStageId: "reviewing",
+      quietWindowMs: 30_000,
+      maxBatchSize: 5,
+      observedAt,
+    })).resolves.toMatchObject({ outcome: "active_batch" });
+    await expect(configureMergeQueueProfile(db, {
+      projectId: firstProject,
+      repositoryId: 701,
+      repository: "wordbricks/briar",
       enabled: false,
+      readinessStageId: "ci_qa",
       quietWindowMs: 30_000,
       maxBatchSize: 5,
       observedAt,

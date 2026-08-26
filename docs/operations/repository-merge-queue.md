@@ -18,7 +18,8 @@ The coordinator enforces these boundaries:
 
 - issue agents continue to claim, branch, and open pull requests in parallel;
 - one enabled Briar project owns each immutable `(repository ID, main)` lane;
-- `ci_qa` completion and the current exact PR identity make a candidate ready;
+- completion of the workflow stage selected by the project and the current
+  exact PR identity make a candidate ready;
 - a force-push, draft change, close, base retarget, or run revision change
   invalidates a mutable candidate and blocks an already-frozen cohort;
 - collection stays open until five minutes after the latest ready candidate;
@@ -91,10 +92,10 @@ request review. Roll out in this order during an explicit maintenance window:
    batch.
 
 ```sh
-briar merge-queue configure --disable
+briar merge-queue configure --disable --readiness-stage ci_qa
 briar merge-queue doctor --json
 briar merge-queue configure --enable \
-  --quiet-window-ms 300000 --max-batch-size 5
+  --readiness-stage ci_qa --quiet-window-ms 300000 --max-batch-size 5
 ```
 
 `doctor` is read-only. It validates the audited local runtime, local `gh`
@@ -110,10 +111,33 @@ GET /projects/<project-id>/merge-queue-profile
 PUT /projects/<project-id>/merge-queue-profile
 {
   "enabled": false,
-  "quietWindowMs": 300000,
-  "maxBatchSize": 5
+  "readinessStageId": "ci_qa"
 }
 ```
+
+The authenticated read-only diagnostics endpoint returns up to five recent
+batches and twelve recent candidates, with active states first:
+
+```text
+GET /projects/<project-id>/merge-queue-status
+```
+
+The Workflow UI displays this snapshot with a manual refresh action. It omits
+claim credentials, Worker identity, validation logs, and failure detail; only
+the PR link, durable state, timestamps, counts, integration SHA, and failure
+code are exposed. The response is private and not cached.
+
+`readinessStageId` must name a stage in the current project workflow. The
+optional `quietWindowMs` and `maxBatchSize` fields preserve their stored values,
+or use the server defaults of 300000 and 5 for a new profile. The Workflow UI
+exposes enablement and the readiness boundary; batching controls remain an
+operator concern.
+
+An enabled profile prevents workflow updates that remove its readiness stage.
+Changing the boundary is also a fresh proof boundary: only completions observed
+after that configuration change can become candidates. Runs whose frozen
+workflow does not contain the newly selected stage remain ineligible rather
+than falling back to another stage.
 
 The server derives the immutable repository identity from the connected
 project and GitHub installation. It does not accept a shell command, status
