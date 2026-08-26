@@ -3557,7 +3557,8 @@ export function App({
             token={briar.token}
           />
         ) : activePage === "inbox" ? (
-          <div
+          <main
+            aria-label={`${t("inbox.title")} · ${t("inbox.messages")}`}
             className={`inbox-layout${isResizingInbox ? " is-resizing-inbox" : ""}`}
             ref={inboxLayoutRef}
             style={
@@ -3567,6 +3568,7 @@ export function App({
             }
           >
             <InboxWithSelection
+              desktopEmbedded
               isSidebarOpen={isSidebarOpen}
               messages={visibleInboxMessages}
               onMarkAllRead={
@@ -3617,7 +3619,11 @@ export function App({
             <InboxDetailTargetBoundary>
               {(target) => (
                 <InboxDetailPanel
-                  label={target ? inboxDetailLabel(target) : t("inbox.messages")}
+                  label={
+                    target
+                      ? inboxDetailLabel(target)
+                      : t("inbox.noNotificationSelected")
+                  }
                 >
                   {target ? renderInboxDetailContent(target) : (
                     <div className="inbox-detail-empty" role="status">
@@ -3628,7 +3634,7 @@ export function App({
                 </InboxDetailPanel>
               )}
             </InboxDetailTargetBoundary>
-          </div>
+          </main>
         ) : activePage === "settings" &&
           settingsTarget.scope === "project" &&
           activeProject ? (

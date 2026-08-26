@@ -4150,7 +4150,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .inbox-detail-pane .run-page-shell > .topbar { padding-right:18px; padding-left:18px; }
 .inbox-detail-empty { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; color:#969791; background:var(--card); }
 .inbox-detail-empty > svg { color:#a8aaa4; }
-.inbox-detail-empty p { margin:0; color:#777972; font-size:var(--text-sm); }
+.inbox-detail-empty p { margin:0; color:var(--muted-foreground); font-size:var(--text-sm); }
 .inbox-detail-loading { width:100%; height:100%; display:grid; place-items:center; color:var(--muted-foreground); background:var(--card); font-size:var(--text-xs); }
 .inbox-detail-unavailable { width:100%; height:100%; padding:32px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:var(--muted-foreground); background:var(--card); text-align:center; }
 .inbox-detail-unavailable strong { color:var(--foreground); font-size:var(--text-sm); }
