@@ -15,6 +15,7 @@ const configuredWorkflow: AutoHuntWorkflow = {
     id: "implementing",
     label: "Implement",
     required: true,
+    evidence: ["diff"],
   }],
   execution: { checkpoints: [] },
   completion: { requiredStages: ["implementing"] },

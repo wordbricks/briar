@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   AutoHuntWorkflowValidationError,
   canonicalizeCheckpointSet,
+  canonicalizeProjectWorkflow,
+  checkpointKeyForBoundary,
   cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
   resolveCheckpointPolicy,
+  autoHuntWorkflowCheckpointKeyPattern,
   workflowWithEffectiveCheckpoints,
   workflowWithAdditionalCheckpoints,
   type AutoHuntWorkflowInput,
@@ -109,6 +112,96 @@ describe("Auto Hunt workflow v2 contract", () => {
       "production-approval",
       "production-review",
     ]);
+  });
+
+  it("canonicalizes project-owned fields deterministically", () => {
+    const draft = {
+      version: 2 as const,
+      requirements: [
+        {
+          id: "bun",
+          label: "Bun",
+          kind: "executable" as const,
+          tool: "bun",
+          reason: "Runs tests.",
+        },
+        ...([
+          ["xcode", "xcode", "wrong"],
+          ["ios", "ios_simulator", "wrong"],
+          ["android", "android_sdk", "wrong"],
+          ["emulator", "android_emulator", "wrong"],
+        ] as const).map(([id, kind, tool]) => ({
+          id,
+          label: id,
+          kind,
+          tool,
+          reason: `Checks ${kind}.`,
+        })),
+      ],
+      stages,
+      execution: {
+        checkpoints: [
+          { key: "second", stage: "production_qa", position: "after" as const },
+          { key: "first", stage: "pr_open", position: "before" as const },
+        ],
+      },
+      completion: { requiredStages: stages.map((stage) => stage.id) },
+    };
+
+    const canonical = canonicalizeProjectWorkflow(draft);
+
+    expect(canonical.requirements.map(({ tool }) => tool)).toEqual([
+      "bun",
+      "xcodebuild",
+      "xcrun",
+      "adb",
+      "emulator",
+    ]);
+    expect(canonical.execution.checkpoints).toEqual([
+      { key: "project-before-pr_open", stage: "pr_open", position: "before" },
+      {
+        key: "project-after-production_qa",
+        stage: "production_qa",
+        position: "after",
+      },
+    ]);
+    expect(canonicalizeProjectWorkflow(canonical)).toEqual(canonical);
+  });
+
+  it("keeps derived keys valid and distinct for maximum-length stage ids", () => {
+    const firstStage = `a${"b".repeat(62)}c`;
+    const secondStage = `a${"b".repeat(62)}d`;
+    const canonical = canonicalizeProjectWorkflow({
+      version: 2,
+      requirements: [],
+      stages: [firstStage, secondStage].map((id) => ({
+        id,
+        label: id,
+        required: true,
+      })),
+      execution: {
+        checkpoints: [firstStage, secondStage].map((stage) => ({
+          key: stage,
+          stage,
+          position: "after" as const,
+        })),
+      },
+      completion: { requiredStages: [firstStage, secondStage] },
+    });
+    const [first, second] = canonical.execution.checkpoints.map(({ key }) => key);
+
+    expect(first).toHaveLength(64);
+    expect(first).toBe(
+      "project-after-abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-5210d1375021b160",
+    );
+    expect(first).toMatch(autoHuntWorkflowCheckpointKeyPattern);
+    expect(second).toHaveLength(64);
+    expect(second).toMatch(autoHuntWorkflowCheckpointKeyPattern);
+    expect(second).not.toBe(first);
+    expect(checkpointKeyForBoundary("project", {
+      stage: firstStage,
+      position: "after",
+    })).toBe(first);
   });
 
   it.each([

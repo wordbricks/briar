@@ -1,6 +1,5 @@
 import {
-  canonicalizeCheckpointSet,
-  normalizeAutoHuntWorkflow,
+  canonicalizeProjectWorkflow,
   type AutoHuntWorkflow,
   type AutoHuntWorkflowCheckpoint,
 } from "../../src/lib/auto-hunt-contract";
@@ -111,17 +110,7 @@ export async function updateProjectSettings(
   input: ProjectSettingsInput,
 ) {
   const updatedAt = new Date().toISOString();
-  const normalizedWorkflow = normalizeAutoHuntWorkflow(input.workflow);
-  const workflow = normalizeAutoHuntWorkflow({
-    ...normalizedWorkflow,
-    execution: {
-      checkpoints: canonicalizeCheckpointSet(
-        normalizedWorkflow,
-        normalizedWorkflow.execution.checkpoints,
-        "project",
-      ),
-    },
-  });
+  const workflow = canonicalizeProjectWorkflow(input.workflow);
   await db
     .prepare(
       `insert into briar_project_settings (

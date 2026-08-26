@@ -5,6 +5,7 @@ import * as SchemaIssue from "effect/SchemaIssue";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import {
   AutoHuntWorkflowValidationError,
+  canonicalizeProjectWorkflow,
   autoHuntEvidenceTypeMaxLength,
   autoHuntEvidenceTypePattern,
   autoHuntPersistedRunStatuses,
@@ -429,7 +430,7 @@ export function parseProjectSettingsInput(value: unknown) {
     const input = decodeProjectSettingsSource(value);
     return {
       ...input,
-      workflow: normalizeAutoHuntWorkflow(input.workflow),
+      workflow: canonicalizeProjectWorkflow(input.workflow),
     };
   } catch (error) {
     if (Schema.isSchemaError(error)) {

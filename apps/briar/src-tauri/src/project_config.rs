@@ -986,7 +986,7 @@ pub(super) fn validate_generated_workflow(workflow: &WorkflowConfig) -> Result<(
     let mut checkpoint_boundaries = BTreeSet::new();
     for checkpoint in &workflow.execution.checkpoints {
         if checkpoint.key.is_empty()
-            || checkpoint.key.len() > 64
+            || checkpoint.key.len() > WORKFLOW_CHECKPOINT_KEY_MAX_LENGTH
             || !checkpoint
                 .key
                 .chars()

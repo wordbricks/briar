@@ -1,5 +1,6 @@
 import { briarApiUrl } from "./api";
 import {
+  canonicalizeProjectWorkflow,
   isRepositoryWorkflowPending,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
@@ -137,7 +138,7 @@ export async function resolveProjectConnectionWorkflow(
     !isRepositoryWorkflowPending(existingWorkflow)
   ) {
     return {
-      workflow: existingWorkflow,
+      workflow: canonicalizeProjectWorkflow(existingWorkflow),
       shouldPersistProjectSettings: false,
     };
   }
@@ -151,12 +152,12 @@ export async function resolveProjectConnectionWorkflow(
     !isRepositoryWorkflowPending(compatiblePreset)
   ) {
     return {
-      workflow: compatiblePreset,
+      workflow: canonicalizeProjectWorkflow(compatiblePreset),
       shouldPersistProjectSettings: true,
     };
   }
   return {
-    workflow: await generateWorkflow(),
+    workflow: canonicalizeProjectWorkflow(await generateWorkflow()),
     shouldPersistProjectSettings: true,
   };
 }

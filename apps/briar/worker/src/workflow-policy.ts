@@ -1,5 +1,6 @@
 import {
   canonicalizeCheckpointSet,
+  canonicalizeProjectWorkflow,
   normalizeAutoHuntWorkflow,
   resolveCheckpointPolicy,
   workflowWithEffectiveCheckpoints,
@@ -33,10 +34,10 @@ export function isStoredWorkflowUnchanged(
   workflowInput: AutoHuntWorkflowInput | null | undefined,
 ) {
   if (!storedWorkflowJson) return false;
-  const storedWorkflow = normalizeAutoHuntWorkflow(
+  const storedWorkflow = canonicalizeProjectWorkflow(
     JSON.parse(storedWorkflowJson),
   );
-  const nextWorkflow = normalizeAutoHuntWorkflow(workflowInput);
+  const nextWorkflow = canonicalizeProjectWorkflow(workflowInput);
   return JSON.stringify(storedWorkflow) === JSON.stringify(nextWorkflow);
 }
 
