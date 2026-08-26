@@ -7,6 +7,13 @@ import type { AutoHuntRunStatus } from "./auto-hunt-contract";
 
 export type ProjectUsagePeriod = "day" | "week" | "month";
 
+export type ProjectUsageDateRange = {
+  from: string;
+  to: string;
+};
+
+export const PROJECT_USAGE_MAX_TIMELINE_BUCKETS = 400;
+
 export type ProjectUsageTimelinePoint = {
   startAt: string;
   completedIssues: number;
@@ -95,10 +102,60 @@ const startOfUtcDay = (now: number) => {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 };
 
+const utcDateKey = (timestamp: number) =>
+  new Date(timestamp).toISOString().slice(0, 10);
+
+const parseUtcDateKey = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return null;
+  const timestamp = Date.parse(`${value}T00:00:00.000Z`);
+  return Number.isFinite(timestamp) && utcDateKey(timestamp) === value
+    ? timestamp
+    : null;
+};
+
+export function defaultProjectUsageDateRange(now: number = Date.now()) {
+  const to = startOfUtcDay(now);
+  return {
+    from: utcDateKey(to - 13 * 86_400_000),
+    to: utcDateKey(to),
+  } satisfies ProjectUsageDateRange;
+}
+
+export function isProjectUsageDateRange(
+  range: ProjectUsageDateRange,
+  period?: ProjectUsagePeriod,
+) {
+  const from = parseUtcDateKey(range.from);
+  const to = parseUtcDateKey(range.to);
+  if (from === null || to === null || from > to) return false;
+  return period === undefined || hasAllowedBucketCount(
+    period,
+    from,
+    to + 86_400_000,
+  );
+}
+
+function customProjectUsageWindow(range: ProjectUsageDateRange) {
+  const startAt = parseUtcDateKey(range.from);
+  const inclusiveEndAt = parseUtcDateKey(range.to);
+  if (startAt === null || inclusiveEndAt === null || startAt > inclusiveEndAt) {
+    throw new RangeError("Project usage date range is invalid");
+  }
+  return { startAt, endAt: inclusiveEndAt + 86_400_000 };
+}
+
 export function projectUsageSummaryWindow(
   period: ProjectUsagePeriod,
   now: number,
+  range?: ProjectUsageDateRange,
 ) {
+  if (range) {
+    const window = customProjectUsageWindow(range);
+    if (!hasAllowedBucketCount(period, window.startAt, window.endAt)) {
+      throw new RangeError("Project usage date range has too many buckets");
+    }
+    return window;
+  }
   const day = startOfUtcDay(now);
   if (period === "day") {
     return { startAt: day - 13 * 86_400_000, endAt: day + 86_400_000 };
@@ -115,13 +172,36 @@ export function projectUsageSummaryWindow(
   };
 }
 
-function bucketStarts(period: ProjectUsagePeriod, startAt: number) {
-  return Array.from({ length: period === "day" ? 14 : 12 }, (_, index) => {
-    if (period === "day") return startAt + index * 86_400_000;
-    if (period === "week") return startAt + index * 7 * 86_400_000;
-    const start = new Date(startAt);
-    return Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + index, 1);
-  });
+function nextBucketStart(period: ProjectUsagePeriod, startAt: number) {
+  if (period === "day") return startAt + 86_400_000;
+  if (period === "week") return startAt + 7 * 86_400_000;
+  const start = new Date(startAt);
+  return Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1);
+}
+
+function hasAllowedBucketCount(
+  period: ProjectUsagePeriod,
+  startAt: number,
+  endAt: number,
+) {
+  let count = 0;
+  for (let current = startAt; current < endAt; current = nextBucketStart(period, current)) {
+    count += 1;
+    if (count > PROJECT_USAGE_MAX_TIMELINE_BUCKETS) return false;
+  }
+  return true;
+}
+
+function bucketStarts(
+  period: ProjectUsagePeriod,
+  startAt: number,
+  endAt: number,
+) {
+  const starts: number[] = [];
+  for (let current = startAt; current < endAt; current = nextBucketStart(period, current)) {
+    starts.push(current);
+  }
+  return starts;
 }
 
 function bucketIndex(
@@ -142,8 +222,9 @@ export function projectTrackedDuration(
   runs: readonly ProjectUsageSummaryRun[],
   period: ProjectUsagePeriod,
   now: number,
+  range?: ProjectUsageDateRange,
 ) {
-  const { startAt, endAt } = projectUsageSummaryWindow(period, now);
+  const { startAt, endAt } = projectUsageSummaryWindow(period, now, range);
   return runs.reduce((total, run) => {
     const timestamp = runTimestamp(run);
     if (!Number.isFinite(timestamp) || timestamp < startAt || timestamp >= endAt) {
@@ -175,9 +256,10 @@ export function summarizeProjectUsage(
   runs: readonly ProjectUsageSummaryRun[],
   period: ProjectUsagePeriod,
   now: number = Date.now(),
+  range?: ProjectUsageDateRange,
 ): ProjectUsageSummary {
-  const { startAt, endAt } = projectUsageSummaryWindow(period, now);
-  const starts = bucketStarts(period, startAt);
+  const { startAt, endAt } = projectUsageSummaryWindow(period, now, range);
+  const starts = bucketStarts(period, startAt, endAt);
   const timeline = starts.map((start) => ({
     startAt: new Date(start).toISOString(),
     completedIssues: 0,
@@ -261,7 +343,7 @@ export function summarizeProjectUsage(
     rangeStart: new Date(startAt).toISOString(),
     rangeEnd: new Date(endAt).toISOString(),
     totalTokens,
-    trackedDurationMs: projectTrackedDuration(runs, period, now),
+    trackedDurationMs: projectTrackedDuration(runs, period, now, range),
     observedRuns,
     reportedRuns,
     completedIssues,
@@ -272,12 +354,16 @@ export function summarizeProjectUsage(
   };
 }
 
-export type ProjectUsageSummaryLoadOptions = { force?: boolean };
+export type ProjectUsageSummaryLoadOptions = {
+  force?: boolean;
+  range?: ProjectUsageDateRange;
+};
 
 export function createCachedProjectUsageSummaryLoader(
   load: (
     projectId: string,
     period: ProjectUsagePeriod,
+    range?: ProjectUsageDateRange,
   ) => Promise<ProjectUsageSummary | null>,
   options: { ttlMs?: number; now?: () => number } = {},
 ) {
@@ -291,12 +377,13 @@ export function createCachedProjectUsageSummaryLoader(
     period: ProjectUsagePeriod,
     loadOptions: ProjectUsageSummaryLoadOptions = {},
   ) => {
-    const key = `${projectId}:${period}`;
+    const range = loadOptions.range;
+    const key = `${projectId}:${period}:${range?.from ?? "default"}:${range?.to ?? "default"}`;
     const pending = inFlight.get(key);
     if (pending) return pending;
     const cached = cache.get(key);
     if (!loadOptions.force && cached && cached.expiresAt > now()) return cached.value;
-    const request = load(projectId, period)
+    const request = load(projectId, period, range)
       .then((value) => {
         cache.set(key, { value, expiresAt: now() + ttlMs });
         return value;

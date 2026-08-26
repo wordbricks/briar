@@ -1,4 +1,8 @@
-import { projectUsageSummaryWindow } from "../../src/lib/project-usage-summary";
+import {
+  isProjectUsageDateRange,
+  projectUsageSummaryWindow,
+  type ProjectUsageDateRange,
+} from "../../src/lib/project-usage-summary";
 import { parseExecutionMetrics } from "./agent-result-json";
 import { listArchivedRunEvents } from "./archive";
 import type { BriarAuth } from "./auth";
@@ -111,15 +115,38 @@ export async function handleDashboardRoute(input: {
     const period = decodeProjectUsagePeriod(
       new URL(request.url).searchParams.get("period") ?? "day",
     );
+    const search = new URL(request.url).searchParams;
+    const from = search.get("from");
+    const to = search.get("to");
+    let range: ProjectUsageDateRange | undefined;
+    if (from !== null || to !== null) {
+      range = { from: from ?? "", to: to ?? "" };
+      if (!isProjectUsageDateRange(range, period)) {
+        throw new HttpError(
+          400,
+          "Usage range is invalid or contains more than 400 timeline buckets",
+        );
+      }
+    }
     const generatedAt = Date.now();
-    const since = new Date(
-      projectUsageSummaryWindow(period, generatedAt).startAt,
-    ).toISOString();
+    const window = projectUsageSummaryWindow(
+      period,
+      generatedAt,
+      range,
+    );
+    const since = new Date(window.startAt).toISOString();
+    const until = new Date(window.endAt).toISOString();
     const [runs, totals] = await Promise.all([
-      listProjectUsageRuns(db, project.id, since),
-      listProjectUsageTotals(db, project.id, since),
+      listProjectUsageRuns(db, project.id, since, until),
+      listProjectUsageTotals(db, project.id, since, until),
     ]);
-    return json(projectUsageSummaryJson(runs, totals, period, generatedAt));
+    return json(projectUsageSummaryJson(
+      runs,
+      totals,
+      period,
+      generatedAt,
+      range,
+    ));
   }
 
   const dashboardDeltaMatch = url.pathname.match(

@@ -2,6 +2,7 @@ import {
   ArrowRight,
   BarChart3,
   Bot,
+  CalendarDays,
   CheckCircle2,
   CircleAlert,
   Clock3,
@@ -23,9 +24,12 @@ import type { MessageKey } from "../i18n/messages";
 import { formatUsageDuration } from "../lib/agent-usage";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import {
+  defaultProjectUsageDateRange,
+  isProjectUsageDateRange,
   projectTrackedDuration as trackedDurationForRange,
   summarizeProjectUsage,
   type ProjectUsageBreakdownItem,
+  type ProjectUsageDateRange,
   type ProjectUsagePeriod,
   type ProjectUsageSummaryRun,
   type ProjectUsageSummaryLoadOptions,
@@ -40,6 +44,18 @@ import type {
 const defaultPeriod: ProjectUsagePeriod = "day";
 const activeStatuses = new Set(["queued", "running", "paused"]);
 const attentionStatuses = new Set(["blocked", "failed"]);
+
+const displayDateRange = (range: ProjectUsageDateRange, locale: string) => {
+  const formatter = new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  });
+  const from = Date.parse(`${range.from}T00:00:00.000Z`);
+  const to = Date.parse(`${range.to}T00:00:00.000Z`);
+  return `${formatter.format(from)} – ${formatter.format(to)}`;
+};
 
 function formatCompact(value: number, locale: string) {
   return new Intl.NumberFormat(locale, {
@@ -137,6 +153,8 @@ export function ProjectLobby({
   const [usageError, setUsageError] = useState<string | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [period, setPeriod] = useState<ProjectUsagePeriod>(defaultPeriod);
+  const [dateRange, setDateRange] = useState(defaultProjectUsageDateRange);
+  const [draftDateRange, setDraftDateRange] = useState(dateRange);
   const [now, setNow] = useState(Date.now);
   const usageRequest = useRef(0);
 
@@ -145,7 +163,10 @@ export function ProjectLobby({
     setUsageLoading(true);
     setUsageError(null);
     try {
-      const summary = await onLoadUsageSummary(project.id, period, { force });
+      const summary = await onLoadUsageSummary(project.id, period, {
+        force,
+        range: dateRange,
+      });
       if (request === usageRequest.current) {
         setUsageSummary(summary);
         setNow(Date.now());
@@ -157,7 +178,7 @@ export function ProjectLobby({
     } finally {
       if (request === usageRequest.current) setUsageLoading(false);
     }
-  }, [onLoadUsageSummary, period, project.id]);
+  }, [dateRange, onLoadUsageSummary, period, project.id]);
 
   useEffect(() => {
     setUsageSummary(null);
@@ -169,15 +190,15 @@ export function ProjectLobby({
     ? dashboard.runs
     : [];
   const dashboardUsage = useMemo(
-    () => summarizeProjectUsage(dashboardRuns, period, now),
-    [dashboardRuns, now, period],
+    () => summarizeProjectUsage(dashboardRuns, period, now, dateRange),
+    [dashboardRuns, dateRange, now, period],
   );
   const totalTokens = usageSummary?.totalTokens ??
     dashboardUsage.totalTokens;
   const observedRuns = usageSummary?.observedRuns ?? dashboardUsage.observedRuns;
   const reportedRuns = usageSummary?.reportedRuns ?? dashboardUsage.reportedRuns;
   const trackedDuration = usageSummary?.trackedDurationMs ??
-    trackedDurationForRange(dashboardRuns, period, now);
+    trackedDurationForRange(dashboardRuns, period, now, dateRange);
   const completedIssues = usageSummary?.completedIssues ??
     dashboardUsage.completedIssues;
   const timeline = usageSummary?.timeline ?? dashboardUsage.timeline;
@@ -225,7 +246,18 @@ export function ProjectLobby({
   const maxTokens = niceScaleMaximum(maxTokensRaw);
   const issueTicks = chartTickValues(maxIssues, true);
   const tokenTicks = chartTickValues(maxTokens, false);
-  const periodLabel = t(`lobby.period.${period}` as MessageKey);
+  const periodLabel = displayDateRange(dateRange, localeTag);
+  const today = defaultProjectUsageDateRange(now).to;
+  const dateRangeValid = isProjectUsageDateRange(draftDateRange, period) &&
+    draftDateRange.to <= today;
+  const dateRangeChanged = draftDateRange.from !== dateRange.from ||
+    draftDateRange.to !== dateRange.to;
+  const applyDateRange = () => {
+    if (!dateRangeValid || !dateRangeChanged) return;
+    usageRequest.current += 1;
+    setUsageSummary(null);
+    setDateRange(draftDateRange);
+  };
   const bucketLabel = (startAt: string) => {
     const timestamp = Date.parse(startAt);
     return period === "month"
@@ -345,22 +377,88 @@ export function ProjectLobby({
                   <p>{t("lobby.analyticsDescription")}</p>
                 </div>
               </div>
-              <div className="project-lobby-period-picker" aria-label={t("lobby.analyticsPeriod")}>
-                {(["day", "week", "month"] as const).map((value) => (
+              <div className="project-lobby-analytics-controls">
+                <div
+                  className="project-lobby-period-picker"
+                  aria-label={t("lobby.analyticsGranularity")}
+                >
+                  {(["day", "week", "month"] as const).map((value) => {
+                    const available = isProjectUsageDateRange(dateRange, value);
+                    return (
+                      <button
+                        aria-pressed={period === value}
+                        className={period === value ? "active" : ""}
+                        disabled={!available}
+                        key={value}
+                        onClick={() => {
+                          if (period === value) return;
+                          usageRequest.current += 1;
+                          setUsageSummary(null);
+                          setPeriod(value);
+                        }}
+                        title={!available
+                          ? t("lobby.analyticsInvalidRange")
+                          : undefined}
+                        type="button"
+                      >
+                        {t(`lobby.periodOption.${value}` as MessageKey)}
+                      </button>
+                    );
+                  })}
+                </div>
+                <form
+                  className="project-lobby-date-range"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    applyDateRange();
+                  }}
+                >
+                  <CalendarDays aria-hidden size={15} />
+                  <label>
+                    <span>{t("lobby.analyticsFrom")}</span>
+                    <input
+                      aria-invalid={draftDateRange.from > draftDateRange.to}
+                      max={draftDateRange.to < today ? draftDateRange.to : today}
+                      name="from"
+                      onChange={(event) => setDraftDateRange((current) => ({
+                        ...current,
+                        from: event.target.value,
+                      }))}
+                      required
+                      type="date"
+                      value={draftDateRange.from}
+                    />
+                  </label>
+                  <ArrowRight aria-hidden className="project-lobby-date-range-arrow" size={13} />
+                  <label>
+                    <span>{t("lobby.analyticsTo")}</span>
+                    <input
+                      aria-invalid={draftDateRange.from > draftDateRange.to || draftDateRange.to > today}
+                      max={today}
+                      min={draftDateRange.from}
+                      name="to"
+                      onChange={(event) => setDraftDateRange((current) => ({
+                        ...current,
+                        to: event.target.value,
+                      }))}
+                      required
+                      type="date"
+                      value={draftDateRange.to}
+                    />
+                  </label>
                   <button
-                    aria-pressed={period === value}
-                    className={period === value ? "active" : ""}
-                    key={value}
-                    onClick={() => {
-                      usageRequest.current += 1;
-                      setUsageSummary(null);
-                      setPeriod(value);
-                    }}
-                    type="button"
+                    aria-label={dateRangeValid
+                      ? t("lobby.analyticsApply")
+                      : t("lobby.analyticsInvalidRange")}
+                    disabled={!dateRangeValid || !dateRangeChanged || usageLoading}
+                    title={!dateRangeValid
+                      ? t("lobby.analyticsInvalidRange")
+                      : undefined}
+                    type="submit"
                   >
-                    {t(`lobby.periodOption.${value}` as MessageKey)}
+                    {t("lobby.analyticsApply")}
                   </button>
-                ))}
+                </form>
               </div>
             </header>
             <div className="project-lobby-chart-wrap">
