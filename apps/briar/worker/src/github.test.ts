@@ -497,6 +497,7 @@ describe("GitHub App user OAuth", () => {
     for (const [, init] of fetchMock.mock.calls) {
       expect(init?.headers).toMatchObject({
         authorization: "Bearer ghu_transient",
+        "user-agent": "Briar-Workflow-GitHub-App",
         "x-github-api-version": "2026-03-10",
       });
     }

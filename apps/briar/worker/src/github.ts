@@ -126,6 +126,7 @@ export async function exchangeGithubOAuthCode(input: {
 const githubApiHeaders = (accessToken: string) => ({
   accept: "application/vnd.github+json",
   authorization: `Bearer ${accessToken}`,
+  "user-agent": "Briar-Workflow-GitHub-App",
   "x-github-api-version": "2026-03-10",
 });
 
