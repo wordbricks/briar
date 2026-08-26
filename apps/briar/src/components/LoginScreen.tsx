@@ -2,6 +2,7 @@ import { ArrowUpRight, Mail, X } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
@@ -33,18 +34,27 @@ export function LoginScreen({
   return (
     <Shell
       className={cn(
-        "login-shell",
-        companionMode && "companion-login-shell",
-        embedded && "embedded-login-shell",
+        "scrollbar-subtle relative grid h-full min-h-0 w-full place-items-center overflow-auto bg-[radial-gradient(circle_at_50%_30%,rgba(108,82,199,0.1),transparent_34%),var(--background)]",
+        companionMode &&
+          "min-h-dvh max-w-full min-w-0 place-items-stretch overflow-x-hidden overflow-y-auto overscroll-x-none bg-card",
+        embedded &&
+          "min-h-full overflow-hidden bg-[radial-gradient(circle_at_50%_35%,rgba(108,82,199,0.12),transparent_38%),var(--background)] p-[58px_28px_28px]",
       )}
       data-tauri-drag-region
     >
-      <div className="login-glow" />
-      <section className="login-card rounded-3xl border border-border bg-card shadow-lg">
+      <div className="pointer-events-none absolute top-[8%] size-80 rounded-full bg-primary/10 blur-[90px]" />
+      <Card
+        className={cn(
+          "relative block w-[410px] rounded-3xl p-9 shadow-[0_26px_80px_rgba(38,42,32,0.1)]",
+          companionMode &&
+            "flex min-h-dvh w-full max-w-none min-w-0 flex-col justify-center rounded-none border-0 p-[max(32px,env(safe-area-inset-top))_max(24px,env(safe-area-inset-right))_max(28px,env(safe-area-inset-bottom))_max(24px,env(safe-area-inset-left))] shadow-none",
+          embedded && "w-[min(410px,calc(100%_-_56px))]",
+        )}
+      >
         {loginCode ? (
           <Button
             aria-label={t("login.close")}
-            className="login-close-button absolute top-5 right-5 size-9"
+            className="absolute top-5 right-5 size-9 rounded-[10px] border border-transparent text-muted-foreground shadow-none transition-colors hover:border-border hover:bg-background hover:text-foreground"
             onClick={onCancel}
             size="icon"
             type="button"
@@ -54,10 +64,15 @@ export function LoginScreen({
           </Button>
         ) : null}
         <Logo />
-        <div className="login-copy">
+        <div
+          className={cn(
+            "mt-[34px] mb-[26px]",
+            companionMode && "mx-auto w-full max-w-[480px]",
+          )}
+        >
           <Typography
             as="p"
-            className="eyebrow"
+            className="m-0 mb-[7px]"
             tone="primary"
             variant="micro"
           >
@@ -96,13 +111,18 @@ export function LoginScreen({
           </Typography>
         </div>
         {loginCode ? (
-          <div className="device-code-card rounded-xl border border-primary/20 bg-accent p-4 text-center">
+          <div
+            className={cn(
+              "flex flex-col items-center rounded-[13px] border border-primary/20 bg-accent p-4 text-center",
+              companionMode && "mx-auto w-full max-w-[480px] min-w-0",
+            )}
+          >
             <Typography as="span" tone="muted" variant="caption">
               {t(companionMode ? "companion.loginApprove" : "login.approveCode")}
             </Typography>
             <Typography
               as="strong"
-              className="mt-2.5 mb-2 block tracking-[0.25em] text-primary"
+              className="mt-[11px] mb-2 block max-w-full font-mono text-3xl font-semibold tracking-[0.25em] text-primary"
               variant="heading"
             >
               {loginCode}
@@ -114,7 +134,10 @@ export function LoginScreen({
         ) : (
           <div className="grid gap-3">
             <Button
-              className="email-button h-11 w-full justify-between rounded-xl px-3.5 text-sm font-semibold"
+              className={cn(
+                "grid h-11 w-full grid-cols-[20px_minmax(0,1fr)_16px] place-items-center rounded-[13px] px-3.5 text-xs font-semibold shadow-[0_5px_16px_rgba(38,42,32,0.05)] [&>svg:first-child]:size-[18px] [&>svg:last-child]:size-4",
+                companionMode && "mx-auto max-w-[480px]",
+              )}
               disabled={loading}
               onClick={() => onLogin("email")}
               type="button"
@@ -124,41 +147,57 @@ export function LoginScreen({
               ) : (
                 <Mail size={18} />
               )}
-              <span className="flex-1 text-center">{t("login.continueEmail")}</span>
+              <span className="col-start-2 text-center">{t("login.continueEmail")}</span>
               <ArrowUpRight size={16} />
             </Button>
-            <div className="login-provider-divider" role="separator">
+            <div
+              className={cn(
+                "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2.5 text-[var(--text-2xs)] text-muted-foreground before:h-px before:bg-border before:content-[''] after:h-px after:bg-border after:content-['']",
+                companionMode && "mx-auto w-full max-w-[480px]",
+              )}
+              role="separator"
+            >
               <span>{t("login.or")}</span>
             </div>
             <Button
-              className="google-button h-11 w-full justify-between rounded-xl border border-border bg-card px-3.5 text-sm font-semibold text-foreground shadow-xs hover:bg-secondary"
+              className={cn(
+                "grid h-[46px] w-full grid-cols-[20px_minmax(0,1fr)_16px] place-items-center rounded-[13px] border border-border bg-card px-3.5 text-xs font-semibold text-foreground shadow-[0_5px_16px_rgba(38,42,32,0.05)] hover:bg-secondary [&>svg:first-child]:size-[18px] [&>svg:last-child]:size-4",
+                companionMode && "mx-auto max-w-[480px]",
+              )}
               disabled={loading}
               onClick={() => onLogin("google")}
               type="button"
               variant="outline"
             >
               <GoogleIcon />
-              <span className="flex-1 text-center">{t("login.continueGoogle")}</span>
+              <span className="col-start-2 text-center">{t("login.continueGoogle")}</span>
               <ArrowUpRight size={16} />
             </Button>
           </div>
         )}
         {error ? (
-          <Typography className="login-error mt-3 text-destructive" role="alert" variant="caption">
+          <Typography
+            className={cn(
+              "mt-3 rounded-[10px] border border-[var(--status-destructive-border)] bg-[var(--status-destructive-surface)] px-3 py-2.5 text-[color:var(--status-destructive-foreground)]",
+              companionMode && "mx-auto w-full max-w-[480px]",
+            )}
+            role="alert"
+            variant="caption"
+          >
             {error}
           </Typography>
         ) : null}
         {companionMode ? (
           <Typography
             as="p"
-            className="login-footnote mt-3.5 text-center"
+            className="mx-auto mt-3.5 w-full max-w-[480px] text-center"
             tone="muted"
             variant="micro"
           >
             {t("companion.loginSecure")}
           </Typography>
         ) : null}
-      </section>
+      </Card>
     </Shell>
   );
 }

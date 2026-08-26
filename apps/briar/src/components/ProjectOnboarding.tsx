@@ -880,7 +880,14 @@ export function ProjectOnboarding({
                       />
                     </label>
                   ) : null}
-                  {error ? <div className="login-error" role="alert">{error}</div> : null}
+                  {error ? (
+                    <div
+                      className="rounded-[10px] border border-[var(--status-destructive-border)] bg-[var(--status-destructive-surface)] px-3 py-2.5 text-xs text-[color:var(--status-destructive-foreground)]"
+                      role="alert"
+                    >
+                      {error}
+                    </div>
+                  ) : null}
                   {repositoryReadiness?.gitReady ? (
                     <button
                       className="onboarding-primary-action"

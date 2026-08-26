@@ -18,7 +18,7 @@ describe("InitialOnboarding", () => {
   let root: Root;
 
   beforeEach(() => {
-Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -30,18 +30,15 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     vi.clearAllMocks();
   });
 
-
   it("starts email verification from the primary second-step action", async () => {
     const props = createProps();
     await act(async () => root.render(<InitialOnboarding {...props} />));
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".initial-welcome-copy button")
-        ?.click();
+      container.querySelector<HTMLButtonElement>("main section button")?.click();
     });
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".email-button")?.click();
+      container.querySelectorAll<HTMLButtonElement>("button")[0]?.click();
     });
 
     expect(props.onLogin).toHaveBeenCalledOnce();
@@ -56,14 +53,10 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     };
     await act(async () => root.render(<InitialOnboarding {...props} />));
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".initial-welcome-copy button")
-        ?.click();
+      container.querySelector<HTMLButtonElement>("main section button")?.click();
     });
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".initial-login-back")
-        ?.click();
+      container.querySelector<HTMLButtonElement>("main > section > button")?.click();
     });
 
     expect(props.onCancelLogin).toHaveBeenCalledOnce();
