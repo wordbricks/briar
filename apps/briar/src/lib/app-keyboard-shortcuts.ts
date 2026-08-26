@@ -156,29 +156,34 @@ function displaySequence(sequence: readonly string[]): string[] {
 export function createKeyboardShortcutHelpSections({
   commandPaletteShortcut,
   keyboardShortcutsShortcut,
+  sequenceShortcutsEnabled = true,
   sidebarShortcut,
   t,
 }: {
   commandPaletteShortcut: string;
   keyboardShortcutsShortcut: string;
+  sequenceShortcutsEnabled?: boolean;
   sidebarShortcut: string;
   t: (key: MessageKey) => string;
 }): KeyboardShortcutHelpSection[] {
-  const sections: KeyboardShortcutHelpSection[] = (
-    ["general", "go", "open"] as const
-  ).map((group) => ({
+  const groups = sequenceShortcutsEnabled
+    ? ["general", "go", "open"] as const
+    : ["general"] as const;
+  const sections: KeyboardShortcutHelpSection[] = groups.map((group) => ({
     id: group,
-    items: appKeyboardShortcutSpecs
-      .filter(
-        (shortcut) =>
-          shortcut.group === group &&
-          !combinedGeneralCommandIds.has(shortcut.id),
-      )
-      .map((shortcut) => ({
-        id: shortcut.id,
-        keys: displaySequence(shortcut.sequence),
-        label: t(shortcut.labelKey),
-      })),
+    items: sequenceShortcutsEnabled
+      ? appKeyboardShortcutSpecs
+          .filter(
+            (shortcut) =>
+              shortcut.group === group &&
+              !combinedGeneralCommandIds.has(shortcut.id),
+          )
+          .map((shortcut) => ({
+            id: shortcut.id,
+            keys: displaySequence(shortcut.sequence),
+            label: t(shortcut.labelKey),
+          }))
+      : [],
     label: t(groupLabelKeys[group]),
   }));
 
@@ -189,14 +194,18 @@ export function createKeyboardShortcutHelpSections({
       items: [
         {
           id: "configuredCommandPalette",
-          join: "or",
-          keys: [commandPaletteShortcut, "/"],
+          join: sequenceShortcutsEnabled ? "or" : undefined,
+          keys: sequenceShortcutsEnabled
+            ? [commandPaletteShortcut, "/"]
+            : [commandPaletteShortcut],
           label: t("keyboardShortcuts.commandPalette"),
         },
         {
           id: "configuredSidebar",
-          join: "or",
-          keys: [sidebarShortcut, "["],
+          join: sequenceShortcutsEnabled ? "or" : undefined,
+          keys: sequenceShortcutsEnabled
+            ? [sidebarShortcut, "["]
+            : [sidebarShortcut],
           label: t("keyboardShortcuts.toggleSidebar"),
         },
         {
@@ -211,36 +220,40 @@ export function createKeyboardShortcutHelpSections({
         },
         {
           id: "keyboardShortcutsModifier",
-          join: "or",
-          keys: [keyboardShortcutsShortcut, "?"],
+          join: sequenceShortcutsEnabled ? "or" : undefined,
+          keys: sequenceShortcutsEnabled
+            ? [keyboardShortcutsShortcut, "?"]
+            : [keyboardShortcutsShortcut],
           label: t("keyboardShortcuts.showGuide"),
         },
         ...generalSection.items,
       ],
     };
   }
-  sections.push({
-    id: "list",
-    items: [
-      {
-        id: "moveDown",
-        join: "or" as const,
-        keys: ["J", "↓"],
-        label: t("keyboardShortcuts.moveDown"),
-      },
-      {
-        id: "moveUp",
-        join: "or" as const,
-        keys: ["K", "↑"],
-        label: t("keyboardShortcuts.moveUp"),
-      },
-      {
-        id: "openFocused",
-        keys: ["Enter"],
-        label: t("keyboardShortcuts.openFocused"),
-      },
-    ],
-    label: t("keyboardShortcuts.section.list"),
-  });
+  if (sequenceShortcutsEnabled) {
+    sections.push({
+      id: "list",
+      items: [
+        {
+          id: "moveDown",
+          join: "or" as const,
+          keys: ["J", "↓"],
+          label: t("keyboardShortcuts.moveDown"),
+        },
+        {
+          id: "moveUp",
+          join: "or" as const,
+          keys: ["K", "↑"],
+          label: t("keyboardShortcuts.moveUp"),
+        },
+        {
+          id: "openFocused",
+          keys: ["Enter"],
+          label: t("keyboardShortcuts.openFocused"),
+        },
+      ],
+      label: t("keyboardShortcuts.section.list"),
+    });
+  }
   return sections;
 }

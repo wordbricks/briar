@@ -419,7 +419,7 @@ describe("HuntBoard", () => {
     expect(listButton?.getAttribute("aria-pressed")).toBe("false");
     expect(container.querySelector(".kanban-progress")).toBeNull();
     expect(container.querySelector(".kanban-card")?.textContent).not.toContain(`${demoDashboard.runs[0].progress}%`);
-    expect(container.querySelector(".kanban-column-content[data-keyboard-list]")).not.toBeNull();
+    expect(container.querySelector(".kanban-board[data-keyboard-list]")).not.toBeNull();
     expect(container.querySelectorAll(".kanban-card[data-keyboard-list-item]")).toHaveLength(container.querySelectorAll(".kanban-card").length);
     await act(async () => listButton?.click());
     expect(container.querySelector(".kanban-board")).toBeNull();

@@ -71,6 +71,7 @@ export function KeyboardShortcutsDialog({
       <DialogContent
         aria-describedby="keyboard-shortcuts-description"
         className="top-[7vh] z-[1310] block max-h-[86vh] w-[min(780px,calc(100vw-24px))] max-w-none translate-y-0 overflow-hidden rounded-2xl border-border/80 bg-card p-0 shadow-2xl backdrop-blur-xl"
+        closeLabel={t("common.close")}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           inputRef.current?.focus();

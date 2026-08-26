@@ -51,6 +51,19 @@ describe("app keyboard shortcuts", () => {
     expect(new Set(serializedSequences).size).toBe(serializedSequences.length);
   });
 
+  it("does not let one command shadow a longer sequence", () => {
+    for (const shortcut of appKeyboardShortcutSpecs) {
+      const prefix = shortcut.sequence.join("\u0000");
+      const shadowed = appKeyboardShortcutSpecs.find(
+        (candidate) =>
+          candidate.id !== shortcut.id &&
+          candidate.sequence.length > shortcut.sequence.length &&
+          candidate.sequence.join("\u0000").startsWith(`${prefix}\u0000`),
+      );
+      expect(shadowed, `${shortcut.id} shadows ${shadowed?.id}`).toBeUndefined();
+    }
+  });
+
   it("combines configured and plain alternatives with or in general help", () => {
     const sections = createKeyboardShortcutHelpSections({
       commandPaletteShortcut: "Ctrl+K",
@@ -135,6 +148,48 @@ describe("app keyboard shortcuts", () => {
         id: "openFocused",
         keys: ["Enter"],
         label: "keyboardShortcuts.openFocused",
+      },
+    ]);
+  });
+
+  it("hides inactive plain-key commands when sequence shortcuts are off", () => {
+    const sections = createKeyboardShortcutHelpSections({
+      commandPaletteShortcut: "Ctrl+K",
+      keyboardShortcutsShortcut: "Ctrl+/",
+      sequenceShortcutsEnabled: false,
+      sidebarShortcut: "Ctrl+B",
+      t: translate,
+    });
+
+    expect(sections.map((section) => section.id)).toEqual(["general"]);
+    expect(sections[0]?.items).toEqual([
+      {
+        id: "configuredCommandPalette",
+        join: undefined,
+        keys: ["Ctrl+K"],
+        label: "keyboardShortcuts.commandPalette",
+      },
+      {
+        id: "configuredSidebar",
+        join: undefined,
+        keys: ["Ctrl+B"],
+        label: "keyboardShortcuts.toggleSidebar",
+      },
+      {
+        id: "navigationBack",
+        keys: ["⌘["],
+        label: "navigation.back",
+      },
+      {
+        id: "navigationForward",
+        keys: ["⌘]"],
+        label: "navigation.forward",
+      },
+      {
+        id: "keyboardShortcutsModifier",
+        join: undefined,
+        keys: ["Ctrl+/"],
+        label: "keyboardShortcuts.showGuide",
       },
     ]);
   });
