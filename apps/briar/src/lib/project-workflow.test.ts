@@ -61,6 +61,60 @@ describe("generated project workflow boundary", () => {
     });
   });
 
+  it("accepts the full persisted bounds for custom stages and checks", () => {
+    const input = {
+      requirements: [],
+      stages: [{
+        id: "release-validation",
+        label: "Release validation",
+        evidence: ["release report"],
+        checks: ["x".repeat(500)],
+      }],
+      execution: {
+        checkpoints: [{
+          stage: "release-validation",
+          position: "after",
+        }],
+      },
+      completion: { requiredStages: ["release-validation"] },
+    };
+
+    expect(parseGeneratedWorkflow(JSON.stringify(input))).toMatchObject({
+      stages: [{
+        id: "release-validation",
+        checks: ["x".repeat(500)],
+        required: true,
+      }],
+      execution: {
+        checkpoints: [{
+          key: "project-after-release-validation",
+          stage: "release-validation",
+        }],
+      },
+    });
+  });
+
+  it("rejects the reserved repository bootstrap stage", () => {
+    const input = generatedWorkflowDraft();
+    input.stages[0]!.id = "repository_workflow_pending";
+    input.execution.checkpoints[0]!.stage = "repository_workflow_pending";
+    input.completion.requiredStages = ["repository_workflow_pending"];
+
+    try {
+      parseGeneratedWorkflow(JSON.stringify(input));
+      throw new Error("Expected workflow parsing to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ProjectWorkflowGenerationError);
+      expect(error).toMatchObject({
+        phase: "draft",
+        issues: expect.arrayContaining([{
+          path: ["stages", 0, "id"],
+          message: "Reserved repository workflow stage is not executable.",
+        }]),
+      });
+    }
+  });
+
   it("keeps malformed JSON behind a typed stable boundary error", () => {
     try {
       parseGeneratedWorkflow("{not-json");

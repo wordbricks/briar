@@ -596,6 +596,33 @@ fn updates_the_connected_project_workflow_locally() {
 }
 
 #[test]
+fn canonicalizes_long_checkpoint_keys_identically_to_the_web_contract() {
+    let stage_id = format!("a{}c", "b".repeat(62));
+    let mut workflow = repository_workflow_bootstrap();
+    workflow.stages = vec![WorkflowStageConfig {
+        id: stage_id.clone(),
+        label: "Long custom stage".to_string(),
+        required: true,
+        evidence: vec![],
+        checks: vec![],
+    }];
+    workflow.completion.required_stages = vec![stage_id.clone()];
+    workflow.execution.checkpoints = vec![WorkflowCheckpointConfig {
+        key: "human-review".to_string(),
+        stage: stage_id,
+        position: WorkflowCheckpointPosition::After,
+    }];
+
+    let canonical = canonicalize_workflow(workflow);
+
+    assert_eq!(
+        canonical.execution.checkpoints[0].key,
+        "project-after-abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-5210d1375021b160"
+    );
+    validate_generated_workflow(&canonical).expect("canonical key should remain valid");
+}
+
+#[test]
 fn disconnecting_velen_clears_legacy_linear_settings() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

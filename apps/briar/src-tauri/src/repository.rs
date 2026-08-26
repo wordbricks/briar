@@ -1,5 +1,34 @@
 use super::*;
 
+pub(super) const WORKFLOW_CHECKPOINT_KEY_MAX_LENGTH: usize = 64;
+
+fn checkpoint_key_for_boundary(owner: &str, checkpoint: &WorkflowCheckpointConfig) -> String {
+    let position = match checkpoint.position {
+        WorkflowCheckpointPosition::Before => "before",
+        WorkflowCheckpointPosition::After => "after",
+    };
+    let key = format!("{owner}-{position}-{}", checkpoint.stage);
+    if key.len() <= WORKFLOW_CHECKPOINT_KEY_MAX_LENGTH {
+        return key;
+    }
+
+    let hash = key
+        .as_bytes()
+        .iter()
+        .fold(14_695_981_039_346_656_037_u64, |hash, byte| {
+            (hash ^ u64::from(*byte)).wrapping_mul(1_099_511_628_211)
+        });
+    let suffix = format!("-{hash:016x}");
+    let prefix_budget = WORKFLOW_CHECKPOINT_KEY_MAX_LENGTH - suffix.len();
+    let prefix_end = key
+        .char_indices()
+        .map(|(index, character)| index + character.len_utf8())
+        .take_while(|end| *end <= prefix_budget)
+        .last()
+        .unwrap_or(0);
+    format!("{}{suffix}", &key[..prefix_end])
+}
+
 pub(super) fn canonicalize_workflow(mut workflow: WorkflowConfig) -> WorkflowConfig {
     for requirement in &mut workflow.requirements {
         let canonical_tool = match requirement.kind {
@@ -14,14 +43,7 @@ pub(super) fn canonicalize_workflow(mut workflow: WorkflowConfig) -> WorkflowCon
         }
     }
     for checkpoint in &mut workflow.execution.checkpoints {
-        checkpoint.key = format!(
-            "project-{}-{}",
-            match checkpoint.position {
-                WorkflowCheckpointPosition::Before => "before",
-                WorkflowCheckpointPosition::After => "after",
-            },
-            checkpoint.stage
-        );
+        checkpoint.key = checkpoint_key_for_boundary("project", checkpoint);
     }
     workflow.execution.checkpoints.sort_by_key(|checkpoint| {
         (

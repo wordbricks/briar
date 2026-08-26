@@ -6,9 +6,13 @@ import {
   AutoHuntWorkflowValidationError,
   autoHuntEvidenceTypeMaxLength,
   autoHuntEvidenceTypePattern,
+  autoHuntRequirementIdPattern,
   autoHuntRequirementKinds,
+  autoHuntStageCheckMaxLength,
+  autoHuntWorkflowStageIdPattern,
   canonicalizeProjectWorkflow,
   checkpointKeyForBoundary,
+  repositoryWorkflowPendingStageId,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
 import {
@@ -50,9 +54,16 @@ const mutableArrayBetween = <S extends Schema.Top>(
     Schema.isMaxLength(maximum),
   );
 
-const workflowIdPattern = /^[a-z][a-z0-9_]*$/u;
-
-const WorkflowStageIdDraft = draftTextMatching(1, 64, workflowIdPattern);
+const WorkflowRequirementIdDraft = draftTextMatching(
+  1,
+  64,
+  autoHuntRequirementIdPattern,
+);
+const WorkflowStageIdDraft = draftTextMatching(
+  1,
+  64,
+  autoHuntWorkflowStageIdPattern,
+);
 
 const EvidenceTypeDraft = draftTextMatching(
   1,
@@ -64,11 +75,14 @@ const WorkflowStageDraft = Schema.Struct({
   id: WorkflowStageIdDraft,
   label: draftText(1, 80),
   evidence: mutableArrayAtMost(EvidenceTypeDraft, 20),
-  checks: mutableArrayAtMost(draftText(1, 300), 20),
+  checks: mutableArrayAtMost(
+    draftText(1, autoHuntStageCheckMaxLength),
+    20,
+  ),
 });
 
 const WorkflowRequirementDraft = Schema.Struct({
-  id: WorkflowStageIdDraft,
+  id: WorkflowRequirementIdDraft,
   label: draftText(1, 80),
   kind: Schema.Literals(autoHuntRequirementKinds),
   tool: draftTextMatching(1, 80, /^[a-zA-Z0-9_.+-]+$/u),
@@ -125,6 +139,14 @@ const GeneratedWorkflowDraft = GeneratedWorkflowProviderSchema.check(
     );
     if (duplicateStageIds) issues.push(duplicateStageIds);
     if (duplicateRequirementIds) issues.push(duplicateRequirementIds);
+    for (const [index, stage] of draft.stages.entries()) {
+      if (stage.id === repositoryWorkflowPendingStageId) {
+        issues.push({
+          path: ["stages", index, "id"],
+          issue: "Reserved repository workflow stage is not executable.",
+        });
+      }
+    }
 
     const requiredStageIds = new Set<string>();
     for (const [index, stageId] of draft.completion.requiredStages.entries()) {

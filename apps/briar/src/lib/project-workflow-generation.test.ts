@@ -4,6 +4,7 @@ import {
   ProjectWorkflowGenerationError,
   type ProjectWorkflowChat,
 } from "./project-workflow";
+import type { AutoHuntWorkflow } from "./auto-hunt-contract";
 
 const projectLlmChat = vi.fn<ProjectWorkflowChat>();
 const generateProjectWorkflow = makeProjectWorkflowGenerator(projectLlmChat);
@@ -108,6 +109,55 @@ describe("project workflow generation repair", () => {
       schema.properties.execution.properties.checkpoints.items;
     expect(checkpoint.required).not.toContain("key");
     expect(checkpoint.properties).not.toHaveProperty("key");
+  });
+
+  it("round-trips every valid persisted custom-stage value during regeneration", async () => {
+    const check = "x".repeat(500);
+    const currentWorkflow = {
+      version: 2,
+      requirements: [],
+      stages: [{
+        id: "release-validation",
+        label: "Release validation",
+        required: true,
+        evidence: ["release report"],
+        checks: [check],
+      }],
+      execution: {
+        checkpoints: [{
+          key: "project-after-release-validation",
+          stage: "release-validation",
+          position: "after",
+        }],
+      },
+      completion: { requiredStages: ["release-validation"] },
+    } satisfies AutoHuntWorkflow;
+    const providerDraft = {
+      requirements: currentWorkflow.requirements,
+      stages: currentWorkflow.stages.map((stage) => ({
+        id: stage.id,
+        label: stage.label,
+        evidence: stage.evidence,
+        checks: stage.checks,
+      })),
+      execution: {
+        checkpoints: currentWorkflow.execution.checkpoints.map((checkpoint) => ({
+          stage: checkpoint.stage,
+          position: checkpoint.position,
+        })),
+      },
+      completion: currentWorkflow.completion,
+    };
+    projectLlmChat.mockResolvedValueOnce(response(providerDraft));
+
+    await expect(
+      generateProjectWorkflow("project-1", currentWorkflow),
+    ).resolves.toEqual(currentWorkflow);
+    expect(projectLlmChat).toHaveBeenCalledTimes(1);
+    expect(projectLlmChat.mock.calls[0]![0].message).toContain(
+      '"id": "release-validation"',
+    );
+    expect(projectLlmChat.mock.calls[0]![0].message).toContain(check);
   });
 
   it("stops after one repair attempt", async () => {

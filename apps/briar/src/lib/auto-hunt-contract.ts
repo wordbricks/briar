@@ -27,6 +27,9 @@ export const autoHuntPersistedRunStatuses = [
 
 export const autoHuntEvidenceTypeMaxLength = 120;
 export const autoHuntEvidenceTypePattern = /^[^\u0000-\u001f\u007f]+$/u;
+export const autoHuntRequirementIdPattern = /^[a-z][a-z0-9_]{0,63}$/u;
+export const autoHuntStageCheckMaxLength = 500;
+export const autoHuntWorkflowCheckpointKeyMaxLength = 64;
 export const autoHuntWorkflowCheckpointKeyPattern =
   /^[a-z][a-z0-9_-]{0,63}$/u;
 export const autoHuntWorkflowStageIdPattern = /^[a-z][a-z0-9_-]{0,63}$/u;
@@ -78,10 +81,27 @@ const checkpointBoundaryId = (
   checkpoint: Pick<AutoHuntWorkflowCheckpoint, "stage" | "position">,
 ) => `${checkpoint.stage}:${checkpoint.position}`;
 
+const checkpointKeyHash = (value: string) => {
+  let hash = 14_695_981_039_346_656_037n;
+  for (const byte of new TextEncoder().encode(value)) {
+    hash ^= BigInt(byte);
+    hash = BigInt.asUintN(64, hash * 1_099_511_628_211n);
+  }
+  return hash.toString(16).padStart(16, "0");
+};
+
 export const checkpointKeyForBoundary = (
   owner: "project" | "user" | "issue",
   checkpoint: Pick<AutoHuntWorkflowCheckpoint, "stage" | "position">,
-) => `${owner}-${checkpoint.position}-${checkpoint.stage}`;
+) => {
+  const key = `${owner}-${checkpoint.position}-${checkpoint.stage}`;
+  if (key.length <= autoHuntWorkflowCheckpointKeyMaxLength) return key;
+  const suffix = `-${checkpointKeyHash(key)}`;
+  return `${key.slice(
+    0,
+    autoHuntWorkflowCheckpointKeyMaxLength - suffix.length,
+  )}${suffix}`;
+};
 
 function orderedCheckpointSet(
   workflow: AutoHuntWorkflow,
@@ -405,7 +425,7 @@ export function normalizeAutoHuntWorkflow(
     const label = trimString(requirement.label);
     const tool = trimString(requirement.tool);
     const reason = trimString(requirement.reason);
-    if (!id || !/^[a-z][a-z0-9_]{0,63}$/u.test(id)) {
+    if (!id || !autoHuntRequirementIdPattern.test(id)) {
       issues.push(`requirements[${index}].id is invalid`);
       return [];
     }
@@ -481,7 +501,7 @@ export function normalizeAutoHuntWorkflow(
     )) {
       issues.push(`stages[${index}].evidence contains an invalid value`);
     }
-    if (checks?.some((value) => value.length > 500)) {
+    if (checks?.some((value) => value.length > autoHuntStageCheckMaxLength)) {
       issues.push(`stages[${index}].checks contains an invalid value`);
     }
     return [{

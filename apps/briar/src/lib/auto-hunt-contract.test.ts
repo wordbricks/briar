@@ -3,9 +3,11 @@ import {
   AutoHuntWorkflowValidationError,
   canonicalizeCheckpointSet,
   canonicalizeProjectWorkflow,
+  checkpointKeyForBoundary,
   cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
   resolveCheckpointPolicy,
+  autoHuntWorkflowCheckpointKeyPattern,
   workflowWithEffectiveCheckpoints,
   workflowWithAdditionalCheckpoints,
   type AutoHuntWorkflowInput,
@@ -164,6 +166,42 @@ describe("Auto Hunt workflow v2 contract", () => {
       },
     ]);
     expect(canonicalizeProjectWorkflow(canonical)).toEqual(canonical);
+  });
+
+  it("keeps derived keys valid and distinct for maximum-length stage ids", () => {
+    const firstStage = `a${"b".repeat(62)}c`;
+    const secondStage = `a${"b".repeat(62)}d`;
+    const canonical = canonicalizeProjectWorkflow({
+      version: 2,
+      requirements: [],
+      stages: [firstStage, secondStage].map((id) => ({
+        id,
+        label: id,
+        required: true,
+      })),
+      execution: {
+        checkpoints: [firstStage, secondStage].map((stage) => ({
+          key: stage,
+          stage,
+          position: "after" as const,
+        })),
+      },
+      completion: { requiredStages: [firstStage, secondStage] },
+    });
+    const [first, second] = canonical.execution.checkpoints.map(({ key }) => key);
+
+    expect(first).toHaveLength(64);
+    expect(first).toBe(
+      "project-after-abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-5210d1375021b160",
+    );
+    expect(first).toMatch(autoHuntWorkflowCheckpointKeyPattern);
+    expect(second).toHaveLength(64);
+    expect(second).toMatch(autoHuntWorkflowCheckpointKeyPattern);
+    expect(second).not.toBe(first);
+    expect(checkpointKeyForBoundary("project", {
+      stage: firstStage,
+      position: "after",
+    })).toBe(first);
   });
 
   it.each([
