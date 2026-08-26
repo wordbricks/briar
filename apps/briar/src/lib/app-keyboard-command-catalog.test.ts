@@ -32,7 +32,7 @@ const expectedPhysicalSequences = {
   goSchedule: ["KeyG", "KeyL"],
   goSettings: ["KeyG", "KeyS"],
   openIssue: ["KeyO", "KeyI"],
-  openProject: ["KeyO", "KeyP"],
+  openProject: ["KeyG", "KeyP"],
   openChannel: ["KeyO", "KeyC"],
   openDm: ["KeyO", "KeyD"],
   openSession: ["KeyO", "KeyS"],
@@ -147,6 +147,29 @@ describe("app keyboard command catalog", () => {
         "capture",
       ),
     ).toMatchObject({ commandId: "openCommandPalette", _tag: "Matched" });
+  });
+
+  it("selects projects with G P while preserving O P as an alias", () => {
+    const catalog = createAppKeyboardCommandCatalog(defaultKeybindings);
+
+    for (const prefixCode of ["KeyG", "KeyO"]) {
+      const prefix = dispatch(
+        catalog,
+        "openProject",
+        { code: prefixCode },
+        "capture",
+      );
+      expect(prefix).toMatchObject({ _tag: "Pending" });
+      expect(
+        reduceKeyboardCommandState(
+          prefix.state,
+          catalog,
+          ["openProject"],
+          { code: "KeyP" },
+          "capture",
+        ),
+      ).toMatchObject({ commandId: "openProject", _tag: "Matched" });
+    }
   });
 
   it("keeps plain shortcuts in normal mode and app chords in both modes", () => {

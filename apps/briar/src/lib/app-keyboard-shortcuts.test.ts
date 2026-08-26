@@ -28,7 +28,7 @@ describe("app keyboard shortcuts", () => {
       ["goSchedule", ["g", "l"]],
       ["goSettings", ["g", "s"]],
       ["openIssue", ["o", "i"]],
-      ["openProject", ["o", "p"]],
+      ["openProject", ["g", "p"]],
       ["openChannel", ["o", "c"]],
       ["openDm", ["o", "d"]],
       ["openSession", ["o", "s"]],
@@ -112,12 +112,16 @@ describe("app keyboard shortcuts", () => {
     const goInbox = sections
       .find((section) => section.id === "go")
       ?.items.find((item) => item.id === "goInbox");
+    const openProject = sections
+      .find((section) => section.id === "go")
+      ?.items.find((item) => item.id === "openProject");
     const openIssue = sections
       .find((section) => section.id === "open")
       ?.items.find((item) => item.id === "openIssue");
 
     expect(goInbox).toMatchObject({ keys: ["G", "I"] });
     expect(goInbox?.join).toBeUndefined();
+    expect(openProject).toMatchObject({ keys: ["G", "P"] });
     expect(openIssue).toMatchObject({ keys: ["O", "I"] });
     expect(openIssue?.join).toBeUndefined();
   });

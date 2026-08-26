@@ -14,7 +14,10 @@ import {
   type KeyboardCommandModifiers,
   type KeyboardCommandPlainBinding,
 } from "./keyboard-command-controller";
-import type { KeyboardShortcutToken } from "./keyboard-shortcuts";
+import type {
+  KeyboardShortcutSequence,
+  KeyboardShortcutToken,
+} from "./keyboard-shortcuts";
 import type { Keybindings, Shortcut } from "./keybindings";
 
 export type AppKeyboardCommandId =
@@ -97,12 +100,13 @@ function configuredBinding(shortcut: Shortcut): KeyboardCommandModifiedBinding {
 }
 
 function physicalBinding(
-  spec: AppKeyboardShortcutSpec,
+  commandId: AppKeyboardShortcutCommandId,
+  sequence: KeyboardShortcutSequence,
 ): KeyboardCommandBinding {
-  if (spec.sequence.includes("?")) {
-    if (spec.sequence.length !== 1 || spec.sequence[0] !== "?") {
+  if (sequence.includes("?")) {
+    if (sequence.length !== 1 || sequence[0] !== "?") {
       throw new Error(
-        `Keyboard shortcut ${spec.id} uses ? outside a single-key binding`,
+        `Keyboard shortcut ${commandId} uses ? outside a single-key binding`,
       );
     }
     return {
@@ -117,7 +121,7 @@ function physicalBinding(
     kind: "plain",
     modes: normalModeOnly,
     sequence: EffectArray.map(
-      spec.sequence,
+      sequence,
       (token) => physicalCodeByToken[token],
     ),
   } satisfies KeyboardCommandPlainBinding;
@@ -127,21 +131,31 @@ function shortcutBindings(
   spec: AppKeyboardShortcutSpec,
   keybindings: Keybindings,
 ): EffectArray.NonEmptyReadonlyArray<KeyboardCommandBinding> {
-  const physical = physicalBinding(spec);
+  const physical = physicalBinding(spec.id, spec.sequence);
+  const aliases = EffectArray.map(
+    spec.aliases ?? [],
+    (sequence) => physicalBinding(spec.id, sequence),
+  );
+  const physicalBindings = EffectArray.prepend(aliases, physical);
   if (spec.id === "openCommandPalette") {
-    return [physical, configuredBinding(keybindings.commandPalette)];
+    return EffectArray.append(
+      physicalBindings,
+      configuredBinding(keybindings.commandPalette),
+    );
   }
   if (spec.id === "toggleSidebar") {
-    return [physical, configuredBinding(keybindings.sidebarToggle)];
+    return EffectArray.append(
+      physicalBindings,
+      configuredBinding(keybindings.sidebarToggle),
+    );
   }
   if (spec.id === "showKeyboardShortcuts") {
-    return [
-      physical,
+    return EffectArray.appendAll(physicalBindings, [
       modifiedBinding("Slash", { meta: true }),
       modifiedBinding("Slash", { control: true }),
-    ];
+    ]);
   }
-  return [physical];
+  return physicalBindings;
 }
 
 function plainListBinding(code: string): KeyboardCommandPlainBinding {
