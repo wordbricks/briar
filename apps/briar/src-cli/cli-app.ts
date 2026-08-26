@@ -528,7 +528,7 @@ const mergeQueueCommand = Command.make("merge-queue").pipe(
     leaf(
       "configure",
       {
-        ...optionalStrings("project"),
+        ...optionalStrings("project", "readiness-stage"),
         ...optionalIntegers("quiet-window-ms", "max-batch-size"),
         ...switches("enable", "disable"),
       },

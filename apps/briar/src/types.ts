@@ -884,6 +884,18 @@ export type ProjectSettings = {
   };
 };
 
+export type MergeQueueProfile = {
+  projectId: string;
+  repositoryId: number;
+  repository: string;
+  baseBranch: "main";
+  enabled: boolean;
+  readinessStageId: string;
+  quietWindowMs: number;
+  maxBatchSize: number;
+  updatedAt: string;
+};
+
 export type DashboardPayload = {
   project: Project;
   settings: ProjectSettings;

@@ -31,6 +31,7 @@ const workflow = JSON.stringify({
   version: 2,
   requirements: [],
   stages: [
+    { id: "reviewing", label: "Review", required: false, evidence: [] },
     { id: "ci_qa", label: "CI", required: true, evidence: [] },
     { id: "merged", label: "Merge", required: true, evidence: [] },
   ],
@@ -127,6 +128,7 @@ describe("repository merge queue coordinator", () => {
       maxConcurrentSessions?: number;
       deviceId?: string;
       quietWindowMs?: number;
+      readinessStageId?: string;
     } = {},
   ): Promise<Lane> => {
     const projectId = `11111111-1111-4111-8111-${
@@ -161,13 +163,15 @@ describe("repository merge queue coordinator", () => {
       db.prepare(
         `insert into briar_merge_queue_profiles (
            project_id, repository_id, repository, base_branch, enabled,
-           quiet_window_ms, max_batch_size, created_at, updated_at
-         ) values (?, ?, ?, 'main', ?, ?, ?, ?, ?)`,
+           readiness_stage_id, quiet_window_ms, max_batch_size, created_at,
+           updated_at
+         ) values (?, ?, ?, 'main', ?, ?, ?, ?, ?, ?)`,
       ).bind(
         projectId,
         repositoryId,
         repository,
         options.enabled === false ? 0 : 1,
+        options.readinessStageId ?? "ci_qa",
         options.quietWindowMs ?? 1000,
         options.maxBatchSize ?? 5,
         at(scenario, 0),
@@ -236,6 +240,7 @@ describe("repository merge queue coordinator", () => {
       pullRequestCount?: number;
       headSha?: string;
       baseSha?: string;
+      completedStageId?: string;
     },
   ): Promise<ReadyRun> => {
     runSequence += 1;
@@ -256,13 +261,14 @@ describe("repository merge queue coordinator", () => {
            workflow_stage, repository, priority, branch, commit_sha,
            started_at, last_event_at, created_at, updated_at,
            workflow_snapshot_json
-         ) values (?, ?, 'issue', ?, ?, 'implementing', 'running', 'ci_qa',
+         ) values (?, ?, 'issue', ?, ?, 'implementing', 'running', ?,
                    ?, ?, 'briar/test', ?, ?, ?, ?, ?, ?)`,
       ).bind(
         runId,
         lane.projectId,
         `merge-run-${runSequence}`,
         `Merge run ${runSequence}`,
+        input.completedStageId ?? "ci_qa",
         lane.repository,
         input.priority ?? null,
         headSha,
@@ -275,8 +281,13 @@ describe("repository merge queue coordinator", () => {
       db.prepare(
         `insert into briar_run_stage_progress (
            run_id, attempt, revision, stage_id, state, started_at, finished_at
-         ) values (?, 1, 1, 'ci_qa', 'completed', ?, ?)`,
-      ).bind(runId, input.readyAt, input.readyAt),
+         ) values (?, 1, 1, ?, 'completed', ?, ?)`,
+      ).bind(
+        runId,
+        input.completedStageId ?? "ci_qa",
+        input.readyAt,
+        input.readyAt,
+      ),
       ...pullRequestNumbers.map((pullRequestNumber) =>
         db.prepare(
           `insert into briar_run_pull_requests (
@@ -447,6 +458,22 @@ describe("repository merge queue coordinator", () => {
     expect(published?.state).toBe("awaiting_merge");
     return context;
   };
+
+  it("registers only the workflow stage selected by the profile", async () => {
+    const lane = await setupLane(40, { readinessStageId: "reviewing" });
+    const ciRun = await createReadyRun(lane, {
+      readyAt: at(40, 10),
+      completedStageId: "ci_qa",
+    });
+    await expect(registerRun(lane, ciRun, at(40, 11))).resolves.toHaveLength(0);
+
+    const reviewRun = await createReadyRun(lane, {
+      readyAt: at(40, 12),
+      completedStageId: "reviewing",
+    });
+    await expect(registerRun(lane, reviewRun, at(40, 13))).resolves
+      .toHaveLength(1);
+  });
 
   it("atomically seals five of six racing candidates and leaves one ready", async () => {
     const lane = await setupLane(2);
@@ -669,7 +696,7 @@ describe("repository merge queue coordinator", () => {
     })).resolves.toBeNull();
   });
 
-  it("does not revive old ci_qa after an out-of-order A-to-B-to-A force-push", async () => {
+  it("does not revive old readiness proof after an out-of-order force-push", async () => {
     const lane = await setupLane(16);
     const originalHead = sha("4");
     const run = await createReadyRun(lane, {
@@ -764,7 +791,7 @@ describe("repository merge queue coordinator", () => {
     })).resolves.toBeNull();
   });
 
-  it("requires ci_qa completed after the merge-queue profile was configured", async () => {
+  it("requires readiness completion after the merge-queue profile was configured", async () => {
     const lane = await setupLane(20, { enabled: false });
     const run = await createReadyRun(lane, {
       readyAt: at(20, 1),
@@ -786,7 +813,7 @@ describe("repository merge queue coordinator", () => {
     }]);
   });
 
-  it("requires fresh ci_qa after a GitHub integration reconnect", async () => {
+  it("requires fresh readiness proof after a GitHub integration reconnect", async () => {
     const lane = await setupLane(21);
     const run = await createReadyRun(lane, {
       readyAt: at(21, 1),
@@ -828,7 +855,7 @@ describe("repository merge queue coordinator", () => {
     ).bind(at(0, 0), at(21, 5), installationId).run();
   });
 
-  it("requires fresh ci_qa after repository access is restored", async () => {
+  it("requires fresh readiness proof after repository access is restored", async () => {
     const lane = await setupLane(22);
     const run = await createReadyRun(lane, {
       readyAt: at(22, 1),

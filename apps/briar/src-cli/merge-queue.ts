@@ -984,6 +984,9 @@ const MergeQueueProfileSchema = Schema.Struct({
   ),
   baseBranch: Schema.Literal("main"),
   enabled: Schema.Boolean,
+  readinessStageId: Schema.String.check(
+    Schema.isPattern(/^[a-z][a-z0-9_-]{0,63}$/u),
+  ),
   quietWindowMs: Schema.Int.check(
     Schema.isGreaterThanOrEqualTo(1_000),
     Schema.isLessThanOrEqualTo(300_000),

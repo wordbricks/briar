@@ -12,6 +12,7 @@ import {
   Flag,
   FolderGit2,
   GitBranch,
+  GitMerge,
   ImagePlus,
   LayoutList,
   Plug,
@@ -60,7 +61,12 @@ import {
 } from "@/components/ui/status-panel";
 import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
-import type { DashboardPayload, Project, ProjectSettings as ProjectSettingsData } from "../types";
+import type {
+  DashboardPayload,
+  MergeQueueProfile,
+  Project,
+  ProjectSettings as ProjectSettingsData,
+} from "../types";
 import { useI18n } from "../i18n";
 import {
   agentEffortOptions,
@@ -99,6 +105,7 @@ import {
 import { isProjectScheduleTabEnabled } from "../lib/project-tabs";
 import { LinearIssueImport } from "./LinearIssueImport";
 import { ProjectExecutionSettings } from "./ProjectExecutionSettings";
+import { ProjectMergeQueueSettings } from "./ProjectMergeQueueSettings";
 import { ProjectTabsSettings } from "./ProjectTabsSettings";
 import { ProviderSelect } from "./ProviderSelect";
 import { SelectMenu } from "./SelectMenu";
@@ -233,6 +240,8 @@ export function ProjectSettings({
   const [scheduleTabSaving, setScheduleTabSaving] = useState(false);
   const [scheduleTabError, setScheduleTabError] = useState<string | null>(null);
   const [scheduleTabSaved, setScheduleTabSaved] = useState(false);
+  const [mergeQueueProfile, setMergeQueueProfile] =
+    useState<MergeQueueProfile | null>(null);
   useEffect(() => {
     if (initialSection) setActiveSection(initialSection);
   }, [initialSection]);
@@ -1322,6 +1331,13 @@ export function ProjectSettings({
             </div>
             {workflowContract ? (
               <>
+                <ProjectMergeQueueSettings
+                  githubRepositoryConnected={Boolean(githubRepository)}
+                  onProfileChange={setMergeQueueProfile}
+                  project={project}
+                  stages={workflowContract.stages}
+                  token={sessionToken}
+                />
                 <section className="project-settings-checkpoints">
                   <header>
                     <span>
@@ -1498,6 +1514,15 @@ export function ProjectSettings({
                                   : t("settings.workflowAfter")}
                               </span>
                             ))}
+                          {mergeQueueProfile?.enabled &&
+                              mergeQueueProfile.readinessStageId === stage.id
+                            ? (
+                              <span className="project-workflow-merge-queue-badge">
+                                <GitMerge size={12} strokeWidth={1.8} />
+                                {t("settings.mergeQueueBoundaryBadge")}
+                              </span>
+                            )
+                            : null}
                           {stage.evidence?.length ? (
                             <div className="project-workflow-stage-detail">
                               <span>{t("settings.workflowEvidence")}</span>

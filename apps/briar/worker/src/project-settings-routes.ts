@@ -39,6 +39,9 @@ import {
   updateProjectExecutionWorkerPolicy,
 } from "./workers";
 
+const DEFAULT_MERGE_QUEUE_QUIET_WINDOW_MS = 300_000;
+const DEFAULT_MERGE_QUEUE_MAX_BATCH_SIZE = 5;
+
 const mergeQueueProfileJson = (row: MergeQueueProfileRow | null) => row
   ? {
       projectId: row.project_id,
@@ -46,6 +49,7 @@ const mergeQueueProfileJson = (row: MergeQueueProfileRow | null) => row
       repository: row.repository,
       baseBranch: row.base_branch,
       enabled: row.enabled === 1,
+      readinessStageId: row.readiness_stage_id,
       quietWindowMs: row.quiet_window_ms,
       maxBatchSize: row.max_batch_size,
       updatedAt: row.updated_at,
@@ -89,39 +93,75 @@ export async function handleProjectSettingsRoute(
     }
     const input = decodeMergeQueueProfileUpdate(await readJson(request));
     const settings = await getProjectSettings(db, project.id);
-    const repositoryName = settings?.github_repository?.trim().toLowerCase();
-    if (!repositoryName) {
+    const readinessStageId = input.readinessStageId ??
+      current?.readiness_stage_id;
+    if (!readinessStageId) {
       throw new HttpError(
-        409,
-        "Connect one GitHub repository before configuring its merge queue",
+        400,
+        "Choose a workflow stage before enabling the merge queue",
+        "MERGE_QUEUE_READINESS_STAGE_REQUIRED",
       );
     }
-    const connection = await getGithubConnectionForOrganization(
-      db,
-      project.organization_id,
-    );
-    if (!connection) {
-      throw new HttpError(409, "GitHub integration is not connected");
-    }
-    const repository = (await listGithubConnectionRepositories(
-      db,
-      connection.installation_id,
-    )).find((candidate) =>
-      candidate.full_name.toLowerCase() === repositoryName
-    );
-    if (!repository) {
+    const workflow = settings?.workflow_json
+      ? JSON.parse(settings.workflow_json) as {
+          stages?: Array<{ id?: unknown }>;
+        }
+      : null;
+    if (
+      input.enabled &&
+      !workflow?.stages?.some((stage) => stage.id === readinessStageId)
+    ) {
       throw new HttpError(
         409,
-        "The configured repository is not included in the GitHub installation",
+        "The merge queue readiness stage is not in the project workflow",
+        "MERGE_QUEUE_WORKFLOW_BOUNDARY_CONFLICT",
       );
     }
+    const repository = !input.enabled && current
+      ? {
+          repository_id: current.repository_id,
+          full_name: current.repository,
+        }
+      : await (async () => {
+          const repositoryName = settings?.github_repository?.trim()
+            .toLowerCase();
+          if (!repositoryName) {
+            throw new HttpError(
+              409,
+              "Connect one GitHub repository before configuring its merge queue",
+            );
+          }
+          const connection = await getGithubConnectionForOrganization(
+            db,
+            project.organization_id,
+          );
+          if (!connection) {
+            throw new HttpError(409, "GitHub integration is not connected");
+          }
+          const connectedRepository = (await listGithubConnectionRepositories(
+            db,
+            connection.installation_id,
+          )).find((candidate) =>
+            candidate.full_name.toLowerCase() === repositoryName
+          );
+          if (!connectedRepository) {
+            throw new HttpError(
+              409,
+              "The configured repository is not included in the GitHub installation",
+            );
+          }
+          return connectedRepository;
+        })();
     const configured = await configureMergeQueueProfile(db, {
       projectId: project.id,
       repositoryId: repository.repository_id,
       repository: repository.full_name,
       enabled: input.enabled,
-      quietWindowMs: input.quietWindowMs,
-      maxBatchSize: input.maxBatchSize,
+      readinessStageId,
+      quietWindowMs: input.quietWindowMs ?? current?.quiet_window_ms ??
+        DEFAULT_MERGE_QUEUE_QUIET_WINDOW_MS,
+      maxBatchSize: input.maxBatchSize ?? current?.max_batch_size ??
+        DEFAULT_MERGE_QUEUE_MAX_BATCH_SIZE,
       observedAt: new Date().toISOString(),
     });
     if (configured.outcome === "active_batch") {
@@ -237,6 +277,19 @@ export async function handleProjectSettingsRoute(
     }
     const input = parseProjectSettingsInput(await readJson(request));
     const currentSettings = await getProjectSettings(db, project.id);
+    const mergeQueueProfile = await getMergeQueueProfile(db, project.id);
+    if (
+      mergeQueueProfile?.enabled === 1 &&
+      !input.workflow.stages.some((stage) =>
+        stage.id === mergeQueueProfile.readiness_stage_id
+      )
+    ) {
+      throw new HttpError(
+        409,
+        "Disable the merge queue before removing its workflow boundary stage",
+        "MERGE_QUEUE_WORKFLOW_BOUNDARY_CONFLICT",
+      );
+    }
     if (
       !isStoredWorkflowUnchanged(
         currentSettings?.workflow_json,

@@ -84,6 +84,7 @@ import type {
   ManagedComputer,
   ManagedComputerProduct,
   ManagedComputerRemoteSessionTicket,
+  MergeQueueProfile,
   ProjectExecutionWorkerPolicy,
   HuntRunPlacement,
   HuntEvent,
@@ -2738,6 +2739,28 @@ export async function updateProjectSettings(
       workflow: normalizeDashboardWorkflow(result.settings.workflow),
     },
   };
+}
+
+export async function loadMergeQueueProfile(
+  token: string,
+  projectId: string,
+) {
+  return request<{ profile: MergeQueueProfile | null }>(
+    `/projects/${projectId}/merge-queue-profile`,
+    token,
+  );
+}
+
+export async function updateMergeQueueProfile(
+  token: string,
+  projectId: string,
+  input: { enabled: boolean; readinessStageId: string },
+) {
+  return request<{ profile: MergeQueueProfile }>(
+    `/projects/${projectId}/merge-queue-profile`,
+    token,
+    { method: "PUT", body: JSON.stringify(input) },
+  );
 }
 
 export async function connectLinearImport(
