@@ -186,6 +186,10 @@ import {
 import { startDesktopChannelTransition } from "./lib/channel-performance";
 import { directMessageDisplayName } from "./lib/direct-messages";
 import { dispatchAutoHuntToWorkers } from "./lib/auto-hunt-worker-dispatch";
+import {
+  projectSupportsExecutionSelection,
+  projectWorkerCapabilityCatalog,
+} from "./lib/project-worker-capabilities";
 import { demoProjectAgents } from "./lib/demo-project-agents";
 import { executeProjectAgentTask } from "./lib/project-agent-execution";
 import { runProjectAgent } from "./lib/project-llm";
@@ -1818,6 +1822,10 @@ export function App({
   ) => {
     const token = briar.token;
     if (!token) throw new Error("로그인이 필요합니다.");
+    const executionDashboard =
+      briar.dashboard?.project.id === projectId
+        ? briar.dashboard
+        : await loadDashboard(token, projectId);
     const result = await dispatchAutoHuntToWorkers(
       {
         dispatch: (run, input) =>
@@ -1828,6 +1836,18 @@ export function App({
       {
         agent,
         runs,
+        providerModels: projectWorkerCapabilityCatalog(
+          executionDashboard.workers ?? [],
+          executionDashboard.executionPolicy,
+        ),
+        selectionAvailable: (selection) =>
+          projectSupportsExecutionSelection(
+            executionDashboard.workers ?? [],
+            executionDashboard.executionPolicy,
+            selection.provider,
+            selection.model,
+            selection.effort,
+          ),
         maxIssues: options?.maxIssues,
         targetRunIds: options?.targetRunIds,
         retryReason: options?.retryReason,
@@ -1844,6 +1864,7 @@ export function App({
   }, [
     activeProject?.id,
     autoHunt.startWorkerDispatchSession,
+    briar.dashboard,
     briar.refresh,
     briar.token,
   ]);

@@ -1,5 +1,10 @@
 import type { HuntRun, ProjectAgent } from "../types";
 import type { ModelEffort } from "./project-llm";
+import type { AgentProviderCapabilityCatalog } from "./agent-provider-contract";
+import {
+  recommendIssueExecution,
+  type IssueExecutionRecommendation,
+} from "./issue-execution-recommendation";
 import {
   defaultAutoHuntMaxIssues,
   isAutoHuntCandidateReady,
@@ -34,6 +39,10 @@ export async function dispatchAutoHuntToWorkers(
     agent: Pick<ProjectAgent, "id" | "provider" | "model" | "effort"> &
       Partial<Pick<ProjectAgent, "skills">>;
     runs: HuntRun[];
+    providerModels?: AgentProviderCapabilityCatalog;
+    selectionAvailable?: (
+      selection: IssueExecutionRecommendation,
+    ) => boolean;
     maxIssues?: number;
     targetRunIds?: string[];
     retryReason?: string | null;
@@ -81,19 +90,31 @@ export async function dispatchAutoHuntToWorkers(
   const agentEffort = issueSkill ? issueSkill.effort : input.agent.effort;
 
   for (const run of candidates) {
-    const provider = run.preferredProvider ?? agentProvider;
+    const recommendation = !run.preferredModel && input.providerModels
+      ? recommendIssueExecution(
+          run.difficulty,
+          input.providerModels,
+          run.preferredProvider,
+          input.selectionAvailable,
+        )
+      : null;
+    const provider =
+      run.preferredProvider ?? recommendation?.provider ?? agentProvider;
     const model =
       run.preferredModel ??
+      recommendation?.model ??
       (run.preferredProvider ? null : (agentModel ?? null));
+    let effort = run.preferredProvider ? null : (agentEffort ?? null);
+    if (run.preferredModel) {
+      effort = run.preferredEffort ?? null;
+    } else if (recommendation) {
+      effort = recommendation.effort;
+    }
     await dependencies.dispatch(run, {
       agentId: input.agent.id,
       provider,
       model,
-      effort: run.preferredModel
-        ? (run.preferredEffort ?? null)
-        : (run.preferredProvider
-            ? null
-            : (agentEffort ?? null)),
+      effort,
       workerId: null,
       reassign: Boolean(run.dispatchedAt || run.workerId),
     });

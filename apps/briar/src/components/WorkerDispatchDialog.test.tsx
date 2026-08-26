@@ -106,6 +106,41 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await act(async () => root.unmount());
   });
 
+  it("preselects the first supported recommendation for the issue difficulty", async () => {
+    const onSubmit = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkerDispatchDialog
+          error={null}
+          intent="approve_execution"
+          isDispatching={false}
+          onOpenChange={vi.fn()}
+          onSubmit={onSubmit}
+          open
+          run={{ title: "Hard issue", difficulty: "hard" } as never}
+          workers={[worker("worker-hard", "Hard Work Mac")]}
+        />,
+      );
+    });
+
+    const approveButton = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("승인하고 실행"));
+    await act(async () => approveButton?.click());
+    expect(onSubmit).toHaveBeenCalledWith({
+      effort: "high",
+      model: "opus",
+      provider: "claude",
+      workerId: null,
+    });
+
+    await act(async () => root.unmount());
+  });
+
   it("shows a disabled completion state after dispatch succeeds", async () => {
     const container = document.createElement("div");
     document.body.append(container);

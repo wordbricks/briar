@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { HuntRun, ProjectAgent } from "../types";
+import { emptyAgentProviderCapabilityCatalog } from "./agent-provider-contract";
 import { dispatchAutoHuntToWorkers } from "./auto-hunt-worker-dispatch";
 
 const agent = {
@@ -207,6 +208,48 @@ describe("dispatchAutoHuntToWorkers", () => {
         model: "gpt-5.6-sol",
         effort: null,
       }),
+    );
+  });
+
+  it("uses a supported difficulty recommendation before the Agent default", async () => {
+    const dispatch = vi.fn(async () => undefined);
+    const retry = vi.fn(async () => undefined);
+    const providerModels = emptyAgentProviderCapabilityCatalog();
+    providerModels.codex = {
+      models: [{
+        id: "gpt-5.6-luna",
+        label: "GPT 5.6 Luna",
+        efforts: [{ id: "max", label: "max" }],
+      }],
+      defaultEfforts: [],
+      allowCustomModels: false,
+      error: null,
+    };
+
+    await dispatchAutoHuntToWorkers(
+      { dispatch, retry },
+      {
+        agent: {
+          id: "agent-1",
+          provider: "claude",
+          model: "sonnet",
+          effort: "high",
+        },
+        providerModels,
+        runs: [run("run-1", { difficulty: "easy" })],
+      },
+    );
+
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "run-1" }),
+      {
+        agentId: "agent-1",
+        provider: "codex",
+        model: "gpt-5.6-luna",
+        effort: "max",
+        workerId: null,
+        reassign: false,
+      },
     );
   });
 
