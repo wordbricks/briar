@@ -419,10 +419,14 @@ describe("HuntBoard", () => {
     expect(listButton?.getAttribute("aria-pressed")).toBe("false");
     expect(container.querySelector(".kanban-progress")).toBeNull();
     expect(container.querySelector(".kanban-card")?.textContent).not.toContain(`${demoDashboard.runs[0].progress}%`);
+    expect(container.querySelector(".kanban-board[data-keyboard-list]")).not.toBeNull();
+    expect(container.querySelectorAll(".kanban-card[data-keyboard-list-item]")).toHaveLength(container.querySelectorAll(".kanban-card").length);
     await act(async () => listButton?.click());
     expect(container.querySelector(".kanban-board")).toBeNull();
     expect(container.querySelector(".issue-list")).not.toBeNull();
+    expect(container.querySelector(".issue-list-body[data-keyboard-list]")).not.toBeNull();
     expect(container.querySelectorAll(".issue-list-row")).toHaveLength(demoDashboard.runs.length);
+    expect(container.querySelectorAll(".issue-list-row[data-keyboard-list-item]")).toHaveLength(demoDashboard.runs.length);
     expect(listButton?.getAttribute("aria-pressed")).toBe("true");
     expect(container.querySelector(".issue-list")?.textContent).toContain(demoDashboard.runs[0].title);
     expect(container.querySelector(".issue-list")?.textContent).not.toContain("진행률");

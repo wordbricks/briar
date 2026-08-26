@@ -759,7 +759,7 @@ export function HuntDashboard({
         priority,
         difficulty: run.difficulty,
         attachments: []
-      }).catch(() => undefined)} onPreferencesChange={(run, preferences) => onUpdateIssuePreferences(run.id, preferences).catch(() => undefined)} onCheckpointsChange={(run, checkpoints) => onUpdateIssueCheckpoints(run.id, checkpoints).catch(() => undefined)} runs={filtered} members={dashboard?.members ?? []} processingIssueIds={processingIssueIds} updatingIssueId={updatingIssueId} /> : <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board" ref={kanbanBoardRef}>
+      }).catch(() => undefined)} onPreferencesChange={(run, preferences) => onUpdateIssuePreferences(run.id, preferences).catch(() => undefined)} onCheckpointsChange={(run, checkpoints) => onUpdateIssueCheckpoints(run.id, checkpoints).catch(() => undefined)} runs={filtered} members={dashboard?.members ?? []} processingIssueIds={processingIssueIds} updatingIssueId={updatingIssueId} /> : <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board" data-keyboard-list="" ref={kanbanBoardRef}>
           {kanbanColumns.length === 0 ? <div className="companion-no-runs">
               <Bot size={22} />
               <strong>{t("dashboard.emptyTitle")}</strong>

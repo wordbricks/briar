@@ -86,7 +86,7 @@ export function KanbanCard({
   return <IssueContextMenu availableProviders={availableProviders} disabled={contextMenuDisabled || isMoving || isDragging || deletingIssueId === run.id || updatingIssueId === run.id} onDelete={onDelete} onTransfer={onTransfer} onEdit={onEdit} onMove={onMove} onOpen={onOpen} onProcessNow={onProcessNow} onPriorityChange={onPriorityChange} onPreferencesChange={onPreferencesChange} onCheckpointsChange={onCheckpointsChange} run={run} isProcessing={isProcessing}>
       <div aria-label={t("run.details", {
       title: run.title
-    })} aria-disabled={isMoving} className={`kanban-card ${meta.tone}${run.status === "paused" ? " awaiting-review" : ""}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}${assignmentBadgeCount > 3 ? " has-four-assignees" : ""}`} draggable={false} onClick={onOpen} onKeyDown={event => {
+    })} aria-disabled={isMoving} className={`kanban-card ${meta.tone}${run.status === "paused" ? " awaiting-review" : ""}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}${assignmentBadgeCount > 3 ? " has-four-assignees" : ""}`} data-keyboard-list-item="" draggable={false} onClick={onOpen} onKeyDown={event => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
       onOpen();

@@ -1,4 +1,5 @@
-import * as Predicate from "effect/Predicate";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import { remoteDesktopCapturesKeyboard } from "./remote-desktop-focus";
 
 export type KeybindingId = "commandPalette" | "sidebarToggle";
@@ -16,6 +17,12 @@ export type Keybindings = {
   commandPalette: Shortcut;
   sidebarToggle: Shortcut;
 };
+
+export type KeyboardNavigationPreferences = {
+  sequenceShortcutsEnabled: boolean;
+};
+
+type StoredKeybindingValues = Partial<Record<KeybindingId, unknown>>;
 
 export const keybindingIds: KeybindingId[] = [
   "commandPalette",
@@ -42,10 +49,50 @@ export const defaultKeybindings: Keybindings = {
 };
 
 export const keybindingsStorageKey = "briar.settings.keybindings.v1";
+export const keyboardNavigationPreferencesStorageKey =
+  "briar.settings.keyboard-navigation.v1";
+export const keyboardNavigationPreferencesChangedEvent =
+  "briar:keyboard-navigation-preferences-changed";
+
+export const defaultKeyboardNavigationPreferences:
+  KeyboardNavigationPreferences = {
+    sequenceShortcutsEnabled: true,
+  };
+
+const ShortcutSchema = Schema.Struct({
+  key: Schema.String,
+  code: Schema.String,
+  meta: Schema.Boolean,
+  ctrl: Schema.Boolean,
+  alt: Schema.Boolean,
+  shift: Schema.Boolean,
+});
+const StoredKeybindingsSchema = Schema.fromJsonString(Schema.Struct({
+  commandPalette: Schema.optional(Schema.Unknown),
+  sidebarToggle: Schema.optional(Schema.Unknown),
+}));
+const KeyboardNavigationPreferencesValueSchema = Schema.Struct({
+  sequenceShortcutsEnabled: Schema.Boolean,
+});
+const KeyboardNavigationPreferencesSchema = Schema.fromJsonString(
+  KeyboardNavigationPreferencesValueSchema,
+);
+const decodeShortcut = Schema.decodeUnknownOption(ShortcutSchema);
+const decodeStoredKeybindings = Schema.decodeUnknownOption(
+  StoredKeybindingsSchema,
+);
+const decodeKeyboardNavigationPreferences = Schema.decodeUnknownOption(
+  KeyboardNavigationPreferencesSchema,
+);
+const decodeKeyboardNavigationPreferencesValue = Schema.decodeUnknownOption(
+  KeyboardNavigationPreferencesValueSchema,
+);
 
 const modifierOnlyKeys = new Set(["Meta", "Control", "Alt", "Shift", "OS"]);
 
 let recordingKeybinding: KeybindingId | null = null;
+let volatileKeyboardNavigationPreferences:
+  KeyboardNavigationPreferences | null = null;
 
 export function keyboardEventIsComposing(event: KeyboardEvent): boolean {
   return event.isComposing || event.keyCode === 229;
@@ -57,18 +104,6 @@ export function setRecordingKeybinding(id: KeybindingId | null) {
 
 export function getRecordingKeybinding(): KeybindingId | null {
   return recordingKeybinding;
-}
-
-function isShortcut(value: unknown): value is Shortcut {
-  if (!Predicate.isObject(value)) return false;
-  return (
-    Predicate.isString(value.key) &&
-    Predicate.isString(value.code) &&
-    Predicate.isBoolean(value.meta) &&
-    Predicate.isBoolean(value.ctrl) &&
-    Predicate.isBoolean(value.alt) &&
-    Predicate.isBoolean(value.shift)
-  );
 }
 
 function persist(keybindings: Keybindings) {
@@ -83,25 +118,30 @@ export function loadKeybindings(): Keybindings {
   const result: Keybindings = { ...defaultKeybindings };
   let repaired = false;
   try {
-    const parsed: unknown = JSON.parse(
-      window.localStorage.getItem(keybindingsStorageKey) ?? "{}",
+    const stored: StoredKeybindingValues = Option.getOrElse(
+      decodeStoredKeybindings(
+        window.localStorage.getItem(keybindingsStorageKey) ?? "{}",
+      ),
+      (): StoredKeybindingValues => ({}),
     );
-    const stored = Predicate.isObject(parsed) ? parsed : {};
     for (const id of keybindingIds) {
-      const storedShortcut = stored[id];
+      const storedValue = stored[id];
+      const storedShortcut = Option.getOrUndefined(
+        decodeShortcut(storedValue),
+      );
       if (
-        isShortcut(storedShortcut) &&
-        !isNavigationHistoryShortcut(storedShortcut)
+        storedShortcut &&
+        !isReservedGlobalShortcut(storedShortcut)
       ) {
         result[id] = storedShortcut;
-      } else if (isShortcut(storedShortcut)) {
+      } else if (storedValue !== undefined) {
         repaired = true;
       }
     }
     if (shortcutsEqual(result.commandPalette, result.sidebarToggle)) {
       if (
-        isShortcut(stored.sidebarToggle) &&
-        !isShortcut(stored.commandPalette)
+        stored.sidebarToggle &&
+        !stored.commandPalette
       ) {
         result.commandPalette = defaultKeybindings.sidebarToggle;
       } else {
@@ -120,9 +160,79 @@ export function loadKeybindings(): Keybindings {
   return result;
 }
 
+export function loadKeyboardNavigationPreferences():
+  KeyboardNavigationPreferences {
+  if (volatileKeyboardNavigationPreferences) {
+    return volatileKeyboardNavigationPreferences;
+  }
+  try {
+    return Option.getOrElse(
+      decodeKeyboardNavigationPreferences(
+        window.localStorage.getItem(
+          keyboardNavigationPreferencesStorageKey,
+        ) ?? "{}",
+      ),
+      () => defaultKeyboardNavigationPreferences,
+    );
+  } catch {
+    return defaultKeyboardNavigationPreferences;
+  }
+}
+
+export function saveKeyboardNavigationPreferences(
+  preferences: KeyboardNavigationPreferences,
+): KeyboardNavigationPreferences {
+  volatileKeyboardNavigationPreferences = preferences;
+  try {
+    window.localStorage.setItem(
+      keyboardNavigationPreferencesStorageKey,
+      JSON.stringify(preferences),
+    );
+    volatileKeyboardNavigationPreferences = null;
+  } catch {
+    // Keep the preferences for the current session when storage is unavailable.
+  }
+  window.dispatchEvent(new CustomEvent<KeyboardNavigationPreferences>(
+    keyboardNavigationPreferencesChangedEvent,
+    { detail: preferences },
+  ));
+  return preferences;
+}
+
+export function subscribeKeyboardNavigationPreferences(
+  onChange: (preferences: KeyboardNavigationPreferences) => void,
+): () => void {
+  const handleChange = (event: Event) => {
+    const decoded = event instanceof CustomEvent
+      ? decodeKeyboardNavigationPreferencesValue(event.detail)
+      : Option.none<KeyboardNavigationPreferences>();
+    onChange(Option.getOrElse(decoded, loadKeyboardNavigationPreferences));
+  };
+  const handleStorage = (event: StorageEvent) => {
+    if (
+      event.key !== null &&
+      event.key !== keyboardNavigationPreferencesStorageKey
+    ) return;
+    volatileKeyboardNavigationPreferences = null;
+    onChange(loadKeyboardNavigationPreferences());
+  };
+  window.addEventListener(
+    keyboardNavigationPreferencesChangedEvent,
+    handleChange,
+  );
+  window.addEventListener("storage", handleStorage);
+  return () => {
+    window.removeEventListener(
+      keyboardNavigationPreferencesChangedEvent,
+      handleChange,
+    );
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
 export function saveKeybinding(id: KeybindingId, shortcut: Shortcut): Keybindings {
   const current = loadKeybindings();
-  if (isNavigationHistoryShortcut(shortcut)) return current;
+  if (isReservedGlobalShortcut(shortcut)) return current;
   const next = { ...current };
   const conflict = keybindingIds.find(
     (candidate) =>
@@ -162,6 +272,23 @@ export function isNavigationHistoryShortcut(shortcut: Shortcut): boolean {
   );
 }
 
+export function isKeyboardShortcutsGuideShortcut(
+  shortcut: Shortcut,
+): boolean {
+  return (
+    shortcut.meta !== shortcut.ctrl &&
+    (shortcut.meta || shortcut.ctrl) &&
+    !shortcut.alt &&
+    !shortcut.shift &&
+    (shortcut.code === "Slash" || shortcut.key === "/")
+  );
+}
+
+export function isReservedGlobalShortcut(shortcut: Shortcut): boolean {
+  return isNavigationHistoryShortcut(shortcut) ||
+    isKeyboardShortcutsGuideShortcut(shortcut);
+}
+
 export function matchesShortcut(event: KeyboardEvent, shortcut: Shortcut): boolean {
   if (keyboardEventIsComposing(event)) return false;
   if (event.metaKey !== shortcut.meta) return false;
@@ -188,7 +315,7 @@ export function shortcutFromEvent(event: KeyboardEvent): Shortcut | null {
     alt: event.altKey,
     shift: event.shiftKey,
   };
-  return isNavigationHistoryShortcut(shortcut) ? null : shortcut;
+  return isReservedGlobalShortcut(shortcut) ? null : shortcut;
 }
 
 export function isMacPlatform(): boolean {
