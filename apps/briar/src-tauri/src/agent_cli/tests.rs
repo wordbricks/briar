@@ -610,7 +610,11 @@ fn parses_plain_and_json_cli_versions() {
 
 #[test]
 fn resolves_the_workspace_git_root() {
-    let root = git_repository_root(Path::new(env!("CARGO_MANIFEST_DIR")))
+    let home = dirs::home_dir().expect("home should resolve");
+    let runner = LocalExecutionEnvironment::discover(&home)
+        .expect("local environment should resolve")
+        .runner();
+    let root = git_repository_root(&runner, Path::new(env!("CARGO_MANIFEST_DIR")))
         .expect("workspace should be a git repository");
     assert_eq!(
         root,
@@ -618,5 +622,39 @@ fn resolves_the_workspace_git_root() {
             .ancestors()
             .nth(3)
             .expect("repository root should exist")
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn resolves_repository_metadata_through_the_shared_nix_environment() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let home = tempfile::tempdir().expect("fixture home should exist");
+    let repository = home.path().join("repository");
+    fs::create_dir_all(&repository).expect("fixture repository should exist");
+    let profile = home.path().join(".nix-profile/bin");
+    fs::create_dir_all(&profile).expect("Nix profile should exist");
+    let git = profile.join("git");
+    fs::write(
+        &git,
+        "#!/bin/sh\ncase \"$1\" in\n  rev-parse) pwd ;;\n  remote) printf 'git@github.com:example/repository.git\\n' ;;\n  *) exit 2 ;;\nesac\n",
+    )
+    .expect("fixture Git should be written");
+    fs::set_permissions(&git, fs::Permissions::from_mode(0o700))
+        .expect("fixture Git should be executable");
+    let runner = LocalExecutionEnvironment::discover(home.path())
+        .expect("local environment should resolve")
+        .runner();
+
+    assert_eq!(
+        git_repository_root(&runner, &repository).expect("root should resolve"),
+        repository
+            .canonicalize()
+            .expect("fixture should canonicalize")
+    );
+    assert_eq!(
+        repository_remote(&runner, &repository).as_deref(),
+        Some("git@github.com:example/repository.git")
     );
 }

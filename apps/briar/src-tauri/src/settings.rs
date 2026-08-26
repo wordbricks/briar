@@ -224,9 +224,9 @@ pub(super) async fn connect_local_project(
         .map_err(|error| error.to_string())?;
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let runner = host::LocalRunner::new(cli_execution_path(&home)?, home.clone());
-        let root = git_repository_root(Path::new(&repository_path))?;
-        let remote = repository_remote(&root);
+        let runner = LocalExecutionEnvironment::discover(&home)?.runner();
+        let root = git_repository_root(&runner, Path::new(&repository_path))?;
+        let remote = repository_remote(&runner, &root);
         auto_hunt.workflow = canonicalize_workflow(auto_hunt.workflow);
         validate_generated_workflow(&auto_hunt.workflow)?;
         let workflow = auto_hunt.workflow.clone();

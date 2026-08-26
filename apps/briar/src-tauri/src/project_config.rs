@@ -189,10 +189,9 @@ pub(super) fn project_runner(
     home: &Path,
 ) -> Result<Arc<dyn host::CommandRunner>, String> {
     project_repository_path(config, project_id)?;
-    Ok(Arc::new(host::LocalRunner::new(
-        cli_execution_path(home)?,
-        home.to_path_buf(),
-    )))
+    Ok(Arc::new(
+        LocalExecutionEnvironment::discover(home)?.runner(),
+    ))
 }
 
 /// Resolve a repository root through a runner: the configured path must be the
@@ -227,37 +226,16 @@ pub(super) fn resolve_workspace_with(
     Ok(root)
 }
 
-pub(super) fn connected_project_workspace(
-    config_path: &Path,
-    project_id: &str,
-) -> Result<PathBuf, String> {
-    let config = read_cli_config(config_path)?;
-    let project = config
-        .projects
-        .iter()
-        .find(|project| project.id == project_id)
-        .ok_or_else(|| "이 컴퓨터에 연결된 프로젝트가 아닙니다.".to_string())?;
-    let configured = fs::canonicalize(&project.repository_path)
-        .map_err(|error| format!("연결된 프로젝트 폴더를 열지 못했습니다: {error}"))?;
-    let root = fs::canonicalize(git_repository_root(&configured)?)
-        .map_err(|error| format!("프로젝트 Git 루트를 열지 못했습니다: {error}"))?;
-    if configured != root {
-        return Err("연결된 프로젝트 경로가 Git 저장소 루트가 아닙니다.".to_string());
-    }
-    Ok(root)
-}
-
 pub(super) fn connected_project_runtime(
     config_path: &Path,
     project_id: &str,
     home: &Path,
 ) -> Result<(Arc<dyn host::CommandRunner>, PathBuf), String> {
     let config = read_cli_config(config_path)?;
+    let repository_path = project_repository_path(&config, project_id)?;
     let runner = project_runner(&config, project_id, home)?;
-    Ok((
-        runner,
-        connected_project_workspace(config_path, project_id)?,
-    ))
+    let workspace = resolve_workspace_with(runner.as_ref(), &repository_path)?;
+    Ok((runner, workspace))
 }
 
 #[derive(Clone, Copy, Default, Deserialize)]
