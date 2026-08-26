@@ -2,7 +2,11 @@ import { Check, Cpu, Save } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import { useEffect, useMemo, useState } from "react";
 
-import { SettingsAlert } from "@/components/settings";
+import {
+  SettingsAlert,
+  SettingsCard,
+  SettingsSection,
+} from "@/components/settings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -158,15 +162,19 @@ export function ProjectExecutionSettings({
   };
 
   return (
-    <section className="project-settings-execution">
-      <section className="project-settings-runtime">
-        <header>
-          <span className="project-settings-runtime-icon">
+    <SettingsSection>
+      <SettingsCard aria-busy={loading || saving} className="p-5 shadow-xs">
+        <header className="flex items-start gap-3">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
             <Cpu size={18} strokeWidth={1.8} />
           </span>
-          <span>
-            <strong>{t("executionPolicy.title")}</strong>
-            <small>{t("executionPolicy.description")}</small>
+          <span className="grid min-w-0 gap-1">
+            <Typography as="strong" variant="bodySm">
+              {t("executionPolicy.title")}
+            </Typography>
+            <Typography as="small" tone="muted" variant="caption">
+              {t("executionPolicy.description")}
+            </Typography>
           </span>
         </header>
 
@@ -177,8 +185,8 @@ export function ProjectExecutionSettings({
         ) : (
           <>
             <div className="grid gap-3 p-5">
-              <button
-                className={`rounded-lg border p-4 text-left ${
+              <Button
+                className={`h-auto flex-col items-start gap-1 whitespace-normal rounded-lg p-4 text-left ${
                   policy.selectionMode === "any"
                     ? "border-primary bg-primary/5"
                     : "border-border"
@@ -186,6 +194,7 @@ export function ProjectExecutionSettings({
                 disabled={!canManage}
                 onClick={() => setSelectionMode("any")}
                 type="button"
+                variant="outline"
               >
                 <Typography as="strong" className="block" variant="bodySm">
                   {t("executionPolicy.any")}
@@ -193,9 +202,9 @@ export function ProjectExecutionSettings({
                 <Typography tone="muted" variant="caption">
                   {t("executionPolicy.anyDescription")}
                 </Typography>
-              </button>
-              <button
-                className={`rounded-lg border p-4 text-left ${
+              </Button>
+              <Button
+                className={`h-auto flex-col items-start gap-1 whitespace-normal rounded-lg p-4 text-left ${
                   policy.selectionMode === "allowlist"
                     ? "border-primary bg-primary/5"
                     : "border-border"
@@ -203,6 +212,7 @@ export function ProjectExecutionSettings({
                 disabled={!canManage}
                 onClick={() => setSelectionMode("allowlist")}
                 type="button"
+                variant="outline"
               >
                 <Typography as="strong" className="block" variant="bodySm">
                   {t("executionPolicy.allowlist")}
@@ -210,7 +220,7 @@ export function ProjectExecutionSettings({
                 <Typography tone="muted" variant="caption">
                   {t("executionPolicy.allowlistDescription")}
                 </Typography>
-              </button>
+              </Button>
             </div>
 
             {policy.selectionMode === "allowlist" ? (
@@ -316,7 +326,7 @@ export function ProjectExecutionSettings({
             {error ? (
               <SettingsAlert className="mx-5 mb-5 mt-0">{error}</SettingsAlert>
             ) : null}
-            <footer>
+            <footer className="mt-4 flex justify-end border-t border-border pt-3.5 max-[760px]:[&>button]:w-full">
               <Button
                 disabled={!canManage || saving || !dirty}
                 onClick={() => void save()}
@@ -338,11 +348,11 @@ export function ProjectExecutionSettings({
             </footer>
           </>
         )}
-      </section>
+      </SettingsCard>
 
       <Typography className="mt-4" tone="muted" variant="caption">
         {t("executionPolicy.registrationHint")}
       </Typography>
-    </section>
+    </SettingsSection>
   );
 }

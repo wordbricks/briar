@@ -189,13 +189,12 @@ export function ProjectAgentSettings({
 
   return (
     <MainContent
-      className="project-agent-settings-page"
+      className="flex h-full min-h-0 flex-col overflow-hidden bg-card"
       id="project-agent-settings"
     >
       <PageHeader
         action={
           <Button
-            className="project-agent-create project-agent-settings-save"
             disabled={
               profileSaving ||
               !responsibility.trim() ||
@@ -219,13 +218,17 @@ export function ProjectAgentSettings({
                 : t("agents.saveProfile")}
           </Button>
         }
-        className={`app-page-header project-agents-heading project-agent-settings-heading${isSidebarOpen ? "" : " sidebar-closed"}`}
+        className={`h-12 min-h-12 shrink-0 px-5 py-0${
+          isSidebarOpen
+            ? ""
+            : " pl-[var(--window-navigation-content-inset)]"
+        }`}
         data-tauri-drag-region
         title={
-          <span className="project-agent-detail-title">
+          <span className="flex min-w-0 items-center gap-2.5">
             <Button
               aria-label={t("agents.back")}
-              className="project-agent-detail-back project-agent-settings-back"
+              className="size-7 shrink-0 text-muted-foreground shadow-none"
               onClick={onBack}
               size="icon"
               type="button"
@@ -233,20 +236,20 @@ export function ProjectAgentSettings({
             >
               <ArrowLeft aria-hidden="true" size={16} />
             </Button>
-            <span>{t("agents.settingsTitle")}</span>
+            <span className="truncate">{t("agents.settingsTitle")}</span>
           </span>
         }
         titleId="project-agent-settings-title"
       />
-      <div className="project-agents-scroll project-agent-settings-scroll">
+      <div className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto bg-card">
         <section
           aria-labelledby="project-agent-settings-title"
-          className="project-agents-content project-agent-settings-content"
+          className="min-h-full pb-14"
         >
-          <div className="project-agents-body project-agent-settings-body">
-            <header>
-              <div>
-                <Typography as="strong" variant="body">
+          <div className="mx-auto w-full max-w-[760px] px-5 pt-8 min-[761px]:px-8">
+            <header className="mb-5">
+              <div className="grid items-start gap-1.5">
+                <Typography as="strong" variant="bodyLg">
                   {t("agents.profileTitle")}
                 </Typography>
                 <Typography as="span" tone="muted" variant="caption">
@@ -259,18 +262,18 @@ export function ProjectAgentSettings({
             </header>
 
             <form
-              className="project-agent-settings-card"
+              className="rounded-2xl border border-border bg-card p-[22px] shadow-xs"
               onSubmit={(event) => {
                 event.preventDefault();
                 void saveProfile();
               }}
             >
-              <header>
-                <span className="project-agent-settings-card-icon">
+              <header className="flex items-start gap-3">
+                <span className="grid size-[46px] shrink-0 place-items-center rounded-xl border border-border bg-muted text-muted-foreground">
                   <Bot size={18} strokeWidth={1.8} />
                 </span>
-                <span>
-                  <Typography as="strong" variant="body">
+                <span className="grid min-w-0 gap-1">
+                  <Typography as="strong" variant="bodyLg">
                     {t("agents.profileTitle")}
                   </Typography>
                   <Typography as="small" tone="muted" variant="caption">
@@ -279,19 +282,19 @@ export function ProjectAgentSettings({
                 </span>
               </header>
 
-              <div className="project-agent-settings-fields">
-                <div className="project-agent-avatar-field">
+              <div className="mt-5 grid gap-[17px] [&_.native-select]:w-full [&_.select-menu-trigger]:h-[42px] [&_.select-menu-trigger]:w-full [&_.select-menu-trigger]:rounded-[11px]">
+                <div className="grid min-w-0 gap-2 text-2xs font-semibold text-foreground">
                   <Label>{t("agents.avatar")}</Label>
-                  <div>
-                    <span className="project-agent-avatar-preview">
+                  <div className="flex min-w-0 items-center gap-3.5">
+                    <span className="grid size-18 shrink-0 place-items-center overflow-hidden rounded-xl border border-border bg-muted text-muted-foreground [&>img]:size-full [&>img]:object-cover">
                       {avatar ? (
                         <img alt="" src={avatar} />
                       ) : (
                         <Bot aria-hidden="true" size={26} />
                       )}
                     </span>
-                    <span className="project-agent-avatar-actions">
-                      <label className="project-agent-avatar-upload">
+                    <span className="flex min-w-0 flex-wrap items-center gap-2">
+                      <label className="inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-input bg-card px-2.5 text-2xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
                         <ImagePlus size={14} />
                         {t(
                           avatar
@@ -301,6 +304,7 @@ export function ProjectAgentSettings({
                         <input
                           accept={projectAgentAvatarAccept}
                           aria-label={t("agents.uploadAvatar")}
+                          className="sr-only"
                           disabled={profileSaving}
                           onChange={(event) => {
                             const file = event.currentTarget.files?.[0];
@@ -322,7 +326,6 @@ export function ProjectAgentSettings({
                       </label>
                       {avatar ? (
                         <Button
-                          className="project-agent-avatar-remove"
                           disabled={profileSaving}
                           onClick={() => {
                             setAvatar(null);
@@ -336,12 +339,17 @@ export function ProjectAgentSettings({
                           {t("agents.removeAvatar")}
                         </Button>
                       ) : null}
-                      <Typography as="small" tone="muted" variant="caption">
+                      <Typography
+                        as="small"
+                        className="w-full font-medium"
+                        tone="muted"
+                        variant="caption"
+                      >
                         {t("agents.avatarHint")}
                       </Typography>
                     </span>
                   </div>
-                  <div className="project-agent-codex-pet-row">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <CodexPetPicker
                       disabled={profileSaving}
                       onSelect={async (pet) => {
@@ -361,7 +369,7 @@ export function ProjectAgentSettings({
                     {codexPet ? <CodexPetAttribution pet={codexPet} /> : null}
                   </div>
                 </div>
-                <div className="project-agent-settings-field">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="project-agent-settings-name">
                     {t("agents.name")}
                   </Label>
@@ -373,7 +381,7 @@ export function ProjectAgentSettings({
                     value={name}
                   />
                 </div>
-                <div className="project-agent-settings-field">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="project-agent-settings-description">
                     {t("agents.agentDescription")}
                   </Label>
@@ -389,9 +397,9 @@ export function ProjectAgentSettings({
                     {t("agents.agentDescriptionHint")}
                   </Typography>
                 </div>
-                <div className="project-agent-settings-runtime-heading">
-                  <Cpu aria-hidden="true" size={15} />
-                  <span>
+                <div className="mt-1 flex items-start gap-2 border-t border-border pt-[17px] text-muted-foreground">
+                  <Cpu aria-hidden="true" className="mt-0.5 shrink-0" size={15} />
+                  <span className="grid min-w-0 gap-1">
                     <Typography as="strong" variant="bodySm">
                       {t("agents.executionTitle")}
                     </Typography>
@@ -400,8 +408,8 @@ export function ProjectAgentSettings({
                     </Typography>
                   </span>
                 </div>
-                <div className="project-agent-settings-field-grid">
-                  <div className="project-agent-settings-field">
+                <div className="grid grid-cols-1 gap-3 min-[761px]:grid-cols-[1fr_1.35fr]">
+                  <div className="grid min-w-0 gap-2">
                     <Label>{t("agents.provider")}</Label>
                     <ProviderSelect
                       disabled={profileSaving}
@@ -414,7 +422,7 @@ export function ProjectAgentSettings({
                       value={provider}
                     />
                   </div>
-                  <div className="project-agent-settings-field">
+                  <div className="grid min-w-0 gap-2">
                     <Label>{t("agents.model")}</Label>
                     <NativeSelect
                       disabled={profileSaving}
@@ -430,7 +438,7 @@ export function ProjectAgentSettings({
                       value={model}
                     />
                   </div>
-                  <div className="project-agent-settings-field">
+                  <div className="grid min-w-0 gap-2">
                     <Label>{t("agents.effort")}</Label>
                     <NativeSelect
                       disabled={profileSaving}
@@ -456,7 +464,7 @@ export function ProjectAgentSettings({
                     />
                   </div>
                 </div>
-                <div className="project-agent-settings-field">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="project-agent-settings-responsibility">
                     {t("agents.responsibility")}
                   </Label>
@@ -473,19 +481,22 @@ export function ProjectAgentSettings({
                     {t("agents.responsibilityHint")}
                   </Typography>
                 </div>
-                <div className="project-agent-color-field project-agent-settings-field">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="project-agent-settings-color">
                     {t("agents.calendarColor")}
                   </Label>
-                  <div>
+                  <div className="flex h-[42px] items-center gap-2.5 rounded-[11px] border border-border bg-muted px-3">
                     <input
                       aria-label={t("agents.calendarColor")}
+                      className="size-7 cursor-pointer rounded-lg border border-border bg-card p-0.5"
                       id="project-agent-settings-color"
                       onChange={(event) => setCalendarColor(event.target.value)}
                       type="color"
                       value={calendarColor}
                     />
-                    <code>{calendarColor.toUpperCase()}</code>
+                    <code className="font-mono text-2xs font-semibold text-foreground">
+                      {calendarColor.toUpperCase()}
+                    </code>
                   </div>
                   <Typography as="small" tone="muted" variant="caption">
                     {t("agents.calendarColorHint")}
@@ -501,9 +512,8 @@ export function ProjectAgentSettings({
                 />
               </div>
 
-              <footer>
+              <footer className="mt-5 flex justify-end border-t border-border pt-4 max-[760px]:[&>button]:w-full">
                 <Button
-                  className="project-agent-settings-save"
                   disabled={
                     profileSaving ||
                     !responsibility.trim() ||
@@ -528,13 +538,13 @@ export function ProjectAgentSettings({
               </footer>
             </form>
 
-            <section className="project-agent-settings-card danger">
-              <header>
-                <span className="project-agent-settings-card-icon">
+            <section className="mt-[18px] rounded-2xl border border-destructive/30 bg-card p-[22px] shadow-xs">
+              <header className="flex items-start gap-3">
+                <span className="grid size-[46px] shrink-0 place-items-center rounded-xl border border-destructive/25 bg-destructive/10 text-destructive">
                   <Trash2 size={18} strokeWidth={1.8} />
                 </span>
-                <span>
-                  <Typography as="strong" variant="body">
+                <span className="grid min-w-0 gap-1">
+                  <Typography as="strong" variant="bodyLg">
                     {t("agents.dangerTitle")}
                   </Typography>
                   <Typography as="small" tone="muted" variant="caption">
@@ -543,12 +553,12 @@ export function ProjectAgentSettings({
                 </span>
               </header>
               {isDeleteDisabled ? (
-                <p className="project-agent-settings-delete-blocked">
-                  <CircleAlert size={14} />
+                <p className="mt-4 flex items-center gap-1.5 text-2xs leading-relaxed text-destructive">
+                  <CircleAlert className="shrink-0" size={14} />
                   {t("agents.deleteBlocked")}
                 </p>
               ) : null}
-              <footer>
+              <footer className="mt-5 flex justify-start border-t border-border pt-4">
                 <Button
                   disabled={isDeleteDisabled}
                   onClick={() => setIsDeleteDialogOpen(true)}
@@ -601,7 +611,6 @@ export function ProjectAgentSettings({
               {t("common.cancel")}
             </Button>
             <Button
-              className="project-agent-delete-confirm"
               disabled={isDeleting}
               onClick={() => void deleteAgent()}
               type="button"

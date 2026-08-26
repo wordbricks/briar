@@ -107,13 +107,13 @@ export function ProjectAgentTaskDialog({
       onOpenChange={onOpenChange}
       open={isOpen}
     >
-      <DialogContent className="project-agent-task-dialog">
+      <DialogContent className="max-h-[min(760px,calc(100vh_-_48px))] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t("agents.taskTitle")}</DialogTitle>
           <DialogDescription>{t("agents.taskDescription")}</DialogDescription>
         </DialogHeader>
 
-        <label className="project-agent-run-worker-select">
+        <label className="grid gap-2 text-xs font-semibold text-foreground [&_.select-menu]:w-full [&_.select-menu-trigger]:w-full">
           <span>{t("agents.skill")}</span>
           <NativeSelect
             disabled={isSubmitting || !agent || agent.skills.length === 0}
@@ -141,7 +141,7 @@ export function ProjectAgentTaskDialog({
         ) : null}
 
         {workerSelectionRequired && selectedSkill ? (
-          <label className="project-agent-run-worker-select">
+          <label className="grid gap-2 text-xs font-semibold text-foreground [&_.select-menu]:w-full [&_.select-menu-trigger]:w-full">
             <span>{t("agents.executionHost")}</span>
             <NativeSelect
               disabled={isSubmitting || availableWorkers.length === 0}
@@ -166,7 +166,7 @@ export function ProjectAgentTaskDialog({
         ) : null}
 
         <form
-          className="project-agent-run-composer"
+          className="grid gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm"
           id="project-agent-task-form"
           onSubmit={(event) => {
             event.preventDefault();
@@ -190,6 +190,7 @@ export function ProjectAgentTaskDialog({
         >
           <Textarea
             aria-label={t("agents.taskInput")}
+            className="min-h-30 resize-y"
             disabled={isSubmitting || !selectedSkill}
             onChange={(event) => setRequest(event.target.value)}
             placeholder={t("agents.taskPlaceholder")}
