@@ -13,13 +13,17 @@ export const organizationJson = (row: OrganizationRow) => ({
   createdAt: row.created_at,
 });
 
-export const organizationMemberJson = (row: OrganizationMemberRow) => ({
+export const organizationMemberJson = (
+  row: OrganizationMemberRow,
+  projectIds?: readonly string[],
+) => ({
   userId: row.user_id,
   name: row.name,
   email: row.email,
   image: row.image,
   role: row.role,
   createdAt: row.created_at,
+  ...(projectIds === undefined ? {} : { projectIds: [...projectIds] }),
 });
 
 const organizationInvitationStatus = (

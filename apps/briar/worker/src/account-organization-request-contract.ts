@@ -132,6 +132,12 @@ export const OrganizationMemberRoleInput = strictSchema(Schema.Struct({
   role: Schema.Literals(["admin", "member"]),
 }));
 
+export const OrganizationMemberProjectsInput = strictSchema(Schema.Struct({
+  projectIds: Schema.mutable(Schema.Array(UuidString)).check(
+    Schema.isMaxLength(500),
+  ),
+}));
+
 export const SlackOAuthInput = strictSchema(Schema.Struct({
   defaultProjectId: UuidString,
 }));
@@ -162,5 +168,8 @@ export const decodeOrganizationInvitationInput = decodeRequestSync(
 );
 export const decodeOrganizationMemberRoleInput = decodeRequestSync(
   OrganizationMemberRoleInput,
+);
+export const decodeOrganizationMemberProjectsInput = decodeRequestSync(
+  OrganizationMemberProjectsInput,
 );
 export const decodeSlackOAuthInput = decodeRequestSync(SlackOAuthInput);

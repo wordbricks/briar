@@ -218,6 +218,15 @@ describe("channel issue proposal approval route", () => {
         now,
       ).run();
     }
+    await db.batch(
+      [projectAId, projectBId].map((projectId) =>
+        db.prepare(
+          `insert into briar_project_members (
+             project_id, organization_id, user_id, created_at, updated_at
+           ) values (?, ?, ?, ?, ?)`,
+        ).bind(projectId, organizationId, memberId, now, now)
+      ),
+    );
     await createChannel(db, {
       id: channelId,
       organizationId,

@@ -1,6 +1,9 @@
 import type { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { listOrganizations } from "./organization-repository";
+import {
+  listOrganizations,
+  listProjectMembers,
+} from "./organization-repository";
 import {
   listOrganizationInboxProjects,
   listOrganizationProjects,
@@ -31,6 +34,8 @@ describe("organization and project repositories", () => {
       values ('owner', 'Owner', 'owner@example.com', 1, '${now}', '${now}');
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
       values ('outsider', 'Outsider', 'outsider@example.com', 1, '${now}', '${now}');
+      insert into user (id, name, email, emailVerified, createdAt, updatedAt)
+      values ('member', 'Member', 'member@example.com', 1, '${now}', '${now}');
       insert into briar_organizations (
         id, name, handle, created_at, updated_at
       ) values (
@@ -40,6 +45,11 @@ describe("organization and project repositories", () => {
         organization_id, user_id, role, created_at, updated_at
       ) values (
         '${organizationId}', 'owner', 'owner', '${now}', '${now}'
+      );
+      insert into briar_organization_members (
+        organization_id, user_id, role, created_at, updated_at
+      ) values (
+        '${organizationId}', 'member', 'member', '${now}', '${now}'
       );
       insert into briar_projects (
         id, owner_user_id, organization_id, name, agent_token_hash,
@@ -90,13 +100,43 @@ describe("organization and project repositories", () => {
       }),
     ]);
     await expect(
-      listOrganizationInboxProjects(db, organizationId),
+      listOrganizationInboxProjects(db, organizationId, "owner"),
     ).resolves.toEqual([
       {
         id: projectId,
         name: "First project",
         issue_key_prefix: "AH",
       },
+    ]);
+  });
+
+  it("limits regular members to explicitly assigned projects", async () => {
+    await expect(listProjects(db, "member")).resolves.toEqual([]);
+    await expect(
+      listOrganizationInboxProjects(db, organizationId, "member"),
+    ).resolves.toEqual([]);
+    await expect(listProjectMembers(db, projectId)).resolves.toEqual([
+      expect.objectContaining({ user_id: "owner", role: "owner" }),
+    ]);
+
+    const now = "2026-08-20T00:05:00.000Z";
+    await db.prepare(
+      `insert into briar_project_members (
+         project_id, organization_id, user_id, created_at, updated_at
+       ) values (?, ?, 'member', ?, ?)`,
+    ).bind(projectId, organizationId, now, now).run();
+
+    await expect(listProjects(db, "member")).resolves.toEqual([
+      expect.objectContaining({ id: projectId, member_role: "member" }),
+    ]);
+    await expect(
+      listOrganizationInboxProjects(db, organizationId, "member"),
+    ).resolves.toEqual([
+      expect.objectContaining({ id: projectId }),
+    ]);
+    await expect(listProjectMembers(db, projectId)).resolves.toEqual([
+      expect.objectContaining({ user_id: "owner", role: "owner" }),
+      expect.objectContaining({ user_id: "member", role: "member" }),
     ]);
   });
 });

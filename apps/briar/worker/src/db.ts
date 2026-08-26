@@ -239,9 +239,13 @@ export {
   revokeOrganizationInvitation,
   acceptOrganizationInvitation,
   updateOrganizationMemberRole,
+  updateOrganizationMemberProjects,
   removeOrganizationMember,
 } from "./organization-command-repository";
-export type { AcceptOrganizationInvitationOutcome } from "./organization-command-repository";
+export type {
+  AcceptOrganizationInvitationOutcome,
+  UpdateOrganizationMemberProjectsOutcome,
+} from "./organization-command-repository";
 
 export {
   getOrganizationInboxSyncVersion,

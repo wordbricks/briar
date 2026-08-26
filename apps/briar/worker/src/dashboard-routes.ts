@@ -43,7 +43,7 @@ import {
 import { organizationMemberJson } from "./organization-json";
 import {
   getOrganizationRole,
-  listOrganizationMembers,
+  listProjectMembers,
 } from "./organization-repository";
 import { projectJson } from "./project-json";
 import { settingsJson } from "./project-settings-json";
@@ -86,7 +86,11 @@ export async function handleDashboardRoute(input: {
       session.user.id,
     );
     if (!role) throw new HttpError(404, "Organization not found");
-    const runs = await listOrganizationStatusTrayRuns(db, organizationId);
+    const runs = await listOrganizationStatusTrayRuns(
+      db,
+      organizationId,
+      session.user.id,
+    );
     return json({
       runs: runs.map(statusTrayRunJson),
       generatedAt: new Date().toISOString(),
@@ -222,7 +226,7 @@ export async function handleDashboardRoute(input: {
           getProjectSettings(db, project.id),
           loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
           getProjectExecutionWorkerPolicy(db, project.id),
-          listOrganizationMembers(db, project.organization_id),
+          listProjectMembers(db, project.id),
         ])
       : null;
     const conversationNotifications = notificationsChanged
@@ -269,7 +273,7 @@ export async function handleDashboardRoute(input: {
           checkpointPolicyJson(metadata[1]),
         ),
         executionPolicy: metadata[2],
-        members: metadata[3].map(organizationMemberJson),
+        members: metadata[3].map((member) => organizationMemberJson(member)),
       });
     }
     if (conversationNotifications) {
@@ -326,7 +330,7 @@ export async function handleDashboardRoute(input: {
           project.organization_id,
         ),
         getProjectExecutionWorkerPolicy(db, project.id),
-        listOrganizationMembers(db, project.organization_id),
+        listProjectMembers(db, project.id),
         listIssueConversationNotifications(
           db,
           project.id,
@@ -377,7 +381,7 @@ export async function handleDashboardRoute(input: {
       workers: workers.map((worker) => workerJson(worker, observedAt)),
       organizationProviders,
       executionPolicy,
-      members: members.map(organizationMemberJson),
+      members: members.map((member) => organizationMemberJson(member)),
       conversationNotifications: conversationNotifications.map(
         issueConversationNotificationJson,
       ),
