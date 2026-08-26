@@ -85,6 +85,7 @@ import type {
   ManagedComputerProduct,
   ManagedComputerRemoteSessionTicket,
   MergeQueueProfile,
+  MergeQueueStatus,
   ProjectExecutionWorkerPolicy,
   HuntRunPlacement,
   HuntEvent,
@@ -2747,6 +2748,16 @@ export async function loadMergeQueueProfile(
 ) {
   return request<{ profile: MergeQueueProfile | null }>(
     `/projects/${projectId}/merge-queue-profile`,
+    token,
+  );
+}
+
+export async function loadMergeQueueStatus(
+  token: string,
+  projectId: string,
+) {
+  return request<{ status: MergeQueueStatus; generatedAt: string }>(
+    `/projects/${projectId}/merge-queue-status`,
     token,
   );
 }

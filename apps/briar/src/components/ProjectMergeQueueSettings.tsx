@@ -1,7 +1,8 @@
-import { Check, GitMerge, Save } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Check, ExternalLink, GitMerge, RefreshCw, Save } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SettingsAlert } from "@/components/settings";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -9,22 +10,44 @@ import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import {
   loadMergeQueueProfile,
+  loadMergeQueueStatus,
   updateMergeQueueProfile,
 } from "../lib/api";
 import type { AutoHuntWorkflowStage } from "../lib/auto-hunt-contract";
-import type { MergeQueueProfile, Project } from "../types";
+import type {
+  MergeQueueBatchState,
+  MergeQueueCandidateState,
+  MergeQueueProfile,
+  MergeQueueStatus,
+  Project,
+} from "../types";
 import { SelectMenu } from "./SelectMenu";
 import { Spinner } from "./ui/spinner";
 
 export type ProjectMergeQueueSettingsApi = {
   load: typeof loadMergeQueueProfile;
+  loadStatus: typeof loadMergeQueueStatus;
   update: typeof updateMergeQueueProfile;
 };
 
 const defaultApi: ProjectMergeQueueSettingsApi = {
   load: loadMergeQueueProfile,
+  loadStatus: loadMergeQueueStatus,
   update: updateMergeQueueProfile,
 };
+
+const statusTone = (
+  state: MergeQueueBatchState | MergeQueueCandidateState,
+): "destructive" | "secondary" | "soft" | "success" | "warning" =>
+  state === "completed" || state === "merged"
+    ? "success"
+    : state === "blocked" || state === "failed"
+      ? "destructive"
+      : state === "collecting" || state === "ready"
+        ? "warning"
+        : state === "dequeued"
+          ? "secondary"
+          : "soft";
 
 export function ProjectMergeQueueSettings({
   api = defaultApi,
@@ -41,7 +64,7 @@ export function ProjectMergeQueueSettings({
   stages: AutoHuntWorkflowStage[];
   token: string | null;
 }) {
-  const { t } = useI18n();
+  const { localeTag, t } = useI18n();
   const canManage = project.role === "owner" || project.role === "admin";
   const [profile, setProfile] = useState<MergeQueueProfile | null>(null);
   const [enabled, setEnabled] = useState(false);
@@ -49,19 +72,52 @@ export function ProjectMergeQueueSettings({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<MergeQueueStatus | null>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const statusRequestSequence = useRef(0);
+
+  const refreshStatus = async () => {
+    if (!token || statusLoading) return;
+    const requestId = ++statusRequestSequence.current;
+    setStatusLoading(true);
+    setStatusError(null);
+    try {
+      const loaded = await api.loadStatus(token, project.id);
+      if (statusRequestSequence.current === requestId) {
+        setStatus(loaded.status);
+      }
+    } catch (caught) {
+      if (statusRequestSequence.current === requestId) {
+        setStatusError(
+          caught instanceof Error ? caught.message : String(caught),
+        );
+      }
+    } finally {
+      if (statusRequestSequence.current === requestId) {
+        setStatusLoading(false);
+      }
+    }
+  };
 
   useEffect(() => {
+    const statusRequestId = ++statusRequestSequence.current;
     setProfile(null);
     setEnabled(false);
     setReadinessStageId("");
     setError(null);
+    setStatus(null);
+    setStatusError(null);
     onProfileChange(null);
     if (!token) {
+      setStatus({ batches: [], candidates: [] });
       setLoading(false);
+      setStatusLoading(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
+    setStatusLoading(true);
     void api.load(token, project.id)
       .then(({ profile: loaded }) => {
         if (cancelled) return;
@@ -77,6 +133,24 @@ export function ProjectMergeQueueSettings({
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+    void api.loadStatus(token, project.id)
+      .then(({ status: loaded }) => {
+        if (!cancelled && statusRequestSequence.current === statusRequestId) {
+          setStatus(loaded);
+        }
+      })
+      .catch((caught) => {
+        if (!cancelled && statusRequestSequence.current === statusRequestId) {
+          setStatusError(
+            caught instanceof Error ? caught.message : String(caught),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled && statusRequestSequence.current === statusRequestId) {
+          setStatusLoading(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -101,6 +175,10 @@ export function ProjectMergeQueueSettings({
     }
     return options;
   }, [readinessStageId, stages, t]);
+  const statusDateFormatter = useMemo(() => new Intl.DateTimeFormat(localeTag, {
+    dateStyle: "short",
+    timeStyle: "short",
+  }), [localeTag]);
   const boundaryValid = stages.some((stage) =>
     stage.id === readinessStageId
   );
@@ -199,6 +277,121 @@ export function ProjectMergeQueueSettings({
               </Typography>
             ) : null}
             {error ? <SettingsAlert>{error}</SettingsAlert> : null}
+          </div>
+          <div className="grid gap-3 border-t border-border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <span className="grid gap-1">
+                <Typography as="strong" variant="bodySm">
+                  {t("settings.mergeQueueStatusTitle")}
+                </Typography>
+                <Typography tone="muted" variant="caption">
+                  {t("settings.mergeQueueStatusDescription")}
+                </Typography>
+              </span>
+              <Button
+                aria-label={t("common.refresh")}
+                disabled={!token || statusLoading}
+                onClick={() => void refreshStatus()}
+                size="icon"
+                type="button"
+                variant="ghost"
+              >
+                {statusLoading ? (
+                  <Spinner size={14} />
+                ) : (
+                  <RefreshCw size={14} />
+                )}
+              </Button>
+            </div>
+            {statusError ? <SettingsAlert>{statusError}</SettingsAlert> : null}
+            {!statusLoading && status ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid content-start gap-2">
+                  <Typography as="strong" tone="muted" variant="caption">
+                    {t("settings.mergeQueueBatches")}
+                  </Typography>
+                  {status.batches.length === 0 ? (
+                    <Typography tone="muted" variant="caption">
+                      {t("settings.mergeQueueNoBatches")}
+                    </Typography>
+                  ) : (
+                    <div className="grid max-h-64 gap-2 overflow-y-auto pr-1">
+                      {status.batches.map((batch) => (
+                        <div
+                          className="grid gap-1 rounded-lg border border-border bg-muted/25 px-3 py-2.5"
+                          key={batch.id}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <code className="text-xs text-muted-foreground">
+                              {batch.id.slice(0, 8)}
+                            </code>
+                            <Badge variant={statusTone(batch.state)}>
+                              {t(`settings.mergeQueueState.${batch.state}`)}
+                            </Badge>
+                          </div>
+                          <Typography tone="muted" variant="caption">
+                            {t("settings.mergeQueueCandidateCount", {
+                              count: batch.candidateCount,
+                            })} · {statusDateFormatter.format(
+                              new Date(batch.updatedAt),
+                            )}
+                          </Typography>
+                          {batch.failureCode ? (
+                            <code className="truncate text-xs text-destructive">
+                              {batch.failureCode}
+                            </code>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="grid content-start gap-2">
+                  <Typography as="strong" tone="muted" variant="caption">
+                    {t("settings.mergeQueueCandidates")}
+                  </Typography>
+                  {status.candidates.length === 0 ? (
+                    <Typography tone="muted" variant="caption">
+                      {t("settings.mergeQueueNoCandidates")}
+                    </Typography>
+                  ) : (
+                    <div className="grid max-h-64 gap-2 overflow-y-auto pr-1">
+                      {status.candidates.map((candidate) => (
+                        <div
+                          className="grid gap-1 rounded-lg border border-border bg-muted/25 px-3 py-2.5"
+                          key={candidate.id}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <a
+                              className="inline-flex min-w-0 items-center gap-1 text-xs font-medium text-foreground hover:text-primary"
+                              href={candidate.pullRequestUrl}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              PR #{candidate.pullRequestNumber}
+                              <ExternalLink className="shrink-0" size={11} />
+                            </a>
+                            <Badge variant={statusTone(candidate.state)}>
+                              {t(`settings.mergeQueueState.${candidate.state}`)}
+                            </Badge>
+                          </div>
+                          <Typography tone="muted" variant="caption">
+                            {statusDateFormatter.format(
+                              new Date(candidate.updatedAt),
+                            )}
+                          </Typography>
+                          {candidate.failureCode ? (
+                            <code className="truncate text-xs text-destructive">
+                              {candidate.failureCode}
+                            </code>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
           <footer className="flex justify-end border-t border-border px-4 py-3">
             <Button

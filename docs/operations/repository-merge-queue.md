@@ -115,6 +115,18 @@ PUT /projects/<project-id>/merge-queue-profile
 }
 ```
 
+The authenticated read-only diagnostics endpoint returns up to five recent
+batches and twelve recent candidates, with active states first:
+
+```text
+GET /projects/<project-id>/merge-queue-status
+```
+
+The Workflow UI displays this snapshot with a manual refresh action. It omits
+claim credentials, Worker identity, validation logs, and failure detail; only
+the PR link, durable state, timestamps, counts, integration SHA, and failure
+code are exposed. The response is private and not cached.
+
 `readinessStageId` must name a stage in the current project workflow. The
 optional `quietWindowMs` and `maxBatchSize` fields preserve their stored values,
 or use the server defaults of 300000 and 5 for a new profile. The Workflow UI

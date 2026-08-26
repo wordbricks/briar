@@ -5,13 +5,14 @@ import {
   getGithubConnectionForOrganization,
   listGithubConnectionRepositories,
 } from "./github-connection-repository";
-import { HttpError, json } from "./http-response";
+import { HttpError, json, privateNoStoreJson } from "./http-response";
 import { decodeMergeQueueProfileUpdate } from "./merge-queue-contract";
 import {
   configureMergeQueueProfile,
   getMergeQueueProfile,
   type MergeQueueProfileRow,
 } from "./merge-queue-profile";
+import { getMergeQueueStatus } from "./merge-queue-status";
 import { canManageOrganization } from "./organization-access";
 import { getProject } from "./project-command-repository";
 import {
@@ -73,6 +74,22 @@ export async function handleProjectSettingsRoute(
   const mergeQueueProfileMatch = pathname.match(
     /^\/projects\/([0-9a-f-]+)\/merge-queue-profile$/u,
   );
+  const mergeQueueStatusMatch = pathname.match(
+    /^\/projects\/([0-9a-f-]+)\/merge-queue-status$/u,
+  );
+  if (mergeQueueStatusMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    const project = await getProject(
+      db,
+      mergeQueueStatusMatch[1],
+      session.user.id,
+    );
+    if (!project) throw new HttpError(404, "Project not found");
+    return privateNoStoreJson({
+      status: await getMergeQueueStatus(db, project.id),
+      generatedAt: new Date().toISOString(),
+    });
+  }
   if (
     mergeQueueProfileMatch &&
     (request.method === "GET" || request.method === "PUT")

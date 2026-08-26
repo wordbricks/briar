@@ -20,6 +20,7 @@ import {
   sealNextMergeBatch,
   selectAuthoritativeMergeGroupHead,
 } from "./merge-batches";
+import { getMergeQueueStatus } from "./merge-queue-status";
 
 const baseTime = Date.parse("2026-08-21T00:00:00.000Z");
 const installationId = 901;
@@ -473,6 +474,14 @@ describe("repository merge queue coordinator", () => {
     });
     await expect(registerRun(lane, reviewRun, at(40, 13))).resolves
       .toHaveLength(1);
+    await expect(getMergeQueueStatus(db, lane.projectId)).resolves.toMatchObject({
+      batches: [{ state: "collecting", candidateCount: 1 }],
+      candidates: [{
+        runId: reviewRun.runId,
+        pullRequestNumber: reviewRun.pullRequestNumbers[0],
+        state: "ready",
+      }],
+    });
   });
 
   it("atomically seals five of six racing candidates and leaves one ready", async () => {
