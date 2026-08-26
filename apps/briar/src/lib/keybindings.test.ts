@@ -1,12 +1,13 @@
 /** @vitest-environment jsdom */
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   defaultKeybindings,
   defaultKeyboardNavigationPreferences,
   formatShortcut,
   getRecordingKeybinding,
   installKeybindingShortcuts,
+  isKeyboardShortcutsGuideShortcut,
   isNavigationHistoryShortcut,
   loadKeybindings,
   loadKeyboardNavigationPreferences,
@@ -17,6 +18,7 @@ import {
   setRecordingKeybinding,
   shortcutFromEvent,
   shortcutsEqual,
+  subscribeKeyboardNavigationPreferences,
   keybindingsStorageKey,
   keyboardNavigationPreferencesStorageKey,
 } from "./keybindings";
@@ -92,6 +94,54 @@ describe("keybindings", () => {
     expect(loadKeyboardNavigationPreferences()).toEqual(
       defaultKeyboardNavigationPreferences,
     );
+  });
+
+  it("keeps a valid shortcut when its sibling is malformed", () => {
+    const customCommandPalette = {
+      key: "p",
+      code: "KeyP",
+      meta: true,
+      ctrl: false,
+      alt: true,
+      shift: false,
+    };
+    window.localStorage.setItem(
+      keybindingsStorageKey,
+      JSON.stringify({
+        commandPalette: customCommandPalette,
+        sidebarToggle: { key: "b" },
+      }),
+    );
+
+    expect(loadKeybindings()).toEqual({
+      commandPalette: customCommandPalette,
+      sidebarToggle: defaultKeybindings.sidebarToggle,
+    });
+  });
+
+  it("notifies preference subscribers and keeps a volatile storage fallback", () => {
+    const onChange = vi.fn();
+    const unsubscribe = subscribeKeyboardNavigationPreferences(onChange);
+    const setItem = vi.spyOn(Storage.prototype, "setItem")
+      .mockImplementationOnce(() => {
+        throw new DOMException("Storage unavailable", "SecurityError");
+      });
+
+    expect(
+      saveKeyboardNavigationPreferences({ sequenceShortcutsEnabled: false }),
+    ).toEqual({ sequenceShortcutsEnabled: false });
+    expect(loadKeyboardNavigationPreferences()).toEqual({
+      sequenceShortcutsEnabled: false,
+    });
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(onChange).toHaveBeenLastCalledWith({
+      sequenceShortcutsEnabled: false,
+    });
+
+    unsubscribe();
+    setItem.mockRestore();
+    saveKeyboardNavigationPreferences(defaultKeyboardNavigationPreferences);
+    expect(onChange).toHaveBeenCalledOnce();
   });
 
   it("swaps conflicting shortcuts so every command remains reachable", () => {
@@ -218,6 +268,34 @@ describe("keybindings", () => {
     window.localStorage.setItem(
       keybindingsStorageKey,
       JSON.stringify({ sidebarToggle: back }),
+    );
+    expect(loadKeybindings()).toEqual(defaultKeybindings);
+  });
+
+  it("reserves the modifier shortcut used by the keyboard guide", () => {
+    const guideShortcut = {
+      key: "/",
+      code: "Slash",
+      meta: true,
+      ctrl: false,
+      alt: false,
+      shift: false,
+    };
+    expect(isKeyboardShortcutsGuideShortcut(guideShortcut)).toBe(true);
+    expect(
+      shortcutFromEvent(new KeyboardEvent("keydown", {
+        key: "/",
+        code: "Slash",
+        metaKey: true,
+      })),
+    ).toBeNull();
+    expect(saveKeybinding("commandPalette", guideShortcut)).toEqual(
+      defaultKeybindings,
+    );
+
+    window.localStorage.setItem(
+      keybindingsStorageKey,
+      JSON.stringify({ commandPalette: guideShortcut }),
     );
     expect(loadKeybindings()).toEqual(defaultKeybindings);
   });

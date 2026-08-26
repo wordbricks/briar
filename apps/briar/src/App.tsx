@@ -11,6 +11,7 @@ import {
   Hash,
   House,
   Inbox as InboxIcon,
+  Keyboard as KeyboardIcon,
   MessageCircle,
   MessagesSquare,
   PanelLeft,
@@ -37,6 +38,8 @@ import {
   CommandPalette,
   type CommandPaletteItem,
 } from "./components/CommandPalette";
+import { KeyboardShortcutModeHint } from "./components/KeyboardShortcutModeHint";
+import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
 import { DirectMessages } from "./components/DirectMessages";
 import {
   CompanionChannels,
@@ -83,6 +86,10 @@ import {
   useMobileNavigationGestures,
 } from "./hooks/useMobileNavigation";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
+import {
+  type KeyboardShortcutAction,
+  useKeyboardShortcuts,
+} from "./hooks/useKeyboardShortcuts";
 import { isProjectScheduleTabEnabled } from "./lib/project-tabs";
 import {
   clearLaunchIntroPreview,
@@ -193,9 +200,22 @@ import {
 } from "./lib/planned-update-recovery";
 import {
   formatShortcut,
+  getRecordingKeybinding,
   installKeybindingShortcuts,
+  isMacPlatform,
+  keyboardEventIsComposing,
   loadKeybindings,
+  loadKeyboardNavigationPreferences,
+  subscribeKeyboardNavigationPreferences,
 } from "./lib/keybindings";
+import {
+  appKeyboardShortcutSpecs,
+  createKeyboardShortcutHelpSections,
+  type AppKeyboardShortcutCommandId,
+} from "./lib/app-keyboard-shortcuts";
+import { installKeyboardListNavigation } from "./lib/keyboard-list-navigation";
+import { hasOpenKeyboardShortcutOverlay } from "./lib/keyboard-shortcuts";
+import { remoteDesktopCapturesKeyboard } from "./lib/remote-desktop-focus";
 import { formatIssueKey } from "./lib/issue-key";
 import { listenForAppMenuSettings } from "./lib/app-menu";
 import {
@@ -710,6 +730,13 @@ export function App() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [commandPaletteInitialQuery, setCommandPaletteInitialQuery] =
+    useState("");
+  const [isKeyboardShortcutsOpen, setIsKeyboardShortcutsOpen] =
+    useState(false);
+  const [sequenceShortcutsEnabled, setSequenceShortcutsEnabled] = useState(
+    () => loadKeyboardNavigationPreferences().sequenceShortcutsEnabled,
+  );
   const {
     containerRef: inboxLayoutRef,
     effectiveWidth: inboxDetailPaneWidth,
@@ -2024,17 +2051,33 @@ export function App() {
       !shouldShowFirstRunTutorial &&
       !isLaunchIntroVisible
   );
+
+  const configuredKeybindings = loadKeybindings();
+  const openCommandPalette = useCallback((initialQuery = "") => {
+    setCommandPaletteInitialQuery(initialQuery);
+    setIsCommandPaletteOpen(true);
+  }, []);
+  const handleCommandPaletteOpenChange = useCallback((open: boolean) => {
+    setIsCommandPaletteOpen(open);
+    if (!open) setCommandPaletteInitialQuery("");
+  }, []);
+
+  useEffect(
+    () => subscribeKeyboardNavigationPreferences((preferences) => {
+      setSequenceShortcutsEnabled(preferences.sequenceShortcutsEnabled);
+    }),
+    [],
+  );
+
   useEffect(
     () =>
       installKeybindingShortcuts((id) => {
         if (id === "commandPalette") {
-          const anotherDialogOpen = !isCommandPaletteOpen && Boolean(
-            document.querySelector(
-              '[data-briar-dialog-overlay][data-state="open"], [aria-modal="true"], dialog[open]',
-            ),
-          );
+          const anotherDialogOpen = !isCommandPaletteOpen &&
+            hasOpenKeyboardShortcutOverlay(document);
           if (commandPaletteAvailable && !anotherDialogOpen) {
-            setIsCommandPaletteOpen((open) => !open);
+            if (isCommandPaletteOpen) handleCommandPaletteOpenChange(false);
+            else openCommandPalette();
           }
           return;
         }
@@ -2042,11 +2085,142 @@ export function App() {
           setIsSidebarOpen((open) => !open);
         }
       }),
-    [commandPaletteAvailable, isCommandPaletteOpen],
+    [
+      commandPaletteAvailable,
+      handleCommandPaletteOpenChange,
+      isCommandPaletteOpen,
+      openCommandPalette,
+    ],
   );
   useEffect(() => {
-    if (!commandPaletteAvailable) setIsCommandPaletteOpen(false);
-  }, [commandPaletteAvailable]);
+    if (commandPaletteAvailable) return;
+    handleCommandPaletteOpenChange(false);
+    setIsKeyboardShortcutsOpen(false);
+  }, [commandPaletteAvailable, handleCommandPaletteOpenChange]);
+
+  useEffect(() => {
+    const handleKeyboardShortcutsKeyDown = (event: KeyboardEvent) => {
+      const hasPrimaryModifier = event.metaKey !== event.ctrlKey &&
+        (event.metaKey || event.ctrlKey);
+      if (
+        event.code !== "Slash" ||
+        !hasPrimaryModifier ||
+        event.altKey ||
+        event.shiftKey ||
+        event.defaultPrevented ||
+        event.repeat ||
+        keyboardEventIsComposing(event) ||
+        getRecordingKeybinding() !== null ||
+        remoteDesktopCapturesKeyboard()
+      ) return;
+
+      const anotherDialogOpen = !isKeyboardShortcutsOpen &&
+        hasOpenKeyboardShortcutOverlay(document);
+      if (!commandPaletteAvailable || anotherDialogOpen) return;
+      event.preventDefault();
+      setIsKeyboardShortcutsOpen((open) => !open);
+    };
+    window.addEventListener("keydown", handleKeyboardShortcutsKeyDown, true);
+    return () =>
+      window.removeEventListener(
+        "keydown",
+        handleKeyboardShortcutsKeyDown,
+        true,
+      );
+  }, [commandPaletteAvailable, isKeyboardShortcutsOpen]);
+
+  const keyboardShortcutTriggers = {
+    createIssue: () => {
+      if (!activeProject) return;
+      setCreateIssueProjectId(activeProject.id);
+      navigateToPage("issues");
+      setIsIssueDialogOpen(true);
+    },
+    goAgents: () => navigateToPage("agents"),
+    goChannels: () => navigateToPage("channels"),
+    goDms: () => navigateToPage("dms"),
+    goInbox: () => navigateToPage("inbox"),
+    goIssues: () => {
+      setRequestedRunId(null);
+      setIssueListRequestKey((key) => key + 1);
+      navigateToPage("issues");
+    },
+    goProjectHome: () => navigateToPage("lobby"),
+    goSchedule: () => navigateToPage("schedule"),
+    goSettings: openAppSettings,
+    openChannel: () => openCommandPalette("c:"),
+    openCommandPalette: () => openCommandPalette(),
+    openDm: () => openCommandPalette("d:"),
+    openIssue: () => openCommandPalette("i:"),
+    openProject: () => openCommandPalette("p:"),
+    openSession: () => openCommandPalette("s:"),
+    showKeyboardShortcuts: () => setIsKeyboardShortcutsOpen(true),
+    toggleSidebar: () => setIsSidebarOpen((open) => !open),
+  } satisfies Record<AppKeyboardShortcutCommandId, () => void>;
+  const keyboardShortcutDisabled = {
+    createIssue: !activeProject,
+    goAgents: !activeProject,
+    goChannels: !briar.activeOrganizationId,
+    goDms: !briar.activeOrganizationId || Boolean(projectWindowProjectId),
+    goInbox: !briar.activeOrganizationId,
+    goIssues: !activeProject,
+    goProjectHome: !activeProject,
+    goSchedule: !activeProject || !isProjectScheduleTabEnabled(activeProject),
+    goSettings: false,
+    openChannel: !briar.activeOrganizationId,
+    openCommandPalette: false,
+    openDm: !briar.activeOrganizationId || Boolean(projectWindowProjectId),
+    openIssue: !activeProject,
+    openProject: activeOrganizationProjects.length === 0,
+    openSession: !activeProject,
+    showKeyboardShortcuts: false,
+    toggleSidebar: false,
+  } satisfies Record<AppKeyboardShortcutCommandId, boolean>;
+  const keyboardShortcutCommands: KeyboardShortcutAction<
+    AppKeyboardShortcutCommandId
+  >[] = appKeyboardShortcutSpecs.map((shortcut) => ({
+    disabled: keyboardShortcutDisabled[shortcut.id] === true,
+    id: shortcut.id,
+    label: t(shortcut.labelKey),
+    onTrigger: keyboardShortcutTriggers[shortcut.id],
+    sequence: shortcut.sequence,
+  }));
+  const { pendingShortcut } = useKeyboardShortcuts({
+    commands: keyboardShortcutCommands,
+    enabled:
+      commandPaletteAvailable &&
+      sequenceShortcutsEnabled &&
+      !isCommandPaletteOpen &&
+      !isKeyboardShortcutsOpen,
+  });
+
+  useEffect(() => {
+    if (!commandPaletteAvailable || !sequenceShortcutsEnabled) return;
+    return installKeyboardListNavigation({
+      getRemoteKeyboardCaptured: remoteDesktopCapturesKeyboard,
+    });
+  }, [commandPaletteAvailable, sequenceShortcutsEnabled]);
+
+  const pendingShortcutChoices = pendingShortcut
+    ? pendingShortcut.candidateIds.flatMap((id) => {
+        const shortcut = appKeyboardShortcutSpecs.find(
+          (candidate) => candidate.id === id,
+        );
+        const key = shortcut?.sequence[pendingShortcut.prefix.length];
+        return shortcut && key
+          ? [{ id, key: key.toUpperCase(), label: t(shortcut.labelKey) }]
+          : [];
+      })
+    : [];
+  const keyboardShortcutsModifierLabel = isMacPlatform() ? "⌘/" : "Ctrl+/";
+  const keyboardShortcutHelpSections = createKeyboardShortcutHelpSections({
+    commandPaletteShortcut: formatShortcut(
+      configuredKeybindings.commandPalette,
+    ),
+    keyboardShortcutsShortcut: keyboardShortcutsModifierLabel,
+    sidebarShortcut: formatShortcut(configuredKeybindings.sidebarToggle),
+    t,
+  });
 
   const paletteSections = {
     actions: {
@@ -2082,7 +2256,6 @@ export function App() {
       label: t("commandPalette.groupProjects"),
     },
   } as const;
-  const configuredKeybindings = loadKeybindings();
   const commandPaletteItems: CommandPaletteItem[] = [];
   const addPaletteItem = (
     item: Omit<CommandPaletteItem, "section" | "sectionLabel">,
@@ -2241,6 +2414,28 @@ export function App() {
       scope: "actions",
     }, paletteSections.context);
   }
+
+  addPaletteItem({
+    description: t("commandPalette.keyboardShortcutsDescription"),
+    icon: <KeyboardIcon />,
+    id: "action:keyboard-shortcuts",
+    keywords: [
+      "keyboard shortcuts",
+      "hotkeys",
+      "vim",
+      "keyboard mode",
+      "단축키",
+      "키보드",
+      "快捷键",
+    ],
+    label: t("keyboardShortcuts.title"),
+    onSelect: () => setIsKeyboardShortcutsOpen(true),
+    priority: 90,
+    remember: false,
+    restoreFocusOnSelect: false,
+    scope: "actions",
+    shortcut: keyboardShortcutsModifierLabel,
+  }, paletteSections.actions);
 
   addPaletteItem({
     description: t(
@@ -3841,11 +4036,30 @@ export function App() {
       {commandPaletteAvailable && isCommandPaletteOpen ? (
         <CommandPalette
           contextLabel={commandPaletteContextLabel}
+          initialQuery={commandPaletteInitialQuery}
           items={commandPaletteItems}
           loading={briar.loading || channelsLoading}
-          onOpenChange={setIsCommandPaletteOpen}
+          onOpenChange={handleCommandPaletteOpenChange}
           open={isCommandPaletteOpen}
           shortcutLabel={formatShortcut(configuredKeybindings.commandPalette)}
+        />
+      ) : null}
+      {commandPaletteAvailable ? (
+        <KeyboardShortcutsDialog
+          onOpenChange={setIsKeyboardShortcutsOpen}
+          open={isKeyboardShortcutsOpen}
+          sections={keyboardShortcutHelpSections}
+        />
+      ) : null}
+      {pendingShortcut ? (
+        <KeyboardShortcutModeHint
+          choices={pendingShortcutChoices}
+          label={t(
+            pendingShortcut.prefix[0] === "g"
+              ? "keyboardShortcuts.section.go"
+              : "keyboardShortcuts.section.open",
+          )}
+          prefix={pendingShortcut.prefix.join(" ").toUpperCase()}
         />
       ) : null}
       {!briar.remoteMode &&

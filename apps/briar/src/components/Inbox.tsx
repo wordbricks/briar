@@ -324,7 +324,7 @@ export function Inbox({
               title={t("inbox.filterEmptyTitle")}
             />
           ) : (
-            <div className="inbox-list">
+            <div className="inbox-list" data-keyboard-list="">
               {visibleMessages.map((message) => (
                 <InboxMessageRow
                   category={classifyInboxMessage(message)}
@@ -410,6 +410,7 @@ function InboxMessageRow({
     >
       <button
         className="inbox-message-open"
+        data-keyboard-list-item=""
         onClick={() => onOpen(message)}
         type="button"
       >
