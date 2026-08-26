@@ -15,6 +15,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useI18n } from "../i18n";
 import {
   groupCommandPaletteItems,
@@ -289,9 +290,9 @@ export function CommandPalette({
             <span className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               {contextLabel ?? t("commandPalette.globalContext")}
             </span>
-            <kbd className="shrink-0 rounded border border-border/80 bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
+            <Kbd className="h-auto shrink-0 rounded border border-border/80 bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
               {shortcutLabel}
-            </kbd>
+            </Kbd>
           </div>
           <div className="flex items-center gap-3">
             <Search
@@ -387,9 +388,9 @@ export function CommandPalette({
                         />
                       ) : null}
                       {item.shortcut ? (
-                        <kbd className="shrink-0 rounded border border-border/70 bg-background/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                        <Kbd className="h-auto shrink-0 rounded border border-border/70 bg-background/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                           {item.shortcut}
-                        </kbd>
+                        </Kbd>
                       ) : selected ? (
                         <CornerDownLeft
                           aria-hidden="true"
@@ -441,16 +442,18 @@ export function CommandPalette({
           <span>{t("commandPalette.scopeHint")}</span>
           <span className="flex items-center gap-3">
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-border bg-background px-1 py-0.5 font-mono">↑</kbd>
-              <kbd className="rounded border border-border bg-background px-1 py-0.5 font-mono">↓</kbd>
+              <KbdGroup>
+                <Kbd className="h-auto rounded border border-border bg-background px-1 py-0.5 font-mono text-[10px]">↑</Kbd>
+                <Kbd className="h-auto rounded border border-border bg-background px-1 py-0.5 font-mono text-[10px]">↓</Kbd>
+              </KbdGroup>
               {t("commandPalette.select")}
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-border bg-background px-1 py-0.5 font-mono">↵</kbd>
+              <Kbd className="h-auto rounded border border-border bg-background px-1 py-0.5 font-mono text-[10px]">↵</Kbd>
               {t("common.open")}
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-border bg-background px-1 py-0.5 font-mono">esc</kbd>
+              <Kbd className="h-auto rounded border border-border bg-background px-1 py-0.5 font-mono text-[10px]">esc</Kbd>
               {t("common.close")}
             </span>
           </span>

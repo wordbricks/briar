@@ -10,6 +10,7 @@ export const maxNavigationHistoryEntries = 100;
 type NavigationAction<T extends string> =
   | { type: "navigate"; value: T }
   | { type: "back" }
+  | { type: "backTo"; predicate: (value: T) => boolean; fallback?: T }
   | { type: "forward" }
   | { type: "replace"; value: T }
   | { type: "reset"; value: T };
@@ -26,6 +27,17 @@ export function reduceNavigationHistory<T extends string>(
 ): NavigationHistory<T> {
   if (action.type === "back") {
     return state.index === 0 ? state : { ...state, index: state.index - 1 };
+  }
+  if (action.type === "backTo") {
+    for (let index = state.index - 1; index >= 0; index -= 1) {
+      const entry = state.entries[index];
+      if (entry !== undefined && action.predicate(entry)) {
+        return { ...state, index };
+      }
+    }
+    return action.fallback === undefined
+      ? state
+      : createNavigationHistory(action.fallback);
   }
   if (action.type === "forward") {
     return state.index === state.entries.length - 1
@@ -77,6 +89,16 @@ export function useNavigationHistory<T extends string>(initial: T) {
     [],
   );
   const goBack = useCallback(() => dispatch({ type: "back" }), []);
+  const goBackTo = useCallback(
+    (predicate: (value: T) => boolean, fallback?: T) => {
+      dispatch(
+        fallback === undefined
+          ? { type: "backTo", predicate }
+          : { type: "backTo", predicate, fallback },
+      );
+    },
+    [],
+  );
   const goForward = useCallback(() => dispatch({ type: "forward" }), []);
   const replace = useCallback(
     (value: T) => dispatch({ type: "replace", value }),
@@ -93,6 +115,7 @@ export function useNavigationHistory<T extends string>(initial: T) {
     canGoForward: history.index < history.entries.length - 1,
     navigate,
     goBack,
+    goBackTo,
     goForward,
     replace,
     reset,

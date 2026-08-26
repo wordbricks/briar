@@ -4,13 +4,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
-import { useEffect } from "react";
 import { useI18n } from "../i18n";
-import {
-  getRecordingKeybinding,
-  keyboardEventIsComposing,
-} from "../lib/keybindings";
-import { remoteDesktopCapturesKeyboard } from "../lib/remote-desktop-focus";
 
 export function WindowNavigationControls({
   canGoBack,
@@ -18,7 +12,6 @@ export function WindowNavigationControls({
   isSidebarOpen,
   onBack,
   onForward,
-  onSettings,
   onSidebarToggle,
 }: {
   canGoBack: boolean;
@@ -26,40 +19,9 @@ export function WindowNavigationControls({
   isSidebarOpen: boolean;
   onBack: () => void;
   onForward: () => void;
-  onSettings: () => void;
   onSidebarToggle: () => void;
 }) {
   const { t } = useI18n();
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (getRecordingKeybinding() || remoteDesktopCapturesKeyboard()) return;
-      if (
-        keyboardEventIsComposing(event) ||
-        !event.metaKey ||
-        event.ctrlKey ||
-        event.altKey ||
-        event.shiftKey
-      ) {
-        return;
-      }
-      if (event.code === "BracketLeft" || event.key === "[") {
-        event.preventDefault();
-        if (!canGoBack) return;
-        onBack();
-      } else if (event.code === "BracketRight" || event.key === "]") {
-        event.preventDefault();
-        if (!canGoForward) return;
-        onForward();
-      } else if (event.code === "Comma" || event.key === ",") {
-        event.preventDefault();
-        onSettings();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [canGoBack, canGoForward, onBack, onForward, onSettings]);
 
   return (
     <nav

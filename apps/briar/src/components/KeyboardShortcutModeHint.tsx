@@ -1,3 +1,5 @@
+import { Kbd } from "@/components/ui/kbd";
+
 export type KeyboardShortcutModeChoice = {
   id: string;
   key: string;
@@ -23,9 +25,9 @@ export function KeyboardShortcutModeHint({
       <div className="max-w-[min(720px,100%)] rounded-xl border border-border/80 bg-card/95 px-3 py-2 shadow-2xl backdrop-blur-xl">
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
           <span className="flex items-center gap-2 text-xs font-medium text-foreground">
-            <kbd className="min-w-6 rounded-md border border-border bg-muted px-1.5 py-1 text-center font-mono text-[10px] font-semibold uppercase shadow-xs">
+            <Kbd className="h-auto min-w-6 rounded-md border border-border bg-muted px-1.5 py-1 text-center font-mono text-[10px] font-semibold uppercase shadow-xs">
               {prefix}
-            </kbd>
+            </Kbd>
             {label}
           </span>
           <span aria-hidden="true" className="h-4 w-px bg-border" />
@@ -34,9 +36,9 @@ export function KeyboardShortcutModeHint({
               className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
               key={choice.id}
             >
-              <kbd className="min-w-5 rounded border border-border/80 bg-background px-1 py-0.5 text-center font-mono text-[9px] font-semibold uppercase text-foreground">
+              <Kbd className="h-auto min-w-5 rounded border border-border/80 bg-background px-1 py-0.5 text-center font-mono text-[9px] font-semibold uppercase text-foreground">
                 {choice.key}
-              </kbd>
+              </Kbd>
               {choice.label}
             </span>
           ))}

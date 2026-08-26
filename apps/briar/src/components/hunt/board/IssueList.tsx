@@ -1,4 +1,7 @@
 import { Bot, ChevronRight } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useAppCollectionKeyboardCommandScope } from "@/hooks/useAppCollectionKeyboardCommandScope";
+import { useControlledCollectionNavigation } from "@/hooks/useControlledCollectionNavigation";
 import { runMeta } from "@/lib/stages";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { formatIssueKey } from "@/lib/issue-key";
@@ -50,6 +53,30 @@ export function IssueList({
   const {
     t
   } = useI18n();
+  const runIds = useMemo(() => runs.map(run => run.id), [runs]);
+  const [cursorId, setCursorId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const activateRun = useCallback((runId: string) => {
+    onOpen(runId);
+  }, [onOpen]);
+  const navigation = useControlledCollectionNavigation<string, HTMLDivElement>({
+    cursorId,
+    itemIds: runIds,
+    onActivate: activateRun,
+    onCursorIdChange: setCursorId,
+    onSelectedIdChange: setSelectedId,
+    orientation: "vertical",
+    selectedId,
+    selectionBehavior: "manual"
+  });
+  useAppCollectionKeyboardCommandScope({
+    enabled: runIds.length > 0,
+    id: "issue-list",
+    move: navigation.move,
+    orientation: "vertical",
+    rootRef: listRef
+  });
   return <div aria-label={t("dashboard.issueList")} className="issue-list" role="table">
       <div className="issue-list-grid issue-list-header" role="row">
         <span role="columnheader">{t("dashboard.task")}</span>
@@ -58,7 +85,7 @@ export function IssueList({
         <span role="columnheader">{t("dashboard.updated")}</span>
         <span aria-hidden="true" />
       </div>
-      <div className="issue-list-body" data-keyboard-list="" role="rowgroup">
+      <div className="issue-list-body" data-keyboard-list="" ref={listRef} role="rowgroup">
         {runs.length === 0 ? <div className="issue-list-empty">
             <Bot size={22} />
             <strong>{t("dashboard.emptyTitle")}</strong>
@@ -71,11 +98,18 @@ export function IssueList({
         return <IssueContextMenu availableProviders={availableProviders} disabled={deletingIssueId === run.id || updatingIssueId === run.id} key={run.id} onDelete={() => onDelete(run.id)} onTransfer={onTransfer ? () => onTransfer(run.id) : undefined} onEdit={() => onEdit(run.id)} onMove={placement => onMove(run, placement)} onOpen={() => onOpen(run.id)} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(run) : undefined} onPriorityChange={priority => onPriorityChange(run, priority)} onPreferencesChange={preferences => onPreferencesChange(run, preferences)} onCheckpointsChange={checkpoints => onCheckpointsChange(run, checkpoints)} run={run} isProcessing={processingIssueIds.has(run.id)}>
               <div aria-label={t("run.details", {
             title: run.title
-          })} className="issue-list-grid issue-list-row" data-keyboard-list-item="" onClick={() => onOpen(run.id)} onKeyDown={event => {
+          })} className="issue-list-grid issue-list-row" data-keyboard-list-current={cursorId === run.id ? "" : undefined} data-keyboard-list-item="" data-run-id={run.id} onClick={() => {
+            setCursorId(run.id);
+            setSelectedId(run.id);
+            onOpen(run.id);
+          }} onFocus={() => setCursorId(run.id)} onKeyDown={event => {
             if (event.key !== "Enter" && event.key !== " ") return;
             event.preventDefault();
-            onOpen(run.id);
-          }} role="row" tabIndex={0}>
+            navigation.activate({
+              repeat: event.repeat,
+              source: "keyboard"
+            });
+          }} onPointerDown={() => setCursorId(run.id)} ref={navigation.getItemRef(run.id)} role="row" tabIndex={0}>
                 <span className="issue-list-task" role="cell">
                   <span className="issue-list-task-kicker">
                     <small>
