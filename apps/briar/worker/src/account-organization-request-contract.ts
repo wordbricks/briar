@@ -53,7 +53,7 @@ const AccountImage = Schema.Union([
 ]);
 
 export const AccountProfileInput = Schema.Struct({
-  username: LowercaseUsername,
+  username: Schema.NullOr(LowercaseUsername),
   name: trimmedText(1, 100),
   image: Schema.NullOr(AccountImage),
 });

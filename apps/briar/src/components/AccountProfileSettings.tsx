@@ -29,7 +29,7 @@ export function AccountProfileSettings({
 }: {
   compact?: boolean;
   onSave: (input: {
-    username: string;
+    username: string | null;
     name: string;
     image: string | null;
   }) => Promise<SessionUser>;
@@ -49,7 +49,8 @@ export function AccountProfileSettings({
 
   const normalizedUsername = username.trim().toLowerCase();
   const normalizedName = name.trim();
-  const usernameValid = usernamePattern.test(normalizedUsername);
+  const usernameValid =
+    normalizedUsername.length === 0 || usernamePattern.test(normalizedUsername);
   const changed =
     normalizedUsername !== saved.username ||
     normalizedName !== saved.name ||
@@ -61,12 +62,12 @@ export function AccountProfileSettings({
     setError(null);
     try {
       const nextUser = await onSave({
-        username: normalizedUsername,
+        username: normalizedUsername || null,
         name: normalizedName,
         image,
       });
       const next = {
-        username: nextUser.username ?? normalizedUsername,
+        username: nextUser.username ?? "",
         name: nextUser.name,
         image: nextUser.image ?? null,
       };
@@ -167,7 +168,10 @@ export function AccountProfileSettings({
                   className="pl-7"
                   disabled={saving}
                   maxLength={30}
-                  onChange={(event) => setUsername(event.target.value)}
+                  onChange={(event) => {
+                    setUsername(event.target.value);
+                    setError(null);
+                  }}
                   placeholder={t("account.usernamePlaceholder")}
                   spellCheck={false}
                   value={username}
@@ -185,7 +189,10 @@ export function AccountProfileSettings({
                 autoComplete="name"
                 disabled={saving}
                 maxLength={100}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  setError(null);
+                }}
                 placeholder={t("account.nicknamePlaceholder")}
                 value={name}
               />
