@@ -39,6 +39,12 @@ const makeProjectQueries = (sql: SqlClient.SqlClient) => {
         join briar_organization_members membership
           on membership.organization_id = project.organization_id
          and membership.user_id = ${userId}
+        left join briar_project_members project_membership
+          on project_membership.project_id = project.id
+         and project_membership.organization_id = project.organization_id
+         and project_membership.user_id = membership.user_id
+        where membership.role in ('owner', 'admin')
+           or project_membership.user_id is not null
         order by organization.created_at, project.created_at
       `,
   });
@@ -62,20 +68,34 @@ const makeProjectQueries = (sql: SqlClient.SqlClient) => {
       `,
   });
 
-const InboxProjectRow = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  issue_key_prefix: Schema.String,
-});
+  const InboxProjectRow = Schema.Struct({
+    id: Schema.String,
+    name: Schema.String,
+    issue_key_prefix: Schema.String,
+  });
 
   const findOrganizationInboxProjects = SqlSchema.findAll({
-    Request: ProjectListRequest,
+    Request: Schema.Struct({
+      organizationId: Schema.String,
+      userId: Schema.String,
+    }),
     Result: InboxProjectRow,
-    execute: ({ scopeId: organizationId }) => sql`
-        select id, name, issue_key_prefix
-        from briar_projects
-        where organization_id = ${organizationId}
-        order by created_at, id
+    execute: ({ organizationId, userId }) => sql`
+        select project.id, project.name, project.issue_key_prefix
+        from briar_projects project
+        join briar_organization_members membership
+          on membership.organization_id = project.organization_id
+         and membership.user_id = ${userId}
+        left join briar_project_members project_membership
+          on project_membership.project_id = project.id
+         and project_membership.organization_id = project.organization_id
+         and project_membership.user_id = membership.user_id
+        where project.organization_id = ${organizationId}
+          and (
+            membership.role in ('owner', 'admin')
+            or project_membership.user_id is not null
+          )
+        order by project.created_at, project.id
       `,
   });
 
@@ -105,11 +125,12 @@ const listOrganizationProjectsEffect = Effect.fn(
 
 const listOrganizationInboxProjectsEffect = Effect.fn(
   "listOrganizationInboxProjectsEffect",
-)(function*(organizationId: string) {
+)(function*(organizationId: string, userId: string) {
   const sql = yield* SqlClient.SqlClient;
   const queries = projectQueries(sql);
   return yield* queries.findOrganizationInboxProjects({
-    scopeId: organizationId,
+    organizationId,
+    userId,
   });
 });
 
@@ -127,5 +148,6 @@ export const listOrganizationProjects = (
 export const listOrganizationInboxProjects = (
   db: D1Database,
   organizationId: string,
+  userId: string,
 ): Promise<Array<Pick<ProjectRow, "id" | "name" | "issue_key_prefix">>> =>
-  runD1(db, listOrganizationInboxProjectsEffect(organizationId));
+  runD1(db, listOrganizationInboxProjectsEffect(organizationId, userId));

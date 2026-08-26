@@ -5,6 +5,7 @@ import {
   decodeOrganizationInvitationInput,
   decodeOrganizationLogoInput,
   decodeOrganizationMemberInput,
+  decodeOrganizationMemberProjectsInput,
   decodeOrganizationMemberRoleInput,
   decodeOrganizationUpdateInput,
 } from "./account-organization-request-contract";
@@ -37,6 +38,7 @@ import {
   updateOrganization,
   updateOrganizationLogo,
   updateOrganizationMemberRole,
+  updateOrganizationMemberProjects,
 } from "./organization-command-repository";
 import {
   loadOrganizationInboxConditionalSnapshot,
@@ -54,6 +56,7 @@ import {
   getOrganizationRole,
   listOrganizationInvitations,
   listOrganizationMembers,
+  listOrganizationProjectMemberships,
   listOrganizations,
   type OrganizationRow,
 } from "./organization-repository";
@@ -98,6 +101,25 @@ export type OrganizationRouteInput = {
   db: D1Database;
 };
 
+async function organizationMembersJson(
+  db: D1Database,
+  organizationId: string,
+) {
+  const [members, projectMemberships] = await Promise.all([
+    listOrganizationMembers(db, organizationId),
+    listOrganizationProjectMemberships(db, organizationId),
+  ]);
+  const projectIdsByUser = new Map<string, string[]>();
+  for (const membership of projectMemberships) {
+    const projectIds = projectIdsByUser.get(membership.user_id) ?? [];
+    projectIds.push(membership.project_id);
+    projectIdsByUser.set(membership.user_id, projectIds);
+  }
+  return members.map((member) =>
+    organizationMemberJson(member, projectIdsByUser.get(member.user_id) ?? [])
+  );
+}
+
 export async function handleOrganizationRoute(
   routeInput: OrganizationRouteInput,
 ): Promise<Response | undefined> {
@@ -118,7 +140,11 @@ export async function handleOrganizationRoute(
       ifNoneMatch: request.headers.get("if-none-match"),
       readVersion: () => getOrganizationInboxSyncVersion(db, organizationId),
       loadSnapshot: async () => {
-        const projects = await listOrganizationInboxProjects(db, organizationId);
+        const projects = await listOrganizationInboxProjects(
+          db,
+          organizationId,
+          session.user.id,
+        );
         const [projectData, channelNotifications, subscribedIssueIds] =
           await Promise.all([
             Promise.all(
@@ -480,11 +506,12 @@ export async function handleOrganizationRoute(
       session.user.id,
     );
     if (!role) throw new HttpError(404, "Organization not found");
-    const members = await listOrganizationMembers(
-      db,
-      organizationMembersMatch[1],
-    );
-    return json({ members: members.map(organizationMemberJson) });
+    return json({
+      members: await organizationMembersJson(
+        db,
+        organizationMembersMatch[1],
+      ),
+    });
   }
   if (organizationMembersMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
@@ -506,11 +533,46 @@ export async function handleOrganizationRoute(
     if (!userId) {
       throw new HttpError(404, "A Briar user with that email was not found");
     }
-    const members = await listOrganizationMembers(
-      db,
-      organizationMembersMatch[1],
+    return json({
+      members: await organizationMembersJson(
+        db,
+        organizationMembersMatch[1],
+      ),
+    });
+  }
+
+  const organizationMemberProjectsMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/members\/([^/]+)\/projects$/u,
+  );
+  if (organizationMemberProjectsMatch && request.method === "PUT") {
+    const session = await requireSession(auth, request);
+    const organizationId = organizationMemberProjectsMatch[1];
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!canManageOrganization(role)) {
+      throw new HttpError(403, "Organization admin access required");
+    }
+    const input = decodeOrganizationMemberProjectsInput(
+      await readJson(request),
     );
-    return json({ members: members.map(organizationMemberJson) });
+    const outcome = await updateOrganizationMemberProjects(
+      db,
+      organizationId,
+      decodeURIComponent(organizationMemberProjectsMatch[2]),
+      input.projectIds,
+    );
+    if (outcome === "member_not_found") {
+      throw new HttpError(404, "Member not found");
+    }
+    if (outcome === "role_has_full_access") {
+      throw new HttpError(
+        409,
+        "Organization owners and admins always have access to every project",
+      );
+    }
+    if (outcome === "project_not_found") {
+      throw new HttpError(400, "Every project must belong to the organization");
+    }
+    return json({ members: await organizationMembersJson(db, organizationId) });
   }
 
   const organizationMemberMatch = pathname.match(
@@ -544,8 +606,7 @@ export async function handleOrganizationRoute(
       input.role,
     );
     if (!updated) throw new HttpError(404, "Member not found");
-    const members = await listOrganizationMembers(db, organizationId);
-    return json({ members: members.map(organizationMemberJson) });
+    return json({ members: await organizationMembersJson(db, organizationId) });
   }
   if (organizationMemberMatch && request.method === "DELETE") {
     const session = await requireSession(auth, request);

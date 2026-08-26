@@ -231,6 +231,15 @@ describe("conversational issue execution approval", () => {
         ),
       ]);
     }
+    await db.batch(
+      [projectAId, projectBId].map((projectId) =>
+        db.prepare(
+          `insert into briar_project_members (
+             project_id, organization_id, user_id, created_at, updated_at
+           ) values (?, ?, ?, ?, ?)`,
+        ).bind(projectId, organizationId, memberId, initialAt, initialAt)
+      ),
+    );
     projectAgentId = (await createProjectAgent(db, projectAId, {
       name: "Execution Agent",
       provider: "codex",
@@ -1507,6 +1516,11 @@ describe("conversational issue execution approval", () => {
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'member', ?, ?)`,
       ).bind(organizationId, approverId, initialAt, initialAt),
+      db.prepare(
+        `insert into briar_project_members (
+           project_id, organization_id, user_id, created_at, updated_at
+         ) values (?, ?, ?, ?, ?)`,
+      ).bind(projectAId, organizationId, approverId, initialAt, initialAt),
     ]);
     const memberApproval = await seedIssueProposal();
     expect((await worker.fetch(acceptIssueRequest(

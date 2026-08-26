@@ -23,7 +23,7 @@ import {
   createIssueWithAttachments,
   updateIssueWithAttachments,
 } from "./issue-write-service";
-import { getOrganizationRole } from "./organization-repository";
+import { listProjectMembers } from "./organization-repository";
 import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
 import {
   readIssueRequest,
@@ -35,14 +35,15 @@ import { requireSession } from "./session-auth";
 
 async function requireIssueAssigneeMembership(
   db: D1Database,
-  organizationId: string,
+  projectId: string,
   assigneeUserId: string | null | undefined,
 ) {
   if (!assigneeUserId) return;
-  if (!(await getOrganizationRole(db, organizationId, assigneeUserId))) {
+  const members = await listProjectMembers(db, projectId);
+  if (!members.some((member) => member.user_id === assigneeUserId)) {
     throw new HttpError(
       400,
-      "Assignee must be a member of the project organization",
+      "Assignee must have access to the project",
     );
   }
 }
@@ -75,7 +76,7 @@ export async function handleIssueCoreRoute(input: {
       await readIssueRequest(request);
     await requireIssueAssigneeMembership(
       db,
-      project.organization_id,
+      project.id,
       input.assigneeUserId,
     );
     const issueId = crypto.randomUUID();
@@ -312,7 +313,7 @@ export async function handleIssueCoreRoute(input: {
       await readIssueUpdateRequest(request);
     await requireIssueAssigneeMembership(
       db,
-      project.organization_id,
+      project.id,
       input.assigneeUserId,
     );
     const run = await updateIssueWithAttachments({

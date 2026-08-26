@@ -672,6 +672,22 @@ export async function updateOrganizationMemberRole(
   );
 }
 
+export async function updateOrganizationMemberProjects(
+  token: string,
+  organizationId: string,
+  userId: string,
+  projectIds: string[],
+) {
+  return request<{ members: OrganizationMember[] }>(
+    `/organizations/${organizationId}/members/${encodeURIComponent(userId)}/projects`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify({ projectIds }),
+    },
+  );
+}
+
 export async function removeOrganizationMember(
   token: string,
   organizationId: string,

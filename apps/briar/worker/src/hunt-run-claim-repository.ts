@@ -426,7 +426,15 @@ export async function findProjectIdByAgentTokenHash(
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
         and membership.user_id = token.issued_to_user_id
+       left join briar_project_members project_membership
+         on project_membership.project_id = project.id
+        and project_membership.organization_id = project.organization_id
+        and project_membership.user_id = membership.user_id
        where token.token_hash = ?
+         and (
+           membership.role in ('owner', 'admin')
+           or project_membership.user_id is not null
+         )
        union all
        select id as project_id
        from briar_projects
@@ -453,7 +461,15 @@ export async function issueProjectAgentToken(
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
         and membership.user_id = ?
-       where project.id = ?`,
+       left join briar_project_members project_membership
+         on project_membership.project_id = project.id
+        and project_membership.organization_id = project.organization_id
+        and project_membership.user_id = membership.user_id
+       where project.id = ?
+         and (
+           membership.role in ('owner', 'admin')
+           or project_membership.user_id is not null
+         )`,
     )
     .bind(
       agentTokenHash,

@@ -67,6 +67,11 @@ describe("project Agent routes", () => {
       now,
       now,
     ).run();
+    await db.prepare(
+      `insert into briar_project_members (
+         project_id, organization_id, user_id, created_at, updated_at
+       ) values (?, ?, ?, ?, ?)`,
+    ).bind(projectId, organizationId, memberId, now, now).run();
   }, 60_000);
 
   afterAll(async () => {
