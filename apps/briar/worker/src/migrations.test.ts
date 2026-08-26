@@ -1199,8 +1199,9 @@ describe("D1 migrations", () => {
       expect(await version()).toBe(6);
       await expect(db.prepare(
         `select organization_id, version
-         from briar_organization_inbox_realtime_outbox`,
-      ).first()).resolves.toEqual({
+         from briar_organization_inbox_realtime_outbox
+         where organization_id = ?`,
+      ).bind(organizationId).first()).resolves.toEqual({
         organization_id: organizationId,
         version: 6,
       });
@@ -4916,4 +4917,96 @@ describe("D1 migrations", () => {
       },
     );
   }, 30_000);
+
+  it("restores CVS organization Slack channels, users, messages, and reactions", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "cvs-slack-migration" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db, {
+        through: "0138_restore_cvs_slack_history.sql",
+      });
+
+      const org = await db
+        .prepare(`select id, name, handle from briar_organizations where handle = 'cvs'`)
+        .first<{ id: string; name: string; handle: string }>();
+      expect(org).toBeTruthy();
+      expect(org?.handle).toBe("cvs");
+
+      const channels = await db
+        .prepare(
+          `select slug, name, topic from briar_channels where organization_id = ? order by slug`,
+        )
+        .bind(org?.id)
+        .all<{ slug: string; name: string; topic: string | null }>();
+      expect(channels.results.length).toBe(9);
+      const slugs = channels.results.map((c) => c.slug);
+      expect(slugs).toEqual([
+        "all-cvs",
+        "bot-alert",
+        "cu-promotion",
+        "cvs-exp",
+        "general",
+        "new-channel",
+        "share",
+        "social",
+        "velen",
+      ]);
+
+      const msgCount = await db
+        .prepare(
+          `select count(*) as count from briar_channel_messages
+           where channel_id in (select id from briar_channels where organization_id = ?)`,
+        )
+        .bind(org?.id)
+        .first<number>("count");
+      expect(msgCount).toBe(4105);
+
+      const rootCount = await db
+        .prepare(
+          `select count(*) as count from briar_channel_messages
+           where channel_id in (select id from briar_channels where organization_id = ?)
+             and parent_message_id is null`,
+        )
+        .bind(org?.id)
+        .first<number>("count");
+      expect(rootCount).toBe(1331);
+
+      const replyCount = await db
+        .prepare(
+          `select count(*) as count from briar_channel_messages
+           where channel_id in (select id from briar_channels where organization_id = ?)
+             and parent_message_id is not null`,
+        )
+        .bind(org?.id)
+        .first<number>("count");
+      expect(replyCount).toBe(2774);
+
+      const reactionCount = await db
+        .prepare(
+          `select count(*) as count from briar_channel_message_reactions r
+           join briar_channel_messages m on m.id = r.message_id
+           where m.channel_id in (select id from briar_channels where organization_id = ?)`,
+        )
+        .bind(org?.id)
+        .first<number>("count");
+      expect(reactionCount).toBe(1439);
+
+      const users = await db
+        .prepare(
+          `select name, email from "user" where email in (
+            'sophia@wordbricks.ai', 'ian@wordbricks.ai', 'jay@wordbricks.ai',
+            'jayce@wordbricks.ai', 'velen@cvs.internal', 'googledrive@cvs.internal'
+          ) order by name`,
+        )
+        .all<{ name: string; email: string }>();
+      expect(users.results.length).toBe(6);
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
 });
+
