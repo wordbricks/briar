@@ -538,7 +538,7 @@ pub(super) fn inspect_repository_readiness_on(
     let remote = repository_healthy
         .then(|| repository_remote(runner, resolved_path))
         .flatten();
-    if remote.is_none() {
+    if requires_github && remote.is_none() {
         issues.push("origin 원격 저장소가 설정되지 않았습니다.".to_string());
     }
 
@@ -551,7 +551,7 @@ pub(super) fn inspect_repository_readiness_on(
     let remote_reachable = git
         .as_ref()
         .ok()
-        .filter(|_| repository_healthy && safe_remote)
+        .filter(|_| requires_github && repository_healthy && safe_remote)
         .and_then(|binary| {
             runner
                 .run(
@@ -570,7 +570,7 @@ pub(super) fn inspect_repository_readiness_on(
                 .ok()
         })
         .is_some_and(|output| output.success());
-    if remote.is_some() && !remote_reachable {
+    if requires_github && remote.is_some() && !remote_reachable {
         issues.push("origin에 인증된 상태로 접근할 수 없습니다.".to_string());
     }
 
@@ -580,7 +580,7 @@ pub(super) fn inspect_repository_readiness_on(
     let push_access = git
         .as_ref()
         .ok()
-        .filter(|_| repository_healthy && remote_reachable)
+        .filter(|_| requires_github && repository_healthy && remote_reachable)
         .and_then(|binary| {
             let sha = runner
                 .run(
@@ -611,7 +611,7 @@ pub(super) fn inspect_repository_readiness_on(
                 .ok()
         })
         .is_some_and(|output| output.success());
-    if remote_reachable && !push_access {
+    if requires_github && remote_reachable && !push_access {
         issues.push("origin에 브랜치를 push할 권한을 확인하지 못했습니다.".to_string());
     }
 

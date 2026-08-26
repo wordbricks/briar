@@ -284,6 +284,96 @@ fn recognizes_pr_workflows_and_github_remotes() {
     );
 }
 
+#[test]
+fn non_pr_workflows_skip_optional_remote_probes() {
+    struct RecordingRunner {
+        inner: host::LocalRunner,
+        commands: std::sync::Mutex<Vec<Vec<String>>>,
+    }
+
+    impl host::CommandRunner for RecordingRunner {
+        fn resolve_binary(&self, tool: &str) -> Result<String, String> {
+            host::CommandRunner::resolve_binary(&self.inner, tool)
+        }
+
+        fn run(&self, spec: &host::CommandSpec) -> Result<host::CommandOutput, String> {
+            self.commands
+                .lock()
+                .expect("commands")
+                .push(spec.args.clone());
+            if spec
+                .args
+                .iter()
+                .any(|argument| matches!(argument.as_str(), "ls-remote" | "push"))
+            {
+                return Ok(host::CommandOutput {
+                    status: Some(1),
+                    stdout: String::new(),
+                    stderr: "remote probe should not run".to_string(),
+                });
+            }
+            host::CommandRunner::run(&self.inner, spec)
+        }
+
+        fn spawn_piped(&self, spec: &host::CommandSpec) -> Result<std::process::Child, String> {
+            host::CommandRunner::spawn_piped(&self.inner, spec)
+        }
+
+        fn canonicalize(&self, path: &Path) -> Result<PathBuf, String> {
+            host::CommandRunner::canonicalize(&self.inner, path)
+        }
+    }
+
+    let Ok(git) = which::which("git") else {
+        return;
+    };
+    let repository = tempfile::tempdir().expect("temporary repository");
+    let initialized = std::process::Command::new(&git)
+        .args(["init", "--quiet"])
+        .current_dir(repository.path())
+        .status()
+        .expect("git init should start");
+    assert!(initialized.success());
+    let remote_added = std::process::Command::new(&git)
+        .args([
+            "remote",
+            "add",
+            "origin",
+            "ssh://example.invalid/repository.git",
+        ])
+        .current_dir(repository.path())
+        .status()
+        .expect("git remote should start");
+    assert!(remote_added.success());
+    let runner = RecordingRunner {
+        inner: host::LocalRunner::new(
+            std::env::var_os("PATH").unwrap_or_default(),
+            repository.path().to_path_buf(),
+        ),
+        commands: std::sync::Mutex::new(Vec::new()),
+    };
+
+    let readiness = inspect_repository_readiness_on(
+        &runner,
+        repository.path(),
+        &repository_workflow_bootstrap(),
+    );
+
+    assert!(!readiness.requires_github);
+    assert!(readiness.git_ready);
+    assert!(readiness.issues.is_empty(), "{:?}", readiness.issues);
+    assert!(runner
+        .commands
+        .lock()
+        .expect("commands")
+        .iter()
+        .all(|arguments| {
+            !arguments
+                .iter()
+                .any(|argument| matches!(argument.as_str(), "ls-remote" | "push"))
+        }));
+}
+
 #[cfg(unix)]
 #[test]
 fn runs_node_based_velen_from_a_gui_style_path() {
