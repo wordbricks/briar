@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { useAtomSet } from "@effect/atom-react";
 import {
   Activity,
   ArrowLeft,
@@ -33,6 +34,10 @@ import { HuntDashboard, RunPage } from "./components/HuntDashboard";
 import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
+import {
+  InboxDetailTargetBoundary,
+  InboxWithSelection,
+} from "./components/InboxSelectionBoundary";
 import { Channels } from "./components/Channels";
 import {
   CommandPalette,
@@ -128,6 +133,7 @@ import {
   isInboxRunDetailTarget,
   type InboxNotificationTarget,
 } from "./lib/inbox-notifications";
+import { inboxDetailTargetAtom } from "./lib/inbox-selection";
 import {
   clearFirstRunTutorialPending,
   hasPendingFirstRunTutorial,
@@ -1298,8 +1304,7 @@ export function App({
     useState<BriarLinkTarget | null>(null);
   const [pendingInboxNotificationTarget, setPendingInboxNotificationTarget] =
     useState<InboxNotificationTarget | null>(null);
-  const [inboxDetailTarget, setInboxDetailTarget] =
-    useState<InboxNotificationTarget | null>(null);
+  const setInboxDetailTarget = useAtomSet(inboxDetailTargetAtom);
   const handleInboxNotificationClick = useCallback(
     (target: InboxNotificationTarget) => {
       if (!projectWindowProjectId) setPendingInboxNotificationTarget(target);
@@ -1723,34 +1728,6 @@ export function App({
         (session) => session.id === requestedSessionId,
       ) ?? null
     : null;
-  const inboxDetailChannelId =
-    inboxDetailTarget?.kind === "channel"
-      ? inboxDetailTarget.targetId
-      : null;
-  const inboxDetailRun =
-    inboxDetailTarget && isInboxRunDetailTarget(inboxDetailTarget)
-      ? briar.dashboard?.runs.find(
-          (run) => run.id === inboxDetailTarget.targetId,
-        ) ?? null
-      : null;
-  const inboxDetailSession =
-    inboxDetailTarget?.kind === "session"
-      ? autoHunt.sessions.find(
-          (session) => session.id === inboxDetailTarget.targetId,
-        ) ?? null
-      : null;
-  const inboxDetailLabel =
-    inboxDetailRun?.title ??
-    (inboxDetailTarget
-      ? inbox.messages.find(
-          (message) => message.id === inboxDetailTarget.messageId,
-        )?.title ?? t("inbox.messages")
-      : t("inbox.messages"));
-  const isInboxDetailLoading = Boolean(
-    inboxDetailTarget &&
-      isInboxRunDetailTarget(inboxDetailTarget) &&
-      briar.dashboard?.project.id !== inboxDetailTarget.projectId,
-  );
   const [issueAgents, setIssueAgents] = useState<ProjectAgent[]>([]);
   const activeProjectAgents = useMemo(
     () => issueAgents.filter((agent) => agent.projectId === activeProject?.id),
@@ -3024,8 +3001,29 @@ export function App({
     />
   );
 
-  const inboxDetailContent = inboxDetailTarget ? (
-    inboxDetailRun ? (
+  const renderInboxDetailContent = (
+    inboxDetailTarget: InboxNotificationTarget,
+  ) => {
+    const inboxDetailChannelId =
+      inboxDetailTarget.kind === "channel"
+        ? inboxDetailTarget.targetId
+        : null;
+    const inboxDetailRun = isInboxRunDetailTarget(inboxDetailTarget)
+      ? briar.dashboard?.runs.find(
+          (run) => run.id === inboxDetailTarget.targetId,
+        ) ?? null
+      : null;
+    const inboxDetailSession = inboxDetailTarget.kind === "session"
+      ? autoHunt.sessions.find(
+          (session) => session.id === inboxDetailTarget.targetId,
+        ) ?? null
+      : null;
+    const isInboxDetailLoading = Boolean(
+      isInboxRunDetailTarget(inboxDetailTarget) &&
+        briar.dashboard?.project.id !== inboxDetailTarget.projectId,
+    );
+
+    return inboxDetailRun ? (
       <RunPage
         availableProviders={
           briar.dashboard?.organizationProviders?.length
@@ -3209,8 +3207,19 @@ export function App({
           {t("common.close")}
         </button>
       </div>
-    )
-  ) : null;
+    );
+  };
+
+  const inboxDetailLabel = (inboxDetailTarget: InboxNotificationTarget) =>
+    (isInboxRunDetailTarget(inboxDetailTarget)
+      ? briar.dashboard?.runs.find(
+          (run) => run.id === inboxDetailTarget.targetId,
+        )?.title
+      : null) ??
+    inbox.messages.find(
+      (message) => message.id === inboxDetailTarget.messageId,
+    )?.title ??
+    t("inbox.messages");
 
   let content: React.ReactNode;
 
@@ -3557,7 +3566,7 @@ export function App({
               } as CSSProperties
             }
           >
-            <Inbox
+            <InboxWithSelection
               isSidebarOpen={isSidebarOpen}
               messages={visibleInboxMessages}
               onMarkAllRead={
@@ -3592,7 +3601,6 @@ export function App({
                 setInboxDetailTarget(target);
               }}
               projects={activeOrganizationProjects}
-              selectedMessageId={inboxDetailTarget?.messageId ?? null}
               unreadCount={visibleInboxUnreadCount}
             />
             <div
@@ -3606,18 +3614,20 @@ export function App({
               tabIndex={0}
               {...inboxResizeProps}
             />
-            <InboxDetailPanel
-              label={
-                inboxDetailTarget ? inboxDetailLabel : t("inbox.messages")
-              }
-            >
-              {inboxDetailContent ?? (
-                <div className="inbox-detail-empty" role="status">
-                  <InboxIcon aria-hidden="true" size={56} strokeWidth={1.2} />
-                  <p>{t("inbox.noNotificationSelected")}</p>
-                </div>
+            <InboxDetailTargetBoundary>
+              {(target) => (
+                <InboxDetailPanel
+                  label={target ? inboxDetailLabel(target) : t("inbox.messages")}
+                >
+                  {target ? renderInboxDetailContent(target) : (
+                    <div className="inbox-detail-empty" role="status">
+                      <InboxIcon aria-hidden="true" size={56} strokeWidth={1.2} />
+                      <p>{t("inbox.noNotificationSelected")}</p>
+                    </div>
+                  )}
+                </InboxDetailPanel>
               )}
-            </InboxDetailPanel>
+            </InboxDetailTargetBoundary>
           </div>
         ) : activePage === "settings" &&
           settingsTarget.scope === "project" &&
