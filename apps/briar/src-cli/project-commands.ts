@@ -4,6 +4,7 @@ import {
   join,
   resolve,
 } from "node:path";
+import * as Schema from "effect/Schema";
 import { repositoryWorkflowPendingStageId } from "../src/lib/auto-hunt-contract";
 import {
   projectWorktreeRoot,
@@ -27,6 +28,93 @@ import {
   worktreesEnabled,
   currentProject,
 } from "./command-support";
+import { HttpRequestError } from "./execution-metrics-upload";
+
+const ProjectListResponse = Schema.Struct({
+  projects: Schema.Array(Schema.Struct({
+    id: Schema.String,
+    name: Schema.String,
+    organizationId: Schema.String,
+    organizationName: Schema.String,
+    role: Schema.Literals(["owner", "admin", "member"]),
+  })),
+}).annotate({
+  parseOptions: { onExcessProperty: "preserve" },
+});
+
+const decodeProjectListResponse = Schema.decodeUnknownSync(ProjectListResponse);
+
+export type ProjectListDependencies = {
+  loadAuthentication: () => Promise<{
+    apiUrl: string;
+    userToken?: string;
+  }>;
+  environmentToken: () => string | undefined;
+  fetchProjects: (apiUrl: string, userToken: string) => Promise<unknown>;
+  jsonOutput: () => boolean;
+  writeOutput: (output: string) => void;
+};
+
+const defaultProjectListDependencies: ProjectListDependencies = {
+  loadAuthentication: loadConfig,
+  environmentToken: () => process.env.BRIAR_USER_TOKEN,
+  fetchProjects: (apiUrl, userToken) =>
+    request<unknown>(apiUrl, "/projects", userToken),
+  jsonOutput: () => has("--json"),
+  writeOutput: console.log,
+};
+
+async function listProjectsCommand(
+  dependencies: Partial<ProjectListDependencies> = {},
+) {
+  const resolved = { ...defaultProjectListDependencies, ...dependencies };
+  const authentication = await resolved.loadAuthentication();
+  const userToken =
+    resolved.environmentToken()?.trim() || authentication.userToken?.trim();
+  if (!userToken) {
+    throw new Error(
+      "Briar에 로그인되어 있지 않습니다. `briar login`을 실행하세요.",
+    );
+  }
+
+  let response: unknown;
+  try {
+    response = await resolved.fetchProjects(authentication.apiUrl, userToken);
+  } catch (error) {
+    if (error instanceof HttpRequestError && error.status === 401) {
+      throw new Error(
+        "Briar 로그인이 만료되었거나 유효하지 않습니다. `briar login`을 다시 실행하세요.",
+      );
+    }
+    throw error;
+  }
+
+  const projects = decodeProjectListResponse(response).projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    organizationId: project.organizationId,
+    organizationName: project.organizationName,
+    role: project.role,
+  }));
+  if (resolved.jsonOutput()) {
+    resolved.writeOutput(JSON.stringify({ projects }, null, 2));
+    return;
+  }
+  if (projects.length === 0) {
+    resolved.writeOutput("접근 가능한 Briar 프로젝트가 없습니다.");
+    return;
+  }
+  resolved.writeOutput(
+    projects.map((project) =>
+      [
+        project.name,
+        `  Project ID: ${project.id}`,
+        `  Organization: ${project.organizationName} (${project.organizationId})`,
+        `  Role: ${project.role}`,
+      ].join("\n")
+    ).join("\n\n"),
+  );
+}
 
 async function createProject() {
   const config = await loadConfig();
@@ -311,6 +399,7 @@ async function showWorkflow() {
 }
 
 export {
+  listProjectsCommand,
   createProject,
   connectProject,
   velenExecutable,
