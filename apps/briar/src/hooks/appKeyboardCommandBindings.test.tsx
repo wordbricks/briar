@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { StrictMode, act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { keybindingsChangedEvent, saveKeybinding } from "../lib/keybindings";
@@ -60,21 +60,22 @@ function SettingsKeyboardHarness({
 }
 
 describe("AppKeyboardCommandProvider", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
+  let unmount: () => Promise<void>;
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     window.localStorage.clear();
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root, unmount } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
+    await cleanup();
     window.localStorage.clear();
-    container.remove();
   });
 
   it("updates live keybindings without replacing the app controller", async () => {
@@ -96,12 +97,11 @@ describe("AppKeyboardCommandProvider", () => {
       return <output>{state.mode}</output>;
     }
 
-    await act(async () =>
-      root.render(
-        <AppKeyboardCommandProvider>
-          <Harness />
-        </AppKeyboardCommandProvider>,
-      )
+    await renderReactTestRoot(
+      root,
+      <AppKeyboardCommandProvider>
+        <Harness />
+      </AppKeyboardCommandProvider>,
     );
     expect(dispatchKey({ code: "KeyK", key: "k", metaKey: true }))
       .toHaveProperty("defaultPrevented", true);
@@ -130,16 +130,15 @@ describe("AppKeyboardCommandProvider", () => {
     const addEventListener = vi.spyOn(window, "addEventListener");
     const removeEventListener = vi.spyOn(window, "removeEventListener");
 
-    await act(async () =>
-      root.render(
-        <StrictMode>
-          <AppKeyboardCommandProvider>
-            <div />
-          </AppKeyboardCommandProvider>
-        </StrictMode>,
-      )
+    await renderReactTestRoot(
+      root,
+      <StrictMode>
+        <AppKeyboardCommandProvider>
+          <div />
+        </AppKeyboardCommandProvider>
+      </StrictMode>,
     );
-    await act(async () => root.unmount());
+    await unmount();
 
     const subscriptionAdds = addEventListener.mock.calls.filter(
       ([eventName]) => eventName === keybindingsChangedEvent,
@@ -162,15 +161,14 @@ describe("AppKeyboardCommandProvider", () => {
       return null;
     }
 
-    await act(async () =>
-      root.render(
-        <AppKeyboardCommandProvider>
+    await renderReactTestRoot(
+      root,
+      <AppKeyboardCommandProvider>
+        <Probe />
+        <AppKeyboardCommandBoundary>
           <Probe />
-          <AppKeyboardCommandBoundary>
-            <Probe />
-          </AppKeyboardCommandBoundary>
-        </AppKeyboardCommandProvider>,
-      )
+        </AppKeyboardCommandBoundary>
+      </AppKeyboardCommandProvider>,
     );
 
     expect(controllers).toHaveLength(2);
@@ -179,12 +177,11 @@ describe("AppKeyboardCommandProvider", () => {
 
   it("closes settings with the first Escape, including from insert mode", async () => {
     const onClose = vi.fn();
-    await act(async () =>
-      root.render(
-        <AppKeyboardCommandProvider>
-          <SettingsKeyboardHarness onClose={onClose} />
-        </AppKeyboardCommandProvider>,
-      )
+    await renderReactTestRoot(
+      root,
+      <AppKeyboardCommandProvider>
+        <SettingsKeyboardHarness onClose={onClose} />
+      </AppKeyboardCommandProvider>,
     );
     const input = container.querySelector("input")!;
 
@@ -210,12 +207,11 @@ describe("AppKeyboardCommandProvider", () => {
 
   it("uses Escape to cancel a pending go sequence before closing settings", async () => {
     const onClose = vi.fn();
-    await act(async () =>
-      root.render(
-        <AppKeyboardCommandProvider>
-          <SettingsKeyboardHarness onClose={onClose} />
-        </AppKeyboardCommandProvider>,
-      )
+    await renderReactTestRoot(
+      root,
+      <AppKeyboardCommandProvider>
+        <SettingsKeyboardHarness onClose={onClose} />
+      </AppKeyboardCommandProvider>,
     );
     const button = container.querySelector("button")!;
 
@@ -246,12 +242,11 @@ describe("AppKeyboardCommandProvider", () => {
   });
 
   it("returns to normal mode when an editable settings control blurs", async () => {
-    await act(async () =>
-      root.render(
-        <AppKeyboardCommandProvider>
-          <SettingsKeyboardHarness onClose={() => undefined} />
-        </AppKeyboardCommandProvider>,
-      )
+    await renderReactTestRoot(
+      root,
+      <AppKeyboardCommandProvider>
+        <SettingsKeyboardHarness onClose={() => undefined} />
+      </AppKeyboardCommandProvider>,
     );
     const input = container.querySelector("input")!;
 

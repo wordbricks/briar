@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OrganizationCreate } from "./OrganizationCreate";
 
@@ -23,18 +23,17 @@ describe("OrganizationCreate", () => {
     vi.useFakeTimers();
     const onCheckHandle = vi.fn().mockResolvedValue(true);
     const onCreate = vi.fn().mockResolvedValue(undefined);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <OrganizationCreate
-          onBack={() => undefined}
-          onCheckHandle={onCheckHandle}
-          onCreate={onCreate}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <OrganizationCreate
+        onBack={() => undefined}
+        onCheckHandle={onCheckHandle}
+        onCreate={onCreate}
+      />,
+    );
 
     const surface = container.querySelector(".organization-create");
     expect(surface?.hasAttribute("data-tauri-drag-region")).toBe(true);
@@ -62,26 +61,24 @@ describe("OrganizationCreate", () => {
       handle: "my-organization-2026",
     });
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("shows a warning and blocks submission when the handle is taken", async () => {
     vi.useFakeTimers();
     const onCheckHandle = vi.fn().mockResolvedValue(false);
     const onCreate = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <OrganizationCreate
-          onBack={() => undefined}
-          onCheckHandle={onCheckHandle}
-          onCreate={onCreate}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <OrganizationCreate
+        onBack={() => undefined}
+        onCheckHandle={onCheckHandle}
+        onCreate={onCreate}
+      />,
+    );
 
     const name = container.querySelector<HTMLInputElement>(
       'input[autocomplete="organization"]',
@@ -101,7 +98,6 @@ describe("OrganizationCreate", () => {
     ).toBe(true);
     expect(onCreate).not.toHaveBeenCalled();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });

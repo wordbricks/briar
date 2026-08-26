@@ -2,7 +2,7 @@
 
 import { RegistryProvider, useAtomSet } from "@effect/atom-react";
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it } from "vitest";
 
 import { inboxDetailTargetAtom } from "../lib/inbox-selection";
@@ -10,9 +10,9 @@ import { InboxDetailTargetBoundary } from "./InboxSelectionBoundary";
 
 describe("InboxSelectionBoundary", () => {
   it("updates detail subscribers without rerendering the app shell", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     let shellRenderCount = 0;
     let detailRenderCount = 0;
 
@@ -49,13 +49,12 @@ describe("InboxSelectionBoundary", () => {
       );
     }
 
-    await act(async () => {
-      root.render(
-        <RegistryProvider>
-          <AppShell />
-        </RegistryProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <RegistryProvider>
+        <AppShell />
+      </RegistryProvider>,
+    );
     expect(shellRenderCount).toBe(1);
     expect(detailRenderCount).toBe(1);
 
@@ -65,7 +64,6 @@ describe("InboxSelectionBoundary", () => {
     expect(shellRenderCount).toBe(1);
     expect(detailRenderCount).toBe(2);
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });

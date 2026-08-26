@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import type { Root } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
@@ -34,14 +35,17 @@ const stages = [
 ];
 
 describe("ProjectMergeQueueSettings", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
+  let root: Root;
   let api: ProjectMergeQueueSettingsApi;
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     localStorage.setItem("briar.locale.v1", "ko");
-    container = document.createElement("div");
-    document.body.append(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
     api = {
       load: vi.fn(async () => ({ profile })),
       loadStatus: vi.fn(async () => ({
@@ -83,29 +87,27 @@ describe("ProjectMergeQueueSettings", () => {
     };
   });
 
-  afterEach(() => {
-    container.remove();
+  afterEach(async () => {
+    await cleanup();
     localStorage.removeItem("briar.locale.v1");
     vi.clearAllMocks();
   });
 
   it("loads a profile and saves enabled plus the selected workflow stage", async () => {
     const onProfileChange = vi.fn();
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ProjectMergeQueueSettings
-            api={api}
-            githubRepositoryConnected
-            onProfileChange={onProfileChange}
-            project={project}
-            stages={stages}
-            token="session-token"
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ProjectMergeQueueSettings
+          api={api}
+          githubRepositoryConnected
+          onProfileChange={onProfileChange}
+          project={project}
+          stages={stages}
+          token="session-token"
+        />
+      </I18nProvider>,
+    );
 
     expect(api.load).toHaveBeenCalledWith(
       "session-token",
@@ -158,6 +160,5 @@ describe("ProjectMergeQueueSettings", () => {
     await act(async () => refresh.click());
     expect(api.loadStatus).toHaveBeenCalledTimes(2);
 
-    await act(async () => root.unmount());
   });
 });

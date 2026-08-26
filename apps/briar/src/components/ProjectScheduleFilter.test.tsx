@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot } from "../test/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import { demoDashboard } from "../lib/demo-data";
@@ -177,9 +177,9 @@ describe("ProjectSchedule agent filter", () => {
         ),
       ],
     });
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
 
     await act(async () => {
       root.render(
@@ -234,8 +234,7 @@ describe("ProjectSchedule agent filter", () => {
     expect(container.textContent).toContain("No scheduled work for Agent C.");
     expect(container.textContent).toContain("0m");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("filters saved schedules by their assigned agent id", async () => {
@@ -272,9 +271,9 @@ describe("ProjectSchedule agent filter", () => {
       },
     ];
     stubScheduleApi({ agents: [agentA, agentB], schedules });
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
 
     await act(async () => {
       root.render(
@@ -311,8 +310,7 @@ describe("ProjectSchedule agent filter", () => {
     expect(container.textContent).toContain("Agent A audit");
     expect(container.textContent).not.toContain("Agent B report");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("opens run details, edits the schedule, and deletes it from the context menu", async () => {
@@ -361,9 +359,9 @@ describe("ProjectSchedule agent filter", () => {
       },
     );
     vi.stubGlobal("fetch", fetchMock);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
 
     await act(async () => {
       root.render(
@@ -451,7 +449,6 @@ describe("ProjectSchedule agent filter", () => {
       expect.objectContaining({ method: "DELETE" }),
     );
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });

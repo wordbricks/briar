@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot, type ReactTestRoot } from "../test/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   ProjectAgentSkillsEditor,
@@ -18,16 +18,12 @@ beforeAll(() => {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
 
-const mounted: Array<{
-  container: HTMLDivElement;
-  root: ReturnType<typeof createRoot>;
-}> = [];
+const mounted: Array<Pick<ReactTestRoot, "cleanup">> = [];
 
 afterEach(async () => {
   while (mounted.length > 0) {
     const item = mounted.pop()!;
-    await act(async () => item.root.unmount());
-    item.container.remove();
+    await item.cleanup();
   }
 });
 
@@ -65,35 +61,34 @@ describe("ProjectAgentSkillsEditor", () => {
 
 
   it("allows the final Skill to be deleted", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    mounted.push({ container, root });
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    mounted.push({ cleanup });
     const onChange = vi.fn();
 
-    await act(async () => {
-      root.render(
-        <ProjectAgentSkillsEditor
-          defaultEffort={null}
-          defaultModel={null}
-          defaultProvider="codex"
-          onChange={onChange}
-          skills={[
-            {
-              id: "skill-1",
-              name: "임시 스킬",
-              description: "삭제 동작을 검증할 때 사용합니다.",
-              body: "삭제할 수 있습니다.",
-              provider: "codex",
-              model: null,
-              effort: null,
-              kind: "custom",
-              position: 0,
-            },
-          ]}
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <ProjectAgentSkillsEditor
+        defaultEffort={null}
+        defaultModel={null}
+        defaultProvider="codex"
+        onChange={onChange}
+        skills={[
+          {
+            id: "skill-1",
+            name: "임시 스킬",
+            description: "삭제 동작을 검증할 때 사용합니다.",
+            body: "삭제할 수 있습니다.",
+            provider: "codex",
+            model: null,
+            effort: null,
+            kind: "custom",
+            position: 0,
+          },
+        ]}
+      />,
+    );
 
     const deleteButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="임시 스킬 스킬 삭제"]',
@@ -121,22 +116,21 @@ describe("ProjectAgentSkillsEditor", () => {
       { ...skills[0]!, id: "skill-6", name: "Skill 6", position: 5 },
     ])).toBe(false);
 
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    mounted.push({ container, root });
-
-    await act(async () => {
-      root.render(
-        <ProjectAgentSkillsEditor
-          defaultEffort={null}
-          defaultModel={null}
-          defaultProvider="codex"
-          onChange={vi.fn()}
-          skills={skills}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    mounted.push({ cleanup });
+
+    await renderReactTestRoot(
+      root,
+      <ProjectAgentSkillsEditor
+        defaultEffort={null}
+        defaultModel={null}
+        defaultProvider="codex"
+        onChange={vi.fn()}
+        skills={skills}
+      />,
+    );
 
     const addButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("스킬 추가"),

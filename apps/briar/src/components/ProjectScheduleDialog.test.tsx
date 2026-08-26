@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot, type ReactTestRoot } from "../test/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import type { ProjectAgent } from "../types";
@@ -24,10 +24,7 @@ const agent: ProjectAgent = {
   updatedAt: "2026-07-27T00:00:00.000Z",
 };
 
-const mounted: Array<{
-  container: HTMLDivElement;
-  root: ReturnType<typeof createRoot>;
-}> = [];
+const mounted: Array<Pick<ReactTestRoot, "cleanup">> = [];
 
 beforeAll(() => {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -36,17 +33,16 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 afterEach(async () => {
   while (mounted.length > 0) {
     const item = mounted.pop()!;
-    await act(async () => item.root.unmount());
-    item.container.remove();
+    await item.cleanup();
   }
 });
 
 async function mount(node: React.ReactNode) {
-  const container = document.createElement("div");
-  document.body.append(container);
-  const root = createRoot(container);
-  mounted.push({ container, root });
-  await act(async () => root.render(node));
+  const { cleanup, container, root } = createReactTestRoot({
+    attachToDocument: true,
+  });
+  mounted.push({ cleanup });
+  await renderReactTestRoot(root, node);
   return container;
 }
 

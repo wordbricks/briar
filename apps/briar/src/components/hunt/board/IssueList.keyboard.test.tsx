@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act, type ComponentProps } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppKeyboardCommandProvider } from "@/hooks/appKeyboardCommands";
@@ -25,33 +25,34 @@ const baseProps = {
 } satisfies Omit<ComponentProps<typeof IssueList>, "onOpen" | "runs">;
 
 describe("IssueList keyboard navigation", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
   let onOpen: ReturnType<typeof vi.fn<(runId: string) => void>>;
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     window.localStorage.clear();
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
     onOpen = vi.fn();
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     window.localStorage.clear();
     vi.restoreAllMocks();
   });
 
   async function renderList(runs: readonly HuntRun[]) {
-    await act(async () => {
-      root.render(<AppKeyboardCommandProvider>
+    await renderReactTestRoot(
+      root,
+      <AppKeyboardCommandProvider>
         <button data-testid="outside" type="button">Outside</button>
         <IssueList {...baseProps} onOpen={onOpen} runs={[...runs]} />
-      </AppKeyboardCommandProvider>);
-    });
+      </AppKeyboardCommandProvider>,
+    );
   }
 
   function row(runId: string): HTMLDivElement {

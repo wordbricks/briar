@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import type { AgentUsageSnapshot } from "../lib/agent-usage";
@@ -113,9 +113,9 @@ const snapshot: AgentUsageSnapshot = {
 describe("AgentUsageStatusBar", () => {
   it("shows compact provider usage and opens the detailed roster", async () => {
     localStorage.setItem("briar.locale.v1", "en");
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const loadUsage = vi.fn().mockResolvedValue(snapshot);
     const onManageAccounts = vi.fn();
     const onOpenUsageDetails = vi.fn();
@@ -168,8 +168,7 @@ describe("AgentUsageStatusBar", () => {
     expect(onManageAccounts).toHaveBeenCalledOnce();
     expect(container.querySelector('[role="dialog"]')).toBeNull();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     localStorage.removeItem("briar.locale.v1");
     localStorage.removeItem("briar.agent-usage.history.v1");
   });

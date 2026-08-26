@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import {
@@ -28,20 +28,20 @@ const sections: KeyboardShortcutHelpSection[] = [
 ];
 
 describe("KeyboardShortcutsDialog", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     window.localStorage.setItem("briar.locale.v1", "en");
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     vi.restoreAllMocks();
   });
 
@@ -84,17 +84,16 @@ describe("KeyboardShortcutsDialog", () => {
   });
 
   it("shows an empty result state", async () => {
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <KeyboardShortcutsDialog
-            onOpenChange={vi.fn()}
-            open
-            sections={sections}
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <KeyboardShortcutsDialog
+          onOpenChange={vi.fn()}
+          open
+          sections={sections}
+        />
+      </I18nProvider>,
+    );
     const input = document.querySelector<HTMLInputElement>(
       '[aria-label="Search shortcuts"]',
     );

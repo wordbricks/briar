@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
@@ -146,26 +146,46 @@ describe("RunResults", () => {
       canonical: true
     }];
     const onLoadRunEvidence = vi.fn(async () => evidence);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={onLoadRunEvidence} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-        throw new Error("not implemented in this test");
-      }} run={{
-        ...demoDashboard.runs[0],
-        workflow: {
-          ...demoDashboard.runs[0].workflow,
-          stages: demoDashboard.runs[0].workflow.stages.map(stage => stage.id === "analyzing" ? {
-            ...stage,
-            evidence: ["repository_findings"]
-          } : stage.id === "local_qa" ? {
-            ...stage,
-            evidence: ["local_ci_result"]
-          } : stage)
-        }
-      }} />);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={onLoadRunEvidence}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={{
+          ...demoDashboard.runs[0],
+          workflow: {
+            ...demoDashboard.runs[0].workflow,
+            stages: demoDashboard.runs[0].workflow.stages.map(stage =>
+              stage.id === "analyzing"
+                ? {
+                  ...stage,
+                  evidence: ["repository_findings"],
+                }
+                : stage.id === "local_qa"
+                ? {
+                  ...stage,
+                  evidence: ["local_ci_result"],
+                }
+                : stage
+            ),
+          },
+        }}
+      />,
+    );
     const evidenceTab = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(button => button.textContent?.includes("증빙"));
     await act(async () => evidenceTab?.click());
     expect(onLoadRunEvidence).toHaveBeenCalledOnce();
@@ -174,8 +194,7 @@ describe("RunResults", () => {
     expect(container.querySelector(".run-evidence-command code")?.textContent).toContain("HuntDashboard.test.tsx");
     expect(container.querySelector(".run-evidence-panel")?.textContent).toContain("local_ci_result");
     expect(container.querySelector(".run-evidence-panel")?.textContent).toContain("기록 안 됨");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("shows authenticated result screenshots in the result and evidence tabs", async () => {
     const observedAt = "2026-07-28T04:30:00.000Z";
@@ -263,18 +282,33 @@ describe("RunResults", () => {
       configurable: true,
       value: vi.fn()
     });
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => evidence} onLoadRunEvidenceImage={onLoadImage} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-        throw new Error("not implemented in this test");
-      }} run={{
-        ...demoDashboard.runs[0],
-        status: "completed",
-        resultSummary: "완료된 결과를 확인했습니다."
-      }} />);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => evidence}
+        onLoadRunEvidenceImage={onLoadImage}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={{
+          ...demoDashboard.runs[0],
+          status: "completed",
+          resultSummary: "완료된 결과를 확인했습니다.",
+        }}
+      />,
+    );
     expect(onLoadImage).toHaveBeenCalledTimes(1);
     expect(onLoadImage).toHaveBeenCalledWith(image);
     expect(onLoadImage).not.toHaveBeenCalledWith(staleImage);
@@ -303,8 +337,7 @@ describe("RunResults", () => {
     expect(onLoadImage).toHaveBeenCalledWith(failedImage);
     expect(container.querySelector(".run-evidence-image img")?.getAttribute("src")).toBe("blob:result-screenshot");
     expect(container.querySelector(".run-evidence-images")?.textContent).toContain("결과 화면");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("reloads result screenshots when the open issue changes", async () => {
     const observedAt = "2026-07-28T04:30:00.000Z";
@@ -359,25 +392,24 @@ describe("RunResults", () => {
       configurable: true,
       value: vi.fn()
     });
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const renderPage = (run: HuntRun) => <RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => {
       evidenceLoads.push(run.id);
       return evidenceFor(run);
     }} onLoadRunEvidenceImage={onLoadImage} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
       throw new Error("not implemented in this test");
     }} run={run} />;
-    await act(async () => root.render(renderPage(firstRun)));
+    await renderReactTestRoot(root, renderPage(firstRun));
     expect(container.querySelector(".run-result-screenshots .run-evidence-image img")?.getAttribute("src")).toBe("blob:first-result-screenshot");
-    await act(async () => root.render(renderPage(secondRun)));
+    await renderReactTestRoot(root, renderPage(secondRun));
     expect(evidenceLoads).toEqual([firstRun.id, secondRun.id]);
     expect(container.textContent).not.toContain(`${firstRun.id}.png`);
     expect(container.textContent).toContain(`${secondRun.id}.png`);
     expect(container.querySelector(".run-result-screenshots .run-evidence-image img")?.getAttribute("src")).toBe("blob:second-result-screenshot");
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:first-result-screenshot");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("prioritizes verified deployment evidence for completed-issue manual QA", async () => {
     const completedRun: HuntRun = {
@@ -415,9 +447,9 @@ describe("RunResults", () => {
       canonical: true,
       ...overrides
     });
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     await act(async () => {
       root.render(<TooltipProvider>
           <RunPage error={null} isRecovering={false} isSidebarOpen onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => [evidence({}), evidence({
@@ -465,8 +497,7 @@ describe("RunResults", () => {
     expect(guide?.innerHTML).not.toContain("stale.example.com");
     expect(guide?.innerHTML).not.toContain("pending.example.com");
     expect(guide?.innerHTML).not.toContain("javascript:");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("shows result reviewers in the result and properties panels and records the current member", async () => {
     const onCompleteResultReview = vi.fn(async () => undefined);
@@ -482,14 +513,32 @@ describe("RunResults", () => {
         completedAt: "2026-08-02T01:00:00.000Z"
       }]
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<TooltipProvider>
-        <RunPage currentUserId="reviewer-2" error={null} isRecovering={false} isSidebarOpen onBack={() => undefined} onCancel={async () => undefined} onCompleteResultReview={onCompleteResultReview} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-        throw new Error("not implemented in this test");
-      }} run={completedRun} />
-      </TooltipProvider>));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <TooltipProvider>
+        <RunPage
+          currentUserId="reviewer-2"
+          error={null}
+          isRecovering={false}
+          isSidebarOpen
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onCompleteResultReview={onCompleteResultReview}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={completedRun}
+        />
+      </TooltipProvider>,
+    );
     expect(container.querySelector(".run-result-review")?.textContent).toContain("@minji");
     expect(container.querySelector(".completed-issue-card-heading .status-pill.reviewed")).not.toBeNull();
     expect(container.querySelector(".completed-issue-card-heading .status-pill-review-icon")).not.toBeNull();
@@ -502,7 +551,6 @@ describe("RunResults", () => {
     const reviewProperty = container.querySelector(".run-result-review-property");
     expect(reviewProperty?.getAttribute("aria-label")).toContain("@minji");
     expect(reviewProperty?.querySelector("img")?.getAttribute("src")).toBe("https://example.com/minji.png");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });

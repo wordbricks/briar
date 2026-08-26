@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 import { CompanionHeader } from "./CompanionHeader";
 
@@ -44,13 +44,13 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 describe("CompanionHeader", () => {
   it("opens account actions without logging out and switches organizations", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const onLogout = vi.fn();
     const onOrganizationChange = vi.fn();
     const onSettings = vi.fn();
 
-    await act(async () => root.render(
+    await renderReactTestRoot(
+      root,
       <CompanionHeader
         activeOrganizationId="organization-1"
         activeProjectId="project-1"
@@ -64,7 +64,7 @@ describe("CompanionHeader", () => {
         projects={projects}
         user={user}
       />,
-    ));
+    );
 
     const accountButton = container.querySelector<HTMLButtonElement>(
       ".companion-account-button",
@@ -97,15 +97,15 @@ describe("CompanionHeader", () => {
 
     expect(onSettings).toHaveBeenCalledOnce();
     expect(onLogout).not.toHaveBeenCalled();
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("places the mobile inbox read action in the header", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const onMarkAllRead = vi.fn();
 
-    await act(async () => root.render(
+    await renderReactTestRoot(
+      root,
       <CompanionHeader
         activeOrganizationId="organization-1"
         activeProjectId="project-1"
@@ -121,7 +121,7 @@ describe("CompanionHeader", () => {
         projects={projects}
         user={user}
       />,
-    ));
+    );
 
     const markAllRead = container.querySelector<HTMLButtonElement>(
       'button[aria-label="모두 읽음"]',
@@ -129,6 +129,6 @@ describe("CompanionHeader", () => {
     await act(async () => markAllRead?.click());
 
     expect(onMarkAllRead).toHaveBeenCalledOnce();
-    await act(async () => root.unmount());
+    await cleanup();
   });
 });

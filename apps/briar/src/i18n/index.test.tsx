@@ -1,7 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { I18nProvider, localeTags, useI18n, type Locale } from ".";
 import type { MessageKey } from "./messages";
@@ -17,30 +16,29 @@ function CurrentLocale() {
 }
 
 describe("i18n", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
 
   beforeEach(() => {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     localStorage.setItem("briar.locale.v1", "ko");
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     localStorage.removeItem("briar.locale.v1");
   });
 
   it("returns the key instead of throwing for a missing translation", async () => {
-    await act(async () =>
-      root.render(
-        <I18nProvider>
-          <MissingTranslation />
-        </I18nProvider>,
-      ),
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <MissingTranslation />
+      </I18nProvider>,
     );
 
     expect(container.textContent).toBe("stage.merged");
@@ -51,12 +49,11 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     async (locale: Locale) => {
       localStorage.setItem("briar.locale.v1", locale);
 
-      await act(async () =>
-        root.render(
-          <I18nProvider>
-            <CurrentLocale />
-          </I18nProvider>,
-        ),
+      await renderReactTestRoot(
+        root,
+        <I18nProvider>
+          <CurrentLocale />
+        </I18nProvider>,
       );
 
       const current = container.querySelector("[data-locale]");

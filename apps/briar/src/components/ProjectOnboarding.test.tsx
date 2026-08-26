@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
@@ -27,49 +27,47 @@ describe("ProjectOnboarding", () => {
         provider: "codex" as const,
       })
       .mockImplementationOnce(() => pendingPreflight.promise);
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
 
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ProjectOnboarding
-            connection={null}
-            error={null}
-            loading={false}
-            onAnalyzeRequirements={async () => ({
-              requirements: [],
-              workflow: repositoryWorkflowBootstrap,
-            })}
-            onCancel={onCancel}
-            onCloneRepository={async () => ({
-              repositoryName: "briar",
-              repositoryPath: "/repo",
-            })}
-            onConnect={async () => ({
-              repositoryPath: "/repo",
-              workflow: repositoryWorkflowBootstrap,
-            })}
-            onCreate={onCreate}
-            onFinish={() => undefined}
-            onInspectLovableRepository={async () => ({
-              compatible: false,
-              issues: [],
-              packageManager: null,
-              scripts: [],
-              stack: null,
-            })}
-            onPreflight={onPreflight}
-            onRepositoryInspect={async () => ({
-              ...demoRepositoryReadiness,
-              repositoryPath: "/repo",
-            })}
-            onRepositorySelect={async () => "/repo"}
-            onReviseWorkflow={async () => repositoryWorkflowBootstrap}
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ProjectOnboarding
+          connection={null}
+          error={null}
+          loading={false}
+          onAnalyzeRequirements={async () => ({
+            requirements: [],
+            workflow: repositoryWorkflowBootstrap,
+          })}
+          onCancel={onCancel}
+          onCloneRepository={async () => ({
+            repositoryName: "briar",
+            repositoryPath: "/repo",
+          })}
+          onConnect={async () => ({
+            repositoryPath: "/repo",
+            workflow: repositoryWorkflowBootstrap,
+          })}
+          onCreate={onCreate}
+          onFinish={() => undefined}
+          onInspectLovableRepository={async () => ({
+            compatible: false,
+            issues: [],
+            packageManager: null,
+            scripts: [],
+            stack: null,
+          })}
+          onPreflight={onPreflight}
+          onRepositoryInspect={async () => ({
+            ...demoRepositoryReadiness,
+            repositoryPath: "/repo",
+          })}
+          onRepositorySelect={async () => "/repo"}
+          onReviseWorkflow={async () => repositoryWorkflowBootstrap}
+        />
+      </I18nProvider>,
+    );
 
     await act(async () => {
       container
@@ -106,6 +104,6 @@ describe("ProjectOnboarding", () => {
     expect(onCancel).toHaveBeenCalledOnce();
     expect(onCreate).not.toHaveBeenCalled();
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 });

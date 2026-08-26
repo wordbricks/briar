@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { StrictMode, act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import {
   afterEach,
   beforeEach,
@@ -120,21 +120,22 @@ function Harness({
 }
 
 describe("createKeyboardCommandBindings", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
+  let unmount: () => Promise<void>;
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root, unmount } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
+    await cleanup();
     setRecordingKeybinding(null);
     setRemoteDesktopKeyboardCapture(false);
-    container.remove();
     vi.useRealTimers();
   });
 
@@ -142,12 +143,11 @@ describe("createKeyboardCommandBindings", () => {
     props: HarnessProps = {},
     catalog: KeyboardCommandCatalog<CommandId> = initialCatalog,
   ) {
-    await act(async () =>
-      root.render(
-        <KeyboardCommandProvider catalog={catalog}>
-          <Harness {...props} />
-        </KeyboardCommandProvider>,
-      )
+    await renderReactTestRoot(
+      root,
+      <KeyboardCommandProvider catalog={catalog}>
+        <Harness {...props} />
+      </KeyboardCommandProvider>,
     );
   }
 
@@ -323,32 +323,30 @@ describe("createKeyboardCommandBindings", () => {
   it("keeps one live scope with latest callbacks through StrictMode replay and cleanup", async () => {
     const first = vi.fn();
     const latest = vi.fn();
-    await act(async () =>
-      root.render(
-        <StrictMode>
-          <KeyboardCommandProvider catalog={initialCatalog}>
-            <Harness onCapture={first} />
-          </KeyboardCommandProvider>
-        </StrictMode>,
-      )
+    await renderReactTestRoot(
+      root,
+      <StrictMode>
+        <KeyboardCommandProvider catalog={initialCatalog}>
+          <Harness onCapture={first} />
+        </KeyboardCommandProvider>
+      </StrictMode>,
     );
     dispatchKey(target(), { code: "KeyX" });
     expect(first).toHaveBeenCalledOnce();
 
-    await act(async () =>
-      root.render(
-        <StrictMode>
-          <KeyboardCommandProvider catalog={initialCatalog}>
-            <Harness onCapture={latest} />
-          </KeyboardCommandProvider>
-        </StrictMode>,
-      )
+    await renderReactTestRoot(
+      root,
+      <StrictMode>
+        <KeyboardCommandProvider catalog={initialCatalog}>
+          <Harness onCapture={latest} />
+        </KeyboardCommandProvider>
+      </StrictMode>,
     );
     dispatchKey(target(), { code: "KeyX" });
     expect(first).toHaveBeenCalledOnce();
     expect(latest).toHaveBeenCalledOnce();
 
-    await act(async () => root.unmount());
+    await unmount();
     const afterUnmount = dispatchKey(document.body, { code: "KeyX" });
     expect(latest).toHaveBeenCalledOnce();
     expect(afterUnmount.defaultPrevented).toBe(false);

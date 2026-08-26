@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
-import { act, type ComponentProps } from "react";
-import { createRoot } from "react-dom/client";
+import type { ComponentProps } from "react";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
@@ -13,8 +13,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 describe("AppSettings source control", () => {
   it("distinguishes remote state from a local workflow where GitHub is optional", async () => {
     localStorage.setItem("briar.locale.v1", "ko");
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const props = {
       connectionState: "connected",
       error: null,
@@ -29,13 +28,12 @@ describe("AppSettings source control", () => {
       requiresLocalReadiness: false,
     } satisfies ComponentProps<typeof AppSettings>;
 
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <AppSettings {...props} />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <AppSettings {...props} />
+      </I18nProvider>,
+    );
 
     expect(container.textContent).toContain(
       "데스크톱 앱에서 연결 상태를 확인할 수 있습니다.",
@@ -46,26 +44,25 @@ describe("AppSettings source control", () => {
       container.querySelector('[aria-label="소스 제어 상태 새로고침"]'),
     ).toBeNull();
 
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <AppSettings
-            {...props}
-            readiness={{
-              ...demoRepositoryReadiness,
-              ghAuthenticated: false,
-              ghInstalled: false,
-              ghVersion: null,
-              githubRepository: null,
-              githubWriteAccess: false,
-              prReady: false,
-              requiresGithub: false,
-            }}
-            requiresLocalReadiness
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <AppSettings
+          {...props}
+          readiness={{
+            ...demoRepositoryReadiness,
+            ghAuthenticated: false,
+            ghInstalled: false,
+            ghVersion: null,
+            githubRepository: null,
+            githubWriteAccess: false,
+            prReady: false,
+            requiresGithub: false,
+          }}
+          requiresLocalReadiness
+        />
+      </I18nProvider>,
+    );
 
     expect(
       container.querySelector('[aria-label="Git enabled"]'),
@@ -84,6 +81,6 @@ describe("AppSettings source control", () => {
       container.querySelector('[aria-label="소스 제어 상태 새로고침"]'),
     ).not.toBeNull();
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 });

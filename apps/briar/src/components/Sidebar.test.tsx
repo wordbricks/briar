@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
@@ -81,36 +81,35 @@ describe("Sidebar", () => {
   it("shows channels as an accordion and creates one from its context menu", async () => {
     const onChannelOpen = vi.fn();
     const onChannelCreate = vi.fn().mockResolvedValue(undefined);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activeChannelId="channel-1"
-          activePage="channels"
-          channels={[
-            {
-              id: "channel-1",
-              organizationId: "organization-1",
-              slug: "general",
-              name: "General",
-              topic: null,
-              visibility: "public",
-              defaultProjectId: null,
-              archivedAt: null,
-              memberCount: 1,
-              agentCount: 0,
-              createdAt: "2026-08-01T00:00:00Z",
-              updatedAt: "2026-08-01T00:00:00Z",
-            },
-          ]}
-          onChannelCreate={onChannelCreate}
-          onChannelOpen={onChannelOpen}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activeChannelId="channel-1"
+        activePage="channels"
+        channels={[
+          {
+            id: "channel-1",
+            organizationId: "organization-1",
+            slug: "general",
+            name: "General",
+            topic: null,
+            visibility: "public",
+            defaultProjectId: null,
+            archivedAt: null,
+            memberCount: 1,
+            agentCount: 0,
+            createdAt: "2026-08-01T00:00:00Z",
+            updatedAt: "2026-08-01T00:00:00Z",
+          },
+        ]}
+        onChannelCreate={onChannelCreate}
+        onChannelOpen={onChannelOpen}
+      />,
+    );
 
     const toggle = container.querySelector<HTMLButtonElement>(
       ".sidebar-channels-toggle",
@@ -187,34 +186,32 @@ describe("Sidebar", () => {
     });
 
     expect(onChannelCreate).toHaveBeenCalledWith("제품 피드백", "private");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("shows channel actions and confirms deletion for an authorized creator", async () => {
     const onChannelDelete = vi.fn().mockResolvedValue(undefined);
     const onChannelSettings = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activeChannelId="channel-1"
-          activePage="channels"
-          channels={[
-            {
-              ...sidebarChannel("channel-1", "General", null),
-              createdByUserId: "user-1",
-            },
-          ]}
-          onChannelDelete={onChannelDelete}
-          onChannelOpen={() => undefined}
-          onChannelSettings={onChannelSettings}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activeChannelId="channel-1"
+        activePage="channels"
+        channels={[
+          {
+            ...sidebarChannel("channel-1", "General", null),
+            createdByUserId: "user-1",
+          },
+        ]}
+        onChannelDelete={onChannelDelete}
+        onChannelOpen={() => undefined}
+        onChannelSettings={onChannelSettings}
+      />,
+    );
 
     const channelButton = container.querySelector<HTMLButtonElement>(
       "#sidebar-channel-list button",
@@ -269,26 +266,24 @@ describe("Sidebar", () => {
     await act(async () => confirmButton?.click());
     expect(onChannelDelete).toHaveBeenCalledWith("channel-1");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("opens project channel creation from the project Channels context menu", async () => {
     const onChannelCreate = vi.fn().mockResolvedValue(undefined);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activePage="channels"
-          channels={[sidebarChannel("channel-project", "Briar dev", "project-1")]}
-          onChannelCreate={onChannelCreate}
-          onChannelOpen={() => undefined}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activePage="channels"
+        channels={[sidebarChannel("channel-project", "Briar dev", "project-1")]}
+        onChannelCreate={onChannelCreate}
+        onChannelOpen={() => undefined}
+      />,
+    );
 
     const projectToggle = container.querySelector<HTMLButtonElement>(
       '[aria-label="Briar 채널 접기"]',
@@ -340,41 +335,39 @@ describe("Sidebar", () => {
       "project-1",
     );
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("nests project-linked channels under that project and keeps unlinked ones at the top", async () => {
     const onChannelOpen = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activeChannelId="channel-project"
-          activePage="channels"
-          channels={[
-            sidebarChannel("channel-common", "General", null),
-            sidebarChannel("channel-project", "Briar dev", "project-1"),
-            sidebarChannel("channel-other", "Console chat", "project-2"),
-          ]}
-          onChannelOpen={onChannelOpen}
-          projects={[
-            ...sidebarProps.projects,
-            {
-              id: "project-2",
-              name: "Console",
-              organizationId: "organization-1",
-              organizationName: "Briar",
-              role: "member",
-              createdAt: "2026-07-23T00:00:00Z",
-            },
-          ]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activeChannelId="channel-project"
+        activePage="channels"
+        channels={[
+          sidebarChannel("channel-common", "General", null),
+          sidebarChannel("channel-project", "Briar dev", "project-1"),
+          sidebarChannel("channel-other", "Console chat", "project-2"),
+        ]}
+        onChannelOpen={onChannelOpen}
+        projects={[
+          ...sidebarProps.projects,
+          {
+            id: "project-2",
+            name: "Console",
+            organizationId: "organization-1",
+            organizationName: "Briar",
+            role: "member",
+            createdAt: "2026-07-23T00:00:00Z",
+          },
+        ]}
+      />,
+    );
 
     const topLevel = container.querySelector("#sidebar-channel-list");
     expect(topLevel?.textContent).toContain("General");
@@ -409,24 +402,22 @@ describe("Sidebar", () => {
       container.querySelector('[aria-label="Briar 채널 펼치기"]'),
     ).not.toBeNull();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("expands a project's Channels tab when that project's channel is open", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activePage="issues"
-          channels={[sidebarChannel("channel-project", "Briar dev", "project-1")]}
-          onChannelOpen={() => undefined}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activePage="issues"
+        channels={[sidebarChannel("channel-project", "Briar dev", "project-1")]}
+        onChannelOpen={() => undefined}
+      />,
+    );
 
     await act(async () => {
       container
@@ -435,17 +426,16 @@ describe("Sidebar", () => {
     });
     expect(container.querySelector("#project-channel-list-project-1")).toBeNull();
 
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activeChannelId="channel-project"
-          activePage="channels"
-          channels={[sidebarChannel("channel-project", "Briar dev", "project-1")]}
-          onChannelOpen={() => undefined}
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activeChannelId="channel-project"
+        activePage="channels"
+        channels={[sidebarChannel("channel-project", "Briar dev", "project-1")]}
+        onChannelOpen={() => undefined}
+      />,
+    );
 
     expect(container.querySelector("#project-channel-list-project-1")).not.toBeNull();
     expect(
@@ -454,35 +444,33 @@ describe("Sidebar", () => {
       ),
     ).toBe("true");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
 
 
 
   it("opens projects by default and lets each project collapse independently", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          projects={[
-            ...sidebarProps.projects,
-            {
-              id: "project-2",
-              name: "Console",
-              organizationId: "organization-1",
-              organizationName: "Briar",
-              role: "member",
-              createdAt: "2026-07-23T00:00:00Z",
-            },
-          ]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        projects={[
+          ...sidebarProps.projects,
+          {
+            id: "project-2",
+            name: "Console",
+            organizationId: "organization-1",
+            organizationName: "Briar",
+            role: "member",
+            createdAt: "2026-07-23T00:00:00Z",
+          },
+        ]}
+      />,
+    );
 
     expect(container.querySelector("#project-views-project-1")).not.toBeNull();
     expect(container.querySelector("#project-views-project-2")).not.toBeNull();
@@ -504,38 +492,36 @@ describe("Sidebar", () => {
       container.querySelector('[aria-label="Console 프로젝트 접기"]'),
     ).not.toBeNull();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("opens project issues when the project name is clicked", async () => {
     const onProjectChange = vi.fn();
     const onIssuesOpen = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activePage="issues"
-          activeProjectId="project-1"
-          onIssuesOpen={onIssuesOpen}
-          onProjectChange={onProjectChange}
-          projects={[
-            ...sidebarProps.projects,
-            {
-              id: "project-2",
-              name: "Console",
-              organizationId: "organization-1",
-              organizationName: "Briar",
-              role: "member",
-              createdAt: "2026-07-23T00:00:00Z",
-            },
-          ]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activePage="issues"
+        activeProjectId="project-1"
+        onIssuesOpen={onIssuesOpen}
+        onProjectChange={onProjectChange}
+        projects={[
+          ...sidebarProps.projects,
+          {
+            id: "project-2",
+            name: "Console",
+            organizationId: "organization-1",
+            organizationName: "Briar",
+            role: "member",
+            createdAt: "2026-07-23T00:00:00Z",
+          },
+        ]}
+      />,
+    );
 
     const headings = Array.from(
       container.querySelectorAll<HTMLButtonElement>(".sidebar-project-heading"),
@@ -555,38 +541,36 @@ describe("Sidebar", () => {
     expect(onProjectChange).toHaveBeenCalledWith("project-2");
     expect(onIssuesOpen).toHaveBeenCalledTimes(2);
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
 
   it("selects a project and keeps it expanded when opening a child view", async () => {
     const onProjectChange = vi.fn();
     const onIssuesOpen = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activeProjectId="project-1"
-          onIssuesOpen={onIssuesOpen}
-          onProjectChange={onProjectChange}
-          projects={[
-            ...sidebarProps.projects,
-            {
-              id: "project-2",
-              name: "Console",
-              organizationId: "organization-1",
-              organizationName: "Briar",
-              role: "member",
-              createdAt: "2026-07-23T00:00:00Z",
-            },
-          ]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activeProjectId="project-1"
+        onIssuesOpen={onIssuesOpen}
+        onProjectChange={onProjectChange}
+        projects={[
+          ...sidebarProps.projects,
+          {
+            id: "project-2",
+            name: "Console",
+            organizationId: "organization-1",
+            organizationName: "Briar",
+            role: "member",
+            createdAt: "2026-07-23T00:00:00Z",
+          },
+        ]}
+      />,
+    );
 
     const consoleIssues = Array.from(
       container.querySelectorAll<HTMLAnchorElement>(".sidebar-project-view"),
@@ -600,20 +584,15 @@ describe("Sidebar", () => {
     expect(onProjectChange).toHaveBeenCalledWith("project-2");
     expect(onIssuesOpen).toHaveBeenCalledOnce();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("opens issue creation from the Issues row action", async () => {
     const onCreateIssue = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar {...sidebarProps} onCreateIssue={onCreateIssue} />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(root, <Sidebar {...sidebarProps} onCreateIssue={onCreateIssue} />);
 
     await act(async () => {
       container
@@ -624,38 +603,36 @@ describe("Sidebar", () => {
     expect(onCreateIssue).toHaveBeenCalledOnce();
     expect(onCreateIssue).toHaveBeenCalledWith("project-1");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
 
   it("opens issue creation for the clicked project when another is active", async () => {
     const onProjectChange = vi.fn();
     const onCreateIssue = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activeProjectId="project-1"
-          onCreateIssue={onCreateIssue}
-          onProjectChange={onProjectChange}
-          projects={[
-            ...sidebarProps.projects,
-            {
-              id: "project-2",
-              name: "Console",
-              organizationId: "organization-1",
-              organizationName: "Briar",
-              role: "owner" as const,
-              createdAt: "2026-07-23T00:00:00Z",
-            },
-          ]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activeProjectId="project-1"
+        onCreateIssue={onCreateIssue}
+        onProjectChange={onProjectChange}
+        projects={[
+          ...sidebarProps.projects,
+          {
+            id: "project-2",
+            name: "Console",
+            organizationId: "organization-1",
+            organizationName: "Briar",
+            role: "owner" as const,
+            createdAt: "2026-07-23T00:00:00Z",
+          },
+        ]}
+      />,
+    );
 
     const consoleAdd = Array.from(
       container.querySelectorAll<HTMLButtonElement>(".sidebar-issue-add"),
@@ -670,45 +647,43 @@ describe("Sidebar", () => {
     expect(onProjectChange).toHaveBeenCalledWith("project-2");
     expect(onCreateIssue).toHaveBeenCalledWith("project-2");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("opens the organization list directly from the brand control", async () => {
     const onOrganizationChange = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          onOrganizationChange={onOrganizationChange}
-          organizations={[
-            ...sidebarProps.organizations,
-            {
-              id: "organization-2",
-              name: "Wordbricks",
-              handle: "wordbricks",
-              logo: null,
-              role: "member",
-              createdAt: "2026-07-23T00:00:00Z",
-            },
-          ]}
-          projects={[
-            ...sidebarProps.projects,
-            {
-              id: "project-2",
-              name: "Console",
-              organizationId: "organization-2",
-              organizationName: "Wordbricks",
-              role: "member",
-              createdAt: "2026-07-23T00:00:00Z",
-            },
-          ]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        onOrganizationChange={onOrganizationChange}
+        organizations={[
+          ...sidebarProps.organizations,
+          {
+            id: "organization-2",
+            name: "Wordbricks",
+            handle: "wordbricks",
+            logo: null,
+            role: "member",
+            createdAt: "2026-07-23T00:00:00Z",
+          },
+        ]}
+        projects={[
+          ...sidebarProps.projects,
+          {
+            id: "project-2",
+            name: "Console",
+            organizationId: "organization-2",
+            organizationName: "Wordbricks",
+            role: "member",
+            createdAt: "2026-07-23T00:00:00Z",
+          },
+        ]}
+      />,
+    );
 
     const trigger = container.querySelector<HTMLButtonElement>(
       '[aria-label="조직 메뉴 열기"]',
@@ -749,23 +724,21 @@ describe("Sidebar", () => {
     expect(onOrganizationChange).toHaveBeenCalledWith("organization-2");
     expect(trigger?.getAttribute("aria-expanded")).toBe("false");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("opens the organization creation page from the bottom of the organization list", async () => {
     const onAddOrganization = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          onAddOrganization={onAddOrganization}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        onAddOrganization={onAddOrganization}
+      />,
+    );
 
     await act(async () => {
       container
@@ -783,8 +756,7 @@ describe("Sidebar", () => {
     expect(onAddOrganization).toHaveBeenCalledOnce();
     expect(container.querySelector('[aria-label="조직 메뉴"]')).toBeNull();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
 
@@ -810,46 +782,45 @@ describe("Sidebar", () => {
       dispatchEvents: [],
       workers: [],
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          agents={[
-            {
-              id: "agent-1",
-              projectId: "project-1",
-              name: "Design agent",
-              avatar: "data:image/png;base64,avatar",
-              codexPet: null,
-              provider: "codex",
-              model: null,
-              effort: null,
-              responsibility: "Inspect the design system",
-              skill: "# Agent",
-              skills: [],
-              calendarColor: "#3275d5",
-              createdAt: "2026-07-28T00:00:00.000Z",
-              updatedAt: "2026-07-28T00:00:00.000Z",
-            },
-          ]}
-          onAgentSessionOpen={onAgentSessionOpen}
-          sessions={[
-            runningSession,
-            {
-              ...runningSession,
-              id: "session-completed",
-              dispatchGroupId: "session-completed",
-              request: "Already finished",
-              status: "completed",
-              completedAt: "2026-07-29T00:10:00.000Z",
-            },
-          ]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        agents={[
+          {
+            id: "agent-1",
+            projectId: "project-1",
+            name: "Design agent",
+            avatar: "data:image/png;base64,avatar",
+            codexPet: null,
+            provider: "codex",
+            model: null,
+            effort: null,
+            responsibility: "Inspect the design system",
+            skill: "# Agent",
+            skills: [],
+            calendarColor: "#3275d5",
+            createdAt: "2026-07-28T00:00:00.000Z",
+            updatedAt: "2026-07-28T00:00:00.000Z",
+          },
+        ]}
+        onAgentSessionOpen={onAgentSessionOpen}
+        sessions={[
+          runningSession,
+          {
+            ...runningSession,
+            id: "session-completed",
+            dispatchGroupId: "session-completed",
+            request: "Already finished",
+            status: "completed",
+            completedAt: "2026-07-29T00:10:00.000Z",
+          },
+        ]}
+      />,
+    );
 
     const sessionButton = container.querySelector<HTMLButtonElement>(
       ".sidebar-agent-session",
@@ -866,54 +837,52 @@ describe("Sidebar", () => {
     await act(async () => sessionButton?.click());
     expect(onAgentSessionOpen).toHaveBeenCalledWith("session-running");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("keeps a running session visible when another project is active", async () => {
     const onAgentSessionOpen = vi.fn();
     const onProjectChange = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activeProjectId="project-2"
-          connectedProjectIds={["project-1", "project-2"]}
-          onAgentSessionOpen={onAgentSessionOpen}
-          onProjectChange={onProjectChange}
-          projects={[
-            ...sidebarProps.projects,
-            {
-              ...sidebarProps.projects[0],
-              id: "project-2",
-              name: "Other project",
-            },
-          ]}
-          sessions={[{
-            id: "session-running",
-            dispatchGroupId: "session-running",
-            projectId: "project-1",
-            agentId: "agent-from-project-1",
-            sessionType: "task",
-            request: "Keep this session visible",
-            status: "running",
-            issues: [],
-            startedAt: "2026-07-29T00:00:00.000Z",
-            completedAt: null,
-            conversationId: null,
-            workspaceRoot: null,
-            summary: null,
-            error: null,
-            events: [],
-            dispatchEvents: [],
-            workers: [],
-          }]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activeProjectId="project-2"
+        connectedProjectIds={["project-1", "project-2"]}
+        onAgentSessionOpen={onAgentSessionOpen}
+        onProjectChange={onProjectChange}
+        projects={[
+          ...sidebarProps.projects,
+          {
+            ...sidebarProps.projects[0],
+            id: "project-2",
+            name: "Other project",
+          },
+        ]}
+        sessions={[{
+          id: "session-running",
+          dispatchGroupId: "session-running",
+          projectId: "project-1",
+          agentId: "agent-from-project-1",
+          sessionType: "task",
+          request: "Keep this session visible",
+          status: "running",
+          issues: [],
+          startedAt: "2026-07-29T00:00:00.000Z",
+          completedAt: null,
+          conversationId: null,
+          workspaceRoot: null,
+          summary: null,
+          error: null,
+          events: [],
+          dispatchEvents: [],
+          workers: [],
+        }]}
+      />,
+    );
 
     const sessionButton = container.querySelector<HTMLButtonElement>(
       ".sidebar-agent-session",
@@ -926,20 +895,18 @@ describe("Sidebar", () => {
     expect(onProjectChange).toHaveBeenCalledWith("project-1");
     expect(onAgentSessionOpen).toHaveBeenCalledWith("session-running");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("opens project settings from the project menu", async () => {
     const onProjectSettings = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar {...sidebarProps} onProjectSettings={onProjectSettings} />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar {...sidebarProps} onProjectSettings={onProjectSettings} />,
+    );
 
     const trigger = container.querySelector<HTMLButtonElement>(
       '[aria-label="Briar 프로젝트 메뉴"]',
@@ -956,18 +923,15 @@ describe("Sidebar", () => {
     expect(onProjectSettings).toHaveBeenCalledWith("project-1");
     expect(container.querySelector('[role="menu"]')).toBeNull();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("opens application settings from the account menu", async () => {
     const onSettings = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<Sidebar {...sidebarProps} onSettings={onSettings} />);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(root, <Sidebar {...sidebarProps} onSettings={onSettings} />);
 
     await act(async () => {
       container
@@ -987,44 +951,42 @@ describe("Sidebar", () => {
     expect(onSettings).toHaveBeenCalledOnce();
     expect(container.querySelector(".account-popover")).toBeNull();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("opens PR readiness from the warning beside a project", async () => {
     const onProjectRepositoryOpen = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          onProjectRepositoryOpen={onProjectRepositoryOpen}
-          projectReadiness={{
-            "project-1": {
-              repositoryPath: "/Users/jay/git/briar",
-              gitInstalled: true,
-              gitVersion: "git version 2.50.1",
-              repositoryHealthy: true,
-              remote: "git@github.com:wordbricks/briar.git",
-              remoteReachable: true,
-              pushAccess: true,
-              requiresGithub: true,
-              githubRepository: "wordbricks/briar",
-              ghInstalled: false,
-              ghVersion: null,
-              ghAuthenticated: false,
-              ghAccount: null,
-              githubWriteAccess: false,
-              gitReady: true,
-              prReady: false,
-              issues: ["GitHub CLI가 설치되지 않았습니다."],
-            },
-          }}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        onProjectRepositoryOpen={onProjectRepositoryOpen}
+        projectReadiness={{
+          "project-1": {
+            repositoryPath: "/Users/jay/git/briar",
+            gitInstalled: true,
+            gitVersion: "git version 2.50.1",
+            repositoryHealthy: true,
+            remote: "git@github.com:wordbricks/briar.git",
+            remoteReachable: true,
+            pushAccess: true,
+            requiresGithub: true,
+            githubRepository: "wordbricks/briar",
+            ghInstalled: false,
+            ghVersion: null,
+            ghAuthenticated: false,
+            ghAccount: null,
+            githubWriteAccess: false,
+            gitReady: true,
+            prReady: false,
+            issues: ["GitHub CLI가 설치되지 않았습니다."],
+          },
+        }}
+      />,
+    );
 
     const warning = container.querySelector<HTMLButtonElement>(
       '[data-project-readiness="project-1"]',
@@ -1033,45 +995,43 @@ describe("Sidebar", () => {
     await act(async () => warning?.click());
     expect(onProjectRepositoryOpen).toHaveBeenCalledWith("project-1");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("routes a disconnected project to repository reconnect", async () => {
     const onProjectRepositoryOpen = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          connectedProjectIds={[]}
-          onProjectRepositoryOpen={onProjectRepositoryOpen}
-          projectReadiness={{
-            "project-1": {
-              repositoryPath: "/stale/repository",
-              gitInstalled: true,
-              gitVersion: "git version 2.50.1",
-              repositoryHealthy: true,
-              remote: "git@github.com:wordbricks/briar.git",
-              remoteReachable: true,
-              pushAccess: true,
-              requiresGithub: true,
-              githubRepository: "wordbricks/briar",
-              ghInstalled: true,
-              ghVersion: "gh version 2.80.0",
-              ghAuthenticated: true,
-              ghAccount: "wordbricks",
-              githubWriteAccess: true,
-              gitReady: true,
-              prReady: true,
-              issues: [],
-            },
-          }}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        connectedProjectIds={[]}
+        onProjectRepositoryOpen={onProjectRepositoryOpen}
+        projectReadiness={{
+          "project-1": {
+            repositoryPath: "/stale/repository",
+            gitInstalled: true,
+            gitVersion: "git version 2.50.1",
+            repositoryHealthy: true,
+            remote: "git@github.com:wordbricks/briar.git",
+            remoteReachable: true,
+            pushAccess: true,
+            requiresGithub: true,
+            githubRepository: "wordbricks/briar",
+            ghInstalled: true,
+            ghVersion: "gh version 2.80.0",
+            ghAuthenticated: true,
+            ghAccount: "wordbricks",
+            githubWriteAccess: true,
+            gitReady: true,
+            prReady: true,
+            issues: [],
+          },
+        }}
+      />,
+    );
 
     const reconnect = container.querySelector<HTMLButtonElement>(
       '[data-project-reconnect="project-1"]',
@@ -1081,8 +1041,7 @@ describe("Sidebar", () => {
     await act(async () => reconnect?.click());
     expect(onProjectRepositoryOpen).toHaveBeenCalledWith("project-1");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("exposes a retry entry after a readiness probe fails", () => {
@@ -1106,12 +1065,15 @@ describe("Sidebar", () => {
 
   it("switches and persists the language from the account submenu", async () => {
     window.localStorage.setItem("briar.locale.v1", "ko");
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<I18nProvider><Sidebar {...sidebarProps} /></I18nProvider>);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <Sidebar {...sidebarProps} />
+      </I18nProvider>,
+    );
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>('[aria-label="계정 메뉴"]')?.click();
@@ -1157,24 +1119,22 @@ describe("Sidebar", () => {
     expect(container.textContent).not.toContain("自动狩猎");
     expect(window.localStorage.getItem("briar.locale.v1")).toBe("zh");
     expect(document.documentElement.lang).toBe("zh-CN");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
 
   it("opens a project from its menu in a new window", async () => {
     const onProjectOpenInNewWindow = vi.fn().mockResolvedValue(undefined);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          onProjectOpenInNewWindow={onProjectOpenInNewWindow}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        onProjectOpenInNewWindow={onProjectOpenInNewWindow}
+      />,
+    );
 
     const menuTrigger = container.querySelector<HTMLButtonElement>(
       ".sidebar-project-menu-trigger",
@@ -1194,40 +1154,38 @@ describe("Sidebar", () => {
     await act(async () => openButton?.click());
     expect(onProjectOpenInNewWindow).toHaveBeenCalledWith("project-1");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("renders only the locked project's identity, channels, and tabs in a project window", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <Sidebar
-          {...sidebarProps}
-          activePage="issues"
-          channels={[
-            sidebarChannel("channel-org", "General", null),
-            sidebarChannel("channel-project", "Briar dev", "project-1"),
-            sidebarChannel("channel-other", "Console dev", "project-2"),
-          ]}
-          onChannelOpen={() => undefined}
-          projectWindowProjectId="project-1"
-          projects={[
-            ...sidebarProps.projects,
-            {
-              id: "project-2",
-              name: "Console",
-              organizationId: "organization-1",
-              organizationName: "Briar",
-              role: "member",
-              createdAt: "2026-07-23T00:00:00Z",
-            },
-          ]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <Sidebar
+        {...sidebarProps}
+        activePage="issues"
+        channels={[
+          sidebarChannel("channel-org", "General", null),
+          sidebarChannel("channel-project", "Briar dev", "project-1"),
+          sidebarChannel("channel-other", "Console dev", "project-2"),
+        ]}
+        onChannelOpen={() => undefined}
+        projectWindowProjectId="project-1"
+        projects={[
+          ...sidebarProps.projects,
+          {
+            id: "project-2",
+            name: "Console",
+            organizationId: "organization-1",
+            organizationName: "Briar",
+            role: "member",
+            createdAt: "2026-07-23T00:00:00Z",
+          },
+        ]}
+      />,
+    );
 
     expect(
       container.querySelector(".sidebar-project-window-brand")?.textContent,
@@ -1248,7 +1206,6 @@ describe("Sidebar", () => {
     expect(projectTabs?.textContent).toContain("에이전트");
     expect(projectTabs?.textContent).not.toContain("Console");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });

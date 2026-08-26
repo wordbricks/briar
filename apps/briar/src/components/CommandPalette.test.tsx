@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { act, useState } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import type { Root } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import { commandPaletteRecentsStorageKey } from "../lib/command-palette";
@@ -39,6 +40,7 @@ const makeItems = (onSelect = vi.fn()): CommandPaletteItem[] => [
 ];
 
 describe("CommandPalette", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
   let root: Root;
 
@@ -46,14 +48,13 @@ describe("CommandPalette", () => {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     window.localStorage.clear();
     window.localStorage.setItem("briar.locale.v1", "en");
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     vi.restoreAllMocks();
   });
 
@@ -284,9 +285,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       );
     }
 
-    await act(async () => {
-      root.render(<ControlledPalette />);
-    });
+    await renderReactTestRoot(root, <ControlledPalette />);
 
     await act(async () => {
       const composingEscape = new KeyboardEvent("keydown", {

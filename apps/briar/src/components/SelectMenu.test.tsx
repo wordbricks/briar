@@ -1,39 +1,38 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 import { SelectMenu } from "./SelectMenu";
 
 describe("SelectMenu", () => {
   it("opens an accessible listbox, shows descriptions, and selects an option", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const onValueChange = vi.fn();
 
-    await act(async () => {
-      root.render(
-        <SelectMenu
-          id="speed"
-          label="Speed"
-          onValueChange={onValueChange}
-          options={[
-            {
-              description: "Default speed",
-              label: "Standard",
-              value: "standard",
-            },
-            {
-              description: "1.5x speed, increased usage",
-              label: "Fast",
-              value: "fast",
-            },
-          ]}
-          value="standard"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <SelectMenu
+        id="speed"
+        label="Speed"
+        onValueChange={onValueChange}
+        options={[
+          {
+            description: "Default speed",
+            label: "Standard",
+            value: "standard",
+          },
+          {
+            description: "1.5x speed, increased usage",
+            label: "Fast",
+            value: "fast",
+          },
+        ]}
+        value="standard"
+      />,
+    );
 
     const trigger = container.querySelector<HTMLButtonElement>("#speed");
     expect(trigger?.getAttribute("role")).toBe("combobox");
@@ -57,30 +56,28 @@ describe("SelectMenu", () => {
     expect(trigger?.hasAttribute("aria-controls")).toBe(false);
     expect(document.activeElement).toBe(trigger);
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("opens from the keyboard and moves focus through enabled options", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <SelectMenu
-          id="keyboard-select"
-          label="Choice"
-          onValueChange={() => undefined}
-          options={[
-            { label: "First", value: "first" },
-            { disabled: true, label: "Disabled", value: "disabled" },
-            { label: "Last", value: "last" },
-          ]}
-          value="first"
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <SelectMenu
+        id="keyboard-select"
+        label="Choice"
+        onValueChange={() => undefined}
+        options={[
+          { label: "First", value: "first" },
+          { disabled: true, label: "Disabled", value: "disabled" },
+          { label: "Last", value: "last" },
+        ]}
+        value="first"
+      />,
+    );
 
     const trigger =
       container.querySelector<HTMLButtonElement>("#keyboard-select");
@@ -116,31 +113,31 @@ describe("SelectMenu", () => {
     });
     expect(document.activeElement?.getAttribute("data-value")).toBe("last");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("renders the portaled listbox above the trigger's ancestor layer", async () => {
     const container = document.createElement("div");
     container.style.position = "fixed";
     container.style.zIndex = "1001";
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <SelectMenu
-          id="modal-select"
-          label="Recurrence"
-          onValueChange={() => undefined}
-          options={[
-            { label: "Daily", value: "daily" },
-            { label: "Weekdays", value: "weekdays" },
-          ]}
-          value="weekdays"
-        />,
-      );
+    const { cleanup, root } = createReactTestRoot({
+      attachToDocument: true,
+      container,
     });
+
+    await renderReactTestRoot(
+      root,
+      <SelectMenu
+        id="modal-select"
+        label="Recurrence"
+        onValueChange={() => undefined}
+        options={[
+          { label: "Daily", value: "daily" },
+          { label: "Weekdays", value: "weekdays" },
+        ]}
+        value="weekdays"
+      />,
+    );
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>("#modal-select")?.click();
@@ -152,33 +149,31 @@ describe("SelectMenu", () => {
       listbox?.closest<HTMLDivElement>(".select-menu-popover")?.style.zIndex,
     ).toBe("1002");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("keeps viewport coordinates inside an untransformed modal dialog", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <div role="dialog">
-          <SelectMenu
-            id="dialog-model-select"
-            label="Model"
-            onValueChange={() => undefined}
-            options={Array.from({ length: 40 }, (_, index) => ({
-              label: `Model ${index + 1}`,
-              value: `provider/model-${index + 1}`,
-            }))}
-            searchPlaceholder="Search models"
-            searchable
-            value="provider/model-1"
-          />
-        </div>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <div role="dialog">
+        <SelectMenu
+          id="dialog-model-select"
+          label="Model"
+          onValueChange={() => undefined}
+          options={Array.from({ length: 40 }, (_, index) => ({
+            label: `Model ${index + 1}`,
+            value: `provider/model-${index + 1}`,
+          }))}
+          searchPlaceholder="Search models"
+          searchable
+          value="provider/model-1"
+        />
+      </div>,
+    );
 
     const dialog = container.querySelector<HTMLElement>('[role="dialog"]')!;
     const trigger = container.querySelector<HTMLButtonElement>(
@@ -224,31 +219,29 @@ describe("SelectMenu", () => {
       dialog?.querySelector('input[aria-label="Search models"]'),
     );
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("translates viewport coordinates for a transformed modal dialog", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <div role="dialog" style={{ transform: "translate(-50%, -50%)" }}>
-          <SelectMenu
-            id="transformed-dialog-select"
-            label="Provider"
-            onValueChange={() => undefined}
-            options={[
-              { label: "Codex", value: "codex" },
-              { label: "Claude", value: "claude" },
-            ]}
-            value="codex"
-          />
-        </div>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <div role="dialog" style={{ transform: "translate(-50%, -50%)" }}>
+        <SelectMenu
+          id="transformed-dialog-select"
+          label="Provider"
+          onValueChange={() => undefined}
+          options={[
+            { label: "Codex", value: "codex" },
+            { label: "Claude", value: "claude" },
+          ]}
+          value="codex"
+        />
+      </div>,
+    );
 
     const dialog = container.querySelector<HTMLElement>('[role="dialog"]')!;
     const trigger = container.querySelector<HTMLButtonElement>(
@@ -283,38 +276,36 @@ describe("SelectMenu", () => {
     expect(popover?.style.left).toBe("60px");
     expect(popover?.style.top).toBe("169px");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("filters searchable options by label, value, and description", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const onValueChange = vi.fn();
 
-    await act(async () => {
-      root.render(
-        <SelectMenu
-          id="model-select"
-          label="Model"
-          onValueChange={onValueChange}
-          options={[
-            { label: "Provider default model", value: "" },
-            {
-              description: "anthropic/claude-opus-4-6",
-              label: "Claude Opus",
-              value: "anthropic/claude-opus-4-6",
-            },
-            { label: "GPT", value: "openai/gpt-5.6" },
-          ]}
-          searchEmptyMessage="No matching models"
-          searchPlaceholder="Search models"
-          searchable
-          value=""
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <SelectMenu
+        id="model-select"
+        label="Model"
+        onValueChange={onValueChange}
+        options={[
+          { label: "Provider default model", value: "" },
+          {
+            description: "anthropic/claude-opus-4-6",
+            label: "Claude Opus",
+            value: "anthropic/claude-opus-4-6",
+          },
+          { label: "GPT", value: "openai/gpt-5.6" },
+        ]}
+        searchEmptyMessage="No matching models"
+        searchPlaceholder="Search models"
+        searchable
+        value=""
+      />,
+    );
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>("#model-select")?.click();
@@ -347,7 +338,6 @@ describe("SelectMenu", () => {
     });
     expect(document.body.textContent).toContain("No matching models");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });

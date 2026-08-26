@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
@@ -33,31 +33,29 @@ const emptyUsageSummary: ProjectUsageSummary = {
 
 describe("ProjectLobby", () => {
   it("loads the latest 14 days by default and applies a custom date range", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const expectedDefault = defaultProjectUsageDateRange();
     const loadUsage = vi.fn(async () => emptyUsageSummary);
 
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ProjectLobby
-            connectionState="connected"
-            dashboard={demoDashboard}
-            isSidebarOpen
-            onLoadUsageSummary={loadUsage}
-            onOpenAgents={() => undefined}
-            onOpenIssue={() => undefined}
-            onOpenIssues={() => undefined}
-            onOpenRepository={() => undefined}
-            onOpenSettings={() => undefined}
-            project={demoDashboard.project}
-            readiness={demoRepositoryReadiness}
-            requiresLocalReadiness
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ProjectLobby
+          connectionState="connected"
+          dashboard={demoDashboard}
+          isSidebarOpen
+          onLoadUsageSummary={loadUsage}
+          onOpenAgents={() => undefined}
+          onOpenIssue={() => undefined}
+          onOpenIssues={() => undefined}
+          onOpenRepository={() => undefined}
+          onOpenSettings={() => undefined}
+          project={demoDashboard.project}
+          readiness={demoRepositoryReadiness}
+          requiresLocalReadiness
+        />
+      </I18nProvider>,
+    );
 
     expect(loadUsage).toHaveBeenLastCalledWith(
       demoDashboard.project.id,
@@ -101,33 +99,31 @@ describe("ProjectLobby", () => {
       },
     );
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("shows an accessible difficulty icon for every recent issue", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
 
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ProjectLobby
-            connectionState="connected"
-            dashboard={demoDashboard}
-            isSidebarOpen
-            onLoadUsageSummary={async () => null}
-            onOpenAgents={() => undefined}
-            onOpenIssue={() => undefined}
-            onOpenIssues={() => undefined}
-            onOpenRepository={() => undefined}
-            onOpenSettings={() => undefined}
-            project={demoDashboard.project}
-            readiness={demoRepositoryReadiness}
-            requiresLocalReadiness
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ProjectLobby
+          connectionState="connected"
+          dashboard={demoDashboard}
+          isSidebarOpen
+          onLoadUsageSummary={async () => null}
+          onOpenAgents={() => undefined}
+          onOpenIssue={() => undefined}
+          onOpenIssues={() => undefined}
+          onOpenRepository={() => undefined}
+          onOpenSettings={() => undefined}
+          project={demoDashboard.project}
+          readiness={demoRepositoryReadiness}
+          requiresLocalReadiness
+        />
+      </I18nProvider>,
+    );
 
     const icons = [...container.querySelectorAll<HTMLElement>(
       ".project-lobby-activity-list [data-difficulty]",
@@ -144,7 +140,7 @@ describe("ProjectLobby", () => {
     expect(icons.every((icon) => icon.getAttribute("aria-label")))
       .toBe(true);
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it.each([
@@ -167,68 +163,64 @@ describe("ProjectLobby", () => {
     readiness,
   }) => {
     localStorage.setItem("briar.locale.v1", "ko");
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
 
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ProjectLobby
-            connectionState={connectionState}
-            dashboard={demoDashboard}
-            isSidebarOpen
-            onLoadUsageSummary={async () => emptyUsageSummary}
-            onOpenAgents={() => undefined}
-            onOpenIssue={() => undefined}
-            onOpenIssues={() => undefined}
-            onOpenRepository={() => undefined}
-            onOpenSettings={() => undefined}
-            project={demoDashboard.project}
-            readiness={readiness}
-            requiresLocalReadiness
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ProjectLobby
+          connectionState={connectionState}
+          dashboard={demoDashboard}
+          isSidebarOpen
+          onLoadUsageSummary={async () => emptyUsageSummary}
+          onOpenAgents={() => undefined}
+          onOpenIssue={() => undefined}
+          onOpenIssues={() => undefined}
+          onOpenRepository={() => undefined}
+          onOpenSettings={() => undefined}
+          project={demoDashboard.project}
+          readiness={readiness}
+          requiresLocalReadiness
+        />
+      </I18nProvider>,
+    );
 
     const repositoryPanel = container.querySelector(".repository-panel");
     expect(repositoryPanel?.textContent).toContain(expectedStatus);
     expect(repositoryPanel?.textContent).toContain(expectedAction);
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("directs repository setup to the desktop instead of a remote dead end", async () => {
     localStorage.setItem("briar.locale.v1", "ko");
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
 
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ProjectLobby
-            connectionState="unknown"
-            dashboard={{
-              ...demoDashboard,
-              settings: {
-                ...demoDashboard.settings,
-                githubRepository: null,
-              },
-            }}
-            isSidebarOpen
-            onLoadUsageSummary={async () => emptyUsageSummary}
-            onOpenAgents={() => undefined}
-            onOpenIssue={() => undefined}
-            onOpenIssues={() => undefined}
-            onOpenRepository={() => undefined}
-            onOpenSettings={() => undefined}
-            project={demoDashboard.project}
-            readiness={null}
-            requiresLocalReadiness={false}
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ProjectLobby
+          connectionState="unknown"
+          dashboard={{
+            ...demoDashboard,
+            settings: {
+              ...demoDashboard.settings,
+              githubRepository: null,
+            },
+          }}
+          isSidebarOpen
+          onLoadUsageSummary={async () => emptyUsageSummary}
+          onOpenAgents={() => undefined}
+          onOpenIssue={() => undefined}
+          onOpenIssues={() => undefined}
+          onOpenRepository={() => undefined}
+          onOpenSettings={() => undefined}
+          project={demoDashboard.project}
+          readiness={null}
+          requiresLocalReadiness={false}
+        />
+      </I18nProvider>,
+    );
 
     const repositoryButton = container.querySelector<HTMLButtonElement>(
       ".repository-panel button",
@@ -236,49 +228,47 @@ describe("ProjectLobby", () => {
     expect(repositoryButton?.disabled).toBe(true);
     expect(repositoryButton?.textContent).toContain("데스크톱 Briar에서 연결");
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("does not call a non-GitHub repository a connected GitHub integration", async () => {
     localStorage.setItem("briar.locale.v1", "ko");
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
 
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ProjectLobby
-            connectionState="connected"
-            dashboard={{
-              ...demoDashboard,
-              settings: { ...demoDashboard.settings, githubRepository: null },
-            }}
-            isSidebarOpen
-            onLoadUsageSummary={async () => emptyUsageSummary}
-            onOpenAgents={() => undefined}
-            onOpenIssue={() => undefined}
-            onOpenIssues={() => undefined}
-            onOpenRepository={() => undefined}
-            onOpenSettings={() => undefined}
-            project={demoDashboard.project}
-            readiness={{
-              ...demoRepositoryReadiness,
-              ghAccount: null,
-              ghAuthenticated: false,
-              ghInstalled: false,
-              ghVersion: null,
-              githubRepository: null,
-              githubWriteAccess: false,
-              pushAccess: false,
-              remote: null,
-              remoteReachable: false,
-              requiresGithub: false,
-            }}
-            requiresLocalReadiness
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ProjectLobby
+          connectionState="connected"
+          dashboard={{
+            ...demoDashboard,
+            settings: { ...demoDashboard.settings, githubRepository: null },
+          }}
+          isSidebarOpen
+          onLoadUsageSummary={async () => emptyUsageSummary}
+          onOpenAgents={() => undefined}
+          onOpenIssue={() => undefined}
+          onOpenIssues={() => undefined}
+          onOpenRepository={() => undefined}
+          onOpenSettings={() => undefined}
+          project={demoDashboard.project}
+          readiness={{
+            ...demoRepositoryReadiness,
+            ghAccount: null,
+            ghAuthenticated: false,
+            ghInstalled: false,
+            ghVersion: null,
+            githubRepository: null,
+            githubWriteAccess: false,
+            pushAccess: false,
+            remote: null,
+            remoteReachable: false,
+            requiresGithub: false,
+          }}
+          requiresLocalReadiness
+        />
+      </I18nProvider>,
+    );
 
     const repositoryPanel = container.querySelector(".repository-panel");
     expect(repositoryPanel?.textContent).toContain("연결된 GitHub 저장소 없음");
@@ -287,7 +277,7 @@ describe("ProjectLobby", () => {
     expect(repositoryPanel?.textContent).not.toContain("GitHub 준비 완료");
     expect(repositoryPanel?.textContent).not.toContain("저장소 연결");
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("summarizes only execution time inside the daily analytics window", () => {

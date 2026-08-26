@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act, useState } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import {
   afterEach,
   beforeEach,
@@ -23,8 +23,9 @@ import {
 type ItemId = "a" | "b" | "c" | "d" | "removed";
 
 describe("useControlledCollectionNavigation", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
   let navigation: ControlledCollectionNavigation<ItemId, HTMLButtonElement>;
   let onActivate: Mock<(
     id: ItemId,
@@ -42,9 +43,9 @@ describe("useControlledCollectionNavigation", () => {
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
     onActivate = vi.fn();
     onCursorIdChange = vi.fn();
     onSelectedIdChange = vi.fn();
@@ -52,8 +53,7 @@ describe("useControlledCollectionNavigation", () => {
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     vi.restoreAllMocks();
   });
 
@@ -157,7 +157,7 @@ describe("useControlledCollectionNavigation", () => {
   }
 
   it("moves a vertical cursor, follows selection, and projects DOM focus", async () => {
-    await act(async () => root.render(<Harness />));
+    await renderReactTestRoot(root, <Harness />);
     const click = vi.spyOn(item("b"), "click");
 
     let result!: ReturnType<typeof navigation.move>;
@@ -187,9 +187,7 @@ describe("useControlledCollectionNavigation", () => {
   });
 
   it("keeps selection manual until activation", async () => {
-    await act(async () =>
-      root.render(<Harness selectionBehavior="manual" />)
-    );
+    await renderReactTestRoot(root, <Harness selectionBehavior="manual" />);
 
     await act(async () => {
       navigation.move("next");
@@ -217,11 +215,7 @@ describe("useControlledCollectionNavigation", () => {
   });
 
   it("uses the controlled cursor after DOM focus leaves the collection", async () => {
-    await act(async () =>
-      root.render(
-        <Harness initialCursorId="b" initialSelectedId="b" />,
-      )
-    );
+    await renderReactTestRoot(root, <Harness initialCursorId="b" initialSelectedId="b" />);
     const outside = container.querySelector<HTMLButtonElement>(
       '[data-testid="outside"]',
     )!;
@@ -237,11 +231,7 @@ describe("useControlledCollectionNavigation", () => {
   });
 
   it("falls back to a visible selected ID when the cursor ID disappeared", async () => {
-    await act(async () =>
-      root.render(
-        <Harness initialCursorId="removed" initialSelectedId="b" />,
-      )
-    );
+    await renderReactTestRoot(root, <Harness initialCursorId="removed" initialSelectedId="b" />);
 
     await act(async () => {
       navigation.move("down");
@@ -253,11 +243,7 @@ describe("useControlledCollectionNavigation", () => {
   });
 
   it("clamps and refocuses without reselecting or activating", async () => {
-    await act(async () =>
-      root.render(
-        <Harness initialCursorId="c" initialSelectedId="c" />,
-      )
-    );
+    await renderReactTestRoot(root, <Harness initialCursorId="c" initialSelectedId="c" />);
     container.querySelector<HTMLButtonElement>('[data-testid="outside"]')!
       .focus();
     onCursorIdChange.mockClear();
@@ -276,7 +262,7 @@ describe("useControlledCollectionNavigation", () => {
   });
 
   it("accepts repeated commands before a controlled rerender completes", async () => {
-    await act(async () => root.render(<Harness />));
+    await renderReactTestRoot(root, <Harness />);
 
     await act(async () => {
       expect(navigation.move("down", { repeat: true }).id).toBe("b");
@@ -297,9 +283,7 @@ describe("useControlledCollectionNavigation", () => {
   });
 
   it("maps horizontal directions and leaves unsupported directions alone", async () => {
-    await act(async () =>
-      root.render(<Harness orientation="horizontal" />)
-    );
+    await renderReactTestRoot(root, <Harness orientation="horizontal" />);
 
     await act(async () => {
       expect(navigation.move("right").id).toBe("b");
@@ -332,15 +316,13 @@ describe("useControlledCollectionNavigation", () => {
       return transitions.get(`${currentId}:${direction}` as "a:down" | "c:right") ??
         currentId;
     };
-    await act(async () =>
-      root.render(
-        <Harness
-          itemIds={["a", "b", "c", "d"]}
-          orientation="both"
-          resolveNextId={({ currentId, direction }) =>
-            gridNext(currentId, direction)}
-        />,
-      )
+    await renderReactTestRoot(
+      root,
+      <Harness
+        itemIds={["a", "b", "c", "d"]}
+        orientation="both"
+        resolveNextId={({ currentId, direction }) => gridNext(currentId, direction)}
+      />,
     );
 
     await act(async () => {
@@ -354,27 +336,21 @@ describe("useControlledCollectionNavigation", () => {
   });
 
   it("projects a pending focus request when its item ref mounts later", async () => {
-    await act(async () =>
-      root.render(<Harness itemIds={["a", "b"]} renderIds={["a"]} />)
-    );
+    await renderReactTestRoot(root, <Harness itemIds={["a", "b"]} renderIds={["a"]} />);
 
     await act(async () => {
       expect(navigation.move("down").id).toBe("b");
     });
     expect(document.activeElement).not.toBe(item("a"));
 
-    await act(async () =>
-      root.render(<Harness itemIds={["a", "b"]} renderIds={["a", "b"]} />)
-    );
+    await renderReactTestRoot(root, <Harness itemIds={["a", "b"]} renderIds={["a", "b"]} />);
 
     expect(document.activeElement).toBe(item("b"));
     expect(scrollSpies.get("b")).toHaveBeenCalled();
   });
 
   it("cancels deferred DOM focus when projection becomes virtual", async () => {
-    await act(async () =>
-      root.render(<Harness itemIds={["a", "b"]} renderIds={["a"]} />)
-    );
+    await renderReactTestRoot(root, <Harness itemIds={["a", "b"]} renderIds={["a"]} />);
     const outside = container.querySelector<HTMLButtonElement>(
       '[data-testid="outside"]',
     )!;
@@ -383,14 +359,13 @@ describe("useControlledCollectionNavigation", () => {
     await act(async () => {
       expect(navigation.move("down").id).toBe("b");
     });
-    await act(async () =>
-      root.render(
-        <Harness
-          itemIds={["a", "b"]}
-          projectDomFocus={false}
-          renderIds={["a", "b"]}
-        />,
-      )
+    await renderReactTestRoot(
+      root,
+      <Harness
+        itemIds={["a", "b"]}
+        projectDomFocus={false}
+        renderIds={["a", "b"]}
+      />,
     );
 
     expect(document.activeElement).toBe(outside);
@@ -398,23 +373,21 @@ describe("useControlledCollectionNavigation", () => {
   });
 
   it("uses stable IDs against the consumer's latest reordered item list", async () => {
-    await act(async () =>
-      root.render(
-        <Harness
-          initialCursorId="b"
-          initialSelectedId="b"
-          itemIds={["a", "b", "c"]}
-        />,
-      )
+    await renderReactTestRoot(
+      root,
+      <Harness
+        initialCursorId="b"
+        initialSelectedId="b"
+        itemIds={["a", "b", "c"]}
+      />,
     );
-    await act(async () =>
-      root.render(
-        <Harness
-          initialCursorId="b"
-          initialSelectedId="b"
-          itemIds={["c", "b", "a"]}
-        />,
-      )
+    await renderReactTestRoot(
+      root,
+      <Harness
+        initialCursorId="b"
+        initialSelectedId="b"
+        itemIds={["c", "b", "a"]}
+      />,
     );
 
     await act(async () => {
@@ -424,9 +397,7 @@ describe("useControlledCollectionNavigation", () => {
   });
 
   it("can keep DOM focus virtual while still updating controlled state", async () => {
-    await act(async () =>
-      root.render(<Harness projectDomFocus={false} />)
-    );
+    await renderReactTestRoot(root, <Harness projectDomFocus={false} />);
     const outside = container.querySelector<HTMLButtonElement>(
       '[data-testid="outside"]',
     )!;
@@ -444,14 +415,13 @@ describe("useControlledCollectionNavigation", () => {
   });
 
   it("reports empty collections without changing state", async () => {
-    await act(async () =>
-      root.render(
-        <Harness
-          initialCursorId={null}
-          initialSelectedId={null}
-          itemIds={[]}
-        />,
-      )
+    await renderReactTestRoot(
+      root,
+      <Harness
+        initialCursorId={null}
+        initialSelectedId={null}
+        itemIds={[]}
+      />,
     );
 
     expect(navigation.move("down")).toEqual({

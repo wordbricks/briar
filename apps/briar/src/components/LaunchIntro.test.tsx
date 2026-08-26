@@ -1,11 +1,13 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import type { Root } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LaunchIntro } from "./LaunchIntro";
 
 describe("LaunchIntro", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
   let root: Root;
 
@@ -15,14 +17,13 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       configurable: true,
       value: vi.fn().mockReturnValue({ matches: false }),
     });
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -32,9 +33,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     const onComplete = vi.fn();
     const onReveal = vi.fn();
 
-    await act(async () => root.render(
-      <LaunchIntro onComplete={onComplete} onReveal={onReveal} />,
-    ));
+    await renderReactTestRoot(root, <LaunchIntro onComplete={onComplete} onReveal={onReveal} />);
 
     await act(async () => vi.advanceTimersByTime(4_999));
     expect(onReveal).not.toHaveBeenCalled();

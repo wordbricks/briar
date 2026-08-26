@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
@@ -130,21 +130,26 @@ describe("HuntBoard", () => {
       ...demoDashboard.runs[index]!,
       difficulty
     }));
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={{
-      ...demoDashboard,
-      runs
-    }} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...demoDashboard,
+          runs,
+        }}
+      />,
+    );
     expect(Array.from(container.querySelectorAll<HTMLElement>(".kanban-card [data-difficulty]")).map(icon => icon.dataset.difficulty).sort()).toEqual(["easy", "hard", "normal"]);
     expect(container.querySelector('[data-difficulty="easy"]')?.getAttribute("aria-label")).toBe("난이도: 쉬움");
     expect(container.querySelector('[data-difficulty="normal"]')?.getAttribute("title")).toBe("난이도: 보통");
     expect(container.querySelector('[data-difficulty="hard"]')?.getAttribute("aria-label")).toBe("난이도: 어려움");
     await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="리스트 보기"]')?.click());
     expect(container.querySelectorAll(".issue-list-task [data-difficulty]")).toHaveLength(3);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it.each(["issue", "feedback", "error"] as const)("shows the assignee avatar immediately after the %s source label", async source => {
     const member = demoDashboard.members![0]!;
@@ -153,25 +158,30 @@ describe("HuntBoard", () => {
       assigneeUserId: member.userId,
       source
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={{
-      ...demoDashboard,
-      runs: [run]
-    }} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...demoDashboard,
+          runs: [run],
+        }}
+      />,
+    );
     const sourceLabel = container.querySelector(".kanban-source");
     const assigneeAvatar = container.querySelector(".kanban-assignee");
     expect(sourceLabel?.nextElementSibling).toBe(assigneeAvatar);
     expect(assigneeAvatar?.getAttribute("aria-label")).toBe(`담당자: ${member.name}`);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("filters the visible issues from the property menu", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={demoDashboard} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
     const trigger = container.querySelector<HTMLButtonElement>('[aria-label="프로퍼티 필터"]');
     expect(trigger).not.toBeNull();
     await act(async () => {
@@ -189,8 +199,7 @@ describe("HuntBoard", () => {
     expect(container.querySelectorAll(".kanban-card")).toHaveLength(1);
     expect(container.textContent).toContain("D1 작업 이벤트 스키마 추가");
     expect(trigger?.textContent).toContain("1");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("combines issue property filters while allowing multiple values per property", () => {
     const runningIssue = {
@@ -231,10 +240,10 @@ describe("HuntBoard", () => {
     })).toBe(true);
   });
   it("opens issue creation with Command-N", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={demoDashboard} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
     expect(container.querySelector('[aria-keyshortcuts="Meta+N"]')).not.toBeNull();
     const shortcut = new KeyboardEvent("keydown", {
       bubbles: true,
@@ -248,18 +257,13 @@ describe("HuntBoard", () => {
     });
     expect(shortcut.defaultPrevented).toBe(true);
     expect(container.querySelector('[aria-label="새 이슈"]')).not.toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("does not capture Command-N without a project", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () =>
-      root.render(
-        <HuntDashboard {...dashboardProps} dashboard={null} noProject />,
-      )
-    );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={null} noProject />);
     const shortcut = new KeyboardEvent("keydown", {
       bubbles: true,
       cancelable: true,
@@ -272,14 +276,13 @@ describe("HuntBoard", () => {
     });
     expect(shortcut.defaultPrevented).toBe(false);
     expect(container.querySelector('[aria-label="새 이슈"]')).toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("adds a bottom drop space and opens issue creation for a kanban column", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={demoDashboard} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
     const implementingColumn = container.querySelector<HTMLElement>('[data-kanban-column-id="stage:implementing"]');
     const addButton = implementingColumn?.querySelector<HTMLButtonElement>("[data-kanban-column-add]");
     expect(implementingColumn?.querySelector(".kanban-column-content")).not.toBeNull();
@@ -287,8 +290,7 @@ describe("HuntBoard", () => {
     await act(async () => addButton?.click());
     expect(container.querySelector('[role="dialog"][aria-label="새 이슈"]')).not.toBeNull();
     await act(async () => container.querySelector<HTMLButtonElement>(".issue-dialog-close")?.click());
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("moves a newly created issue to the column that opened its add action", async () => {
     window.localStorage.removeItem(createIssueDraftStorageKey);
@@ -296,10 +298,18 @@ describe("HuntBoard", () => {
       runId: "created-from-kanban"
     }));
     const onMoveRun = vi.fn(async () => undefined);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={demoDashboard} onCreateIssue={onCreateIssue} onMoveRun={onMoveRun} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+        onCreateIssue={onCreateIssue}
+        onMoveRun={onMoveRun}
+      />,
+    );
     const addButton = container.querySelector<HTMLButtonElement>('[data-kanban-column-id="stage:implementing"] [data-kanban-column-add]');
     await act(async () => addButton?.click());
     const titleInput = container.querySelector<HTMLInputElement>(".issue-title-input");
@@ -320,8 +330,7 @@ describe("HuntBoard", () => {
     });
     expect(container.querySelector('[role="dialog"][aria-label="새 이슈"]')).toBeNull();
     window.localStorage.removeItem(createIssueDraftStorageKey);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it.each(["completed", "cancelled", "blocked", "failed"] as const)("hides the assigned worker icon when an issue is %s", status => {
     const run = {
@@ -349,13 +358,20 @@ describe("HuntBoard", () => {
       claimedAt: null,
       leaseExpiresAt: null
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={{
-      ...demoDashboard,
-      runs: [queuedRun]
-    }} onProcessIssueNow={onProcessIssueNow} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...demoDashboard,
+          runs: [queuedRun],
+        }}
+        onProcessIssueNow={onProcessIssueNow}
+      />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".kanban-card")?.dispatchEvent(new MouseEvent("contextmenu", {
         bubbles: true,
@@ -367,17 +383,19 @@ describe("HuntBoard", () => {
     expect(processItem?.hasAttribute("data-disabled")).toBe(false);
     await act(async () => processItem?.click());
     expect(onProcessIssueNow).toHaveBeenCalledWith(queuedRun);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("collapses and expands a kanban stage column per user and project", async () => {
     window.localStorage.clear();
     const userId = "user-collapse-1";
     const projectId = demoDashboard.project.id;
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} currentUserId={userId} dashboard={demoDashboard} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard {...dashboardProps} currentUserId={userId} dashboard={demoDashboard} />,
+    );
     const collapseButton = container.querySelector<HTMLButtonElement>('button[aria-label="분석 열 접기"]');
     expect(collapseButton).not.toBeNull();
     expect(container.querySelector('[data-kanban-column-id="stage:analyzing"][data-kanban-column-collapsed="false"]')).not.toBeNull();
@@ -392,17 +410,19 @@ describe("HuntBoard", () => {
       container.querySelector<HTMLButtonElement>('button[aria-label="분석 열 펼치기"]')?.click();
     });
     expect(container.querySelector('[data-kanban-column-id="stage:analyzing"]')?.getAttribute("data-kanban-column-collapsed")).toBe("false");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("hides a kanban column into the hidden list and can show it again", async () => {
     window.localStorage.clear();
     const userId = "user-hide-1";
     const projectId = demoDashboard.project.id;
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} currentUserId={userId} dashboard={demoDashboard} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard {...dashboardProps} currentUserId={userId} dashboard={demoDashboard} />,
+    );
     const hideTrigger = container.querySelector<HTMLButtonElement>('[aria-label="분석 열 메뉴"]');
     expect(hideTrigger).not.toBeNull();
     expect(container.querySelector('[data-kanban-column-id="stage:analyzing"]')).not.toBeNull();
@@ -432,13 +452,11 @@ describe("HuntBoard", () => {
     await act(async () => showItem?.click());
     expect(container.querySelector('[data-kanban-column-id="stage:analyzing"]')).not.toBeNull();
     expect(container.querySelector("[data-kanban-hidden-columns]")).toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("switches between kanban and list views while preserving issue navigation", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={demoDashboard} />));
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
     const listButton = container.querySelector<HTMLButtonElement>('button[aria-label="리스트 보기"]');
     expect(listButton?.getAttribute("aria-pressed")).toBe("false");
     expect(container.querySelector(".kanban-progress")).toBeNull();
@@ -469,7 +487,7 @@ describe("HuntBoard", () => {
     });
     expect(container.querySelector(".issue-list")).not.toBeNull();
     expect(container.querySelector(".kanban-board")).toBeNull();
-    await act(async () => root.unmount());
+    await cleanup();
   });
   it("reveals the process dialog shortcut when a queued companion task is swiped left", async () => {
     const onProcessIssueNow = vi.fn();
@@ -484,12 +502,19 @@ describe("HuntBoard", () => {
       requestedWorkerId: null,
       executionReadiness: "ready" as const
     };
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} companionMode dashboard={{
-      ...demoDashboard,
-      runs: [queuedRun]
-    }} onProcessIssueNow={onProcessIssueNow} />));
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        companionMode
+        dashboard={{
+          ...demoDashboard,
+          runs: [queuedRun],
+        }}
+        onProcessIssueNow={onProcessIssueNow}
+      />,
+    );
     const swipeRow = container.querySelector<HTMLElement>(".companion-task-swipe");
     const firePointer = (type: string, clientX: number, clientY: number) => {
       const event = new Event(type, {
@@ -531,18 +556,15 @@ describe("HuntBoard", () => {
     await act(async () => action?.click());
     expect(onProcessIssueNow).toHaveBeenCalledWith(queuedRun);
     expect(container.querySelector(".run-page")).toBeNull();
-    await act(async () => root.unmount());
+    await cleanup();
   });
   it("shows paused issues in their stage column on the attention filter", async () => {
     const pausedRun = demoDashboard.runs.find(run => run.status === "paused");
     const blockedRun = demoDashboard.runs.find(run => run.status === "blocked");
     expect(pausedRun).toBeTruthy();
     expect(blockedRun).toBeTruthy();
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
-    });
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
     const attentionTab = Array.from(container.querySelectorAll<HTMLButtonElement>(".status-tabs button")).find(button => button.textContent?.includes("확인 필요"));
     expect(attentionTab).toBeTruthy();
     await act(async () => {
@@ -555,8 +577,7 @@ describe("HuntBoard", () => {
     expect(container.querySelector('[data-kanban-column-id="stage:implementing"]')).toBeNull();
     expect(container.querySelector('[data-kanban-column-id="status:blocked"]')?.textContent).toContain(blockedRun!.title);
     expect(container.querySelector('[data-kanban-column-id="status:failed"]')).not.toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("does not start a pointer drag for paused review cards", async () => {
     const pausedRun = {
@@ -565,15 +586,20 @@ describe("HuntBoard", () => {
       workflowStage: "local_qa"
     };
     const onMoveRun = vi.fn(async () => undefined);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<HuntDashboard {...dashboardProps} dashboard={{
-        ...demoDashboard,
-        runs: [pausedRun]
-      }} onMoveRun={onMoveRun} />);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...demoDashboard,
+          runs: [pausedRun],
+        }}
+        onMoveRun={onMoveRun}
+      />,
+    );
     const card = container.querySelector<HTMLElement>(".kanban-card");
     const backlogColumn = container.querySelector<HTMLElement>('[aria-label="백로그"]');
     expect(card?.className).toContain("awaiting-review");
@@ -623,8 +649,7 @@ describe("HuntBoard", () => {
     expect(card?.className).not.toContain("dragging");
     expect(document.body.querySelector(".kanban-card-drag-preview")).toBeNull();
     expect(onMoveRun).not.toHaveBeenCalled();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("marks effective pause checkpoints at their kanban boundaries", () => {
     const workflow = {
@@ -685,8 +710,7 @@ describe("HuntBoard", () => {
     expect(markup).toContain("Security review 시작 전 확인");
   });
   it("updates kanban pause markers when checkpoint settings change", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const checkpointPolicy = {
       ...demoDashboard.settings.checkpointPolicy!,
       projectMandatory: [],
@@ -700,29 +724,35 @@ describe("HuntBoard", () => {
         checkpointPolicy
       }
     };
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={dashboard} />));
+    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={dashboard} />);
     expect(container.querySelector(".kanban-checkpoint-marker")).toBeNull();
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={{
-      ...dashboard,
-      settings: {
-        ...dashboard.settings,
-        checkpointPolicy: {
-          ...checkpointPolicy,
-          effective: [{
-            key: "user-before-implementing",
-            stage: "implementing",
-            position: "before"
-          }],
-          userDefaults: [{
-            key: "user-before-implementing",
-            stage: "implementing",
-            position: "before"
-          }]
-        }
-      }
-    }} />));
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...dashboard,
+          settings: {
+            ...dashboard.settings,
+            checkpointPolicy: {
+              ...checkpointPolicy,
+              effective: [{
+                key: "user-before-implementing",
+                stage: "implementing",
+                position: "before",
+              }],
+              userDefaults: [{
+                key: "user-before-implementing",
+                stage: "implementing",
+                position: "before",
+              }],
+            },
+          },
+        }}
+      />,
+    );
     expect(container.querySelector(".kanban-checkpoint-marker")?.getAttribute("aria-label")).toContain("구현 시작 전 확인");
-    await act(async () => root.unmount());
+    await cleanup();
   });
   it("changes issue status when a kanban card is pointer-dragged onto another column", async () => {
     const onMoveRun = vi.fn(async () => undefined);
@@ -736,13 +766,20 @@ describe("HuntBoard", () => {
       claimedAt: null,
       leaseExpiresAt: null
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={{
-      ...demoDashboard,
-      runs: [queuedRun]
-    }} onMoveRun={onMoveRun} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...demoDashboard,
+          runs: [queuedRun],
+        }}
+        onMoveRun={onMoveRun}
+      />,
+    );
     const card = container.querySelector<HTMLElement>(".kanban-card");
     const backlogColumn = container.querySelector<HTMLElement>('[aria-label="백로그"]');
     expect(card?.getAttribute("draggable")).toBe("false");
@@ -810,16 +847,22 @@ describe("HuntBoard", () => {
     });
     expect(container.querySelector(".run-page")).toBeNull();
     expect(container.querySelector(".kanban-board")).not.toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("shows recovery errors from failed status moves on the board", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<ToastProvider>
-          <HuntDashboard {...dashboardProps} dashboard={demoDashboard} recoveryError="상태 이동에 실패했습니다." />
-        </ToastProvider>));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <ToastProvider>
+        <HuntDashboard
+          {...dashboardProps}
+          dashboard={demoDashboard}
+          recoveryError="상태 이동에 실패했습니다."
+        />
+      </ToastProvider>,
+    );
     expect(container.querySelector(".error-banner")).toBeNull();
     expect(document.body.querySelector('[data-testid="app-toast"].error')?.textContent).toContain("상태 이동에 실패했습니다.");
     await act(async () => {
@@ -827,8 +870,7 @@ describe("HuntBoard", () => {
     });
     expect(container.querySelector(".run-page")).not.toBeNull();
     expect(document.body.querySelectorAll('[data-testid="app-toast"].error')).toHaveLength(1);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("uses the regular status and execution flows for a created channel issue", async () => {
     const channelRun: HuntRun = {
@@ -841,9 +883,9 @@ describe("HuntBoard", () => {
     };
     const onMoveRun = vi.fn(async () => undefined);
     const onProcessIssueNow = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     await act(async () => {
       root.render(<HuntDashboard {...dashboardProps} dashboard={{
         ...demoDashboard,
@@ -875,8 +917,7 @@ describe("HuntBoard", () => {
     expect(processNow?.disabled).toBe(false);
     await act(async () => processNow?.click());
     expect(onProcessIssueNow).toHaveBeenCalledWith(queuedChannelRun);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("restores the Kanban scroll position through internal issue navigation", async () => {
     const run = demoDashboard.runs[0];
@@ -884,10 +925,10 @@ describe("HuntBoard", () => {
       ...demoDashboard,
       runs: [run]
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={dashboard} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={dashboard} />);
     const board = container.querySelector<HTMLDivElement>(".kanban-board");
     expect(board).not.toBeNull();
     if (board) board.scrollLeft = 248;
@@ -895,7 +936,6 @@ describe("HuntBoard", () => {
     expect(container.querySelector(".run-page-shell")).not.toBeNull();
     await act(async () => container.querySelector<HTMLButtonElement>(".run-page-titlebar-back")?.click());
     expect(container.querySelector<HTMLDivElement>(".kanban-board")?.scrollLeft).toBe(248);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });
