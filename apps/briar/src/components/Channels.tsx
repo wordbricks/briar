@@ -2652,7 +2652,10 @@ export function Channels({
       ) : null}
 
       {showRequestedThreadOnly && !(threadParentId && activeChannel) ? (
-        <div className="inbox-detail-loading" role="status">
+        <div
+          className="inbox-detail-loading grid h-full w-full place-items-center bg-card text-xs text-muted-foreground"
+          role="status"
+        >
           <LoadingState label={t("inbox.detailLoading")} />
         </div>
       ) : null}
@@ -3068,11 +3071,11 @@ function ChannelWelcome({
 function DirectMessageWelcome({ name }: { name: string }) {
   const { t } = useI18n();
   return (
-    <div className="channel-welcome dm-welcome">
+    <div className="channel-welcome">
       <div className="channel-welcome-icon" aria-hidden="true">
         <MessageCircle size={28} />
       </div>
-      <h3>{name}</h3>
+      <h3 className="justify-start">{name}</h3>
       <p className="channel-welcome-lead">
         {t("dm.welcome", { name })}
       </p>

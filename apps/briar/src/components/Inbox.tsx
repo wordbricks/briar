@@ -282,9 +282,11 @@ export function Inbox({
     <PageHeader
       action={markAllReadAction}
       className={cn(
-        "inbox-heading",
-        "app-page-header",
+        "h-12 min-h-12 shrink-0 px-[22px] [&_.page-header-copy]:min-w-0 [&_.page-header-copy]:flex-1 [&_.page-header-title]:truncate [&_.page-header-title]:text-base [&_.page-header-title]:font-[650] [&_.page-header-title]:leading-tight",
         !isSidebarOpen && "sidebar-closed",
+        !isSidebarOpen && "pl-[var(--window-navigation-content-inset)]",
+        "max-[760px]:px-[18px]",
+        !isSidebarOpen && "max-[760px]:pl-[var(--window-navigation-content-inset)]",
       )}
       data-tauri-drag-region
       title={t("inbox.title")}
@@ -294,22 +296,26 @@ export function Inbox({
 
   const inboxContent = (
     <div
-      className="inbox-scroll min-h-0 flex-1 overflow-auto"
+      className={cn(
+        "inbox-scroll flex min-h-0 flex-1 flex-col overflow-hidden p-0",
+        companionMode &&
+          "min-h-full overflow-visible pb-[calc(108px+env(safe-area-inset-bottom))]",
+      )}
     >
       <section
-        className="inbox-content"
+        className="inbox-content m-0 flex min-h-0 w-full flex-1 flex-col"
         aria-labelledby={companionMode ? undefined : "inbox-title"}
         aria-label={companionMode ? t("inbox.title") : undefined}
       >
         <section
           aria-label={t("inbox.messages")}
-          className="inbox-panel rounded-none border-0 bg-card"
+          className="inbox-panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-card shadow-none"
         >
           {companionMode ? null : (
-            <header className="inbox-filter-bar">
-              <div className="inbox-filter-controls">
+            <header className="inbox-filter-bar flex min-h-[58px] shrink-0 items-center justify-between gap-4 overflow-hidden border-b border-border/80 bg-card/95 py-2.5 pl-[21px] pr-[18px] max-[760px]:gap-2 max-[760px]:px-3">
+              <div className="inbox-filter-controls flex min-w-0 flex-1 items-center gap-2.5 max-[760px]:items-stretch max-[760px]:flex-col max-[760px]:gap-2">
                 <SelectMenu
-                  className="inbox-project-filter"
+                  className="inbox-project-filter w-[176px] shrink-0 max-[760px]:w-full max-[760px]:flex-auto"
                   label={t("inbox.projectFilter")}
                   onValueChange={setSelectedProjectId}
                   options={projectOptions}
@@ -318,7 +324,7 @@ export function Inbox({
                 />
                 <div
                   aria-label={t("inbox.filters")}
-                  className="inbox-filters"
+                  className="inbox-filters flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   role="group"
                 >
                   {inboxFilters.map((category) => {
@@ -326,11 +332,34 @@ export function Inbox({
                       `inbox.category.${category}` as MessageKey,
                     );
                     const count = unreadCategoryCounts[category];
+                    const isActive = activeFilters.has(category);
+                    const filterTone = isActive
+                      ? category === "urgent"
+                        ? "border-destructive/40 bg-destructive/10 text-destructive hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                        : category === "action_required"
+                          ? "border-warning/40 bg-warning/10 text-warning hover:border-warning/40 hover:bg-warning/10 hover:text-warning"
+                          : category === "important"
+                            ? "border-primary/40 bg-primary/10 text-primary hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                            : "border-border bg-secondary text-foreground hover:border-border hover:bg-secondary hover:text-foreground"
+                      : "border-input bg-muted text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground";
+                    const filterCountTone = isActive
+                      ? category === "urgent"
+                        ? "bg-destructive/20 text-destructive"
+                        : category === "action_required"
+                          ? "bg-warning/20 text-warning"
+                          : category === "important"
+                            ? "bg-primary/20 text-primary"
+                            : "bg-secondary text-foreground"
+                      : "bg-muted text-muted-foreground";
                     return (
                       <button
                         aria-label={count > 0 ? `${label} ${count}` : label}
-                        aria-pressed={activeFilters.has(category)}
-                        className={cn("inbox-filter", category)}
+                        aria-pressed={isActive}
+                        className={cn(
+                          "inbox-filter relative inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] border p-0 transition-[transform,border-color,background-color,color] duration-150 ease-out motion-reduce:transition-none active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+                          category,
+                          filterTone,
+                        )}
                         key={category}
                         onClick={() => toggleFilter(category)}
                         title={label}
@@ -340,7 +369,10 @@ export function Inbox({
                         {count > 0 ? (
                           <span
                             aria-hidden="true"
-                            className="inbox-filter-count"
+                            className={cn(
+                              "inbox-filter-count absolute -right-1 -top-1 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-[3px] font-mono text-[10px] font-semibold leading-none shadow-[0_0_0_1.5px_var(--card)]",
+                              filterCountTone,
+                            )}
                           >
                             {count}
                           </span>
@@ -350,7 +382,12 @@ export function Inbox({
                   })}
                 </div>
               </div>
-              <Typography as="span" tone="muted" variant="caption">
+              <Typography
+                as="span"
+                className="shrink-0 font-mono text-2xs font-medium"
+                tone="muted"
+                variant="caption"
+              >
                 {t("inbox.filteredCount", { count: filteredMessages.length })}
               </Typography>
             </header>
@@ -358,21 +395,27 @@ export function Inbox({
 
           {messages.length === 0 ? (
             <EmptyState
-              className="inbox-empty"
+              className={cn(
+                "inbox-empty min-h-0 flex-1 p-[34px] [&>span]:mb-3.5 [&>span]:size-12 [&>span]:rounded-[15px] [&>span]:bg-accent [&>span]:text-primary [&>strong]:text-xs [&>p]:mt-[7px] [&>p]:text-2xs",
+                companionMode && "min-h-[260px]",
+              )}
               description={t("inbox.emptyDescription")}
               icon={<InboxIcon size={23} />}
               title={t("inbox.emptyTitle")}
             />
           ) : filteredMessages.length === 0 ? (
             <EmptyState
-              className="inbox-empty"
+              className={cn(
+                "inbox-empty min-h-0 flex-1 p-[34px] [&>span]:mb-3.5 [&>span]:size-12 [&>span]:rounded-[15px] [&>span]:bg-accent [&>span]:text-primary [&>strong]:text-xs [&>p]:mt-[7px] [&>p]:text-2xs",
+                companionMode && "min-h-[260px]",
+              )}
               description={t("inbox.filterEmptyDescription")}
               icon={<InboxIcon size={23} />}
               title={t("inbox.filterEmptyTitle")}
             />
           ) : (
             <div
-              className="inbox-list"
+              className="inbox-list scrollbar-subtle grid min-h-0 flex-1 content-start overflow-y-auto bg-card"
               data-has-more={hasMore ? "true" : "false"}
               data-keyboard-list=""
               data-visible-count={visibleMessages.length}
@@ -474,19 +517,48 @@ function InboxMessageRow({
     },
     [openButtonRef],
   );
+  const iconTone =
+    message.kind === "conversation" || message.kind === "channel"
+      ? "overflow-hidden rounded-full bg-[linear-gradient(145deg,#6ec8c4,#3aa8a3)] p-0 text-white"
+      : category === "urgent"
+        ? "bg-destructive/10 text-destructive"
+        : category === "action_required"
+          ? "bg-warning/10 text-warning"
+          : category === "important"
+            ? "bg-primary/10 text-primary"
+            : message.kind === "issue" && message.status === "completed"
+              ? "bg-success/10 text-success"
+              : message.kind === "issue" && message.status === "cancelled"
+                ? "bg-muted text-muted-foreground"
+                : "bg-primary/10 text-primary";
+  const rowBackground = selected
+    ? "bg-accent hover:bg-accent"
+    : compact
+      ? "bg-transparent hover:bg-transparent"
+      : showUnreadAction
+        ? "bg-accent/30 hover:bg-accent/60"
+        : "bg-card hover:bg-muted";
 
   return (
     <div
       className={cn(
-        "inbox-message",
+        "inbox-message group relative min-h-[68px] w-full border-b border-border/70 text-inherit transition-colors duration-150 last:border-b-0",
         category,
         showUnreadAction && "unread",
-        selected && "selected",
+        rowBackground,
+        selected && "selected shadow-[inset_3px_0_0_var(--primary)]",
+        compact && "min-h-[76px] border-b-0",
       )}
     >
       <button
         aria-current={selected ? "true" : undefined}
-        className="inbox-message-open"
+        className={cn(
+          "inbox-message-open grid min-h-[68px] w-full grid-cols-[36px_minmax(0,1fr)_auto] grid-rows-[1fr_1fr] items-center gap-x-3 border-0 bg-transparent px-[18px] py-2.5 text-left text-inherit transition-transform duration-100 ease-out motion-reduce:transform-none active:scale-[.997] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+          !compact && "max-[760px]:gap-x-2.5 max-[760px]:px-3",
+          compact &&
+            "grid-cols-[46px_minmax(0,1fr)] gap-x-3 px-[max(16px,env(safe-area-inset-right))] py-2.5 pl-[max(16px,env(safe-area-inset-left))]",
+          compact && "active:bg-secondary",
+        )}
         data-keyboard-list-item=""
         data-keyboard-list-current={current ? "" : undefined}
         onClick={() => onOpen(message)}
@@ -496,7 +568,7 @@ function InboxMessageRow({
       >
         <span
           className={cn(
-            "inbox-message-icon grid size-9 shrink-0 place-items-center rounded-lg",
+            "inbox-message-icon relative col-start-1 row-span-2 grid size-9 shrink-0 place-items-center rounded-[10px]",
             category,
             message.kind,
             (message.kind === "conversation" || message.kind === "channel") &&
@@ -504,6 +576,8 @@ function InboxMessageRow({
             message.kind === "conversation" || message.kind === "channel"
               ? message.reason
               : message.status,
+            iconTone,
+            compact && "size-[46px] rounded-full",
           )}
         >
           {message.kind === "conversation" || message.kind === "channel" ? (
@@ -529,7 +603,10 @@ function InboxMessageRow({
           message.kind !== "channel" ? (
             <span
               aria-hidden="true"
-              className="inbox-message-project-icon"
+              className={cn(
+                "inbox-message-project-icon pointer-events-none absolute -bottom-1 -right-1 z-[1] grid size-[17px] place-items-center overflow-hidden rounded-full border-2 border-card bg-card text-muted-foreground shadow-[0_1px_3px_rgba(31,32,28,.18)] [&>img]:size-full [&>img]:rounded-full [&>img]:object-contain [&>svg]:size-full [&>svg]:p-0.5",
+                compact && "-bottom-0.5 -right-0.5",
+              )}
               data-project-id={project.id}
             >
               <ProjectIcon
@@ -539,27 +616,34 @@ function InboxMessageRow({
             </span>
           ) : null}
         </span>
-        <span className="inbox-message-copy">
-          <Typography as="strong" className="truncate" variant="bodySm">
+        <span className="inbox-message-copy col-start-2 row-span-2 grid min-w-0 grid-rows-[1fr_1fr] items-center gap-0">
+          <Typography
+            as="strong"
+            className="min-w-0 truncate text-xs font-semibold leading-[1.25]"
+            variant="bodySm"
+          >
             {messageTitle(t, message)}
           </Typography>
-          <small className="inbox-message-detail">
-            <span className="inbox-message-project">
+          <small className={cn(
+            "inbox-message-detail flex min-w-0 items-center gap-[5px] overflow-hidden text-2xs leading-[1.3] whitespace-nowrap text-muted-foreground",
+            compact && "gap-[3px] text-xs",
+          )}>
+            <span className="inbox-message-project shrink-0 font-medium text-muted-foreground">
               {message.kind === "channel" ? `#${message.channelName}` : message.projectName}
             </span>
-            <span aria-hidden="true" className="inbox-message-separator">
+            <span aria-hidden="true" className="inbox-message-separator shrink-0 text-border">
               ·
             </span>
-            <span className="inbox-message-description">
+            <span className="inbox-message-description min-w-0 overflow-hidden text-ellipsis">
               {messageSecondaryText(t, message)}
             </span>
             {compact ? (
               <>
-                <span aria-hidden="true" className="inbox-message-separator">
+                <span aria-hidden="true" className="inbox-message-separator shrink-0 text-border">
                   ·
                 </span>
                 <time
-                  className="inbox-message-inline-time"
+                  className="inbox-message-inline-time shrink-0 font-mono text-2xs font-medium text-muted-foreground"
                   dateTime={message.occurredAt}
                   title={formatDate(message.occurredAt, localeTag)}
                 >
@@ -570,11 +654,14 @@ function InboxMessageRow({
           </small>
         </span>
         {!compact && !showUnreadAction ? (
-          <ChevronRight className="inbox-message-chevron" size={15} />
+          <ChevronRight
+            className="inbox-message-chevron col-start-3 row-start-1 justify-self-end text-muted-foreground/70"
+            size={15}
+          />
         ) : null}
         {compact ? null : (
           <time
-            className="inbox-message-time"
+            className="inbox-message-time col-start-3 row-start-2 justify-self-end whitespace-nowrap pl-3 font-mono text-2xs font-medium text-muted-foreground"
             dateTime={message.occurredAt}
             title={formatDate(message.occurredAt, localeTag)}
           >
@@ -585,7 +672,12 @@ function InboxMessageRow({
       {showUnreadAction ? (
         <button
           aria-label={t("inbox.markRead")}
-          className="inbox-mark-read"
+          className={cn(
+            "inbox-mark-read absolute right-[9px] top-[5px] z-[1] grid size-8 place-items-center rounded-[9px] border-0 p-0 text-primary transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+            compact
+              ? "left-[max(22px,calc(env(safe-area-inset-left)+14px))] right-auto top-[45px] size-[22px] rounded-full border-2 border-card bg-foreground text-card shadow-none hover:bg-primary focus-visible:bg-primary"
+              : "bg-transparent hover:bg-accent focus-visible:bg-accent",
+          )}
           onClick={() => {
             openRef.current?.focus({ preventScroll: true });
             onMarkRead(message.id);
@@ -593,10 +685,23 @@ function InboxMessageRow({
           title={t("inbox.markRead")}
           type="button"
         >
-          <i aria-hidden="true" className="inbox-mark-read-dot" />
+          <i
+            aria-hidden="true"
+            className={cn(
+              "inbox-mark-read-dot col-start-1 row-start-1 size-1.5 rounded-full transition-[opacity,transform] duration-150",
+              compact
+                ? "bg-card shadow-none group-hover:opacity-100 group-hover:scale-100 hover:scale-[.7] hover:opacity-0 focus-visible:scale-[.7] focus-visible:opacity-0"
+                : "bg-primary shadow-[0_0_0_3px_color-mix(in_srgb,var(--primary)_10%,transparent)] group-hover:scale-[.8] group-hover:opacity-0 hover:scale-[.8] hover:opacity-0 focus-visible:scale-[.8] focus-visible:opacity-0",
+            )}
+          />
           <Check
             aria-hidden="true"
-            className="inbox-mark-read-check"
+            className={cn(
+              "inbox-mark-read-check col-start-1 row-start-1 size-[15px] scale-[.8] text-current opacity-0 transition-[opacity,transform] duration-150",
+              compact
+                ? "group-hover:scale-[.8] group-hover:opacity-0 hover:scale-100 hover:opacity-100 focus-visible:scale-100 focus-visible:opacity-100"
+                : "group-hover:scale-100 group-hover:opacity-100 hover:scale-100 hover:opacity-100 focus-visible:scale-100 focus-visible:opacity-100",
+            )}
             size={15}
           />
         </button>
@@ -621,14 +726,17 @@ function InboxMessageAuthorAvatar({
     return (
       <img
         alt=""
-        className="inbox-message-author-avatar"
+        className="inbox-message-author-avatar size-full object-cover"
         onError={() => setFailed(true)}
         src={image}
       />
     );
   }
   return (
-    <span aria-hidden="true" className="inbox-message-author-fallback">
+    <span
+      aria-hidden="true"
+      className="inbox-message-author-fallback text-sm font-[720] leading-none"
+    >
       {initial}
     </span>
   );
