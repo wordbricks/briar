@@ -332,7 +332,7 @@ export function OrganizationSettings({
         </SettingsNav>
       </SettingsSidebar>}
 
-      <SettingsMain className="bg-[#fbfbfd]" isSidebarOpen={isSidebarOpen}>
+      <SettingsMain className="bg-background" isSidebarOpen={isSidebarOpen}>
         <SettingsScroll className="pt-[clamp(40px,8vw,76px)]">
           <div className="mx-auto w-full max-w-[980px]">
             {activeSection === "general" ? (
@@ -572,7 +572,7 @@ export function OrganizationSettings({
                     />
                   </label>
                   <SelectMenu
-                    className="organization-role-filter"
+                    className="!w-auto min-w-[122px]"
                     label={t("organization.roleFilter")}
                     onValueChange={(value) => setRoleFilter(value as RoleFilter)}
                     options={[
@@ -625,7 +625,7 @@ export function OrganizationSettings({
                     <span>{t("organization.role")}</span>
                     <span>{t("organization.projects")}</span>
                     <span>{t("organization.joined")}</span>
-                    <span className="visually-hidden">{t("organization.actions")}</span>
+                    <span className="sr-only">{t("organization.actions")}</span>
                   </div>
                   <div className="flex items-center justify-between border-b border-border bg-muted/60 px-4 py-2">
                     <Typography as="strong" variant="bodySm">
