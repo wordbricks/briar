@@ -28,6 +28,7 @@ import type {
 import { ManagedComputerRemoteDesktop } from "./ManagedComputerRemoteDesktop";
 import { WorkerIcon } from "./WorkerIcon";
 import { WorkerProviderIcons } from "./WorkerProviderIcons";
+import { cn } from "../lib/utils";
 
 export function workerProviders(worker: ExecutionWorker): AgentProvider[] {
   if (
@@ -69,10 +70,10 @@ export function workerUpdateAvailable({
 }): boolean {
   return Boolean(
     latestVersion &&
-      currentVersion &&
-      isSemanticVersion(currentVersion) &&
-      isSemanticVersion(latestVersion) &&
-      compareSemanticVersions(currentVersion, latestVersion) < 0,
+    currentVersion &&
+    isSemanticVersion(currentVersion) &&
+    isSemanticVersion(latestVersion) &&
+    compareSemanticVersions(currentVersion, latestVersion) < 0,
   );
 }
 
@@ -133,8 +134,9 @@ export function WorkerStatusBar({
   const [managedComputersByDeviceId, setManagedComputersByDeviceId] = useState<
     Record<string, ManagedComputer>
   >({});
-  const [remoteComputer, setRemoteComputer] =
-    useState<ManagedComputer | null>(null);
+  const [remoteComputer, setRemoteComputer] = useState<ManagedComputer | null>(
+    null,
+  );
   const [deviceUpdates, setDeviceUpdates] = useState<
     Record<string, DeviceUpdateState>
   >({});
@@ -244,8 +246,8 @@ export function WorkerStatusBar({
     ]);
   }, [isOpen, refreshManagedComputerMetadata, refreshUpdateMetadata]);
 
-  const hasPendingUpdate = Object.values(deviceUpdates).some(
-    (device) => Boolean(device.updateRequest),
+  const hasPendingUpdate = Object.values(deviceUpdates).some((device) =>
+    Boolean(device.updateRequest),
   );
 
   useEffect(() => {
@@ -286,7 +288,7 @@ export function WorkerStatusBar({
   return (
     <div
       aria-label={t("worker.executionEnvironment")}
-      className="worker-status-menu"
+      className="relative flex h-full shrink-0 items-stretch border-l border-border"
       ref={rootRef}
     >
       <button
@@ -294,25 +296,29 @@ export function WorkerStatusBar({
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-label={t("worker.activeCount", { count: activeCount })}
-        className="worker-status-trigger"
+        className="flex h-full min-w-12 cursor-pointer items-center justify-center gap-1.5 border-0 bg-transparent px-2.5 py-0 text-muted-foreground hover:bg-secondary hover:text-foreground active:scale-[.97] focus-visible:relative focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring [&>svg]:shrink-0"
         onClick={() => setIsOpen((open) => !open)}
         ref={triggerRef}
         title={t("worker.activeCount", { count: activeCount })}
         type="button"
       >
         <Monitor aria-hidden size={14} strokeWidth={1.8} />
-        <strong>{activeCount}</strong>
+        <strong className="min-w-[9px] text-center font-mono text-micro leading-none font-semibold">
+          {activeCount}
+        </strong>
       </button>
       {isOpen ? (
         <div
           aria-label={t("worker.executionEnvironment")}
-          className="worker-status-popover"
+          className="absolute right-1.5 bottom-[calc(100%+7px)] z-60 max-h-[min(420px,calc(100vh-74px))] w-[310px] origin-bottom-right animate-in overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl duration-150 fade-in slide-in-from-bottom-1 zoom-in-95 motion-reduce:animate-none"
           id={popoverId}
           role="dialog"
         >
-          <header>
-            <strong>{t("worker.executionEnvironment")}</strong>
-            <span className="worker-status-header-actions">
+          <header className="flex h-[42px] items-center justify-between gap-3 border-b border-border px-3.5 py-0">
+            <strong className="text-sm font-bold">
+              {t("worker.executionEnvironment")}
+            </strong>
+            <span className="flex items-center gap-1.5 text-micro text-muted-foreground [&>button]:grid [&>button]:size-6 [&>button]:cursor-pointer [&>button]:place-items-center [&>button]:rounded-md [&>button]:border-0 [&>button]:bg-transparent [&>button]:p-0 [&>button]:text-muted-foreground [&>button]:hover:bg-accent [&>button]:hover:text-accent-foreground [&>button]:disabled:cursor-default [&>button]:disabled:opacity-70">
               <span>
                 {t("worker.activeSummary", {
                   active: activeCount,
@@ -351,11 +357,14 @@ export function WorkerStatusBar({
             </span>
           </header>
           {updateError ? (
-            <p className="worker-status-error" role="alert">
+            <p
+              className="m-0 border-b border-border px-3 py-2 text-micro text-[var(--status-destructive-foreground)]"
+              role="alert"
+            >
               {updateError}
             </p>
           ) : null}
-          <div className="worker-status-list">
+          <div className="scrollbar-subtle max-h-[376px] overflow-y-auto">
             {workers.map((worker) => {
               const providers = workerProviders(worker);
               const status = t(`worker.readiness.${worker.readiness}`);
@@ -415,54 +424,71 @@ export function WorkerStatusBar({
 
               return (
                 <div
-                  className="worker-status-item"
+                  className="grid min-h-[52px] min-w-0 grid-cols-[7px_28px_minmax(0,1fr)_auto] items-center gap-2 border-t border-border bg-popover px-3 py-2 text-muted-foreground first:border-t-0"
                   key={worker.id}
                   title={titleParts.join(" · ")}
                 >
                   <i
                     aria-label={status}
-                    className={`worker-status-dot ${worker.readiness}`}
+                    className={cn(
+                      "size-[7px] shrink-0 rounded-full bg-muted-foreground",
+                      worker.readiness === "available" &&
+                        "bg-success shadow-[0_0_0_3px_color-mix(in_srgb,var(--success)_12%,transparent)]",
+                      worker.readiness === "busy" && "bg-accent-foreground",
+                      worker.readiness === "needs_attention" && "bg-warning",
+                    )}
                     role="img"
                   />
                   <WorkerIcon icon={worker.icon} size={28} />
-                  <span className="worker-status-copy">
-                    <strong>{worker.label}</strong>
-                    <span className="worker-status-meta">
-                      <small>{status}</small>
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <strong className="truncate text-xs font-semibold text-foreground">
+                      {worker.label}
+                    </strong>
+                    <span className="flex min-w-0 flex-wrap items-center gap-2">
+                      <small className="min-w-0 truncate text-micro text-muted-foreground">
+                        {status}
+                      </small>
                       <span
                         aria-label={slotUsage}
                         aria-valuemax={maximumSlots}
                         aria-valuemin={0}
                         aria-valuenow={activeSlots}
-                        className="worker-slot-usage"
+                        className="inline-flex items-center gap-1 text-muted-foreground"
                         role="progressbar"
                       >
-                        <i aria-hidden>
+                        <i
+                          aria-hidden
+                          className="h-1 w-[34px] shrink-0 overflow-hidden rounded-full bg-secondary"
+                        >
                           <b
+                            className="block h-full rounded-[inherit] bg-accent-foreground transition-[width] duration-200 motion-reduce:transition-none"
                             style={{
                               width: `${(activeSlots / maximumSlots) * 100}%`,
                             }}
                           />
                         </i>
-                        <small aria-hidden>
+                        <small
+                          aria-hidden
+                          className="min-w-[23px] whitespace-nowrap font-mono text-micro leading-none font-semibold text-muted-foreground"
+                        >
                           {activeSlots}/{maximumSlots}
                         </small>
                       </span>
                       {versionLabel ? (
-                        <small className="worker-status-version">
+                        <small className="whitespace-nowrap font-mono text-micro leading-none font-semibold text-muted-foreground">
                           {versionLabel}
                         </small>
                       ) : null}
                     </span>
                   </span>
-                  <span className="worker-status-actions">
-                    <span className="worker-status-providers">
+                  <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-0.5 [&>span]:flex [&>span]:items-center [&>span]:gap-0.5 [&>span>span]:grid [&>span>span]:size-5 [&>span>span]:place-items-center [&>span>span]:rounded-md [&>span>span]:border [&>span>span]:border-border [&>span>span]:bg-card [&>span>span]:text-foreground [&_img]:block [&_svg]:block">
                       <WorkerProviderIcons providers={providers} size={13} />
                     </span>
                     {managedComputer ? (
                       <button
                         aria-label={`${t("managedComputer.remote.open")}: ${worker.label}`}
-                        className="worker-status-remote"
+                        className="grid size-[22px] cursor-pointer place-items-center rounded-md border border-border bg-card p-0 text-foreground hover:bg-accent hover:text-accent-foreground"
                         onClick={() => {
                           setIsOpen(false);
                           setRemoteComputer(managedComputer);
@@ -485,17 +511,17 @@ export function WorkerStatusBar({
                                   "",
                               })
                             : isPending
-                            ? t("organization.workerUpdatePending", {
-                                version:
-                                  updateRequest?.targetVersion ??
-                                  latestVersion ??
-                                  "",
-                              })
-                            : t("organization.workerUpdate", {
-                                name: worker.label,
-                              })
+                              ? t("organization.workerUpdatePending", {
+                                  version:
+                                    updateRequest?.targetVersion ??
+                                    latestVersion ??
+                                    "",
+                                })
+                              : t("organization.workerUpdate", {
+                                  name: worker.label,
+                                })
                         }
-                        className="worker-status-update"
+                        className="grid size-[22px] cursor-pointer place-items-center rounded-md border border-border bg-card p-0 text-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-default disabled:opacity-70"
                         disabled={
                           isUpdating ||
                           isPending ||
@@ -518,26 +544,22 @@ export function WorkerStatusBar({
                                   t("organization.workerUpdateDelayed"),
                               })
                             : isPending
-                            ? t("organization.workerUpdatePending", {
-                                version:
-                                  updateRequest?.targetVersion ??
-                                  latestVersion ??
-                                  "",
-                              })
-                            : remoteUpdateSupported
-                              ? t("organization.workerUpdate", {
-                                  name: worker.label,
+                              ? t("organization.workerUpdatePending", {
+                                  version:
+                                    updateRequest?.targetVersion ??
+                                    latestVersion ??
+                                    "",
                                 })
-                              : t("organization.workerUpdateUnsupported")
+                              : remoteUpdateSupported
+                                ? t("organization.workerUpdate", {
+                                    name: worker.label,
+                                  })
+                                : t("organization.workerUpdateUnsupported")
                         }
                         type="button"
                       >
                         {isUpdating || isPending ? (
-                          <Spinner
-                            aria-hidden
-                            size={13}
-                            strokeWidth={1.8}
-                          />
+                          <Spinner aria-hidden size={13} strokeWidth={1.8} />
                         ) : (
                           <Download aria-hidden size={13} strokeWidth={1.8} />
                         )}
@@ -551,10 +573,10 @@ export function WorkerStatusBar({
         </div>
       ) : null}
       {remoteComputer &&
-          organizationId &&
-          token &&
-          remoteComputer.organizationId === organizationId &&
-          remoteComputer.requesterUserId === userId ? (
+      organizationId &&
+      token &&
+      remoteComputer.organizationId === organizationId &&
+      remoteComputer.requesterUserId === userId ? (
         <ManagedComputerRemoteDesktop
           computer={remoteComputer}
           onClose={() => setRemoteComputer(null)}

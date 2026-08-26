@@ -15,7 +15,7 @@ export function WorkerIcon({
   return (
     <span
       aria-hidden="true"
-      className="worker-icon"
+      className="worker-icon grid shrink-0 place-items-center overflow-hidden rounded-[28%] border border-border bg-muted text-muted-foreground leading-none [&_img]:block [&_img]:size-full [&_img]:object-cover"
       style={{
         fontSize: `${resolvedGlyphSize}px`,
         height: `${size}px`,

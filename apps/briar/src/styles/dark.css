@@ -51,12 +51,8 @@
 .dark .sidebar-channel-context-menu,
 .dark .channel-create-dialog,
 .dark .account-popover,
-.dark .agent-usage-popover,
-.dark .worker-status-popover,
 .dark .app-version-popover,
-.dark .health-popover,
-.dark .companion-account-popover,
-.dark .project-schedule-context-menu {
+.dark .companion-account-popover {
   border-color: var(--sidebar-border);
   color: var(--sidebar-popover-foreground);
   background: var(--sidebar-popover);
@@ -99,9 +95,7 @@
 .dark .topbar,
 .dark .app-status-bar,
 .dark .page-header,
-.dark .queue-header,
-.dark .project-agents-heading,
-.dark .project-schedule-heading {
+.dark .queue-header {
   border-color: var(--border);
   color: var(--foreground);
   background: var(--card);
@@ -187,9 +181,7 @@
 
 .dark .kanban-card,
 .dark .issue-list-body,
-.dark .issue-list-row,
-.dark .project-schedule-calendar,
-.dark .project-schedule-toolbar {
+.dark .issue-list-row {
   border-color: var(--border);
   color: var(--foreground);
   background: var(--card);
@@ -197,9 +189,7 @@
 
 .dark .issue-list-row:hover,
 .dark .issue-list-row:focus-visible,
-.dark .status-tabs button:hover,
-.dark .health-trigger:hover,
-.dark .health-trigger[aria-expanded="true"] {
+.dark .status-tabs button:hover {
   color: var(--foreground);
   background: var(--secondary);
 }
@@ -255,61 +245,20 @@
 .dark .dialog,
 .dark .issue-dialog,
 .dark .run-dialog,
-.dark .delete-project-dialog,
-.dark .project-schedule-dialog,
-.dark .project-schedule-detail {
+.dark .delete-project-dialog {
   border-color: var(--border);
   color: var(--foreground);
   background: var(--card);
 }
 
-.dark .agent-usage-status-trigger,
-.dark .worker-status-trigger,
-.dark .app-version-trigger,
-.dark .health-trigger {
+.dark .app-version-trigger {
   color: var(--muted-foreground);
 }
 
-.dark .agent-usage-status-trigger:hover,
-.dark .agent-usage-status-trigger[aria-expanded="true"],
-.dark .worker-status-trigger:hover,
-.dark .worker-status-trigger[aria-expanded="true"],
 .dark .app-version-trigger:hover,
 .dark .app-version-trigger[aria-expanded="true"] {
   color: var(--foreground);
   background: var(--secondary);
-}
-
-.dark .agent-usage-status-provider > small,
-.dark .agent-usage-meter > strong,
-.dark .worker-slot-usage,
-.dark .worker-slot-usage > small {
-  color: var(--muted-foreground);
-}
-
-.dark .usage-overview {
-  --muted-foreground:#9b9ba3;
-  --usage-codex-color:#eceee9;
-  --usage-unknown-color:#a8aaa5;
-}
-
-.dark .health-item {
-  border-color: var(--border);
-}
-
-.dark .health-item strong {
-  color: var(--foreground);
-}
-
-.dark .health-item em,
-.dark .health-actions button {
-  color: var(--muted-foreground);
-}
-
-.dark .health-actions button:hover:not(:disabled) {
-  color: var(--accent-foreground);
-  border-color: var(--input);
-  background: var(--accent);
 }
 
 .dark .channel-message-avatar .channel-agent-badge {

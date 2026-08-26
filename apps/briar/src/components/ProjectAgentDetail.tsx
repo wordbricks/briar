@@ -2,10 +2,7 @@ import { ArrowLeft, Play } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import { useEffect, useState } from "react";
 
-import {
-  MainContent,
-  PageHeader,
-} from "@/components/layout";
+import { MainContent, PageHeader } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
@@ -21,17 +18,14 @@ import {
   agentWithSkillsRuntime,
 } from "../lib/project-agent";
 import { runProjectAgent } from "../lib/project-llm";
-import type {
-  DashboardPayload,
-  HuntRun,
-  ProjectAgent,
-} from "../types";
+import type { DashboardPayload, HuntRun, ProjectAgent } from "../types";
 import { ProjectAgentSessionDetail } from "./ProjectAgentSessionDetail";
 import { ProjectAgentSessions } from "./ProjectAgentSessions";
 import {
   ProjectAgentTaskDialog,
   type ProjectAgentTaskDialogSubmit,
 } from "./ProjectAgentTaskDialog";
+import { cn } from "../lib/utils";
 
 export type {
   ProjectAgentTaskSessionSettlement,
@@ -155,12 +149,7 @@ export function ProjectAgentDetail({
         session.agentId === agent.id,
     );
     if (dispatchSession) setSelectedSessionId(dispatchSession.id);
-  }, [
-    agent.id,
-    agent.projectId,
-    selectedSession,
-    sessions,
-  ]);
+  }, [agent.id, agent.projectId, selectedSession, sessions]);
 
   const openTaskDialog = () => {
     setIsTaskDialogOpen(true);
@@ -206,10 +195,9 @@ export function ProjectAgentDetail({
         },
       );
     } catch (caught) {
-      toast(
-        caught instanceof Error ? caught.message : String(caught),
-        { tone: "error" },
-      );
+      toast(caught instanceof Error ? caught.message : String(caught), {
+        tone: "error",
+      });
     } finally {
       setIsStarting(false);
     }
@@ -278,12 +266,8 @@ export function ProjectAgentDetail({
       <PageHeader
         action={
           <Button
-            className="project-agent-create project-agent-run-task"
-            disabled={
-              isTaskStarting ||
-              !dashboard ||
-              agent.skills.length === 0
-            }
+            className="h-[34px] px-3 text-xs active:scale-[.97]"
+            disabled={isTaskStarting || !dashboard || agent.skills.length === 0}
             onClick={openTaskDialog}
             type="button"
           >
@@ -301,13 +285,16 @@ export function ProjectAgentDetail({
             )}
           </Button>
         }
-        className={`app-page-header project-agents-heading project-agent-detail-heading${isSidebarOpen ? "" : " sidebar-closed"}`}
+        className={cn(
+          "app-page-header h-12 shrink-0 px-5 [&_.page-header-description]:hidden",
+          !isSidebarOpen && "sidebar-closed",
+        )}
         data-tauri-drag-region
         title={
-          <span className="project-agent-detail-title">
+          <span className="flex min-w-0 items-center gap-2.5">
             <Button
               aria-label={t("agents.back")}
-              className="project-agent-detail-back"
+              className="size-7 shrink-0 rounded-md p-0 text-muted-foreground shadow-none hover:bg-secondary hover:text-foreground"
               onClick={onBack}
               size="icon"
               type="button"
@@ -315,12 +302,12 @@ export function ProjectAgentDetail({
             >
               <ArrowLeft aria-hidden="true" size={16} />
             </Button>
-            <span>{agent.name}</span>
+            <span className="truncate">{agent.name}</span>
           </span>
         }
         titleId="project-agent-detail-title"
       />
-      <div className="project-agent-run-scroll">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <ProjectAgentSessions
           agent={agent}
           onSessionOpen={setSelectedSessionId}
