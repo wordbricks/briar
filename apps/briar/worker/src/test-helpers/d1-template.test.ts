@@ -64,6 +64,13 @@ describe("D1 test template isolation", () => {
     expect(template.manifest.builder).toBe("wrangler-local");
     expect(template.manifest.runtimes.platform).toBe(process.platform);
     expect(template.manifest.runtimes.architecture).toBe(process.arch);
+    expect(template.manifest.schemaObjects).toBeGreaterThan(0);
+    expect(template.manifest.files.some(({ path, bytes }) => (
+      path.includes("/d1/") &&
+      path.endsWith(".sqlite-wal") &&
+      !path.endsWith("/metadata.sqlite-wal") &&
+      bytes > 0
+    ))).toBe(false);
     const appliedMigrations = await first.db.prepare(
       "select name from d1_migrations order by id",
     ).all<{ name: string }>();

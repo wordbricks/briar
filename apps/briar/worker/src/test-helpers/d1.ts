@@ -46,6 +46,20 @@ type TemplateManifest = {
   schemaObjects: number;
 };
 
+type NativeCheckpointResult = {
+  checkpoint: {
+    busy: number;
+    log: number;
+    checkpointed: number;
+  } | null;
+};
+
+type NativeTemplateVerification = NativeCheckpointResult & {
+  quickCheck: string | null;
+  schemaObjects: number | null;
+  migrations: string[];
+};
+
 export type D1TestTemplate = {
   fingerprint: string;
   directory: string;
@@ -73,7 +87,7 @@ interface WranglerLocalEnvironment {
   [name: string]: string | undefined;
 }
 
-const TEMPLATE_FORMAT_VERSION = 3;
+const TEMPLATE_FORMAT_VERSION = 4;
 const TEMPLATE_BUILDER = "wrangler-local";
 const TEMPLATE_DATABASE_ID = "00000000-0000-4000-8000-000000000001";
 const TEMPLATE_DATABASE_NAME = "briar-d1-test-template";
@@ -91,6 +105,10 @@ const WRANGLER_CONFIG_FILE = "wrangler.d1-test.json";
 const WRANGLER_TIMEOUT_MS = 5 * 60_000;
 const WRANGLER_MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
 const WRANGLER_FAILURE_LOG_LINES = 40;
+const NATIVE_VERIFIER_TIMEOUT_MS = 60_000;
+const NATIVE_VERIFIER_FILE = fileURLToPath(
+  new URL("../../../../../scripts/verify-d1-test-template.ts", import.meta.url),
+);
 const WRANGLER_LOCAL_ENVIRONMENT_VARIABLES = [
   "HOME",
   "LANG",
@@ -367,34 +385,167 @@ async function releaseTemplateLock(
   await rm(lockPath, { recursive: true, force: true });
 }
 
-async function verifyPreparedDatabase(
+async function verifyMiniflareDatabase(
   db: D1Database,
-  expectedMigrations?: readonly string[],
+  expectedMigrationCount: number,
 ) {
-  const integrity = await db.prepare("PRAGMA quick_check").first<Record<string, unknown>>();
-  if (!integrity || !Object.values(integrity).includes("ok")) {
-    throw new Error("D1 template failed SQLite quick_check");
-  }
-  const schemaObjects = await db.prepare(
-    `select count(*) as count from sqlite_master
-     where type in ('table', 'index', 'trigger') and name not like 'sqlite_%'`,
+  const ready = await db.prepare("select 1 as ready").first<number>("ready");
+  if (ready !== 1) throw new Error("D1 template failed Miniflare connection check");
+  const observedMigrationCount = await db.prepare(
+    "select count(*) as count from d1_migrations",
   ).first<number>("count");
-  if (!schemaObjects || schemaObjects < 1) {
-    throw new Error("D1 template contains no application schema objects");
+  if (observedMigrationCount !== expectedMigrationCount) {
+    throw new Error(
+      `D1 template migration count mismatch in Miniflare: ` +
+        `expected ${expectedMigrationCount}, observed ${observedMigrationCount ?? "none"}`,
+    );
   }
-  if (expectedMigrations) {
-    const migrationHistory = await db.prepare(
-      "select name from d1_migrations order by id",
-    ).all<{ name: string }>();
-    const observedMigrations = migrationHistory.results.map(({ name }) => name);
-    if (JSON.stringify(observedMigrations) !== JSON.stringify(expectedMigrations)) {
-      throw new Error(
-        `D1 template migration history mismatch: expected ${expectedMigrations.length}, ` +
-          `observed ${observedMigrations.length}`,
-      );
+}
+
+async function findD1SqliteDatabase(persistencePath: string) {
+  const d1Root = join(persistencePath, "d1");
+  const candidates: string[] = [];
+  const visit = async (directory: string): Promise<void> => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`D1 persistence contains an unexpected symbolic link: ${path}`);
+      }
+      if (entry.isDirectory()) {
+        await visit(path);
+      } else if (
+        entry.isFile() &&
+        entry.name.endsWith(".sqlite") &&
+        entry.name !== "metadata.sqlite"
+      ) {
+        candidates.push(path);
+      }
     }
+  };
+  await visit(d1Root);
+  if (candidates.length !== 1) {
+    throw new Error(
+      `Expected one local D1 SQLite database, found ${candidates.length}`,
+    );
   }
-  return schemaObjects;
+  return candidates[0]!;
+}
+
+function bunExecutable() {
+  const versions = process.versions as NodeJS.ProcessVersions & { bun?: string };
+  return versions.bun ? process.execPath : "bun";
+}
+
+async function runNativeTemplateVerifier<T extends NativeCheckpointResult>(
+  databasePath: string,
+  checkpointOnly = false,
+) {
+  const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>(
+    (resolvePromise, rejectPromise) => {
+      execFile(
+        bunExecutable(),
+        [
+          "run",
+          NATIVE_VERIFIER_FILE,
+          databasePath,
+          ...(checkpointOnly ? ["--checkpoint-only"] : []),
+        ],
+        {
+          cwd: process.cwd(),
+          encoding: "utf8",
+          env: localWranglerEnvironment(),
+          maxBuffer: WRANGLER_MAX_OUTPUT_BYTES,
+          timeout: NATIVE_VERIFIER_TIMEOUT_MS,
+        },
+        (error, stdout, stderr) => {
+          if (!error) {
+            resolvePromise({ stdout, stderr });
+            return;
+          }
+          const diagnostic = wranglerFailureOutput(stdout, stderr);
+          rejectPromise(new Error(
+            error.killed
+              ? `Native D1 template verification timed out after ` +
+                `${NATIVE_VERIFIER_TIMEOUT_MS / 1_000}s`
+              : `Native D1 template verification failed with exit code ` +
+                `${error.code ?? "unknown"}` +
+                (diagnostic ? `:\n${diagnostic}` : ""),
+            { cause: error },
+          ));
+        },
+      );
+    },
+  );
+  if (stderr.trim()) {
+    console.warn(`[d1-test] native verifier warning:\n${stderr.trim()}`);
+  }
+  try {
+    return JSON.parse(stdout.trim()) as T;
+  } catch (error) {
+    throw new Error("Native D1 template verifier returned invalid JSON", {
+      cause: error,
+    });
+  }
+}
+
+async function assertCompactedWal(databasePath: string) {
+  try {
+    const wal = await stat(`${databasePath}-wal`);
+    if (wal.size !== 0) {
+      throw new Error(`D1 template WAL remains ${wal.size} bytes after checkpoint`);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+}
+
+async function checkpointAndVerifyPreparedDatabase(
+  persistencePath: string,
+  expectedMigrations: readonly string[],
+) {
+  const startedAt = performance.now();
+  const databasePath = await findD1SqliteDatabase(persistencePath);
+  const verification = await runNativeTemplateVerifier<NativeTemplateVerification>(
+    databasePath,
+  );
+  if (
+    !verification.checkpoint ||
+    verification.checkpoint.busy !== 0 ||
+    verification.quickCheck !== "ok" ||
+    !Number.isInteger(verification.schemaObjects) ||
+    (verification.schemaObjects ?? 0) < 1 ||
+    JSON.stringify(verification.migrations) !== JSON.stringify(expectedMigrations)
+  ) {
+    throw new Error(
+      `Native D1 template verification failed: ` +
+        `checkpoint busy=${verification.checkpoint?.busy ?? "unknown"}; ` +
+        `quick_check=${verification.quickCheck ?? "missing"}; ` +
+        `schema objects=${verification.schemaObjects ?? "missing"}; ` +
+        `migrations=${verification.migrations?.length ?? "missing"}/${expectedMigrations.length}`,
+    );
+  }
+  await assertCompactedWal(databasePath);
+  console.info(
+    `[d1-test] native SQLite checkpoint and verification: ` +
+      `${verification.schemaObjects} schema objects; ` +
+      `${expectedMigrations.length} migrations; ` +
+      `elapsed: ${((performance.now() - startedAt) / 1_000).toFixed(3)}s`,
+  );
+  return { databasePath, schemaObjects: verification.schemaObjects! };
+}
+
+async function checkpointPreparedDatabase(databasePath: string) {
+  const checkpoint = await runNativeTemplateVerifier<NativeCheckpointResult>(
+    databasePath,
+    true,
+  );
+  if (!checkpoint.checkpoint || checkpoint.checkpoint.busy !== 0) {
+    throw new Error(
+      `Final D1 template checkpoint failed: ` +
+        `busy=${checkpoint.checkpoint?.busy ?? "unknown"}`,
+    );
+  }
+  await assertCompactedWal(databasePath);
 }
 
 function localWranglerEnvironment() {
@@ -509,19 +660,23 @@ async function buildTemplate(
     temporaryDirectory,
     fingerprint.files.length,
   );
+  const { databasePath, schemaObjects } = await checkpointAndVerifyPreparedDatabase(
+    persistencePath,
+    fingerprint.files,
+  );
   const miniflare = new Miniflare({
     modules: TEMPLATE_BINDING_CONFIG.modules,
     script: TEMPLATE_BINDING_CONFIG.script,
     d1Databases: { DB: TEMPLATE_DATABASE_ID },
     resourcePersistencePath: persistencePath,
   });
-  let schemaObjects: number;
   try {
     const db = await miniflare.getD1Database("DB") as unknown as D1Database;
-    schemaObjects = await verifyPreparedDatabase(db, fingerprint.files);
+    await verifyMiniflareDatabase(db, fingerprint.files.length);
   } finally {
     await miniflare.dispose();
   }
+  await checkpointPreparedDatabase(databasePath);
   const files = await listTemplateFiles(
     join(temporaryDirectory, PERSISTENCE_PARENT_DIRECTORY),
   );
@@ -721,7 +876,7 @@ export async function createIsolatedTestDatabase(
     });
     clonedMiniflare = miniflare;
     const db = await miniflare.getD1Database("DB") as unknown as D1Database;
-    await verifyPreparedDatabase(db, template.manifest.migrations);
+    await verifyMiniflareDatabase(db, template.manifest.migrations.length);
     const disposeMiniflare = miniflare.dispose.bind(miniflare);
     let disposed = false;
     const dispose = async () => {
