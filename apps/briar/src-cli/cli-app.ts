@@ -14,6 +14,7 @@ import {
   configureProject,
   connectProject,
   createProject,
+  listProjectsCommand,
   projectDoctor,
   showWorkflow,
 } from "./project-commands";
@@ -145,6 +146,12 @@ const skillsCommand = Command.make("skills").pipe(
 const projectCommand = Command.make("project").pipe(
   Command.withDescription("Create and configure Briar projects"),
   Command.withSubcommands([
+    leaf(
+      "list",
+      switches("json"),
+      listProjectsCommand,
+      "List projects available to the signed-in user",
+    ),
     leaf(
       "create",
       optionalStrings("name"),
