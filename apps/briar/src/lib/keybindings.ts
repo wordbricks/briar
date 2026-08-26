@@ -49,6 +49,7 @@ export const defaultKeybindings: Keybindings = {
 };
 
 export const keybindingsStorageKey = "briar.settings.keybindings.v1";
+export const keybindingsChangedEvent = "briar:keybindings-changed";
 export const keyboardNavigationPreferencesStorageKey =
   "briar.settings.keyboard-navigation.v1";
 export const keyboardNavigationPreferencesChangedEvent =
@@ -90,7 +91,12 @@ const decodeKeyboardNavigationPreferencesValue = Schema.decodeUnknownOption(
 
 const modifierOnlyKeys = new Set(["Meta", "Control", "Alt", "Shift", "OS"]);
 
+function hasConfigurableModifier(shortcut: Shortcut): boolean {
+  return shortcut.meta || shortcut.ctrl || shortcut.alt;
+}
+
 let recordingKeybinding: KeybindingId | null = null;
+let volatileKeybindings: Keybindings | null = null;
 let volatileKeyboardNavigationPreferences:
   KeyboardNavigationPreferences | null = null;
 
@@ -109,12 +115,14 @@ export function getRecordingKeybinding(): KeybindingId | null {
 function persist(keybindings: Keybindings) {
   try {
     window.localStorage.setItem(keybindingsStorageKey, JSON.stringify(keybindings));
+    volatileKeybindings = null;
   } catch {
-    // Keep the keybindings for the current session when storage is unavailable.
+    volatileKeybindings = keybindings;
   }
 }
 
 export function loadKeybindings(): Keybindings {
+  if (volatileKeybindings) return volatileKeybindings;
   const result: Keybindings = { ...defaultKeybindings };
   let repaired = false;
   try {
@@ -131,6 +139,7 @@ export function loadKeybindings(): Keybindings {
       );
       if (
         storedShortcut &&
+        hasConfigurableModifier(storedShortcut) &&
         !isReservedGlobalShortcut(storedShortcut)
       ) {
         result[id] = storedShortcut;
@@ -232,7 +241,10 @@ export function subscribeKeyboardNavigationPreferences(
 
 export function saveKeybinding(id: KeybindingId, shortcut: Shortcut): Keybindings {
   const current = loadKeybindings();
-  if (isReservedGlobalShortcut(shortcut)) return current;
+  if (
+    !hasConfigurableModifier(shortcut) ||
+    isReservedGlobalShortcut(shortcut)
+  ) return current;
   const next = { ...current };
   const conflict = keybindingIds.find(
     (candidate) =>
@@ -241,11 +253,37 @@ export function saveKeybinding(id: KeybindingId, shortcut: Shortcut): Keybinding
   if (conflict) next[conflict] = current[id];
   next[id] = shortcut;
   persist(next);
+  window.dispatchEvent(
+    new CustomEvent<Keybindings>(keybindingsChangedEvent, { detail: next }),
+  );
   return next;
 }
 
 export function resetKeybinding(id: KeybindingId): Keybindings {
   return saveKeybinding(id, defaultKeybindings[id]);
+}
+
+export function subscribeKeybindings(
+  onChange: (keybindings: Keybindings) => void,
+): () => void {
+  const handleChange = (event: Event) => {
+    if (event instanceof CustomEvent) {
+      onChange(event.detail as Keybindings);
+      return;
+    }
+    volatileKeybindings = null;
+    onChange(loadKeybindings());
+  };
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key !== null && event.key !== keybindingsStorageKey) return;
+    handleChange(event);
+  };
+  window.addEventListener(keybindingsChangedEvent, handleChange);
+  window.addEventListener("storage", handleStorage);
+  return () => {
+    window.removeEventListener(keybindingsChangedEvent, handleChange);
+    window.removeEventListener("storage", handleStorage);
+  };
 }
 
 export function shortcutsEqual(a: Shortcut, b: Shortcut): boolean {
@@ -284,9 +322,31 @@ export function isKeyboardShortcutsGuideShortcut(
   );
 }
 
+export function isAppSystemShortcut(shortcut: Shortcut): boolean {
+  if (!shortcut.meta || shortcut.ctrl || shortcut.alt) return false;
+  if (
+    !shortcut.shift &&
+    (shortcut.code === "KeyN" ||
+      shortcut.code === "Comma" ||
+      shortcut.key.toLowerCase() === "n" ||
+      shortcut.key === ",")
+  ) {
+    return true;
+  }
+  return shortcut.code === "Equal" ||
+    shortcut.code === "NumpadAdd" ||
+    shortcut.code === "Minus" ||
+    shortcut.code === "NumpadSubtract" ||
+    shortcut.key === "+" ||
+    shortcut.key === "=" ||
+    shortcut.key === "-" ||
+    shortcut.key === "−";
+}
+
 export function isReservedGlobalShortcut(shortcut: Shortcut): boolean {
   return isNavigationHistoryShortcut(shortcut) ||
-    isKeyboardShortcutsGuideShortcut(shortcut);
+    isKeyboardShortcutsGuideShortcut(shortcut) ||
+    isAppSystemShortcut(shortcut);
 }
 
 export function matchesShortcut(event: KeyboardEvent, shortcut: Shortcut): boolean {
