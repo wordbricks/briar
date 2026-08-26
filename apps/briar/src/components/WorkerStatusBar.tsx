@@ -1,6 +1,7 @@
 import {
   Download,
   Monitor,
+  MonitorUp,
   RefreshCw,
   Settings,
 } from "lucide-react";
@@ -8,15 +9,23 @@ import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import {
+  loadManagedComputerProduct,
+  loadManagedComputers,
   loadOrganizationExecutionWorkers,
   requestOrganizationExecutionWorkerUpdate,
 } from "../lib/api";
+import { supportsManagedComputerRemoteDesktop } from "../lib/platform";
 import type { AgentProvider } from "../lib/project-llm";
 import {
   compareSemanticVersions,
   isSemanticVersion,
 } from "../lib/semantic-version";
-import type { ExecutionWorker, OrganizationExecutionWorker } from "../types";
+import type {
+  ExecutionWorker,
+  ManagedComputer,
+  OrganizationExecutionWorker,
+} from "../types";
+import { ManagedComputerRemoteDesktop } from "./ManagedComputerRemoteDesktop";
 import { WorkerIcon } from "./WorkerIcon";
 import { WorkerProviderIcons } from "./WorkerProviderIcons";
 
@@ -72,6 +81,33 @@ type DeviceUpdateState = {
   updateRequest: OrganizationExecutionWorker["updateRequest"];
 };
 
+export function managedComputerShortcutTarget({
+  managedComputersByDeviceId,
+  organizationId,
+  remoteDesktopEnabled,
+  userId,
+  worker,
+}: {
+  managedComputersByDeviceId: Record<string, ManagedComputer>;
+  organizationId?: string | null;
+  remoteDesktopEnabled: boolean;
+  userId?: string | null;
+  worker: ExecutionWorker;
+}): ManagedComputer | null {
+  if (!remoteDesktopEnabled || !userId) return null;
+  const computer = managedComputersByDeviceId[worker.deviceId];
+  if (
+    !computer ||
+    (computer.state !== "needs_setup" && computer.state !== "ready") ||
+    computer.organizationId !== organizationId ||
+    computer.requesterUserId !== userId ||
+    worker.ownerUserId !== userId
+  ) {
+    return null;
+  }
+  return computer;
+}
+
 export function WorkerStatusBar({
   onOpenSettings,
   onRefresh,
@@ -92,6 +128,13 @@ export function WorkerStatusBar({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [canManage, setCanManage] = useState(false);
+  const [managedComputerRemoteEnabled, setManagedComputerRemoteEnabled] =
+    useState(false);
+  const [managedComputersByDeviceId, setManagedComputersByDeviceId] = useState<
+    Record<string, ManagedComputer>
+  >({});
+  const [remoteComputer, setRemoteComputer] =
+    useState<ManagedComputer | null>(null);
   const [deviceUpdates, setDeviceUpdates] = useState<
     Record<string, DeviceUpdateState>
   >({});
@@ -127,12 +170,42 @@ export function WorkerStatusBar({
     }
   }, [organizationId, token]);
 
+  const refreshManagedComputerMetadata = useCallback(async () => {
+    if (!token || !organizationId || !supportsManagedComputerRemoteDesktop()) {
+      setManagedComputerRemoteEnabled(false);
+      setManagedComputersByDeviceId({});
+      return;
+    }
+    try {
+      const [product, response] = await Promise.all([
+        loadManagedComputerProduct(token, organizationId),
+        loadManagedComputers(token, organizationId),
+      ]);
+      const next: Record<string, ManagedComputer> = {};
+      for (const computer of response.computers) {
+        if (
+          computer.deviceId &&
+          (computer.state === "needs_setup" || computer.state === "ready")
+        ) {
+          next[computer.deviceId] = computer;
+        }
+      }
+      setManagedComputerRemoteEnabled(product.remoteDesktopEnabled);
+      setManagedComputersByDeviceId(next);
+    } catch {
+      // Hide shortcuts when managed-computer eligibility cannot be verified.
+      setManagedComputerRemoteEnabled(false);
+      setManagedComputersByDeviceId({});
+    }
+  }, [organizationId, token]);
+
   const refreshStatus = useCallback(() => {
     if (refreshRequestRef.current) return refreshRequestRef.current;
     setIsRefreshing(true);
     const request = Promise.all([
       onRefresh ? Promise.resolve(onRefresh()) : Promise.resolve(),
       refreshUpdateMetadata(),
+      refreshManagedComputerMetadata(),
     ])
       .then(() => undefined)
       .finally(() => {
@@ -141,7 +214,7 @@ export function WorkerStatusBar({
       });
     refreshRequestRef.current = request;
     return request;
-  }, [onRefresh, refreshUpdateMetadata]);
+  }, [onRefresh, refreshManagedComputerMetadata, refreshUpdateMetadata]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -165,8 +238,11 @@ export function WorkerStatusBar({
 
   useEffect(() => {
     if (!isOpen) return;
-    void refreshUpdateMetadata();
-  }, [isOpen, refreshUpdateMetadata]);
+    void Promise.all([
+      refreshUpdateMetadata(),
+      refreshManagedComputerMetadata(),
+    ]);
+  }, [isOpen, refreshManagedComputerMetadata, refreshUpdateMetadata]);
 
   const hasPendingUpdate = Object.values(deviceUpdates).some(
     (device) => Boolean(device.updateRequest),
@@ -322,6 +398,13 @@ export function WorkerStatusBar({
                 mayRequestUpdate &&
                 remoteUpdateSupported &&
                 (updateAvailable || isPending || updateFailed || isUpdating);
+              const managedComputer = managedComputerShortcutTarget({
+                managedComputersByDeviceId,
+                organizationId,
+                remoteDesktopEnabled: managedComputerRemoteEnabled,
+                userId,
+                worker,
+              });
               const titleParts = [
                 worker.label,
                 status,
@@ -376,6 +459,20 @@ export function WorkerStatusBar({
                     <span className="worker-status-providers">
                       <WorkerProviderIcons providers={providers} size={13} />
                     </span>
+                    {managedComputer ? (
+                      <button
+                        aria-label={`${t("managedComputer.remote.open")}: ${worker.label}`}
+                        className="worker-status-remote"
+                        onClick={() => {
+                          setIsOpen(false);
+                          setRemoteComputer(managedComputer);
+                        }}
+                        title={`${t("managedComputer.remote.open")}: ${worker.label}`}
+                        type="button"
+                      >
+                        <MonitorUp aria-hidden size={13} strokeWidth={1.8} />
+                      </button>
+                    ) : null}
                     {showUpdateControl ? (
                       <button
                         aria-busy={isUpdating || isPending}
@@ -452,6 +549,18 @@ export function WorkerStatusBar({
             })}
           </div>
         </div>
+      ) : null}
+      {remoteComputer &&
+          organizationId &&
+          token &&
+          remoteComputer.organizationId === organizationId &&
+          remoteComputer.requesterUserId === userId ? (
+        <ManagedComputerRemoteDesktop
+          computer={remoteComputer}
+          onClose={() => setRemoteComputer(null)}
+          organizationId={organizationId}
+          token={token}
+        />
       ) : null}
     </div>
   );

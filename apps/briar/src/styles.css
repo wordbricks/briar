@@ -163,10 +163,10 @@ body { overflow: hidden; font-synthesis: none; }
 .worker-status-providers > span { display:flex; align-items:center; gap:3px; }
 .worker-status-providers > span > span { width:20px; height:20px; display:grid; place-items:center; border:1px solid var(--border); border-radius:6px; color:var(--foreground); background:var(--card); }
 .worker-status-providers img,.worker-status-providers svg { display:block; }
-.worker-status-update { width:22px; height:22px; padding:0; display:grid; place-items:center; border:1px solid var(--border); border-radius:6px; color:var(--foreground); background:var(--card); cursor:pointer; }
-.worker-status-update:hover:not(:disabled) { color:var(--accent-foreground); background:var(--accent); }
+.worker-status-update,.worker-status-remote { width:22px; height:22px; padding:0; display:grid; place-items:center; border:1px solid var(--border); border-radius:6px; color:var(--foreground); background:var(--card); cursor:pointer; }
+.worker-status-update:hover:not(:disabled),.worker-status-remote:hover { color:var(--accent-foreground); background:var(--accent); }
 .worker-status-update:disabled { opacity:.72; cursor:default; }
-.worker-status-update:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
+.worker-status-update:focus-visible,.worker-status-remote:focus-visible { outline:2px solid #8b70dd; outline-offset:1px; }
 .worker-status-error { margin:0; padding:8px 12px; border-bottom:1px solid var(--border); color:var(--destructive); font-size:var(--text-2xs); }
 .app-version-status { flex:0 0 auto; height:100%; position:relative; display:flex; align-items:stretch; border-left:1px solid var(--border); }
 .app-version-trigger { min-width:58px; height:100%; padding:0 10px; display:flex; align-items:center; justify-content:center; border:0; color:#777972; background:transparent; cursor:pointer; }
