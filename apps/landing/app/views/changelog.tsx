@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.162",
+        date: "2026년 8월 26일",
+        title: "키보드로 Briar 어디든 더 빠르게 탐색합니다",
+        summary:
+          "Linear 스타일의 모드 단축키와 목록 탐색을 도입해 마우스 없이도 프로젝트의 주요 화면과 항목을 빠르게 오갈 수 있습니다.",
+        items: [
+          "G와 O 접두어 모드로 프로젝트 홈, 이슈, Inbox, 채널, DM, 일정, 설정과 검색 대상을 두 번의 키 입력으로 바로 엽니다.",
+          "이슈 목록, Inbox, Kanban에서 J·K 또는 방향키로 이동하고 Enter로 선택한 항목을 열어 검토 흐름을 이어갑니다.",
+          "⌘/ 도움말과 모드 힌트로 사용 가능한 키를 확인하고, 설정에서 단일 키·시퀀스 단축키를 끌 수 있습니다.",
+          "입력 필드, IME 조합, 대화상자, 단축키 기록, 원격 데스크톱에서는 전역 키 입력을 안전하게 억제합니다.",
+          "실행 이벤트가 사용자가 편집한 이슈 제목을 이전 값으로 되돌리지 않도록 동기화 충돌을 수정했습니다.",
+        ],
+      },
+      {
         version: "1.2.161",
         date: "2026년 8월 26일",
         title: "관리형 컴퓨터 운영과 이슈 탐색을 더 빠르고 안전하게 다듬습니다",
@@ -1136,6 +1150,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.162",
+        date: "August 26, 2026",
+        title: "Navigate anywhere in Briar faster from the keyboard",
+        summary:
+          "Use Linear-style command modes and list navigation to move through the project's main views and items without reaching for the mouse.",
+        items: [
+          "Use G and O prefix modes to open project home, issues, Inbox, channels, DMs, schedule, settings, and scoped searches with two keystrokes.",
+          "Move through issue lists, Inbox, and Kanban with J, K, or the arrow keys, then open the focused item with Enter.",
+          "Discover available keys through the Command+/ guide and mode hints, and disable single-key and sequence shortcuts in settings.",
+          "Suppress global keys safely in editable fields, IME composition, dialogs, shortcut recording, and remote-desktop sessions.",
+          "Prevent run events from reverting issue titles after a user edits them.",
+        ],
+      },
       {
         version: "1.2.161",
         date: "August 26, 2026",
@@ -2334,7 +2362,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-161">
+          <a href="#v1-2-162">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2356,7 +2384,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.161"
+                      entry.version === "1.2.162"
+                        ? "2026-08-26"
+                        : entry.version === "1.2.161"
                         ? "2026-08-26"
                         : entry.version === "1.2.160"
                         ? "2026-08-25"
