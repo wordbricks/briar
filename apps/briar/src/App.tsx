@@ -67,6 +67,7 @@ import { ProjectSchedule } from "./components/ProjectSchedule";
 import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
+import { EmptyState, MainContent, PageHeader } from "./components/layout";
 import { LoadingState } from "./components/ui/loading-state";
 import { Sidebar } from "./components/Sidebar";
 import {
@@ -3556,6 +3557,17 @@ export function App({
             projects={activeOrganizationProjects}
             token={briar.token}
           />
+        ) : activePage === "dms" &&
+          !projectWindowProjectId &&
+          briar.activeOrganizationId ? (
+          <MainContent id="dms">
+            <PageHeader title={t("sidebar.dms")} />
+            <EmptyState
+              description={t("dm.composeDescription")}
+              icon={<MessageCircle aria-hidden="true" size={20} />}
+              title={t("dm.empty")}
+            />
+          </MainContent>
         ) : activePage === "inbox" ? (
           <main
             aria-label={`${t("inbox.title")} · ${t("inbox.messages")}`}
