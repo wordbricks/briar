@@ -187,6 +187,7 @@ pub(super) fn run() {
             update_project_sandbox_settings,
             update_local_project_workflow,
             update_local_project_velen_org,
+            preflight_local_project_connection,
             project_repository_readiness,
             install_project_github_cli,
             login_project_github,

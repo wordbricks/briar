@@ -4187,6 +4187,7 @@ export function App({
             resetNavigation("lobby");
           }}
           onInspectLovableRepository={briar.inspectLovableProject}
+          onPreflight={briar.preflightProjectConnection}
           onReviseWorkflow={briar.reviseWorkflow}
           onRepositorySelect={briar.selectProjectRepository}
           onRepositoryInspect={briar.inspectProjectRepository}

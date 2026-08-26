@@ -22,11 +22,13 @@ import { Spinner } from "./ui/spinner";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { ProjectConnection } from "../hooks/useBriar";
 import { ApiError, apiErrorIssueMessages } from "../lib/api";
-import type {
-  LocalAutoHuntConfig,
-  LovableRepositoryCompatibility,
-  RepositoryReadiness,
-  WorkflowRequirementHealth,
+import {
+  preflightThenCreateProject,
+  type LocalAutoHuntConfig,
+  type LocalProjectConnectionPreflight,
+  type LovableRepositoryCompatibility,
+  type RepositoryReadiness,
+  type WorkflowRequirementHealth,
 } from "../lib/project-connection";
 import {
   isRepositoryWorkflowPending,
@@ -71,6 +73,20 @@ type WorkflowFailure = {
   issues: string[];
 };
 
+function localConnectionSettings(
+  workflow: AutoHuntWorkflow,
+  readiness: RepositoryReadiness | null,
+): LocalAutoHuntConfig {
+  return {
+    velenOrg: null,
+    linearEnabled: false,
+    linearSource: null,
+    linearTeam: null,
+    githubRepository: readiness?.githubRepository ?? null,
+    workflow,
+  };
+}
+
 type Props = {
   canCancel?: boolean;
   connection: ProjectConnection | null;
@@ -96,6 +112,10 @@ type Props = {
   onInspectLovableRepository: (
     repositoryPath: string,
   ) => Promise<LovableRepositoryCompatibility>;
+  onPreflight: (
+    settings: LocalAutoHuntConfig,
+    repositoryPath: string,
+  ) => Promise<LocalProjectConnectionPreflight>;
   onReviseWorkflow: (
     projectId: string,
     requestedChange: string,
@@ -296,6 +316,7 @@ export function ProjectOnboarding({
   onCreate,
   onFinish,
   onInspectLovableRepository,
+  onPreflight,
   onRepositoryInspect,
   onRepositorySelect,
   onReviseWorkflow,
@@ -310,6 +331,9 @@ export function ProjectOnboarding({
     useState<RepositoryReadiness | null>(null);
   const [repositoryError, setRepositoryError] = useState<string | null>(null);
   const [selectingRepository, setSelectingRepository] = useState(false);
+  const [preflightingRepository, setPreflightingRepository] = useState(false);
+  const [connectionPreflight, setConnectionPreflight] =
+    useState<LocalProjectConnectionPreflight | null>(null);
   const [workflow, setWorkflow] = useState<AutoHuntWorkflow | null>(null);
   const [workflowError, setWorkflowError] = useState<WorkflowFailure | null>(null);
   const [workflowProgress, setWorkflowProgress] =
@@ -362,15 +386,10 @@ export function ProjectOnboarding({
     const key = `${connection.project.id}:${generationAttempt}:${
       lovablePreset ? "lovable" : "generated"
     }`;
-    const settings: LocalAutoHuntConfig = {
-      velenOrg: null,
-      linearEnabled: false,
-      linearSource: null,
-      linearTeam: null,
-      githubRepository: repositoryReadiness?.githubRepository ?? null,
-      workflow:
-        lovablePreset ?? connection.workflow ?? repositoryWorkflowBootstrap,
-    };
+    const settings = localConnectionSettings(
+      lovablePreset ?? connection.workflow ?? repositoryWorkflowBootstrap,
+      repositoryReadiness,
+    );
     if (generationRequest.current?.key !== key) {
       generationProgressKey.current = key;
       setWorkflowProgress(null);
@@ -428,6 +447,7 @@ export function ProjectOnboarding({
   const selectRepository = async () => {
     setSelectingRepository(true);
     setRepositoryError(null);
+    setConnectionPreflight(null);
     try {
       const selected = await onRepositorySelect();
       if (!selected) return;
@@ -440,8 +460,24 @@ export function ProjectOnboarding({
       setRepositoryPath(readiness.repositoryPath);
       setRepositoryReadiness(readiness);
       if (!connection) setName(repositoryProjectName(readiness.repositoryPath));
+      try {
+        const preflight = await onPreflight(
+          localConnectionSettings(
+            connection?.workflow ?? repositoryWorkflowBootstrap,
+            readiness,
+          ),
+          readiness.repositoryPath,
+        );
+        setRepositoryPath(preflight.repositoryPath);
+        setConnectionPreflight(preflight);
+      } catch (caught) {
+        setRepositoryError(
+          caught instanceof Error ? caught.message : String(caught),
+        );
+      }
     } catch (caught) {
       setRepositoryReadiness(null);
+      setConnectionPreflight(null);
       setRepositoryError(
         caught instanceof Error ? caught.message : String(caught),
       );
@@ -481,10 +517,20 @@ export function ProjectOnboarding({
       const compatibility = await onInspectLovableRepository(
         readiness.repositoryPath,
       ).catch(() => null);
-      setLovablePreset(
-        compatibility ? lovableWorkflowPreset(compatibility) : null,
+      const preset = compatibility ? lovableWorkflowPreset(compatibility) : null;
+      setLovablePreset(preset);
+      const preflight = await preflightThenCreateProject(
+        () => onPreflight(
+          localConnectionSettings(
+            preset ?? repositoryWorkflowBootstrap,
+            readiness,
+          ),
+          readiness.repositoryPath,
+        ),
+        () => onCreate({ name: cloned.repositoryName || repositoryName }),
       );
-      await onCreate({ name: cloned.repositoryName || repositoryName });
+      setRepositoryPath(preflight.repositoryPath);
+      setConnectionPreflight(preflight);
       setWorkflowError(null);
       setPhase("workflow-loading");
     } catch (caught) {
@@ -499,35 +545,37 @@ export function ProjectOnboarding({
     if (!repositoryReadiness?.gitReady) return;
     const projectName = (connection?.project.name ?? name).trim();
     if (!projectName) return;
-    if (!connection) {
-      try {
-        await onCreate({ name: projectName });
-      } catch {
+    const selectedWorkflow = connection?.workflow ?? repositoryWorkflowBootstrap;
+    const settings = localConnectionSettings(
+      selectedWorkflow,
+      repositoryReadiness,
+    );
+    setPreflightingRepository(true);
+    setRepositoryError(null);
+    try {
+      const preflight = await preflightThenCreateProject(
+        () => onPreflight(settings, repositoryPath),
+        connection ? undefined : () => onCreate({ name: projectName }),
+      );
+      setRepositoryPath(preflight.repositoryPath);
+      setConnectionPreflight(preflight);
+      if (
+        connection?.workflow &&
+        !isRepositoryWorkflowPending(connection.workflow)
+      ) {
+        await onConnect(settings, preflight.repositoryPath);
+        onFinish();
         return;
       }
+      setWorkflowError(null);
+      setPhase("workflow-loading");
+    } catch (caught) {
+      setRepositoryError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      setPreflightingRepository(false);
     }
-    if (
-      connection?.workflow &&
-      !isRepositoryWorkflowPending(connection.workflow)
-    ) {
-      const settings: LocalAutoHuntConfig = {
-        velenOrg: null,
-        linearEnabled: false,
-        linearSource: null,
-        linearTeam: null,
-        githubRepository: repositoryReadiness.githubRepository ?? null,
-        workflow: connection.workflow,
-      };
-      try {
-        await onConnect(settings, repositoryPath);
-        onFinish();
-      } catch {
-        // The connection error is surfaced by the parent on this repository step.
-      }
-      return;
-    }
-    setWorkflowError(null);
-    setPhase("workflow-loading");
   };
 
   const retryWorkflowGeneration = () => {
@@ -838,7 +886,7 @@ export function ProjectOnboarding({
                       </div>
                       <button
                         className="setup-repository-action"
-                        disabled={loading || selectingRepository}
+                        disabled={loading || selectingRepository || preflightingRepository}
                         onClick={() => void selectRepository()}
                         type="button"
                       >
@@ -864,6 +912,17 @@ export function ProjectOnboarding({
                           {repositoryReadiness?.pushAccess ? <Check size={13} /> : <CircleAlert size={13} />}
                           <i><strong>push</strong><small>{repositoryReadiness?.pushAccess ? t("onboarding.pushReady") : t("onboarding.pushCheckNeeded")}</small></i>
                         </span>
+                        <span className={connectionPreflight ? "ready" : "warning"}>
+                          {connectionPreflight ? <Check size={13} /> : <Cpu size={13} />}
+                          <i>
+                            <strong>{t("settings.provider")}</strong>
+                            <small>
+                              {connectionPreflight
+                                ? agentProviderLabels[connectionPreflight.provider]
+                                : t("common.checkNeeded")}
+                            </small>
+                          </i>
+                        </span>
                       </div>
                     ) : null}
                     {repositoryError ? <p className="repository-readiness-error" role="alert"><CircleAlert size={13} />{repositoryError}</p> : null}
@@ -884,10 +943,10 @@ export function ProjectOnboarding({
                   {repositoryReadiness?.gitReady ? (
                     <button
                       className="onboarding-primary-action"
-                      disabled={loading || selectingRepository || (!connection && !name.trim())}
+                      disabled={loading || selectingRepository || preflightingRepository || (!connection && !name.trim())}
                       type="submit"
                     >
-                      {loading
+                      {loading || preflightingRepository
                         ? reconnectingExistingWorkflow
                           ? t("onboarding.repositoryConnecting")
                           : t("onboarding.creating")

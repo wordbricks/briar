@@ -86,6 +86,7 @@ import {
   loadConnectedProjectIds,
   loginProjectGithub,
   pickGitRepository,
+  preflightLocalProjectConnection,
   repairAutoHunt,
   resolveProjectConnectionWorkflow,
   updateLocalProjectVelenOrg,
@@ -195,10 +196,10 @@ export type UseBriarOptions = {
 };
 
 export type ProjectConnection = {
+  kind: "new" | "reconnect";
   project: Project;
   agentToken: string | null;
   workflow?: ProjectSettings["workflow"];
-  enableLocalWorkerAfterConnect?: boolean;
 };
 
 const demoMode = import.meta.env.VITE_BRIAR_DEMO !== "false" && !isApiConfigured;
@@ -1506,7 +1507,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         setVelen(null);
         setProjectConnection({
           ...result,
-          enableLocalWorkerAfterConnect: true,
+          kind: "new",
         });
         return result;
       } catch (caught) {
@@ -1633,6 +1634,12 @@ export function useBriar(options: UseBriarOptions = {}) {
     [],
   );
 
+  const preflightProjectConnection = useCallback(
+    async (autoHunt: LocalAutoHuntConfig, repositoryPath: string) =>
+      preflightLocalProjectConnection({ autoHunt, repositoryPath }),
+    [],
+  );
+
   const connectProject = useCallback(async (
     autoHunt: LocalAutoHuntConfig,
     repositoryPath: string,
@@ -1644,7 +1651,6 @@ export function useBriar(options: UseBriarOptions = {}) {
     const connection = projectConnection;
     setLoading(true);
     setError(null);
-    let connectedLocally = false;
     try {
       const agentToken =
         connection.agentToken ??
@@ -1662,7 +1668,6 @@ export function useBriar(options: UseBriarOptions = {}) {
         repositoryPath,
         autoHunt,
       });
-      connectedLocally = true;
       setConnectedProjectIds((current) =>
         withConnectedProject(current, connection.project.id),
       );
@@ -1742,16 +1747,11 @@ export function useBriar(options: UseBriarOptions = {}) {
           ? { ...current, project: connectedProject, workflow: generatedWorkflow }
           : current,
       );
-      if (connection.enableLocalWorkerAfterConnect && token) {
+      if (connection.kind === "new" && token) {
         await configureLocalExecutionWorker(
           connection.project.id,
           token,
           true,
-        );
-        setProjectConnection((current) =>
-          current?.project.id === connection.project.id
-            ? { ...current, enableLocalWorkerAfterConnect: false }
-            : current,
         );
       }
       setError(null);
@@ -1763,20 +1763,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         workflow: generatedWorkflow,
       };
     } catch (caught) {
-      let message = caught instanceof Error ? caught.message : String(caught);
-      if (connectedLocally) {
-        try {
-          await disconnectLocalProject(connection.project.id);
-          setConnectedProjectIds((current) =>
-            withoutConnectedProject(current, connection.project.id),
-          );
-        } catch (cleanupError) {
-          const cleanup = cleanupError instanceof Error
-            ? cleanupError.message
-            : String(cleanupError);
-          message = `${message} (임시 로컬 연결 정리 실패: ${cleanup})`;
-        }
-      }
+      const message = caught instanceof Error ? caught.message : String(caught);
       setError(message);
       throw errorWithMessage(caught, message);
     } finally {
@@ -1848,6 +1835,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     setVelen(null);
     setIsCreatingProject(true);
     setProjectConnection({
+      kind: "reconnect",
       project,
       agentToken: null,
       workflow: dashboard?.settings.workflow,
@@ -3824,6 +3812,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     createProjectRepository,
     inspectProjectRepository: inspectRepositoryReadiness,
     inspectLovableProject,
+    preflightProjectConnection,
     installGithubForProject,
     loginGithubForProject,
     repairHealth,
