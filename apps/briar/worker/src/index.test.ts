@@ -1026,6 +1026,17 @@ describe("Worker HTTP contract", () => {
     });
     expect(
       decodeAccountProfileInput({
+        username: null,
+        name: " Jay Park ",
+        image: null,
+      }),
+    ).toEqual({
+      username: null,
+      name: "Jay Park",
+      image: null,
+    });
+    expect(
+      decodeAccountProfileInput({
         username: "jay_dev",
         name: "Jay Kim",
         image: "https://lh3.googleusercontent.com/a/example=s96-c",

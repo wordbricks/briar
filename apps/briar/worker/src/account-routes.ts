@@ -30,6 +30,9 @@ import { processSlackRevocationQueue } from "./slack-revocations";
 
 const accountDeletionFreshAgeMs = 24 * 60 * 60 * 1_000;
 
+const isUniqueConstraintError = (error: unknown) =>
+  error instanceof Error && /unique constraint failed/iu.test(error.message);
+
 export type AccountRouteInput = {
   request: Request;
   auth: BriarAuth;
@@ -100,29 +103,30 @@ export async function handleAccountRoute(
       await readJson(request, 450_000),
     );
     const updatedAt = new Date().toISOString();
-    const result = await db
-      .prepare(
-        `update "user"
-         set "username" = ?, "name" = ?, "image" = ?, "updatedAt" = ?
-         where "id" = ?
-           and not exists (
-             select 1 from "user" as existing
-             where lower(existing."username") = lower(?)
-               and existing."id" <> ?
-           )`,
-      )
-      .bind(
-        input.username,
-        input.name,
-        input.image,
-        updatedAt,
-        session.user.id,
-        input.username,
-        session.user.id,
-      )
-      .run();
+    let result: D1Result;
+    try {
+      result = await db
+        .prepare(
+          `update "user"
+           set "username" = ?, "name" = ?, "image" = ?, "updatedAt" = ?
+           where "id" = ?`,
+        )
+        .bind(
+          input.username,
+          input.name,
+          input.image,
+          updatedAt,
+          session.user.id,
+        )
+        .run();
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new HttpError(409, "Username is already taken");
+      }
+      throw error;
+    }
     if (result.meta.changes !== 1) {
-      throw new HttpError(409, "Username is already taken");
+      throw new HttpError(404, "Account not found");
     }
     return json({
       user: {
@@ -230,4 +234,3 @@ export async function handleAccountRoute(
     );
   }
 }
-

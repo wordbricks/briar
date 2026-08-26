@@ -170,7 +170,7 @@ export function AppSettings({
   onBack: () => void;
   onAccountDelete?: (confirmation: string) => Promise<void>;
   onAccountSave?: (input: {
-    username: string;
+    username: string | null;
     name: string;
     image: string | null;
   }) => Promise<SessionUser>;

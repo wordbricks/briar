@@ -1105,7 +1105,11 @@ export function useBriar(options: UseBriarOptions = {}) {
   }, [cancelLogin]);
 
   const updateAccountProfile = useCallback(
-    async (input: { username: string; name: string; image: string | null }) => {
+    async (input: {
+      username: string | null;
+      name: string;
+      image: string | null;
+    }) => {
       if (!user) throw new Error("로그인이 필요합니다.");
       const nextUser =
         demoMode || !token

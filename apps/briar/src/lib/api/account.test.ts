@@ -128,6 +128,37 @@ describe("Account API", () => {
     );
   });
 
+  it("updates a nickname without assigning a username", async () => {
+    const userWithoutUsername = {
+      ...user,
+      username: null,
+      name: "Jay Park",
+    };
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ user: userWithoutUsername }), {
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(updateAccountProfile("token", {
+      username: null,
+      name: "Jay Park",
+      image: null,
+    })).resolves.toEqual(userWithoutUsername);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/me"),
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({
+          username: null,
+          name: "Jay Park",
+          image: null,
+        }),
+      }),
+    );
+  });
+
   it("deletes the signed-in account with an email confirmation", async () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
