@@ -1283,6 +1283,7 @@ export const ko = {
   "inbox.unread": "읽지 않음",
   "inbox.unreadCount": "읽지 않은 메시지 {count}개",
   "inbox.markRead": "읽음으로 표시",
+  "inbox.markUnread": "읽지 않음으로 표시",
   "inbox.markAllRead": "모두 읽음",
   "inbox.emptyTitle": "새 메시지가 없습니다.",
   "inbox.emptyDescription": "이슈 상태가 바뀌거나 세션이 끝나면 여기에 알려드릴게요.",
@@ -2314,6 +2315,7 @@ export type Messages = Record<MessageKey, string>;
 
 export const en = {
   ...ko,
+  "inbox.markUnread": "Mark as unread",
   "commandPalette.title": "Command palette",
   "commandPalette.description": "Search commands, pages, issues, projects, channels, and direct messages.",
   "commandPalette.globalContext": "All of Briar",
@@ -3679,6 +3681,7 @@ export const en = {
 } satisfies Messages;
 export const zh = {
   ...en,
+  "inbox.markUnread": "标为未读",
   "commandPalette.title": "命令面板",
   "commandPalette.description": "搜索命令、页面、问题、项目、频道和私信。",
   "commandPalette.globalContext": "整个 Briar",

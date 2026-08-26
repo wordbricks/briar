@@ -82,6 +82,10 @@ export const InboxReadStatesInput = strictSchema(Schema.Struct({
   ),
 ));
 
+export const InboxUnreadStateInput = strictSchema(Schema.Struct({
+  messageId: InboxReadStateMessageId,
+}));
+
 export const ProjectAgentScheduleBatchClaim = strictSchema(Schema.Struct({
   projectIds: Schema.mutable(Schema.Array(UuidString)).check(
     Schema.isLengthBetween(1, 100),
@@ -145,6 +149,9 @@ export const SlackOAuthInput = strictSchema(Schema.Struct({
 export const decodeAccountProfileInput = decodeRequestSync(AccountProfileInput);
 export const decodeInboxReadStatesInput = decodeRequestSync(
   InboxReadStatesInput,
+);
+export const decodeInboxUnreadStateInput = decodeRequestSync(
+  InboxUnreadStateInput,
 );
 export const decodeProjectAgentScheduleBatchClaim = decodeRequestSync(
   ProjectAgentScheduleBatchClaim,

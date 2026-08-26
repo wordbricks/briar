@@ -14,6 +14,7 @@ import {
   isCanonicalInboxSessionVersion,
 } from "../lib/inbox-session-version";
 import {
+  deleteInboxReadState,
   loadInboxFeed,
   loadInboxReadStates,
   saveInboxReadStates,
@@ -184,6 +185,7 @@ type InboxFeedSyncIdentity = {
 };
 
 export type InboxSyncDependencies = {
+  deleteReadState?: typeof deleteInboxReadState;
   loadFeed: typeof loadInboxFeed;
   loadReadStates: typeof loadInboxReadStates;
   saveReadStates: typeof saveInboxReadStates;
@@ -191,6 +193,7 @@ export type InboxSyncDependencies = {
 };
 
 export const defaultInboxSyncDependencies = {
+  deleteReadState: deleteInboxReadState,
   loadFeed: loadInboxFeed,
   loadReadStates: loadInboxReadStates,
   saveReadStates: saveInboxReadStates,
@@ -1190,6 +1193,54 @@ export function useInbox(
     [queueReadStatePush, storageKey],
   );
 
+  const markUnread = useCallback(
+    (messageId: string) => {
+      if (!token) return;
+      setState((current) => {
+        if (
+          current.storageKey !== storageKey ||
+          !Object.prototype.hasOwnProperty.call(
+            current.readVersions,
+            messageId,
+          )
+        ) {
+          return current;
+        }
+        const previousVersion = current.readVersions[messageId];
+        const readVersions = { ...current.readVersions };
+        delete readVersions[messageId];
+        const next = { messages: current.messages, readVersions };
+        writeInboxStorage(storageKey, next);
+        const generation = readSyncGenerationRef.current;
+        if (generation) {
+          generation.remoteMutationGeneration += 1;
+          delete generation.remoteReadVersions[messageId];
+        }
+        void (dependencies.deleteReadState ?? deleteInboxReadState)(
+          token,
+          messageId,
+        ).catch(() => {
+          setState((latest) => {
+            if (latest.storageKey !== storageKey || !previousVersion) {
+              return latest;
+            }
+            const restored = {
+              messages: latest.messages,
+              readVersions: {
+                ...latest.readVersions,
+                [messageId]: previousVersion,
+              },
+            };
+            writeInboxStorage(storageKey, restored);
+            return { storageKey, ...restored };
+          });
+        });
+        return { storageKey, ...next };
+      });
+    },
+    [dependencies, storageKey, token],
+  );
+
   const markIssueRead = useCallback(
     (runId: string) => {
       setState((current) => {
@@ -1250,6 +1301,7 @@ export function useInbox(
     markAllRead,
     markIssueRead,
     markRead,
+    markUnread,
     notificationBaselineId:
       notificationFeedIdentity?.scope === feedScope
         ? notificationFeedIdentity.scope
