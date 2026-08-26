@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.166",
+        date: "2026년 8월 27일",
+        title: "저장소 워크플로 생성과 실행 계약을 일관되게 만듭니다",
+        summary:
+          "워크플로 초안과 실행 설정의 책임을 분리해 저장소 분석 결과를 안정적으로 저장하고, 잘못된 생성 응답을 안전하게 복구합니다.",
+        items: [
+          "필수 단계, 체크포인트 식별자, 특수 도구 이름처럼 서로 맞아야 하는 실행 설정을 Briar가 하나의 워크플로 초안에서 일관되게 계산합니다.",
+          "프로바이더 응답이 실행 계약을 충족하지 않으면 구조화된 진단을 바탕으로 같은 대화에서 한 번만 교정을 요청합니다.",
+          "기존 사용자 정의 단계와 긴 검증 명령을 재생성할 때 그대로 보존하고, 앱·Worker·네이티브 저장 경계가 동일한 규칙을 적용합니다.",
+        ],
+      },
+      {
         version: "1.2.165",
         date: "2026년 8월 27일",
         title: "데스크톱 준비 상태와 작업 탐색을 더 빠르고 안정적으로 연결합니다",
@@ -1196,6 +1208,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.166",
+        date: "August 27, 2026",
+        title: "Make repository workflow generation and execution consistent",
+        summary:
+          "Separate workflow-draft and execution-setting ownership so repository analysis saves reliably and invalid generated responses can recover safely.",
+        items: [
+          "Derive required stages, checkpoint identifiers, and specialized tool names consistently inside Briar from one workflow draft.",
+          "When a provider response violates the execution contract, use structured diagnostics to request exactly one correction in the same conversation.",
+          "Preserve existing custom stages and long validation commands during regeneration, with the same rules across app, Worker, and native persistence boundaries.",
+        ],
+      },
       {
         version: "1.2.165",
         date: "August 27, 2026",
