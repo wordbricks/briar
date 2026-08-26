@@ -29,6 +29,87 @@ import {
 } from "./channel-activity-ticket";
 import { HttpError } from "./http-response";
 
+type ActivityReplyIdentity = {
+  id: string;
+  trigger_message_id: string;
+  parent_message_id: string;
+  attempts: number;
+  lease_expires_at: string | null;
+};
+
+async function activityCredential(
+  env: Env,
+  job: ActivityReplyIdentity,
+  createCredential: (
+    secret: string,
+    expiresAt: number,
+  ) => Promise<{ token: string; expiresAt: number }>,
+) {
+  if (!job.lease_expires_at) {
+    throw new HttpError(409, "Reply claim has no active lease");
+  }
+  const expiresAt = Date.parse(job.lease_expires_at);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    throw new HttpError(409, "Reply claim lease has expired");
+  }
+  const credential = await createCredential(env.BETTER_AUTH_SECRET, expiresAt);
+  return {
+    token: credential.token,
+    expiresAt: new Date(credential.expiresAt).toISOString(),
+  };
+}
+
+type ActivityFrameInput = Pick<
+  ChannelAgentActivityFrame,
+  "sequence" | "activity"
+>;
+
+function activityFrame<Scope extends object>(
+  job: Omit<ActivityReplyIdentity, "lease_expires_at">,
+  input: ActivityFrameInput,
+  scope: Scope,
+  now: number,
+) {
+  return {
+    version: CHANNEL_AGENT_ACTIVITY_VERSION,
+    replyJobId: job.id,
+    attempt: job.attempts,
+    sequence: input.sequence,
+    ...scope,
+    triggerMessageId: job.trigger_message_id,
+    parentMessageId: job.parent_message_id,
+    activity: input.activity,
+    sentAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + CHANNEL_AGENT_ACTIVITY_STALE_MS).toISOString(),
+  };
+}
+
+function scheduleActivityClear<Frame>(
+  env: Env,
+  context: ExecutionContext | undefined,
+  adapter: {
+    makeFrame: (input: ActivityFrameInput) => Frame;
+    publish: (frame: Frame) => Promise<void>;
+    failureMessage: string;
+    failureContext: Record<string, string>;
+  },
+) {
+  if (!env.CHANNEL_ACTIVITY_REALTIME) return;
+  const frame = adapter.makeFrame({
+    sequence: Number.MAX_SAFE_INTEGER,
+    activity: null,
+  });
+  const publish = adapter.publish(frame).catch((error) => {
+    console.error(JSON.stringify({
+      message: adapter.failureMessage,
+      ...adapter.failureContext,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+  });
+  if (context) context.waitUntil(publish);
+  else void publish;
+}
+
 export async function flushOrganizationInboxRealtimeOutbox(
   env: Env,
   db: D1Database,
@@ -110,16 +191,10 @@ export async function channelActivityCredential(
   job: ChannelActivityReplyIdentity,
   input: { workerId: string; deviceId: string },
 ) {
-  if (!job.lease_expires_at) {
-    throw new HttpError(409, "Reply claim has no active lease");
-  }
-  const expiresAt = Date.parse(job.lease_expires_at);
-  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-    throw new HttpError(409, "Reply claim lease has expired");
-  }
-  const credential = await createChannelActivityPublishToken(
-    env.BETTER_AUTH_SECRET,
-    {
+  return activityCredential(
+    env,
+    job,
+    (secret, expiresAt) => createChannelActivityPublishToken(secret, {
       organizationId: job.organization_id,
       channelId: job.channel_id,
       replyJobId: job.id,
@@ -130,12 +205,8 @@ export async function channelActivityCredential(
       workerId: input.workerId,
       deviceId: input.deviceId,
       expiresAt,
-    },
+    }),
   );
-  return {
-    token: credential.token,
-    expiresAt: new Date(credential.expiresAt).toISOString(),
-  };
 }
 
 export function channelActivityFrame(
@@ -143,19 +214,12 @@ export function channelActivityFrame(
   input: Pick<ChannelAgentActivityFrame, "sequence" | "activity">,
   now = Date.now(),
 ): ChannelAgentActivityFrame {
-  return {
-    version: CHANNEL_AGENT_ACTIVITY_VERSION,
-    replyJobId: job.id,
-    attempt: job.attempts,
-    sequence: input.sequence,
-    agentId: job.agent_id,
-    channelId: job.channel_id,
-    triggerMessageId: job.trigger_message_id,
-    parentMessageId: job.parent_message_id,
-    activity: input.activity,
-    sentAt: new Date(now).toISOString(),
-    expiresAt: new Date(now + CHANNEL_AGENT_ACTIVITY_STALE_MS).toISOString(),
-  };
+  return activityFrame(
+    job,
+    input,
+    { agentId: job.agent_id, channelId: job.channel_id },
+    now,
+  );
 }
 
 export function scheduleChannelActivityClear(
@@ -163,24 +227,16 @@ export function scheduleChannelActivityClear(
   job: ChannelActivityReplyIdentity,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_ACTIVITY_REALTIME) return;
-  const frame = channelActivityFrame(job, {
-    sequence: Number.MAX_SAFE_INTEGER,
-    activity: null,
-  });
-  const publish = publishChannelActivity(env, job.organization_id, frame).catch(
-    (error) => {
-      console.error(JSON.stringify({
-        message: "Channel activity clear failed",
-        organizationId: job.organization_id,
-        channelId: job.channel_id,
-        replyJobId: job.id,
-        error: error instanceof Error ? error.message : String(error),
-      }));
+  return scheduleActivityClear(env, context, {
+    makeFrame: (input) => channelActivityFrame(job, input),
+    publish: (frame) => publishChannelActivity(env, job.organization_id, frame),
+    failureMessage: "Channel activity clear failed",
+    failureContext: {
+      organizationId: job.organization_id,
+      channelId: job.channel_id,
+      replyJobId: job.id,
     },
-  );
-  if (context) context.waitUntil(publish);
-  else void publish;
+  });
 }
 
 type IssueActivityReplyIdentity = Pick<
@@ -200,16 +256,10 @@ export async function issueActivityCredential(
   job: IssueActivityReplyIdentity,
   input: { workerId: string; deviceId: string },
 ) {
-  if (!job.lease_expires_at) {
-    throw new HttpError(409, "Reply claim has no active lease");
-  }
-  const expiresAt = Date.parse(job.lease_expires_at);
-  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-    throw new HttpError(409, "Reply claim lease has expired");
-  }
-  const credential = await createIssueActivityPublishToken(
-    env.BETTER_AUTH_SECRET,
-    {
+  return activityCredential(
+    env,
+    job,
+    (secret, expiresAt) => createIssueActivityPublishToken(secret, {
       organizationId,
       projectId: job.project_id,
       runId: job.run_id,
@@ -220,12 +270,8 @@ export async function issueActivityCredential(
       workerId: input.workerId,
       deviceId: input.deviceId,
       expiresAt,
-    },
+    }),
   );
-  return {
-    token: credential.token,
-    expiresAt: new Date(credential.expiresAt).toISOString(),
-  };
 }
 
 export function issueActivityFrame(
@@ -233,19 +279,12 @@ export function issueActivityFrame(
   input: Pick<IssueAgentActivityFrame, "sequence" | "activity">,
   now = Date.now(),
 ): IssueAgentActivityFrame {
-  return {
-    version: CHANNEL_AGENT_ACTIVITY_VERSION,
-    replyJobId: job.id,
-    attempt: job.attempts,
-    sequence: input.sequence,
-    projectId: job.project_id,
-    runId: job.run_id,
-    triggerMessageId: job.trigger_message_id,
-    parentMessageId: job.parent_message_id,
-    activity: input.activity,
-    sentAt: new Date(now).toISOString(),
-    expiresAt: new Date(now + CHANNEL_AGENT_ACTIVITY_STALE_MS).toISOString(),
-  };
+  return activityFrame(
+    job,
+    input,
+    { projectId: job.project_id, runId: job.run_id },
+    now,
+  );
 }
 
 export function scheduleIssueActivityClear(
@@ -254,25 +293,17 @@ export function scheduleIssueActivityClear(
   job: IssueActivityReplyIdentity,
   context?: ExecutionContext,
 ) {
-  if (!env.CHANNEL_ACTIVITY_REALTIME) return;
-  const frame = issueActivityFrame(job, {
-    sequence: Number.MAX_SAFE_INTEGER,
-    activity: null,
-  });
-  const publish = publishIssueActivity(env, organizationId, frame).catch(
-    (error) => {
-      console.error(JSON.stringify({
-        message: "Issue activity clear failed",
-        organizationId,
-        projectId: job.project_id,
-        runId: job.run_id,
-        replyJobId: job.id,
-        error: error instanceof Error ? error.message : String(error),
-      }));
+  return scheduleActivityClear(env, context, {
+    makeFrame: (input) => issueActivityFrame(job, input),
+    publish: (frame) => publishIssueActivity(env, organizationId, frame),
+    failureMessage: "Issue activity clear failed",
+    failureContext: {
+      organizationId,
+      projectId: job.project_id,
+      runId: job.run_id,
+      replyJobId: job.id,
     },
-  );
-  if (context) context.waitUntil(publish);
-  else void publish;
+  });
 }
 
 export function scheduleChannelActivityDisconnect(
@@ -396,4 +427,3 @@ export function projectMutationProject(
   ) return null;
   return pathname.match(/^\/projects\/([0-9a-f-]+)(?:\/|$)/u)?.[1] ?? null;
 }
-

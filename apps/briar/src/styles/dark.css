@@ -15,13 +15,6 @@
   color: var(--sidebar-foreground);
 }
 
-.dark .app-settings-sidebar,
-.dark .organization-settings-sidebar {
-  border-color: var(--sidebar-border);
-  color: var(--sidebar-foreground);
-  background: var(--sidebar-fallback);
-}
-
 .dark .sidebar-channel-list button.unread {
   color: var(--sidebar-accent-foreground);
 }
@@ -96,12 +89,8 @@
 
 .dark .app-content-surface,
 .dark .main-content,
-.dark .organization-settings-layout,
-.dark .organization-settings,
 .dark .organization-create,
 .dark .project-settings-page,
-.dark .settings-main,
-.dark .app-settings-main,
 .dark .kanban-board,
 .dark .issue-list {
   color: var(--foreground);

@@ -44,7 +44,7 @@ export function ProviderRow({
   const row = (
     <div
       className={cn(
-        "settings-provider-row relative grid min-h-[72px] grid-cols-[34px_minmax(0,1fr)_auto_46px] items-center gap-x-3 border-b border-border/80 px-[18px] py-4 last:border-b-0",
+        "relative grid min-h-[72px] grid-cols-[34px_minmax(0,1fr)_auto_46px] items-center gap-x-3 border-b border-border/80 px-[18px] py-4 last:border-b-0",
         details && "border-b-0",
         className,
       )}
