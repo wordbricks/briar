@@ -60,6 +60,17 @@ describe("D1 test template isolation", () => {
     expect(first.fingerprint).toBe(second.fingerprint);
     expect(first.persistencePath).not.toBe(second.persistencePath);
 
+    const template = await prepareD1TestTemplate();
+    expect(template.manifest.builder).toBe("wrangler-local");
+    expect(template.manifest.runtimes.platform).toBe(process.platform);
+    expect(template.manifest.runtimes.architecture).toBe(process.arch);
+    const appliedMigrations = await first.db.prepare(
+      "select name from d1_migrations order by id",
+    ).all<{ name: string }>();
+    expect(appliedMigrations.results.map(({ name }) => name)).toEqual(
+      template.manifest.migrations,
+    );
+
     await first.db.prepare(
       "create table d1_template_isolation_marker (value text not null)",
     ).run();
@@ -112,6 +123,15 @@ describe("D1 test template isolation", () => {
 
     await expect(access(persistencePath)).rejects.toMatchObject({ code: "ENOENT" });
     await expect(readFile(templateFile)).resolves.toEqual(sourceBefore);
+  });
+
+  it("fails fast when a template clone cannot start", async () => {
+    await expect(createIsolatedTestDatabase({
+      suite: "template-clone-fail-fast",
+      miniflareOptions: {
+        script: "export default {",
+      },
+    })).rejects.toThrow(/automatic full-migration fallback is disabled/iu);
   });
 
   it.runIf(process.env.BRIAR_D1_TEST_CACHE_RECOVERY === "1")(
