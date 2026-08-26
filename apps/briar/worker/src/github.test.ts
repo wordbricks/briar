@@ -497,6 +497,7 @@ describe("GitHub App user OAuth", () => {
     for (const [, init] of fetchMock.mock.calls) {
       expect(init?.headers).toMatchObject({
         authorization: "Bearer ghu_transient",
+        "user-agent": "Briar-Workflow-GitHub-App",
         "x-github-api-version": "2026-03-10",
       });
     }
@@ -530,5 +531,19 @@ describe("GitHub App user OAuth", () => {
       installationId: 901,
       appSlug: "briar-app",
     })).rejects.toThrow(/not accessible/iu);
+  });
+
+  it("identifies the failed GitHub API endpoint without exposing the token", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(null, { status: 403 })
+    ));
+
+    await expect(verifyGithubOAuthInstallation({
+      accessToken: "ghu_transient",
+      installationId: 901,
+      appSlug: "briar-app",
+    })).rejects.toThrow(
+      "GitHub API request to /user failed with status 403",
+    );
   });
 });
