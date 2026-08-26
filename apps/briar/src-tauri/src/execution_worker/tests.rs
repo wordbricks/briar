@@ -1,6 +1,74 @@
 use super::*;
 use crate::test_support::test_config_path;
+use std::cell::RefCell;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+#[test]
+fn worker_enable_does_not_deprovision_after_registration_fails() {
+    let commands = RefCell::new(Vec::<String>::new());
+    let run = |arguments: &[&str]| {
+        commands.borrow_mut().push(arguments[1].to_string());
+        Err("register failed".to_string())
+    };
+
+    let error = enable_execution_worker(&run, "project-1", "/bun", "/briar.js")
+        .expect_err("registration should fail");
+
+    assert_eq!(error, "register failed");
+    assert_eq!(commands.into_inner(), ["register"]);
+}
+
+#[test]
+fn worker_enable_rolls_back_after_an_unreadable_status() {
+    let commands = RefCell::new(Vec::<String>::new());
+    let run = |arguments: &[&str]| {
+        commands.borrow_mut().push(arguments[1].to_string());
+        if arguments[1] == "status" {
+            Ok("not-json".to_string())
+        } else {
+            Ok("{}".to_string())
+        }
+    };
+
+    let error = enable_execution_worker(&run, "project-1", "/bun", "/briar.js")
+        .expect_err("invalid status should fail");
+
+    assert!(!error.starts_with(WORKER_CLEANUP_INCOMPLETE_PREFIX));
+    assert_eq!(
+        commands.into_inner(),
+        [
+            "register",
+            "install-service",
+            "status",
+            "uninstall-service",
+            "unregister",
+        ]
+    );
+}
+
+#[test]
+fn worker_enable_reports_when_rollback_cannot_finish() {
+    let commands = RefCell::new(Vec::<String>::new());
+    let run = |arguments: &[&str]| {
+        commands.borrow_mut().push(arguments[1].to_string());
+        match arguments[1] {
+            "install-service" => Err("install failed".to_string()),
+            "uninstall-service" => Err("uninstall failed".to_string()),
+            _ => Ok("{}".to_string()),
+        }
+    };
+
+    let error = enable_execution_worker(&run, "project-1", "/bun", "/briar.js")
+        .expect_err("incomplete cleanup should fail");
+
+    assert!(error.starts_with(WORKER_CLEANUP_INCOMPLETE_PREFIX));
+    assert!(error.contains("install failed"));
+    assert!(error.contains("uninstall failed"));
+    assert_eq!(
+        commands.into_inner(),
+        ["register", "install-service", "uninstall-service"]
+    );
+}
 
 #[cfg(debug_assertions)]
 #[test]

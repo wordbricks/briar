@@ -57,13 +57,16 @@ pub(super) fn write_cli_connection(
     config.api_url = api_url.clone();
     // Preserve CLI-owned worktree settings and the project sandbox choice when
     // the app refreshes the rest of the connection record.
-    let stored_auto_hunt = config
+    let stored_project = config
         .projects
         .iter()
-        .find(|project| project.id == project_id)
-        .and_then(|project| project.auto_hunt.as_ref());
+        .find(|project| project.id == project_id);
+    let stored_auto_hunt = stored_project.and_then(|project| project.auto_hunt.as_ref());
     let stored_worktrees = stored_auto_hunt.and_then(|auto_hunt| auto_hunt.worktrees.clone());
     let stored_sandbox = stored_auto_hunt.and_then(|auto_hunt| auto_hunt.sandbox.clone());
+    let stored_extra = stored_project
+        .map(|project| project.extra.clone())
+        .unwrap_or_default();
     let mut auto_hunt: StoredAutoHuntConfig = agent_config.auto_hunt.into();
     auto_hunt.worktrees = stored_worktrees;
     auto_hunt.sandbox = Some(stored_sandbox.unwrap_or_else(|| StoredSandboxConfig {
@@ -79,7 +82,7 @@ pub(super) fn write_cli_connection(
         agent_token,
         llm: Some(agent_config.llm),
         auto_hunt: Some(auto_hunt),
-        extra: BTreeMap::new(),
+        extra: stored_extra,
     });
 
     write_cli_config(config_path, &config)

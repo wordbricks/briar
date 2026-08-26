@@ -9,7 +9,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { chmod, mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import { homedir, hostname, platform } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 import type { ModelEffort } from "../src/lib/agent-provider-contract";
@@ -928,6 +928,11 @@ export async function writeServiceDefinition(definition: ServiceDefinition) {
   await writeFile(definition.path, definition.contents, { mode: 0o600 });
   await chmod(definition.path, 0o600);
   return definition.path;
+}
+
+/** Remove the unit after the service manager has stopped and disabled it. */
+export async function removeServiceDefinition(definition: ServiceDefinition) {
+  await rm(definition.path, { force: true });
 }
 
 const workerLogDirectory = (logPath: string) =>
