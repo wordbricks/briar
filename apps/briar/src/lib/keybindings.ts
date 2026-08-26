@@ -67,6 +67,7 @@ const ShortcutSchema = Schema.Struct({
   alt: Schema.Boolean,
   shift: Schema.Boolean,
 });
+const shortcutEquivalence = Schema.toEquivalence(ShortcutSchema);
 const StoredKeybindingsSchema = Schema.fromJsonString(Schema.Struct({
   commandPalette: Schema.optional(Schema.Unknown),
   sidebarToggle: Schema.optional(Schema.Unknown),
@@ -286,14 +287,7 @@ export function subscribeKeybindings(
 }
 
 export function shortcutsEqual(a: Shortcut, b: Shortcut): boolean {
-  return (
-    a.key === b.key &&
-    a.code === b.code &&
-    a.meta === b.meta &&
-    a.ctrl === b.ctrl &&
-    a.alt === b.alt &&
-    a.shift === b.shift
-  );
+  return shortcutEquivalence(a, b);
 }
 
 export function isNavigationHistoryShortcut(shortcut: Shortcut): boolean {

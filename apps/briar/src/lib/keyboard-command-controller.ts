@@ -1,48 +1,42 @@
+import * as EffectArray from "effect/Array";
+import * as Data from "effect/Data";
+import * as Duration from "effect/Duration";
+import * as Equal from "effect/Equal";
+import * as Equivalence from "effect/Equivalence";
+import * as Match from "effect/Match";
+import * as Option from "effect/Option";
+import * as Order from "effect/Order";
 import { AtomRef } from "effect/unstable/reactivity";
 
-export type KeyboardCommandMode = "normal" | "insert";
+import {
+  compileKeyboardCommandBindingIndex,
+  keyboardCommandModifiedCandidate,
+  keyboardCommandPlainCandidatesWithPrefix,
+  type KeyboardCommandBindingIndex,
+} from "./keyboard-command-index";
+import {
+  modesForKeyboardCommandBinding,
+  type KeyboardCommandBinding,
+  type KeyboardCommandDefinition,
+  type KeyboardCommandMode,
+  type KeyboardCommandModifiedBinding,
+  type KeyboardCommandModifiers,
+  type KeyboardCommandPhase,
+  type KeyboardCommandPlainBinding,
+} from "./keyboard-command-model";
 
-/**
- * Capture owns app-global chords and multi-key sequences. Bubble owns
- * contextual commands that must yield to a focused widget first.
- */
-export type KeyboardCommandPhase = "capture" | "bubble";
-
-export type KeyboardCommandModifiers = {
-  readonly alt: boolean;
-  readonly control: boolean;
-  readonly meta: boolean;
-  readonly shift: boolean;
-};
-
-export type KeyboardCommandPlainBinding = {
-  readonly kind: "plain";
-  readonly modes?: readonly KeyboardCommandMode[];
-  readonly sequence: readonly [string, ...string[]];
-};
-
-export type KeyboardCommandModifiedBinding = {
-  readonly code: string;
-  readonly kind: "modified";
-  readonly modes?: readonly KeyboardCommandMode[];
-  readonly modifiers: KeyboardCommandModifiers;
-};
-
-export type KeyboardCommandBinding =
-  | KeyboardCommandPlainBinding
-  | KeyboardCommandModifiedBinding;
-
-export type KeyboardCommandDefinition<CommandId extends string = string> = {
-  readonly bindings: readonly [
-    KeyboardCommandBinding,
-    ...KeyboardCommandBinding[],
-  ];
-  readonly id: CommandId;
-  readonly phase: KeyboardCommandPhase;
-  readonly repeat?: "allow" | "ignore";
-};
+export type {
+  KeyboardCommandBinding,
+  KeyboardCommandDefinition,
+  KeyboardCommandMode,
+  KeyboardCommandModifiedBinding,
+  KeyboardCommandModifiers,
+  KeyboardCommandPhase,
+  KeyboardCommandPlainBinding,
+} from "./keyboard-command-model";
 
 export type KeyboardCommandCatalog<CommandId extends string = string> = {
+  readonly bindingIndex: KeyboardCommandBindingIndex<CommandId>;
   readonly commands: readonly KeyboardCommandDefinition<CommandId>[];
   readonly commandById: ReadonlyMap<
     CommandId,
@@ -67,7 +61,8 @@ export type KeyboardCommandInput = {
 
 export type KeyboardCommandPending<CommandId extends string = string> = {
   readonly candidateIds: readonly CommandId[];
-  readonly sequence: readonly [string, ...string[]];
+  readonly phase: KeyboardCommandPhase;
+  readonly sequence: EffectArray.NonEmptyReadonlyArray<string>;
 };
 
 export type KeyboardCommandState<CommandId extends string = string> = {
@@ -84,43 +79,40 @@ export type KeyboardCommandIgnoredReason =
   | "unavailable"
   | "unmatched";
 
-export type KeyboardCommandIgnoredDecision<CommandId extends string> = {
-  readonly consumeEvent: false;
-  readonly reason: KeyboardCommandIgnoredReason;
-  readonly state: KeyboardCommandState<CommandId>;
-  readonly status: "ignored";
-};
-
-export type KeyboardCommandConsumeDecision<CommandId extends string> = {
-  readonly commandId?: CommandId;
-  readonly consumeEvent: true;
-  readonly reason: "cancelled" | "handler";
-  readonly scopeId?: string;
-  readonly state: KeyboardCommandState<CommandId>;
-  readonly status: "consume";
-};
-
-export type KeyboardCommandPendingDecision<CommandId extends string> = {
-  readonly consumeEvent: true;
-  readonly state: KeyboardCommandState<CommandId> & {
-    readonly pending: KeyboardCommandPending<CommandId>;
-  };
-  readonly status: "pending";
-};
-
-export type KeyboardCommandMatchedDecision<CommandId extends string> = {
-  readonly commandId: CommandId;
-  readonly consumeEvent: true;
-  readonly scopeId?: string;
-  readonly state: KeyboardCommandState<CommandId>;
-  readonly status: "matched";
-};
-
 export type KeyboardCommandReduction<CommandId extends string> =
-  | KeyboardCommandConsumeDecision<CommandId>
-  | KeyboardCommandIgnoredDecision<CommandId>
-  | KeyboardCommandMatchedDecision<CommandId>
-  | KeyboardCommandPendingDecision<CommandId>;
+  Data.TaggedEnum<{
+    Consumed: {
+      readonly commandId?: CommandId;
+      readonly reason: "cancelled" | "handler";
+      readonly scopeId?: string;
+      readonly state: KeyboardCommandState<CommandId>;
+    };
+    Ignored: {
+      readonly reason: KeyboardCommandIgnoredReason;
+      readonly state: KeyboardCommandState<CommandId>;
+    };
+    Matched: {
+      readonly commandId: CommandId;
+      readonly scopeId?: string;
+      readonly state: KeyboardCommandState<CommandId>;
+    };
+    Pending: {
+      readonly state: KeyboardCommandState<CommandId> & {
+        readonly pending: KeyboardCommandPending<CommandId>;
+      };
+    };
+  }>;
+
+interface KeyboardCommandReductionDefinition extends
+  Data.TaggedEnum.WithGenerics<1> {
+  readonly taggedEnum: KeyboardCommandReduction<this["A"] & string>;
+}
+
+export const KeyboardCommandDecision =
+  Data.taggedEnum<KeyboardCommandReductionDefinition>();
+
+export type KeyboardCommandIgnoredDecision<CommandId extends string> =
+  Data.TaggedEnum.Value<KeyboardCommandReduction<CommandId>, "Ignored">;
 
 export type KeyboardCommandHandlerResult =
   | "consume"
@@ -164,7 +156,7 @@ export type KeyboardCommandControllerOptions<CommandId extends string> = {
   readonly catalog: KeyboardCommandCatalog<CommandId>;
   readonly initialMode?: KeyboardCommandMode;
   readonly scheduleSequenceTimeout?: KeyboardCommandScheduleTimeout;
-  readonly sequenceTimeoutMs?: number;
+  readonly sequenceTimeout?: Duration.Input;
 };
 
 export type KeyboardCommandController<CommandId extends string> = {
@@ -189,35 +181,32 @@ export type KeyboardCommandController<CommandId extends string> = {
   ) => boolean;
 };
 
-export const keyboardCommandSequenceTimeoutMs = 1_500;
+export const keyboardCommandSequenceTimeout = Duration.millis(1_500);
 
-const normalModeOnly = ["normal"] as const;
-
-function phaseForCommand(
-  command: KeyboardCommandDefinition,
-): KeyboardCommandPhase {
-  return command.phase;
-}
-
-function modesForBinding(
-  binding: KeyboardCommandBinding,
-): readonly KeyboardCommandMode[] {
-  return binding.modes ?? normalModeOnly;
-}
+const sequenceEquivalence = Equivalence.Array(Equivalence.String);
+const modifiersEquivalence = Equivalence.Struct({
+  alt: Equivalence.Boolean,
+  control: Equivalence.Boolean,
+  meta: Equivalence.Boolean,
+  shift: Equivalence.Boolean,
+});
+const modifiedBindingEquivalence = Equivalence.Struct({
+  code: Equivalence.String,
+  modifiers: modifiersEquivalence,
+});
 
 function modesOverlap(
   left: readonly KeyboardCommandMode[],
   right: readonly KeyboardCommandMode[],
 ): boolean {
-  return left.some((mode) => right.includes(mode));
+  return EffectArray.some(left, (mode) => EffectArray.contains(right, mode));
 }
 
 function sameSequence(
   left: readonly string[],
   right: readonly string[],
 ): boolean {
-  return left.length === right.length &&
-    left.every((value, index) => value === right[index]);
+  return sequenceEquivalence(left, right);
 }
 
 function sequenceStartsWith(
@@ -225,29 +214,24 @@ function sequenceStartsWith(
   prefix: readonly string[],
 ): boolean {
   return sequence.length >= prefix.length &&
-    prefix.every((value, index) => sequence[index] === value);
-}
-
-function modifiedBindingKey(binding: KeyboardCommandModifiedBinding): string {
-  const { alt, control, meta, shift } = binding.modifiers;
-  return `${binding.code}:${Number(alt)}${Number(control)}${Number(meta)}${Number(shift)}`;
+    sequenceEquivalence(EffectArray.take(sequence, prefix.length), prefix);
 }
 
 function assertValidBinding(
   commandId: string,
   binding: KeyboardCommandBinding,
 ): void {
-  const modes = modesForBinding(binding);
+  const modes = modesForKeyboardCommandBinding(binding);
   if (modes.length === 0) {
     throw new Error(`Keyboard command ${commandId} has no active modes`);
   }
-  if (new Set(modes).size !== modes.length) {
+  if (EffectArray.dedupe(modes).length !== modes.length) {
     throw new Error(`Keyboard command ${commandId} repeats an active mode`);
   }
   if (binding.kind === "plain") {
     if (
       binding.sequence.length === 0 ||
-      binding.sequence.some((code) => code.length === 0)
+      EffectArray.some(binding.sequence, (code) => code.length === 0)
     ) {
       throw new Error(`Keyboard command ${commandId} has an empty physical code`);
     }
@@ -271,14 +255,19 @@ function bindingsConflict(
   rightPhase: KeyboardCommandPhase,
 ): boolean {
   if (leftPhase !== rightPhase) return false;
-  if (!modesOverlap(modesForBinding(left), modesForBinding(right))) {
+  if (
+    !modesOverlap(
+      modesForKeyboardCommandBinding(left),
+      modesForKeyboardCommandBinding(right),
+    )
+  ) {
     return false;
   }
   if (left.kind === "plain" && right.kind === "plain") {
     return sameSequence(left.sequence, right.sequence);
   }
   if (left.kind === "modified" && right.kind === "modified") {
-    return modifiedBindingKey(left) === modifiedBindingKey(right);
+    return modifiedBindingEquivalence(left, right);
   }
   return false;
 }
@@ -292,7 +281,10 @@ function bindingShadows(
   if (leftPhase !== rightPhase) return false;
   return left.kind === "plain" &&
     right.kind === "plain" &&
-    modesOverlap(modesForBinding(left), modesForBinding(right)) &&
+    modesOverlap(
+      modesForKeyboardCommandBinding(left),
+      modesForKeyboardCommandBinding(right),
+    ) &&
     left.sequence.length < right.sequence.length &&
     sequenceStartsWith(right.sequence, left.sequence);
 }
@@ -314,11 +306,11 @@ export function createKeyboardCommandCatalog<const CommandId extends string>(
     }
   }
 
-  const flattened = commandDefinitions.flatMap((command) =>
-    command.bindings.map((binding) => ({
+  const flattened = EffectArray.flatMap(commandDefinitions, (command) =>
+    EffectArray.map(command.bindings, (binding) => ({
       binding,
       commandId: command.id,
-      phase: phaseForCommand(command),
+      phase: command.phase,
     }))
   );
   for (let leftIndex = 0; leftIndex < flattened.length; leftIndex += 1) {
@@ -370,19 +362,33 @@ export function createKeyboardCommandCatalog<const CommandId extends string>(
     }
   }
 
-  const commands = commandDefinitions.map((command) => ({
+  const cloneBinding = Match.type<KeyboardCommandBinding>().pipe(
+    Match.discriminatorsExhaustive("kind")({
+      modified: (binding): KeyboardCommandModifiedBinding => ({
+        ...binding,
+        modes: binding.modes && [...binding.modes],
+        modifiers: { ...binding.modifiers },
+      }),
+      plain: (binding): KeyboardCommandPlainBinding => ({
+        ...binding,
+        modes: binding.modes && [...binding.modes],
+        sequence: EffectArray.map(binding.sequence, (code) => code),
+      }),
+    }),
+  );
+  const commands = EffectArray.map(commandDefinitions, (command) => ({
     ...command,
-    bindings: command.bindings.map((binding) =>
-      binding.kind === "plain"
-        ? { ...binding, modes: binding.modes && [...binding.modes], sequence: [...binding.sequence] }
-        : { ...binding, modes: binding.modes && [...binding.modes], modifiers: { ...binding.modifiers } }
-    ),
-  })) as unknown as readonly KeyboardCommandDefinition<CommandId>[];
-  const commandById = new Map(commands.map((command) => [
+    bindings: EffectArray.map(command.bindings, cloneBinding),
+  } satisfies KeyboardCommandDefinition<CommandId>));
+  const commandById = new Map(EffectArray.map(commands, (command) => [
     command.id,
     command,
-  ]));
-  return { commandById, commands };
+  ] as const));
+  return {
+    bindingIndex: compileKeyboardCommandBindingIndex(commands),
+    commandById,
+    commands,
+  };
 }
 
 export function makeKeyboardCommandState<CommandId extends string = string>(
@@ -419,24 +425,87 @@ function hasModifier(modifiers: KeyboardCommandModifiers): boolean {
   return modifiers.alt || modifiers.control || modifiers.meta || modifiers.shift;
 }
 
-function bindingIncludesMode(
-  binding: KeyboardCommandBinding,
-  mode: KeyboardCommandMode,
-): boolean {
-  return modesForBinding(binding).includes(mode);
-}
-
 function uniqueIds<CommandId extends string>(
   ids: readonly CommandId[],
 ): readonly CommandId[] {
-  return [...new Set(ids)];
+  return EffectArray.dedupe(ids);
+}
+
+function commandIdsForKeyboardInput<CommandId extends string>(
+  state: KeyboardCommandState<CommandId>,
+  catalog: KeyboardCommandCatalog<CommandId>,
+  input: KeyboardCommandInput,
+  phase: KeyboardCommandPhase,
+): readonly CommandId[] {
+  if (
+    input.defaultPrevented === true ||
+    input.isComposing === true ||
+    (state.pending !== null && state.pending.phase !== phase)
+  ) {
+    return [];
+  }
+
+  const modifiers = inputModifiers(input);
+  if (
+    state.pending !== null &&
+    input.code === "Escape" &&
+    !hasModifier(modifiers)
+  ) {
+    return [];
+  }
+  if (hasModifier(modifiers)) {
+    const modifiedIds = EffectArray.map(
+      Option.toArray(
+        keyboardCommandModifiedCandidate(
+          catalog.bindingIndex,
+          phase,
+          state.mode,
+          input.code,
+          modifiers,
+        ),
+      ),
+      ({ command }) => command.id,
+    );
+    return state.pending !== null && input.repeat === true
+      ? uniqueIds(
+        EffectArray.appendAll(state.pending.candidateIds, modifiedIds),
+      )
+      : modifiedIds;
+  }
+  if (state.pending !== null && input.repeat === true) {
+    return state.pending.candidateIds;
+  }
+
+  const sequence = state.pending === null
+    ? [input.code]
+    : EffectArray.append(state.pending.sequence, input.code);
+  const frozenIds = state.pending === null
+    ? null
+    : new Set(state.pending.candidateIds);
+  return uniqueIds(
+    EffectArray.map(
+      EffectArray.filter(
+        keyboardCommandPlainCandidatesWithPrefix(
+          catalog.bindingIndex,
+          phase,
+          state.mode,
+          sequence,
+        ),
+        ({ command }) => frozenIds === null || frozenIds.has(command.id),
+      ),
+      ({ command }) => command.id,
+    ),
+  );
 }
 
 function ignored<CommandId extends string>(
   state: KeyboardCommandState<CommandId>,
   reason: KeyboardCommandIgnoredReason,
 ): KeyboardCommandIgnoredDecision<CommandId> {
-  return { consumeEvent: false, reason, state, status: "ignored" };
+  return KeyboardCommandDecision.Ignored({
+    reason,
+    state,
+  });
 }
 
 export function reduceKeyboardCommandState<CommandId extends string>(
@@ -450,17 +519,28 @@ export function reduceKeyboardCommandState<CommandId extends string>(
     return ignored(state, "default-prevented");
   }
   if (input.isComposing === true) return ignored(state, "composing");
+  if (state.pending !== null && state.pending.phase !== phase) {
+    return ignored(state, "unmatched");
+  }
 
   const activeIds = new Set(activeCommandIds);
   const modifiers = inputModifiers(input);
   const pendingIds = state.pending === null
     ? null
     : new Set(state.pending.candidateIds);
-  const definitions = catalog.commands.filter((command) =>
-    activeIds.has(command.id) &&
-    phaseForCommand(command) === phase &&
-    (pendingIds === null || pendingIds.has(command.id))
-  );
+  const activePendingDefinitions = state.pending === null
+    ? []
+    : EffectArray.filter(
+      EffectArray.flatMap(
+        state.pending.candidateIds,
+        (commandId) =>
+          Option.toArray(
+            Option.fromUndefinedOr(catalog.commandById.get(commandId)),
+          ),
+      ),
+      (command) =>
+        activeIds.has(command.id) && command.phase === phase,
+    );
 
   if (
     state.pending !== null &&
@@ -468,18 +548,19 @@ export function reduceKeyboardCommandState<CommandId extends string>(
     !hasModifier(modifiers)
   ) {
     const nextState = cancelPendingKeyboardCommand(state);
-    return {
-      consumeEvent: true,
+    return KeyboardCommandDecision.Consumed({
       reason: "cancelled",
       state: nextState,
-      status: "consume",
-    };
+    });
   }
 
   if (
     input.repeat === true &&
     state.pending !== null &&
-    definitions.every((command) => command.repeat !== "allow")
+    EffectArray.every(
+      activePendingDefinitions,
+      (command) => command.repeat !== "allow",
+    )
   ) {
     return ignored(state, "repeat");
   }
@@ -497,113 +578,112 @@ export function reduceKeyboardCommandState<CommandId extends string>(
         phase,
       );
     }
-    const nextSequence = [
-      ...state.pending.sequence,
+    const nextSequence = EffectArray.append(
+      state.pending.sequence,
       input.code,
-    ] as [string, ...string[]];
-    const matching = definitions.flatMap((command) =>
-      repeatEligible(command)
-        ? command.bindings.flatMap((binding) =>
-          binding.kind === "plain" &&
-            bindingIncludesMode(binding, state.mode) &&
-            sequenceStartsWith(binding.sequence, nextSequence)
-            ? [{ binding, command }]
-            : []
-        )
-        : []
     );
-    const exact = matching.find(({ binding }) =>
-      binding.kind === "plain" &&
-      binding.sequence.length === nextSequence.length
+    const matching = EffectArray.filter(
+      keyboardCommandPlainCandidatesWithPrefix(
+        catalog.bindingIndex,
+        phase,
+        state.mode,
+        nextSequence,
+      ),
+      ({ command }) =>
+        activeIds.has(command.id) &&
+        (pendingIds === null || pendingIds.has(command.id)) &&
+        repeatEligible(command),
     );
-    if (exact) {
-      return {
-        commandId: exact.command.id,
-        consumeEvent: true,
+    const exact = EffectArray.findFirst(
+      matching,
+      ({ binding }) => binding.sequence.length === nextSequence.length,
+    );
+    if (Option.isSome(exact)) {
+      return KeyboardCommandDecision.Matched({
+        commandId: exact.value.command.id,
         state: cancelPendingKeyboardCommand(state),
-        status: "matched",
-      };
+      });
     }
     if (matching.length === 0) {
       return ignored(cancelPendingKeyboardCommand(state), "unmatched");
     }
     const pending: KeyboardCommandPending<CommandId> = {
-      candidateIds: uniqueIds(matching.map(({ command }) => command.id)),
+      candidateIds: uniqueIds(
+        EffectArray.map(matching, ({ command }) => command.id),
+      ),
+      phase,
       sequence: nextSequence,
     };
     const nextState = { ...state, pending };
-    return { consumeEvent: true, state: nextState, status: "pending" };
+    return KeyboardCommandDecision.Pending({
+      state: nextState,
+    });
   }
 
   if (hasModifier(modifiers)) {
-    const exact = definitions.find((command) =>
-      repeatEligible(command) &&
-      command.bindings.some((binding) =>
-        binding.kind === "modified" &&
-        bindingIncludesMode(binding, state.mode) &&
-        binding.code === input.code &&
-        modifiedBindingKey(binding) === `${input.code}:${Number(modifiers.alt)}${Number(modifiers.control)}${Number(modifiers.meta)}${Number(modifiers.shift)}`
-      )
+    const candidate = keyboardCommandModifiedCandidate(
+      catalog.bindingIndex,
+      phase,
+      state.mode,
+      input.code,
+      modifiers,
     );
-    if (exact) {
-      return {
-        commandId: exact.id,
-        consumeEvent: true,
+    if (
+      Option.isSome(candidate) &&
+      activeIds.has(candidate.value.command.id) &&
+      repeatEligible(candidate.value.command)
+    ) {
+      return KeyboardCommandDecision.Matched({
+        commandId: candidate.value.command.id,
         state,
-        status: "matched",
-      };
+      });
     }
-    const deniedRepeat = input.repeat === true && definitions.some((command) =>
-      command.repeat !== "allow" &&
-      command.bindings.some((binding) =>
-        binding.kind === "modified" &&
-        bindingIncludesMode(binding, state.mode) &&
-        binding.code === input.code &&
-        modifiedBindingKey(binding) === `${input.code}:${Number(modifiers.alt)}${Number(modifiers.control)}${Number(modifiers.meta)}${Number(modifiers.shift)}`
-      )
-    );
+    const deniedRepeat = input.repeat === true &&
+      Option.isSome(candidate) &&
+      activeIds.has(candidate.value.command.id) &&
+      candidate.value.command.repeat !== "allow";
     return ignored(state, deniedRepeat ? "repeat" : "unmatched");
   }
 
-  const matching = definitions.flatMap((command) =>
-    repeatEligible(command)
-      ? command.bindings.flatMap((binding) =>
-        binding.kind === "plain" &&
-          bindingIncludesMode(binding, state.mode) &&
-          binding.sequence[0] === input.code
-          ? [{ binding, command }]
-          : []
-      )
-      : []
+  const structuralCandidates = keyboardCommandPlainCandidatesWithPrefix(
+    catalog.bindingIndex,
+    phase,
+    state.mode,
+    [input.code],
   );
-  const exact = matching.find(({ binding }) =>
-    binding.kind === "plain" && binding.sequence.length === 1
+  const matching = EffectArray.filter(
+    structuralCandidates,
+    ({ command }) => activeIds.has(command.id) && repeatEligible(command),
   );
-  if (exact) {
-    return {
-      commandId: exact.command.id,
-      consumeEvent: true,
+  const exact = EffectArray.findFirst(
+    matching,
+    ({ binding }) => binding.sequence.length === 1,
+  );
+  if (Option.isSome(exact)) {
+    return KeyboardCommandDecision.Matched({
+      commandId: exact.value.command.id,
       state,
-      status: "matched",
-    };
+    });
   }
   if (matching.length === 0) {
-    const deniedRepeat = input.repeat === true && definitions.some((command) =>
-      command.repeat !== "allow" &&
-      command.bindings.some((binding) =>
-        binding.kind === "plain" &&
-        bindingIncludesMode(binding, state.mode) &&
-        binding.sequence[0] === input.code
-      )
+    const deniedRepeat = input.repeat === true && EffectArray.some(
+      structuralCandidates,
+      ({ command }) =>
+        activeIds.has(command.id) && command.repeat !== "allow",
     );
     return ignored(state, deniedRepeat ? "repeat" : "unmatched");
   }
   const pending: KeyboardCommandPending<CommandId> = {
-    candidateIds: uniqueIds(matching.map(({ command }) => command.id)),
+    candidateIds: uniqueIds(
+      EffectArray.map(matching, ({ command }) => command.id),
+    ),
+    phase,
     sequence: [input.code],
   };
   const nextState = { ...state, pending };
-  return { consumeEvent: true, state: nextState, status: "pending" };
+  return KeyboardCommandDecision.Pending({
+    state: nextState,
+  });
 }
 
 type RegisteredScope<CommandId extends string> = {
@@ -637,10 +717,21 @@ export function createKeyboardCommandController<CommandId extends string>(
   let cancelSequenceTimeout: (() => void) | null = null;
   let catalog = options.catalog;
   let disposed = false;
+  let orderedScopes: readonly RegisteredScope<CommandId>[] = [];
 
-  const sortedScopes = () => [...registrations.values()].sort((left, right) =>
-    right.scope.priority - left.scope.priority || right.order - left.order
+  const scopeOrder = Order.mapInput(
+    Order.Tuple([
+      Order.flip(Order.Number),
+      Order.flip(Order.Number),
+    ]),
+    (registration: RegisteredScope<CommandId>) => [
+      registration.scope.priority,
+      registration.order,
+    ] as const,
   );
+  const refreshOrderedScopes = () => {
+    orderedScopes = EffectArray.sort(registrations.values(), scopeOrder);
+  };
 
   const routesFor = (
     commandId: CommandId,
@@ -672,7 +763,7 @@ export function createKeyboardCommandController<CommandId extends string>(
 
   const replaceState = (nextState: KeyboardCommandState<CommandId>) => {
     const currentState = stateRoot.value;
-    if (nextState === currentState) return;
+    if (Equal.equals(nextState, currentState)) return;
     clearScheduledTimeout();
     stateRoot.set(nextState);
     if (
@@ -683,7 +774,9 @@ export function createKeyboardCommandController<CommandId extends string>(
         () => {
           replaceState(cancelPendingKeyboardCommand(stateRoot.value));
         },
-        options.sequenceTimeoutMs ?? keyboardCommandSequenceTimeoutMs,
+        Duration.toMillis(
+          options.sequenceTimeout ?? keyboardCommandSequenceTimeout,
+        ),
       );
     }
   };
@@ -704,14 +797,19 @@ export function createKeyboardCommandController<CommandId extends string>(
     },
     dispatch: (input, phase) => {
       if (disposed) return ignored(stateRoot.value, "disposed");
-      const scopes = sortedScopes();
       const routesByCommand = new Map<CommandId, CommandRoutes<CommandId>>();
       const activeCommandIds: CommandId[] = [];
-      for (const command of catalog.commands) {
-        const resolved = routesFor(command.id, scopes);
-        routesByCommand.set(command.id, resolved);
+      const candidateIds = commandIdsForKeyboardInput(
+        stateRoot.value,
+        catalog,
+        input,
+        phase,
+      );
+      for (const commandId of candidateIds) {
+        const resolved = routesFor(commandId, orderedScopes);
+        routesByCommand.set(commandId, resolved);
         if (resolved.routes.length > 0) {
-          activeCommandIds.push(command.id);
+          activeCommandIds.push(commandId);
         }
       }
       const reduction = reduceKeyboardCommandState(
@@ -722,32 +820,32 @@ export function createKeyboardCommandController<CommandId extends string>(
         phase,
       );
       replaceState(reduction.state);
-      if (reduction.status !== "matched") return reduction;
+      if (!KeyboardCommandDecision.$is("Matched")(reduction)) {
+        return reduction;
+      }
 
       const resolved = routesByCommand.get(reduction.commandId);
       if (!resolved) return ignored(stateRoot.value, "unavailable");
       for (const route of resolved.routes) {
-        const result = route.handler.run({
+        const outcome = route.handler.run({
           commandId: reduction.commandId,
           input,
           mode: stateRoot.value.mode,
         });
-        if (result === "pass") continue;
-        if (result === "consume") {
-          return {
+        if (outcome === "pass") continue;
+        if (outcome === "consume") {
+          return KeyboardCommandDecision.Consumed({
             commandId: reduction.commandId,
-            consumeEvent: true,
             reason: "handler",
             scopeId: route.scopeId,
             state: stateRoot.value,
-            status: "consume",
-          };
+          });
         }
-        return {
-          ...reduction,
+        return KeyboardCommandDecision.Matched({
+          commandId: reduction.commandId,
           scopeId: route.scopeId,
           state: stateRoot.value,
-        };
+        });
       }
       return ignored(
         stateRoot.value,
@@ -759,6 +857,7 @@ export function createKeyboardCommandController<CommandId extends string>(
       disposed = true;
       clearScheduledTimeout();
       registrations.clear();
+      refreshOrderedScopes();
       stateRoot.set(cancelPendingKeyboardCommand(stateRoot.value));
     },
     registerScope: (scope) => {
@@ -773,6 +872,7 @@ export function createKeyboardCommandController<CommandId extends string>(
         scope,
         token,
       });
+      refreshOrderedScopes();
       return token;
     },
     setCatalog: (nextCatalog) => {
@@ -794,12 +894,17 @@ export function createKeyboardCommandController<CommandId extends string>(
       replaceState(setKeyboardCommandMode(stateRoot.value, mode));
     },
     snapshot: stateRoot,
-    unregisterScope: (token) => registrations.delete(token),
+    unregisterScope: (token) => {
+      const deleted = registrations.delete(token);
+      if (deleted) refreshOrderedScopes();
+      return deleted;
+    },
     updateScope: (token, scope) => {
       const current = registrations.get(token);
       if (!current) return false;
       validateScope(scope);
       registrations.set(token, { ...current, scope });
+      refreshOrderedScopes();
       return true;
     },
   };

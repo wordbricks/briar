@@ -1,4 +1,5 @@
 import { useAtomRef } from "@effect/atom-react";
+import type * as Duration from "effect/Duration";
 import {
   createContext,
   useContext,
@@ -11,6 +12,7 @@ import {
 import { getRecordingKeybinding } from "../lib/keybindings";
 import {
   createKeyboardCommandController,
+  KeyboardCommandDecision,
   type KeyboardCommandCatalog,
   type KeyboardCommandController,
   type KeyboardCommandInput,
@@ -28,14 +30,13 @@ import { remoteDesktopCapturesKeyboard } from "../lib/remote-desktop-focus";
 export type KeyboardCommandDomAdapterOptions<CommandId extends string> = {
   readonly controller: KeyboardCommandController<CommandId>;
   readonly documentTarget: Document;
-  readonly getCatalog: () => KeyboardCommandCatalog<CommandId>;
   readonly isKeybindingRecording?: () => boolean;
   readonly remoteCapturesKeyboard?: () => boolean;
   readonly windowTarget: Window;
 };
 
 export type KeyboardCommandBindingsOptions = {
-  readonly sequenceTimeoutMs?: number;
+  readonly sequenceTimeout?: Duration.Input;
 };
 
 export type KeyboardCommandProviderProps<CommandId extends string> = {
@@ -60,14 +61,10 @@ function inputFromKeyboardEvent(event: KeyboardEvent): KeyboardCommandInput {
 
 function pendingBelongsToPhase<CommandId extends string>(
   controller: KeyboardCommandController<CommandId>,
-  catalog: KeyboardCommandCatalog<CommandId>,
   phase: KeyboardCommandPhase,
 ): boolean {
   const pending = controller.snapshot.value.pending;
-  if (pending === null) return true;
-  return pending.candidateIds.some((commandId) =>
-    catalog.commandById.get(commandId)?.phase === phase
-  );
+  return pending === null || pending.phase === phase;
 }
 
 /**
@@ -77,7 +74,6 @@ function pendingBelongsToPhase<CommandId extends string>(
 export function installKeyboardCommandDomAdapters<CommandId extends string>({
   controller,
   documentTarget,
-  getCatalog,
   isKeybindingRecording = () => getRecordingKeybinding() !== null,
   remoteCapturesKeyboard = remoteDesktopCapturesKeyboard,
   windowTarget,
@@ -87,9 +83,11 @@ export function installKeyboardCommandDomAdapters<CommandId extends string>({
     phase: KeyboardCommandPhase,
   ) => {
     if (isKeybindingRecording() || remoteCapturesKeyboard()) return;
-    if (!pendingBelongsToPhase(controller, getCatalog(), phase)) return;
+    if (!pendingBelongsToPhase(controller, phase)) return;
     const decision = controller.dispatch(inputFromKeyboardEvent(event), phase);
-    if (decision.consumeEvent) event.preventDefault();
+    if (!KeyboardCommandDecision.$is("Ignored")(decision)) {
+      event.preventDefault();
+    }
   };
   const captureKeydown = (event: KeyboardEvent) => dispatch(event, "capture");
   const bubbleKeydown = (event: KeyboardEvent) => dispatch(event, "bubble");
@@ -141,27 +139,24 @@ export function createKeyboardCommandBindings<CommandId extends string>(
     const controllerRef = useRef<KeyboardCommandController<CommandId> | null>(
       null,
     );
-    const catalogRef = useRef(catalog);
     const lifecycleGenerationRef = useRef(0);
     if (controllerRef.current === null) {
       controllerRef.current = createKeyboardCommandController({
         catalog,
         scheduleSequenceTimeout: scheduleWindowTimeout,
-        sequenceTimeoutMs: options.sequenceTimeoutMs,
+        sequenceTimeout: options.sequenceTimeout,
       });
     }
     const controller = controllerRef.current;
 
     useLayoutEffect(() => {
       controller.setCatalog(catalog);
-      catalogRef.current = catalog;
     }, [catalog, controller]);
 
     useEffect(() =>
       installKeyboardCommandDomAdapters({
         controller,
         documentTarget: document,
-        getCatalog: () => catalogRef.current,
         windowTarget: window,
       }), [controller]);
 

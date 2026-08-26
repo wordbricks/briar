@@ -1,3 +1,5 @@
+import * as EffectArray from "effect/Array";
+
 import {
   appKeyboardShortcutSpecs,
   type AppKeyboardShortcutCommandId,
@@ -114,17 +116,17 @@ function physicalBinding(
   return {
     kind: "plain",
     modes: normalModeOnly,
-    sequence: spec.sequence.map((token) => physicalCodeByToken[token]) as [
-      string,
-      ...string[],
-    ],
+    sequence: EffectArray.map(
+      spec.sequence,
+      (token) => physicalCodeByToken[token],
+    ),
   } satisfies KeyboardCommandPlainBinding;
 }
 
 function shortcutBindings(
   spec: AppKeyboardShortcutSpec,
   keybindings: Keybindings,
-): readonly [KeyboardCommandBinding, ...KeyboardCommandBinding[]] {
+): EffectArray.NonEmptyReadonlyArray<KeyboardCommandBinding> {
   const physical = physicalBinding(spec);
   if (spec.id === "openCommandPalette") {
     return [physical, configuredBinding(keybindings.commandPalette)];

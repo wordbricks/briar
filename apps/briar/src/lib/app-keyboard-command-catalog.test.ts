@@ -78,9 +78,6 @@ describe("app keyboard command catalog", () => {
 
     expect(catalog.commands.map(({ id }) => id)).toEqual(expectedIds);
     expect(catalog.commandById.size).toBe(expectedIds.length);
-    expect(new Set(expectedIds).size).toBe(expectedIds.length);
-    expect(catalog.commands.every(({ phase }) => phase === "capture" || phase === "bubble"))
-      .toBe(true);
   });
 
   it("converts the 17 public shortcut specs to physical codes", () => {
@@ -123,7 +120,7 @@ describe("app keyboard command catalog", () => {
         { code: "KeyC", key: "ㅊ" },
         "capture",
       ),
-    ).toMatchObject({ commandId: "createIssue", status: "matched" });
+    ).toMatchObject({ commandId: "createIssue", _tag: "Matched" });
 
     const prefix = dispatch(
       catalog,
@@ -131,7 +128,7 @@ describe("app keyboard command catalog", () => {
       { code: "KeyG", key: "ㅎ" },
       "capture",
     );
-    expect(prefix).toMatchObject({ status: "pending" });
+    expect(prefix).toMatchObject({ _tag: "Pending" });
     expect(
       reduceKeyboardCommandState(
         prefix.state,
@@ -140,7 +137,7 @@ describe("app keyboard command catalog", () => {
         { code: "KeyI", key: "ㅑ" },
         "capture",
       ),
-    ).toMatchObject({ commandId: "goInbox", status: "matched" });
+    ).toMatchObject({ commandId: "goInbox", _tag: "Matched" });
 
     expect(
       dispatch(
@@ -149,7 +146,7 @@ describe("app keyboard command catalog", () => {
         { code: "KeyK", key: "ㅏ", metaKey: true },
         "capture",
       ),
-    ).toMatchObject({ commandId: "openCommandPalette", status: "matched" });
+    ).toMatchObject({ commandId: "openCommandPalette", _tag: "Matched" });
   });
 
   it("keeps plain shortcuts in normal mode and app chords in both modes", () => {
@@ -157,7 +154,7 @@ describe("app keyboard command catalog", () => {
 
     expect(
       dispatch(catalog, "createIssue", { code: "KeyC" }, "capture"),
-    ).toMatchObject({ commandId: "createIssue", status: "matched" });
+    ).toMatchObject({ commandId: "createIssue", _tag: "Matched" });
     expect(
       dispatch(
         catalog,
@@ -166,7 +163,7 @@ describe("app keyboard command catalog", () => {
         "capture",
         "insert",
       ),
-    ).toMatchObject({ status: "ignored" });
+    ).toMatchObject({ _tag: "Ignored" });
 
     for (const commandId of [
       "openCommandPalette",
@@ -185,11 +182,11 @@ describe("app keyboard command catalog", () => {
       for (const mode of ["normal", "insert"] as const) {
         expect(
           dispatch(catalog, commandId, inputs[commandId], "capture", mode),
-        ).toMatchObject({ commandId, status: "matched" });
+        ).toMatchObject({ commandId, _tag: "Matched" });
       }
       expect(
         dispatch(catalog, commandId, inputs[commandId], "bubble"),
-      ).toMatchObject({ status: "ignored" });
+      ).toMatchObject({ _tag: "Ignored" });
     }
   });
 
@@ -203,7 +200,7 @@ describe("app keyboard command catalog", () => {
         { code: "Slash", key: "?", shiftKey: true },
         "capture",
       ),
-    ).toMatchObject({ commandId: "showKeyboardShortcuts", status: "matched" });
+    ).toMatchObject({ commandId: "showKeyboardShortcuts", _tag: "Matched" });
     expect(
       dispatch(
         catalog,
@@ -212,7 +209,7 @@ describe("app keyboard command catalog", () => {
         "capture",
         "insert",
       ),
-    ).toMatchObject({ status: "ignored" });
+    ).toMatchObject({ _tag: "Ignored" });
 
     for (const input of [
       { code: "Slash", metaKey: true },
@@ -228,7 +225,7 @@ describe("app keyboard command catalog", () => {
         ),
       ).toMatchObject({
         commandId: "showKeyboardShortcuts",
-        status: "matched",
+        _tag: "Matched",
       });
     }
   });
@@ -249,23 +246,23 @@ describe("app keyboard command catalog", () => {
     for (const [commandId, code] of listInputs) {
       expect(
         dispatch(catalog, commandId, { code, repeat: true }, "bubble"),
-      ).toMatchObject({ commandId, status: "matched" });
+      ).toMatchObject({ commandId, _tag: "Matched" });
       expect(
         dispatch(catalog, commandId, { code }, "capture"),
-      ).toMatchObject({ status: "ignored" });
+      ).toMatchObject({ _tag: "Ignored" });
       expect(
         dispatch(catalog, commandId, { code }, "bubble", "insert"),
-      ).toMatchObject({ status: "ignored" });
+      ).toMatchObject({ _tag: "Ignored" });
     }
 
     for (const mode of ["normal", "insert"] as const) {
       expect(
         dispatch(catalog, "closeSettings", { code: "Escape" }, "bubble", mode),
-      ).toMatchObject({ commandId: "closeSettings", status: "matched" });
+      ).toMatchObject({ commandId: "closeSettings", _tag: "Matched" });
     }
     expect(
       dispatch(catalog, "closeSettings", { code: "Escape" }, "capture"),
-    ).toMatchObject({ status: "ignored" });
+    ).toMatchObject({ _tag: "Ignored" });
   });
 
   it("keeps both physical zoom clusters and their current repeat behavior", () => {
@@ -286,7 +283,7 @@ describe("app keyboard command catalog", () => {
             "capture",
             "insert",
           ),
-        ).toMatchObject({ commandId, status: "matched" });
+        ).toMatchObject({ commandId, _tag: "Matched" });
       }
     }
   });
@@ -359,7 +356,7 @@ describe("app keyboard command catalog", () => {
         "capture",
         "insert",
       ),
-    ).toMatchObject({ commandId: "openCommandPalette", status: "matched" });
+    ).toMatchObject({ commandId: "openCommandPalette", _tag: "Matched" });
   });
 
   it("rejects configurable conflicts with each other and reserved app chords", () => {

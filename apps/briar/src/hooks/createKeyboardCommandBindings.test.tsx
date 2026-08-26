@@ -250,6 +250,28 @@ describe("createKeyboardCommandBindings", () => {
       .toBe("idle");
   });
 
+  it("lets an invalid capture continuation reach bubble on the same event", async () => {
+    const onBubble = vi.fn();
+    await renderHarness({ onBubble });
+
+    let prefix!: KeyboardEvent;
+    await act(async () => {
+      prefix = dispatchKey(target(), { code: "KeyG", key: "g" });
+    });
+    expect(prefix.defaultPrevented).toBe(true);
+    expect(container.querySelector('[data-testid="pending"]')?.textContent)
+      .toBe("KeyG");
+
+    let continuation!: KeyboardEvent;
+    await act(async () => {
+      continuation = dispatchKey(target(), { code: "KeyB", key: "b" });
+    });
+    expect(continuation.defaultPrevented).toBe(true);
+    expect(onBubble).toHaveBeenCalledOnce();
+    expect(container.querySelector('[data-testid="pending"]')?.textContent)
+      .toBe("idle");
+  });
+
   it("updates the catalog at runtime without replacing the controller", async () => {
     const controllers: KeyboardCommandController<CommandId>[] = [];
     const onDynamic = vi.fn();

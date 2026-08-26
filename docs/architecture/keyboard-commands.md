@@ -8,26 +8,34 @@ temporary command handlers with explicit priority.
 
 Each layer answers one question:
 
-1. **Catalog — what can this key mean?**
+1. **Model — what is a keyboard command?**
+   `keyboard-command-model.ts` owns the immutable binding, mode, phase,
+   modifier, and command-definition vocabulary. Bindings use non-empty Effect
+   arrays, so an empty sequence is not representable after construction.
+2. **Catalog and index — what can this key mean?**
    `app-keyboard-command-catalog.ts` maps physical key codes and configured
-   chords to stable command IDs. It also declares mode, phase, and repeat
-   policy. Keyboard-layout-independent behavior belongs here.
-2. **Controller — which command owns this event now?**
+   chords to stable command IDs. Catalog construction validates conflicts,
+   clones the definitions, then compiles plain sequences into an Effect `Trie`
+   and modified strokes into an Effect `HashMap`. Mode and propagation phase
+   select the index leaf before any handler is consulted.
+3. **Controller — which command owns this event now?**
    `keyboard-command-controller.ts` is a synchronous reducer plus a scoped
-   handler registry. It resolves sequences, availability, scope priority, and
-   fallthrough before returning an explicit consume/pass decision.
-3. **AtomRef — what transient command state must React observe?**
+   handler registry. It asks the compiled index for structural candidates,
+   resolves availability only for those candidates, then reduces the input to
+   an Effect tagged decision. Scope order is recomputed only when registrations
+   change.
+4. **AtomRef — what transient command state must React observe?**
    The root controller owns one Effect `AtomRef` containing only `mode` and the
    pending sequence. UI such as the shortcut HUD subscribes to that snapshot.
-4. **DOM adapters — when may Briar decide?**
+5. **DOM adapters — when may Briar decide?**
    One capture adapter owns app-global chords and sequences. One bubble adapter
    owns contextual navigation after a focused WAI-ARIA widget has had the first
    chance to handle the event.
-5. **Scopes — who can execute the command?**
+6. **Scopes — who can execute the command?**
    The app shell, page, collection, and temporary surface register handlers.
    Higher-priority mounted scopes decide first and may deliberately pass to a
    lower scope.
-6. **Controlled collection navigation — where does focus move?**
+7. **Controlled collection navigation — where does focus move?**
    A collection owns stable item IDs, a keyboard cursor, and selection. The
    reusable hook computes movement and projects an accepted cursor into a DOM
    ref; it never infers state from `document.activeElement` and never calls
@@ -39,18 +47,46 @@ Each layer answers one question:
 physical key
     |
     v
-capture adapter ---- app chord / Vim sequence ----> controller
-    |                                                   |
-    | pass                                              | scope priority
-    v                                                   v
-focused widget ---- local WAI-ARIA behavior       command handler
-    | pass                                              |
-    v                                                   v
-bubble adapter ---- contextual navigation ------> controlled cursor
-                                                        |
-                                                        v
-                                             selection + focus projection
+capture adapter --> phase/mode index --> structural candidates
+    |                                      |
+    | pass                                 v
+    |                              ordered scope routing
+    |                                      |
+    v                                      v
+focused widget --------------------> tagged decision --> handler
+    | pass                                 |
+    v                                      v
+bubble adapter ----------------> controlled cursor --> focus projection
 ```
+
+## Effect boundary
+
+Effect helpers describe domain semantics; they do not make the native keydown
+path asynchronous. The controller must return before browser propagation
+continues, so dispatch and command handlers remain synchronous functions.
+
+- `Data.TaggedEnum` and exhaustive matching model reducer decisions and handler
+  outcomes.
+- `Array.NonEmptyReadonlyArray`, `Equivalence`, and `Schema.toEquivalence`
+  preserve binding invariants and semantic equality without serialization.
+- `Trie` handles physical-sequence prefixes. Sequence tokens use a
+  length-framed encoding, so `A, BC` cannot collide with `AB, C` and token
+  prefixes remain string prefixes.
+- `HashMap` uses a private `Data.TaggedClass` modified-stroke key, giving fresh
+  lookup values structural Effect equality and hashing.
+- `Order` restores catalog declaration order after Trie lookup and orders
+  scopes by priority then registration recency.
+- `Option` stays local to safe index and native-map lookups. Observable Atom
+  state uses plain nullable fields because that is the React-facing state
+  contract.
+- `Duration` is accepted at configuration boundaries and converted to
+  milliseconds only at the browser scheduler boundary. `Equal` prevents
+  semantic no-op Atom writes and timeout churn.
+
+Do not introduce `Effect.gen`, services, or layers into dispatch merely to make
+the code look more Effect-like. Add them only when command execution gains a
+real effectful dependency or typed failure channel that benefits from runtime
+composition.
 
 ## State ownership
 
@@ -58,7 +94,7 @@ The Effect atom is intentionally small. It contains serializable, app-wide,
 observable state:
 
 - `normal` or `insert` mode
-- the pending multi-key sequence and its candidates
+- the pending multi-key sequence, its owning phase, and its frozen candidates
 
 The following do **not** belong in the atom:
 
@@ -71,6 +107,12 @@ The following do **not** belong in the atom:
 
 This keeps Atom updates deterministic and inspectable without turning every
 focus transition into global application state.
+
+Candidate IDs are frozen when a prefix begins, so a command that becomes
+available halfway through a chord cannot join it. Availability is still
+re-evaluated for the frozen candidates on relevant later strokes. This cleanly
+separates structural eligibility (catalog/index) from live ownership
+(registered scopes).
 
 ## Mode and phase contracts
 
