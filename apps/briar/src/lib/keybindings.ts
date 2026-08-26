@@ -1,4 +1,5 @@
-import * as Predicate from "effect/Predicate";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import { remoteDesktopCapturesKeyboard } from "./remote-desktop-focus";
 
 export type KeybindingId = "commandPalette" | "sidebarToggle";
@@ -15,6 +16,10 @@ export type Shortcut = {
 export type Keybindings = {
   commandPalette: Shortcut;
   sidebarToggle: Shortcut;
+};
+
+export type KeyboardNavigationPreferences = {
+  sequenceShortcutsEnabled: boolean;
 };
 
 export const keybindingIds: KeybindingId[] = [
@@ -42,6 +47,37 @@ export const defaultKeybindings: Keybindings = {
 };
 
 export const keybindingsStorageKey = "briar.settings.keybindings.v1";
+export const keyboardNavigationPreferencesStorageKey =
+  "briar.settings.keyboard-navigation.v1";
+
+export const defaultKeyboardNavigationPreferences:
+  KeyboardNavigationPreferences = {
+    sequenceShortcutsEnabled: true,
+  };
+
+const ShortcutSchema = Schema.Struct({
+  key: Schema.String,
+  code: Schema.String,
+  meta: Schema.Boolean,
+  ctrl: Schema.Boolean,
+  alt: Schema.Boolean,
+  shift: Schema.Boolean,
+});
+const StoredKeybindingsSchema = Schema.fromJsonString(Schema.Struct({
+  commandPalette: Schema.optional(ShortcutSchema),
+  sidebarToggle: Schema.optional(ShortcutSchema),
+}));
+const KeyboardNavigationPreferencesSchema = Schema.fromJsonString(
+  Schema.Struct({
+    sequenceShortcutsEnabled: Schema.Boolean,
+  }),
+);
+const decodeStoredKeybindings = Schema.decodeUnknownOption(
+  StoredKeybindingsSchema,
+);
+const decodeKeyboardNavigationPreferences = Schema.decodeUnknownOption(
+  KeyboardNavigationPreferencesSchema,
+);
 
 const modifierOnlyKeys = new Set(["Meta", "Control", "Alt", "Shift", "OS"]);
 
@@ -59,18 +95,6 @@ export function getRecordingKeybinding(): KeybindingId | null {
   return recordingKeybinding;
 }
 
-function isShortcut(value: unknown): value is Shortcut {
-  if (!Predicate.isObject(value)) return false;
-  return (
-    Predicate.isString(value.key) &&
-    Predicate.isString(value.code) &&
-    Predicate.isBoolean(value.meta) &&
-    Predicate.isBoolean(value.ctrl) &&
-    Predicate.isBoolean(value.alt) &&
-    Predicate.isBoolean(value.shift)
-  );
-}
-
 function persist(keybindings: Keybindings) {
   try {
     window.localStorage.setItem(keybindingsStorageKey, JSON.stringify(keybindings));
@@ -83,25 +107,27 @@ export function loadKeybindings(): Keybindings {
   const result: Keybindings = { ...defaultKeybindings };
   let repaired = false;
   try {
-    const parsed: unknown = JSON.parse(
-      window.localStorage.getItem(keybindingsStorageKey) ?? "{}",
+    const stored: Partial<Keybindings> = Option.getOrElse(
+      decodeStoredKeybindings(
+        window.localStorage.getItem(keybindingsStorageKey) ?? "{}",
+      ),
+      (): Partial<Keybindings> => ({}),
     );
-    const stored = Predicate.isObject(parsed) ? parsed : {};
     for (const id of keybindingIds) {
       const storedShortcut = stored[id];
       if (
-        isShortcut(storedShortcut) &&
+        storedShortcut &&
         !isNavigationHistoryShortcut(storedShortcut)
       ) {
         result[id] = storedShortcut;
-      } else if (isShortcut(storedShortcut)) {
+      } else if (storedShortcut) {
         repaired = true;
       }
     }
     if (shortcutsEqual(result.commandPalette, result.sidebarToggle)) {
       if (
-        isShortcut(stored.sidebarToggle) &&
-        !isShortcut(stored.commandPalette)
+        stored.sidebarToggle &&
+        !stored.commandPalette
       ) {
         result.commandPalette = defaultKeybindings.sidebarToggle;
       } else {
@@ -118,6 +144,36 @@ export function loadKeybindings(): Keybindings {
     // Fall back to the defaults when stored keybindings are unreadable.
   }
   return result;
+}
+
+export function loadKeyboardNavigationPreferences():
+  KeyboardNavigationPreferences {
+  try {
+    return Option.getOrElse(
+      decodeKeyboardNavigationPreferences(
+        window.localStorage.getItem(
+          keyboardNavigationPreferencesStorageKey,
+        ) ?? "{}",
+      ),
+      () => defaultKeyboardNavigationPreferences,
+    );
+  } catch {
+    return defaultKeyboardNavigationPreferences;
+  }
+}
+
+export function saveKeyboardNavigationPreferences(
+  preferences: KeyboardNavigationPreferences,
+): KeyboardNavigationPreferences {
+  try {
+    window.localStorage.setItem(
+      keyboardNavigationPreferencesStorageKey,
+      JSON.stringify(preferences),
+    );
+  } catch {
+    // Keep the preferences for the current session when storage is unavailable.
+  }
+  return preferences;
 }
 
 export function saveKeybinding(id: KeybindingId, shortcut: Shortcut): Keybindings {

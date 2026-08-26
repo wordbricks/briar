@@ -8,6 +8,7 @@ import {
   defaultKeybindings,
   formatShortcut,
   loadKeybindings,
+  loadKeyboardNavigationPreferences,
 } from "../lib/keybindings";
 import { KeybindingsSettings } from "./KeybindingsSettings";
 
@@ -65,6 +66,34 @@ describe("KeybindingsSettings", () => {
         shift: true,
       }),
     );
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("toggles Linear-style single-key and sequence shortcuts", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <KeybindingsSettings />
+        </I18nProvider>,
+      );
+    });
+
+    const toggle = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Single-key and sequence shortcuts"]',
+    );
+    expect(toggle?.getAttribute("data-state")).toBe("checked");
+
+    await act(async () => toggle?.click());
+
+    expect(loadKeyboardNavigationPreferences()).toEqual({
+      sequenceShortcutsEnabled: false,
+    });
+    expect(toggle?.getAttribute("data-state")).toBe("unchecked");
 
     await act(async () => root.unmount());
     container.remove();
