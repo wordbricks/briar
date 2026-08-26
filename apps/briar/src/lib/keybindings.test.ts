@@ -3,18 +3,22 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   defaultKeybindings,
+  defaultKeyboardNavigationPreferences,
   formatShortcut,
   getRecordingKeybinding,
   installKeybindingShortcuts,
   isNavigationHistoryShortcut,
   loadKeybindings,
+  loadKeyboardNavigationPreferences,
   matchesShortcut,
   resetKeybinding,
   saveKeybinding,
+  saveKeyboardNavigationPreferences,
   setRecordingKeybinding,
   shortcutFromEvent,
   shortcutsEqual,
   keybindingsStorageKey,
+  keyboardNavigationPreferencesStorageKey,
 } from "./keybindings";
 
 describe("keybindings", () => {
@@ -64,6 +68,29 @@ describe("keybindings", () => {
     resetKeybinding("sidebarToggle");
     expect(loadKeybindings().sidebarToggle).toEqual(
       defaultKeybindings.sidebarToggle,
+    );
+  });
+
+  it("persists the Linear-style sequence shortcut preference", () => {
+    expect(loadKeyboardNavigationPreferences()).toEqual(
+      defaultKeyboardNavigationPreferences,
+    );
+
+    expect(
+      saveKeyboardNavigationPreferences({ sequenceShortcutsEnabled: false }),
+    ).toEqual({ sequenceShortcutsEnabled: false });
+    expect(loadKeyboardNavigationPreferences()).toEqual({
+      sequenceShortcutsEnabled: false,
+    });
+  });
+
+  it("repairs malformed keyboard navigation preferences", () => {
+    window.localStorage.setItem(
+      keyboardNavigationPreferencesStorageKey,
+      JSON.stringify({ sequenceShortcutsEnabled: "yes" }),
+    );
+    expect(loadKeyboardNavigationPreferences()).toEqual(
+      defaultKeyboardNavigationPreferences,
     );
   });
 
