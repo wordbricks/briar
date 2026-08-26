@@ -4,6 +4,8 @@ import {
 import { agentReplyParentMessageId } from "../../src/lib/issue-reply-decision";
 import {
   channelReplyNoAvailableWorkerError,
+  channelReplyProviderUsageExhaustedError,
+  type ChannelReplyUnavailableReason,
 } from "../../src/lib/channels-contract";
 import { hydrateAgentSkills } from "./agent-skills";
 import { processArchiveCleanupQueue } from "./archive";
@@ -57,7 +59,7 @@ import {
 } from "./request-readers";
 import { requireSession } from "./session-auth";
 import {
-  hasAvailableChannelReplyWorker,
+  channelReplyWorkerAvailability,
   userOwnsExecutionWorkerDevice,
 } from "./workers";
 import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
@@ -349,7 +351,7 @@ export async function handleChannelMessageRoute(
           ? selectedSkillTarget.skill
           : null;
         const replyRuntime = selectedSkill ?? agent;
-        const hasAvailableWorker = await hasAvailableChannelReplyWorker(db, {
+        const workerAvailability = await channelReplyWorkerAvailability(db, {
           organizationId,
           projectId: agent.project_id,
           provider: replyRuntime.provider,
@@ -357,10 +359,11 @@ export async function handleChannelMessageRoute(
           effort: replyRuntime.effort,
           observedAt: createdAt,
         });
-        const unavailableReason:
-          | typeof channelReplyNoAvailableWorkerError
-          | null = hasAvailableWorker
+        const unavailableReason: ChannelReplyUnavailableReason | null =
+          workerAvailability === "available"
             ? null
+            : workerAvailability === "usage_exhausted"
+            ? channelReplyProviderUsageExhaustedError
             : channelReplyNoAvailableWorkerError;
         return { agent, selectedSkill, replyRuntime, unavailableReason };
       }),

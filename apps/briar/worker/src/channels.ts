@@ -1,5 +1,6 @@
 import {
   channelReplyNoAvailableWorkerError,
+  type ChannelReplyUnavailableReason,
   type ChannelActionType,
   type ChannelAgentProvider as AgentProvider,
   type ChannelAgentReply,
@@ -2485,7 +2486,7 @@ export async function enqueueChannelAgentReplies(
       projectId: string | null;
       skillId?: string | null;
       provider: AgentProvider;
-      unavailableReason?: typeof channelReplyNoAvailableWorkerError | null;
+      unavailableReason?: ChannelReplyUnavailableReason | null;
     }>;
     preferredDeviceId?: string | null;
     createdAt: string;

@@ -25,6 +25,7 @@ import {
 import {
   authenticateExecutionWorker,
   bindExecutionWorkerProject,
+  channelReplyWorkerAvailability,
   countExecutionWorkerDeviceSessions,
   completeExecutionWorkerUpdates,
   countLeasedRuns,
@@ -1714,6 +1715,82 @@ describe("detached execution workers", () => {
         observedAt: atMinute(3),
       }),
     ).resolves.toBe(true);
+  });
+
+  it("distinguishes exhausted Agent usage from an unavailable Worker", async () => {
+    const worker = await register("channel-reply-usage", 1);
+    const reply = {
+      organizationId: projectId,
+      projectId,
+      provider: "grok" as const,
+      model: "grok-4.6",
+      effort: "high" as const,
+      observedAt: atMinute(2),
+    };
+
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: worker.worker.id,
+      acceptingWork: false,
+      readinessState: "needs_attention",
+      capabilities: {
+        providerHealth: {
+          grok: {
+            installed: true,
+            authenticated: true,
+            healthy: false,
+            reason: "usage_exhausted",
+            usageExhausted: true,
+            maxUsedPercent: 100,
+          },
+        },
+      },
+      observedAt: atMinute(2),
+    });
+    await expect(channelReplyWorkerAvailability(db, reply))
+      .resolves.toBe("usage_exhausted");
+    await expect(hasAvailableChannelReplyWorker(db, reply))
+      .resolves.toBe(false);
+
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: worker.worker.id,
+      acceptingWork: true,
+      readinessState: "ready",
+      capabilities: {
+        providerHealth: {
+          grok: {
+            installed: true,
+            authenticated: true,
+            healthy: true,
+          },
+        },
+      },
+      observedAt: atMinute(3),
+    });
+    await expect(channelReplyWorkerAvailability(db, {
+      ...reply,
+      observedAt: atMinute(3),
+    })).resolves.toBe("available");
+
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: worker.worker.id,
+      acceptingWork: false,
+      readinessState: "needs_attention",
+      capabilities: {
+        providerHealth: {
+          grok: {
+            installed: true,
+            authenticated: false,
+            healthy: false,
+            reason: "not_authenticated",
+          },
+        },
+      },
+      observedAt: atMinute(4),
+    });
+    await expect(channelReplyWorkerAvailability(db, {
+      ...reply,
+      observedAt: atMinute(4),
+    })).resolves.toBe("unavailable");
   });
 
   it("renames a device and all of its project bindings together", async () => {

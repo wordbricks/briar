@@ -54,6 +54,14 @@ export const channelReplyClaimTokenHeader =
 export const channelReplyNoAvailableWorkerError =
   "No available Worker can run this Agent.";
 
+/** Stable server error used when a compatible runtime reports exhausted usage. */
+export const channelReplyProviderUsageExhaustedError =
+  "The assigned Agent model has reached its usage limit.";
+
+export type ChannelReplyUnavailableReason =
+  | typeof channelReplyNoAvailableWorkerError
+  | typeof channelReplyProviderUsageExhaustedError;
+
 const strictSchemaOptions = {
   errors: "all",
   onExcessProperty: "error",

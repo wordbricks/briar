@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   channelReplyClaimTokenHeader,
   channelReplyNoAvailableWorkerError,
+  channelReplyProviderUsageExhaustedError,
 } from "../../src/lib/channels-contract";
 import apiWorker from "./index";
 import {
@@ -3806,6 +3807,110 @@ describe("organization channels", () => {
       error: channelReplyNoAvailableWorkerError,
       completed_at: at(41),
     });
+  });
+
+  it("reports exhausted assigned-model usage when posting a channel message", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000309";
+    const agentId = "aa000000-0000-4000-8000-000000000309";
+    const observedAt = new Date().toISOString();
+    await bindWorkerToProject();
+    await db.batch([
+      db.prepare(
+        `update briar_execution_worker_devices
+         set state = 'online', last_heartbeat_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(observedAt, observedAt, deviceId),
+      db.prepare(
+        `update briar_execution_workers
+         set state = 'online', accepting_work = 0,
+             readiness_state = 'needs_attention', capabilities_json = ?,
+             last_heartbeat_at = ?, updated_at = ? where id = ?`,
+      ).bind(
+        JSON.stringify({
+          providerHealth: {
+            grok: {
+              installed: true,
+              authenticated: true,
+              healthy: false,
+              reason: "usage_exhausted",
+              usageExhausted: true,
+              maxUsedPercent: 100,
+            },
+          },
+          providerCapabilities: {
+            grok: {
+              models: [{
+                id: "grok-4.6",
+                label: "Grok 4.6",
+                efforts: [{ id: "high", label: "High" }],
+              }],
+              defaultEfforts: [],
+              allowCustomModels: false,
+              error: null,
+            },
+          },
+        }),
+        observedAt,
+        observedAt,
+        boundWorkerId,
+      ),
+      db.prepare(
+        `insert into briar_project_agents (
+           id, organization_id, project_id, name, provider, model,
+           responsibility, effort, created_at, updated_at
+         ) values (?, ?, ?, 'Limit Agent', 'grok', 'grok-4.6',
+                   'Reply with Grok', 'high', ?, ?)`,
+      ).bind(agentId, organizationId, projectId, observedAt, observedAt),
+    ]);
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "usage-limit-error",
+      name: "Usage limit error",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: projectId,
+      createdByUserId: ownerId,
+      createdAt: observedAt,
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId,
+      addedByUserId: ownerId,
+      createdAt: observedAt,
+    });
+
+    const response = await apiWorker.fetch(new Request(
+      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          body: "@Limit-Agent help",
+          mentionedAgentIds: [agentId],
+        }),
+      },
+    ), {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "channels-context-test-secret-channels-context-test",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env);
+
+    expect(response.status).toBe(201);
+    const body = await response.json() as {
+      agentReplies: Array<{ status: string; error: string | null }>;
+    };
+    expect(body.agentReplies).toEqual([
+      expect.objectContaining({
+        status: "failed",
+        error: channelReplyProviderUsageExhaustedError,
+      }),
+    ]);
   });
 
   it("excludes changes in channels the member cannot see from the delta", async () => {

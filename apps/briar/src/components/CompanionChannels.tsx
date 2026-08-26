@@ -875,6 +875,7 @@ export function CompanionChannels({
                     error: channelReplyErrorText(failed.error, {
                       fallback: t("run.failed"),
                       noAvailableWorker: t("agents.agentWorkerUnavailable"),
+                      usageExhausted: t("agents.agentUsageExhausted"),
                     }),
                   }),
                 );
@@ -1200,6 +1201,7 @@ export function CompanionChannels({
               error: channelReplyErrorText(failed.error, {
                 fallback: t("run.failed"),
                 noAvailableWorker: t("agents.agentWorkerUnavailable"),
+                usageExhausted: t("agents.agentUsageExhausted"),
               }),
             }),
           );
