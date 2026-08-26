@@ -251,6 +251,30 @@ describe("HuntBoard", () => {
     await act(async () => root.unmount());
     container.remove();
   });
+  it("does not capture Command-N without a project", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () =>
+      root.render(
+        <HuntDashboard {...dashboardProps} dashboard={null} noProject />,
+      )
+    );
+    const shortcut = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      code: "KeyN",
+      key: "n",
+      metaKey: true,
+    });
+    await act(async () => {
+      window.dispatchEvent(shortcut);
+    });
+    expect(shortcut.defaultPrevented).toBe(false);
+    expect(container.querySelector('[aria-label="새 이슈"]')).toBeNull();
+    await act(async () => root.unmount());
+    container.remove();
+  });
   it("adds a bottom drop space and opens issue creation for a kanban column", async () => {
     const container = document.createElement("div");
     document.body.append(container);

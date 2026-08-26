@@ -183,8 +183,13 @@ export function createKeyboardCommandBindings<CommandId extends string>(
     );
   }
 
+  function useOptionalKeyboardCommandController():
+    KeyboardCommandController<CommandId> | null {
+    return useContext(ControllerContext);
+  }
+
   function useKeyboardCommandController(): KeyboardCommandController<CommandId> {
-    const controller = useContext(ControllerContext);
+    const controller = useOptionalKeyboardCommandController();
     if (controller === null) {
       throw new Error(
         "useKeyboardCommandController must be used inside KeyboardCommandProvider",
@@ -225,5 +230,6 @@ export function createKeyboardCommandBindings<CommandId extends string>(
     useKeyboardCommandController,
     useKeyboardCommandScope,
     useKeyboardCommandState,
+    useOptionalKeyboardCommandController,
   } as const;
 }

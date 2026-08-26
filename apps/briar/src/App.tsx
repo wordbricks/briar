@@ -210,7 +210,6 @@ import {
   createKeyboardShortcutHelpSections,
   type AppKeyboardShortcutCommandId,
 } from "./lib/app-keyboard-shortcuts";
-import { handleKeyboardListNavigation } from "./lib/keyboard-list-navigation";
 import { hasOpenKeyboardShortcutOverlay } from "./lib/keyboard-shortcuts";
 import { formatIssueKey } from "./lib/issue-key";
 import { listenForAppMenuSettings } from "./lib/app-menu";
@@ -2164,20 +2163,6 @@ export function App({
       return "handled" as const;
     },
   });
-  const listNavigationHandler = {
-    isAvailable: () =>
-      commandPaletteAvailable && sequenceShortcutsEnabled,
-    run: ({ input }: {
-      input: { readonly nativeEvent?: KeyboardEvent };
-    }) => {
-      const event = input.nativeEvent;
-      if (!event) return "pass" as const;
-      return handleKeyboardListNavigation(event)
-        ? "handled" as const
-        : "pass" as const;
-    },
-  };
-
   useAppKeyboardCommandScope({
     fallthrough: true,
     handlers: {
@@ -2204,10 +2189,6 @@ export function App({
           return "consume";
         },
       },
-      moveListDown: listNavigationHandler,
-      moveListLeft: listNavigationHandler,
-      moveListRight: listNavigationHandler,
-      moveListUp: listNavigationHandler,
       openChannel: sequenceHandler("openChannel"),
       openCommandPalette: {
         run: ({ input }) => {

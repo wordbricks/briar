@@ -9,7 +9,11 @@ import { demoDashboard, demoRunEvents } from "@/lib/demo-data";
 import * as api from "@/lib/api";
 import * as channelRealtime from "@/lib/channel-realtime";
 import * as issueActivityHook from "@/hooks/use-issue-agent-activity";
-import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import {
+  AppKeyboardCommandProvider,
+  useAppKeyboardCommandScope,
+  useAppKeyboardCommandState,
+} from "@/hooks/appKeyboardCommands";
 import type { ExecutionWorker, HuntRun, IssueMessage, IssueMessageSendResult, ProjectAgent, RunEvidence, UpdateIssueInput } from "@/types";
 import { CreateIssueDialog, EditIssueDialog, HuntDashboard, IssueAgentActivityPanel, RunPage, runMatchesIssuePropertyFilters, type IssuePropertyFilters } from "@/components/HuntDashboard";
 import { ToastProvider } from "@/components/ui/toast";
@@ -198,18 +202,23 @@ describe("IssueEditor", () => {
       return event;
     };
     function Harness() {
-      const { pendingShortcut } = useKeyboardShortcuts({
-        commands: [{
-          id: "goInbox",
-          label: "Go to Inbox",
-          onTrigger: onGoInbox,
-          sequence: ["g", "i"]
-        }],
-        enabled: true
+      const keyboardState = useAppKeyboardCommandState();
+      useAppKeyboardCommandScope({
+        fallthrough: true,
+        handlers: {
+          goInbox: {
+            run: () => {
+              onGoInbox();
+              return "handled";
+            }
+          }
+        },
+        id: "issue-editor-keyboard-regression",
+        priority: 0
       });
       return <>
         <output data-testid="shortcut-mode">
-          {pendingShortcut?.prefix.join("") ?? "idle"}
+          {`${keyboardState.mode}:${keyboardState.pending?.sequence.join("+") ?? "idle"}`}
         </output>
         <RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
           throw new Error("not implemented in this test");
@@ -217,7 +226,11 @@ describe("IssueEditor", () => {
       </>;
     }
     try {
-      await act(async () => root.render(<Harness />));
+      await act(async () => root.render(
+        <AppKeyboardCommandProvider>
+          <Harness />
+        </AppKeyboardCommandProvider>
+      ));
       const mode = container.querySelector('[data-testid="shortcut-mode"]');
       const title = container.querySelector<HTMLInputElement>(
         ".run-page-inline-title"
@@ -232,9 +245,10 @@ describe("IssueEditor", () => {
           ?.set?.call(title, "Escape saves this title");
         title.dispatchEvent(new Event("input", { bubbles: true }));
       });
+      expect(mode?.textContent).toBe("insert:idle");
       expect(dispatchKey(title, { code: "KeyG", key: "g" }).defaultPrevented)
         .toBe(false);
-      expect(mode?.textContent).toBe("idle");
+      expect(mode?.textContent).toBe("insert:idle");
 
       let escape!: KeyboardEvent;
       await act(async () => {
@@ -244,6 +258,7 @@ describe("IssueEditor", () => {
       });
       expect(escape.defaultPrevented).toBe(true);
       expect(document.activeElement).not.toBe(title);
+      expect(mode?.textContent).toBe("normal:idle");
       expect(onUpdateIssue).toHaveBeenCalledWith(expect.objectContaining({
         title: "Escape saves this title"
       }));
@@ -251,19 +266,22 @@ describe("IssueEditor", () => {
       await act(async () => {
         dispatchKey(document.body, { code: "KeyG", key: "g" });
       });
-      expect(mode?.textContent).toBe("g");
+      expect(mode?.textContent).toBe("normal:KeyG");
       await act(async () => {
         dispatchKey(document.body, { code: "KeyI", key: "i" });
       });
       expect(onGoInbox).toHaveBeenCalledTimes(1);
-      expect(mode?.textContent).toBe("idle");
+      expect(mode?.textContent).toBe("normal:idle");
 
-      description.focus();
+      await act(async () => {
+        description.focus();
+      });
+      expect(mode?.textContent).toBe("insert:idle");
       expect(
         dispatchKey(description, { code: "KeyG", key: "g" })
           .defaultPrevented
       ).toBe(false);
-      expect(mode?.textContent).toBe("idle");
+      expect(mode?.textContent).toBe("insert:idle");
       await act(async () => {
         escape = dispatchKey(description, {
           code: "Escape",
@@ -272,12 +290,14 @@ describe("IssueEditor", () => {
       });
       expect(escape.defaultPrevented).toBe(true);
       expect(document.activeElement).not.toBe(description);
+      expect(mode?.textContent).toBe("normal:idle");
 
       await act(async () => {
         dispatchKey(document.body, { code: "KeyG", key: "g" });
         dispatchKey(document.body, { code: "KeyI", key: "i" });
       });
       expect(onGoInbox).toHaveBeenCalledTimes(2);
+      expect(mode?.textContent).toBe("normal:idle");
     } finally {
       await act(async () => root.unmount());
       container.remove();

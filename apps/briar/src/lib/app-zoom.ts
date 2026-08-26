@@ -1,5 +1,4 @@
 import { isDesktopTauri } from "./platform";
-import { remoteDesktopCapturesKeyboard } from "./remote-desktop-focus";
 
 export const appZoomStorageKey = "briar.appZoom";
 export const appZoomSteps = [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4] as const;
@@ -57,37 +56,6 @@ async function applyZoom(zoom: AppZoom) {
   document.documentElement.style.setProperty("zoom", String(zoom));
 }
 
-function zoomDirection(event: KeyboardEvent) {
-  if (
-    event.isComposing ||
-    !event.metaKey ||
-    event.ctrlKey ||
-    event.altKey
-  ) {
-    return 0;
-  }
-
-  if (
-    event.code === "Equal" ||
-    event.code === "NumpadAdd" ||
-    event.key === "+" ||
-    event.key === "="
-  ) {
-    return 1;
-  }
-
-  if (
-    event.code === "Minus" ||
-    event.code === "NumpadSubtract" ||
-    event.key === "-" ||
-    event.key === "−"
-  ) {
-    return -1;
-  }
-
-  return 0;
-}
-
 /**
  * Creates one zoom command state machine and applies the saved zoom once.
  *
@@ -124,27 +92,4 @@ export function createAppZoomCommands(
     zoomIn: () => move(1),
     zoomOut: () => move(-1),
   };
-}
-
-export function installAppZoomShortcuts(
-  commandsOrApply?: AppZoomApply | AppZoomCommands,
-) {
-  const commands = commandsOrApply === undefined
-    ? createAppZoomCommands()
-    : typeof commandsOrApply === "function"
-    ? createAppZoomCommands(commandsOrApply)
-    : commandsOrApply;
-
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (remoteDesktopCapturesKeyboard()) return;
-    const direction = zoomDirection(event);
-    if (direction === 0) return;
-
-    event.preventDefault();
-    if (direction > 0) commands.zoomIn();
-    else commands.zoomOut();
-  };
-
-  window.addEventListener("keydown", handleKeyDown);
-  return () => window.removeEventListener("keydown", handleKeyDown);
 }

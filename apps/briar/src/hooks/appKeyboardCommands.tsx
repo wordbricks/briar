@@ -15,6 +15,7 @@ const {
   useKeyboardCommandController,
   useKeyboardCommandScope,
   useKeyboardCommandState,
+  useOptionalKeyboardCommandController,
 } = appKeyboardCommandBindings;
 
 export function AppKeyboardCommandProvider({
@@ -38,8 +39,23 @@ export function AppKeyboardCommandProvider({
   );
 }
 
+export function AppKeyboardCommandBoundary({
+  children,
+}: {
+  readonly children: ReactNode;
+}) {
+  const controller = useOptionalKeyboardCommandController();
+  if (controller !== null) return children;
+  return (
+    <AppKeyboardCommandProvider>
+      {children}
+    </AppKeyboardCommandProvider>
+  );
+}
+
 export {
   useKeyboardCommandController as useAppKeyboardCommandController,
   useKeyboardCommandScope as useAppKeyboardCommandScope,
   useKeyboardCommandState as useAppKeyboardCommandState,
+  useOptionalKeyboardCommandController as useOptionalAppKeyboardCommandController,
 };

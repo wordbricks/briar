@@ -1,6 +1,5 @@
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import { remoteDesktopCapturesKeyboard } from "./remote-desktop-focus";
 
 export type KeybindingId = "commandPalette" | "sidebarToggle";
 
@@ -428,25 +427,4 @@ export function formatShortcut(
   }
   parts.push(displayKey(shortcut.key));
   return isMac ? parts.join("") : parts.join("+");
-}
-
-export function installKeybindingShortcuts(
-  onShortcut: (id: KeybindingId) => void,
-): () => void {
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (
-      event.repeat || keyboardEventIsComposing(event) || getRecordingKeybinding() ||
-      remoteDesktopCapturesKeyboard()
-    ) return;
-    const keybindings = loadKeybindings();
-    for (const id of keybindingIds) {
-      if (matchesShortcut(event, keybindings[id])) {
-        event.preventDefault();
-        onShortcut(id);
-        return;
-      }
-    }
-  };
-  window.addEventListener("keydown", handleKeyDown, true);
-  return () => window.removeEventListener("keydown", handleKeyDown, true);
 }

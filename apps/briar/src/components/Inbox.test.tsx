@@ -1,11 +1,11 @@
 /** @vitest-environment jsdom */
 
-import { act, useState } from "react";
+import { act, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AppKeyboardCommandProvider } from "../hooks/appKeyboardCommands";
 import type { InboxMessageWithReadState } from "../hooks/useInbox";
 import { I18nProvider } from "../i18n";
-import { installKeyboardListNavigation } from "../lib/keyboard-list-navigation";
 import type { Project } from "../types";
 import {
   Inbox,
@@ -51,12 +51,20 @@ const issue = (
   ...overrides,
 }) as InboxMessageWithReadState;
 
+function TestProviders({ children }: { children: ReactNode }) {
+  return (
+    <AppKeyboardCommandProvider>
+      <I18nProvider>{children}</I18nProvider>
+    </AppKeyboardCommandProvider>
+  );
+}
+
 describe("Inbox", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
 
   beforeEach(() => {
-Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     localStorage.setItem("briar.locale.v1", "ko");
     container = document.createElement("div");
     document.body.append(container);
@@ -93,29 +101,44 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         priority: 2,
       }),
     ];
+    const onOpen = vi.fn();
 
     await act(async () =>
       root.render(
-        <I18nProvider>
+        <TestProviders>
           <Inbox
             isSidebarOpen
             messages={messages}
             onMarkAllRead={vi.fn()}
             onMarkRead={vi.fn()}
-            onOpen={vi.fn()}
+            onOpen={onOpen}
             projects={projects}
             unreadCount={3}
           />
-        </I18nProvider>,
+        </TestProviders>,
       ),
     );
 
     const projectFilter = container.querySelector<HTMLButtonElement>(
       '[aria-label="프로젝트 필터"]',
-    );
+    )!;
     expect(projectFilter?.textContent).toContain("모든 프로젝트");
 
-    await act(async () => projectFilter?.click());
+    const initialFirstMessage = container.querySelector<HTMLButtonElement>(
+      ".inbox-message-open",
+    )!;
+    initialFirstMessage.scrollIntoView = vi.fn();
+    const initialNavigationEvent = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      code: "KeyJ",
+      key: "j",
+    });
+    await act(async () => projectFilter.dispatchEvent(initialNavigationEvent));
+    expect(initialNavigationEvent.defaultPrevented).toBe(true);
+    expect(onOpen).toHaveBeenLastCalledWith(messages[0]);
+
+    await act(async () => projectFilter.click());
     const sproutOption = document.querySelector<HTMLButtonElement>(
       '[role="option"][data-value="project-2"]',
     );
@@ -137,21 +160,22 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         ?.textContent,
     ).toBe("1");
 
-    const stopKeyboardNavigation = installKeyboardListNavigation();
-    const firstMessage = container.querySelector<HTMLElement>(
+    const firstMessage = container.querySelector<HTMLButtonElement>(
       ".inbox-message-open",
-    );
-    firstMessage!.scrollIntoView = vi.fn();
+    )!;
+    firstMessage.scrollIntoView = vi.fn();
+    const click = vi.spyOn(firstMessage, "click");
     const navigationEvent = new KeyboardEvent("keydown", {
       bubbles: true,
       cancelable: true,
       code: "KeyJ",
       key: "j",
     });
-    projectFilter?.dispatchEvent(navigationEvent);
+    await act(async () => projectFilter.dispatchEvent(navigationEvent));
     expect(navigationEvent.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(firstMessage);
-    stopKeyboardNavigation();
+    expect(onOpen).toHaveBeenLastCalledWith(messages[1]);
+    expect(click).not.toHaveBeenCalled();
   });
 
   it("marks one message as read without opening its destination", async () => {
@@ -164,7 +188,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
     await act(async () =>
       root.render(
-        <I18nProvider>
+        <TestProviders>
           <Inbox
             isSidebarOpen
             messages={[message]}
@@ -174,7 +198,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
             projects={projects}
             unreadCount={1}
           />
-        </I18nProvider>,
+        </TestProviders>,
       ),
     );
 
@@ -188,9 +212,138 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(onMarkRead).toHaveBeenCalledOnce();
     expect(onMarkRead).toHaveBeenCalledWith(message.id);
     expect(onOpen).not.toHaveBeenCalled();
-    expect(document.activeElement).toBe(
-      container.querySelector(".inbox-message-open"),
+    const openButton = container.querySelector(".inbox-message-open");
+    expect(document.activeElement).toBe(openButton);
+    expect(openButton?.hasAttribute("data-keyboard-list-current")).toBe(true);
+  });
+
+  it("preserves pointer, Enter, and Space activation on native buttons", async () => {
+    const messages = [
+      issue("first", "First issue", { priority: 1, status: "failed" }),
+      issue("second", "Second issue", { priority: 1, status: "failed" }),
+      issue("third", "Third issue", { priority: 1, status: "failed" }),
+    ];
+    const onOpen = vi.fn();
+
+    function Harness() {
+      const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
+        null,
+      );
+      return (
+        <TestProviders>
+          <Inbox
+            isSidebarOpen
+            messages={messages}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={(message) => {
+              onOpen(message);
+              setSelectedMessageId(message.id);
+            }}
+            projects={projects}
+            selectedMessageId={selectedMessageId}
+            unreadCount={messages.length}
+          />
+        </TestProviders>
+      );
+    }
+
+    await act(async () => root.render(<Harness />));
+    const buttons = [
+      ...container.querySelectorAll<HTMLButtonElement>(".inbox-message-open"),
+    ];
+    expect(buttons.every((button) => button.type === "button")).toBe(true);
+
+    await act(async () => buttons[1]?.focus());
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(buttons[1]?.hasAttribute("data-keyboard-list-current")).toBe(true);
+
+    await act(async () => {
+      buttons[1]?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, detail: 1 }),
+      );
+    });
+    expect(onOpen).toHaveBeenLastCalledWith(messages[1]);
+    expect(buttons[1]?.hasAttribute("data-keyboard-list-current")).toBe(true);
+
+    const enter = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      code: "Enter",
+      key: "Enter",
+    });
+    await act(async () => {
+      buttons[0]?.dispatchEvent(enter);
+      buttons[0]?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, detail: 0 }),
+      );
+    });
+    expect(enter.defaultPrevented).toBe(false);
+    expect(onOpen).toHaveBeenLastCalledWith(messages[0]);
+    expect(buttons[0]?.getAttribute("aria-current")).toBe("true");
+
+    const space = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      code: "Space",
+      key: " ",
+    });
+    await act(async () => {
+      buttons[2]?.dispatchEvent(space);
+      buttons[2]?.dispatchEvent(
+        new KeyboardEvent("keyup", {
+          bubbles: true,
+          cancelable: true,
+          code: "Space",
+          key: " ",
+        }),
+      );
+      buttons[2]?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, detail: 0 }),
+      );
+    });
+    expect(space.defaultPrevented).toBe(false);
+    expect(onOpen).toHaveBeenLastCalledWith(messages[2]);
+    expect(buttons[2]?.hasAttribute("data-keyboard-list-current")).toBe(true);
+  });
+
+  it("does not claim list navigation commands in companion mode", async () => {
+    const onOpen = vi.fn();
+    await act(async () =>
+      root.render(
+        <TestProviders>
+          <button data-testid="companion-outside" type="button">
+            Outside
+          </button>
+          <Inbox
+            companionMode
+            isSidebarOpen
+            messages={[issue("message", "Companion message")]}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onOpen={onOpen}
+            projects={projects}
+            unreadCount={1}
+          />
+        </TestProviders>,
+      )
     );
+    const outside = container.querySelector<HTMLButtonElement>(
+      '[data-testid="companion-outside"]',
+    )!;
+    const event = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      code: "KeyJ",
+      key: "j",
+    });
+
+    outside.focus();
+    await act(async () => outside.dispatchEvent(event));
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(outside);
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
   it("keeps keyboard navigation and the selected detail message in sync", async () => {
@@ -206,7 +359,8 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         null,
       );
       return (
-        <I18nProvider>
+        <TestProviders>
+          <button data-testid="outside-inbox" type="button">Outside</button>
           <Inbox
             isSidebarOpen
             messages={messages}
@@ -220,13 +374,13 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
             selectedMessageId={selectedMessageId}
             unreadCount={messages.length}
           />
-        </I18nProvider>
+        </TestProviders>
       );
     }
 
     await act(async () => root.render(<Harness />));
-    const projectFilter = container.querySelector<HTMLButtonElement>(
-      '[aria-label="프로젝트 필터"]',
+    const outside = container.querySelector<HTMLButtonElement>(
+      '[data-testid="outside-inbox"]',
     )!;
     const messageButtons = [
       ...container.querySelectorAll<HTMLButtonElement>(
@@ -236,13 +390,15 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     for (const messageButton of messageButtons) {
       messageButton.scrollIntoView = vi.fn();
     }
+    const clickSpies = messageButtons.map((messageButton) =>
+      vi.spyOn(messageButton, "click")
+    );
     expect(
       container
         .querySelector("[data-keyboard-list]")
         ?.hasAttribute("data-keyboard-list-activate-on-navigation"),
-    ).toBe(true);
+    ).toBe(false);
 
-    const stopKeyboardNavigation = installKeyboardListNavigation();
     const navigate = async (
       key: "j" | "k",
       { repeat = false }: { repeat?: boolean } = {},
@@ -254,17 +410,17 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         key,
         repeat,
       });
-      await act(async () => projectFilter.dispatchEvent(event));
+      await act(async () => outside.dispatchEvent(event));
       expect(event.defaultPrevented).toBe(true);
     };
 
-    projectFilter.focus();
+    outside.focus();
     await navigate("j");
     expect(onOpen).toHaveBeenLastCalledWith(messages[0]);
     expect(document.activeElement).toBe(messageButtons[0]);
     expect(messageButtons[0]?.getAttribute("aria-current")).toBe("true");
 
-    projectFilter.focus();
+    outside.focus();
     await navigate("j");
     expect(onOpen).toHaveBeenLastCalledWith(messages[1]);
     expect(document.activeElement).toBe(messageButtons[1]);
@@ -272,16 +428,22 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       true,
     );
 
-    projectFilter.focus();
+    outside.focus();
     await navigate("j", { repeat: true });
     expect(onOpen).toHaveBeenLastCalledWith(messages[2]);
     expect(document.activeElement).toBe(messageButtons[2]);
 
-    projectFilter.focus();
+    const openCountAtBoundary = onOpen.mock.calls.length;
+    outside.focus();
+    await navigate("j", { repeat: true });
+    expect(onOpen).toHaveBeenCalledTimes(openCountAtBoundary);
+    expect(document.activeElement).toBe(messageButtons[2]);
+
+    outside.focus();
     await navigate("k");
     expect(onOpen).toHaveBeenLastCalledWith(messages[1]);
     expect(document.activeElement).toBe(messageButtons[1]);
-    stopKeyboardNavigation();
+    for (const clickSpy of clickSpies) expect(clickSpy).not.toHaveBeenCalled();
   });
 
 
@@ -301,7 +463,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
     await act(async () =>
       root.render(
-        <I18nProvider>
+        <TestProviders>
           <Inbox
             isSidebarOpen
             messages={messages}
@@ -311,7 +473,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
             projects={projects}
             unreadCount={120}
           />
-        </I18nProvider>,
+        </TestProviders>,
       ),
     );
 
@@ -319,7 +481,9 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(scroll).not.toBeNull();
     expect(scroll?.getAttribute("data-visible-count")).toBe("50");
     expect(scroll?.getAttribute("data-has-more")).toBe("true");
-    expect(container.querySelector(".inbox-list[data-keyboard-list]")).not.toBeNull();
+    expect(
+      container.querySelector(".inbox-list[data-keyboard-list]"),
+    ).not.toBeNull();
     expect(container.querySelectorAll(".inbox-message")).toHaveLength(50);
     expect(
       container.querySelectorAll(
@@ -400,7 +564,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
     await act(async () =>
       root.render(
-        <I18nProvider>
+        <TestProviders>
           <Inbox
             isSidebarOpen
             messages={messages}
@@ -410,7 +574,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
             projects={projects}
             unreadCount={120}
           />
-        </I18nProvider>,
+        </TestProviders>,
       ),
     );
 

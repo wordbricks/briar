@@ -23,6 +23,8 @@ import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import { SelectMenu } from "./SelectMenu";
+import { useAppCollectionKeyboardCommandScope } from "../hooks/useAppCollectionKeyboardCommandScope";
+import { useControlledCollectionNavigation } from "../hooks/useControlledCollectionNavigation";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/messages";
 import { autoHuntWorkflowStageCatalog } from "../lib/auto-hunt-contract";
@@ -107,6 +109,9 @@ export function Inbox({
   );
   const [selectedProjectId, setSelectedProjectId] = useState("all");
   const [visibleCount, setVisibleCount] = useState(INBOX_PAGE_SIZE);
+  const [cursorMessageId, setCursorMessageId] = useState<string | null>(
+    selectedMessageId,
+  );
   const listRef = useRef<HTMLDivElement | null>(null);
   const projectsById = useMemo(
     () => new Map(projects.map((project) => [project.id, project])),
@@ -164,7 +169,51 @@ export function Inbox({
     () => pageInboxMessages(filteredMessages, visibleCount),
     [filteredMessages, visibleCount],
   );
+  const visibleMessageIds = useMemo(
+    () => visibleMessages.map((message) => message.id),
+    [visibleMessages],
+  );
+  const visibleMessagesById = useMemo(
+    () => new Map(visibleMessages.map((message) => [message.id, message])),
+    [visibleMessages],
+  );
   const hasMore = visibleMessages.length < filteredMessages.length;
+
+  useEffect(() => {
+    if (selectedMessageId !== null) setCursorMessageId(selectedMessageId);
+  }, [selectedMessageId]);
+
+  const navigation = useControlledCollectionNavigation<
+    string,
+    HTMLButtonElement
+  >({
+    cursorId: cursorMessageId,
+    itemIds: visibleMessageIds,
+    onCursorIdChange: setCursorMessageId,
+    onSelectedIdChange: (messageId) => {
+      const message = visibleMessagesById.get(messageId);
+      if (message) onOpen(message);
+    },
+    orientation: "vertical",
+    selectedId: selectedMessageId,
+    selectionBehavior: "follow-cursor",
+  });
+
+  const openMessage = useCallback(
+    (message: InboxMessageWithReadState) => {
+      setCursorMessageId(message.id);
+      onOpen(message);
+    },
+    [onOpen],
+  );
+
+  useAppCollectionKeyboardCommandScope({
+    enabled: !companionMode && visibleMessageIds.length > 0,
+    id: "inbox-list",
+    move: navigation.move,
+    orientation: "vertical",
+    rootRef: listRef,
+  });
 
   useEffect(() => {
     setVisibleCount(INBOX_PAGE_SIZE);
@@ -326,7 +375,6 @@ export function Inbox({
               className="inbox-list"
               data-has-more={hasMore ? "true" : "false"}
               data-keyboard-list=""
-              data-keyboard-list-activate-on-navigation=""
               data-visible-count={visibleMessages.length}
               onScroll={(event) =>
                 maybeLoadMoreFromScroll(event.currentTarget)}
@@ -336,11 +384,14 @@ export function Inbox({
                 <InboxMessageRow
                   category={classifyInboxMessage(message)}
                   compact={companionMode}
+                  current={message.id === cursorMessageId}
                   key={message.id}
                   localeTag={localeTag}
                   message={message}
+                  onCursorChange={setCursorMessageId}
                   onMarkRead={onMarkRead}
-                  onOpen={onOpen}
+                  onOpen={openMessage}
+                  openButtonRef={navigation.getItemRef(message.id)}
                   project={projectsById.get(message.projectId)}
                   selected={message.id === selectedMessageId}
                   t={t}
@@ -390,26 +441,39 @@ function FilterIcon({ category }: { category: InboxCategory }) {
 function InboxMessageRow({
   category,
   compact,
+  current,
   localeTag,
   message,
+  onCursorChange,
   onMarkRead,
   onOpen,
+  openButtonRef,
   project,
   selected,
   t,
 }: {
   category: InboxCategory;
   compact: boolean;
+  current: boolean;
   localeTag: string;
   message: InboxMessageWithReadState;
+  onCursorChange: (messageId: string) => void;
   onMarkRead: (messageId: string) => void;
   onOpen: (message: InboxMessageWithReadState) => void;
+  openButtonRef: (element: HTMLButtonElement | null) => void;
   project: Project | undefined;
   selected: boolean;
   t: (key: MessageKey, values?: Record<string, string | number>) => string;
 }) {
   const showUnreadAction = message.isUnread && category !== "activity";
   const openRef = useRef<HTMLButtonElement | null>(null);
+  const setOpenButtonRef = useCallback(
+    (element: HTMLButtonElement | null) => {
+      openRef.current = element;
+      openButtonRef(element);
+    },
+    [openButtonRef],
+  );
 
   return (
     <div
@@ -424,9 +488,10 @@ function InboxMessageRow({
         aria-current={selected ? "true" : undefined}
         className="inbox-message-open"
         data-keyboard-list-item=""
-        data-keyboard-list-current={selected ? "" : undefined}
+        data-keyboard-list-current={current ? "" : undefined}
         onClick={() => onOpen(message)}
-        ref={openRef}
+        onFocus={() => onCursorChange(message.id)}
+        ref={setOpenButtonRef}
         type="button"
       >
         <span

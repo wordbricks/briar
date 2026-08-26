@@ -6,7 +6,6 @@ import {
   defaultKeyboardNavigationPreferences,
   formatShortcut,
   getRecordingKeybinding,
-  installKeybindingShortcuts,
   isAppSystemShortcut,
   isKeyboardShortcutsGuideShortcut,
   isNavigationHistoryShortcut,
@@ -408,57 +407,4 @@ describe("keybindings", () => {
     ).toBe(false);
   });
 
-  it("notifies registered handlers and ignores matches while recording", () => {
-    const fired: string[] = [];
-    const uninstall = installKeybindingShortcuts((id) => fired.push(id));
-
-    const nestedTarget = document.createElement("button");
-    nestedTarget.addEventListener("keydown", (event) => event.stopPropagation());
-    document.body.append(nestedTarget);
-    nestedTarget.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        bubbles: true,
-        key: "k",
-        code: "KeyK",
-        metaKey: true,
-      }),
-    );
-    const webkitCompositionEvent = new KeyboardEvent("keydown", {
-      key: "k",
-      code: "KeyK",
-      metaKey: true,
-    });
-    Object.defineProperty(webkitCompositionEvent, "keyCode", { value: 229 });
-    window.dispatchEvent(webkitCompositionEvent);
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key: "k",
-        code: "KeyK",
-        metaKey: true,
-        repeat: true,
-      }),
-    );
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key: "b",
-        code: "KeyB",
-        metaKey: true,
-      }),
-    );
-    expect(fired).toEqual(["commandPalette", "sidebarToggle"]);
-
-    setRecordingKeybinding("sidebarToggle");
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key: "b",
-        code: "KeyB",
-        metaKey: true,
-      }),
-    );
-    expect(fired).toEqual(["commandPalette", "sidebarToggle"]);
-    expect(getRecordingKeybinding()).toBe("sidebarToggle");
-
-    nestedTarget.remove();
-    uninstall();
-  });
 });
