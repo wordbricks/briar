@@ -65,3 +65,16 @@ export function executionWorkerSupportsSelection(
   return Option.isSome(parsed) &&
     agentProviderSupportsSelection(parsed.value[provider], model, effort);
 }
+
+export function projectSupportsExecutionSelection(
+  workers: readonly ExecutionWorker[],
+  policy: ProjectExecutionWorkerPolicy | undefined,
+  provider: AgentProvider,
+  model: string | null,
+  effort: string | null,
+) {
+  return projectPolicyWorkers(workers, policy).some((worker) =>
+    isProjectWorkerCatalogEligible(worker) &&
+    executionWorkerSupportsSelection(worker, provider, model, effort)
+  );
+}
