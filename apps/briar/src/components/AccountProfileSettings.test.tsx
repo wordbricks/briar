@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
@@ -16,26 +16,25 @@ describe("AccountProfileSettings", () => {
       email: "jay@example.com",
       ...input,
     }));
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <AccountProfileSettings
-            onSave={onSave}
-            user={{
-              id: "user-1",
-              username: "jay",
-              name: "Jay",
-              email: "jay@example.com",
-              image: null,
-            }}
-          />
-        </I18nProvider>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <AccountProfileSettings
+          onSave={onSave}
+          user={{
+            id: "user-1",
+            username: "jay",
+            name: "Jay",
+            email: "jay@example.com",
+            image: null,
+          }}
+        />
+      </I18nProvider>,
+    );
 
     const username = container.querySelector<HTMLInputElement>(
       'input[autocomplete="username"]',
@@ -65,27 +64,25 @@ describe("AccountProfileSettings", () => {
     });
     expect(container.textContent).toContain("Saved");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("does not submit an invalid username", async () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     const onSave = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <AccountProfileSettings
-            onSave={onSave}
-            user={{ id: "user-1", name: "Jay", email: "jay@example.com" }}
-          />
-        </I18nProvider>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <AccountProfileSettings
+          onSave={onSave}
+          user={{ id: "user-1", name: "Jay", email: "jay@example.com" }}
+        />
+      </I18nProvider>,
+    );
     const username = container.querySelector<HTMLInputElement>(
       'input[autocomplete="username"]',
     )!;
@@ -98,8 +95,7 @@ describe("AccountProfileSettings", () => {
     ).toBe(true);
     expect(onSave).not.toHaveBeenCalled();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("saves a nickname when the account has no username", async () => {
@@ -109,20 +105,19 @@ describe("AccountProfileSettings", () => {
       email: "jay@example.com",
       ...input,
     }));
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <AccountProfileSettings
-            onSave={onSave}
-            user={{ id: "user-1", name: "Jay", email: "jay@example.com" }}
-          />
-        </I18nProvider>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <AccountProfileSettings
+          onSave={onSave}
+          user={{ id: "user-1", name: "Jay", email: "jay@example.com" }}
+        />
+      </I18nProvider>,
+    );
 
     const nickname = container.querySelector<HTMLInputElement>(
       'input[autocomplete="name"]',
@@ -143,8 +138,7 @@ describe("AccountProfileSettings", () => {
     });
     expect(container.textContent).toContain("Saved");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("clears a stale username conflict after the username changes", async () => {
@@ -152,20 +146,19 @@ describe("AccountProfileSettings", () => {
     const onSave = vi.fn(async () => {
       throw new Error("Username is already taken");
     });
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <AccountProfileSettings
-            onSave={onSave}
-            user={{ id: "user-1", name: "Jay", email: "jay@example.com" }}
-          />
-        </I18nProvider>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <AccountProfileSettings
+          onSave={onSave}
+          user={{ id: "user-1", name: "Jay", email: "jay@example.com" }}
+        />
+      </I18nProvider>,
+    );
 
     const username = container.querySelector<HTMLInputElement>(
       'input[autocomplete="username"]',
@@ -180,8 +173,7 @@ describe("AccountProfileSettings", () => {
     await act(async () => setInputValue(username, "available_name"));
     expect(container.querySelector('[role="alert"]')).toBeNull();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });
 

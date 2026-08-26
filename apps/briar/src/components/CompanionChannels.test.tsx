@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import type { ChannelSummary } from "../lib/channels-contract";
@@ -69,9 +69,9 @@ describe("CompanionChannels", () => {
   });
 
   it("preserves the mobile channel stack and accessible back navigation", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    await act(async () => root.render(
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(
+      root,
       <I18nProvider>
         <CompanionChannels
           activeProjectId={null}
@@ -81,7 +81,7 @@ describe("CompanionChannels", () => {
           token="token"
         />
       </I18nProvider>,
-    ));
+    );
     await act(async () => Promise.resolve());
 
     const channelButton = [...container.querySelectorAll("button")].find(
@@ -103,6 +103,6 @@ describe("CompanionChannels", () => {
 
     await act(async () => back?.click());
     expect(container.textContent).toContain("General");
-    await act(async () => root.unmount());
+    await cleanup();
   });
 });

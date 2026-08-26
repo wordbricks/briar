@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../../i18n";
@@ -27,31 +27,30 @@ describe("formatElapsed", () => {
 });
 
 describe("LoadingState", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
 
   beforeEach(() => {
     vi.useFakeTimers();
     localStorage.setItem("briar.locale.v1", "en");
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     localStorage.removeItem("briar.locale.v1");
     vi.useRealTimers();
   });
 
   async function renderLoader(variant?: LoadingStateVariant, label?: string) {
-    await act(async () =>
-      root.render(
-        <I18nProvider>
-          <LoadingState label={label} variant={variant} />
-        </I18nProvider>,
-      ),
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <LoadingState label={label} variant={variant} />
+      </I18nProvider>,
     );
     return container.querySelector<HTMLElement>("[data-testid='loading-state']");
   }

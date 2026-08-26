@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
@@ -45,24 +45,23 @@ describe("UnifiedSettingsSidebar", () => {
   it("groups settings and reveals nested project sections from the project name", async () => {
     window.localStorage.setItem("briar.locale.v1", "en");
     const onNavigate = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <UnifiedSettingsSidebar
-            activeTarget={{ scope: "application", section: "general" }}
-            isOpen
-            onBack={() => undefined}
-            onNavigate={onNavigate}
-            organizations={[organization]}
-            projects={projects}
-          />
-        </I18nProvider>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <UnifiedSettingsSidebar
+          activeTarget={{ scope: "application", section: "general" }}
+          isOpen
+          onBack={() => undefined}
+          onNavigate={onNavigate}
+          organizations={[organization]}
+          projects={projects}
+        />
+      </I18nProvider>,
+    );
 
     expect(container.textContent).toContain("Application settings");
     expect(container.textContent).toContain("My account");
@@ -171,35 +170,33 @@ describe("UnifiedSettingsSidebar", () => {
       section: "agents",
     });
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("keeps a deep-linked project and section expanded and selected", async () => {
     window.localStorage.setItem("briar.locale.v1", "en");
     const onNavigate = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <UnifiedSettingsSidebar
-            activeTarget={{
-              scope: "project",
-              projectId: "project-2",
-              section: "agent-configuration",
-            }}
-            isOpen
-            onBack={() => undefined}
-            onNavigate={onNavigate}
-            organizations={[organization]}
-            projects={projects}
-          />
-        </I18nProvider>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <UnifiedSettingsSidebar
+          activeTarget={{
+            scope: "project",
+            projectId: "project-2",
+            section: "agent-configuration",
+          }}
+          isOpen
+          onBack={() => undefined}
+          onNavigate={onNavigate}
+          organizations={[organization]}
+          projects={projects}
+        />
+      </I18nProvider>,
+    );
 
     expect(
       container
@@ -226,31 +223,29 @@ describe("UnifiedSettingsSidebar", () => {
     ).toBe("false");
     expect(onNavigate).not.toHaveBeenCalled();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("filters and force-expands the matching scope without mixing its routes", async () => {
     window.localStorage.setItem("briar.locale.v1", "en");
     const onNavigate = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <UnifiedSettingsSidebar
-            activeTarget={{ scope: "application", section: "general" }}
-            isOpen
-            onBack={() => undefined}
-            onNavigate={onNavigate}
-            organizations={[organization]}
-            projects={projects}
-          />
-        </I18nProvider>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <UnifiedSettingsSidebar
+          activeTarget={{ scope: "application", section: "general" }}
+          isOpen
+          onBack={() => undefined}
+          onNavigate={onNavigate}
+          organizations={[organization]}
+          projects={projects}
+        />
+      </I18nProvider>,
+    );
 
     const search = container.querySelector<HTMLInputElement>(
       'input[type="search"]',
@@ -296,7 +291,6 @@ describe("UnifiedSettingsSidebar", () => {
       section: "general",
     });
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "./test/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -72,9 +72,9 @@ describe("theme", () => {
   it("tracks system changes and persists an explicit selection", async () => {
     const systemTheme = installMatchMedia(false);
     window.localStorage.setItem(themeStorageKey, "system");
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
 
     function ThemeControl() {
       const { resolvedTheme, setTheme, theme } = useTheme();
@@ -85,13 +85,12 @@ describe("theme", () => {
       );
     }
 
-    await act(async () => {
-      root.render(
-        <ThemeProvider>
-          <ThemeControl />
-        </ThemeProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <ThemeProvider>
+        <ThemeControl />
+      </ThemeProvider>,
+    );
     expect(container.textContent).toBe("system:light");
 
     await act(async () => systemTheme.setMatches(true));
@@ -105,8 +104,7 @@ describe("theme", () => {
     expect(window.localStorage.getItem(themeStorageKey)).toBe("light");
     expect(document.documentElement.classList.contains("dark")).toBe(false);
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("falls back to light when system theme detection is unavailable", () => {

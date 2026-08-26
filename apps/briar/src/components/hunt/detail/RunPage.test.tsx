@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
@@ -153,13 +153,20 @@ describe("RunPage", () => {
       requestedWorkerId: null,
       executionReadiness: "ready" as const
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={{
-      ...demoDashboard,
-      runs: [queuedRun]
-    }} onProcessIssueNow={onProcessIssueNow} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...demoDashboard,
+          runs: [queuedRun],
+        }}
+        onProcessIssueNow={onProcessIssueNow}
+      />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".kanban-card")?.click();
     });
@@ -169,8 +176,7 @@ describe("RunPage", () => {
     expect(processNow?.getAttribute("aria-label")).toContain("바로 처리하기");
     await act(async () => processNow?.click());
     expect(onProcessIssueNow).toHaveBeenCalledWith(queuedRun);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("lets users change status and priority from compact property badges", async () => {
     const onMove = vi.fn(async () => undefined);
@@ -181,16 +187,31 @@ describe("RunPage", () => {
       workflowStage: null,
       priority: 4
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<TooltipProvider>
-          <RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={onMove} onRetry={async () => undefined} onSendIssueMessage={async () => {
-          throw new Error("not implemented in this test");
-        }} onUpdateIssue={onUpdateIssue} run={run} />
-        </TooltipProvider>);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <TooltipProvider>
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={onMove}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          onUpdateIssue={onUpdateIssue}
+          run={run}
+        />
+      </TooltipProvider>,
+    );
     const statusTrigger = container.querySelector<HTMLButtonElement>(".run-page-property-select.status .select-menu-trigger");
     const priorityTrigger = container.querySelector<HTMLButtonElement>(".run-page-property-select.priority .select-menu-trigger");
     expect(statusTrigger?.textContent).toContain("대기");
@@ -214,14 +235,13 @@ describe("RunPage", () => {
       difficulty: run.difficulty,
       attachments: []
     });
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("opens issue details as a page and returns to the kanban", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={demoDashboard} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(root, <HuntDashboard {...dashboardProps} dashboard={demoDashboard} />);
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".kanban-card")?.click();
     });
@@ -333,8 +353,7 @@ describe("RunPage", () => {
     });
     expect(container.querySelector(".run-page")).toBeNull();
     expect(container.querySelector(".kanban-board")).not.toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("shows subscriber avatars and toggles the current member subscription", async () => {
     const member = demoDashboard.members![0]!;
@@ -347,37 +366,73 @@ describe("RunPage", () => {
         subscribedAt: "2026-08-12T00:00:00.000Z"
       }]
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<RunPage currentUserId={member.userId} error={null} isRecovering={false} isSidebarOpen mentionMembers={[member]} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-      throw new Error("not implemented in this test");
-    }} onUpdateIssueSubscription={onUpdateIssueSubscription} run={run} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        currentUserId={member.userId}
+        error={null}
+        isRecovering={false}
+        isSidebarOpen
+        mentionMembers={[member]}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        onUpdateIssueSubscription={onUpdateIssueSubscription}
+        run={run}
+      />,
+    );
     expect(container.querySelectorAll(".issue-subscriber-avatar")).toHaveLength(1);
     const subscribe = container.querySelector<HTMLButtonElement>(".issue-subscribe-button");
     expect(subscribe?.textContent).toContain("구독 중");
     expect(subscribe?.getAttribute("aria-pressed")).toBe("true");
     await act(async () => subscribe?.click());
     expect(onUpdateIssueSubscription).toHaveBeenCalledWith(false);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("keeps an assignee subscribed", async () => {
     const member = demoDashboard.members![0]!;
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<RunPage currentUserId={member.userId} error={null} isRecovering={false} isSidebarOpen mentionMembers={[member]} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-      throw new Error("not implemented in this test");
-    }} onUpdateIssueSubscription={async () => undefined} run={{
-      ...demoDashboard.runs[0],
-      assigneeUserId: member.userId
-    }} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        currentUserId={member.userId}
+        error={null}
+        isRecovering={false}
+        isSidebarOpen
+        mentionMembers={[member]}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        onUpdateIssueSubscription={async () => undefined}
+        run={{
+          ...demoDashboard.runs[0],
+          assigneeUserId: member.userId,
+        }}
+      />,
+    );
     const subscribe = container.querySelector<HTMLButtonElement>(".issue-subscribe-button");
     expect(subscribe?.disabled).toBe(true);
     expect(subscribe?.title).toBe("담당자는 이 이슈를 항상 구독합니다.");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("moves the conversation into a tab when the issue page becomes narrow", async () => {
     let resizeCallback: ResizeObserverCallback | null = null;
@@ -390,13 +445,30 @@ describe("RunPage", () => {
       unobserve() {}
     }
     vi.stubGlobal("ResizeObserver", TestResizeObserver);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const onViewingIssueConversationChange = vi.fn();
-    await act(async () => root.render(<RunPage error={null} isRecovering={false} isSidebarOpen onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onViewingIssueConversationChange={onViewingIssueConversationChange} onSendIssueMessage={async () => {
-      throw new Error("not implemented in this test");
-    }} run={demoDashboard.runs[0]} />));
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        error={null}
+        isRecovering={false}
+        isSidebarOpen
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onViewingIssueConversationChange={onViewingIssueConversationChange}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={demoDashboard.runs[0]}
+      />,
+    );
     expect(onViewingIssueConversationChange).toHaveBeenLastCalledWith(demoDashboard.runs[0].id);
     const layout = container.querySelector<HTMLElement>(".run-page-layout")!;
     const emitResize = async (width: number) => {
@@ -430,9 +502,8 @@ describe("RunPage", () => {
     expect(container.querySelector(".run-page-conversation-resizer")).not.toBeNull();
     expect(container.querySelector<HTMLElement>(".issue-description-pane")?.hidden).toBe(false);
     expect(onViewingIssueConversationChange).toHaveBeenLastCalledWith(demoDashboard.runs[0].id);
-    await act(async () => root.unmount());
+    await cleanup();
     expect(onViewingIssueConversationChange).toHaveBeenLastCalledWith(null);
-    container.remove();
     vi.unstubAllGlobals();
   });
   it("selects the conversation tab when a narrow issue opens from an Inbox reply", async () => {
@@ -446,12 +517,29 @@ describe("RunPage", () => {
       unobserve() {}
     }
     vi.stubGlobal("ResizeObserver", TestResizeObserver);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<RunPage error={null} initialDetailTab="conversation" isRecovering={false} isSidebarOpen onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-      throw new Error("not implemented in this test");
-    }} run={demoDashboard.runs[0]} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        error={null}
+        initialDetailTab="conversation"
+        isRecovering={false}
+        isSidebarOpen
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={demoDashboard.runs[0]}
+      />,
+    );
     const layout = container.querySelector<HTMLElement>(".run-page-layout")!;
     await act(async () => {
       resizeCallback?.([{
@@ -479,16 +567,18 @@ describe("RunPage", () => {
     expect(layout.classList.contains("is-conversation-tabbed")).toBe(false);
     expect(container.querySelector(".issue-conversation-tab-panel")).toBeNull();
     expect(container.querySelector<HTMLElement>(".issue-description-pane")?.hidden).toBe(false);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     vi.unstubAllGlobals();
   });
   it("marks an open issue viewed again when its inbox version changes", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const onIssueViewed = vi.fn();
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={demoDashboard} onIssueViewed={onIssueViewed} />));
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard {...dashboardProps} dashboard={demoDashboard} onIssueViewed={onIssueViewed} />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".kanban-card")?.click();
     });
@@ -503,32 +593,41 @@ describe("RunPage", () => {
         lastEventAt: "2026-08-06T03:00:00.000Z"
       } : run)
     };
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={updatedDashboard} onIssueViewed={onIssueViewed} />));
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard {...dashboardProps} dashboard={updatedDashboard} onIssueViewed={onIssueViewed} />,
+    );
     expect(onIssueViewed).toHaveBeenLastCalledWith(viewedRun.id);
     expect(onIssueViewed).toHaveBeenCalledTimes(callsAfterOpening + 1);
     const callsAfterIssueUpdate = onIssueViewed.mock.calls.length;
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={{
-      ...updatedDashboard,
-      conversationNotifications: [{
-        id: "new-reply",
-        runId: viewedRun.id,
-        runTitle: viewedRun.title,
-        rootMessageId: "root-message",
-        body: "I added the requested answer.",
-        author: {
-          id: "reply-author",
-          name: "Reply author",
-          image: null,
-          provider: null
-        },
-        reason: "thread_reply",
-        createdAt: "2026-08-06T03:01:00.000Z"
-      }]
-    }} onIssueViewed={onIssueViewed} />));
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={{
+          ...updatedDashboard,
+          conversationNotifications: [{
+            id: "new-reply",
+            runId: viewedRun.id,
+            runTitle: viewedRun.title,
+            rootMessageId: "root-message",
+            body: "I added the requested answer.",
+            author: {
+              id: "reply-author",
+              name: "Reply author",
+              image: null,
+              provider: null,
+            },
+            reason: "thread_reply",
+            createdAt: "2026-08-06T03:01:00.000Z",
+          }],
+        }}
+        onIssueViewed={onIssueViewed}
+      />,
+    );
     expect(onIssueViewed).toHaveBeenLastCalledWith(viewedRun.id);
     expect(onIssueViewed).toHaveBeenCalledTimes(callsAfterIssueUpdate + 1);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("refreshes status history when the open issue records a new event", async () => {
     const run = demoDashboard.runs[0];
@@ -542,19 +641,34 @@ describe("RunPage", () => {
         eventCount: 1
       }, ...demoDashboard.runs.slice(1)]
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={initialDashboard} onLoadRunEvents={onLoadRunEvents} requestedRunId={run.id} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={initialDashboard}
+        onLoadRunEvents={onLoadRunEvents}
+        requestedRunId={run.id}
+      />,
+    );
     expect(onLoadRunEvents).toHaveBeenCalledTimes(1);
     const statusHistoryTab = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(button => button.textContent === "상태");
     await act(async () => statusHistoryTab?.click());
     expect(container.querySelectorAll(".issue-status-history-panel .timeline-event")).toHaveLength(1);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} dashboard={demoDashboard} onLoadRunEvents={onLoadRunEvents} requestedRunId={run.id} />));
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        dashboard={demoDashboard}
+        onLoadRunEvents={onLoadRunEvents}
+        requestedRunId={run.id}
+      />,
+    );
     expect(onLoadRunEvents).toHaveBeenCalledTimes(2);
     expect(container.querySelectorAll(".issue-status-history-panel .timeline-event")).toHaveLength(events.length);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("adds a checkpoint from an unstarted issue progress chart", async () => {
     const onUpdateIssueCheckpoints = vi.fn(async () => undefined);
@@ -572,12 +686,29 @@ describe("RunPage", () => {
         }
       }
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<RunPage error={null} isRecovering={false} isSidebarOpen onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-      throw new Error("not implemented in this test");
-    }} onUpdateIssueCheckpoints={onUpdateIssueCheckpoints} run={run} />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        error={null}
+        isRecovering={false}
+        isSidebarOpen
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        onUpdateIssueCheckpoints={onUpdateIssueCheckpoints}
+        run={run}
+      />,
+    );
     const checkpoint = container.querySelector<HTMLButtonElement>('.issue-workflow-checkpoint[data-position="after"]');
     expect(checkpoint?.disabled).toBe(false);
     await act(async () => checkpoint?.click());
@@ -585,42 +716,68 @@ describe("RunPage", () => {
       key: expect.stringMatching(/^issue-after-/u),
       position: "after"
     })]);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("opens the requested issue conversation in the conversation tab", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<HuntDashboard {...dashboardProps} companionMode dashboard={demoDashboard} requestedRunId={demoDashboard.runs[0].id} requestedRunInitialTab="conversation" />));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <HuntDashboard
+        {...dashboardProps}
+        companionMode
+        dashboard={demoDashboard}
+        requestedRunId={demoDashboard.runs[0].id}
+        requestedRunInitialTab="conversation"
+      />,
+    );
     const conversationTab = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(tab => tab.textContent === "대화");
     const conversationPanel = container.querySelector<HTMLElement>(".issue-conversation-tab-panel");
     expect(conversationTab?.getAttribute("aria-selected")).toBe("true");
     expect(conversationPanel?.hidden).toBe(false);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("shows editable prerequisite and follow-up relationships in issue properties", async () => {
     const prerequisite = demoDashboard.runs[1];
     const dependent = demoDashboard.runs[0];
     const addDependency = vi.fn(async () => undefined);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<TooltipProvider>
-        <RunPage availableRuns={demoDashboard.runs} isSidebarOpen error={null} isRecovering={false} onAddDependency={addDependency} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRemoveDependency={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-        throw new Error("not implemented in this test");
-      }} run={{
-        ...dependent,
-        prerequisites: [{
-          id: prerequisite.id,
-          runNumber: prerequisite.runNumber,
-          title: prerequisite.title,
-          status: prerequisite.status
-        }],
-        dependents: []
-      }} />
-      </TooltipProvider>));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <TooltipProvider>
+        <RunPage
+          availableRuns={demoDashboard.runs}
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onAddDependency={addDependency}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRemoveDependency={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={{
+            ...dependent,
+            prerequisites: [{
+              id: prerequisite.id,
+              runNumber: prerequisite.runNumber,
+              title: prerequisite.title,
+              status: prerequisite.status,
+            }],
+            dependents: [],
+          }}
+        />
+      </TooltipProvider>,
+    );
     expect(container.querySelector(".issue-description-scroll .issue-dependencies")).toBeNull();
     expect(container.querySelector(".issue-dependencies")).toBeNull();
     await act(async () => {
@@ -647,14 +804,13 @@ describe("RunPage", () => {
       Array.from(picker?.querySelectorAll<HTMLButtonElement>("button") ?? []).find(button => button.textContent?.trim() === "닫기")?.click();
     });
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("clears the resume spinner when the run reaches another paused checkpoint", async () => {
     const onResume = vi.fn(async () => undefined);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const pausedRun: HuntRun = {
       ...demoDashboard.runs[1],
       status: "paused"
@@ -664,9 +820,7 @@ describe("RunPage", () => {
         throw new Error("not implemented in this test");
       }} run={run} />
       </TooltipProvider>;
-    await act(async () => {
-      root.render(renderRun(pausedRun));
-    });
+    await renderReactTestRoot(root, renderRun(pausedRun));
     const resumeButton = container.querySelector<HTMLButtonElement>(".paused-result-resume");
     expect(resumeButton?.disabled).toBe(false);
     expect(resumeButton?.querySelector(".spin")).toBeNull();
@@ -677,38 +831,57 @@ describe("RunPage", () => {
     expect(onResume).toHaveBeenCalledOnce();
     expect(resumeButton?.disabled).toBe(true);
     expect(resumeButton?.querySelector(".spin")).not.toBeNull();
-    await act(async () => {
-      root.render(renderRun({
+    await renderReactTestRoot(
+      root,
+      renderRun({
         ...pausedRun,
-        checkpoint: pausedRun.checkpoint ? {
-          ...pausedRun.checkpoint,
-          key: "project-after-pr_open",
-          stage: "pr_open",
-          stageLabel: "Pull request",
-          terminalReviewOnly: false
-        } : null,
-        workflowStage: "pr_open"
-      }));
-    });
+        checkpoint: pausedRun.checkpoint
+          ? {
+            ...pausedRun.checkpoint,
+            key: "project-after-pr_open",
+            stage: "pr_open",
+            stageLabel: "Pull request",
+            terminalReviewOnly: false,
+          }
+          : null,
+        workflowStage: "pr_open",
+      }),
+    );
     const nextCheckpointButton = container.querySelector<HTMLButtonElement>(".paused-result-resume");
     expect(nextCheckpointButton?.disabled).toBe(false);
     expect(nextCheckpointButton?.querySelector(".spin")).toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("submits paused review feedback as an explicit rework request", async () => {
     const onRework = vi.fn(async () => undefined);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<TooltipProvider>
-        <RunPage error={null} isRecovering={false} isSidebarOpen onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onRework={onRework} onSendIssueMessage={async () => {
-        throw new Error("not implemented in this test");
-      }} run={{
-        ...demoDashboard.runs[1],
-        status: "paused" as const
-      }} />
-      </TooltipProvider>));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <TooltipProvider>
+        <RunPage
+          error={null}
+          isRecovering={false}
+          isSidebarOpen
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onRework={onRework}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={{
+            ...demoDashboard.runs[1],
+            status: "paused" as const,
+          }}
+        />
+      </TooltipProvider>,
+    );
     const openButton = container.querySelector<HTMLButtonElement>(".paused-result-rework");
     expect(openButton?.textContent).toContain("수정 요청");
     await act(async () => openButton?.click());
@@ -733,8 +906,7 @@ describe("RunPage", () => {
       workflowStage: "local_qa",
       reason: "결과 요약을 더 짧게 만들고 모바일 화면도 다시 확인해 주세요."
     });
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("requires the user to accept a Project Agent rework proposal before revision", async () => {
     const proposalId = "abababab-abab-4bab-8bab-abababababab";
@@ -768,17 +940,34 @@ describe("RunPage", () => {
       acceptedAt: "2026-08-05T01:01:00.000Z",
       appliedRevision: 2
     }));
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<TooltipProvider>
-        <RunPage error={null} isRecovering={false} isSidebarOpen onAcceptIssueAction={onAccept} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => [message]} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-        throw new Error("not implemented in this test");
-      }} run={{
-        ...demoDashboard.runs[1],
-        status: "completed" as const
-      }} />
-      </TooltipProvider>));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <TooltipProvider>
+        <RunPage
+          error={null}
+          isRecovering={false}
+          isSidebarOpen
+          onAcceptIssueAction={onAccept}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [message]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          run={{
+            ...demoDashboard.runs[1],
+            status: "completed" as const,
+          }}
+        />
+      </TooltipProvider>,
+    );
     await act(async () => {
       await Promise.resolve();
     });
@@ -791,8 +980,7 @@ describe("RunPage", () => {
     });
     expect(onAccept).toHaveBeenCalledWith(message.proposedAction);
     expect(container.textContent).toContain("리비전 2 개정이 시작되었습니다.");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("requires acceptance before a Project Agent-created issue is persisted", async () => {
     const createdRunId = "30303030-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -833,14 +1021,32 @@ describe("RunPage", () => {
       resultRunId: createdRunId
     }));
     const onIssueOpen = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<TooltipProvider>
-        <RunPage error={null} isRecovering={false} isSidebarOpen onAcceptIssueAction={onAccept} onBack={() => undefined} onCancel={async () => undefined} onDependencyOpen={onIssueOpen} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => [message]} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-        throw new Error("not implemented");
-      }} run={demoDashboard.runs[1]} />
-      </TooltipProvider>));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <TooltipProvider>
+        <RunPage
+          error={null}
+          isRecovering={false}
+          isSidebarOpen
+          onAcceptIssueAction={onAccept}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onDependencyOpen={onIssueOpen}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => [message]}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented");
+          }}
+          run={demoDashboard.runs[1]}
+        />
+      </TooltipProvider>,
+    );
     await act(async () => {
       await Promise.resolve();
     });
@@ -866,8 +1072,7 @@ describe("RunPage", () => {
       viewButton?.click();
     });
     expect(onIssueOpen).toHaveBeenCalledWith(createdRunId);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("keeps create evidence while approving its distinct follow-up run", async () => {
     const conversationRun = demoDashboard.runs[1];
@@ -953,19 +1158,39 @@ describe("RunPage", () => {
       requestedEffort: input.effort,
       requestedWorkerId: input.workerId
     }));
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<TooltipProvider>
-        <RunPage availableRuns={[conversationRun, targetRun]} error={null} executionWorkers={[{
-        ...dashboardWorker,
-        readiness: "available",
-        activeSessions: 0,
-        availableSessions: 1
-      }]} isRecovering={false} isSidebarOpen onAcceptIssueAction={onAcceptCreate} onAcceptIssueExecution={onAcceptExecution} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={onLoadMessages} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-        throw new Error("not implemented");
-      }} run={conversationRun} />
-      </TooltipProvider>));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <TooltipProvider>
+        <RunPage
+          availableRuns={[conversationRun, targetRun]}
+          error={null}
+          executionWorkers={[{
+            ...dashboardWorker,
+            readiness: "available",
+            activeSessions: 0,
+            availableSessions: 1,
+          }]}
+          isRecovering={false}
+          isSidebarOpen
+          onAcceptIssueAction={onAcceptCreate}
+          onAcceptIssueExecution={onAcceptExecution}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={onLoadMessages}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented");
+          }}
+          run={conversationRun}
+        />
+      </TooltipProvider>,
+    );
     await act(async () => {
       await Promise.resolve();
     });
@@ -996,7 +1221,6 @@ describe("RunPage", () => {
     });
     expect(container.textContent).toContain("새 이슈가 생성되었습니다");
     expect(container.textContent).toContain("실행이 명시적으로 승인");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });

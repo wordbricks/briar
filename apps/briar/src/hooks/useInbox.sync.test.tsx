@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { act, useMemo } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import type { Root } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { demoDashboard } from "../lib/demo-data";
 import type { DashboardPayload } from "../types";
@@ -58,6 +59,7 @@ const dashboardAt = (revision: number): DashboardPayload => {
 
 let inbox: ReturnType<typeof useInbox>;
 let root: Root;
+let cleanup: () => Promise<void>;
 let container: HTMLDivElement;
 
 function Harness({
@@ -89,7 +91,7 @@ const renderHarness = async (props: {
   token: string;
   userId: string;
 }) => {
-  await act(async () => root.render(<Harness {...props} />));
+  await renderReactTestRoot(root, <Harness {...props} />);
 };
 
 const flushPromises = async () => {
@@ -111,12 +113,11 @@ describe("Inbox read-state synchronization", () => {
     sync.loadReadStates.mockReset().mockResolvedValue({});
     sync.saveReadStates.mockReset().mockResolvedValue({});
     sync.startPolling.mockReset().mockReturnValue(() => undefined);
-    container = document.createElement("div");
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot());
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("isolates an old account PUT from the new account generation", async () => {

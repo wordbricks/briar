@@ -1,7 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { describe, expect, it } from "vitest";
 
 import { I18nProvider } from "@/i18n";
@@ -10,9 +9,9 @@ import { RunManualQaGuide } from "./RunManualQaGuide";
 
 describe("RunManualQaGuide", () => {
   it("makes overflowing local commands keyboard scrollable", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const run = {
       ...demoDashboard.runs[0]!,
       workflow: {
@@ -28,19 +27,18 @@ describe("RunManualQaGuide", () => {
       },
     };
 
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <RunManualQaGuide
-            evidence={[]}
-            loadError={null}
-            loading={false}
-            onRetry={async () => undefined}
-            run={run}
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <RunManualQaGuide
+          evidence={[]}
+          loadError={null}
+          loading={false}
+          onRetry={async () => undefined}
+          run={run}
+        />
+      </I18nProvider>,
+    );
 
     const commandRegions = [
       ...container.querySelectorAll<HTMLPreElement>(
@@ -56,7 +54,6 @@ describe("RunManualQaGuide", () => {
       commandRegions.every((region) => region.querySelector("code")),
     ).toBe(true);
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type { ProjectAgent } from "../types";
@@ -47,39 +47,38 @@ const taskSession: AutoHuntSession = {
 describe("ProjectAgentSessions", () => {
   it("shows direct task sessions for only the selected agent", async () => {
     const onSessionOpen = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () =>
-      root.render(
-        <ProjectAgentSessions
-          agent={agent}
-          onSessionOpen={onSessionOpen}
-          projectId="project-1"
-          sessions={[
-            taskSession,
-            {
-              ...taskSession,
-              id: "scheduled-session",
-              trigger: "scheduled",
-              request: "Daily repository audit",
-              status: "skipped",
-              summary: "대기 상태인 이슈가 없어 세션을 건너뛰었습니다.",
-              events: [{
-                id: "scheduled-session-skipped",
-                type: "skipped",
-                occurredAt: "2026-07-28T01:01:00.000Z",
-              }],
-            },
-            {
-              ...taskSession,
-              id: "other-agent-session",
-              agentId: "agent-2",
-              request: "Do not show this task.",
-            },
-          ]}
-        />,
-      ),
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <ProjectAgentSessions
+        agent={agent}
+        onSessionOpen={onSessionOpen}
+        projectId="project-1"
+        sessions={[
+          taskSession,
+          {
+            ...taskSession,
+            id: "scheduled-session",
+            trigger: "scheduled",
+            request: "Daily repository audit",
+            status: "skipped",
+            summary: "대기 상태인 이슈가 없어 세션을 건너뛰었습니다.",
+            events: [{
+              id: "scheduled-session-skipped",
+              type: "skipped",
+              occurredAt: "2026-07-28T01:01:00.000Z",
+            }],
+          },
+          {
+            ...taskSession,
+            id: "other-agent-session",
+            agentId: "agent-2",
+            request: "Do not show this task.",
+          },
+        ]}
+      />,
     );
 
     expect(container.textContent).toContain(
@@ -98,15 +97,14 @@ describe("ProjectAgentSessions", () => {
     expect(onSessionOpen).toHaveBeenCalledWith("task-session");
     expect(document.querySelector('[role="dialog"]')).toBeNull();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("shows a task and its Auto Hunt dispatch as one session", async () => {
     const onSessionOpen = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const dispatchSession: AutoHuntSession = {
       ...taskSession,
       id: "dispatch-session",
@@ -128,15 +126,14 @@ describe("ProjectAgentSessions", () => {
       }],
     };
 
-    await act(async () =>
-      root.render(
-        <ProjectAgentSessions
-          agent={agent}
-          onSessionOpen={onSessionOpen}
-          projectId="project-1"
-          sessions={[dispatchSession, taskSession]}
-        />,
-      ),
+    await renderReactTestRoot(
+      root,
+      <ProjectAgentSessions
+        agent={agent}
+        onSessionOpen={onSessionOpen}
+        projectId="project-1"
+        sessions={[dispatchSession, taskSession]}
+      />,
     );
 
     expect(
@@ -154,7 +151,6 @@ describe("ProjectAgentSessions", () => {
     });
     expect(onSessionOpen).toHaveBeenCalledWith("dispatch-session");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });

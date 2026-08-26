@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type AgentActivityTransport,
@@ -95,10 +95,9 @@ describe("agent activity state", () => {
     vi.setSystemTime(new Date("2026-08-26T00:00:00.000Z"));
     const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(false);
     const transport = new FakeTransport();
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
 
-    await act(async () => root.render(<Probe transport={transport} />));
+    await renderReactTestRoot(root, <Probe transport={transport} />);
     expect(transport.start).toHaveBeenCalledOnce();
 
     await act(async () => transport.emit(frame(1, {
@@ -119,7 +118,7 @@ describe("agent activity state", () => {
     document.dispatchEvent(new Event("visibilitychange"));
     expect(transport.start).toHaveBeenCalledTimes(2);
 
-    await act(async () => root.unmount());
+    await cleanup();
     expect(transport.unsubscribe).toHaveBeenCalledOnce();
     expect(transport.stop).toHaveBeenCalledTimes(2);
     expect(vi.getTimerCount()).toBe(0);

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useHorizontalPaneResize } from "./useHorizontalPaneResize";
 
@@ -65,10 +65,9 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   });
 
   it("tracks one captured pointer, calculates a right-edge percentage, and persists on finish", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const save = vi.fn();
-    await act(async () => root.render(<Probe load={() => null} save={save} />));
+    await renderReactTestRoot(root, <Probe load={() => null} save={save} />);
 
     const layout = container.firstElementChild as HTMLDivElement;
     const separator = layout.firstElementChild as HTMLDivElement;
@@ -129,14 +128,13 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(layout.dataset.resizing).toBe("false");
     expect(save).toHaveBeenLastCalledWith(30);
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("moves by five points with arrows and clamps Home and End to the bounds", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const save = vi.fn();
-    await act(async () => root.render(<Probe load={() => null} save={save} />));
+    await renderReactTestRoot(root, <Probe load={() => null} save={save} />);
     const separator = container.querySelector<HTMLElement>(
       '[role="separator"]',
     )!;
@@ -170,15 +168,14 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(ignored.defaultPrevented).toBe(false);
     expect(save).toHaveBeenCalledTimes(6);
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("restores a persisted width before the first interaction", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const load = vi.fn(() => 48);
     const save = vi.fn();
-    await act(async () => root.render(<Probe load={load} save={save} />));
+    await renderReactTestRoot(root, <Probe load={load} save={save} />);
 
     const separator = container.querySelector<HTMLElement>(
       '[role="separator"]',
@@ -197,6 +194,6 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     );
     expect(save).toHaveBeenCalledWith(53);
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 });

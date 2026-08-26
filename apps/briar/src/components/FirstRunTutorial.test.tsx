@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 import { FirstRunTutorial } from "./FirstRunTutorial";
 
@@ -13,23 +13,20 @@ function buttonWithText(label: string) {
 
 function mountTutorial() {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  const container = document.createElement("div");
-  document.body.append(container);
-  return { container, root: createRoot(container) };
+  return createReactTestRoot({ attachToDocument: true });
 }
 
 describe("FirstRunTutorial", () => {
   it("starts the developer setup from the purpose choice", async () => {
-    const { container, root } = mountTutorial();
+    const { cleanup, container, root } = mountTutorial();
     const onDeveloperSelect = vi.fn();
-    await act(async () =>
-      root.render(
-        <FirstRunTutorial
-          onCollaboratorComplete={() => undefined}
-          onDeveloperSelect={onDeveloperSelect}
-          open
-        />,
-      ),
+    await renderReactTestRoot(
+      root,
+      <FirstRunTutorial
+        onCollaboratorComplete={() => undefined}
+        onDeveloperSelect={onDeveloperSelect}
+        open
+      />,
     );
 
     expect(document.body.textContent).toContain(
@@ -38,21 +35,19 @@ describe("FirstRunTutorial", () => {
     await act(async () => buttonWithText("개발 환경 설정")?.click());
     expect(onDeveloperSelect).toHaveBeenCalledOnce();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("shows a placeholder demo for collaborators", async () => {
-    const { container, root } = mountTutorial();
+    const { cleanup, container, root } = mountTutorial();
     const onCollaboratorComplete = vi.fn();
-    await act(async () =>
-      root.render(
-        <FirstRunTutorial
-          onCollaboratorComplete={onCollaboratorComplete}
-          onDeveloperSelect={() => undefined}
-          open
-        />,
-      ),
+    await renderReactTestRoot(
+      root,
+      <FirstRunTutorial
+        onCollaboratorComplete={onCollaboratorComplete}
+        onDeveloperSelect={() => undefined}
+        open
+      />,
     );
 
     await act(async () => buttonWithText("간단한 데모 보기")?.click());
@@ -64,7 +59,6 @@ describe("FirstRunTutorial", () => {
     await act(async () => buttonWithText("Briar 시작하기")?.click());
     expect(onCollaboratorComplete).toHaveBeenCalledOnce();
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });

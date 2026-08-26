@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import type { Root } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultAgentProviderModelCatalog } from "../lib/project-llm";
 import type { ExecutionWorker, HuntRun } from "../types";
@@ -73,18 +74,20 @@ const remotelyAcceptedProposal: ExecutionProposalView = {
 };
 
 describe("IssueExecutionApproval", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: Root;
+  let unmount: () => Promise<void>;
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root, unmount } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
+    await cleanup();
     document.body.innerHTML = "";
   });
 
@@ -100,17 +103,16 @@ describe("IssueExecutionApproval", () => {
       requestedWorkerId: input.workerId,
     }));
 
-    await act(async () => {
-      root.render(
-        <IssueExecutionApproval
-          loadExecutionContext={loadExecutionContext}
-          onAccept={onAccept}
-          onAccepted={vi.fn()}
-          proposal={pendingProposal}
-          surfaceKey="channel:root:message"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <IssueExecutionApproval
+        loadExecutionContext={loadExecutionContext}
+        onAccept={onAccept}
+        onAccepted={vi.fn()}
+        proposal={pendingProposal}
+        surfaceKey="channel:root:message"
+      />,
+    );
 
     expect(loadExecutionContext).not.toHaveBeenCalled();
     expect(onAccept).not.toHaveBeenCalled();
@@ -140,17 +142,16 @@ describe("IssueExecutionApproval", () => {
   it("rechecks the current run and rejects a state change before mutation", async () => {
     let latestRun = backlogRun;
     const onAccept = vi.fn();
-    await act(async () => {
-      root.render(
-        <IssueExecutionApproval
-          loadExecutionContext={async () => context(latestRun)}
-          onAccept={onAccept}
-          onAccepted={vi.fn()}
-          proposal={pendingProposal}
-          surfaceKey="issue:message"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <IssueExecutionApproval
+        loadExecutionContext={async () => context(latestRun)}
+        onAccept={onAccept}
+        onAccepted={vi.fn()}
+        proposal={pendingProposal}
+        surfaceKey="issue:message"
+      />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".execution-proposal-approve",
@@ -176,17 +177,16 @@ describe("IssueExecutionApproval", () => {
     const onAccept = vi.fn(() => new Promise<ExecutionProposalView>((resolve) => {
       resolveAccept = resolve;
     }));
-    await act(async () => {
-      root.render(
-        <IssueExecutionApproval
-          executionContext={context()}
-          onAccept={onAccept}
-          onAccepted={vi.fn()}
-          proposal={pendingProposal}
-          surfaceKey="issue:double-submit"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <IssueExecutionApproval
+        executionContext={context()}
+        onAccept={onAccept}
+        onAccepted={vi.fn()}
+        proposal={pendingProposal}
+        surfaceKey="issue:double-submit"
+      />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".execution-proposal-approve",
@@ -217,28 +217,26 @@ describe("IssueExecutionApproval", () => {
       }),
     );
     const onAccept = vi.fn();
-    await act(async () => {
-      root.render(
-        <IssueExecutionApproval
-          loadExecutionContext={loadExecutionContext}
-          onAccept={onAccept}
-          onAccepted={vi.fn()}
-          proposal={pendingProposal}
-          surfaceKey="channel:before-back"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <IssueExecutionApproval
+        loadExecutionContext={loadExecutionContext}
+        onAccept={onAccept}
+        onAccepted={vi.fn()}
+        proposal={pendingProposal}
+        surfaceKey="channel:before-back"
+      />,
+    );
     act(() => {
       container.querySelector<HTMLButtonElement>(
         ".execution-proposal-approve",
       )?.click();
     });
-    await act(async () => root.unmount());
+    await unmount();
     await act(async () => resolveContext(context()));
 
     expect(onAccept).not.toHaveBeenCalled();
     expect(document.body.textContent).not.toContain("이슈 실행 승인");
-    root = createRoot(container);
   });
 
   it("does not reopen after a delayed context load when the proposal is accepted remotely", async () => {
@@ -259,7 +257,7 @@ describe("IssueExecutionApproval", () => {
       />
     );
 
-    await act(async () => root.render(render(pendingProposal)));
+    await renderReactTestRoot(root, render(pendingProposal));
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".execution-proposal-approve",
@@ -268,7 +266,7 @@ describe("IssueExecutionApproval", () => {
     });
     expect(container.textContent).toContain("실행 설정 확인 중");
 
-    await act(async () => root.render(render(remotelyAcceptedProposal)));
+    await renderReactTestRoot(root, render(remotelyAcceptedProposal));
     await act(async () => resolveContext(context()));
 
     expect(onAccept).not.toHaveBeenCalled();
@@ -297,7 +295,7 @@ describe("IssueExecutionApproval", () => {
       />
     );
 
-    await act(async () => root.render(render(pendingProposal)));
+    await renderReactTestRoot(root, render(pendingProposal));
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".execution-proposal-approve",
@@ -312,7 +310,7 @@ describe("IssueExecutionApproval", () => {
     });
     expect(loadExecutionContext).toHaveBeenCalledTimes(2);
 
-    await act(async () => root.render(render(remotelyAcceptedProposal)));
+    await renderReactTestRoot(root, render(remotelyAcceptedProposal));
     await act(async () => resolvePreflight(context()));
 
     expect(onAccept).not.toHaveBeenCalled();
@@ -342,20 +340,20 @@ describe("IssueExecutionApproval", () => {
       />
     );
 
-    await act(async () => root.render(render(null)));
+    await renderReactTestRoot(root, render(null));
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".execution-proposal-approve",
       )?.click();
       await Promise.resolve();
     });
-    await act(async () => root.render(render("채널이 보관되었습니다.")));
+    await renderReactTestRoot(root, render("채널이 보관되었습니다."));
     await act(async () => resolveFirstContext(context()));
 
     expect(document.body.textContent).not.toContain("이슈 실행 승인");
     expect(container.textContent).toContain("채널이 보관되었습니다.");
 
-    await act(async () => root.render(render(null)));
+    await renderReactTestRoot(root, render(null));
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".execution-proposal-approve",
@@ -419,17 +417,16 @@ describe("IssueExecutionApproval", () => {
       ))
       .mockResolvedValueOnce(accepted);
 
-    await act(async () => {
-      root.render(
-        <IssueExecutionApproval
-          loadExecutionContext={loadExecutionContext}
-          onAccept={onAccept}
-          onAccepted={vi.fn()}
-          proposal={pendingProposal}
-          surfaceKey="issue:preserve-selection"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <IssueExecutionApproval
+        loadExecutionContext={loadExecutionContext}
+        onAccept={onAccept}
+        onAccepted={vi.fn()}
+        proposal={pendingProposal}
+        surfaceKey="issue:preserve-selection"
+      />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".execution-proposal-approve",
@@ -537,7 +534,7 @@ describe("IssueExecutionApproval", () => {
         surfaceKey={surfaceKey}
       />
     );
-    await act(async () => root.render(render("channel-a:thread-a")));
+    await renderReactTestRoot(root, render("channel-a:thread-a"));
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".execution-proposal-approve",
@@ -552,7 +549,7 @@ describe("IssueExecutionApproval", () => {
     });
     expect(onAccept).toHaveBeenCalledTimes(1);
 
-    await act(async () => root.render(render("channel-a:root")));
+    await renderReactTestRoot(root, render("channel-a:root"));
     await act(async () => resolveAccept({
       ...pendingProposal,
       status: "accepted",
@@ -566,29 +563,28 @@ describe("IssueExecutionApproval", () => {
 
   it("shows accepted settings and trusted delegation attribution", async () => {
     const onIssueOpen = vi.fn();
-    await act(async () => {
-      root.render(
-        <IssueExecutionApproval
-          executionContext={context()}
-          onAccept={vi.fn()}
-          onAccepted={vi.fn()}
-          onIssueOpen={onIssueOpen}
-          projectName="Briar"
-          proposal={{
-            ...pendingProposal,
-            status: "accepted",
-            acceptedAt: "2026-08-11T00:04:00.000Z",
-            requestedProvider: "codex",
-            requestedModel: "gpt-5.6-sol",
-            requestedEffort: "high",
-            requestedWorkerId: worker.id,
-            delegatedByAgentId: "44444444-4444-4444-8444-444444444444",
-            delegatedByAgentName: "Bumble",
-          }}
-          surfaceKey="channel:accepted"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <IssueExecutionApproval
+        executionContext={context()}
+        onAccept={vi.fn()}
+        onAccepted={vi.fn()}
+        onIssueOpen={onIssueOpen}
+        projectName="Briar"
+        proposal={{
+          ...pendingProposal,
+          status: "accepted",
+          acceptedAt: "2026-08-11T00:04:00.000Z",
+          requestedProvider: "codex",
+          requestedModel: "gpt-5.6-sol",
+          requestedEffort: "high",
+          requestedWorkerId: worker.id,
+          delegatedByAgentId: "44444444-4444-4444-8444-444444444444",
+          delegatedByAgentName: "Bumble",
+        }}
+        surfaceKey="channel:accepted"
+      />,
+    );
     expect(container.textContent).toContain("Organization Agent Bumble의 위임");
     expect(container.textContent).toContain("codex · gpt-5.6-sol · high");
     expect(container.textContent).toContain("Build Mac");

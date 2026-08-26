@@ -2,7 +2,7 @@
 
 import { readFileSync } from "node:fs";
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AgentSkillExecutionProposal,
@@ -70,18 +70,19 @@ async function chooseWorker(label = "Build Mac") {
 }
 
 describe("AgentSkillExecutionApproval", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
 
   beforeEach(() => {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
+    await cleanup();
     document.body.innerHTML = "";
   });
 
@@ -100,17 +101,16 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       resultSessionId: "session-1",
     }));
 
-    await act(async () => {
-      root.render(
-        <AgentSkillExecutionApproval
-          loadExecutionContext={loadExecutionContext}
-          onAccept={onAccept}
-          onAccepted={onAccepted}
-          proposal={pending}
-          surfaceKey="channel:root:message"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <AgentSkillExecutionApproval
+        loadExecutionContext={loadExecutionContext}
+        onAccept={onAccept}
+        onAccepted={onAccepted}
+        proposal={pending}
+        surfaceKey="channel:root:message"
+      />,
+    );
     expect(loadExecutionContext).not.toHaveBeenCalled();
     expect(onAccept).not.toHaveBeenCalled();
 
@@ -149,19 +149,18 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       ...worker("worker-2"),
       acceptingWork: false,
     };
-    await act(async () => {
-      root.render(
-        <AgentSkillExecutionApproval
-          loadExecutionContext={async () => ({
-            workers: [worker("worker-1", "offline"), notAccepting],
-          })}
-          onAccept={onAccept}
-          onAccepted={vi.fn()}
-          proposal={proposal()}
-          surfaceKey="channel:no-selectable-worker"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <AgentSkillExecutionApproval
+        loadExecutionContext={async () => ({
+          workers: [worker("worker-1", "offline"), notAccepting],
+        })}
+        onAccept={onAccept}
+        onAccepted={vi.fn()}
+        proposal={proposal()}
+        surfaceKey="channel:no-selectable-worker"
+      />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".skill-execution-proposal-card footer button",
@@ -192,17 +191,16 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   it("fails closed when the selected Worker changes before final approval", async () => {
     let latestWorkers = [worker("worker-1")];
     const onAccept = vi.fn();
-    await act(async () => {
-      root.render(
-        <AgentSkillExecutionApproval
-          loadExecutionContext={async () => ({ workers: latestWorkers })}
-          onAccept={onAccept}
-          onAccepted={vi.fn()}
-          proposal={proposal()}
-          surfaceKey="issue:message"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <AgentSkillExecutionApproval
+        loadExecutionContext={async () => ({ workers: latestWorkers })}
+        onAccept={onAccept}
+        onAccepted={vi.fn()}
+        proposal={proposal()}
+        surfaceKey="issue:message"
+      />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".skill-execution-proposal-card footer button",
@@ -226,17 +224,16 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         resolveContext = resolve;
       }));
     const onAccept = vi.fn();
-    await act(async () => {
-      root.render(
-        <AgentSkillExecutionApproval
-          loadExecutionContext={loadExecutionContext}
-          onAccept={onAccept}
-          onAccepted={vi.fn()}
-          proposal={proposal("proposal-old")}
-          surfaceKey="channel:old"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <AgentSkillExecutionApproval
+        loadExecutionContext={loadExecutionContext}
+        onAccept={onAccept}
+        onAccepted={vi.fn()}
+        proposal={proposal("proposal-old")}
+        surfaceKey="channel:old"
+      />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".skill-execution-proposal-card footer button",
@@ -261,17 +258,16 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
   it("renders immutable Worker and session history without loading current state", async () => {
     const loadExecutionContext = vi.fn();
-    await act(async () => {
-      root.render(
-        <AgentSkillExecutionApproval
-          loadExecutionContext={loadExecutionContext}
-          onAccept={vi.fn()}
-          onAccepted={vi.fn()}
-          proposal={proposal("proposal-accepted", "accepted")}
-          surfaceKey="history"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <AgentSkillExecutionApproval
+        loadExecutionContext={loadExecutionContext}
+        onAccept={vi.fn()}
+        onAccepted={vi.fn()}
+        proposal={proposal("proposal-accepted", "accepted")}
+        surfaceKey="history"
+      />,
+    );
     expect(document.body.textContent).toContain("Build Mac");
     expect(document.body.textContent).toContain("session-1");
     expect(loadExecutionContext).not.toHaveBeenCalled();

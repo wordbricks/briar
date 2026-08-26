@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act, useState, type ReactNode } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppKeyboardCommandProvider } from "../hooks/appKeyboardCommands";
 import type { InboxMessageWithReadState } from "../hooks/useInbox";
@@ -60,20 +60,20 @@ function TestProviders({ children }: { children: ReactNode }) {
 }
 
 describe("Inbox", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     localStorage.setItem("briar.locale.v1", "ko");
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     localStorage.removeItem("briar.locale.v1");
     vi.restoreAllMocks();
   });
@@ -103,20 +103,19 @@ describe("Inbox", () => {
     ];
     const onOpen = vi.fn();
 
-    await act(async () =>
-      root.render(
-        <TestProviders>
-          <Inbox
-            isSidebarOpen
-            messages={messages}
-            onMarkAllRead={vi.fn()}
-            onMarkRead={vi.fn()}
-            onOpen={onOpen}
-            projects={projects}
-            unreadCount={3}
-          />
-        </TestProviders>,
-      ),
+    await renderReactTestRoot(
+      root,
+      <TestProviders>
+        <Inbox
+          isSidebarOpen
+          messages={messages}
+          onMarkAllRead={vi.fn()}
+          onMarkRead={vi.fn()}
+          onOpen={onOpen}
+          projects={projects}
+          unreadCount={3}
+        />
+      </TestProviders>,
     );
 
     const projectFilter = container.querySelector<HTMLButtonElement>(
@@ -186,20 +185,19 @@ describe("Inbox", () => {
     const onMarkRead = vi.fn();
     const onOpen = vi.fn();
 
-    await act(async () =>
-      root.render(
-        <TestProviders>
-          <Inbox
-            isSidebarOpen
-            messages={[message]}
-            onMarkAllRead={vi.fn()}
-            onMarkRead={onMarkRead}
-            onOpen={onOpen}
-            projects={projects}
-            unreadCount={1}
-          />
-        </TestProviders>,
-      ),
+    await renderReactTestRoot(
+      root,
+      <TestProviders>
+        <Inbox
+          isSidebarOpen
+          messages={[message]}
+          onMarkAllRead={vi.fn()}
+          onMarkRead={onMarkRead}
+          onOpen={onOpen}
+          projects={projects}
+          unreadCount={1}
+        />
+      </TestProviders>,
     );
 
     const markRead = container.querySelector<HTMLButtonElement>(
@@ -226,21 +224,20 @@ describe("Inbox", () => {
     const onMarkUnread = vi.fn();
     const onOpen = vi.fn();
 
-    await act(async () =>
-      root.render(
-        <TestProviders>
-          <Inbox
-            isSidebarOpen
-            messages={[message]}
-            onMarkAllRead={vi.fn()}
-            onMarkRead={vi.fn()}
-            onMarkUnread={onMarkUnread}
-            onOpen={onOpen}
-            projects={projects}
-            unreadCount={0}
-          />
-        </TestProviders>,
-      ),
+    await renderReactTestRoot(
+      root,
+      <TestProviders>
+        <Inbox
+          isSidebarOpen
+          messages={[message]}
+          onMarkAllRead={vi.fn()}
+          onMarkRead={vi.fn()}
+          onMarkUnread={onMarkUnread}
+          onOpen={onOpen}
+          projects={projects}
+          unreadCount={0}
+        />
+      </TestProviders>,
     );
 
     const markUnread = container.querySelector<HTMLButtonElement>(
@@ -288,7 +285,7 @@ describe("Inbox", () => {
       );
     }
 
-    await act(async () => root.render(<Harness />));
+    await renderReactTestRoot(root, <Harness />);
     const buttons = [
       ...container.querySelectorAll<HTMLButtonElement>(".inbox-message-open"),
     ];
@@ -349,24 +346,23 @@ describe("Inbox", () => {
 
   it("does not claim list navigation commands in companion mode", async () => {
     const onOpen = vi.fn();
-    await act(async () =>
-      root.render(
-        <TestProviders>
-          <button data-testid="companion-outside" type="button">
-            Outside
-          </button>
-          <Inbox
-            companionMode
-            isSidebarOpen
-            messages={[issue("message", "Companion message")]}
-            onMarkAllRead={vi.fn()}
-            onMarkRead={vi.fn()}
-            onOpen={onOpen}
-            projects={projects}
-            unreadCount={1}
-          />
-        </TestProviders>,
-      )
+    await renderReactTestRoot(
+      root,
+      <TestProviders>
+        <button data-testid="companion-outside" type="button">
+          Outside
+        </button>
+        <Inbox
+          companionMode
+          isSidebarOpen
+          messages={[issue("message", "Companion message")]}
+          onMarkAllRead={vi.fn()}
+          onMarkRead={vi.fn()}
+          onOpen={onOpen}
+          projects={projects}
+          unreadCount={1}
+        />
+      </TestProviders>,
     );
     const outside = container.querySelector<HTMLButtonElement>(
       '[data-testid="companion-outside"]',
@@ -418,7 +414,7 @@ describe("Inbox", () => {
       );
     }
 
-    await act(async () => root.render(<Harness />));
+    await renderReactTestRoot(root, <Harness />);
     const outside = container.querySelector<HTMLButtonElement>(
       '[data-testid="outside-inbox"]',
     )!;
@@ -501,20 +497,19 @@ describe("Inbox", () => {
       }),
     );
 
-    await act(async () =>
-      root.render(
-        <TestProviders>
-          <Inbox
-            isSidebarOpen
-            messages={messages}
-            onMarkAllRead={vi.fn()}
-            onMarkRead={vi.fn()}
-            onOpen={vi.fn()}
-            projects={projects}
-            unreadCount={120}
-          />
-        </TestProviders>,
-      ),
+    await renderReactTestRoot(
+      root,
+      <TestProviders>
+        <Inbox
+          isSidebarOpen
+          messages={messages}
+          onMarkAllRead={vi.fn()}
+          onMarkRead={vi.fn()}
+          onOpen={vi.fn()}
+          projects={projects}
+          unreadCount={120}
+        />
+      </TestProviders>,
     );
 
     const scroll = container.querySelector<HTMLDivElement>(".inbox-list");
@@ -602,20 +597,19 @@ describe("Inbox", () => {
       ),
     ];
 
-    await act(async () =>
-      root.render(
-        <TestProviders>
-          <Inbox
-            isSidebarOpen
-            messages={messages}
-            onMarkAllRead={vi.fn()}
-            onMarkRead={vi.fn()}
-            onOpen={vi.fn()}
-            projects={projects}
-            unreadCount={120}
-          />
-        </TestProviders>,
-      ),
+    await renderReactTestRoot(
+      root,
+      <TestProviders>
+        <Inbox
+          isSidebarOpen
+          messages={messages}
+          onMarkAllRead={vi.fn()}
+          onMarkRead={vi.fn()}
+          onOpen={vi.fn()}
+          projects={projects}
+          unreadCount={120}
+        />
+      </TestProviders>,
     );
 
     const scroll = container.querySelector<HTMLDivElement>(".inbox-list");

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useObjectUrl, type ObjectUrlLoader } from "./useObjectUrl";
 
@@ -34,11 +34,10 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   });
 
   it("creates a URL for a synchronous Blob and revokes it on unmount", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const blob = new Blob(["preview"]);
 
-    await act(async () => root.render(<Probe loader={() => blob} />));
+    await renderReactTestRoot(root, <Probe loader={() => blob} />);
 
     expect(container.querySelector("output")?.dataset).toMatchObject({
       failed: "false",
@@ -46,19 +45,18 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     });
     expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
 
-    await act(async () => root.unmount());
+    await cleanup();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:preview");
   });
 
   it("resets state and revokes the previous URL when the loader changes", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const next = deferredBlob();
     const firstLoader = () => new Blob(["first"]);
     const nextLoader = () => next.promise;
 
-    await act(async () => root.render(<Probe loader={firstLoader} />));
-    await act(async () => root.render(<Probe loader={nextLoader} />));
+    await renderReactTestRoot(root, <Probe loader={firstLoader} />);
+    await renderReactTestRoot(root, <Probe loader={nextLoader} />);
 
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:preview");
     expect(container.querySelector("output")?.dataset).toMatchObject({
@@ -74,19 +72,18 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       "blob:preview",
     );
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("ignores a stale promise after the loader changes", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const stale = deferredBlob();
     const current = deferredBlob();
     const staleLoader = () => stale.promise;
     const currentLoader = () => current.promise;
 
-    await act(async () => root.render(<Probe loader={staleLoader} />));
-    await act(async () => root.render(<Probe loader={currentLoader} />));
+    await renderReactTestRoot(root, <Probe loader={staleLoader} />);
+    await renderReactTestRoot(root, <Probe loader={currentLoader} />);
     await act(async () => {
       stale.resolve(new Blob(["stale"]));
       await stale.promise;
@@ -102,12 +99,11 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       "blob:preview",
     );
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("reports rejected, thrown, and URL creation failures", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const rejectedLoader = () => Promise.reject(new Error("load failed"));
 
     await act(async () => {
@@ -119,36 +115,35 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     const thrownLoader = () => {
       throw new Error("load failed");
     };
-    await act(async () => root.render(<Probe loader={thrownLoader} />));
+    await renderReactTestRoot(root, <Probe loader={thrownLoader} />);
     expect(container.querySelector("output")?.dataset.failed).toBe("true");
 
     vi.mocked(URL.createObjectURL).mockImplementationOnce(() => {
       throw new Error("URL unavailable");
     });
     const blobLoader = () => new Blob(["preview"]);
-    await act(async () => root.render(<Probe loader={blobLoader} />));
+    await renderReactTestRoot(root, <Probe loader={blobLoader} />);
     expect(container.querySelector("output")?.dataset).toMatchObject({
       failed: "true",
       source: "",
     });
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("ignores a rejection after unmount and accepts a null loader", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot();
     const pending = deferredBlob();
     const loader = () => pending.promise;
 
-    await act(async () => root.render(<Probe loader={null} />));
+    await renderReactTestRoot(root, <Probe loader={null} />);
     expect(container.querySelector("output")?.dataset).toMatchObject({
       failed: "false",
       source: "",
     });
 
-    await act(async () => root.render(<Probe loader={loader} />));
-    await act(async () => root.unmount());
+    await renderReactTestRoot(root, <Probe loader={loader} />);
+    await cleanup();
     await act(async () => {
       pending.reject(new Error("late failure"));
       await pending.promise.catch(() => undefined);

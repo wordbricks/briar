@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act, useRef } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { saveKeyboardNavigationPreferences } from "../lib/keybindings";
@@ -12,8 +12,9 @@ import {
 } from "./useAppCollectionKeyboardCommandScope";
 
 describe("useAppCollectionKeyboardCommandScope", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
   let move: ReturnType<
     typeof vi.fn<AppCollectionKeyboardCommandScopeOptions["move"]>
   >;
@@ -24,16 +25,15 @@ describe("useAppCollectionKeyboardCommandScope", () => {
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     window.localStorage.clear();
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
     move = vi.fn(() => ({ handled: true }));
     otherMove = vi.fn(() => ({ handled: true }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     window.localStorage.clear();
     document.querySelectorAll("[data-test-overlay]").forEach((element) =>
       element.remove()
@@ -87,12 +87,11 @@ describe("useAppCollectionKeyboardCommandScope", () => {
   async function renderHarness(
     props: Parameters<typeof Harness>[0] = {},
   ) {
-    await act(async () =>
-      root.render(
-        <AppKeyboardCommandProvider>
-          <Harness {...props} />
-        </AppKeyboardCommandProvider>,
-      )
+    await renderReactTestRoot(
+      root,
+      <AppKeyboardCommandProvider>
+        <Harness {...props} />
+      </AppKeyboardCommandProvider>,
     );
   }
 

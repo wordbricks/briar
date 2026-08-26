@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import type { Root } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ChannelAgentReply,
@@ -202,10 +203,9 @@ function Harness({
 }
 
 async function renderHarness(props: React.ComponentProps<typeof Harness>) {
-  const container = document.createElement("div");
-  const root = createRoot(container);
-  await act(async () => root.render(<Harness {...props} />));
-  return { root };
+  const { cleanup, container, root } = createReactTestRoot();
+  await renderReactTestRoot(root, <Harness {...props} />);
+  return { cleanup, root };
 }
 
 const current = () => {
@@ -214,17 +214,20 @@ const current = () => {
 };
 
 describe("useChannelConversation", () => {
+  let cleanup: (() => Promise<void>) | null = null;
   let root: Root | null = null;
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     latest = null;
+    cleanup = null;
     realtimeTransport.listener = null;
     vi.clearAllMocks();
   });
 
   afterEach(async () => {
-    if (root) await act(async () => root?.unmount());
+    if (cleanup) await cleanup();
+    cleanup = null;
     root = null;
     vi.restoreAllMocks();
   });
@@ -232,7 +235,7 @@ describe("useChannelConversation", () => {
   it("drops a channel detail response after the selected surface changes", async () => {
     const pending = deferred<Awaited<ReturnType<typeof import("../lib/api").loadChannel>>>();
     api.loadChannel.mockReturnValueOnce(pending.promise);
-    ({ root } = await renderHarness({ activeChannel: channel("channel-a") }));
+    ({ cleanup, root } = await renderHarness({ activeChannel: channel("channel-a") }));
 
     let request!: ReturnType<Conversation["loadChannelConversation"]>;
     await act(async () => {
@@ -266,7 +269,7 @@ describe("useChannelConversation", () => {
       messages: [message("older", { createdAt: "2026-08-01T00:00:00.000Z" })],
       nextCursor: null,
     });
-    ({ root } = await renderHarness({
+    ({ cleanup, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialMessages: [message("current")],
       initialNextCursor: "cursor-1",
@@ -298,7 +301,7 @@ describe("useChannelConversation", () => {
       removedMessageIds: [],
       agentReplies: [],
     });
-    ({ root } = await renderHarness({
+    ({ cleanup, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       realtimeEnabled: true,
     }));
@@ -334,7 +337,7 @@ describe("useChannelConversation", () => {
       messages: [rootMessage, reply],
       nextCursor: null,
     };
-    ({ root } = await renderHarness({
+    ({ cleanup, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialMessages: [rootMessage],
     }));
@@ -372,7 +375,7 @@ describe("useChannelConversation", () => {
       messages: [requestedRoot, requestedReply],
       nextCursor: null,
     });
-    ({ root } = await renderHarness({ activeChannel: channel("channel-a") }));
+    ({ cleanup, root } = await renderHarness({ activeChannel: channel("channel-a") }));
 
     await act(async () => {
       await current().loadChannelConversation({
@@ -398,7 +401,7 @@ describe("useChannelConversation", () => {
   it("reconciles an optimistic root message with the server response", async () => {
     const pending = deferred<Awaited<ReturnType<typeof import("../lib/api").sendChannelMessage>>>();
     api.sendChannelMessage.mockReturnValueOnce(pending.promise);
-    ({ root } = await renderHarness({ activeChannel: channel("channel-a") }));
+    ({ cleanup, root } = await renderHarness({ activeChannel: channel("channel-a") }));
 
     let request!: ReturnType<Conversation["send"]>;
     await act(async () => {
@@ -444,7 +447,7 @@ describe("useChannelConversation", () => {
       resultItems: undefined,
       executionProposal: null,
     });
-    ({ root } = await renderHarness({
+    ({ cleanup, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialMessages: [proposalMessage],
     }));
@@ -485,7 +488,7 @@ describe("useChannelConversation", () => {
       executionProposal: null;
     }>();
     api.acceptChannelProposal.mockReturnValueOnce(pending.promise);
-    ({ root } = await renderHarness({
+    ({ cleanup, root } = await renderHarness({
       activeChannel: channel("channel-a"),
       initialMessages: [proposalMessage],
     }));

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot, type ReactTestRoot } from "../../test/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_ERROR_TOAST_DURATION_MS,
@@ -11,10 +11,7 @@ import {
   useToast,
 } from "./toast";
 
-const mounted: Array<{
-  container: HTMLDivElement;
-  root: ReturnType<typeof createRoot>;
-}> = [];
+const mounted: Array<Pick<ReactTestRoot, "cleanup">> = [];
 
 beforeAll(() => {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -27,8 +24,7 @@ beforeEach(() => {
 afterEach(async () => {
   while (mounted.length > 0) {
     const item = mounted.pop()!;
-    await act(async () => item.root.unmount());
-    item.container.remove();
+    await item.cleanup();
   }
   vi.useRealTimers();
   document.body.querySelectorAll("[data-testid='toast-viewport']").forEach((node) => {
@@ -52,17 +48,16 @@ async function mountProbe(
   message = "링크가 복사되었습니다",
   options?: ToastOptions,
 ) {
-  const container = document.createElement("div");
-  document.body.append(container);
-  const root = createRoot(container);
-  mounted.push({ container, root });
-  await act(async () => {
-    root.render(
-      <ToastProvider>
-        <Probe message={message} options={options} />
-      </ToastProvider>,
-    );
+  const { cleanup, container, root } = createReactTestRoot({
+    attachToDocument: true,
   });
+  mounted.push({ cleanup });
+  await renderReactTestRoot(
+    root,
+    <ToastProvider>
+      <Probe message={message} options={options} />
+    </ToastProvider>,
+  );
   return container;
 }
 

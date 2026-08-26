@@ -1,44 +1,43 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
 import { WindowNavigationControls } from "./WindowNavigationControls";
 
 describe("WindowNavigationControls", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("exposes history state and leaves keyboard ownership to the app controller", async () => {
     const onBack = vi.fn();
     const onForward = vi.fn();
-    await act(async () =>
-      root.render(
-        <I18nProvider>
-          <WindowNavigationControls
-            canGoBack
-            canGoForward={false}
-            isSidebarOpen
-            onBack={onBack}
-            onForward={onForward}
-            onSidebarToggle={() => undefined}
-          />
-        </I18nProvider>,
-      )
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <WindowNavigationControls
+          canGoBack
+          canGoForward={false}
+          isSidebarOpen
+          onBack={onBack}
+          onForward={onForward}
+          onSidebarToggle={() => undefined}
+        />
+      </I18nProvider>,
     );
 
     const back = container.querySelector<HTMLButtonElement>(
@@ -66,19 +65,18 @@ describe("WindowNavigationControls", () => {
 
   it("exposes and invokes the sidebar control", async () => {
     const onSidebarToggle = vi.fn();
-    await act(async () =>
-      root.render(
-        <I18nProvider>
-          <WindowNavigationControls
-            canGoBack={false}
-            canGoForward={false}
-            isSidebarOpen={false}
-            onBack={() => undefined}
-            onForward={() => undefined}
-            onSidebarToggle={onSidebarToggle}
-          />
-        </I18nProvider>,
-      )
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <WindowNavigationControls
+          canGoBack={false}
+          canGoForward={false}
+          isSidebarOpen={false}
+          onBack={() => undefined}
+          onForward={() => undefined}
+          onSidebarToggle={onSidebarToggle}
+        />
+      </I18nProvider>,
     );
 
     const sidebar = container.querySelector<HTMLButtonElement>(

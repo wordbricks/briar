@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
@@ -142,26 +142,26 @@ describe("IssueConversation", () => {
       updatedAt: createdAt
     };
     const onLoadIssueMessages = vi.fn<() => Promise<IssueMessage[]>>().mockResolvedValueOnce([loadedMessage]).mockImplementation(() => new Promise(() => undefined));
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const renderPage = (run = demoDashboard.runs[0]) => <RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={() => onLoadIssueMessages()} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
       throw new Error("not implemented in this test");
     }} run={run} />;
-    await act(async () => root.render(renderPage()));
+    await renderReactTestRoot(root, renderPage());
     expect(onLoadIssueMessages).toHaveBeenCalledOnce();
     expect(container.querySelector(".issue-message-list")?.textContent).toContain(loadedMessage.body);
-    await act(async () => {
-      root.render(renderPage({
+    await renderReactTestRoot(
+      root,
+      renderPage({
         ...demoDashboard.runs[0],
-        updatedAt: new Date(Date.now() + 15_000).toISOString()
-      }));
-    });
+        updatedAt: new Date(Date.now() + 15_000).toISOString(),
+      }),
+    );
     expect(onLoadIssueMessages).toHaveBeenCalledOnce();
     expect(container.querySelector(".issue-message-state")).toBeNull();
     expect(container.querySelector(".issue-message-list")?.textContent).toContain(loadedMessage.body);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("uses Inbox conversation changes as a delta recovery signal", async () => {
     const run = demoDashboard.runs[0];
@@ -257,9 +257,9 @@ describe("IssueConversation", () => {
       sentAt: createdAt,
       expiresAt: "2099-01-01T00:00:00.000Z"
     }]]));
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const renderPage = (conversationInboxSyncSignal: string) => <RunPage conversationInboxSyncSignal={conversationInboxSyncSignal} error={null} isRecovering={false} isSidebarOpen onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
       throw new Error("message should not be sent");
     }} organizationId="organization-1" projectId={demoDashboard.project.id} run={run} token="token" />;
@@ -281,8 +281,7 @@ describe("IssueConversation", () => {
     expect(loadDelta).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain(reply.body);
     expect(container.textContent).not.toContain("Agent가 답변을 작성하고 있습니다");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     createTransport.mockRestore();
     activity.mockRestore();
     loadDelta.mockRestore();
@@ -338,13 +337,13 @@ describe("IssueConversation", () => {
       ...message,
       executionProposal: null
     }]);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const renderPage = (nextTargetRun: HuntRun) => <RunPage availableRuns={[conversationRun, nextTargetRun]} isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={onLoadIssueMessages} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
       throw new Error("not implemented in this test");
     }} run={conversationRun} />;
-    await act(async () => root.render(renderPage(targetRun)));
+    await renderReactTestRoot(root, renderPage(targetRun));
     expect(container.querySelector(".execution-proposal-card")).not.toBeNull();
     await act(async () => {
       root.render(renderPage({
@@ -355,8 +354,7 @@ describe("IssueConversation", () => {
     });
     expect(onLoadIssueMessages).toHaveBeenCalledTimes(2);
     expect(container.querySelector(".execution-proposal-card")).toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("uses the shared exact-Worker Skill approval in issue conversations", async () => {
     const run = demoDashboard.runs[0];
@@ -411,9 +409,9 @@ describe("IssueConversation", () => {
       activeSessions: 0,
       availableSessions: 1
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     await act(async () => {
       root.render(<RunPage availableRuns={[run]} error={null} executionWorkers={[skillWorker]} isRecovering={false} isSidebarOpen onAcceptSkillExecution={onAccept} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => [message]} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
         throw new Error("not implemented in this test");
@@ -436,8 +434,7 @@ describe("IssueConversation", () => {
       workerId: "worker-1"
     });
     expect(container.textContent).toContain("session-skill-issue");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("revalidates a newly loaded pending proposal when its target changed during the load", async () => {
     const conversationRun = demoDashboard.runs[1];
@@ -493,13 +490,13 @@ describe("IssueConversation", () => {
       ...message,
       executionProposal: null
     }]);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const renderPage = (nextTargetRun: HuntRun) => <RunPage availableRuns={[conversationRun, nextTargetRun]} isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={onLoadIssueMessages} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
       throw new Error("not implemented in this test");
     }} run={conversationRun} />;
-    await act(async () => root.render(renderPage(targetRun)));
+    await renderReactTestRoot(root, renderPage(targetRun));
     await act(async () => {
       root.render(renderPage({
         ...targetRun,
@@ -512,8 +509,7 @@ describe("IssueConversation", () => {
     });
     expect(onLoadIssueMessages).toHaveBeenCalledTimes(2);
     expect(container.querySelector(".execution-proposal-card")).toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("does not reload accepted proposal history as its target progresses", async () => {
     const conversationRun = demoDashboard.runs[1];
@@ -551,13 +547,13 @@ describe("IssueConversation", () => {
       updatedAt: createdAt
     };
     const onLoadIssueMessages = vi.fn<() => Promise<IssueMessage[]>>().mockResolvedValue([message]);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     const renderPage = (nextTargetRun: HuntRun) => <RunPage availableRuns={[conversationRun, nextTargetRun]} isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={onLoadIssueMessages} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
       throw new Error("not implemented in this test");
     }} run={conversationRun} />;
-    await act(async () => root.render(renderPage(targetRun)));
+    await renderReactTestRoot(root, renderPage(targetRun));
     expect(onLoadIssueMessages).toHaveBeenCalledOnce();
     await act(async () => {
       root.render(renderPage({
@@ -570,8 +566,7 @@ describe("IssueConversation", () => {
     expect(onLoadIssueMessages).toHaveBeenCalledOnce();
     expect(container.querySelector(".execution-proposal-card")).not.toBeNull();
     expect(container.querySelector(".issue-message-state")).toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("shows an Android/Tauri message without a sending label and restores the draft on failure", async () => {
     let rejectSend: (reason: Error) => void = () => undefined;
@@ -579,9 +574,9 @@ describe("IssueConversation", () => {
       rejectSend = reject;
     });
     const onSendIssueMessage = vi.fn(() => pendingSend);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     await act(async () => {
       root.render(<RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={onSendIssueMessage} run={demoDashboard.runs[0]} />);
       await Promise.resolve();
@@ -616,8 +611,7 @@ describe("IssueConversation", () => {
     expect(textarea?.value).toBe(draft);
     expect(container.querySelector(".issue-message.is-optimistic")).toBeNull();
     expect(container.querySelector(".issue-composer-error")?.textContent).toContain("전송 실패");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("pastes an image into the issue conversation and sends it without text", async () => {
     const image = new File(["image"], "clipboard.png", {
@@ -649,9 +643,9 @@ describe("IssueConversation", () => {
       message: sentMessage,
       agentReply: null
     }));
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     await act(async () => {
       root.render(<RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => image} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={onSendIssueMessage} run={demoDashboard.runs[0]} />);
       await Promise.resolve();
@@ -682,8 +676,7 @@ describe("IssueConversation", () => {
       attachments: [image],
       body: expect.stringContaining("briar-attachment://")
     }));
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("renders replies flat and sends a reply to any message", async () => {
     const rootMessage: IssueMessage = {
@@ -720,18 +713,32 @@ describe("IssueConversation", () => {
       updatedAt: "2026-08-03T10:02:00.000Z"
     };
     let sentParentId: string | null | undefined;
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => [rootMessage, reply, nestedReply]} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async input => {
-        sentParentId = input.parentMessageId;
-        return {
-          message: nestedReply,
-          agentReply: null
-        };
-      }} run={demoDashboard.runs[0]} />);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => [rootMessage, reply, nestedReply]}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async input => {
+          sentParentId = input.parentMessageId;
+          return {
+            message: nestedReply,
+            agentReply: null,
+          };
+        }}
+        run={demoDashboard.runs[0]}
+      />,
+    );
     const groupByBody = (body: string) => Array.from(container.querySelectorAll<HTMLElement>(".issue-message-group")).find(group => group.querySelector(":scope > .issue-message > div > .issue-message-body")?.textContent?.includes(body));
     const replyGroup = groupByBody("기존 답글");
     const nestedGroup = groupByBody("기존 대댓글");
@@ -760,8 +767,7 @@ describe("IssueConversation", () => {
       await Promise.resolve();
     });
     expect(sentParentId).toBe(nestedReply.id);
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("edits and deletes messages the current user authored", async () => {
     const createdAt = "2026-08-03T10:00:00.000Z";
@@ -795,15 +801,32 @@ describe("IssueConversation", () => {
       updatedAt: "2026-08-03T10:02:00.000Z"
     }));
     const onDeleteIssueMessage = vi.fn(async () => undefined);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<RunPage currentUserId="jay" isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onDeleteIssueMessage={onDeleteIssueMessage} onEditIssueMessage={onEditIssueMessage} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => [rootMessage, reply]} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => ({
-        message: rootMessage,
-        agentReply: null
-      })} run={demoDashboard.runs[0]} />);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        currentUserId="jay"
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onDeleteIssueMessage={onDeleteIssueMessage}
+        onEditIssueMessage={onEditIssueMessage}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => [rootMessage, reply]}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => ({
+          message: rootMessage,
+          agentReply: null,
+        })}
+        run={demoDashboard.runs[0]}
+      />,
+    );
     const groupByBody = (body: string) => Array.from(container.querySelectorAll<HTMLElement>(".issue-message-group")).find(group => group.querySelector(":scope > .issue-message > div > .issue-message-body")?.textContent?.includes(body));
     const rootGroup = groupByBody("수정 전 원문");
     expect(rootGroup).not.toBeUndefined();
@@ -841,8 +864,7 @@ describe("IssueConversation", () => {
     confirmSpy.mockRestore();
     expect(onDeleteIssueMessage).toHaveBeenCalledWith(rootMessage.id);
     expect(container.querySelector(".issue-message-group")).toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("hides edit and delete actions for messages the current user did not author", async () => {
     const createdAt = "2026-08-03T10:00:00.000Z";
@@ -861,19 +883,33 @@ describe("IssueConversation", () => {
       createdAt,
       updatedAt: createdAt
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<RunPage currentUserId="jay" isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => [agentMessage]} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => ({
-        message: agentMessage,
-        agentReply: null
-      })} run={demoDashboard.runs[0]} />);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        currentUserId="jay"
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => [agentMessage]}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => ({
+          message: agentMessage,
+          agentReply: null,
+        })}
+        run={demoDashboard.runs[0]}
+      />,
+    );
     expect(container.querySelector('button[title="메시지 수정"]')).toBeNull();
     expect(container.querySelector('button[title="메시지 삭제"]')).toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("keeps the conversation error alert when an agent reply fails", async () => {
     const createdAt = new Date().toISOString();
@@ -896,15 +932,29 @@ describe("IssueConversation", () => {
     const pendingAgentReply = new Promise<IssueMessage>((_, reject) => {
       rejectAgentReply = reject;
     });
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => ({
-        message: userMessage,
-        agentReply: pendingAgentReply
-      })} run={demoDashboard.runs[0]} />);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => ({
+          message: userMessage,
+          agentReply: pendingAgentReply,
+        })}
+        run={demoDashboard.runs[0]}
+      />,
+    );
     const textarea = container.querySelector<HTMLTextAreaElement>(".issue-message-composer textarea");
     await act(async () => {
       if (!textarea) return;
@@ -932,8 +982,7 @@ describe("IssueConversation", () => {
     expect(errorState?.querySelector("[data-testid='loading-state']")).toBeNull();
     expect(errorState?.querySelector(".spin")).toBeNull();
     expect(errorState?.querySelector("svg")).not.toBeNull();
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
   it("sends the selected member id with an issue conversation mention", async () => {
     const createdAt = new Date().toISOString();
@@ -943,39 +992,54 @@ describe("IssueConversation", () => {
       mentionedUserIds?: string[];
       mentionedAgentIds?: string[];
     } | undefined;
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<RunPage isSidebarOpen error={null} isRecovering={false} mentionMembers={[{
-        userId: "member-1",
-        name: "Member One",
-        email: "member@example.com",
-        image: null,
-        role: "member",
-        createdAt
-      }]} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async input => {
-        sentInput = input;
-        return {
-          message: {
-            id: "member-mention",
-            runId: demoDashboard.runs[0].id,
-            parentMessageId: null,
-            body: input.body,
-            author: {
-              id: "owner",
-              name: "Owner",
-              image: null,
-              provider: null
-            },
-            replyCount: 0,
-            createdAt,
-            updatedAt: createdAt
-          },
-          agentReply: null
-        };
-      }} run={demoDashboard.runs[0]} />);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        mentionMembers={[{
+          userId: "member-1",
+          name: "Member One",
+          email: "member@example.com",
+          image: null,
+          role: "member",
+          createdAt,
+        }]}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => []}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async input => {
+          sentInput = input;
+          return {
+            message: {
+              id: "member-mention",
+              runId: demoDashboard.runs[0].id,
+              parentMessageId: null,
+              body: input.body,
+              author: {
+                id: "owner",
+                name: "Owner",
+                image: null,
+                provider: null,
+              },
+              replyCount: 0,
+              createdAt,
+              updatedAt: createdAt,
+            },
+            agentReply: null,
+          };
+        }}
+        run={demoDashboard.runs[0]}
+      />,
+    );
     const textarea = container.querySelector<HTMLTextAreaElement>(".issue-message-composer textarea");
     await act(async () => {
       textarea?.focus();
@@ -1013,7 +1077,6 @@ describe("IssueConversation", () => {
       mentionedUserIds: ["member-1"],
       mentionedAgentIds: []
     });
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });
