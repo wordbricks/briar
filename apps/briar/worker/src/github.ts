@@ -135,7 +135,7 @@ async function fetchGithubApi(path: string, accessToken: string) {
   });
   if (!response.ok) {
     throw new GithubOAuthError(
-      `GitHub API request failed with status ${response.status}`,
+      `GitHub API request to ${path} failed with status ${response.status}`,
     );
   }
   return readGithubJson(response);

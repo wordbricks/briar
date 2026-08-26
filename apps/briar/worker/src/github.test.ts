@@ -531,4 +531,18 @@ describe("GitHub App user OAuth", () => {
       appSlug: "briar-app",
     })).rejects.toThrow(/not accessible/iu);
   });
+
+  it("identifies the failed GitHub API endpoint without exposing the token", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(null, { status: 403 })
+    ));
+
+    await expect(verifyGithubOAuthInstallation({
+      accessToken: "ghu_transient",
+      installationId: 901,
+      appSlug: "briar-app",
+    })).rejects.toThrow(
+      "GitHub API request to /user failed with status 403",
+    );
+  });
 });
