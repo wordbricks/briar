@@ -834,6 +834,7 @@ export type OrganizationMember = {
   email: string;
   image: string | null;
   role: "owner" | "admin" | "member";
+  projectIds?: string[];
   createdAt: string;
 };
 

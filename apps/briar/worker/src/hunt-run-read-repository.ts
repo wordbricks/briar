@@ -93,6 +93,7 @@ export async function listDashboardRunsByIds(
 export async function listOrganizationStatusTrayRuns(
   db: D1Database,
   organizationId: string,
+  userId: string,
 ) {
   const runs = await db
     .prepare(
@@ -102,13 +103,24 @@ export async function listOrganizationStatusTrayRuns(
               run.last_event_at
        from briar_hunt_runs run
        join briar_projects project on project.id = run.project_id
+       join briar_organization_members membership
+         on membership.organization_id = project.organization_id
+        and membership.user_id = ?
+       left join briar_project_members project_membership
+         on project_membership.project_id = project.id
+        and project_membership.organization_id = project.organization_id
+        and project_membership.user_id = membership.user_id
        where project.organization_id = ?
+         and (
+           membership.role in ('owner', 'admin')
+           or project_membership.user_id is not null
+         )
          and run.status = 'running'
          and run.paused_at is null
        order by run.updated_at desc, run.id
        limit 200`,
     )
-    .bind(organizationId)
+    .bind(userId, organizationId)
     .all<OrganizationStatusTrayRunRow>();
 
   return runs.results;

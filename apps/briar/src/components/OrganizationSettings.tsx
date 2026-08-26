@@ -29,6 +29,7 @@ import {
 } from "@/components/settings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +50,7 @@ import {
   removeOrganizationMember,
   revokeOrganizationInvitation,
   updateOrganizationMemberRole,
+  updateOrganizationMemberProjects,
 } from "../lib/api";
 import {
   organizationLogoAccept,
@@ -131,6 +133,10 @@ export function OrganizationSettings({
   const [saving, setSaving] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+  const [projectAccessMember, setProjectAccessMember] =
+    useState<OrganizationMember | null>(null);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [savingProjectAccess, setSavingProjectAccess] = useState(false);
   const [revokingInvitationId, setRevokingInvitationId] = useState<
     string | null
   >(null);
@@ -229,12 +235,19 @@ export function OrganizationSettings({
         t("organization.name"),
         t("organization.email"),
         t("organization.role"),
+        t("organization.projects"),
         t("organization.joined"),
       ],
       ...filteredMembers.map((member) => [
         member.name,
         member.email,
         roleLabel(member.role),
+        member.role === "owner" || member.role === "admin"
+          ? t("organization.allProjects")
+          : organizationProjects
+            .filter((project) => member.projectIds?.includes(project.id))
+            .map((project) => project.name)
+            .join(", "),
         member.createdAt,
       ]),
     ];
@@ -606,10 +619,11 @@ export function OrganizationSettings({
                   aria-label={t("organization.memberList")}
                   className="overflow-hidden rounded-xl border border-border bg-card"
                 >
-                  <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_120px_100px_40px] gap-3 border-b border-border px-4 py-2.5 text-micro font-medium tracking-wide text-muted-foreground uppercase">
+                  <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.3fr)_110px_140px_90px_40px] gap-3 border-b border-border px-4 py-2.5 text-micro font-medium tracking-wide text-muted-foreground uppercase">
                     <span>{t("organization.name")}</span>
                     <span>{t("organization.email")}</span>
                     <span>{t("organization.role")}</span>
+                    <span>{t("organization.projects")}</span>
                     <span>{t("organization.joined")}</span>
                     <span className="visually-hidden">{t("organization.actions")}</span>
                   </div>
@@ -632,7 +646,7 @@ export function OrganizationSettings({
                   ) : (
                     filteredMembers.map((member) => (
                       <div
-                        className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_120px_100px_40px] items-center gap-3 border-b border-border/80 px-4 py-3 last:border-b-0"
+                        className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.3fr)_110px_140px_90px_40px] items-center gap-3 border-b border-border/80 px-4 py-3 last:border-b-0"
                         key={member.userId}
                       >
                         <div className="flex min-w-0 items-center gap-2.5">
@@ -708,6 +722,48 @@ export function OrganizationSettings({
                           >
                             {roleLabel(member.role)}
                           </Badge>
+                        )}
+                        {member.role === "owner" || member.role === "admin" ? (
+                          <Typography as="span" tone="muted" variant="caption">
+                            {t("organization.allProjects")}
+                          </Typography>
+                        ) : canManage ? (
+                          <Button
+                            className="w-full justify-start overflow-hidden"
+                            onClick={() => {
+                              setProjectAccessMember(member);
+                              setSelectedProjectIds(
+                                member.projectIds?.filter((projectId) =>
+                                  organizationProjects.some(
+                                    (project) => project.id === projectId,
+                                  )
+                                ) ?? [],
+                              );
+                              setError(null);
+                            }}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                          >
+                            <span className="truncate">
+                              {(member.projectIds?.length ?? 0) === 0
+                                ? t("organization.noProjectAccess")
+                                : (member.projectIds?.length ?? 0) ===
+                                    organizationProjects.length
+                                  ? t("organization.allProjects")
+                                  : t("organization.projectCount", {
+                                      count: member.projectIds?.length ?? 0,
+                                    })}
+                            </span>
+                          </Button>
+                        ) : (
+                          <Typography as="span" tone="muted" variant="caption">
+                            {(member.projectIds?.length ?? 0) === 0
+                              ? t("organization.noProjectAccess")
+                              : t("organization.projectCount", {
+                                  count: member.projectIds?.length ?? 0,
+                                })}
+                          </Typography>
                         )}
                         <time
                           className="text-xs text-muted-foreground"
@@ -894,6 +950,95 @@ export function OrganizationSettings({
           </div>
         </SettingsScroll>
       </SettingsMain>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!savingProjectAccess && !open) setProjectAccessMember(null);
+        }}
+        open={projectAccessMember !== null}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {t("organization.projectAccessTitle", {
+                name: projectAccessMember?.name ?? "",
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              {t("organization.projectAccessDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 grid max-h-[360px] gap-2 overflow-y-auto">
+            {organizationProjects.map((project) => {
+              const checked = selectedProjectIds.includes(project.id);
+              return (
+                <label
+                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2.5 hover:bg-muted/60"
+                  key={project.id}
+                >
+                  <Checkbox
+                    checked={checked}
+                    disabled={savingProjectAccess}
+                    onCheckedChange={(nextChecked) =>
+                      setSelectedProjectIds((current) =>
+                        nextChecked
+                          ? [...current, project.id]
+                          : current.filter((projectId) => projectId !== project.id)
+                      )
+                    }
+                  />
+                  <Typography as="span" variant="bodySm">
+                    {project.name}
+                  </Typography>
+                </label>
+              );
+            })}
+            {organizationProjects.length === 0 ? (
+              <Typography className="py-6 text-center" tone="muted" variant="bodySm">
+                {t("organization.noProjects")}
+              </Typography>
+            ) : null}
+          </div>
+          {error ? <SettingsAlert className="mt-4">{error}</SettingsAlert> : null}
+          <DialogFooter className="mt-6">
+            <Button
+              disabled={savingProjectAccess}
+              onClick={() => setProjectAccessMember(null)}
+              type="button"
+              variant="outline"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              disabled={savingProjectAccess || !projectAccessMember}
+              onClick={() => {
+                if (!projectAccessMember) return;
+                setSavingProjectAccess(true);
+                setError(null);
+                void updateOrganizationMemberProjects(
+                  token,
+                  organizationId,
+                  projectAccessMember.userId,
+                  selectedProjectIds,
+                )
+                  .then((result) => {
+                    setMembers(result.members);
+                    setProjectAccessMember(null);
+                  })
+                  .catch((caught) =>
+                    setError(
+                      caught instanceof Error ? caught.message : String(caught),
+                    )
+                  )
+                  .finally(() => setSavingProjectAccess(false));
+              }}
+              type="button"
+            >
+              {savingProjectAccess ? t("common.saving") : t("common.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         onOpenChange={(open) => {

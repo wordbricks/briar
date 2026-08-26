@@ -196,6 +196,17 @@ describe("conversational Agent Skill execution approval", () => {
         observedAt,
       ),
       db.prepare(
+        `insert into briar_project_members (
+           project_id, organization_id, user_id, created_at, updated_at
+         ) values (?, ?, ?, ?, ?)`,
+      ).bind(
+        projectId,
+        organizationId,
+        memberId,
+        observedAt,
+        observedAt,
+      ),
+      db.prepare(
         `insert into briar_project_settings (
            project_id, workflow_json, mandatory_checkpoints_json,
            created_at, updated_at

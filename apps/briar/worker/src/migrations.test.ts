@@ -23,6 +23,63 @@ import {
   executeD1Sql,
 } from "./test-helpers/d1";
 
+it("backfills every existing organization member into every existing project", async () => {
+  const miniflare = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    d1Databases: { DB: "briar-project-members-backfill-test" },
+  });
+  try {
+    const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    await applyD1Migrations(db, { through: "0137_execution_worker_lifecycle_telemetry.sql" });
+    const now = "2026-08-26T00:00:00.000Z";
+    await executeD1Sql(
+      db,
+      `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+       values ('backfill-owner', 'Owner', 'owner-backfill@example.com', 1, '${now}', '${now}');
+       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+       values ('backfill-member', 'Member', 'member-backfill@example.com', 1, '${now}', '${now}');
+       insert into briar_organizations (id, name, handle, created_at, updated_at)
+       values ('backfill-org', 'Backfill', 'backfill', '${now}', '${now}');
+       insert into briar_organization_members (
+         organization_id, user_id, role, created_at, updated_at
+       ) values ('backfill-org', 'backfill-owner', 'owner', '${now}', '${now}');
+       insert into briar_organization_members (
+         organization_id, user_id, role, created_at, updated_at
+       ) values ('backfill-org', 'backfill-member', 'member', '${now}', '${now}');
+       insert into briar_projects (
+         id, owner_user_id, organization_id, name, agent_token_hash,
+         created_at, updated_at
+       ) values (
+         'backfill-project-a', 'backfill-owner', 'backfill-org', 'A',
+         '${"a".repeat(64)}', '${now}', '${now}'
+       );
+       insert into briar_projects (
+         id, owner_user_id, organization_id, name, agent_token_hash,
+         created_at, updated_at
+       ) values (
+         'backfill-project-b', 'backfill-owner', 'backfill-org', 'B',
+         '${"b".repeat(64)}', '${now}', '${now}'
+       );`,
+    );
+
+    await applyD1Migrations(db, { files: ["0138_project_members.sql"] });
+    const memberships = await db.prepare(
+      `select project_id, user_id
+       from briar_project_members
+       order by project_id, user_id`,
+    ).all<{ project_id: string; user_id: string }>();
+    expect(memberships.results).toEqual([
+      { project_id: "backfill-project-a", user_id: "backfill-member" },
+      { project_id: "backfill-project-a", user_id: "backfill-owner" },
+      { project_id: "backfill-project-b", user_id: "backfill-member" },
+      { project_id: "backfill-project-b", user_id: "backfill-owner" },
+    ]);
+  } finally {
+    await miniflare.dispose();
+  }
+});
+
 async function createPreDescriptionOrganizationAgent(
   db: D1Database,
   input: {
