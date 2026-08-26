@@ -58,7 +58,7 @@ export function IssueList({
         <span role="columnheader">{t("dashboard.updated")}</span>
         <span aria-hidden="true" />
       </div>
-      <div className="issue-list-body" role="rowgroup">
+      <div className="issue-list-body" data-keyboard-list="" role="rowgroup">
         {runs.length === 0 ? <div className="issue-list-empty">
             <Bot size={22} />
             <strong>{t("dashboard.emptyTitle")}</strong>
@@ -71,7 +71,7 @@ export function IssueList({
         return <IssueContextMenu availableProviders={availableProviders} disabled={deletingIssueId === run.id || updatingIssueId === run.id} key={run.id} onDelete={() => onDelete(run.id)} onTransfer={onTransfer ? () => onTransfer(run.id) : undefined} onEdit={() => onEdit(run.id)} onMove={placement => onMove(run, placement)} onOpen={() => onOpen(run.id)} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(run) : undefined} onPriorityChange={priority => onPriorityChange(run, priority)} onPreferencesChange={preferences => onPreferencesChange(run, preferences)} onCheckpointsChange={checkpoints => onCheckpointsChange(run, checkpoints)} run={run} isProcessing={processingIssueIds.has(run.id)}>
               <div aria-label={t("run.details", {
             title: run.title
-          })} className="issue-list-grid issue-list-row" onClick={() => onOpen(run.id)} onKeyDown={event => {
+          })} className="issue-list-grid issue-list-row" data-keyboard-list-item="" onClick={() => onOpen(run.id)} onKeyDown={event => {
             if (event.key !== "Enter" && event.key !== " ") return;
             event.preventDefault();
             onOpen(run.id);

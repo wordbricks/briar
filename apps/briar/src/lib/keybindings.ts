@@ -22,6 +22,8 @@ export type KeyboardNavigationPreferences = {
   sequenceShortcutsEnabled: boolean;
 };
 
+type StoredKeybindingValues = Partial<Record<KeybindingId, unknown>>;
+
 export const keybindingIds: KeybindingId[] = [
   "commandPalette",
   "sidebarToggle",
@@ -49,6 +51,8 @@ export const defaultKeybindings: Keybindings = {
 export const keybindingsStorageKey = "briar.settings.keybindings.v1";
 export const keyboardNavigationPreferencesStorageKey =
   "briar.settings.keyboard-navigation.v1";
+export const keyboardNavigationPreferencesChangedEvent =
+  "briar:keyboard-navigation-preferences-changed";
 
 export const defaultKeyboardNavigationPreferences:
   KeyboardNavigationPreferences = {
@@ -64,24 +68,31 @@ const ShortcutSchema = Schema.Struct({
   shift: Schema.Boolean,
 });
 const StoredKeybindingsSchema = Schema.fromJsonString(Schema.Struct({
-  commandPalette: Schema.optional(ShortcutSchema),
-  sidebarToggle: Schema.optional(ShortcutSchema),
+  commandPalette: Schema.optional(Schema.Unknown),
+  sidebarToggle: Schema.optional(Schema.Unknown),
 }));
+const KeyboardNavigationPreferencesValueSchema = Schema.Struct({
+  sequenceShortcutsEnabled: Schema.Boolean,
+});
 const KeyboardNavigationPreferencesSchema = Schema.fromJsonString(
-  Schema.Struct({
-    sequenceShortcutsEnabled: Schema.Boolean,
-  }),
+  KeyboardNavigationPreferencesValueSchema,
 );
+const decodeShortcut = Schema.decodeUnknownOption(ShortcutSchema);
 const decodeStoredKeybindings = Schema.decodeUnknownOption(
   StoredKeybindingsSchema,
 );
 const decodeKeyboardNavigationPreferences = Schema.decodeUnknownOption(
   KeyboardNavigationPreferencesSchema,
 );
+const decodeKeyboardNavigationPreferencesValue = Schema.decodeUnknownOption(
+  KeyboardNavigationPreferencesValueSchema,
+);
 
 const modifierOnlyKeys = new Set(["Meta", "Control", "Alt", "Shift", "OS"]);
 
 let recordingKeybinding: KeybindingId | null = null;
+let volatileKeyboardNavigationPreferences:
+  KeyboardNavigationPreferences | null = null;
 
 export function keyboardEventIsComposing(event: KeyboardEvent): boolean {
   return event.isComposing || event.keyCode === 229;
@@ -107,20 +118,23 @@ export function loadKeybindings(): Keybindings {
   const result: Keybindings = { ...defaultKeybindings };
   let repaired = false;
   try {
-    const stored: Partial<Keybindings> = Option.getOrElse(
+    const stored: StoredKeybindingValues = Option.getOrElse(
       decodeStoredKeybindings(
         window.localStorage.getItem(keybindingsStorageKey) ?? "{}",
       ),
-      (): Partial<Keybindings> => ({}),
+      (): StoredKeybindingValues => ({}),
     );
     for (const id of keybindingIds) {
-      const storedShortcut = stored[id];
+      const storedValue = stored[id];
+      const storedShortcut = Option.getOrUndefined(
+        decodeShortcut(storedValue),
+      );
       if (
         storedShortcut &&
-        !isNavigationHistoryShortcut(storedShortcut)
+        !isReservedGlobalShortcut(storedShortcut)
       ) {
         result[id] = storedShortcut;
-      } else if (storedShortcut) {
+      } else if (storedValue !== undefined) {
         repaired = true;
       }
     }
@@ -148,6 +162,9 @@ export function loadKeybindings(): Keybindings {
 
 export function loadKeyboardNavigationPreferences():
   KeyboardNavigationPreferences {
+  if (volatileKeyboardNavigationPreferences) {
+    return volatileKeyboardNavigationPreferences;
+  }
   try {
     return Option.getOrElse(
       decodeKeyboardNavigationPreferences(
@@ -165,20 +182,57 @@ export function loadKeyboardNavigationPreferences():
 export function saveKeyboardNavigationPreferences(
   preferences: KeyboardNavigationPreferences,
 ): KeyboardNavigationPreferences {
+  volatileKeyboardNavigationPreferences = preferences;
   try {
     window.localStorage.setItem(
       keyboardNavigationPreferencesStorageKey,
       JSON.stringify(preferences),
     );
+    volatileKeyboardNavigationPreferences = null;
   } catch {
     // Keep the preferences for the current session when storage is unavailable.
   }
+  window.dispatchEvent(new CustomEvent<KeyboardNavigationPreferences>(
+    keyboardNavigationPreferencesChangedEvent,
+    { detail: preferences },
+  ));
   return preferences;
+}
+
+export function subscribeKeyboardNavigationPreferences(
+  onChange: (preferences: KeyboardNavigationPreferences) => void,
+): () => void {
+  const handleChange = (event: Event) => {
+    const decoded = event instanceof CustomEvent
+      ? decodeKeyboardNavigationPreferencesValue(event.detail)
+      : Option.none<KeyboardNavigationPreferences>();
+    onChange(Option.getOrElse(decoded, loadKeyboardNavigationPreferences));
+  };
+  const handleStorage = (event: StorageEvent) => {
+    if (
+      event.key !== null &&
+      event.key !== keyboardNavigationPreferencesStorageKey
+    ) return;
+    volatileKeyboardNavigationPreferences = null;
+    onChange(loadKeyboardNavigationPreferences());
+  };
+  window.addEventListener(
+    keyboardNavigationPreferencesChangedEvent,
+    handleChange,
+  );
+  window.addEventListener("storage", handleStorage);
+  return () => {
+    window.removeEventListener(
+      keyboardNavigationPreferencesChangedEvent,
+      handleChange,
+    );
+    window.removeEventListener("storage", handleStorage);
+  };
 }
 
 export function saveKeybinding(id: KeybindingId, shortcut: Shortcut): Keybindings {
   const current = loadKeybindings();
-  if (isNavigationHistoryShortcut(shortcut)) return current;
+  if (isReservedGlobalShortcut(shortcut)) return current;
   const next = { ...current };
   const conflict = keybindingIds.find(
     (candidate) =>
@@ -218,6 +272,23 @@ export function isNavigationHistoryShortcut(shortcut: Shortcut): boolean {
   );
 }
 
+export function isKeyboardShortcutsGuideShortcut(
+  shortcut: Shortcut,
+): boolean {
+  return (
+    shortcut.meta !== shortcut.ctrl &&
+    (shortcut.meta || shortcut.ctrl) &&
+    !shortcut.alt &&
+    !shortcut.shift &&
+    (shortcut.code === "Slash" || shortcut.key === "/")
+  );
+}
+
+export function isReservedGlobalShortcut(shortcut: Shortcut): boolean {
+  return isNavigationHistoryShortcut(shortcut) ||
+    isKeyboardShortcutsGuideShortcut(shortcut);
+}
+
 export function matchesShortcut(event: KeyboardEvent, shortcut: Shortcut): boolean {
   if (keyboardEventIsComposing(event)) return false;
   if (event.metaKey !== shortcut.meta) return false;
@@ -244,7 +315,7 @@ export function shortcutFromEvent(event: KeyboardEvent): Shortcut | null {
     alt: event.altKey,
     shift: event.shiftKey,
   };
-  return isNavigationHistoryShortcut(shortcut) ? null : shortcut;
+  return isReservedGlobalShortcut(shortcut) ? null : shortcut;
 }
 
 export function isMacPlatform(): boolean {

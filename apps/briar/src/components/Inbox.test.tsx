@@ -205,7 +205,13 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(scroll).not.toBeNull();
     expect(scroll?.getAttribute("data-visible-count")).toBe("50");
     expect(scroll?.getAttribute("data-has-more")).toBe("true");
+    expect(container.querySelector(".inbox-list[data-keyboard-list]")).not.toBeNull();
     expect(container.querySelectorAll(".inbox-message")).toHaveLength(50);
+    expect(
+      container.querySelectorAll(
+        ".inbox-message-open[data-keyboard-list-item]",
+      ),
+    ).toHaveLength(50);
     expect(container.textContent).toContain("Urgent issue 0");
     expect(container.textContent).toContain("Urgent issue 49");
     expect(container.textContent).not.toContain("Urgent issue 50");

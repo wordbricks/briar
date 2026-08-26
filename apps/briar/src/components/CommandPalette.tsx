@@ -79,6 +79,7 @@ function focusWithoutScrolling(element: HTMLElement) {
 
 export function CommandPalette({
   contextLabel,
+  initialQuery = "",
   items,
   loading = false,
   onOpenChange,
@@ -86,6 +87,7 @@ export function CommandPalette({
   shortcutLabel,
 }: {
   contextLabel?: string | null;
+  initialQuery?: string;
   items: readonly CommandPaletteItem[];
   loading?: boolean;
   onOpenChange: (open: boolean) => void;
@@ -111,10 +113,10 @@ export function CommandPalette({
   useEffect(() => {
     if (!open) return;
     restoreFocusOnCloseRef.current = true;
-    setQuery("");
+    setQuery(initialQuery);
     setActiveId(null);
     setRecentIds(loadCommandPaletteRecents());
-  }, [open]);
+  }, [initialQuery, open]);
 
   const hasQuery = query.trim().length > 0;
   const matchedGroups = useMemo(() => {
