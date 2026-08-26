@@ -19,14 +19,22 @@ import {
   X,
 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import type { ProjectConnection } from "../hooks/useBriar";
 import { ApiError, apiErrorIssueMessages } from "../lib/api";
-import type {
-  LocalAutoHuntConfig,
-  LovableRepositoryCompatibility,
-  RepositoryReadiness,
-  WorkflowRequirementHealth,
+import {
+  preflightThenCreateProject,
+  type LocalAutoHuntConfig,
+  type LocalProjectConnectionPreflight,
+  type LovableRepositoryCompatibility,
+  type RepositoryReadiness,
+  type WorkflowRequirementHealth,
 } from "../lib/project-connection";
 import {
   isRepositoryWorkflowPending,
@@ -71,6 +79,20 @@ type WorkflowFailure = {
   issues: string[];
 };
 
+function localConnectionSettings(
+  workflow: AutoHuntWorkflow,
+  readiness: RepositoryReadiness | null,
+): LocalAutoHuntConfig {
+  return {
+    velenOrg: null,
+    linearEnabled: false,
+    linearSource: null,
+    linearTeam: null,
+    githubRepository: readiness?.githubRepository ?? null,
+    workflow,
+  };
+}
+
 type Props = {
   canCancel?: boolean;
   connection: ProjectConnection | null;
@@ -96,6 +118,10 @@ type Props = {
   onInspectLovableRepository: (
     repositoryPath: string,
   ) => Promise<LovableRepositoryCompatibility>;
+  onPreflight: (
+    settings: LocalAutoHuntConfig,
+    repositoryPath: string,
+  ) => Promise<LocalProjectConnectionPreflight>;
   onReviseWorkflow: (
     projectId: string,
     requestedChange: string,
@@ -117,6 +143,8 @@ type OnboardingPhase =
   | "workflow-review"
   | "tools-loading"
   | "tools-review";
+
+type RepositoryOperation = "idle" | "preflight" | "commit";
 
 function Progress({ current, total }: { current: number; total: 3 | 4 }) {
   return (
@@ -296,6 +324,7 @@ export function ProjectOnboarding({
   onCreate,
   onFinish,
   onInspectLovableRepository,
+  onPreflight,
   onRepositoryInspect,
   onRepositorySelect,
   onReviseWorkflow,
@@ -310,6 +339,13 @@ export function ProjectOnboarding({
     useState<RepositoryReadiness | null>(null);
   const [repositoryError, setRepositoryError] = useState<string | null>(null);
   const [selectingRepository, setSelectingRepository] = useState(false);
+  const [repositoryOperation, setRepositoryOperation] =
+    useState<RepositoryOperation>("idle");
+  const repositoryOperationRef = useRef<RepositoryOperation>("idle");
+  const repositoryRequest = useRef(0);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [connectionPreflight, setConnectionPreflight] =
+    useState<LocalProjectConnectionPreflight | null>(null);
   const [workflow, setWorkflow] = useState<AutoHuntWorkflow | null>(null);
   const [workflowError, setWorkflowError] = useState<WorkflowFailure | null>(null);
   const [workflowProgress, setWorkflowProgress] =
@@ -334,13 +370,42 @@ export function ProjectOnboarding({
   const [lovablePreset, setLovablePreset] =
     useState<AutoHuntWorkflow | null>(null);
 
+  const updateRepositoryOperation = useCallback(
+    (operation: RepositoryOperation) => {
+      repositoryOperationRef.current = operation;
+      setRepositoryOperation(operation);
+    },
+    [],
+  );
+  const cancelOnboarding = useCallback(() => {
+    if (
+      loading ||
+      lovableImporting ||
+      repositoryOperationRef.current === "commit"
+    ) {
+      return;
+    }
+    repositoryRequest.current += 1;
+    updateRepositoryOperation("idle");
+    onCancel();
+  }, [loading, lovableImporting, onCancel, updateRepositoryOperation]);
+
+  const preflightingRepository = repositoryOperation !== "idle";
+
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !loading && !lovableImporting) onCancel();
+      if (event.key === "Escape") cancelOnboarding();
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [loading, lovableImporting, onCancel]);
+  }, [cancelOnboarding]);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+    return () => {
+      repositoryRequest.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     if (connection && !name) setName(connection.project.name);
@@ -362,15 +427,10 @@ export function ProjectOnboarding({
     const key = `${connection.project.id}:${generationAttempt}:${
       lovablePreset ? "lovable" : "generated"
     }`;
-    const settings: LocalAutoHuntConfig = {
-      velenOrg: null,
-      linearEnabled: false,
-      linearSource: null,
-      linearTeam: null,
-      githubRepository: repositoryReadiness?.githubRepository ?? null,
-      workflow:
-        lovablePreset ?? connection.workflow ?? repositoryWorkflowBootstrap,
-    };
+    const settings = localConnectionSettings(
+      lovablePreset ?? connection.workflow ?? repositoryWorkflowBootstrap,
+      repositoryReadiness,
+    );
     if (generationRequest.current?.key !== key) {
       generationProgressKey.current = key;
       setWorkflowProgress(null);
@@ -426,27 +486,50 @@ export function ProjectOnboarding({
   ]);
 
   const selectRepository = async () => {
+    const request = ++repositoryRequest.current;
+    const isCurrent = () => request === repositoryRequest.current;
     setSelectingRepository(true);
     setRepositoryError(null);
+    setConnectionPreflight(null);
     try {
       const selected = await onRepositorySelect();
-      if (!selected) return;
+      if (!selected || !isCurrent()) return;
       setRepositoryPath(selected);
       setRepositoryReadiness(null);
       const readiness = await onRepositoryInspect(
         selected,
         connection?.workflow ?? repositoryWorkflowBootstrap,
       );
+      if (!isCurrent()) return;
       setRepositoryPath(readiness.repositoryPath);
       setRepositoryReadiness(readiness);
       if (!connection) setName(repositoryProjectName(readiness.repositoryPath));
+      try {
+        const preflight = await onPreflight(
+          localConnectionSettings(
+            connection?.workflow ?? repositoryWorkflowBootstrap,
+            readiness,
+          ),
+          readiness.repositoryPath,
+        );
+        if (!isCurrent()) return;
+        setRepositoryPath(preflight.repositoryPath);
+        setConnectionPreflight(preflight);
+      } catch (caught) {
+        if (!isCurrent()) return;
+        setRepositoryError(
+          caught instanceof Error ? caught.message : String(caught),
+        );
+      }
     } catch (caught) {
+      if (!isCurrent()) return;
       setRepositoryReadiness(null);
+      setConnectionPreflight(null);
       setRepositoryError(
         caught instanceof Error ? caught.message : String(caught),
       );
     } finally {
-      setSelectingRepository(false);
+      if (isCurrent()) setSelectingRepository(false);
     }
   };
 
@@ -481,10 +564,20 @@ export function ProjectOnboarding({
       const compatibility = await onInspectLovableRepository(
         readiness.repositoryPath,
       ).catch(() => null);
-      setLovablePreset(
-        compatibility ? lovableWorkflowPreset(compatibility) : null,
+      const preset = compatibility ? lovableWorkflowPreset(compatibility) : null;
+      setLovablePreset(preset);
+      const preflight = await preflightThenCreateProject(
+        () => onPreflight(
+          localConnectionSettings(
+            preset ?? repositoryWorkflowBootstrap,
+            readiness,
+          ),
+          readiness.repositoryPath,
+        ),
+        () => onCreate({ name: cloned.repositoryName || repositoryName }),
       );
-      await onCreate({ name: cloned.repositoryName || repositoryName });
+      setRepositoryPath(preflight.repositoryPath);
+      setConnectionPreflight(preflight);
       setWorkflowError(null);
       setPhase("workflow-loading");
     } catch (caught) {
@@ -499,35 +592,56 @@ export function ProjectOnboarding({
     if (!repositoryReadiness?.gitReady) return;
     const projectName = (connection?.project.name ?? name).trim();
     if (!projectName) return;
-    if (!connection) {
-      try {
-        await onCreate({ name: projectName });
-      } catch {
+    const selectedWorkflow = connection?.workflow ?? repositoryWorkflowBootstrap;
+    const settings = localConnectionSettings(
+      selectedWorkflow,
+      repositoryReadiness,
+    );
+    const request = ++repositoryRequest.current;
+    const assertCurrent = () => {
+      if (request !== repositoryRequest.current) {
+        throw new Error("Project connection request was cancelled");
+      }
+    };
+    updateRepositoryOperation("preflight");
+    setRepositoryError(null);
+    setConnectionPreflight(null);
+    try {
+      const preflight = await preflightThenCreateProject(
+        () => onPreflight(settings, repositoryPath),
+        connection
+          ? undefined
+          : async () => {
+              assertCurrent();
+              updateRepositoryOperation("commit");
+              await onCreate({ name: projectName });
+            },
+        assertCurrent,
+      );
+      setRepositoryPath(preflight.repositoryPath);
+      setConnectionPreflight(preflight);
+      if (
+        connection?.workflow &&
+        !isRepositoryWorkflowPending(connection.workflow)
+      ) {
+        updateRepositoryOperation("commit");
+        await onConnect(settings, preflight.repositoryPath);
+        assertCurrent();
+        onFinish();
         return;
       }
-    }
-    if (
-      connection?.workflow &&
-      !isRepositoryWorkflowPending(connection.workflow)
-    ) {
-      const settings: LocalAutoHuntConfig = {
-        velenOrg: null,
-        linearEnabled: false,
-        linearSource: null,
-        linearTeam: null,
-        githubRepository: repositoryReadiness.githubRepository ?? null,
-        workflow: connection.workflow,
-      };
-      try {
-        await onConnect(settings, repositoryPath);
-        onFinish();
-      } catch {
-        // The connection error is surfaced by the parent on this repository step.
+      setWorkflowError(null);
+      setPhase("workflow-loading");
+    } catch (caught) {
+      if (request !== repositoryRequest.current) return;
+      setRepositoryError(
+        caught instanceof Error ? caught.message : String(caught),
+      );
+    } finally {
+      if (request === repositoryRequest.current) {
+        updateRepositoryOperation("idle");
       }
-      return;
     }
-    setWorkflowError(null);
-    setPhase("workflow-loading");
   };
 
   const retryWorkflowGeneration = () => {
@@ -626,11 +740,7 @@ export function ProjectOnboarding({
     <div
       className="dialog-backdrop project-onboarding-modal-backdrop"
       onMouseDown={(event) => {
-        if (
-          event.currentTarget === event.target &&
-          !loading &&
-          !lovableImporting
-        ) onCancel();
+        if (event.currentTarget === event.target) cancelOnboarding();
       }}
     >
       <section
@@ -642,7 +752,20 @@ export function ProjectOnboarding({
         <header className="project-onboarding-dialog-toolbar">
           <span>
             {backAction ? (
-              <button onClick={backAction} type="button">
+              <button
+                disabled={
+                  loading ||
+                  lovableImporting ||
+                  repositoryOperation === "commit"
+                }
+                onClick={() => {
+                  repositoryRequest.current += 1;
+                  setSelectingRepository(false);
+                  updateRepositoryOperation("idle");
+                  backAction();
+                }}
+                type="button"
+              >
                 <ArrowLeft size={15} /> {t("onboarding.previous")}
               </button>
             ) : null}
@@ -650,8 +773,13 @@ export function ProjectOnboarding({
           <button
             aria-label={t("common.close")}
             className="project-onboarding-dialog-close"
-            disabled={loading || lovableImporting}
-            onClick={onCancel}
+            disabled={
+              loading ||
+              lovableImporting ||
+              repositoryOperation === "commit"
+            }
+            onClick={cancelOnboarding}
+            ref={closeButtonRef}
             type="button"
           >
             <X size={18} />
@@ -838,7 +966,7 @@ export function ProjectOnboarding({
                       </div>
                       <button
                         className="setup-repository-action"
-                        disabled={loading || selectingRepository}
+                        disabled={loading || selectingRepository || preflightingRepository}
                         onClick={() => void selectRepository()}
                         type="button"
                       >
@@ -863,6 +991,17 @@ export function ProjectOnboarding({
                         <span className={repositoryReadiness?.pushAccess ? "ready" : "warning"}>
                           {repositoryReadiness?.pushAccess ? <Check size={13} /> : <CircleAlert size={13} />}
                           <i><strong>push</strong><small>{repositoryReadiness?.pushAccess ? t("onboarding.pushReady") : t("onboarding.pushCheckNeeded")}</small></i>
+                        </span>
+                        <span className={connectionPreflight ? "ready" : "warning"}>
+                          {connectionPreflight ? <Check size={13} /> : <Cpu size={13} />}
+                          <i>
+                            <strong>{t("settings.provider")}</strong>
+                            <small>
+                              {connectionPreflight
+                                ? agentProviderLabels[connectionPreflight.provider]
+                                : t("common.checkNeeded")}
+                            </small>
+                          </i>
                         </span>
                       </div>
                     ) : null}
@@ -891,10 +1030,10 @@ export function ProjectOnboarding({
                   {repositoryReadiness?.gitReady ? (
                     <button
                       className="onboarding-primary-action"
-                      disabled={loading || selectingRepository || (!connection && !name.trim())}
+                      disabled={loading || selectingRepository || preflightingRepository || (!connection && !name.trim())}
                       type="submit"
                     >
-                      {loading
+                      {loading || preflightingRepository
                         ? reconnectingExistingWorkflow
                           ? t("onboarding.repositoryConnecting")
                           : t("onboarding.creating")

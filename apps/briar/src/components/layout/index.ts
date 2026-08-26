@@ -1,4 +1,5 @@
 export {
+  EmbeddedMainContentBoundary,
   EmptyState,
   MainContent,
   PageHeader,

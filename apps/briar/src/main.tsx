@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { RegistryProvider } from "@effect/atom-react";
 import { App } from "./App";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppUpdateProvider } from "./components/AppUpdateProvider";
@@ -36,27 +37,29 @@ if (nativeLaunchIntro) {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider>
-      <I18nProvider>
-        <TooltipProvider delayDuration={200}>
-          <ToastProvider>
-            <AppErrorBoundary>
-              {nativeLaunchIntro ? (
-                <NativeLaunchIntro />
-              ) : (
-                <AppUpdateProvider>
-                  <AppKeyboardCommandProvider>
-                    <App appZoomCommands={appZoomCommands} />
-                  </AppKeyboardCommandProvider>
-                </AppUpdateProvider>
-              )}
-            </AppErrorBoundary>
-            {import.meta.env.DEV && !nativeLaunchIntro ? (
-              <DevelopmentBadge />
-            ) : null}
-          </ToastProvider>
-        </TooltipProvider>
-      </I18nProvider>
-    </ThemeProvider>
+    <RegistryProvider>
+      <ThemeProvider>
+        <I18nProvider>
+          <TooltipProvider delayDuration={200}>
+            <ToastProvider>
+              <AppErrorBoundary>
+                {nativeLaunchIntro ? (
+                  <NativeLaunchIntro />
+                ) : (
+                  <AppUpdateProvider>
+                    <AppKeyboardCommandProvider>
+                      <App appZoomCommands={appZoomCommands} />
+                    </AppKeyboardCommandProvider>
+                  </AppUpdateProvider>
+                )}
+              </AppErrorBoundary>
+              {import.meta.env.DEV && !nativeLaunchIntro ? (
+                <DevelopmentBadge />
+              ) : null}
+            </ToastProvider>
+          </TooltipProvider>
+        </I18nProvider>
+      </ThemeProvider>
+    </RegistryProvider>
   </StrictMode>,
 );

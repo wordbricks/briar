@@ -417,7 +417,7 @@ export function SelectMenu({
       ref={rootRef}
     >
       <button
-        aria-controls={listboxId}
+        aria-controls={isOpen ? listboxId : undefined}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-label={label}

@@ -22,7 +22,10 @@ import {
   type AutoHuntSession,
 } from "../hooks/useAutoHuntSessions";
 import { useI18n, type Locale } from "../i18n";
-import { isProjectConnectedLocally } from "../lib/local-project-connection";
+import {
+  isLocalProjectRepositoryReady,
+  localProjectConnectionState,
+} from "../lib/local-project-connection";
 import { isProjectScheduleTabEnabled } from "../lib/project-tabs";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import type {
@@ -86,13 +89,14 @@ export function Sidebar({
   onOrganizationChange,
   onProjectChange,
   onProjectOpenInNewWindow,
-  onProjectReadinessOpen,
+  onProjectRepositoryOpen,
   onProjectSettings,
   onSettings,
   onLogout,
   organizations,
   projects,
   projectReadiness,
+  projectReadinessError,
   projectWindowProjectId = null,
   sessions,
   token,
@@ -130,13 +134,14 @@ export function Sidebar({
   onOrganizationChange: (organizationId: string) => void;
   onProjectChange: (projectId: string) => void;
   onProjectOpenInNewWindow?: (projectId: string) => Promise<void>;
-  onProjectReadinessOpen: (projectId: string) => void;
+  onProjectRepositoryOpen: (projectId: string) => void;
   onProjectSettings: (projectId: string) => void;
   onSettings: () => void;
   onLogout: () => void;
   organizations: Organization[];
   projects: Project[];
   projectReadiness: Record<string, RepositoryReadiness>;
+  projectReadinessError: Record<string, string>;
   projectWindowProjectId?: string | null;
   sessions: AutoHuntSession[];
   token: string | null;
@@ -350,7 +355,7 @@ export function Sidebar({
   const selectProject = (projectId: string) => {
     if (projectId !== activeProjectId) onProjectChange(projectId);
     setProjectExpanded(projectId, true);
-    onLobbyOpen();
+    onIssuesOpen();
   };
 
   return (
@@ -699,12 +704,20 @@ export function Sidebar({
             const isExpanded = isProjectExpanded(project.id);
             const isMenuOpen = project.id === openProjectMenuId;
             const readiness = projectReadiness[project.id];
-            const needsConnection = !isProjectConnectedLocally(
+            const readinessError = projectReadinessError[project.id];
+            const connectionState = localProjectConnectionState(
               connectedProjectIds,
               project.id,
             );
+            const needsConnection = connectionState === "disconnected";
             const needsAttention =
-              !needsConnection && readiness?.requiresGithub && !readiness.prReady;
+              connectionState === "connected" &&
+              Boolean(readiness) &&
+              !isLocalProjectRepositoryReady(readiness ?? null);
+            const needsInspection =
+              connectionState !== "disconnected" &&
+              !readiness &&
+              Boolean(readinessError);
             const runningAgentSessions =
               runningAgentSessionsByProjectId.get(project.id) ?? [];
             const openProjectPage = (open: () => void) => {
@@ -716,7 +729,7 @@ export function Sidebar({
             return (
               <section className="sidebar-project-group" key={project.id}>
                 <div
-                  className={`sidebar-project-row${needsAttention ? " has-warning" : ""}`}
+                  className={`sidebar-project-row${needsConnection || needsAttention || needsInspection ? " has-warning" : ""}`}
                 >
                   <div className="sidebar-project-heading-group">
                     <button
@@ -759,20 +772,31 @@ export function Sidebar({
                       {isActive && <i aria-label={t("sidebar.currentProject")} />}
                     </button>
                   </div>
-                  {needsAttention ? (
+                  {needsConnection || needsAttention || needsInspection ? (
                     <button
-                      aria-label={t("repositorySetup.open", { name: project.name })}
+                      aria-label={
+                        needsConnection
+                          ? t("sidebar.projectNotConnected", { name: project.name })
+                          : t("repositorySetup.open", { name: project.name })
+                      }
                       className="sidebar-project-warning"
-                      data-project-readiness={project.id}
-                      onClick={() => onProjectReadinessOpen(project.id)}
-                      title={t("repositorySetup.open", { name: project.name })}
+                      data-project-readiness={needsAttention || needsInspection ? project.id : undefined}
+                      data-project-reconnect={needsConnection ? project.id : undefined}
+                      onClick={() => onProjectRepositoryOpen(project.id)}
+                      title={
+                        needsConnection
+                          ? t("sidebar.projectNotConnected", { name: project.name })
+                          : t("repositorySetup.open", { name: project.name })
+                      }
                       type="button"
                     >
                       <span aria-hidden="true">!</span>
                     </button>
                   ) : null}
                   <button
-                    aria-controls={`project-menu-${project.id}`}
+                    aria-controls={
+                      isMenuOpen ? `project-menu-${project.id}` : undefined
+                    }
                     aria-expanded={isMenuOpen}
                     aria-haspopup="menu"
                     aria-label={t("sidebar.projectMenu", { name: project.name })}

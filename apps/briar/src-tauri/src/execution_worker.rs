@@ -1,5 +1,68 @@
 use super::*;
 
+const WORKER_CLEANUP_INCOMPLETE_PREFIX: &str = "BRIAR_WORKER_CLEANUP_INCOMPLETE: ";
+
+fn cleanup_enabled_worker(
+    run: &impl Fn(&[&str]) -> Result<String, String>,
+    project_id: &str,
+) -> Result<(), String> {
+    run(&["worker", "uninstall-service", "--project", project_id])?;
+    run(&[
+        "worker",
+        "unregister",
+        "--project",
+        project_id,
+        "--lifecycle-reason",
+        "managed-deprovision",
+    ])?;
+    Ok(())
+}
+
+fn rollback_enabled_worker_failure(
+    run: &impl Fn(&[&str]) -> Result<String, String>,
+    project_id: &str,
+    cause: String,
+) -> String {
+    match cleanup_enabled_worker(run, project_id) {
+        Ok(()) => cause,
+        Err(cleanup) => {
+            format!("{WORKER_CLEANUP_INCOMPLETE_PREFIX}{cause} (Worker 정리 실패: {cleanup})")
+        }
+    }
+}
+
+fn enable_execution_worker(
+    run: &impl Fn(&[&str]) -> Result<String, String>,
+    project_id: &str,
+    bun_path: &str,
+    cli_path: &str,
+) -> Result<serde_json::Value, String> {
+    // A failed registration has not produced a local binding that can be
+    // unregistered reliably. Cleanup begins only after the CLI confirms that
+    // registration completed.
+    run(&["worker", "register", "--project", project_id])?;
+    run(&[
+        "worker",
+        "install-service",
+        "--project",
+        project_id,
+        "--runtime-binary",
+        bun_path,
+        "--cli-script",
+        cli_path,
+    ])
+    .map_err(|cause| rollback_enabled_worker_failure(run, project_id, cause))?;
+    let status = run(&["worker", "status", "--project", project_id])
+        .map_err(|cause| rollback_enabled_worker_failure(run, project_id, cause))?;
+    serde_json::from_str(&status).map_err(|error| {
+        rollback_enabled_worker_failure(
+            run,
+            project_id,
+            format!("Worker 상태를 읽지 못했습니다: {error}"),
+        )
+    })
+}
+
 #[tauri::command]
 pub(super) fn configure_execution_worker(
     app: AppHandle,
@@ -50,34 +113,11 @@ pub(super) fn configure_execution_worker(
     };
 
     if enabled {
-        run(&["worker", "register", "--project", &project_id])?;
-        if let Err(error) = run(&[
-            "worker",
-            "install-service",
-            "--project",
-            &project_id,
-            "--runtime-binary",
-            bun_path,
-            "--cli-script",
-            cli_path,
-        ]) {
-            // Registration and service installation are one user action. Do
-            // not leave a project half-enabled when the service cannot start.
-            let _ = run(&["worker", "uninstall-service", "--project", &project_id]);
-            let _ = run(&[
-                "worker",
-                "unregister",
-                "--project",
-                &project_id,
-                "--lifecycle-reason",
-                "managed-deprovision",
-            ]);
-            return Err(error);
-        }
-    } else {
-        run(&["worker", "uninstall-service", "--project", &project_id])?;
-        run(&["worker", "unregister", "--project", &project_id])?;
+        return enable_execution_worker(&run, &project_id, bun_path, cli_path);
     }
+
+    run(&["worker", "uninstall-service", "--project", &project_id])?;
+    run(&["worker", "unregister", "--project", &project_id])?;
 
     let status = run(&["worker", "status", "--project", &project_id])?;
     serde_json::from_str(&status).map_err(|error| format!("Worker 상태를 읽지 못했습니다: {error}"))

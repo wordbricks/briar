@@ -38,10 +38,12 @@ describe("SelectMenu", () => {
     const trigger = container.querySelector<HTMLButtonElement>("#speed");
     expect(trigger?.getAttribute("role")).toBe("combobox");
     expect(trigger?.getAttribute("aria-expanded")).toBe("false");
+    expect(trigger?.hasAttribute("aria-controls")).toBe(false);
 
     await act(async () => trigger?.click());
     const listbox = document.querySelector("#speed-listbox");
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
+    expect(trigger?.getAttribute("aria-controls")).toBe("speed-listbox");
     expect(listbox?.getAttribute("role")).toBe("listbox");
     expect(listbox?.textContent).toContain("1.5x speed, increased usage");
 
@@ -52,6 +54,7 @@ describe("SelectMenu", () => {
     });
     expect(onValueChange).toHaveBeenCalledWith("fast");
     expect(document.querySelector("#speed-listbox")).toBeNull();
+    expect(trigger?.hasAttribute("aria-controls")).toBe(false);
     expect(document.activeElement).toBe(trigger);
 
     await act(async () => root.unmount());

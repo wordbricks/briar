@@ -42,6 +42,7 @@ describe("ProjectLobby", () => {
       root.render(
         <I18nProvider>
           <ProjectLobby
+            connectionState="connected"
             dashboard={demoDashboard}
             isSidebarOpen
             onLoadUsageSummary={loadUsage}
@@ -52,6 +53,7 @@ describe("ProjectLobby", () => {
             onOpenSettings={() => undefined}
             project={demoDashboard.project}
             readiness={demoRepositoryReadiness}
+            requiresLocalReadiness
           />
         </I18nProvider>,
       );
@@ -110,6 +112,7 @@ describe("ProjectLobby", () => {
       root.render(
         <I18nProvider>
           <ProjectLobby
+            connectionState="connected"
             dashboard={demoDashboard}
             isSidebarOpen
             onLoadUsageSummary={async () => null}
@@ -120,6 +123,7 @@ describe("ProjectLobby", () => {
             onOpenSettings={() => undefined}
             project={demoDashboard.project}
             readiness={demoRepositoryReadiness}
+            requiresLocalReadiness
           />
         </I18nProvider>,
       );
@@ -139,6 +143,149 @@ describe("ProjectLobby", () => {
       .toBe(true);
     expect(icons.every((icon) => icon.getAttribute("aria-label")))
       .toBe(true);
+
+    await act(async () => root.unmount());
+  });
+
+  it.each([
+    {
+      connectionState: "unknown" as const,
+      expectedAction: "다시 확인",
+      expectedStatus: "확인 필요",
+      readiness: null,
+    },
+    {
+      connectionState: "disconnected" as const,
+      expectedAction: "저장소 연결",
+      expectedStatus: "설정 필요",
+      readiness: demoRepositoryReadiness,
+    },
+  ])("renders $connectionState repository state honestly", async ({
+    connectionState,
+    expectedAction,
+    expectedStatus,
+    readiness,
+  }) => {
+    localStorage.setItem("briar.locale.v1", "ko");
+    const container = document.createElement("div");
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <ProjectLobby
+            connectionState={connectionState}
+            dashboard={demoDashboard}
+            isSidebarOpen
+            onLoadUsageSummary={async () => emptyUsageSummary}
+            onOpenAgents={() => undefined}
+            onOpenIssue={() => undefined}
+            onOpenIssues={() => undefined}
+            onOpenRepository={() => undefined}
+            onOpenSettings={() => undefined}
+            project={demoDashboard.project}
+            readiness={readiness}
+            requiresLocalReadiness
+          />
+        </I18nProvider>,
+      );
+    });
+
+    const repositoryPanel = container.querySelector(".repository-panel");
+    expect(repositoryPanel?.textContent).toContain(expectedStatus);
+    expect(repositoryPanel?.textContent).toContain(expectedAction);
+
+    await act(async () => root.unmount());
+  });
+
+  it("directs repository setup to the desktop instead of a remote dead end", async () => {
+    localStorage.setItem("briar.locale.v1", "ko");
+    const container = document.createElement("div");
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <ProjectLobby
+            connectionState="unknown"
+            dashboard={{
+              ...demoDashboard,
+              settings: {
+                ...demoDashboard.settings,
+                githubRepository: null,
+              },
+            }}
+            isSidebarOpen
+            onLoadUsageSummary={async () => emptyUsageSummary}
+            onOpenAgents={() => undefined}
+            onOpenIssue={() => undefined}
+            onOpenIssues={() => undefined}
+            onOpenRepository={() => undefined}
+            onOpenSettings={() => undefined}
+            project={demoDashboard.project}
+            readiness={null}
+            requiresLocalReadiness={false}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    const repositoryButton = container.querySelector<HTMLButtonElement>(
+      ".repository-panel button",
+    );
+    expect(repositoryButton?.disabled).toBe(true);
+    expect(repositoryButton?.textContent).toContain("데스크톱 Briar에서 연결");
+
+    await act(async () => root.unmount());
+  });
+
+  it("does not call a non-GitHub repository a connected GitHub integration", async () => {
+    localStorage.setItem("briar.locale.v1", "ko");
+    const container = document.createElement("div");
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <ProjectLobby
+            connectionState="connected"
+            dashboard={{
+              ...demoDashboard,
+              settings: { ...demoDashboard.settings, githubRepository: null },
+            }}
+            isSidebarOpen
+            onLoadUsageSummary={async () => emptyUsageSummary}
+            onOpenAgents={() => undefined}
+            onOpenIssue={() => undefined}
+            onOpenIssues={() => undefined}
+            onOpenRepository={() => undefined}
+            onOpenSettings={() => undefined}
+            project={demoDashboard.project}
+            readiness={{
+              ...demoRepositoryReadiness,
+              ghAccount: null,
+              ghAuthenticated: false,
+              ghInstalled: false,
+              ghVersion: null,
+              githubRepository: null,
+              githubWriteAccess: false,
+              pushAccess: false,
+              remote: null,
+              remoteReachable: false,
+              requiresGithub: false,
+            }}
+            requiresLocalReadiness
+          />
+        </I18nProvider>,
+      );
+    });
+
+    const repositoryPanel = container.querySelector(".repository-panel");
+    expect(repositoryPanel?.textContent).toContain("연결된 GitHub 저장소 없음");
+    expect(repositoryPanel?.textContent).toContain("선택");
+    expect(repositoryPanel?.textContent).toContain("현재 워크플로우에는 필요하지 않습니다");
+    expect(repositoryPanel?.textContent).not.toContain("GitHub 준비 완료");
+    expect(repositoryPanel?.textContent).not.toContain("저장소 연결");
 
     await act(async () => root.unmount());
   });

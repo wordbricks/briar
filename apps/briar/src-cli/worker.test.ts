@@ -1,3 +1,5 @@
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -19,6 +21,7 @@ import {
   launchdPlist,
   runWorkerLoop,
   restartInstalledServices,
+  removeServiceDefinition,
   serviceDefinition,
   serviceLabel,
   systemdUnit,
@@ -1020,6 +1023,22 @@ describe("worker service definitions", () => {
       }),
     ).toEqual({ restarted: 1, skipped: 1 });
     expect(commands).toEqual([installed.restartCommand]);
+  });
+
+  it("removes a disabled worker service definition idempotently", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-worker-service-"));
+    const definition = {
+      ...serviceDefinition({ ...input, platform: "darwin" }),
+      path: join(directory, "worker.plist"),
+    };
+    try {
+      await writeFile(definition.path, definition.contents);
+      await removeServiceDefinition(definition);
+      await expect(access(definition.path)).rejects.toThrow();
+      await expect(removeServiceDefinition(definition)).resolves.toBeUndefined();
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
   });
 
   it("reports worker service restart failures", () => {

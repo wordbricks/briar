@@ -1,7 +1,26 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 
 import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
+
+const MainContentElementContext = createContext<"main" | "div">("main");
+
+export function EmbeddedMainContentBoundary({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return (
+    <MainContentElementContext.Provider value="div">
+      {children}
+    </MainContentElementContext.Provider>
+  );
+}
 
 /** Product main pane — keeps legacy `main-content` hooks for CSS. */
 export function MainContent({
@@ -14,8 +33,9 @@ export function MainContent({
   companionMode?: boolean;
   id?: string;
 }) {
+  const Element = useContext(MainContentElementContext);
   return (
-    <main
+    <Element
       className={cn(
         "main-content min-w-0 flex-1 bg-background text-foreground",
         companionMode && "companion-mode",
@@ -25,7 +45,7 @@ export function MainContent({
       {...props}
     >
       {children}
-    </main>
+    </Element>
   );
 }
 

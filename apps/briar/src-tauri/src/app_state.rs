@@ -190,6 +190,14 @@ pub(super) struct ConnectedLocalProject {
     pub(super) workflow: WorkflowConfig,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct LocalProjectConnectionPreflight {
+    pub(super) repository_path: String,
+    pub(super) repository_remote: Option<String>,
+    pub(super) provider: agent::AgentProviderKind,
+}
+
 pub(super) fn repository_workflow_bootstrap() -> WorkflowConfig {
     WorkflowConfig {
         version: 2,

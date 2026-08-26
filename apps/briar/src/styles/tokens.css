@@ -80,7 +80,7 @@
 
   /* muted = soft surface; muted-foreground = secondary text */
   --muted: #f4f5ef;
-  --muted-foreground: #73756f;
+  --muted-foreground: #696b65;
 
   /* accent = soft brand wash; primary = solid brand */
   --accent: #f0ecfb;

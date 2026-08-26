@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { useAtomSet } from "@effect/atom-react";
 import {
   Activity,
   ArrowLeft,
@@ -33,6 +34,10 @@ import { HuntDashboard, RunPage } from "./components/HuntDashboard";
 import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
+import {
+  InboxDetailTargetBoundary,
+  InboxWithSelection,
+} from "./components/InboxSelectionBoundary";
 import { Channels } from "./components/Channels";
 import {
   CommandPalette,
@@ -62,6 +67,7 @@ import { ProjectSchedule } from "./components/ProjectSchedule";
 import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
+import { EmptyState, MainContent, PageHeader } from "./components/layout";
 import { Button } from "./components/ui/button";
 import { LoadingState } from "./components/ui/loading-state";
 import { Sidebar } from "./components/Sidebar";
@@ -129,6 +135,7 @@ import {
   isInboxRunDetailTarget,
   type InboxNotificationTarget,
 } from "./lib/inbox-notifications";
+import { inboxDetailTargetAtom } from "./lib/inbox-selection";
 import {
   clearFirstRunTutorialPending,
   hasPendingFirstRunTutorial,
@@ -150,6 +157,11 @@ import {
   type BriarLinkTarget,
 } from "./lib/issue-links";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
+import {
+  localProjectConnectionState,
+  localProjectReadiness,
+  projectRepositoryDestination,
+} from "./lib/local-project-connection";
 import type { IssueDetailTab } from "./lib/issue-detail-tab";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./lib/agent-usage-pricing";
@@ -1299,8 +1311,7 @@ export function App({
     useState<BriarLinkTarget | null>(null);
   const [pendingInboxNotificationTarget, setPendingInboxNotificationTarget] =
     useState<InboxNotificationTarget | null>(null);
-  const [inboxDetailTarget, setInboxDetailTarget] =
-    useState<InboxNotificationTarget | null>(null);
+  const setInboxDetailTarget = useAtomSet(inboxDetailTargetAtom);
   const handleInboxNotificationClick = useCallback(
     (target: InboxNotificationTarget) => {
       if (!projectWindowProjectId) setPendingInboxNotificationTarget(target);
@@ -1580,10 +1591,98 @@ export function App({
   );
   const [repositorySetupProjectId, setRepositorySetupProjectId] =
     useState<string | null>(null);
+  const repositorySetupTriggerRef = useRef<HTMLElement | null>(null);
+  const repositoryReconnectRequestRef = useRef(0);
+  const rememberRepositorySetupTrigger = useCallback(() => {
+    const activeElement = document.activeElement;
+    repositorySetupTriggerRef.current =
+      activeElement instanceof HTMLElement && activeElement !== document.body
+        ? activeElement
+        : null;
+  }, []);
+  const restoreRepositorySetupTrigger = useCallback(() => {
+    const trigger = repositorySetupTriggerRef.current;
+    repositorySetupTriggerRef.current = null;
+    window.requestAnimationFrame(() => {
+      if (trigger?.isConnected) trigger.focus();
+    });
+  }, []);
+  const beginProjectReconnect = useCallback(
+    (projectId: string, rememberTrigger = true) => {
+      const request = ++repositoryReconnectRequestRef.current;
+      if (rememberTrigger) rememberRepositorySetupTrigger();
+      const trigger = repositorySetupTriggerRef.current;
+      void briar.reconnectProject(projectId).then((outcome) => {
+        if (
+          request !== repositoryReconnectRequestRef.current ||
+          repositorySetupTriggerRef.current !== trigger
+        ) {
+          return;
+        }
+        if (outcome === "opened") return;
+        repositorySetupTriggerRef.current = null;
+        if (outcome !== "failed") return;
+        const activeElement = document.activeElement;
+        if (
+          trigger?.isConnected &&
+          (activeElement === trigger || activeElement === document.body)
+        ) {
+          trigger.focus();
+        }
+      });
+    },
+    [briar.reconnectProject, rememberRepositorySetupTrigger],
+  );
   const hasCompactedWindowForOnboarding = useRef(false);
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
+  const openProjectRepository = useCallback((projectId: string) => {
+    if (!briar.projects.some((project) => project.id === projectId)) return;
+
+    const connectionState = localProjectConnectionState(
+      briar.connectedProjectIds,
+      projectId,
+    );
+    const readiness = briar.projectReadiness[projectId] ?? null;
+    const destination = projectRepositoryDestination({
+      connectionState,
+      readiness,
+      requiresLocalReadiness: !briar.remoteMode,
+    });
+
+    setRepositorySetupProjectId(null);
+    if (destination === "reconnect") {
+      beginProjectReconnect(projectId);
+      return;
+    }
+
+    briar.setActiveProjectId(projectId);
+    if (destination === "settings") {
+      repositorySetupTriggerRef.current = null;
+      setSettingsTarget({
+        scope: "project",
+        projectId,
+        section: "general",
+      });
+      navigateToPage("settings", projectId);
+      return;
+    }
+
+    rememberRepositorySetupTrigger();
+    setRepositorySetupProjectId(projectId);
+    void briar.refreshProjectReadiness(projectId);
+  }, [
+    briar.connectedProjectIds,
+    briar.projectReadiness,
+    briar.projects,
+    briar.remoteMode,
+    briar.refreshProjectReadiness,
+    briar.setActiveProjectId,
+    beginProjectReconnect,
+    rememberRepositorySetupTrigger,
+    navigateToPage,
+  ]);
   const projectWindowProject = projectWindowProjectId
     ? briar.projects.find((project) => project.id === projectWindowProjectId) ?? null
     : null;
@@ -1636,34 +1735,6 @@ export function App({
         (session) => session.id === requestedSessionId,
       ) ?? null
     : null;
-  const inboxDetailChannelId =
-    inboxDetailTarget?.kind === "channel"
-      ? inboxDetailTarget.targetId
-      : null;
-  const inboxDetailRun =
-    inboxDetailTarget && isInboxRunDetailTarget(inboxDetailTarget)
-      ? briar.dashboard?.runs.find(
-          (run) => run.id === inboxDetailTarget.targetId,
-        ) ?? null
-      : null;
-  const inboxDetailSession =
-    inboxDetailTarget?.kind === "session"
-      ? autoHunt.sessions.find(
-          (session) => session.id === inboxDetailTarget.targetId,
-        ) ?? null
-      : null;
-  const inboxDetailLabel =
-    inboxDetailRun?.title ??
-    (inboxDetailTarget
-      ? inbox.messages.find(
-          (message) => message.id === inboxDetailTarget.messageId,
-        )?.title ?? t("inbox.messages")
-      : t("inbox.messages"));
-  const isInboxDetailLoading = Boolean(
-    inboxDetailTarget &&
-      isInboxRunDetailTarget(inboxDetailTarget) &&
-      briar.dashboard?.project.id !== inboxDetailTarget.projectId,
-  );
   const [issueAgents, setIssueAgents] = useState<ProjectAgent[]>([]);
   const activeProjectAgents = useMemo(
     () => issueAgents.filter((agent) => agent.projectId === activeProject?.id),
@@ -2784,7 +2855,7 @@ export function App({
         }
         setRequestedRunId(null);
         setRequestedSessionId(null);
-        navigateToPage("lobby", project.id);
+        navigateToPage("issues", project.id);
       },
       priority: project.id === briar.activeProjectId ? 100 : 20,
       scope: "projects",
@@ -2954,8 +3025,29 @@ export function App({
     />
   );
 
-  const inboxDetailContent = inboxDetailTarget ? (
-    inboxDetailRun ? (
+  const renderInboxDetailContent = (
+    inboxDetailTarget: InboxNotificationTarget,
+  ) => {
+    const inboxDetailChannelId =
+      inboxDetailTarget.kind === "channel"
+        ? inboxDetailTarget.targetId
+        : null;
+    const inboxDetailRun = isInboxRunDetailTarget(inboxDetailTarget)
+      ? briar.dashboard?.runs.find(
+          (run) => run.id === inboxDetailTarget.targetId,
+        ) ?? null
+      : null;
+    const inboxDetailSession = inboxDetailTarget.kind === "session"
+      ? autoHunt.sessions.find(
+          (session) => session.id === inboxDetailTarget.targetId,
+        ) ?? null
+      : null;
+    const isInboxDetailLoading = Boolean(
+      isInboxRunDetailTarget(inboxDetailTarget) &&
+        briar.dashboard?.project.id !== inboxDetailTarget.projectId,
+    );
+
+    return inboxDetailRun ? (
       <RunPage
         availableProviders={
           briar.dashboard?.organizationProviders?.length
@@ -3153,8 +3245,19 @@ export function App({
           {t("common.close")}
         </Button>
       </div>
-    )
-  ) : null;
+    );
+  };
+
+  const inboxDetailLabel = (inboxDetailTarget: InboxNotificationTarget) =>
+    (isInboxRunDetailTarget(inboxDetailTarget)
+      ? briar.dashboard?.runs.find(
+          (run) => run.id === inboxDetailTarget.targetId,
+        )?.title
+      : null) ??
+    inbox.messages.find(
+      (message) => message.id === inboxDetailTarget.messageId,
+    )?.title ??
+    t("inbox.messages");
 
   let content: React.ReactNode;
 
@@ -3306,7 +3409,7 @@ export function App({
                 ? openProjectInNewWindow
                 : undefined
             }
-            onProjectReadinessOpen={setRepositorySetupProjectId}
+            onProjectRepositoryOpen={openProjectRepository}
             onProjectSettings={(projectId) => {
               briar.setActiveProjectId(projectId);
               setSettingsTarget({
@@ -3321,6 +3424,7 @@ export function App({
             organizations={briar.organizations}
             projects={visibleProjects}
             projectReadiness={briar.projectReadiness}
+            projectReadinessError={briar.projectReadinessError}
             projectWindowProjectId={projectWindowProjectId}
             sessions={autoHunt.sessions}
             token={briar.token}
@@ -3332,20 +3436,19 @@ export function App({
         <div className="app-content-surface">
         {repositorySetupProjectId ? (
           <ProjectRepositorySetupDialog
+            connectionState={localProjectConnectionState(
+              briar.connectedProjectIds,
+              repositorySetupProjectId,
+            )}
             error={briar.projectReadinessError[repositorySetupProjectId] ?? null}
             loading={
-              briar.projectReadinessLoadingId === repositorySetupProjectId
+              briar.projectReadinessLoadingProjects.has(
+                repositorySetupProjectId,
+              )
             }
             onClose={() => {
-              const projectId = repositorySetupProjectId;
               setRepositorySetupProjectId(null);
-              window.requestAnimationFrame(() => {
-                document
-                  .querySelector<HTMLButtonElement>(
-                    `[data-project-readiness="${projectId}"]`,
-                  )
-                  ?.focus();
-              });
+              restoreRepositorySetupTrigger();
             }}
             onInstallGithub={() =>
               briar.installGithubForProject(repositorySetupProjectId)
@@ -3353,6 +3456,11 @@ export function App({
             onLoginGithub={() =>
               briar.loginGithubForProject(repositorySetupProjectId)
             }
+            onReconnect={() => {
+              const projectId = repositorySetupProjectId;
+              setRepositorySetupProjectId(null);
+              beginProjectReconnect(projectId, false);
+            }}
             onRefresh={() =>
               briar.refreshProjectReadiness(repositorySetupProjectId)
             }
@@ -3381,6 +3489,7 @@ export function App({
           settingsTarget.scope === "application" &&
           briar.user ? (
           <AppSettings
+            connectionState={briar.activeProjectConnectionState}
             error={
               activeProject
                 ? briar.projectReadinessError[activeProject.id] ?? null
@@ -3390,7 +3499,7 @@ export function App({
             isSidebarOpen={isSidebarOpen}
             loading={
               activeProject
-                ? briar.projectReadinessLoadingId === activeProject.id
+                ? briar.projectReadinessLoadingProjects.has(activeProject.id)
                 : false
             }
             navigationSidebar={unifiedSettingsSidebar}
@@ -3417,6 +3526,7 @@ export function App({
                 ? briar.projectReadiness[activeProject.id] ?? null
                 : null
             }
+            requiresLocalReadiness={!briar.remoteMode}
             usageScopeKey={briar.activeOrganizationId ?? "none"}
             user={briar.user}
           />
@@ -3484,8 +3594,20 @@ export function App({
             projects={activeOrganizationProjects}
             token={briar.token}
           />
+        ) : activePage === "dms" &&
+          !projectWindowProjectId &&
+          briar.activeOrganizationId ? (
+          <MainContent id="dms">
+            <PageHeader title={t("sidebar.dms")} />
+            <EmptyState
+              description={t("dm.composeDescription")}
+              icon={<MessageCircle aria-hidden="true" size={20} />}
+              title={t("dm.empty")}
+            />
+          </MainContent>
         ) : activePage === "inbox" ? (
-          <div
+          <main
+            aria-label={`${t("inbox.title")} · ${t("inbox.messages")}`}
             className={cn(
               "inbox-layout grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(280px,1fr)_var(--inbox-resizer-width,6px)_minmax(320px,var(--inbox-detail-pane-width,50%))] grid-rows-[minmax(0,1fr)] bg-card",
               isResizingInbox && "is-resizing-inbox cursor-col-resize select-none",
@@ -3497,7 +3619,8 @@ export function App({
               } as CSSProperties
             }
           >
-            <Inbox
+            <InboxWithSelection
+              desktopEmbedded
               isSidebarOpen={isSidebarOpen}
               messages={visibleInboxMessages}
               onMarkAllRead={
@@ -3533,7 +3656,6 @@ export function App({
                 setInboxDetailTarget(target);
               }}
               projects={activeOrganizationProjects}
-              selectedMessageId={inboxDetailTarget?.messageId ?? null}
               unreadCount={visibleInboxUnreadCount}
             />
             <div
@@ -3551,22 +3673,28 @@ export function App({
               tabIndex={0}
               {...inboxResizeProps}
             />
-            <InboxDetailPanel
-              label={
-                inboxDetailTarget ? inboxDetailLabel : t("inbox.messages")
-              }
-            >
-              {inboxDetailContent ?? (
-                <div
-                  className="inbox-detail-empty flex h-full w-full flex-col items-center justify-center gap-[18px] bg-card text-center text-muted-foreground [&>svg]:text-muted-foreground/60 [&>p]:m-0 [&>p]:text-sm"
-                  role="status"
+            <InboxDetailTargetBoundary>
+              {(target) => (
+                <InboxDetailPanel
+                  label={
+                    target
+                      ? inboxDetailLabel(target)
+                      : t("inbox.noNotificationSelected")
+                  }
                 >
-                  <InboxIcon aria-hidden="true" size={56} strokeWidth={1.2} />
-                  <p>{t("inbox.noNotificationSelected")}</p>
-                </div>
+                  {target ? renderInboxDetailContent(target) : (
+                    <div
+                      className="inbox-detail-empty flex h-full w-full flex-col items-center justify-center gap-[18px] bg-card text-center text-muted-foreground [&>svg]:text-muted-foreground/60 [&>p]:m-0 [&>p]:text-sm"
+                      role="status"
+                    >
+                      <InboxIcon aria-hidden="true" size={56} strokeWidth={1.2} />
+                      <p>{t("inbox.noNotificationSelected")}</p>
+                    </div>
+                  )}
+                </InboxDetailPanel>
               )}
-            </InboxDetailPanel>
-          </div>
+            </InboxDetailTargetBoundary>
+          </main>
         ) : activePage === "settings" &&
           settingsTarget.scope === "project" &&
           activeProject ? (
@@ -3574,7 +3702,10 @@ export function App({
             dashboard={briar.dashboard}
             githubRepository={
               briar.dashboard?.settings.githubRepository ??
-              briar.projectReadiness[activeProject.id]?.githubRepository ??
+              localProjectReadiness(
+                briar.activeProjectConnectionState,
+                briar.projectReadiness[activeProject.id] ?? null,
+              )?.githubRepository ??
               null
             }
             health={briar.health}
@@ -3640,6 +3771,7 @@ export function App({
           />
         ) : activePage === "lobby" && activeProject ? (
           <ProjectLobby
+            connectionState={briar.activeProjectConnectionState}
             dashboard={briar.dashboard}
             isSidebarOpen={isSidebarOpen}
             onLoadUsageSummary={loadProjectHomeUsage}
@@ -3653,21 +3785,7 @@ export function App({
               setRequestedRunId(null);
               navigateToPage("issues");
             }}
-            onOpenRepository={() => {
-              if (
-                briar.projectReadiness[activeProject.id]?.githubRepository ||
-                briar.dashboard?.settings.githubRepository
-              ) {
-                setSettingsTarget({
-                  scope: "project",
-                  projectId: activeProject.id,
-                  section: "general",
-                });
-                navigateToPage("settings");
-                return;
-              }
-              setRepositorySetupProjectId(activeProject.id);
-            }}
+            onOpenRepository={() => openProjectRepository(activeProject.id)}
             onOpenSettings={() => {
               setSettingsTarget({
                 scope: "project",
@@ -3678,6 +3796,7 @@ export function App({
             }}
             project={activeProject}
             readiness={briar.projectReadiness[activeProject.id] ?? null}
+            requiresLocalReadiness={!briar.remoteMode}
           />
         ) : activePage === "agents" && activeProject ? (
           <ProjectAgents
@@ -3889,7 +4008,11 @@ export function App({
             error={briar.healthError}
             health={briar.health}
             loading={briar.healthLoading}
-            onReconnect={briar.reconnectProject}
+            onReconnect={() => {
+              if (briar.activeProjectId) {
+                beginProjectReconnect(briar.activeProjectId);
+              }
+            }}
             onRefresh={() => void briar.refreshHealth()}
             onRepair={() => void briar.repairHealth()}
           />
@@ -4213,6 +4336,7 @@ export function App({
           onCancel={() => {
             setDeveloperToolsProjectSetupRequested(false);
             briar.cancelProjectCreation();
+            restoreRepositorySetupTrigger();
           }}
           onAnalyzeRequirements={async (projectId, onProgress) => {
             const workflow = await briar.analyzeWorkflowRequirements(
@@ -4229,6 +4353,7 @@ export function App({
           onConnect={briar.connectProject}
           onCreate={briar.addProject}
           onFinish={() => {
+            repositorySetupTriggerRef.current = null;
             setDeveloperToolsProjectSetupRequested(false);
             briar.finishProjectCreation();
             setRequestedRunId(null);
@@ -4236,6 +4361,7 @@ export function App({
             resetNavigation("lobby");
           }}
           onInspectLovableRepository={briar.inspectLovableProject}
+          onPreflight={briar.preflightProjectConnection}
           onReviseWorkflow={briar.reviseWorkflow}
           onRepositorySelect={briar.selectProjectRepository}
           onRepositoryInspect={briar.inspectProjectRepository}

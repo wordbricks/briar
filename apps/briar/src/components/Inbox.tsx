@@ -79,6 +79,7 @@ export function nextInboxVisibleCount(
 
 export function Inbox({
   companionMode = false,
+  desktopEmbedded = false,
   isSidebarOpen,
   messages,
   onMarkAllRead,
@@ -90,6 +91,7 @@ export function Inbox({
   unreadCount,
 }: {
   companionMode?: boolean;
+  desktopEmbedded?: boolean;
   isSidebarOpen: boolean;
   messages: InboxMessageWithReadState[];
   onMarkAllRead: () => void;
@@ -463,6 +465,18 @@ export function Inbox({
       <MainContent className="companion-inbox" id="inbox">
         {inboxContent}
       </MainContent>
+    );
+  }
+
+  if (desktopEmbedded) {
+    return (
+      <div
+        className="main-content min-w-0 flex-1 bg-background text-foreground"
+        id="inbox"
+      >
+        {pageHeader}
+        {inboxContent}
+      </div>
     );
   }
 

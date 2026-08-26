@@ -1,0 +1,34 @@
+/** @vitest-environment jsdom */
+
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import { describe, expect, it } from "vitest";
+
+import { InboxDetailPanel } from "./InboxDetailPanel";
+import { MainContent } from "./layout";
+
+describe("InboxDetailPanel", () => {
+  it("embeds detail main content without creating a nested main landmark", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <main>
+          <InboxDetailPanel label="Selected issue">
+            <MainContent id="issue-detail">Issue detail</MainContent>
+          </InboxDetailPanel>
+        </main>,
+      );
+    });
+
+    expect(container.querySelectorAll("main")).toHaveLength(1);
+    const detail = container.querySelector("#issue-detail");
+    expect(detail?.tagName).toBe("DIV");
+    expect(detail?.classList.contains("main-content")).toBe(true);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+});

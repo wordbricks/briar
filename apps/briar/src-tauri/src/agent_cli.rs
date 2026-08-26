@@ -1,39 +1,45 @@
 use super::*;
 
-pub(super) fn git_repository_root(path: &Path) -> Result<PathBuf, String> {
+pub(super) fn git_repository_root(
+    runner: &dyn host::CommandRunner,
+    path: &Path,
+) -> Result<PathBuf, String> {
     if !path.is_dir() {
         return Err("선택한 폴더를 찾을 수 없습니다.".to_string());
     }
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(path)
-        .args(["rev-parse", "--show-toplevel"])
-        .output()
-        .map_err(|error| format!("Git을 실행할 수 없습니다: {error}"))?;
-    if !output.status.success() {
+    let git = runner.resolve_binary("git")?;
+    let output = runner.run(
+        &host::CommandSpec::new(git)
+            .args(["rev-parse", "--show-toplevel"])
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .working_directory(path),
+    )?;
+    if !output.success() {
         return Err("Git 저장소 폴더를 선택하세요.".to_string());
     }
-    let root = String::from_utf8(output.stdout)
-        .map_err(|_| "Git 저장소 경로를 읽을 수 없습니다.".to_string())?;
-    let root = PathBuf::from(root.trim());
+    let root = PathBuf::from(output.stdout_trimmed());
     if !root.is_dir() {
         return Err("Git 저장소의 최상위 폴더를 찾을 수 없습니다.".to_string());
     }
-    Ok(root)
+    runner
+        .canonicalize(&root)
+        .map_err(|error| format!("Git 저장소의 최상위 폴더를 열지 못했습니다: {error}"))
 }
 
-pub(super) fn repository_remote(path: &Path) -> Option<String> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(path)
-        .args(["remote", "get-url", "origin"])
-        .output()
+pub(super) fn repository_remote(runner: &dyn host::CommandRunner, path: &Path) -> Option<String> {
+    let git = runner.resolve_binary("git").ok()?;
+    let output = runner
+        .run(
+            &host::CommandSpec::new(git)
+                .args(["remote", "get-url", "origin"])
+                .env("GIT_TERMINAL_PROMPT", "0")
+                .working_directory(path),
+        )
         .ok()?;
-    if !output.status.success() {
+    if !output.success() {
         return None;
     }
-    let remote = String::from_utf8(output.stdout).ok()?;
-    let remote = remote.trim();
+    let remote = output.stdout.trim();
     (!remote.is_empty()).then(|| remote.to_string())
 }
 
@@ -1682,77 +1688,6 @@ pub(super) async fn install_agent_browser(
     })
     .await
     .map_err(|error| error.to_string())?
-}
-
-pub(super) fn bundled_runtime_directories(executable: &Path) -> Vec<PathBuf> {
-    let Some(directory) = executable.parent() else {
-        return Vec::new();
-    };
-    let mut directories = vec![directory.to_path_buf()];
-    if directory.file_name() == Some(OsStr::new("deps")) {
-        if let Some(target_profile) = directory.parent() {
-            directories.push(target_profile.to_path_buf());
-        }
-    }
-    directories
-}
-
-pub(crate) fn bundled_bun_binary() -> Option<PathBuf> {
-    env::current_exe()
-        .ok()
-        .into_iter()
-        .flat_map(|executable| bundled_runtime_directories(&executable))
-        .map(|directory| directory.join("bun"))
-        .find(|candidate| candidate.is_file())
-}
-
-pub(super) fn cli_execution_path_with_runtime(
-    home: &Path,
-    runtime_directories: impl IntoIterator<Item = PathBuf>,
-) -> Result<OsString, String> {
-    let mut paths = vec![home.join(".local/bin")];
-    paths.extend(runtime_directories);
-    paths.extend([
-        home.join(".grok/bin"),
-        home.join(".cursor/bin"),
-        home.join(".opencode/bin"),
-        home.join("bin"),
-        home.join(".bun/bin"),
-        home.join(".cargo/bin"),
-        home.join(".volta/bin"),
-        home.join(".asdf/shims"),
-        home.join(".asdf/bin"),
-        home.join(".local/share/mise/shims"),
-        home.join(".mise/shims"),
-        home.join(".nodenv/shims"),
-        home.join(".nodenv/bin"),
-        home.join("Library/Android/sdk/platform-tools"),
-        home.join("Library/Android/sdk/emulator"),
-        home.join("Android/Sdk/platform-tools"),
-        home.join("Android/Sdk/emulator"),
-        PathBuf::from("/opt/homebrew/bin"),
-        PathBuf::from("/usr/local/bin"),
-        PathBuf::from("/usr/bin"),
-        PathBuf::from("/bin"),
-    ]);
-    for variable in ["ANDROID_HOME", "ANDROID_SDK_ROOT"] {
-        if let Some(sdk_root) = env::var_os(variable) {
-            let sdk_root = PathBuf::from(sdk_root);
-            paths.push(sdk_root.join("platform-tools"));
-            paths.push(sdk_root.join("emulator"));
-        }
-    }
-    if let Some(existing) = env::var_os("PATH") {
-        paths.extend(env::split_paths(&existing));
-    }
-    env::join_paths(paths).map_err(|error| format!("CLI 실행 경로를 구성하지 못했습니다: {error}"))
-}
-
-pub(super) fn cli_execution_path(home: &Path) -> Result<OsString, String> {
-    let runtime_directories = env::current_exe()
-        .map(|executable| bundled_runtime_directories(&executable))
-        .unwrap_or_default();
-    cli_execution_path_with_runtime(home, runtime_directories)
 }
 
 #[cfg(test)]

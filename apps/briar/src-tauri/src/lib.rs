@@ -17,7 +17,7 @@ use std::process::Child;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     env,
-    ffi::{OsStr, OsString},
+    ffi::OsStr,
     fs::{self, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -119,6 +119,9 @@ use agent_cli::*;
 use app_state::*;
 use auto_hunt::*;
 use execution_worker::*;
+use host::{bundled_bun_binary, cli_execution_path, LocalExecutionEnvironment};
+#[cfg(test)]
+use host::{bundled_runtime_directories, cli_execution_path_with_runtime};
 use native_ui::*;
 use project_config::*;
 use project_execution::*;

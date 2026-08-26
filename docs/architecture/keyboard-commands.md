@@ -102,8 +102,10 @@ The following do **not** belong in the atom:
   input or callback refs.
 - Handler functions and mounted component ownership; these live in the
   controller's tokenized registry.
-- A list or board's cursor and selection; these remain controlled React state
-  beside the data whose stable IDs define visual order.
+- A collection's keyboard cursor; it remains controlled React state beside the
+  data whose stable IDs define visual order. A preview target may use a scoped
+  Atom when sibling list and detail consumers need to subscribe independently,
+  as Inbox does, but the Atom must not own DOM focus or navigation order.
 
 This keeps Atom updates deterministic and inspectable without turning every
 focus transition into global application state.
