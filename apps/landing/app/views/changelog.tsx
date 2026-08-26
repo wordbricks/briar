@@ -30,6 +30,22 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.164",
+        date: "2026년 8월 26일",
+        title: "프로젝트 워크플로와 병합 큐의 경계를 명확하게 연결합니다",
+        summary:
+          "프로젝트별 준비 단계를 병합 큐의 기준으로 설정하고 현재 큐 상태를 확인하면서, 프로필 저장과 채널 답글 라우팅, macOS 설치 화면을 안정화합니다.",
+        items: [
+          "프로젝트 설정에서 병합 큐를 켜고 워크플로의 준비 단계를 선택해 어떤 완료 시점부터 PR이 큐에 들어갈지 명시할 수 있습니다.",
+          "최근 배치와 후보 PR의 상태, 통합 SHA, 타임스탬프를 설정 화면에서 새로고침하며 확인할 수 있습니다.",
+          "준비 단계가 바뀌면 이후에 관찰된 완료만 새 경계의 증거로 인정하고, 활성 큐가 참조하는 단계를 워크플로에서 제거하지 못하도록 보호합니다.",
+          "Worker가 프로젝트별 병합 큐 경계를 API, CLI, D1 상태와 일관되게 적용하고 안전한 기본값과 진단 정보를 유지합니다.",
+          "활성 채널 스레드 세션의 Worker와 메시지의 선호 기기가 다를 때 서로 양보하며 답글이 대기 상태에 갇히는 교착을 방지합니다.",
+          "username이 아직 없는 계정도 nickname과 username을 저장할 수 있고, 실제 중복 username만 정확히 거부합니다.",
+          "macOS DMG 설치 화면에서 Briar와 Applications 아이콘, 배경, 드래그 안내가 다시 올바른 위치와 디자인으로 표시됩니다.",
+        ],
+      },
+      {
         version: "1.2.163",
         date: "2026년 8월 26일",
         title: "키보드 탐색의 흐름과 포커스를 더 단단하게 다듬습니다",
@@ -1164,6 +1180,22 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.164",
+        date: "August 26, 2026",
+        title: "Connect project workflows to clear merge-queue boundaries",
+        summary:
+          "Choose a project readiness stage as the merge-queue boundary, inspect current queue activity, and stabilize profile saving, channel-reply routing, and the macOS installer.",
+        items: [
+          "Enable the merge queue in project settings and select the workflow stage whose completion makes a pull request eligible for collection.",
+          "Refresh and inspect recent batches and candidate pull requests, including their state, integration SHA, and timestamps, from the settings view.",
+          "Treat only completions observed after a boundary change as fresh proof, and prevent workflow edits from removing a stage referenced by an active profile.",
+          "Apply each project's queue boundary consistently across the Worker, API, CLI, and D1 state while preserving safe defaults and diagnostics.",
+          "Prevent channel replies from remaining queued when a live thread-session owner and a message-level preferred device would otherwise yield to each other.",
+          "Let accounts without an existing username save their nickname and username while rejecting only genuine username conflicts.",
+          "Restore the Briar and Applications icons, background, and drag guidance to their intended layout in the macOS DMG installer.",
+        ],
+      },
       {
         version: "1.2.163",
         date: "August 26, 2026",
