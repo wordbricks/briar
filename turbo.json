@@ -1,6 +1,15 @@
 {
   "$schema": "https://v2-10-9.turborepo.dev/schema.json",
-  "globalPassThroughEnv": ["CI", "VITEST_MAX_WORKERS"],
+  "globalPassThroughEnv": [
+    "CARGO_HOME",
+    "CI",
+    "MISE_CARGO_HOME",
+    "MISE_RUSTUP_HOME",
+    "PATH",
+    "RUSTUP_HOME",
+    "RUSTUP_TOOLCHAIN",
+    "VITEST_MAX_WORKERS"
+  ],
   "tasks": {
     "//#lint:repo": {
       "inputs": [
