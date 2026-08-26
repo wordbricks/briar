@@ -62,6 +62,7 @@ import { ProjectSchedule } from "./components/ProjectSchedule";
 import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
+import { Button } from "./components/ui/button";
 import { LoadingState } from "./components/ui/loading-state";
 import { Sidebar } from "./components/Sidebar";
 import {
@@ -185,6 +186,7 @@ import {
 } from "./lib/channel-realtime";
 import { startDesktopChannelTransition } from "./lib/channel-performance";
 import { directMessageDisplayName } from "./lib/direct-messages";
+import { cn } from "./lib/utils";
 import { dispatchAutoHuntToWorkers } from "./lib/auto-hunt-worker-dispatch";
 import {
   projectSupportsExecutionSelection,
@@ -3127,15 +3129,29 @@ export function App({
         token={briar.token}
       />
     ) : isInboxDetailLoading ? (
-      <div className="inbox-detail-loading" role="status">
+      <div
+        className="inbox-detail-loading grid h-full w-full place-items-center bg-card text-xs text-muted-foreground"
+        role="status"
+      >
         <LoadingState label={t("inbox.detailLoading")} />
       </div>
     ) : (
-      <div className="inbox-detail-unavailable" role="alert">
-        <strong>{t("run.loadFailed")}</strong>
-        <button onClick={() => setInboxDetailTarget(null)} type="button">
+      <div
+        className="inbox-detail-unavailable flex h-full w-full flex-col items-center justify-center gap-3.5 bg-card px-8 py-8 text-center text-muted-foreground"
+        role="alert"
+      >
+        <strong className="text-sm font-semibold text-foreground">
+          {t("run.loadFailed")}
+        </strong>
+        <Button
+          className="min-h-[34px] rounded-[9px] px-3 text-xs font-semibold"
+          onClick={() => setInboxDetailTarget(null)}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
           {t("common.close")}
-        </button>
+        </Button>
       </div>
     )
   ) : null;
@@ -3470,7 +3486,10 @@ export function App({
           />
         ) : activePage === "inbox" ? (
           <div
-            className={`inbox-layout${isResizingInbox ? " is-resizing-inbox" : ""}`}
+            className={cn(
+              "inbox-layout grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(280px,1fr)_var(--inbox-resizer-width,6px)_minmax(320px,var(--inbox-detail-pane-width,50%))] grid-rows-[minmax(0,1fr)] bg-card",
+              isResizingInbox && "is-resizing-inbox cursor-col-resize select-none",
+            )}
             ref={inboxLayoutRef}
             style={
               {
@@ -3522,7 +3541,11 @@ export function App({
               aria-valuemax={inboxPaneWidthMax}
               aria-valuemin={inboxPaneWidthMin}
               aria-valuenow={inboxDetailPaneWidth}
-              className="inbox-pane-resizer"
+              className={cn(
+                "inbox-pane-resizer relative z-[1] h-full min-h-0 min-w-0 cursor-col-resize touch-none bg-transparent outline-none before:absolute before:bottom-0 before:left-1/2 before:top-0 before:w-px before:-translate-x-1/2 before:bg-border before:opacity-0 before:shadow-none before:transition-[opacity,background-color,box-shadow] before:duration-150 after:absolute after:left-1/2 after:top-1/2 after:h-[34px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:border after:border-border after:bg-card after:opacity-0 after:transition-[opacity,border-color,background-color] after:duration-150 motion-reduce:before:transition-none motion-reduce:after:transition-none hover:before:bg-primary/60 hover:before:opacity-100 hover:before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] hover:after:border-primary/60 hover:after:bg-accent hover:after:opacity-100 focus-visible:before:bg-primary/60 focus-visible:before:opacity-100 focus-visible:before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] focus-visible:after:border-primary/60 focus-visible:after:bg-accent focus-visible:after:opacity-100",
+                isResizingInbox &&
+                  "before:bg-primary/60 before:opacity-100 before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] after:border-primary/60 after:bg-accent after:opacity-100",
+              )}
               role="separator"
               tabIndex={0}
               {...inboxResizeProps}
@@ -3533,7 +3556,10 @@ export function App({
               }
             >
               {inboxDetailContent ?? (
-                <div className="inbox-detail-empty" role="status">
+                <div
+                  className="inbox-detail-empty flex h-full w-full flex-col items-center justify-center gap-[18px] bg-card text-center text-muted-foreground [&>svg]:text-muted-foreground/60 [&>p]:m-0 [&>p]:text-sm"
+                  role="status"
+                >
                   <InboxIcon aria-hidden="true" size={56} strokeWidth={1.2} />
                   <p>{t("inbox.noNotificationSelected")}</p>
                 </div>
