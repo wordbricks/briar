@@ -552,13 +552,26 @@ fn updates_the_connected_project_workflow_locally() {
         checks: vec!["cargo test".to_string()],
     }];
     workflow.completion.required_stages = vec!["repository_qa".to_string()];
+    workflow.requirements = vec![WorkflowRequirementConfig {
+        id: "xcode".to_string(),
+        label: "Xcode".to_string(),
+        kind: WorkflowRequirementKind::Xcode,
+        tool: "wrong".to_string(),
+        reason: "Builds the iOS app.".to_string(),
+    }];
     workflow.execution.checkpoints = vec![WorkflowCheckpointConfig {
-        key: "project-after-repository_qa".to_string(),
+        key: "human_review".to_string(),
         stage: "repository_qa".to_string(),
         position: WorkflowCheckpointPosition::After,
     }];
 
-    update_project_workflow_at(&config_path, "project-1", workflow).expect("workflow should save");
+    let canonical = update_project_workflow_at(&config_path, "project-1", workflow)
+        .expect("workflow should save");
+    assert_eq!(canonical.requirements[0].tool, "xcodebuild");
+    assert_eq!(
+        canonical.execution.checkpoints[0].key,
+        "project-after-repository_qa"
+    );
 
     let saved: serde_json::Value = serde_json::from_str(
         &fs::read_to_string(&config_path).expect("saved config should be readable"),
@@ -567,6 +580,10 @@ fn updates_the_connected_project_workflow_locally() {
     assert_eq!(
         saved["projects"][0]["autoHunt"]["workflow"]["stages"][0]["checks"][0],
         "cargo test"
+    );
+    assert_eq!(
+        saved["projects"][0]["autoHunt"]["workflow"]["requirements"][0]["tool"],
+        "xcodebuild"
     );
     let runtime_workflow = project_auto_hunt_workflow_json(&config_path, "project-1")
         .expect("runtime workflow should load");

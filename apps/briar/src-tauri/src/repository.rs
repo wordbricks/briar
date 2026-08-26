@@ -1,6 +1,18 @@
 use super::*;
 
 pub(super) fn canonicalize_workflow(mut workflow: WorkflowConfig) -> WorkflowConfig {
+    for requirement in &mut workflow.requirements {
+        let canonical_tool = match requirement.kind {
+            WorkflowRequirementKind::Executable => None,
+            WorkflowRequirementKind::Xcode => Some("xcodebuild"),
+            WorkflowRequirementKind::IosSimulator => Some("xcrun"),
+            WorkflowRequirementKind::AndroidSdk => Some("adb"),
+            WorkflowRequirementKind::AndroidEmulator => Some("emulator"),
+        };
+        if let Some(tool) = canonical_tool {
+            requirement.tool = tool.to_string();
+        }
+    }
     for checkpoint in &mut workflow.execution.checkpoints {
         checkpoint.key = format!(
             "project-{}-{}",

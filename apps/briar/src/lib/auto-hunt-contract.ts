@@ -234,6 +234,13 @@ export const autoHuntRequirementKinds = [
 export type AutoHuntRequirementKind =
   (typeof autoHuntRequirementKinds)[number];
 
+export const autoHuntSpecializedRequirementTools = {
+  xcode: "xcodebuild",
+  ios_simulator: "xcrun",
+  android_sdk: "adb",
+  android_emulator: "emulator",
+} satisfies Record<Exclude<AutoHuntRequirementKind, "executable">, string>;
+
 export type AutoHuntWorkflowRequirement = {
   id: string;
   label: string;
@@ -595,6 +602,32 @@ export function normalizeAutoHuntWorkflow(
     stages,
     execution: { checkpoints },
     completion: { requiredStages },
+  };
+}
+
+/** Canonical persisted form for a project's own workflow policy. */
+export function canonicalizeProjectWorkflow(
+  workflow: AutoHuntWorkflowInput | null | undefined,
+): AutoHuntWorkflowV2 {
+  const normalized = normalizeAutoHuntWorkflow(workflow);
+  const withCanonicalRequirements: AutoHuntWorkflowV2 = {
+    ...normalized,
+    requirements: normalized.requirements.map((requirement) => ({
+      ...requirement,
+      tool: requirement.kind === "executable"
+        ? requirement.tool
+        : autoHuntSpecializedRequirementTools[requirement.kind],
+    })),
+  };
+  return {
+    ...withCanonicalRequirements,
+    execution: {
+      checkpoints: canonicalizeCheckpointSet(
+        withCanonicalRequirements,
+        withCanonicalRequirements.execution.checkpoints,
+        "project",
+      ),
+    },
   };
 }
 
