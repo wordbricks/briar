@@ -1,7 +1,4 @@
-import {
-  Bot,
-  ChevronRight,
-} from "lucide-react";
+import { Bot, ChevronRight } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import { useMemo } from "react";
 
@@ -28,19 +25,16 @@ export function ProjectAgentSessions({
   sessions: AutoHuntSession[];
 }) {
   const { localeTag, t } = useI18n();
-  const agentSessions = useMemo(
-    () => {
-      const matchingSessions = sessions.filter(
-        (session) =>
-          session.projectId === projectId && session.agentId === agent.id,
-      );
-      return collapseLinkedAutoHuntSessions(matchingSessions);
-    },
-    [agent.id, projectId, sessions],
-  );
+  const agentSessions = useMemo(() => {
+    const matchingSessions = sessions.filter(
+      (session) =>
+        session.projectId === projectId && session.agentId === agent.id,
+    );
+    return collapseLinkedAutoHuntSessions(matchingSessions);
+  }, [agent.id, projectId, sessions]);
 
   return (
-    <section className="auto-hunt-session-panel project-agent-session-panel">
+    <section className="auto-hunt-session-panel m-0 min-h-0 w-full flex-1 rounded-none border-0 shadow-none">
       <header>
         <div>
           <Typography as="h2" variant="bodyLg">
@@ -106,11 +100,7 @@ export function ProjectAgentSessions({
 function SessionStatusIcon({ status }: { status: AutoHuntSessionStatus }) {
   return (
     <span className={`auto-hunt-session-icon ${status}`}>
-      {status === "running" ? (
-        <Spinner size={17} />
-      ) : (
-        <Bot size={17} />
-      )}
+      {status === "running" ? <Spinner size={17} /> : <Bot size={17} />}
     </span>
   );
 }
