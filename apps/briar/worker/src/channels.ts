@@ -3097,6 +3097,9 @@ export async function claimNextChannelAgentReply(
     const replyLeaseExpired = candidate.status === "running" &&
       candidate.lease_expires_at !== null &&
       candidate.lease_expires_at <= input.claimedAt;
+    const claimingWorkerOwnsLiveSession =
+      !sessionExpired && !replyLeaseExpired &&
+      candidate.session_owner_worker_id === input.workerId;
     if (
       !sessionExpired && !replyLeaseExpired &&
       candidate.session_owner_worker_id &&
@@ -3127,7 +3130,11 @@ export async function claimNextChannelAgentReply(
       if (ownerAvailable) continue;
     }
 
+    // A healthy live session owner is the elected claimant. Reapplying a
+    // conflicting message-level device preference here would make the owner
+    // and preferred device yield to each other indefinitely.
     if (
+      !claimingWorkerOwnsLiveSession &&
       candidate.preferred_device_id &&
       candidate.preferred_device_id !== input.deviceId
     ) {
