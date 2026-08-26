@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { EmbeddedMainContentBoundary } from "./layout";
 
 export function InboxDetailPanel({
   children,
@@ -9,7 +10,7 @@ export function InboxDetailPanel({
 }) {
   return (
     <section aria-label={label} className="inbox-detail-pane">
-      {children}
+      <EmbeddedMainContentBoundary>{children}</EmbeddedMainContentBoundary>
     </section>
   );
 }
