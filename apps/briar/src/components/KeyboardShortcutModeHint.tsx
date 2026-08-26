@@ -15,6 +15,7 @@ export function KeyboardShortcutModeHint({
 }) {
   return (
     <div
+      aria-atomic="true"
       aria-live="polite"
       className="pointer-events-none fixed inset-x-0 bottom-10 z-[1320] flex justify-center px-4"
       role="status"

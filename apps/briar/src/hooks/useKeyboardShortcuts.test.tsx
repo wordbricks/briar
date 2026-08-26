@@ -102,6 +102,21 @@ describe("useKeyboardShortcuts", () => {
     expect(onInbox).not.toHaveBeenCalled();
   });
 
+  it("clears a pending prefix when the pointer takes over", async () => {
+    await act(async () => root.render(<Harness />));
+    await act(async () => {
+      dispatch({ code: "KeyG", key: "g" });
+    });
+    expect(container.textContent).toBe("g");
+
+    await act(async () => {
+      document.body.dispatchEvent(new PointerEvent("pointerdown", {
+        bubbles: true,
+      }));
+    });
+    expect(container.textContent).toBe("idle");
+  });
+
   it("runs question mark directly but pauses in editable controls", async () => {
     await act(async () => root.render(<Harness />));
     await act(async () => {

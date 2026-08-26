@@ -2082,6 +2082,7 @@ export function App() {
           return;
         }
         if (id === "sidebarToggle") {
+          if (hasOpenKeyboardShortcutOverlay(document)) return;
           setIsSidebarOpen((open) => !open);
         }
       }),
@@ -2218,6 +2219,7 @@ export function App() {
       configuredKeybindings.commandPalette,
     ),
     keyboardShortcutsShortcut: keyboardShortcutsModifierLabel,
+    sequenceShortcutsEnabled,
     sidebarShortcut: formatShortcut(configuredKeybindings.sidebarToggle),
     t,
   });

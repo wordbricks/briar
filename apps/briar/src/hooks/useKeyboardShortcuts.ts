@@ -6,6 +6,7 @@ import {
   hasOpenKeyboardShortcutOverlay,
   idleKeyboardShortcutState,
   keyboardShortcutSequenceTimeoutMs,
+  shouldIgnoreKeyboardShortcutEvent,
   type KeyboardShortcutCommand,
   type KeyboardShortcutPendingState,
   type KeyboardShortcutState,
@@ -63,17 +64,28 @@ export function useKeyboardShortcuts<CommandId extends string>({
   }, [cancelPendingShortcut, pendingShortcut]);
 
   useEffect(() => {
+    if (!pendingShortcut) return;
+    document.addEventListener("pointerdown", cancelPendingShortcut, true);
+    return () =>
+      document.removeEventListener("pointerdown", cancelPendingShortcut, true);
+  }, [cancelPendingShortcut, pendingShortcut]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!enabledRef.current) return;
       const activeCommands = commandsRef.current;
+      const eventOptions = {
+        isRecording: getRecordingKeybinding() !== null,
+        remoteKeyboardCaptured: remoteDesktopCapturesKeyboard(),
+      };
+      if (shouldIgnoreKeyboardShortcutEvent(event, eventOptions)) return;
       const result = advanceKeyboardShortcut(
         stateRef.current,
         activeCommands,
         event,
         {
+          ...eventOptions,
           hasOpenOverlay: hasOpenKeyboardShortcutOverlay(document),
-          isRecording: getRecordingKeybinding() !== null,
-          remoteKeyboardCaptured: remoteDesktopCapturesKeyboard(),
         },
       );
       if (result.consumeEvent) event.preventDefault();
