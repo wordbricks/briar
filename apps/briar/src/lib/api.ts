@@ -306,6 +306,21 @@ export async function saveInboxReadStates(
   return decodeInboxReadVersions(result.readVersions ?? {});
 }
 
+export async function deleteInboxReadState(
+  token: string,
+  messageId: string,
+): Promise<Record<string, string>> {
+  const result = await request<{ readVersions?: unknown }>(
+    "/inbox/read-states",
+    token,
+    {
+      method: "DELETE",
+      body: JSON.stringify({ messageId }),
+    },
+  );
+  return decodeInboxReadVersions(result.readVersions ?? {});
+}
+
 export async function loadProjects(token: string): Promise<Project[]> {
   const result = await request<{ projects: unknown[] }>("/projects", token);
   return decodeProjectsResponse(result.projects);

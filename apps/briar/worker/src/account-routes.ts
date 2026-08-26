@@ -9,6 +9,7 @@ import {
   decodeAccountDeletionInput,
   decodeAccountProfileInput,
   decodeInboxReadStatesInput,
+  decodeInboxUnreadStateInput,
 } from "./account-organization-request-contract";
 import {
   deleteAccountData,
@@ -19,6 +20,7 @@ import {
   decodeMobileCurrentUserResponse,
 } from "./mobile-contract";
 import {
+  deleteInboxReadState,
   listInboxReadStates,
   upsertInboxReadStates,
 } from "./inbox-read-state-repository";
@@ -89,6 +91,20 @@ export async function handleAccountRoute(
       session.user.id,
       entries,
       new Date().toISOString(),
+    );
+    return json({
+      readVersions: Object.fromEntries(
+        rows.map((row) => [row.message_id, row.version]),
+      ),
+    });
+  }
+  if (pathname === "/inbox/read-states" && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const input = decodeInboxUnreadStateInput(await readJson(request));
+    const rows = await deleteInboxReadState(
+      db,
+      session.user.id,
+      input.messageId,
     );
     return json({
       readVersions: Object.fromEntries(

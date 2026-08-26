@@ -3510,6 +3510,7 @@ export function App({
                   : inbox.markAllRead
               }
               onMarkRead={inbox.markRead}
+              onMarkUnread={inbox.markUnread}
               onOpen={(message) => {
                 const target = inboxNotificationTarget(message);
                 inbox.markRead(message.id);
@@ -4017,6 +4018,7 @@ export function App({
               messages={inbox.messages}
               onMarkAllRead={inbox.markAllRead}
               onMarkRead={inbox.markRead}
+              onMarkUnread={inbox.markUnread}
               onOpen={(message) =>
                 setPendingInboxNotificationTarget(
                   inboxNotificationTarget(message),

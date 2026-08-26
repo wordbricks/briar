@@ -15,6 +15,7 @@ import {
   CircleAlert,
   Clock3,
   Inbox as InboxIcon,
+  Mail,
   Siren,
 } from "lucide-react";
 
@@ -82,6 +83,7 @@ export function Inbox({
   messages,
   onMarkAllRead,
   onMarkRead,
+  onMarkUnread = () => {},
   onOpen,
   projects,
   selectedMessageId = null,
@@ -92,6 +94,7 @@ export function Inbox({
   messages: InboxMessageWithReadState[];
   onMarkAllRead: () => void;
   onMarkRead: (messageId: string) => void;
+  onMarkUnread?: (messageId: string) => void;
   onOpen: (message: InboxMessageWithReadState) => void;
   projects: Project[];
   selectedMessageId?: string | null;
@@ -433,6 +436,7 @@ export function Inbox({
                   message={message}
                   onCursorChange={setCursorMessageId}
                   onMarkRead={onMarkRead}
+                  onMarkUnread={onMarkUnread}
                   onOpen={openMessage}
                   openButtonRef={navigation.getItemRef(message.id)}
                   project={projectsById.get(message.projectId)}
@@ -489,6 +493,7 @@ function InboxMessageRow({
   message,
   onCursorChange,
   onMarkRead,
+  onMarkUnread,
   onOpen,
   openButtonRef,
   project,
@@ -502,6 +507,7 @@ function InboxMessageRow({
   message: InboxMessageWithReadState;
   onCursorChange: (messageId: string) => void;
   onMarkRead: (messageId: string) => void;
+  onMarkUnread: (messageId: string) => void;
   onOpen: (message: InboxMessageWithReadState) => void;
   openButtonRef: (element: HTMLButtonElement | null) => void;
   project: Project | undefined;
@@ -509,6 +515,8 @@ function InboxMessageRow({
   t: (key: MessageKey, values?: Record<string, string | number>) => string;
 }) {
   const showUnreadAction = message.isUnread && category !== "activity";
+  const showMarkUnreadAction = !compact && !message.isUnread;
+  const showReadStateAction = showUnreadAction || showMarkUnreadAction;
   const openRef = useRef<HTMLButtonElement | null>(null);
   const setOpenButtonRef = useCallback(
     (element: HTMLButtonElement | null) => {
@@ -653,7 +661,7 @@ function InboxMessageRow({
             ) : null}
           </small>
         </span>
-        {!compact && !showUnreadAction ? (
+        {!compact && !showReadStateAction ? (
           <ChevronRight
             className="inbox-message-chevron col-start-3 row-start-1 justify-self-end text-muted-foreground/70"
             size={15}
@@ -704,6 +712,20 @@ function InboxMessageRow({
             )}
             size={15}
           />
+        </button>
+      ) : null}
+      {showMarkUnreadAction ? (
+        <button
+          aria-label={t("inbox.markUnread")}
+          className="inbox-mark-unread absolute right-[9px] top-[5px] z-[1] grid size-8 place-items-center rounded-[9px] border-0 bg-transparent p-0 text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+          onClick={() => {
+            openRef.current?.focus({ preventScroll: true });
+            onMarkUnread(message.id);
+          }}
+          title={t("inbox.markUnread")}
+          type="button"
+        >
+          <Mail aria-hidden="true" size={15} />
         </button>
       ) : null}
     </div>
