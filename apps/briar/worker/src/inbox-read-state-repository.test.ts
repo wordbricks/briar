@@ -1,6 +1,7 @@
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  deleteInboxReadState,
   listInboxReadStates,
   upsertInboxReadStates,
 } from "./inbox-read-state-repository";
@@ -82,6 +83,21 @@ describe("inbox read state repository", () => {
       ]),
     );
     await expect(listInboxReadStates(db, "owner")).resolves.toHaveLength(2);
+    await expect(listInboxReadStates(db, "member")).resolves.toEqual([]);
+  });
+
+  it("removes only the selected account-scoped read state", async () => {
+    const remaining = await deleteInboxReadState(
+      db,
+      "owner",
+      "issue:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+
+    expect(remaining).toEqual([
+      expect.objectContaining({
+        message_id: "conversation:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      }),
+    ]);
     await expect(listInboxReadStates(db, "member")).resolves.toEqual([]);
   });
 

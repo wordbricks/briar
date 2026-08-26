@@ -68,6 +68,18 @@ const upsertInboxReadStatesEffect = Effect.fn("upsertInboxReadStatesEffect")(
   },
 );
 
+const deleteInboxReadStateEffect = Effect.fn("deleteInboxReadStateEffect")(
+  function*(userId: string, messageId: string) {
+    const sql = yield* D1Client.D1Client;
+    yield* sql`
+      delete from briar_inbox_read_states
+      where user_id = ${userId} and message_id = ${messageId}
+    `;
+    const queries = inboxReadStateQueries(sql);
+    return yield* queries.findInboxReadStates({ userId });
+  },
+);
+
 export const listInboxReadStates = (
   db: D1Database,
   userId: string,
@@ -81,3 +93,10 @@ export const upsertInboxReadStates = (
   updatedAt: string,
 ): Promise<Array<InboxReadStateRow>> =>
   runD1(db, upsertInboxReadStatesEffect(userId, entries, updatedAt));
+
+export const deleteInboxReadState = (
+  db: D1Database,
+  userId: string,
+  messageId: string,
+): Promise<Array<InboxReadStateRow>> =>
+  runD1(db, deleteInboxReadStateEffect(userId, messageId));

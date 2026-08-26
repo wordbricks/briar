@@ -120,9 +120,9 @@ export function ProjectAgentSkillsEditor({
   };
 
   return (
-    <div className="project-agent-skills-editor">
-      <div className="project-agent-skills-editor-heading">
-        <span>
+    <div className="mt-1 grid gap-3.5 border-t border-border pt-5">
+      <div className="flex items-start justify-between gap-4 max-[760px]:flex-col max-[760px]:items-stretch max-[760px]:[&>button]:w-full">
+        <span className="grid min-w-0 gap-1">
           <Typography as="strong" variant="bodySm">
             {t("agents.skills")}
           </Typography>
@@ -143,7 +143,7 @@ export function ProjectAgentSkillsEditor({
       </div>
 
       {skills.length === 0 ? (
-        <div className="project-agent-skills-empty">
+        <div className="grid min-h-36 place-items-center content-center gap-2.5 rounded-xl border border-dashed border-border bg-muted p-5 text-center text-muted-foreground">
           <Wrench aria-hidden="true" size={20} />
           <Typography tone="muted" variant="caption">
             {t("agents.skillsEmpty")}
@@ -159,7 +159,7 @@ export function ProjectAgentSkillsEditor({
           </Button>
         </div>
       ) : (
-        <div className="project-agent-skill-list">
+        <div className="grid gap-3">
           {skills.map((skill, index) => {
             const modelOptions = agentModelOptions(
               providerModels,
@@ -171,20 +171,22 @@ export function ProjectAgentSkillsEditor({
               skill.name.trim() || t("agents.untitledSkill");
             return (
               <section
-                className="project-agent-skill-card"
+                className="overflow-hidden rounded-xl border border-border bg-card"
                 key={skill.id ?? `${skill.kind}-${index}`}
               >
-                <header>
-                  <span>
+                <header className="flex min-h-12 items-center justify-between gap-3 border-b border-border bg-muted px-3 py-2">
+                  <span className="flex min-w-0 items-center gap-2 overflow-hidden">
                     <Wrench aria-hidden="true" size={15} />
-                    <strong>
+                    <strong className="min-w-0 truncate text-xs">
                       {skill.name.trim() || t("agents.untitledSkill")}
                     </strong>
                     {skill.kind === "issue_processing" ? (
-                      <small>{t("agents.issueProcessingSkill")}</small>
+                      <small className="min-h-5 shrink-0 whitespace-nowrap rounded-full border border-border bg-card px-2 py-0.5 text-2xs text-muted-foreground">
+                        {t("agents.issueProcessingSkill")}
+                      </small>
                     ) : null}
                   </span>
-                  <span>
+                  <span className="flex shrink-0 items-center">
                     <Button
                       aria-label={t("agents.deleteSkill", {
                         name: skill.name.trim() || t("agents.untitledSkill"),
@@ -200,8 +202,8 @@ export function ProjectAgentSkillsEditor({
                   </span>
                 </header>
 
-                <div className="project-agent-skill-fields">
-                  <div className="project-agent-settings-field">
+                <div className="grid gap-3.5 p-4 [&_.native-select]:w-full [&_.select-menu-trigger]:h-[42px] [&_.select-menu-trigger]:w-full [&_.select-menu-trigger]:rounded-[11px]">
+                  <div className="grid min-w-0 gap-2">
                     <Label htmlFor={`project-agent-skill-name-${index}`}>
                       {t("agents.skillName")}
                     </Label>
@@ -218,7 +220,7 @@ export function ProjectAgentSkillsEditor({
                     />
                   </div>
 
-                  <div className="project-agent-settings-field">
+                  <div className="grid min-w-0 gap-2">
                     <Label
                       htmlFor={`project-agent-skill-description-${index}`}
                     >
@@ -240,7 +242,7 @@ export function ProjectAgentSkillsEditor({
                     />
                   </div>
 
-                  <div className="project-agent-settings-field">
+                  <div className="grid min-w-0 gap-2">
                     <Label htmlFor={`project-agent-skill-body-${index}`}>
                       {t("agents.skillBody")}
                     </Label>
@@ -258,8 +260,8 @@ export function ProjectAgentSkillsEditor({
                     />
                   </div>
 
-                  <div className="project-agent-skill-runtime-grid">
-                    <div className="project-agent-settings-field">
+                  <div className="grid grid-cols-1 gap-2.5 min-[761px]:grid-cols-[1fr_1.35fr_1fr]">
+                    <div className="grid min-w-0 gap-2">
                       <Label>{t("agents.provider")}</Label>
                       <ProviderSelect
                         disabled={disabled}
@@ -274,7 +276,7 @@ export function ProjectAgentSkillsEditor({
                         value={skill.provider}
                       />
                     </div>
-                    <div className="project-agent-settings-field">
+                    <div className="grid min-w-0 gap-2">
                       <Label>{t("agents.model")}</Label>
                       <NativeSelect
                         disabled={disabled}
@@ -292,7 +294,7 @@ export function ProjectAgentSkillsEditor({
                         value={skill.model ?? ""}
                       />
                     </div>
-                    <div className="project-agent-settings-field">
+                    <div className="grid min-w-0 gap-2">
                       <Label>{t("agents.effort")}</Label>
                       <NativeSelect
                         disabled={disabled}

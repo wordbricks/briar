@@ -47,7 +47,10 @@ import type { ProjectAgentLocale } from "./project-agent";
 import type { ModelEffort } from "./agent-provider-contract";
 import type { AgentProvider } from "./agent-provider";
 import type { UsageRangeDays } from "./agent-usage-overview";
-import type { ProjectUsagePeriod } from "./project-usage-summary";
+import type {
+  ProjectUsageDateRange,
+  ProjectUsagePeriod,
+} from "./project-usage-summary";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./agent-usage-pricing";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type { InboxMessage } from "../hooks/useInbox";
@@ -298,6 +301,21 @@ export async function saveInboxReadStates(
     {
       method: "PUT",
       body: JSON.stringify({ readVersions }),
+    },
+  );
+  return decodeInboxReadVersions(result.readVersions ?? {});
+}
+
+export async function deleteInboxReadState(
+  token: string,
+  messageId: string,
+): Promise<Record<string, string>> {
+  const result = await request<{ readVersions?: unknown }>(
+    "/inbox/read-states",
+    token,
+    {
+      method: "DELETE",
+      body: JSON.stringify({ messageId }),
     },
   );
   return decodeInboxReadVersions(result.readVersions ?? {});
@@ -830,10 +848,16 @@ export async function loadProjectUsageSummary(
   token: string,
   projectId: string,
   period: ProjectUsagePeriod = "day",
+  range?: ProjectUsageDateRange,
   signal?: AbortSignal,
 ): Promise<ProjectUsageSummary> {
+  const search = new URLSearchParams({ period });
+  if (range) {
+    search.set("from", range.from);
+    search.set("to", range.to);
+  }
   return decodeProjectUsageSummaryResponse(await request<ProjectUsageSummary>(
-    `/projects/${encodeURIComponent(projectId)}/usage/summary?period=${period}`,
+    `/projects/${encodeURIComponent(projectId)}/usage/summary?${search}`,
     token,
     { signal },
   ));

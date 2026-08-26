@@ -27,6 +27,7 @@ import { Spinner } from "./ui/spinner";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
+  SettingsAlert,
   SettingsBackButton,
   SettingsMain,
   SettingsNav,
@@ -615,9 +616,8 @@ export function ProjectSettings({
   const activeItem = navigationItems.find((item) => item.id === activeSection);
 
   return (
-    <SettingsShell className="project-settings-page">
+    <SettingsShell>
       {navigationSidebar || <SettingsSidebar
-        className="project-settings-sidebar"
         isOpen={isSidebarOpen}
         label={t("settings.navigation")}
       >
@@ -625,7 +625,7 @@ export function ProjectSettings({
           {t("settings.back")}
         </SettingsBackButton>
 
-        <SettingsNav className="project-settings-nav">
+        <SettingsNav className="pt-1">
           <SettingsNavGroup label={t("settings.title")}>
             {navigationItems.map((item) => (
               <SettingsNavItem
@@ -643,10 +643,10 @@ export function ProjectSettings({
       </SettingsSidebar>}
 
       <SettingsMain
-        className="project-settings-main"
+        className="bg-background"
         isSidebarOpen={isSidebarOpen}
       >
-        <SettingsScroll className="project-settings-scroll">
+        <SettingsScroll>
           <SettingsPageHeader
             description={
               activeItem?.description ??
@@ -656,7 +656,7 @@ export function ProjectSettings({
           />
 
           {activeSection === "general" ? (
-            <section className="project-settings-card mx-auto grid w-full max-w-[720px] gap-5 rounded-xl border border-border bg-card px-5 py-4 shadow-xs">
+            <section className="mx-auto grid w-full max-w-[720px] gap-5 rounded-xl border border-border bg-card px-5 py-4 shadow-xs">
               <div className="flex min-h-12 items-center justify-between gap-4">
                 <div className="grid gap-1">
                   <Typography tone="muted" variant="caption">
@@ -866,34 +866,41 @@ export function ProjectSettings({
           ) : null}
 
           <section
-            className="project-settings-integration"
+            className="mx-auto mt-4 w-full max-w-[720px] rounded-xl border border-border bg-card p-5 shadow-xs"
             data-project-integration="velen"
             hidden={activeSection !== "integrations"}
           >
-            <header>
-              <span className="project-settings-integration-icon">
+            <header className="flex items-start gap-3 max-[760px]:flex-wrap">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
                 <Database size={18} strokeWidth={1.8} />
               </span>
-              <span>
-                <strong>{t("settings.velenTitle")}</strong>
-                <small>{t("settings.velenDescription")}</small>
+              <span className="grid min-w-0 gap-1">
+                <Typography as="strong" variant="bodySm">
+                  {t("settings.velenTitle")}
+                </Typography>
+                <Typography as="small" tone="muted" variant="caption">
+                  {t("settings.velenDescription")}
+                </Typography>
               </span>
-              <div className="project-settings-integration-actions">
-                <button
+              <div className="ml-auto flex items-center gap-2 max-[760px]:ml-11 max-[760px]:w-full">
+                <Button
                   aria-label={t("settings.velenRefresh")}
                   disabled={velenLoading || velenSaving}
                   onClick={() => void refreshVelen()}
+                  size="icon-sm"
                   type="button"
+                  variant="outline"
                 >
                   <Spinner icon={RefreshCw} size={14} spinning={velenLoading} />
-                </button>
+                </Button>
               </div>
             </header>
 
-            <div className="project-settings-integration-fields">
-              <label>
-                <span>{t("settings.velenOrg")}</span>
+            <div className="mt-4 grid gap-2.5 min-[761px]:grid-cols-[minmax(0,1.5fr)_minmax(180px,1fr)]">
+              <label className="grid min-w-0 gap-1.5">
+                <Label>{t("settings.velenOrg")}</Label>
                 <SelectMenu
+                  className="[&_.select-menu-trigger]:h-9"
                   disabled={velenLoading || velenSaving}
                   label={t("settings.velenOrg")}
                   onValueChange={setVelenOrg}
@@ -921,16 +928,14 @@ export function ProjectSettings({
             </div>
 
             {velenError ? (
-              <p className="project-settings-velen-error" role="alert">
-                <AlertTriangle size={13} /> {velenError}
-              </p>
+              <SettingsAlert className="mt-2.5">{velenError}</SettingsAlert>
             ) : null}
 
-            <footer>
-              <p>
+            <footer className="mt-3.5 flex items-center justify-between gap-4 max-[760px]:flex-col max-[760px]:items-stretch max-[760px]:[&>button]:w-full">
+              <Typography className="flex-1" tone="muted" variant="caption">
                 {t("settings.velenOptional")}
-              </p>
-              <button
+              </Typography>
+              <Button
                 disabled={
                   velenLoading ||
                   velenSaving ||
@@ -949,12 +954,12 @@ export function ProjectSettings({
                   : !velenChanged
                     ? t("common.saved")
                     : t("common.save")}
-              </button>
+              </Button>
             </footer>
           </section>
 
           <div
-            className="project-settings-import-panel"
+            className="mx-auto w-full max-w-[720px]"
             hidden={activeSection !== "issue-import"}
           >
             <LinearIssueImport
@@ -969,27 +974,31 @@ export function ProjectSettings({
           </div>
 
           <section
-            className="project-settings-agent-configuration"
+            className="mx-auto mt-4 w-full max-w-[720px]"
             hidden={activeSection !== "agent-configuration"}
           >
             <section
               aria-busy={runtimeLoading || runtimeSaving}
-              className="project-settings-runtime"
+              className="rounded-xl border border-border bg-card p-5 shadow-xs"
             >
-              <header>
-                <span className="project-settings-runtime-icon">
+              <header className="flex items-start gap-3">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
                   <Bot size={18} strokeWidth={1.8} />
                 </span>
-                <span>
-                  <strong>{t("settings.runtimeTitle")}</strong>
-                  <small>{t("settings.runtimeDescription")}</small>
+                <span className="grid min-w-0 gap-1">
+                  <Typography as="strong" variant="bodySm">
+                    {t("settings.runtimeTitle")}
+                  </Typography>
+                  <Typography as="small" tone="muted" variant="caption">
+                    {t("settings.runtimeDescription")}
+                  </Typography>
                 </span>
               </header>
 
-              <div className="project-settings-runtime-controls">
-                <label htmlFor="project-runtime-provider">
+              <div className="mt-4 grid items-center gap-2.5 min-[761px]:grid-cols-[minmax(110px,1fr)_minmax(210px,280px)] [&_.select-menu-trigger]:h-9">
+                <Label htmlFor="project-runtime-provider">
                   {t("settings.provider")}
-                </label>
+                </Label>
                 <ProviderSelect
                   disabled={runtimeLoading || runtimeSaving}
                   id="project-runtime-provider"
@@ -1009,9 +1018,9 @@ export function ProjectSettings({
                   value={runtimeProvider}
                 />
 
-                <label htmlFor="project-runtime-model">
+                <Label htmlFor="project-runtime-model">
                   {t("settings.model")}
-                </label>
+                </Label>
                 <SelectMenu
                   disabled={runtimeLoading || runtimeSaving}
                   id="project-runtime-model"
@@ -1028,9 +1037,9 @@ export function ProjectSettings({
                   value={runtimeModel ?? ""}
                 />
 
-                <label htmlFor="project-runtime-effort">
+                <Label htmlFor="project-runtime-effort">
                   {t("settings.effort")}
-                </label>
+                </Label>
                 <SelectMenu
                   disabled={runtimeLoading || runtimeSaving}
                   id="project-runtime-effort"
@@ -1049,9 +1058,9 @@ export function ProjectSettings({
                   value={runtimeEffort ?? ""}
                 />
 
-                <label htmlFor="project-runtime-approval">
+                <Label htmlFor="project-runtime-approval">
                   {t("settings.approvalRequest")}
-                </label>
+                </Label>
                 <SelectMenu
                   disabled={runtimeLoading || runtimeSaving}
                   id="project-runtime-approval"
@@ -1081,7 +1090,7 @@ export function ProjectSettings({
                 />
               </div>
 
-              <p className="project-settings-runtime-note">
+              <Typography className="mt-3" tone="muted" variant="caption">
                 {t(
                   approvalPolicy === "untrusted"
                     ? "settings.approvalUntrustedDescription"
@@ -1089,15 +1098,12 @@ export function ProjectSettings({
                       ? "settings.approvalOnRequestDescription"
                       : "settings.approvalNeverDescription",
                 ).replace("Codex", agentProviderLabels[runtimeProvider])}
-              </p>
+              </Typography>
               {runtimeError ? (
-                <p className="project-settings-runtime-error" role="alert">
-                  <CircleAlert size={14} />
-                  {runtimeError}
-                </p>
+                <SettingsAlert className="mt-3">{runtimeError}</SettingsAlert>
               ) : null}
-              <footer>
-                <button
+              <footer className="mt-4 flex justify-end border-t border-border pt-3.5 max-[760px]:[&>button]:w-full">
+                <Button
                   disabled={
                     runtimeLoading ||
                     runtimeSaving ||
@@ -1119,33 +1125,43 @@ export function ProjectSettings({
                     : !runtimeChanged
                       ? t("common.saved")
                       : t("settings.saveRuntime")}
-                </button>
+                </Button>
               </footer>
             </section>
 
             <div
-              className={`project-settings-sandbox${
-                sandbox.fullAccess ? " unrestricted" : ""
+              className={`mt-3 flex items-center gap-2.5 rounded-xl border p-4 shadow-xs ${
+                sandbox.fullAccess
+                  ? "border-[var(--status-warning-border)] bg-[var(--status-warning-surface)]"
+                  : "border-[var(--status-success-border)] bg-[var(--status-success-surface)]"
               }`}
             >
-              <span className="project-settings-sandbox-icon">
+              <span
+                className={`grid size-8 shrink-0 place-items-center rounded-lg ${
+                  sandbox.fullAccess
+                    ? "bg-warning/15 text-[var(--status-warning-foreground)]"
+                    : "bg-success/15 text-[var(--status-success-foreground)]"
+                }`}
+              >
                 {sandbox.fullAccess ? (
                   <AlertTriangle size={17} strokeWidth={1.8} />
                 ) : (
                   <ShieldCheck size={17} strokeWidth={1.8} />
                 )}
               </span>
-              <span>
-                <strong>{t("settings.sandboxTitle")}</strong>
-                <small>
+              <span className="grid min-w-0 gap-1">
+                <Typography as="strong" variant="caption">
+                  {t("settings.sandboxTitle")}
+                </Typography>
+                <Typography as="small" tone="muted" variant="caption">
                   {t(
                     sandbox.fullAccess
                       ? "settings.sandboxUnrestrictedDescription"
                       : "settings.sandboxWorkspaceDescription",
                   )}
-                </small>
+                </Typography>
               </span>
-              <label className="project-settings-toggle flex items-center gap-2">
+              <label className="ml-auto flex cursor-pointer items-center gap-2">
                 <Switch
                   aria-label={t("settings.sandboxTitle")}
                   checked={sandbox.fullAccess}
@@ -1164,9 +1180,7 @@ export function ProjectSettings({
               </label>
             </div>
             {sandboxError ? (
-              <p className="project-settings-sandbox-error" role="alert">
-                {sandboxError}
-              </p>
+              <SettingsAlert className="mt-2">{sandboxError}</SettingsAlert>
             ) : null}
           </section>
 
@@ -1181,18 +1195,22 @@ export function ProjectSettings({
           </div>
 
           <section
-            className="project-settings-automation"
+            className="mx-auto mt-4 w-full max-w-[720px] rounded-xl border border-border bg-card p-5 shadow-sm"
             hidden={activeSection !== "workflow"}
           >
-            <header>
-              <span className="project-settings-automation-icon">
+            <header className="flex items-start gap-3 max-[760px]:flex-wrap">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
                 <GitBranch size={18} strokeWidth={1.8} />
               </span>
-              <span>
-                <strong>{t("settings.workflowTitle")}</strong>
-                <small>{t("settings.workflowDescription")}</small>
+              <span className="grid min-w-0 gap-1">
+                <Typography as="strong" variant="bodySm">
+                  {t("settings.workflowTitle")}
+                </Typography>
+                <Typography as="small" tone="muted" variant="caption">
+                  {t("settings.workflowDescription")}
+                </Typography>
               </span>
-              <div className="project-settings-automation-actions">
+              <div className="ml-auto flex items-center gap-2 max-[760px]:ml-11 max-[760px]:w-full max-[760px]:flex-wrap">
                 <Button
                   disabled={
                     isAnalyzingWorkflowRequirements ||
@@ -1254,11 +1272,11 @@ export function ProjectSettings({
                 ) : null}
               </div>
             </header>
-            <p className="project-settings-workflow-ai-note">
+            <p className="ml-11 mt-3.5 text-2xs leading-relaxed text-muted-foreground max-[480px]:ml-0">
               {t("settings.workflowAgentDescription")}
             </p>
             <form
-              className="project-settings-workflow-revision"
+              className="ml-11 mt-3.5 grid gap-2 rounded-xl border border-border bg-muted p-3 max-[480px]:ml-0"
               onSubmit={(event) => {
                 event.preventDefault();
                 void reviseWorkflow();
@@ -1284,8 +1302,10 @@ export function ProjectSettings({
                 rows={3}
                 value={workflowRevisionRequest}
               />
-              <footer>
-                <small>{t("settings.workflowRevisionDescription")}</small>
+              <footer className="flex items-center justify-between gap-3 max-[480px]:flex-col max-[480px]:items-stretch">
+                <Typography as="small" tone="muted" variant="caption">
+                  {t("settings.workflowRevisionDescription")}
+                </Typography>
                 <Button
                   disabled={
                     isAnalyzingWorkflowRequirements ||
@@ -1310,23 +1330,25 @@ export function ProjectSettings({
             </form>
             <div aria-live="polite">
               {workflowRegenerated ? (
-                <p className="project-settings-workflow-success">
+                <p className="ml-11 mt-2.5 flex items-center gap-1.5 text-2xs text-[var(--status-success-foreground)] max-[480px]:ml-0">
                   <Check size={13} />{t("settings.workflowRegenerated")}
                 </p>
               ) : null}
               {workflowRequirementsAnalyzed ? (
-                <p className="project-settings-workflow-success">
+                <p className="ml-11 mt-2.5 flex items-center gap-1.5 text-2xs text-[var(--status-success-foreground)] max-[480px]:ml-0">
                   <Check size={13} />
                   {t("settings.workflowRequirementsAnalyzed")}
                 </p>
               ) : null}
               {workflowRevised ? (
-                <p className="project-settings-workflow-success">
+                <p className="ml-11 mt-2.5 flex items-center gap-1.5 text-2xs text-[var(--status-success-foreground)] max-[480px]:ml-0">
                   <Check size={13} />{t("settings.workflowRevised")}
                 </p>
               ) : null}
               {workflowError ? (
-                <p className="project-settings-workflow-error">{workflowError}</p>
+                <p className="ml-11 mt-2.5 text-2xs text-[var(--status-destructive-foreground)] max-[480px]:ml-0">
+                  {workflowError}
+                </p>
               ) : null}
             </div>
             {workflowContract ? (
@@ -1338,30 +1360,50 @@ export function ProjectSettings({
                   stages={workflowContract.stages}
                   token={sessionToken}
                 />
-                <section className="project-settings-checkpoints">
-                  <header>
-                    <span>
+                <section className="mt-3.5 overflow-hidden rounded-xl border border-border bg-card">
+                  <header className="border-b border-border bg-muted px-3.5 py-3">
+                    <span className="flex items-start gap-2 text-accent-foreground">
                       <Flag size={16} strokeWidth={1.8} />
-                      <span>
-                        <strong>{t("settings.workflowCheckpoints")}</strong>
-                        <small>{t("settings.workflowCheckpointsDescription")}</small>
+                      <span className="grid gap-1">
+                        <Typography as="strong" variant="caption">
+                          {t("settings.workflowCheckpoints")}
+                        </Typography>
+                        <Typography as="small" tone="muted" variant="micro">
+                          {t("settings.workflowCheckpointsDescription")}
+                        </Typography>
                       </span>
                     </span>
                   </header>
-                  <div className="project-settings-checkpoint-grid" role="table">
-                    <div className="checkpoint-grid-header" role="row">
+                  <div className="grid" role="table">
+                    <div
+                      className="grid min-h-8 grid-cols-[minmax(150px,1fr)_minmax(210px,1.2fr)_minmax(210px,1.2fr)] items-center bg-muted px-3.5 text-2xs text-muted-foreground max-[760px]:hidden"
+                      role="row"
+                    >
                       <strong role="columnheader">{t("settings.workflowStage")}</strong>
                       <strong role="columnheader">{t("settings.workflowProjectMandatory")}</strong>
                       <strong role="columnheader">{t("settings.workflowMyDefaults")}</strong>
                     </div>
                     {workflowContract.stages.map((stage) => (
-                      <div className="checkpoint-grid-row" key={stage.id} role="row">
-                        <span className="checkpoint-stage" role="cell">
-                          <strong>{stage.label}</strong>
-                          <small>{stage.id}</small>
+                      <div
+                        className="grid min-h-13 grid-cols-[minmax(150px,1fr)_minmax(210px,1.2fr)_minmax(210px,1.2fr)] items-center border-t border-border px-3.5 py-2 max-[760px]:grid-cols-1 max-[760px]:gap-2"
+                        key={stage.id}
+                        role="row"
+                      >
+                        <span className="grid gap-0.5" role="cell">
+                          <Typography as="strong" variant="caption">
+                            {stage.label}
+                          </Typography>
+                          <Typography as="small" tone="muted" variant="micro">
+                            {stage.id}
+                          </Typography>
                         </span>
                         {(["project", "user"] as const).map((scope) => (
-                          <span className="checkpoint-options" key={scope} role="cell">
+                          <span className="flex flex-wrap gap-2" key={scope} role="cell">
+                            <span className="w-[90px] text-2xs text-muted-foreground min-[761px]:hidden">
+                              {scope === "project"
+                                ? t("settings.workflowProjectMandatory")
+                                : t("settings.workflowMyDefaults")}
+                            </span>
                             {(["before", "after"] as const).map((position) => {
                               const mandatory = projectMandatory.some((checkpoint) =>
                                 checkpoint.stage === stage.id && checkpoint.position === position);
@@ -1371,7 +1413,11 @@ export function ProjectSettings({
                               const checkboxId = `workflow-checkpoint-${project.id}-${scope}-${stage.id}-${position}`;
                               return (
                                 <Label
-                                  className={locked ? "locked" : ""}
+                                  className={`inline-flex min-h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-input bg-card px-2 py-1 text-2xs text-muted-foreground ${
+                                    locked || selected
+                                      ? "border-primary/40 bg-accent text-accent-foreground"
+                                      : ""
+                                  } ${locked ? "cursor-not-allowed border-dashed" : ""}`}
                                   htmlFor={checkboxId}
                                   key={position}
                                 >
@@ -1408,7 +1454,7 @@ export function ProjectSettings({
                       </div>
                     ))}
                   </div>
-                  <footer>
+                  <footer className="border-t border-border bg-muted px-3.5 py-2.5 text-2xs text-muted-foreground">
                     {effectiveCheckpoints.length === 0
                       ? t("settings.workflowNoCheckpoints")
                       : t("settings.workflowCheckpointCount", {
@@ -1418,23 +1464,31 @@ export function ProjectSettings({
                 </section>
                 <Card
                   aria-label={t("settings.workflowDiagram")}
-                  className="project-workflow-contract"
+                  className="mt-4 overflow-hidden"
                   role="group"
                 >
-                <div className="project-workflow-repository">
-                  <span>{t("settings.repository")}</span>
-                  <strong>{githubRepository ?? t("settings.noRepository")}</strong>
-                  <span className="project-workflow-version">
+                <div className="flex min-h-9 min-w-0 items-center gap-2 border-b border-border bg-muted px-3">
+                  <Typography as="span" tone="muted" variant="micro">
+                    {t("settings.repository")}
+                  </Typography>
+                  <code className="truncate font-mono text-2xs font-medium text-foreground">
+                    {githubRepository ?? t("settings.noRepository")}
+                  </code>
+                  <span className="ml-auto shrink-0 font-mono text-2xs font-medium text-muted-foreground uppercase">
                     v{workflowContract.version}
                   </span>
                 </div>
-                <section className="project-workflow-requirements">
-                  <header>
-                    <span>
+                <section className="border-b border-border bg-card p-3.5">
+                  <header className="flex items-center justify-between gap-2.5">
+                    <span className="flex items-center gap-2 text-accent-foreground">
                       <Cpu size={16} strokeWidth={1.8} />
-                      <span>
-                        <strong>{t("settings.workflowRequirements")}</strong>
-                        <small>{t("settings.workflowRequirementsDescription")}</small>
+                      <span className="grid gap-0.5">
+                        <Typography as="strong" variant="caption">
+                          {t("settings.workflowRequirements")}
+                        </Typography>
+                        <Typography as="small" tone="muted" variant="micro">
+                          {t("settings.workflowRequirementsDescription")}
+                        </Typography>
                       </span>
                     </span>
                     {onRefreshHealth ? (
@@ -1450,49 +1504,89 @@ export function ProjectSettings({
                     ) : null}
                   </header>
                   {workflowContract.requirements.length ? (
-                    <ul>
+                    <ul className="mt-3 grid list-none gap-2 p-0 min-[761px]:grid-cols-2">
                       {workflowContract.requirements.map((requirement) => {
                         const status = requirementHealth.get(requirement.id);
                         return (
-                          <li key={requirement.id}>
-                            <i className={status?.healthy ? "ok" : "warning"}>
+                          <li
+                            className="grid min-w-0 grid-cols-[27px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border bg-card p-2.5"
+                            key={requirement.id}
+                          >
+                            <i
+                              className={`grid size-7 place-items-center rounded-lg not-italic ${
+                                status?.healthy
+                                  ? "bg-[var(--status-success-surface)] text-[var(--status-success-foreground)]"
+                                  : "bg-[var(--status-warning-surface)] text-[var(--status-warning-foreground)]"
+                              }`}
+                            >
                               {status?.healthy ? (
                                 <CheckCircle2 size={15} />
                               ) : (
                                 <CircleAlert size={15} />
                               )}
                             </i>
-                            <span>
-                              <strong>{requirement.label}</strong>
-                              <small>{requirement.reason}</small>
-                              <code>{requirement.tool}</code>
+                            <span className="grid min-w-0 gap-0.5">
+                              <Typography as="strong" variant="micro">
+                                {requirement.label}
+                              </Typography>
+                              <Typography as="small" tone="muted" variant="micro">
+                                {requirement.reason}
+                              </Typography>
+                              <code className="font-mono text-2xs font-medium text-muted-foreground">
+                                {requirement.tool}
+                              </code>
                             </span>
-                            <em>
+                            <em
+                              className={`whitespace-nowrap rounded-md px-1.5 py-1 text-2xs not-italic ${
+                                status?.healthy
+                                  ? "bg-[var(--status-success-surface)] text-[var(--status-success-foreground)]"
+                                  : "bg-[var(--status-warning-surface)] text-[var(--status-warning-foreground)]"
+                              }`}
+                            >
                               {status
                                 ? status.healthy
                                   ? t("common.healthy")
                                   : t("common.checkNeeded")
                                 : t("health.notChecked")}
                             </em>
-                            {status?.detail ? <p>{status.detail}</p> : null}
+                            {status?.detail ? (
+                              <p className="col-[2/-1] m-0 text-2xs leading-snug text-muted-foreground">
+                                {status.detail}
+                              </p>
+                            ) : null}
                           </li>
                         );
                       })}
                     </ul>
                   ) : (
-                    <p>{t("health.noWorkflowRequirements")}</p>
+                    <Typography className="ml-6 mt-2.5" tone="muted" variant="micro">
+                      {t("health.noWorkflowRequirements")}
+                    </Typography>
                   )}
                 </section>
-                <div className="project-workflow-diagram">
-                  <ol className="project-workflow-stages">
+                <div className="min-w-0 p-[18px]">
+                  <ol className="scrollbar-subtle flex list-none items-stretch overflow-x-auto p-0 pb-1.5">
                     {workflowContract.stages.map((stage, index) => (
-                      <li key={`${stage.id}-${index}`}>
+                      <li
+                        className="flex min-w-0 shrink-0 items-center"
+                        key={`${stage.id}-${index}`}
+                      >
                         <article
-                          className={`project-workflow-stage ${stage.required ? "required" : "optional"}`}
+                          className={`flex min-h-46 w-[190px] shrink-0 flex-col rounded-xl border border-border p-3 shadow-xs ${
+                            stage.required
+                              ? "bg-card"
+                              : "border-dashed bg-muted"
+                          }`}
                         >
-                          <header>
-                            <span>{index + 1}</span>
-                            <em>
+                          <header className="flex items-center justify-between gap-2">
+                            <span className="grid size-6 place-items-center rounded-lg bg-primary font-mono text-2xs font-semibold text-primary-foreground shadow-sm">
+                              {index + 1}
+                            </span>
+                            <em className={`rounded-full px-2 py-1 text-2xs font-bold not-italic ${
+                              stage.required
+                                ? "bg-accent text-accent-foreground"
+                                : "bg-secondary text-secondary-foreground"
+                            }`}>
                               {t(
                                 stage.required
                                   ? "common.required"
@@ -1500,13 +1594,17 @@ export function ProjectSettings({
                               )}
                             </em>
                           </header>
-                          <strong>{stage.label}</strong>
-                          <code>{stage.id}</code>
+                          <strong className="mt-3 text-2xs leading-snug text-foreground">
+                            {stage.label}
+                          </strong>
+                          <code className="mt-1 font-mono text-2xs font-medium text-muted-foreground">
+                            {stage.id}
+                          </code>
                           {effectiveCheckpoints
                             .filter((checkpoint) => checkpoint.stage === stage.id)
                             .map((checkpoint) => (
                               <span
-                                className="project-workflow-pause-badge"
+                                className="mt-2 self-start rounded-full bg-primary px-1.5 py-1 text-2xs font-bold text-primary-foreground"
                                 key={checkpoint.key}
                               >
                                 {checkpoint.position === "before"
@@ -1517,28 +1615,42 @@ export function ProjectSettings({
                           {mergeQueueProfile?.enabled &&
                               mergeQueueProfile.readinessStageId === stage.id
                             ? (
-                              <span className="project-workflow-merge-queue-badge">
+                              <span className="mt-2 inline-flex self-start items-center gap-1 rounded-full bg-[var(--status-success-surface)] px-1.5 py-1 text-2xs font-bold text-[var(--status-success-foreground)]">
                                 <GitMerge size={12} strokeWidth={1.8} />
                                 {t("settings.mergeQueueBoundaryBadge")}
                               </span>
                             )
                             : null}
                           {stage.evidence?.length ? (
-                            <div className="project-workflow-stage-detail">
-                              <span>{t("settings.workflowEvidence")}</span>
-                              <ul>
+                            <div className="mt-3 grid gap-1.5">
+                              <span className="text-2xs font-bold tracking-wide text-muted-foreground uppercase">
+                                {t("settings.workflowEvidence")}
+                              </span>
+                              <ul className="flex list-none flex-wrap gap-1 p-0">
                                 {stage.evidence.map((item) => (
-                                  <li key={item}>{item}</li>
+                                  <li
+                                    className="max-w-full truncate rounded-md border border-border bg-muted px-1.5 py-1 font-mono text-2xs font-medium text-muted-foreground"
+                                    key={item}
+                                  >
+                                    {item}
+                                  </li>
                                 ))}
                               </ul>
                             </div>
                           ) : null}
                           {stage.checks?.length ? (
-                            <div className="project-workflow-stage-detail">
-                              <span>{t("settings.workflowChecks")}</span>
-                              <ul className="project-workflow-checks">
+                            <div className="mt-3 grid gap-1.5">
+                              <span className="text-2xs font-bold tracking-wide text-muted-foreground uppercase">
+                                {t("settings.workflowChecks")}
+                              </span>
+                              <ul className="grid list-none gap-1 p-0">
                                 {stage.checks.map((check) => (
-                                  <li key={check}>{check}</li>
+                                  <li
+                                    className="max-w-full overflow-hidden rounded-md border border-border bg-muted px-1.5 py-1 font-mono text-2xs font-medium whitespace-normal text-muted-foreground [overflow-wrap:anywhere]"
+                                    key={check}
+                                  >
+                                    {check}
+                                  </li>
                                 ))}
                               </ul>
                             </div>
@@ -1547,7 +1659,7 @@ export function ProjectSettings({
                         {index < workflowContract.stages.length - 1 ? (
                           <span
                             aria-hidden="true"
-                            className="project-workflow-connector"
+                            className="grid w-[34px] shrink-0 place-items-center text-muted-foreground"
                           >
                             <ArrowRight size={17} strokeWidth={1.8} />
                           </span>
@@ -1555,32 +1667,36 @@ export function ProjectSettings({
                       </li>
                     ))}
                   </ol>
-                  <footer className="project-workflow-summary">
-                    <div>
+                  <footer className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+                    <div className="flex min-h-12 min-w-[190px] flex-1 items-center gap-2 rounded-lg border border-border bg-accent px-3 py-2 text-accent-foreground">
                       <CheckCircle2 size={18} strokeWidth={1.8} />
-                      <span>
-                        <small>{t("settings.workflowCompletion")}</small>
-                        <strong>
+                      <span className="grid min-w-0 gap-0.5">
+                        <Typography as="small" className="font-bold tracking-wide uppercase" tone="muted" variant="micro">
+                          {t("settings.workflowCompletion")}
+                        </Typography>
+                        <Typography as="strong" className="truncate" variant="micro">
                           {t("settings.workflowRequiredStageCount", {
                             count:
                               requiredWorkflowStages(
                                 workflowContract,
                               ).length,
                           })}
-                        </strong>
+                        </Typography>
                       </span>
                     </div>
-                    <div className="project-workflow-pause-summary">
+                    <div className="flex min-h-12 min-w-[190px] flex-1 items-center gap-2 rounded-lg border border-border bg-accent px-3 py-2 text-accent-foreground">
                       <Flag size={18} strokeWidth={1.8} />
-                      <span>
-                        <small>{t("settings.workflowCheckpoints")}</small>
-                        <strong>
+                      <span className="grid min-w-0 gap-0.5">
+                        <Typography as="small" className="font-bold tracking-wide uppercase" tone="muted" variant="micro">
+                          {t("settings.workflowCheckpoints")}
+                        </Typography>
+                        <Typography as="strong" className="truncate" variant="micro">
                           {effectiveCheckpoints.length === 0
                             ? t("settings.workflowNoCheckpoints")
                             : t("settings.workflowCheckpointCount", {
                                 count: effectiveCheckpoints.length,
                               })}
-                        </strong>
+                        </Typography>
                       </span>
                     </div>
                   </footer>
@@ -1588,12 +1704,14 @@ export function ProjectSettings({
                 </Card>
               </>
             ) : (
-              <p className="project-settings-empty">{t("settings.loadingWorkflow")}</p>
+              <p className="mt-4 rounded-lg border border-dashed border-border bg-muted p-4 text-center text-2xs text-muted-foreground">
+                {t("settings.loadingWorkflow")}
+              </p>
             )}
           </section>
 
           <StatusPanel
-            className="project-settings-danger mx-auto mt-4 max-w-[720px] items-center"
+            className="mx-auto mt-4 max-w-[720px] items-center max-[760px]:flex-col max-[760px]:items-start max-[760px]:[&_[data-slot=status-panel-action]]:ml-0 max-[760px]:[&_[data-slot=status-panel-action]]:w-full max-[760px]:[&_[data-slot=status-panel-action]>button]:w-full"
             density="spacious"
             hidden={activeSection !== "general"}
             tone="destructive"
@@ -1653,7 +1771,6 @@ export function ProjectSettings({
               {t("common.cancel")}
             </Button>
             <Button
-              className="delete-project-confirm"
               disabled={isDeleting}
               onClick={() => void confirmDelete()}
               type="button"

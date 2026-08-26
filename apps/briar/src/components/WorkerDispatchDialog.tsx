@@ -28,9 +28,11 @@ import { useAgentProviderModelPreferences } from "../hooks/useAgentProviderModel
 import {
   executionWorkerSupportsSelection,
   projectPolicyWorkers,
+  projectSupportsExecutionSelection,
   projectWorkerCapabilityCatalog,
   projectWorkerProviders,
 } from "../lib/project-worker-capabilities";
+import { recommendIssueExecution } from "../lib/issue-execution-recommendation";
 import type {
   ExecutionWorker,
   HuntRun,
@@ -133,6 +135,31 @@ export function WorkerDispatchDialog({
       ),
     [normalizedModel, provider, providerModels],
   );
+  const recommendedSelection = useMemo(() =>
+    !initialSelection && run?.difficulty && !run.requestedProvider &&
+      !run.preferredModel
+      ? recommendIssueExecution(
+          run.difficulty,
+          providerModels,
+          run.preferredProvider,
+          (selection) => projectSupportsExecutionSelection(
+            workers,
+            policy,
+            selection.provider,
+            selection.model,
+            selection.effort,
+          ),
+        )
+      : null, [
+    initialSelection,
+    providerModels,
+    run?.difficulty,
+    run?.preferredModel,
+    run?.preferredProvider,
+    run?.requestedProvider,
+    policy,
+    workers,
+  ]);
   const selectedEffortKnown = !effort || effortOptions.some(
     (option) => option.value === effort,
   );
@@ -170,6 +197,7 @@ export function WorkerDispatchDialog({
       (initialSelection && healthyProviders.includes(initialSelection.provider)
         ? initialSelection.provider
         : null) ??
+      recommendedSelection?.provider ??
       run?.preferredProvider ??
       run?.requestedProvider ??
       preferredWorker?.agentProvider ??
@@ -186,15 +214,18 @@ export function WorkerDispatchDialog({
     setProvider(initialProvider);
     setModel(
       requestedModel ??
+        recommendedSelection?.model ??
         defaultModelForProvider(initialProvider),
     );
-    setEffort(
-      initialSelection
-        ? (initialSelection.effort ?? "")
-        : run?.preferredProvider
-          ? (run.preferredEffort ?? "")
-          : (run?.requestedEffort ?? ""),
-    );
+    let initialEffort = run?.requestedEffort ?? "";
+    if (initialSelection) {
+      initialEffort = initialSelection.effort ?? "";
+    } else if (run?.preferredProvider) {
+      initialEffort = run.preferredEffort ?? recommendedSelection?.effort ?? "";
+    } else if (recommendedSelection) {
+      initialEffort = recommendedSelection.effort ?? "";
+    }
+    setEffort(initialEffort);
     setWorkerId(
       initialSelection?.workerId ??
       run?.requestedWorkerId ??
@@ -209,6 +240,7 @@ export function WorkerDispatchDialog({
     policyWorkers,
     providerModelPreferences,
     providerModels,
+    recommendedSelection,
     run?.preferredEffort,
     run?.preferredModel,
     run?.preferredProvider,

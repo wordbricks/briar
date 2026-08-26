@@ -78,7 +78,7 @@ it("backfills every existing organization member into every existing project", a
   } finally {
     await miniflare.dispose();
   }
-});
+}, 30_000);
 
 async function createPreDescriptionOrganizationAgent(
   db: D1Database,

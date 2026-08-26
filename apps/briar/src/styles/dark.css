@@ -15,13 +15,6 @@
   color: var(--sidebar-foreground);
 }
 
-.dark .app-settings-sidebar,
-.dark .organization-settings-sidebar {
-  border-color: var(--sidebar-border);
-  color: var(--sidebar-foreground);
-  background: var(--sidebar-fallback);
-}
-
 .dark .sidebar-channel-list button.unread {
   color: var(--sidebar-accent-foreground);
 }
@@ -96,12 +89,7 @@
 
 .dark .app-content-surface,
 .dark .main-content,
-.dark .organization-settings-layout,
-.dark .organization-settings,
 .dark .organization-create,
-.dark .project-settings-page,
-.dark .settings-main,
-.dark .app-settings-main,
 .dark .kanban-board,
 .dark .issue-list {
   color: var(--foreground);
@@ -112,7 +100,6 @@
 .dark .app-status-bar,
 .dark .page-header,
 .dark .queue-header,
-.dark .inbox-heading,
 .dark .project-agents-heading,
 .dark .project-schedule-heading {
   border-color: var(--border);
@@ -201,8 +188,6 @@
 .dark .kanban-card,
 .dark .issue-list-body,
 .dark .issue-list-row,
-.dark .inbox-panel,
-.dark .inbox-message,
 .dark .project-schedule-calendar,
 .dark .project-schedule-toolbar {
   border-color: var(--border);
@@ -212,97 +197,11 @@
 
 .dark .issue-list-row:hover,
 .dark .issue-list-row:focus-visible,
-.dark .inbox-message.unread,
-.dark .inbox-message.unread:hover,
 .dark .status-tabs button:hover,
 .dark .health-trigger:hover,
 .dark .health-trigger[aria-expanded="true"] {
   color: var(--foreground);
   background: var(--secondary);
-}
-
-.dark .inbox-mark-read {
-  color: var(--primary-foreground);
-}
-
-.dark .inbox-mark-read:hover,
-.dark .inbox-mark-read:focus-visible {
-  background: var(--accent);
-}
-
-.dark .inbox-filter-bar {
-  border-color: var(--border);
-  background: var(--card);
-}
-
-.dark .inbox-filter-bar > span {
-  color: var(--muted-foreground);
-}
-
-.dark .inbox-project-filter.select-menu .select-menu-trigger,
-.dark .inbox-filter {
-  border-color: var(--input);
-  color: var(--muted-foreground);
-  background: var(--secondary);
-}
-
-.dark
-  .inbox-project-filter.select-menu
-  .select-menu-trigger:hover:not(:disabled),
-.dark .inbox-filter:hover {
-  border-color: color-mix(in srgb, var(--primary) 38%, var(--input));
-  color: var(--foreground);
-  background: var(--accent);
-}
-
-.dark .inbox-filter-count {
-  color: var(--muted-foreground);
-  background: var(--muted);
-  box-shadow: 0 0 0 1.5px var(--card);
-}
-
-.dark .inbox-filter[aria-pressed="true"].urgent {
-  border-color: color-mix(in srgb, var(--destructive) 45%, var(--border));
-  color: var(--destructive);
-  background: color-mix(in srgb, var(--card) 82%, var(--destructive));
-}
-
-.dark .inbox-filter[aria-pressed="true"].urgent .inbox-filter-count {
-  color: var(--destructive);
-  background: color-mix(in srgb, var(--card) 70%, var(--destructive));
-}
-
-.dark .inbox-filter[aria-pressed="true"].action_required {
-  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
-  color: var(--warning);
-  background: color-mix(in srgb, var(--card) 82%, var(--warning));
-}
-
-.dark .inbox-filter[aria-pressed="true"].action_required .inbox-filter-count {
-  color: var(--warning);
-  background: color-mix(in srgb, var(--card) 70%, var(--warning));
-}
-
-.dark .inbox-filter[aria-pressed="true"].important {
-  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
-  color: var(--primary);
-  background: color-mix(in srgb, var(--card) 82%, var(--primary));
-}
-
-.dark .inbox-filter[aria-pressed="true"].important .inbox-filter-count {
-  color: var(--primary);
-  background: color-mix(in srgb, var(--card) 70%, var(--primary));
-}
-
-.dark .inbox-filter[aria-pressed="true"].activity {
-  border-color: var(--input);
-  color: var(--foreground);
-  background: var(--secondary);
-}
-
-.dark .inbox-filter[aria-pressed="true"].activity .inbox-filter-count {
-  color: var(--foreground);
-  background: var(--muted);
 }
 
 .dark .search-box input,
@@ -349,8 +248,7 @@
   border-color: var(--border);
 }
 
-.dark .companion-shell .kanban-card:active,
-.dark .companion-shell .inbox-message-open:active {
+.dark .companion-shell .kanban-card:active {
   background: var(--secondary);
 }
 

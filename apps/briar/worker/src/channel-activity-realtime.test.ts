@@ -4,7 +4,13 @@ import {
   type ChannelAgentActivityFrame,
   type IssueAgentActivityFrame,
 } from "../../src/lib/channel-agent-activity";
-import { ChannelActivityHub } from "./channel-activity-realtime";
+import {
+  ChannelActivityHub,
+  publishChannelActivity,
+  publishIssueActivity,
+  subscribeToChannelActivity,
+  subscribeToIssueActivity,
+} from "./channel-activity-realtime";
 
 class FakeSocket {
   sent: string[] = [];
@@ -146,5 +152,80 @@ describe("ChannelActivityHub", () => {
       projectId: issueFrame.projectId,
       activity: { kind: "message" },
     });
+  });
+});
+
+describe("activity hub adapters", () => {
+  it("uses distinct hub names while sharing the subscribe request", async () => {
+    const fetch = vi.fn(async (_url: string, _init?: RequestInit) =>
+      new Response(null, { status: 204 })
+    );
+    const getByName = vi.fn((_name: string) => ({ fetch }));
+    const env = {
+      CHANNEL_ACTIVITY_REALTIME: { getByName },
+    } as unknown as Env;
+    const authorizationExpiresAt = Date.now() + 60_000;
+
+    await subscribeToChannelActivity(env, {
+      organizationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      channelId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      userId: "user-a",
+      authorizationExpiresAt,
+    });
+    await subscribeToIssueActivity(env, {
+      organizationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      projectId: "11111111-1111-4111-8111-111111111111",
+      runId: "22222222-2222-4222-8222-222222222222",
+      userId: "user-a",
+      authorizationExpiresAt,
+    });
+
+    expect(getByName.mock.calls.map(([name]) => name)).toEqual([
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:issue:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222",
+    ]);
+    for (const [url, init] of fetch.mock.calls) {
+      expect(String(url)).toContain("/subscribe?userId=user-a&authorizationExpiresAt=");
+      expect(init).toEqual({ headers: { Upgrade: "websocket" } });
+    }
+  });
+
+  it("uses the shared publish request and preserves scope-specific errors", async () => {
+    const fetch = vi.fn(async (_url: string, _init?: RequestInit) =>
+      new Response(null, { status: 503 })
+    );
+    const env = {
+      CHANNEL_ACTIVITY_REALTIME: { getByName: vi.fn(() => ({ fetch })) },
+    } as unknown as Env;
+    const channelFrame = frame(1);
+    const issueFrame: IssueAgentActivityFrame = {
+      version: channelFrame.version,
+      replyJobId: channelFrame.replyJobId,
+      attempt: channelFrame.attempt,
+      sequence: channelFrame.sequence,
+      projectId: "11111111-1111-4111-8111-111111111111",
+      runId: "22222222-2222-4222-8222-222222222222",
+      triggerMessageId: channelFrame.triggerMessageId,
+      parentMessageId: channelFrame.parentMessageId,
+      activity: channelFrame.activity,
+      sentAt: channelFrame.sentAt,
+      expiresAt: channelFrame.expiresAt,
+    };
+
+    await expect(publishChannelActivity(
+      env,
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      channelFrame,
+    )).rejects.toThrow("Channel activity publish failed (503)");
+    await expect(publishIssueActivity(
+      env,
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      issueFrame,
+    )).rejects.toThrow("Issue activity publish failed (503)");
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    for (const [url] of fetch.mock.calls) {
+      expect(url).toBe("https://channel-activity.internal/publish");
+    }
   });
 });

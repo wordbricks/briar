@@ -22,6 +22,10 @@ import type { ModelEffort } from "./project-llm";
 import {
   agentWithSkillsRuntime,
 } from "./project-agent";
+import {
+  projectSupportsExecutionSelection,
+  projectWorkerCapabilityCatalog,
+} from "./project-worker-capabilities";
 
 export type ProjectAgentScheduleExecutionDependencies = {
   loadDashboard: (
@@ -121,6 +125,18 @@ export async function executeScheduledProjectAgent(
               {
                 agent: runtimeAgent,
                 runs: dashboard.runs,
+                providerModels: projectWorkerCapabilityCatalog(
+                  dashboard.workers ?? [],
+                  dashboard.executionPolicy,
+                ),
+                selectionAvailable: (selection) =>
+                  projectSupportsExecutionSelection(
+                    dashboard.workers ?? [],
+                    dashboard.executionPolicy,
+                    selection.provider,
+                    selection.model,
+                    selection.effort,
+                  ),
                 maxIssues: decision.maxIssues ?? undefined,
                 targetRunIds: decision.targetRunIds ?? undefined,
                 retryReason: decision.retryReason,

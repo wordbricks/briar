@@ -1,0 +1,131 @@
+import { briarApiUrl } from "./api-config";
+
+type Listener<Frame> = (frame: Frame) => void;
+
+export type AgentActivityRealtimeAdapter<Frame> = {
+  label: "Channel" | "Issue";
+  ticketPath: string;
+  decodeFrame: (value: unknown) => Frame | null;
+  matchesScope: (frame: Frame) => boolean;
+};
+
+export type AgentActivityRealtimeInput<Frame> = {
+  token: string;
+  adapter: AgentActivityRealtimeAdapter<Frame>;
+  fetch?: typeof fetch;
+  createWebSocket?: (url: string) => WebSocket;
+};
+
+export class AgentActivityRealtimeTransport<Frame> {
+  private readonly listeners = new Set<Listener<Frame>>();
+  private active = false;
+  private generation = 0;
+  private socket: WebSocket | null = null;
+  private reconnectTimer: number | null = null;
+  private reconnectDelayMs = 1_000;
+
+  constructor(private readonly input: AgentActivityRealtimeInput<Frame>) {}
+
+  subscribe(listener: Listener<Frame>) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  start() {
+    if (this.active) return;
+    this.active = true;
+    this.reconnectDelayMs = 1_000;
+    void this.connect(++this.generation);
+  }
+
+  stop() {
+    this.active = false;
+    this.generation += 1;
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    const socket = this.socket;
+    this.socket = null;
+    socket?.close(1000, `${this.input.adapter.label} activity stopped`);
+  }
+
+  private async connect(generation: number) {
+    const { adapter } = this.input;
+    try {
+      const fetchImpl = this.input.fetch ?? fetch;
+      const response = await fetchImpl(`${briarApiUrl}${adapter.ticketPath}`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${this.input.token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(
+          `${adapter.label} activity ticket failed (${response.status})`,
+        );
+      }
+      const body = await response.json() as { url?: unknown };
+      if (typeof body.url !== "string" || !/^wss?:\/\//u.test(body.url)) {
+        throw new Error(
+          `${adapter.label} activity ticket returned an invalid URL`,
+        );
+      }
+      if (!this.active || generation !== this.generation) return;
+      const createSocket = this.input.createWebSocket ??
+        ((url: string) => new WebSocket(url));
+      const socket = createSocket(body.url);
+      this.socket = socket;
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        if (this.socket === socket) this.socket = null;
+        if (this.active && generation === this.generation) {
+          this.scheduleReconnect(generation);
+        }
+      };
+      socket.addEventListener("open", () => {
+        this.reconnectDelayMs = 1_000;
+      });
+      socket.addEventListener("message", (event) => {
+        if (!this.active || generation !== this.generation) return;
+        let value: unknown;
+        try {
+          value = JSON.parse(typeof event.data === "string" ? event.data : "");
+        } catch {
+          return;
+        }
+        const parsed = adapter.decodeFrame(value);
+        if (parsed === null || !adapter.matchesScope(parsed)) return;
+        for (const listener of this.listeners) listener(parsed);
+      });
+      socket.addEventListener("close", finish);
+      socket.addEventListener("error", () => {
+        socket.close(1011, `${adapter.label} activity socket failed`);
+        finish();
+      });
+    } catch (error) {
+      console.warn(`${adapter.label} activity socket disconnected`, error);
+      if (this.active && generation === this.generation) {
+        this.scheduleReconnect(generation);
+      }
+    }
+  }
+
+  private scheduleReconnect(generation: number) {
+    if (this.reconnectTimer !== null) return;
+    const delay = Math.min(
+      this.reconnectDelayMs * (0.75 + Math.random() * 0.5),
+      30_000,
+    );
+    this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 30_000);
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.active && generation === this.generation) {
+        void this.connect(generation);
+      }
+    }, delay);
+  }
+}

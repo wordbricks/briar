@@ -40,7 +40,8 @@ describe("AppSettings source control", () => {
     expect(container.textContent).toContain(
       "데스크톱 앱에서 연결 상태를 확인할 수 있습니다.",
     );
-    expect(container.querySelectorAll(".settings-provider-row")).toHaveLength(0);
+    expect(container.querySelector('[aria-label="Git enabled"]')).toBeNull();
+    expect(container.querySelector('[aria-label="GitHub enabled"]')).toBeNull();
     expect(
       container.querySelector('[aria-label="소스 제어 상태 새로고침"]'),
     ).toBeNull();
@@ -66,14 +67,17 @@ describe("AppSettings source control", () => {
       );
     });
 
-    const providerRows = container.querySelectorAll(".settings-provider-row");
-    expect(providerRows).toHaveLength(2);
-    expect(providerRows[0]?.textContent).toContain("Git");
-    expect(providerRows[1]?.textContent).toContain(
+    expect(
+      container.querySelector('[aria-label="Git enabled"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="GitHub enabled"]'),
+    ).not.toBeNull();
+    expect(container.textContent).toContain(
       "현재 워크플로우에는 GitHub CLI가 필요하지 않습니다.",
     );
-    expect(providerRows[1]?.querySelector('[aria-label="선택"]')).not.toBeNull();
-    expect(providerRows[1]?.textContent).not.toContain(
+    expect(container.querySelector('[aria-label="선택"]')).not.toBeNull();
+    expect(container.textContent).not.toContain(
       "GitHub CLI를 사용할 수 없습니다.",
     );
     expect(

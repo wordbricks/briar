@@ -217,6 +217,46 @@ describe("Inbox", () => {
     expect(openButton?.hasAttribute("data-keyboard-list-current")).toBe(true);
   });
 
+  it("marks one read message as unread without opening its destination", async () => {
+    const message = issue("read", "Revisit this update", {
+      isUnread: false,
+      priority: 1,
+      status: "failed",
+    });
+    const onMarkUnread = vi.fn();
+    const onOpen = vi.fn();
+
+    await act(async () =>
+      root.render(
+        <TestProviders>
+          <Inbox
+            isSidebarOpen
+            messages={[message]}
+            onMarkAllRead={vi.fn()}
+            onMarkRead={vi.fn()}
+            onMarkUnread={onMarkUnread}
+            onOpen={onOpen}
+            projects={projects}
+            unreadCount={0}
+          />
+        </TestProviders>,
+      ),
+    );
+
+    const markUnread = container.querySelector<HTMLButtonElement>(
+      ".inbox-mark-unread",
+    );
+    expect(markUnread?.getAttribute("aria-label")).toBe("읽지 않음으로 표시");
+
+    await act(async () => markUnread?.click());
+
+    expect(onMarkUnread).toHaveBeenCalledWith(message.id);
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(
+      container.querySelector(".inbox-message-open"),
+    );
+  });
+
   it("preserves pointer, Enter, and Space activation on native buttons", async () => {
     const messages = [
       issue("first", "First issue", { priority: 1, status: "failed" }),

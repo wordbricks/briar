@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
 import { demoDashboard, demoRepositoryReadiness } from "../lib/demo-data";
+import { defaultProjectUsageDateRange } from "../lib/project-usage-summary";
 import type { ProjectUsageSummary } from "../types";
 import { ProjectLobby, projectTrackedDuration } from "./ProjectLobby";
 
@@ -31,6 +32,78 @@ const emptyUsageSummary: ProjectUsageSummary = {
 };
 
 describe("ProjectLobby", () => {
+  it("loads the latest 14 days by default and applies a custom date range", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    const expectedDefault = defaultProjectUsageDateRange();
+    const loadUsage = vi.fn(async () => emptyUsageSummary);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider>
+          <ProjectLobby
+            connectionState="connected"
+            dashboard={demoDashboard}
+            isSidebarOpen
+            onLoadUsageSummary={loadUsage}
+            onOpenAgents={() => undefined}
+            onOpenIssue={() => undefined}
+            onOpenIssues={() => undefined}
+            onOpenRepository={() => undefined}
+            onOpenSettings={() => undefined}
+            project={demoDashboard.project}
+            readiness={demoRepositoryReadiness}
+            requiresLocalReadiness
+          />
+        </I18nProvider>,
+      );
+    });
+
+    expect(loadUsage).toHaveBeenLastCalledWith(
+      demoDashboard.project.id,
+      "day",
+      { force: false, range: expectedDefault },
+    );
+    const from = container.querySelector<HTMLInputElement>('input[name="from"]');
+    const to = container.querySelector<HTMLInputElement>('input[name="to"]');
+    const form = container.querySelector<HTMLFormElement>(
+      ".project-lobby-date-range",
+    );
+    expect(from).not.toBeNull();
+    expect(to).not.toBeNull();
+    expect(form).not.toBeNull();
+
+    const setInputValue = (input: HTMLInputElement, value: string) => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    await act(async () => {
+      setInputValue(from!, "2026-08-01");
+      setInputValue(to!, "2026-08-05");
+    });
+    await act(async () => {
+      form!.dispatchEvent(new SubmitEvent("submit", {
+        bubbles: true,
+        cancelable: true,
+      }));
+    });
+
+    expect(loadUsage).toHaveBeenLastCalledWith(
+      demoDashboard.project.id,
+      "day",
+      {
+        force: false,
+        range: { from: "2026-08-01", to: "2026-08-05" },
+      },
+    );
+
+    await act(async () => root.unmount());
+  });
+
   it("shows an accessible difficulty icon for every recent issue", async () => {
     const container = document.createElement("div");
     const root = createRoot(container);
