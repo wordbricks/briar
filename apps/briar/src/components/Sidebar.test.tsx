@@ -508,9 +508,9 @@ describe("Sidebar", () => {
     container.remove();
   });
 
-  it("opens the project home page when the project name is clicked", async () => {
+  it("opens project issues when the project name is clicked", async () => {
     const onProjectChange = vi.fn();
-    const onLobbyOpen = vi.fn();
+    const onIssuesOpen = vi.fn();
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -520,7 +520,7 @@ describe("Sidebar", () => {
           {...sidebarProps}
           activePage="issues"
           activeProjectId="project-1"
-          onLobbyOpen={onLobbyOpen}
+          onIssuesOpen={onIssuesOpen}
           onProjectChange={onProjectChange}
           projects={[
             ...sidebarProps.projects,
@@ -549,11 +549,11 @@ describe("Sidebar", () => {
 
     await act(async () => briarHeading?.click());
     expect(onProjectChange).not.toHaveBeenCalled();
-    expect(onLobbyOpen).toHaveBeenCalledOnce();
+    expect(onIssuesOpen).toHaveBeenCalledOnce();
 
     await act(async () => consoleHeading?.click());
     expect(onProjectChange).toHaveBeenCalledWith("project-2");
-    expect(onLobbyOpen).toHaveBeenCalledTimes(2);
+    expect(onIssuesOpen).toHaveBeenCalledTimes(2);
 
     await act(async () => root.unmount());
     container.remove();

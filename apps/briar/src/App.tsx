@@ -2832,7 +2832,7 @@ export function App({
         }
         setRequestedRunId(null);
         setRequestedSessionId(null);
-        navigateToPage("lobby", project.id);
+        navigateToPage("issues", project.id);
       },
       priority: project.id === briar.activeProjectId ? 100 : 20,
       scope: "projects",

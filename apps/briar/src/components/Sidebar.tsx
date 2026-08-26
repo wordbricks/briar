@@ -355,7 +355,7 @@ export function Sidebar({
   const selectProject = (projectId: string) => {
     if (projectId !== activeProjectId) onProjectChange(projectId);
     setProjectExpanded(projectId, true);
-    onLobbyOpen();
+    onIssuesOpen();
   };
 
   return (
