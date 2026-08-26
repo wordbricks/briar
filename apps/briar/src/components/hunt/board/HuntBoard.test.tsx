@@ -251,6 +251,30 @@ describe("HuntBoard", () => {
     await act(async () => root.unmount());
     container.remove();
   });
+  it("does not capture Command-N without a project", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () =>
+      root.render(
+        <HuntDashboard {...dashboardProps} dashboard={null} noProject />,
+      )
+    );
+    const shortcut = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      code: "KeyN",
+      key: "n",
+      metaKey: true,
+    });
+    await act(async () => {
+      window.dispatchEvent(shortcut);
+    });
+    expect(shortcut.defaultPrevented).toBe(false);
+    expect(container.querySelector('[aria-label="새 이슈"]')).toBeNull();
+    await act(async () => root.unmount());
+    container.remove();
+  });
   it("adds a bottom drop space and opens issue creation for a kanban column", async () => {
     const container = document.createElement("div");
     document.body.append(container);
@@ -419,10 +443,14 @@ describe("HuntBoard", () => {
     expect(listButton?.getAttribute("aria-pressed")).toBe("false");
     expect(container.querySelector(".kanban-progress")).toBeNull();
     expect(container.querySelector(".kanban-card")?.textContent).not.toContain(`${demoDashboard.runs[0].progress}%`);
+    expect(container.querySelector(".kanban-board[data-keyboard-list]")).not.toBeNull();
+    expect(container.querySelectorAll(".kanban-card[data-keyboard-list-item]")).toHaveLength(container.querySelectorAll(".kanban-card").length);
     await act(async () => listButton?.click());
     expect(container.querySelector(".kanban-board")).toBeNull();
     expect(container.querySelector(".issue-list")).not.toBeNull();
+    expect(container.querySelector(".issue-list-body[data-keyboard-list]")).not.toBeNull();
     expect(container.querySelectorAll(".issue-list-row")).toHaveLength(demoDashboard.runs.length);
+    expect(container.querySelectorAll(".issue-list-row[data-keyboard-list-item]")).toHaveLength(demoDashboard.runs.length);
     expect(listButton?.getAttribute("aria-pressed")).toBe("true");
     expect(container.querySelector(".issue-list")?.textContent).toContain(demoDashboard.runs[0].title);
     expect(container.querySelector(".issue-list")?.textContent).not.toContain("진행률");

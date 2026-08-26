@@ -1,5 +1,8 @@
 import { ChevronRight, Rocket } from "lucide-react";
-import { type PointerEvent as ReactPointerEvent } from "react";
+import {
+  type PointerEvent as ReactPointerEvent,
+  type Ref,
+} from "react";
 import { AgentProviderIcon } from "@/components/AgentIcons";
 import { WorkerIcon } from "@/components/WorkerIcon";
 import { ProjectAgentAvatar } from "@/components/ProjectAgentAvatar";
@@ -22,10 +25,12 @@ export function KanbanCard({
   activeAgent,
   assignee,
   assignedWorker,
+  cardRef,
   hideAssignmentBadges = false,
   contextMenuDisabled,
   deletingIssueId,
   isDragging = false,
+  isKeyboardCursor = false,
   isMoving,
   isProcessing,
   issueKeyPrefix,
@@ -36,6 +41,7 @@ export function KanbanCard({
   onPointerMove,
   onPointerUp,
   onEdit,
+  onFocus,
   onMove,
   run,
   onOpen,
@@ -50,10 +56,12 @@ export function KanbanCard({
   activeAgent: ProjectAgent | null;
   assignee: OrganizationMember | null;
   assignedWorker: ExecutionWorker | null;
+  cardRef?: Ref<HTMLDivElement>;
   hideAssignmentBadges?: boolean;
   contextMenuDisabled: boolean;
   deletingIssueId: string | null;
   isDragging?: boolean;
+  isKeyboardCursor?: boolean;
   isMoving: boolean;
   isProcessing: boolean;
   issueKeyPrefix?: string;
@@ -64,6 +72,7 @@ export function KanbanCard({
   onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
   onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
   onEdit: () => void;
+  onFocus?: () => void;
   onMove: (placement: HuntRunPlacement) => void;
   run: HuntRun;
   onOpen: () => void;
@@ -86,11 +95,11 @@ export function KanbanCard({
   return <IssueContextMenu availableProviders={availableProviders} disabled={contextMenuDisabled || isMoving || isDragging || deletingIssueId === run.id || updatingIssueId === run.id} onDelete={onDelete} onTransfer={onTransfer} onEdit={onEdit} onMove={onMove} onOpen={onOpen} onProcessNow={onProcessNow} onPriorityChange={onPriorityChange} onPreferencesChange={onPreferencesChange} onCheckpointsChange={onCheckpointsChange} run={run} isProcessing={isProcessing}>
       <div aria-label={t("run.details", {
       title: run.title
-    })} aria-disabled={isMoving} className={`kanban-card ${meta.tone}${run.status === "paused" ? " awaiting-review" : ""}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}${assignmentBadgeCount > 3 ? " has-four-assignees" : ""}`} draggable={false} onClick={onOpen} onKeyDown={event => {
+    })} aria-disabled={isMoving} className={`kanban-card ${meta.tone}${run.status === "paused" ? " awaiting-review" : ""}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}${assignmentBadgeCount > 3 ? " has-four-assignees" : ""}`} data-keyboard-list-current={isKeyboardCursor ? "" : undefined} data-keyboard-list-item="" data-run-id={run.id} draggable={false} onClick={onOpen} onFocus={onFocus} onKeyDown={event => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
       onOpen();
-    }} onPointerCancel={onPointerCancel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} role="button" tabIndex={0}>
+    }} onPointerCancel={onPointerCancel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} ref={cardRef} role="button" tabIndex={0}>
         {assignmentBadgeCount > 0 && <span className="kanban-card-assignee-badges">
             {!hideAssignmentBadges && activeAgent && <span aria-label={t("run.assigned", {
           agent: activeAgent.name

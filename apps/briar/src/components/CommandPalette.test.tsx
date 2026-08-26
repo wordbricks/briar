@@ -58,9 +58,11 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   });
 
   const renderPalette = async ({
+    initialQuery,
     items = makeItems(),
     onOpenChange = vi.fn(),
   }: {
+    initialQuery?: string;
     items?: CommandPaletteItem[];
     onOpenChange?: (open: boolean) => void;
   } = {}) => {
@@ -69,6 +71,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         <I18nProvider>
           <CommandPalette
             contextLabel="Briar project"
+            initialQuery={initialQuery}
             items={items}
             onOpenChange={onOpenChange}
             open
@@ -132,6 +135,17 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(document.querySelectorAll('[role="option"]')).toHaveLength(0);
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
       "No matching commands or items.",
+    );
+  });
+
+  it("opens with a scoped initial query", async () => {
+    await renderPalette({ initialQuery: "i:" });
+
+    const input = document.querySelector<HTMLInputElement>('[role="combobox"]');
+    expect(input?.value).toBe("i:");
+    expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
+    expect(document.querySelector('[role="option"]')?.textContent).toContain(
+      "Mélanie onboarding",
     );
   });
 

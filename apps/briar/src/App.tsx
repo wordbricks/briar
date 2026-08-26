@@ -11,6 +11,7 @@ import {
   Hash,
   House,
   Inbox as InboxIcon,
+  Keyboard as KeyboardIcon,
   MessageCircle,
   MessagesSquare,
   PanelLeft,
@@ -37,6 +38,8 @@ import {
   CommandPalette,
   type CommandPaletteItem,
 } from "./components/CommandPalette";
+import { KeyboardShortcutModeHint } from "./components/KeyboardShortcutModeHint";
+import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
 import { DirectMessages } from "./components/DirectMessages";
 import {
   CompanionChannels,
@@ -83,6 +86,10 @@ import {
   useMobileNavigationGestures,
 } from "./hooks/useMobileNavigation";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
+import {
+  useAppKeyboardCommandScope,
+  useAppKeyboardCommandState,
+} from "./hooks/appKeyboardCommands";
 import { isProjectScheduleTabEnabled } from "./lib/project-tabs";
 import {
   clearLaunchIntroPreview,
@@ -193,11 +200,20 @@ import {
 } from "./lib/planned-update-recovery";
 import {
   formatShortcut,
-  installKeybindingShortcuts,
+  isMacPlatform,
   loadKeybindings,
+  loadKeyboardNavigationPreferences,
+  subscribeKeyboardNavigationPreferences,
 } from "./lib/keybindings";
+import {
+  appKeyboardShortcutSpecs,
+  createKeyboardShortcutHelpSections,
+  type AppKeyboardShortcutCommandId,
+} from "./lib/app-keyboard-shortcuts";
+import { hasOpenKeyboardShortcutOverlay } from "./lib/keyboard-shortcuts";
 import { formatIssueKey } from "./lib/issue-key";
 import { listenForAppMenuSettings } from "./lib/app-menu";
+import type { AppZoomCommands } from "./lib/app-zoom";
 import {
   channelIdFromNavigationLocation,
   channelNavigationLocation,
@@ -229,7 +245,11 @@ type AgentAutoHuntOptions = {
 
 const CHANNEL_CATALOG_RETRY_MS = 3_000;
 
-export function App() {
+export function App({
+  appZoomCommands = null,
+}: {
+  readonly appZoomCommands?: AppZoomCommands | null;
+}) {
   const { locale, t } = useI18n();
   const [projectWindowProjectId] = useState(readProjectWindowProjectId);
   const autoHunt = useAutoHuntSessions();
@@ -710,6 +730,13 @@ export function App() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [commandPaletteInitialQuery, setCommandPaletteInitialQuery] =
+    useState("");
+  const [isKeyboardShortcutsOpen, setIsKeyboardShortcutsOpen] =
+    useState(false);
+  const [sequenceShortcutsEnabled, setSequenceShortcutsEnabled] = useState(
+    () => loadKeyboardNavigationPreferences().sequenceShortcutsEnabled,
+  );
   const {
     containerRef: inboxLayoutRef,
     effectiveWidth: inboxDetailPaneWidth,
@@ -740,6 +767,7 @@ export function App() {
     canGoBack,
     canGoForward,
     goBack,
+    goBackTo,
     goForward,
     navigate: navigateToLocation,
     replace: replaceNavigationLocation,
@@ -788,6 +816,30 @@ export function App() {
       ),
     [briar.activeOrganizationId, navigateToLocation],
   );
+  const closeSettings = useCallback(() => {
+    const projectId = navigationActiveProjectIdRef.current;
+    goBackTo(
+      (location) => pageFromNavigationLocation(location) !== "settings",
+      projectId ? projectNavigationLocation("issues", projectId) : "issues",
+    );
+  }, [goBackTo]);
+  useAppKeyboardCommandScope({
+    fallthrough: true,
+    handlers: {
+      closeSettings: {
+        isAvailable: () =>
+          activePage === "settings" &&
+          !briar.companionMode &&
+          !hasOpenKeyboardShortcutOverlay(document),
+        run: () => {
+          closeSettings();
+          return "handled";
+        },
+      },
+    },
+    id: "settings-page",
+    priority: 100,
+  });
   const navigateToIssue = useCallback(
     (runId: string, projectId = navigationActiveProjectIdRef.current) => {
       if (!projectId) return;
@@ -2024,29 +2076,245 @@ export function App() {
       !shouldShowFirstRunTutorial &&
       !isLaunchIntroVisible
   );
+
+  const configuredKeybindings = loadKeybindings();
+  const openCommandPalette = useCallback((initialQuery = "") => {
+    setCommandPaletteInitialQuery(initialQuery);
+    setIsCommandPaletteOpen(true);
+  }, []);
+  const handleCommandPaletteOpenChange = useCallback((open: boolean) => {
+    setIsCommandPaletteOpen(open);
+    if (!open) setCommandPaletteInitialQuery("");
+  }, []);
+
   useEffect(
-    () =>
-      installKeybindingShortcuts((id) => {
-        if (id === "commandPalette") {
-          const anotherDialogOpen = !isCommandPaletteOpen && Boolean(
-            document.querySelector(
-              '[data-briar-dialog-overlay][data-state="open"], [aria-modal="true"], dialog[open]',
-            ),
-          );
-          if (commandPaletteAvailable && !anotherDialogOpen) {
-            setIsCommandPaletteOpen((open) => !open);
-          }
-          return;
-        }
-        if (id === "sidebarToggle") {
-          setIsSidebarOpen((open) => !open);
-        }
-      }),
-    [commandPaletteAvailable, isCommandPaletteOpen],
+    () => subscribeKeyboardNavigationPreferences((preferences) => {
+      setSequenceShortcutsEnabled(preferences.sequenceShortcutsEnabled);
+    }),
+    [],
   );
+
   useEffect(() => {
-    if (!commandPaletteAvailable) setIsCommandPaletteOpen(false);
-  }, [commandPaletteAvailable]);
+    if (commandPaletteAvailable) return;
+    handleCommandPaletteOpenChange(false);
+    setIsKeyboardShortcutsOpen(false);
+  }, [commandPaletteAvailable, handleCommandPaletteOpenChange]);
+
+  const keyboardShortcutTriggers = {
+    createIssue: () => {
+      if (!activeProject) return;
+      setCreateIssueProjectId(activeProject.id);
+      navigateToPage("issues");
+      setIsIssueDialogOpen(true);
+    },
+    goAgents: () => navigateToPage("agents"),
+    goChannels: () => navigateToPage("channels"),
+    goDms: () => navigateToPage("dms"),
+    goInbox: () => navigateToPage("inbox"),
+    goIssues: () => {
+      setRequestedRunId(null);
+      setIssueListRequestKey((key) => key + 1);
+      navigateToPage("issues");
+    },
+    goProjectHome: () => navigateToPage("lobby"),
+    goSchedule: () => navigateToPage("schedule"),
+    goSettings: openAppSettings,
+    openChannel: () => openCommandPalette("c:"),
+    openCommandPalette: () => openCommandPalette(),
+    openDm: () => openCommandPalette("d:"),
+    openIssue: () => openCommandPalette("i:"),
+    openProject: () => openCommandPalette("p:"),
+    openSession: () => openCommandPalette("s:"),
+    showKeyboardShortcuts: () => setIsKeyboardShortcutsOpen(true),
+    toggleSidebar: () => setIsSidebarOpen((open) => !open),
+  } satisfies Record<AppKeyboardShortcutCommandId, () => void>;
+  const keyboardShortcutDisabled = {
+    createIssue: !activeProject,
+    goAgents: !activeProject,
+    goChannels: !briar.activeOrganizationId,
+    goDms: !briar.activeOrganizationId || Boolean(projectWindowProjectId),
+    goInbox: !briar.activeOrganizationId,
+    goIssues: !activeProject,
+    goProjectHome: !activeProject,
+    goSchedule: !activeProject || !isProjectScheduleTabEnabled(activeProject),
+    goSettings: false,
+    openChannel: !briar.activeOrganizationId,
+    openCommandPalette: false,
+    openDm: !briar.activeOrganizationId || Boolean(projectWindowProjectId),
+    openIssue: !activeProject,
+    openProject: activeOrganizationProjects.length === 0,
+    openSession: !activeProject,
+    showKeyboardShortcuts: false,
+    toggleSidebar: false,
+  } satisfies Record<AppKeyboardShortcutCommandId, boolean>;
+  const sequenceShortcutShellAvailable =
+    commandPaletteAvailable &&
+    sequenceShortcutsEnabled &&
+    !isCommandPaletteOpen &&
+    !isKeyboardShortcutsOpen;
+  const sequenceCommandAvailable = (id: AppKeyboardShortcutCommandId) =>
+    sequenceShortcutShellAvailable &&
+    !keyboardShortcutDisabled[id] &&
+    !hasOpenKeyboardShortcutOverlay(document);
+  const sequenceHandler = (id: AppKeyboardShortcutCommandId) => ({
+    isAvailable: () => sequenceCommandAvailable(id),
+    run: () => {
+      keyboardShortcutTriggers[id]();
+      return "handled" as const;
+    },
+  });
+  useAppKeyboardCommandScope({
+    fallthrough: true,
+    handlers: {
+      createIssue: sequenceHandler("createIssue"),
+      goAgents: sequenceHandler("goAgents"),
+      goChannels: sequenceHandler("goChannels"),
+      goDms: sequenceHandler("goDms"),
+      goInbox: sequenceHandler("goInbox"),
+      goIssues: sequenceHandler("goIssues"),
+      goProjectHome: sequenceHandler("goProjectHome"),
+      goSchedule: sequenceHandler("goSchedule"),
+      goSettings: sequenceHandler("goSettings"),
+      historyBack: {
+        isAvailable: () => commandPaletteAvailable,
+        run: () => {
+          if (canGoBack) goBack();
+          return "consume";
+        },
+      },
+      historyForward: {
+        isAvailable: () => commandPaletteAvailable,
+        run: () => {
+          if (canGoForward) goForward();
+          return "consume";
+        },
+      },
+      openChannel: sequenceHandler("openChannel"),
+      openCommandPalette: {
+        run: ({ input }) => {
+          const configured = Boolean(
+            input.altKey ||
+              input.controlKey ||
+              input.ctrlKey ||
+              input.metaKey,
+          );
+          if (!configured && !sequenceCommandAvailable("openCommandPalette")) {
+            return "pass";
+          }
+          const anotherDialogOpen = !isCommandPaletteOpen &&
+            hasOpenKeyboardShortcutOverlay(document);
+          if (!commandPaletteAvailable || anotherDialogOpen) {
+            return configured ? "consume" : "pass";
+          }
+          if (isCommandPaletteOpen) handleCommandPaletteOpenChange(false);
+          else openCommandPalette();
+          return "handled";
+        },
+      },
+      openDm: sequenceHandler("openDm"),
+      openIssue: sequenceHandler("openIssue"),
+      openProject: sequenceHandler("openProject"),
+      openSession: sequenceHandler("openSession"),
+      openSettings: {
+        isAvailable: () => commandPaletteAvailable,
+        run: () => {
+          openAppSettings();
+          return "handled";
+        },
+      },
+      showKeyboardShortcuts: {
+        run: ({ input }) => {
+          const primaryModifier =
+            Boolean(input.metaKey) !==
+              Boolean(input.controlKey || input.ctrlKey) &&
+            Boolean(input.metaKey || input.controlKey || input.ctrlKey) &&
+            !input.altKey &&
+            !input.shiftKey;
+          if (!primaryModifier) {
+            if (!sequenceCommandAvailable("showKeyboardShortcuts")) {
+              return "pass";
+            }
+            setIsKeyboardShortcutsOpen(true);
+            return "handled";
+          }
+          const anotherDialogOpen = !isKeyboardShortcutsOpen &&
+            hasOpenKeyboardShortcutOverlay(document);
+          if (!commandPaletteAvailable || anotherDialogOpen) return "pass";
+          setIsKeyboardShortcutsOpen((open) => !open);
+          return "handled";
+        },
+      },
+      toggleSidebar: {
+        run: ({ input }) => {
+          const configured = Boolean(
+            input.altKey ||
+              input.controlKey ||
+              input.ctrlKey ||
+              input.metaKey,
+          );
+          if (!configured && !sequenceCommandAvailable("toggleSidebar")) {
+            return "pass";
+          }
+          if (hasOpenKeyboardShortcutOverlay(document)) {
+            return configured ? "consume" : "pass";
+          }
+          setIsSidebarOpen((open) => !open);
+          return "handled";
+        },
+      },
+      ...(appZoomCommands
+        ? {
+            zoomIn: {
+              run: () => {
+                appZoomCommands.zoomIn();
+                return "handled" as const;
+              },
+            },
+            zoomOut: {
+              run: () => {
+                appZoomCommands.zoomOut();
+                return "handled" as const;
+              },
+            },
+          }
+        : {}),
+    },
+    id: "app-global",
+    priority: 0,
+  });
+
+  const keyboardCommandState = useAppKeyboardCommandState();
+  const pendingShortcut = keyboardCommandState.pending;
+  const pendingShortcutSpec = pendingShortcut
+    ? appKeyboardShortcutSpecs.find(
+        ({ id }) => id === pendingShortcut.candidateIds[0],
+      )
+    : undefined;
+  const pendingShortcutPrefix = pendingShortcut
+    ? pendingShortcutSpec?.sequence.slice(0, pendingShortcut.sequence.length) ??
+      pendingShortcut.sequence
+    : [];
+  const pendingShortcutChoices = pendingShortcut
+    ? pendingShortcut.candidateIds.flatMap((id) => {
+        const shortcut = appKeyboardShortcutSpecs.find(
+          (candidate) => candidate.id === id,
+        );
+        const key = shortcut?.sequence[pendingShortcut.sequence.length];
+        return shortcut && key
+          ? [{ id, key: key.toUpperCase(), label: t(shortcut.labelKey) }]
+          : [];
+      })
+    : [];
+  const keyboardShortcutsModifierLabel = isMacPlatform() ? "⌘/" : "Ctrl+/";
+  const keyboardShortcutHelpSections = createKeyboardShortcutHelpSections({
+    commandPaletteShortcut: formatShortcut(
+      configuredKeybindings.commandPalette,
+    ),
+    keyboardShortcutsShortcut: keyboardShortcutsModifierLabel,
+    sequenceShortcutsEnabled,
+    sidebarShortcut: formatShortcut(configuredKeybindings.sidebarToggle),
+    t,
+  });
 
   const paletteSections = {
     actions: {
@@ -2082,7 +2350,6 @@ export function App() {
       label: t("commandPalette.groupProjects"),
     },
   } as const;
-  const configuredKeybindings = loadKeybindings();
   const commandPaletteItems: CommandPaletteItem[] = [];
   const addPaletteItem = (
     item: Omit<CommandPaletteItem, "section" | "sectionLabel">,
@@ -2241,6 +2508,28 @@ export function App() {
       scope: "actions",
     }, paletteSections.context);
   }
+
+  addPaletteItem({
+    description: t("commandPalette.keyboardShortcutsDescription"),
+    icon: <KeyboardIcon />,
+    id: "action:keyboard-shortcuts",
+    keywords: [
+      "keyboard shortcuts",
+      "hotkeys",
+      "vim",
+      "keyboard mode",
+      "단축키",
+      "키보드",
+      "快捷键",
+    ],
+    label: t("keyboardShortcuts.title"),
+    onSelect: () => setIsKeyboardShortcutsOpen(true),
+    priority: 90,
+    remember: false,
+    restoreFocusOnSelect: false,
+    scope: "actions",
+    shortcut: keyboardShortcutsModifierLabel,
+  }, paletteSections.actions);
 
   addPaletteItem({
     description: t(
@@ -2622,7 +2911,7 @@ export function App() {
     <UnifiedSettingsSidebar
       activeTarget={settingsTarget}
       isOpen={isSidebarOpen}
-      onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
+      onBack={closeSettings}
       onNavigate={(target) => {
         setSettingsTarget(target);
         navigateToLocation(settingsNavigationLocation(target));
@@ -2902,7 +3191,6 @@ export function App() {
             isSidebarOpen={isSidebarOpen}
             onBack={goBack}
             onForward={goForward}
-            onSettings={openAppSettings}
             onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
           />
         {activePage !== "settings" ? (
@@ -3069,7 +3357,7 @@ export function App() {
                 : false
             }
             navigationSidebar={unifiedSettingsSidebar}
-            onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
+            onBack={closeSettings}
             onAccountDelete={
               briar.demoMode ? undefined : briar.deleteAccount
             }
@@ -3103,9 +3391,7 @@ export function App() {
             isSidebarOpen={isSidebarOpen}
             key={settingsOrganization.id}
             navigationSidebar={unifiedSettingsSidebar}
-            onBack={() =>
-              canGoBack ? goBack() : navigateToPage("issues")
-            }
+            onBack={closeSettings}
             organization={settingsOrganization}
             onLogoChange={briar.changeOrganizationLogo}
             onRename={briar.renameOrganization}
@@ -3206,6 +3492,7 @@ export function App() {
                 setInboxDetailTarget(target);
               }}
               projects={activeOrganizationProjects}
+              selectedMessageId={inboxDetailTarget?.messageId ?? null}
               unreadCount={visibleInboxUnreadCount}
             />
             <div
@@ -3248,9 +3535,7 @@ export function App() {
             initialSection={settingsTarget.section}
             key={activeProject.id}
             navigationSidebar={unifiedSettingsSidebar}
-            onBack={() =>
-              canGoBack ? goBack() : navigateToPage("issues")
-            }
+            onBack={closeSettings}
             onDelete={async () => {
               const fallbackProject = briar.projects.find(
                 (project) => project.id !== activeProject.id,
@@ -3841,11 +4126,30 @@ export function App() {
       {commandPaletteAvailable && isCommandPaletteOpen ? (
         <CommandPalette
           contextLabel={commandPaletteContextLabel}
+          initialQuery={commandPaletteInitialQuery}
           items={commandPaletteItems}
           loading={briar.loading || channelsLoading}
-          onOpenChange={setIsCommandPaletteOpen}
+          onOpenChange={handleCommandPaletteOpenChange}
           open={isCommandPaletteOpen}
           shortcutLabel={formatShortcut(configuredKeybindings.commandPalette)}
+        />
+      ) : null}
+      {commandPaletteAvailable ? (
+        <KeyboardShortcutsDialog
+          onOpenChange={setIsKeyboardShortcutsOpen}
+          open={isKeyboardShortcutsOpen}
+          sections={keyboardShortcutHelpSections}
+        />
+      ) : null}
+      {pendingShortcut ? (
+        <KeyboardShortcutModeHint
+          choices={pendingShortcutChoices}
+          label={t(
+            pendingShortcutPrefix[0] === "g"
+              ? "keyboardShortcuts.section.go"
+              : "keyboardShortcuts.section.open",
+          )}
+          prefix={pendingShortcutPrefix.join(" ").toUpperCase()}
         />
       ) : null}
       {!briar.remoteMode &&
