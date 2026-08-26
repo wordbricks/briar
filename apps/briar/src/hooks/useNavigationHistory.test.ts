@@ -7,6 +7,10 @@ import {
 import {
   channelNavigationLocation,
   issueNavigationLocation,
+  pageFromNavigationLocation,
+  projectNavigationLocation,
+  settingsNavigationLocation,
+  type AppNavigationLocation,
 } from "../lib/app-navigation";
 
 describe("navigation history", () => {
@@ -28,33 +32,40 @@ describe("navigation history", () => {
     expect(history.entries[history.index]).toBe("auto-hunt");
   });
 
-  it("returns to a matching destination past contiguous route entries", () => {
-    let history = createNavigationHistory<string>("issues");
-    for (const value of [
-      "inbox",
-      "settings:account",
-      "settings:keybindings",
-      "settings:project",
-    ]) {
+  it("returns to the app past every visited settings scope in one action", () => {
+    const appDestination = projectNavigationLocation("issues", "project-a");
+    const settingsDestinations: AppNavigationLocation[] = [
+      settingsNavigationLocation({
+        scope: "application",
+        section: "account",
+      }),
+      settingsNavigationLocation({
+        scope: "organization",
+        organizationId: "organization-a",
+        section: "members",
+      }),
+      settingsNavigationLocation({
+        scope: "project",
+        projectId: "project-a",
+        section: "workflow",
+      }),
+    ];
+    let history =
+      createNavigationHistory<AppNavigationLocation>(appDestination);
+    for (const value of settingsDestinations) {
       history = reduceNavigationHistory(history, { type: "navigate", value });
     }
 
     history = reduceNavigationHistory(history, {
       type: "backTo",
-      predicate: (value) => !value.startsWith("settings:"),
+      predicate: (value) => pageFromNavigationLocation(value) !== "settings",
     });
 
-    expect(history.entries[history.index]).toBe("inbox");
-    expect(history.entries).toEqual([
-      "issues",
-      "inbox",
-      "settings:account",
-      "settings:keybindings",
-      "settings:project",
-    ]);
+    expect(history.entries[history.index]).toBe(appDestination);
+    expect(history.entries).toEqual([appDestination, ...settingsDestinations]);
 
     history = reduceNavigationHistory(history, { type: "forward" });
-    expect(history.entries[history.index]).toBe("settings:account");
+    expect(history.entries[history.index]).toBe(settingsDestinations[0]);
   });
 
   it("uses a clean fallback when no earlier destination matches", () => {
