@@ -1,4 +1,5 @@
 import { CircleAlert, Image as ImageIcon, Paperclip, X } from "lucide-react";
+import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { useCallback, useEffect, useState } from "react";
 import { NativeSelect } from "@/components/NativeSelect";
@@ -308,7 +309,7 @@ export function CreateIssueDialog({
         </div>
         <footer>
           <span className="issue-submit-hint">
-            <kbd>⌘</kbd>
+            <Kbd>⌘</Kbd>
             {t("issue.submitHint")}
           </span>
           <div>

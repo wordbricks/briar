@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { NativeSelect } from "@/components/NativeSelect";
 import { ProviderSelect } from "@/components/ProviderSelect";
 import { SelectMenu } from "@/components/SelectMenu";
@@ -21,6 +21,7 @@ import { eventMeta, runMeta } from "@/lib/stages";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { formatExecutionDuration, formatExecutionTokens } from "@/lib/agent-execution-metrics";
 import { issueTitleInputMaxLength, isIssueTitleWithinLimit } from "@/lib/issue-title";
+import { isKeyboardShortcutEditableTarget, keyboardShortcutEventIsComposing } from "@/lib/keyboard-shortcuts";
 import { defaultIssueDetailTab, type IssueDetailTab } from "@/lib/issue-detail-tab";
 import { issueAttachmentReference, issueAttachmentReferences, removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
 import { clampConversationPaneWidth, conversationPaneWidthDefault, conversationPaneWidthMax, conversationPaneWidthMin, loadConversationPaneWidth, saveConversationPaneWidth } from "@/lib/conversation-pane-width";
@@ -278,6 +279,7 @@ export function RunPage({
   const [inlineKeptAttachmentIds, setInlineKeptAttachmentIds] = useState<string[]>(() => (run.attachments ?? []).map(attachment => attachment.id));
   const [inlineSaveStatus, setInlineSaveStatus] = useState<"saved" | "saving" | "failed">("saved");
   const inlineSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inlineSaveTaskRef = useRef<(() => void) | null>(null);
   const inlineSaveSequenceRef = useRef(0);
   const inlineSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const inlineSavePendingRef = useRef({
@@ -287,6 +289,34 @@ export function RunPage({
   const inlineUpdateIssueRef = useRef(onUpdateIssue);
   const inlineDescriptionEditorRef = useRef<HTMLDivElement>(null);
   const canEditIssueInline = Boolean(onUpdateIssue);
+  const flushInlineSave = useCallback(() => {
+    const save = inlineSaveTaskRef.current;
+    if (!save) return;
+    if (inlineSaveTimerRef.current) {
+      clearTimeout(inlineSaveTimerRef.current);
+      inlineSaveTimerRef.current = null;
+    }
+    inlineSaveTaskRef.current = null;
+    save();
+  }, []);
+  const leaveInlineEditing = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
+    if (
+      event.defaultPrevented ||
+      event.key !== "Escape" ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      keyboardShortcutEventIsComposing(event.nativeEvent) ||
+      !isKeyboardShortcutEditableTarget(event.target) ||
+      !(event.target instanceof HTMLElement)
+    ) {
+      return;
+    }
+    event.preventDefault();
+    flushInlineSave();
+    event.target.blur();
+  }, [flushInlineSave]);
   const lastSavedInlineIssueRef = useRef({
     runId: run.id,
     title: run.title.trim(),
@@ -382,6 +412,7 @@ export function RunPage({
       clearTimeout(inlineSaveTimerRef.current);
       inlineSaveTimerRef.current = null;
     }
+    inlineSaveTaskRef.current = null;
     setInlineTitle(run.title);
     setInlineDescription(run.issueDescription ?? "");
     setInlineKeptAttachmentIds((run.attachments ?? []).map(attachment => attachment.id));
@@ -427,6 +458,7 @@ export function RunPage({
       clearTimeout(inlineSaveTimerRef.current);
       inlineSaveTimerRef.current = null;
     }
+    inlineSaveTaskRef.current = null;
     if (!canEditIssueInline) return;
     const title = inlineTitle.trim();
     const description = inlineDescription.trim() || null;
@@ -442,8 +474,11 @@ export function RunPage({
     }
     setInlineSaveStatus("saving");
     const sequence = ++inlineSaveSequenceRef.current;
-    inlineSaveTimerRef.current = setTimeout(() => {
+    const saveInlineIssue = () => {
       inlineSaveTimerRef.current = null;
+      if (inlineSaveTaskRef.current === saveInlineIssue) {
+        inlineSaveTaskRef.current = null;
+      }
       const update = inlineUpdateIssueRef.current;
       if (!update) return;
       const runAttachmentIds = (run.attachments ?? []).map(attachment => attachment.id);
@@ -485,14 +520,19 @@ export function RunPage({
           setInlineSaveStatus("failed");
         }
       });
-    }, 600);
+    };
+    inlineSaveTaskRef.current = saveInlineIssue;
+    inlineSaveTimerRef.current = setTimeout(saveInlineIssue, 600);
     return () => {
       if (inlineSaveTimerRef.current) {
         clearTimeout(inlineSaveTimerRef.current);
         inlineSaveTimerRef.current = null;
       }
+      if (inlineSaveTaskRef.current === saveInlineIssue) {
+        inlineSaveTaskRef.current = null;
+      }
     };
-  }, [canEditIssueInline, inlineDescription, inlineKeptAttachmentIds, inlineTitle, run.id, run.priority]);
+  }, [canEditIssueInline, inlineDescription, inlineKeptAttachmentIds, inlineTitle, run.difficulty, run.id, run.priority]);
   useEffect(() => {
     void loadRunEvents();
   }, [loadRunEvents, run.eventCount, run.id]);
@@ -883,7 +923,7 @@ export function RunPage({
           <small className="run-page-window-number">
             {formatIssueKey(issueKeyPrefix, run.runNumber)}
           </small>
-          <input aria-label={t("issue.title")} className="run-page-window-title run-page-inline-title" id="run-page-title" maxLength={issueTitleInputMaxLength(inlineTitle, locale)} onChange={event => setInlineTitle(event.currentTarget.value)} readOnly={!onUpdateIssue} title={inlineTitle} value={inlineTitle} />
+          <input aria-label={t("issue.title")} className="run-page-window-title run-page-inline-title" id="run-page-title" maxLength={issueTitleInputMaxLength(inlineTitle, locale)} onChange={event => setInlineTitle(event.currentTarget.value)} onKeyDown={leaveInlineEditing} readOnly={!onUpdateIssue} title={inlineTitle} value={inlineTitle} />
           {inlineSaveIndicator}
           <div className="run-page-titlebar-actions">
             {compactProperties}
@@ -915,7 +955,7 @@ export function RunPage({
                 <div className="run-page-overview">
                   <div className="run-page-title-row">
                     <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>
-                    <input aria-label={t("issue.title")} className="run-page-inline-title" id="run-page-title" maxLength={issueTitleInputMaxLength(inlineTitle, locale)} onChange={event => setInlineTitle(event.currentTarget.value)} readOnly={!onUpdateIssue} value={inlineTitle} />
+                    <input aria-label={t("issue.title")} className="run-page-inline-title" id="run-page-title" maxLength={issueTitleInputMaxLength(inlineTitle, locale)} onChange={event => setInlineTitle(event.currentTarget.value)} onKeyDown={leaveInlineEditing} readOnly={!onUpdateIssue} value={inlineTitle} />
                     {inlineSaveIndicator}
                     <IssueActionsMenu disabled={isDeletingIssue || isRecovering} mutatingDisabled={isUpdatingIssue} onCancel={canCancelRemoteExecution ? () => void runAction(onCancel) : undefined} onUnassign={canUnassign ? () => void runAction(() => onUnassignRun!(run.id)) : undefined} onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined} onTransfer={onTransfer ? () => {
                   setTransferError(null);
@@ -1012,7 +1052,7 @@ export function RunPage({
                               </button>}
                           </div>
                         </section> : null}
-                      {onUpdateIssue ? <DraftIssueDescriptionEditor attachments={editableIssueAttachments} autoSizeTextFields className="issue-description-inline-editor" description={inlineDescription} editorRef={inlineDescriptionEditorRef} label={t("issue.description")} onChange={setInlineDescription} onLoadAttachment={onLoadAttachment} onRemoveAttachment={reference => {
+                      {onUpdateIssue ? <DraftIssueDescriptionEditor attachments={editableIssueAttachments} autoSizeTextFields className="issue-description-inline-editor" description={inlineDescription} editorRef={inlineDescriptionEditorRef} label={t("issue.description")} onChange={setInlineDescription} onKeyDown={leaveInlineEditing} onLoadAttachment={onLoadAttachment} onRemoveAttachment={reference => {
                       setInlineKeptAttachmentIds(current => current.filter(attachmentId => attachmentId !== reference));
                       setInlineDescription(current => removeIssueAttachmentMarkdown(current, reference));
                     }} placeholder={t("issue.descriptionPlaceholder")} removeLabel={name => t("issue.remove", {
