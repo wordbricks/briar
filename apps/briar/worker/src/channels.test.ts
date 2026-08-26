@@ -2461,7 +2461,7 @@ describe("organization channels", () => {
     ]);
   });
 
-  it("reuses and serializes a thread session, fails over once, and cleans it after the sliding TTL", async () => {
+  it("reuses a thread session across conflicting device preferences, fails over, and cleans it after the sliding TTL", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000201";
     const agentId = "aa000000-0000-4000-8000-000000000201";
     const rootId = "f0000000-0000-4000-8000-000000000201";
@@ -2656,8 +2656,10 @@ describe("organization channels", () => {
       triggerMessageId: followupId,
       parentMessageId: rootId,
       agents: [{ id: agentId, projectId, provider: "claude" }],
+      preferredDeviceId: fallbackDeviceId,
       createdAt: time(3),
     });
+    expect(followupJob.preferred_device_id).toBe(fallbackDeviceId);
     await expect(claim(
       boundWorkerId,
       deviceId,
@@ -2694,6 +2696,9 @@ describe("organization channels", () => {
       "7".repeat(64),
       time(6),
     )).resolves.toBeNull();
+    // A live session owner wins over a conflicting message-level preference.
+    // Otherwise the owner yields to the preferred device while the preferred
+    // device yields back to the owner, leaving the reply queued forever.
     const concurrent = await Promise.all([
       claim(boundWorkerId, deviceId, "8".repeat(64), time(6)),
       claim(boundWorkerId, deviceId, "9".repeat(64), time(6)),
