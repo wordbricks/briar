@@ -5,12 +5,18 @@ import {
   resolve,
 } from "node:path";
 import * as Schema from "effect/Schema";
-import { repositoryWorkflowPendingStageId } from "../src/lib/auto-hunt-contract";
+import {
+  isRepositoryWorkflowPending,
+  repositoryWorkflowPendingStageId,
+} from "../src/lib/auto-hunt-contract";
 import {
   projectWorktreeRoot,
   resolveBaseRef,
 } from "./worktree";
-import { type ProjectConfig } from "./config-contract";
+import {
+  type Config,
+  type ProjectConfig,
+} from "./config-contract";
 import { decodeVelenEnvelope } from "./command-contract";
 import {
   args,
@@ -29,6 +35,13 @@ import {
   currentProject,
 } from "./command-support";
 import { HttpRequestError } from "./execution-metrics-upload";
+import {
+  configWithRemoteProjectSettings,
+  type FetchRemoteProjectSettings,
+  fetchRemoteProjectSettings,
+  projectWithRemoteSettings,
+  remoteWorkflowState,
+} from "./project-settings-sync";
 
 const ProjectListResponse = Schema.Struct({
   projects: Schema.Array(Schema.Struct({
@@ -347,44 +360,195 @@ async function configureProject() {
   );
 }
 
-async function projectDoctor() {
-  const config = await loadConfig();
-  const project = await currentProject(config);
+export type ProjectDoctorDependencies = {
+  loadConfiguration: () => Promise<Config>;
+  selectProject: (config: Config) => Promise<ProjectConfig>;
+  environmentToken: () => string | undefined;
+  fetchProjectSettings: FetchRemoteProjectSettings;
+  persistConfig: (config: Config) => Promise<void>;
+  inspectVelen: typeof ensureConfiguredVelen;
+  resolveProjectBaseRef: (project: ProjectConfig) => string | null;
+  writeOutput: (output: string) => void;
+};
+
+const defaultProjectDoctorDependencies: ProjectDoctorDependencies = {
+  loadConfiguration: loadConfig,
+  selectProject: currentProject,
+  environmentToken: () => process.env.BRIAR_USER_TOKEN,
+  fetchProjectSettings: fetchRemoteProjectSettings,
+  persistConfig: saveConfig,
+  inspectVelen: ensureConfiguredVelen,
+  resolveProjectBaseRef: (project) =>
+    resolveBaseRef(runGit, project.repositoryPath),
+  writeOutput: console.log,
+};
+
+type ProjectDoctorWorkflowSync = {
+  status:
+    | "local_ready"
+    | "refreshed"
+    | "server_generation_pending"
+    | "local_persistence_failed"
+    | "session_unavailable"
+    | "api_unavailable"
+    | "network_unavailable";
+  source: "local" | "server";
+  persisted: boolean;
+  serverWorkflowState: "ready" | "generation_pending" | null;
+  message: string;
+};
+
+const unavailableWorkflowSync = (
+  error: unknown,
+): ProjectDoctorWorkflowSync => {
+  if (error instanceof HttpRequestError && error.status === 401) {
+    return {
+      status: "session_unavailable",
+      source: "server",
+      persisted: false,
+      serverWorkflowState: null,
+      message: "Briar login session is invalid or expired",
+    };
+  }
+  if (error instanceof TypeError) {
+    return {
+      status: "network_unavailable",
+      source: "server",
+      persisted: false,
+      serverWorkflowState: null,
+      message: "Project settings could not be reached over the network",
+    };
+  }
+  return {
+    status: "api_unavailable",
+    source: "server",
+    persisted: false,
+    serverWorkflowState: null,
+    message: "Project settings API did not return usable settings",
+  };
+};
+
+async function projectDoctor(
+  dependencies: Partial<ProjectDoctorDependencies> = {},
+) {
+  const resolved = { ...defaultProjectDoctorDependencies, ...dependencies };
+  const config = await resolved.loadConfiguration();
+  const project = await resolved.selectProject(config);
+  let effectiveProject = project;
+  let workflow = project.autoHunt?.workflow;
+  let workflowSync: ProjectDoctorWorkflowSync = {
+    status: "local_ready",
+    source: "local",
+    persisted: true,
+    serverWorkflowState: null,
+    message: "Local repository workflow is ready",
+  };
+
+  if (!workflow || isRepositoryWorkflowPending(workflow)) {
+    const userToken = resolved.environmentToken()?.trim() ||
+      config.userToken?.trim();
+    if (!userToken) {
+      workflow = undefined;
+      workflowSync = {
+        status: "session_unavailable",
+        source: "server",
+        persisted: false,
+        serverWorkflowState: null,
+        message: "Briar login session is unavailable",
+      };
+    } else {
+      try {
+        const settings = await resolved.fetchProjectSettings(
+          config.apiUrl,
+          project.id,
+          userToken,
+        );
+        const serverWorkflowState = remoteWorkflowState(settings);
+        effectiveProject = projectWithRemoteSettings(project, settings);
+        workflow = serverWorkflowState === "ready"
+          ? settings.workflow
+          : undefined;
+        try {
+          await resolved.persistConfig(configWithRemoteProjectSettings(
+            config,
+            project.id,
+            settings,
+          ));
+          workflowSync = serverWorkflowState === "ready"
+            ? {
+                status: "refreshed",
+                source: "server",
+                persisted: true,
+                serverWorkflowState,
+                message: "Repository workflow was refreshed from Briar",
+              }
+            : {
+                status: "server_generation_pending",
+                source: "server",
+                persisted: true,
+                serverWorkflowState,
+                message: "Briar is still generating the repository workflow",
+              };
+        } catch {
+          workflowSync = {
+            status: "local_persistence_failed",
+            source: "server",
+            persisted: false,
+            serverWorkflowState,
+            message: "Remote project settings exist but local config could not be updated",
+          };
+        }
+      } catch (error) {
+        workflow = undefined;
+        workflowSync = unavailableWorkflowSync(error);
+      }
+    }
+  }
+
   let velen: ReturnType<typeof ensureConfiguredVelen> = null;
   let velenError: string | null = null;
   try {
-    velen = ensureConfiguredVelen(project);
+    velen = resolved.inspectVelen(effectiveProject);
   } catch (error) {
     velenError = error instanceof Error ? error.message : String(error);
   }
-  console.log(
-    JSON.stringify({
-      ok: true,
-      projectId: project.id,
-      repositoryPath: project.repositoryPath,
-      velenOrg: project.autoHunt?.velenOrg ?? null,
-      linearEnabled: project.autoHunt?.linear?.enabled ?? false,
-      linearSource: project.autoHunt?.linear?.source ?? null,
-      dataSource: project.autoHunt?.dataSource ?? null,
-      workflow: configuredWorkflow(project),
-      worktrees: {
-        enabled: worktreesEnabled(project),
-        root: projectWorktreeRoot(worktreeSettings(project).root, project.id),
-        branchPrefix: worktreeSettings(project).branchPrefix,
-        // null means no origin/HEAD and no main/master: allocation would fail.
-        baseRef: resolveBaseRef(runGit, project.repositoryPath),
-      },
-      sandbox: {
-        // true is the default; false opts into checkout/worktree-confined writes.
-        fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
-      },
-      velenHealthy: velenError === null,
-      velenError,
-      requestIds: [velen?.auth.requestId, velen?.org.requestId, velen?.linear?.requestId].filter(
-        Boolean,
+  const result = {
+    ok: Boolean(workflow) && workflowSync.status !== "local_persistence_failed",
+    projectId: project.id,
+    repositoryPath: project.repositoryPath,
+    velenOrg: effectiveProject.autoHunt?.velenOrg ?? null,
+    linearEnabled: effectiveProject.autoHunt?.linear?.enabled ?? false,
+    linearSource: effectiveProject.autoHunt?.linear?.source ?? null,
+    dataSource: effectiveProject.autoHunt?.dataSource ?? null,
+    githubRepository: effectiveProject.autoHunt?.githubRepository ?? null,
+    workflow: workflow ?? null,
+    workflowSync,
+    worktrees: {
+      enabled: worktreesEnabled(effectiveProject),
+      root: projectWorktreeRoot(
+        worktreeSettings(effectiveProject).root,
+        effectiveProject.id,
       ),
-    }),
-  );
+      branchPrefix: worktreeSettings(effectiveProject).branchPrefix,
+      // null means no origin/HEAD and no main/master: allocation would fail.
+      baseRef: resolved.resolveProjectBaseRef(effectiveProject),
+    },
+    sandbox: {
+      // true is the default; false opts into checkout/worktree-confined writes.
+      fullAccess: effectiveProject.autoHunt?.sandbox?.fullAccess ?? true,
+    },
+    velenHealthy: velenError === null,
+    velenError,
+    requestIds: [velen?.auth.requestId, velen?.org.requestId, velen?.linear?.requestId].filter(
+      Boolean,
+    ),
+  };
+  resolved.writeOutput(JSON.stringify(result));
+  if (!result.ok) {
+    throw new Error(
+      `Project doctor could not use the repository workflow: ${workflowSync.status}`,
+    );
+  }
 }
 
 async function showWorkflow() {

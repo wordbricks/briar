@@ -277,6 +277,9 @@ for shell_profile in /home/briar/.profile /home/briar/.bashrc; do
 done
 
 install -o root -g root -m 0755 \
+  "$source_dir/briar-open-browser" \
+  /opt/briar/bin/briar-open-browser
+install -o root -g root -m 0755 \
   "$source_dir/briar-managed-runtime-update-request" \
   "$source_dir/briar-managed-runtime-updater" \
   "$source_dir/verify-managed-image" \

@@ -5,6 +5,7 @@ import {
 } from "../src/lib/agent-provider";
 import {
   cliVersion,
+  currentProject,
   gitValueAt,
   loadConfig,
   login,
@@ -21,6 +22,13 @@ import {
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
 } from "./provider-health";
+import {
+  configWithRemoteProjectSettings,
+  type FetchRemoteProjectSettings,
+  fetchRemoteProjectSettings,
+  projectWithRemoteSettings,
+  remoteWorkflowState,
+} from "./project-settings-sync";
 export { managedComputerWorkerSupervisor } from "./managed-computer-supervisor";
 
 type SetupSessionResponse = {
@@ -93,6 +101,71 @@ async function configForManagedComputer(apiOrigin: string) {
   return { config, userToken };
 }
 
+type ManagedComputerCredential = Awaited<
+  ReturnType<typeof loadManagedComputerCredential>
+>;
+
+export type ManagedComputerSyncDependencies = {
+  credentialPath: () => string;
+  loadCredential: (path: string) => Promise<ManagedComputerCredential>;
+  loadAuthentication: typeof configForManagedComputer;
+  resolveProjectId: (
+    config: Awaited<ReturnType<typeof loadConfig>>,
+  ) => Promise<string>;
+  fetchProjectSettings: FetchRemoteProjectSettings;
+  persistConfig: typeof saveConfig;
+  writeOutput: (output: string) => void;
+};
+
+const defaultManagedComputerSyncDependencies: ManagedComputerSyncDependencies = {
+  credentialPath: credentialPathFromFlag,
+  loadCredential: loadManagedComputerCredential,
+  loadAuthentication: configForManagedComputer,
+  resolveProjectId: async (config) =>
+    value("--project")?.trim() || (await currentProject(config)).id,
+  fetchProjectSettings: fetchRemoteProjectSettings,
+  persistConfig: saveConfig,
+  writeOutput: console.log,
+};
+
+export async function managedComputerSyncCommand(
+  dependencies: Partial<ManagedComputerSyncDependencies> = {},
+) {
+  const resolved = {
+    ...defaultManagedComputerSyncDependencies,
+    ...dependencies,
+  };
+  const credential = await resolved.loadCredential(resolved.credentialPath());
+  const { config, userToken } = await resolved.loadAuthentication(
+    credential.apiOrigin,
+  );
+  const projectId = await resolved.resolveProjectId(config);
+  const project = config.projects.find((candidate) => candidate.id === projectId);
+  if (!project) {
+    throw new Error(
+      `Briar project ${projectId} is not configured on this managed computer`,
+    );
+  }
+  const settings = await resolved.fetchProjectSettings(
+    credential.apiOrigin,
+    projectId,
+    userToken,
+  );
+  const nextConfig = configWithRemoteProjectSettings(
+    config,
+    projectId,
+    settings,
+  );
+  await resolved.persistConfig(nextConfig);
+  resolved.writeOutput(JSON.stringify({
+    projectId,
+    githubRepository: settings.githubRepository,
+    workflowState: remoteWorkflowState(settings),
+    workflowRequirementCount: settings.workflow.requirements.length,
+    synced: true,
+  }));
+}
+
 export async function managedComputerSetupCommand() {
   const credentialFile = credentialPathFromFlag();
   const credential = await loadManagedComputerCredential(credentialFile);
@@ -139,6 +212,12 @@ export async function managedComputerSetupCommand() {
   if (computer.computer.deviceId !== credential.deviceId) {
     throw new Error("This managed computer enrollment does not match the API");
   }
+
+  const authoritativeSettings = await fetchRemoteProjectSettings(
+    credential.apiOrigin,
+    projectId,
+    userToken,
+  );
 
   const existingProject = config.projects.find((project) => project.id === projectId);
   const provider = providerFromFlag(existingProject?.llm?.provider ?? "codex");
@@ -204,7 +283,7 @@ export async function managedComputerSetupCommand() {
     repositoryPath,
     ["remote", "get-url", "origin"],
   ) ?? undefined;
-  const project = {
+  const project = projectWithRemoteSettings({
     ...existingProject,
     id: projectId,
     repositoryPath,
@@ -218,7 +297,7 @@ export async function managedComputerSetupCommand() {
       label: binding.worker.label,
       maxConcurrentSessions: binding.worker.maxConcurrentSessions,
     },
-  };
+  }, authoritativeSettings);
   config.apiUrl = credential.apiOrigin;
   config.managedComputer = {
     managedComputerId: credential.managedComputerId,
