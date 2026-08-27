@@ -1617,6 +1617,8 @@ export const ko = {
   "run.commit": "커밋",
   "run.pullRequest": "Pull request",
   "run.openPullRequest": "{label} 바로 열기",
+  "run.relatedMessage": "관련 메시지",
+  "run.openRelatedMessage": "관련 메시지로 돌아가기",
   "run.started": "시작",
   "run.activity": "활동 기록",
   "run.activityCount": "기록 {count}개",
@@ -3690,6 +3692,8 @@ export const en = {
   "settings.mergeQueueState.enqueued": "Enqueued",
   "settings.mergeQueueState.merged": "Merged",
   "settings.mergeQueueState.dequeued": "Dequeued",
+  "run.relatedMessage": "Related message",
+  "run.openRelatedMessage": "Return to related message",
 } satisfies Messages;
 export const zh = {
   ...en,
@@ -5031,4 +5035,6 @@ export const zh = {
   "settings.mergeQueueState.enqueued": "已入队",
   "settings.mergeQueueState.merged": "已合并",
   "settings.mergeQueueState.dequeued": "已移出队列",
+  "run.relatedMessage": "相关消息",
+  "run.openRelatedMessage": "返回相关消息",
 } satisfies Messages;

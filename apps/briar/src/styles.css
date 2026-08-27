@@ -1091,6 +1091,7 @@ body { overflow: hidden; font-synthesis: none; }
 .issue-result-reviewers.compact .issue-result-reviewer { max-width:220px; min-height:28px; padding:2px 7px 2px 3px; }
 .issue-result-reviewers.compact .issue-result-reviewer-avatar { width:22px; height:22px; flex-basis:22px; }
 .run-property-link { text-decoration:none; cursor:pointer; }.run-property-link:hover { background:var(--accent); }.run-property-link:focus-visible { outline:2px solid var(--ring); outline-offset:1px; }
+.run-property-button { width:100%; padding:0; border:0; font:inherit; text-align:left; background:transparent; cursor:pointer; }.run-property-button:hover { background:var(--accent); }.run-property-button:focus-visible { outline:2px solid var(--ring); outline-offset:1px; }.run-property-button .run-property-copy { gap:3px; }.run-property-button .run-property-copy small { overflow:hidden; color:var(--muted-foreground); font-size:var(--text-2xs); line-height:1.3; text-overflow:ellipsis; white-space:nowrap; }.run-property-icon.related-message { color:#318064; }
 .run-properties .run-status-control { margin:0; padding:0; grid-template-columns:24px minmax(0,1fr) 14px; gap:10px; border:0; background:transparent; }
 .run-properties .run-status-control select { width:100%; height:20px; margin:-2px 0 0; padding:0 20px 0 0; border:0; border-radius:6px; outline:0; color:var(--foreground); background:transparent; font-size:var(--text-sm); font-weight:600; cursor:pointer; }
 .run-properties .run-status-control select:hover { background:var(--accent); }

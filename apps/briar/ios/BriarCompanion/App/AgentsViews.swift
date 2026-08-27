@@ -621,6 +621,7 @@ struct SessionDetailView: View {
     let snapshot: DashboardSnapshot?
     let issueConversationView: IssueConversationViewTracker?
     let refreshDashboard: () async -> Void
+    let onRelatedMessageOpen: (RelatedMessageReference) -> Void
     let onSkillSessionMaterialized: SkillSessionMaterializedHandler
     let onSkillSessionOpen: SkillSessionOpenHandler
 
@@ -634,6 +635,7 @@ struct SessionDetailView: View {
         snapshot: DashboardSnapshot?,
         issueConversationView: IssueConversationViewTracker? = nil,
         refreshDashboard: @escaping () async -> Void,
+        onRelatedMessageOpen: @escaping (RelatedMessageReference) -> Void = { _ in },
         onSkillSessionMaterialized: @escaping SkillSessionMaterializedHandler = { _ in },
         onSkillSessionOpen: @escaping SkillSessionOpenHandler = { _, _ in }
     ) {
@@ -646,6 +648,7 @@ struct SessionDetailView: View {
         self.snapshot = snapshot
         self.issueConversationView = issueConversationView
         self.refreshDashboard = refreshDashboard
+        self.onRelatedMessageOpen = onRelatedMessageOpen
         self.onSkillSessionMaterialized = onSkillSessionMaterialized
         self.onSkillSessionOpen = onSkillSessionOpen
     }
@@ -726,6 +729,7 @@ struct SessionDetailView: View {
                                     providers: snapshot?.organizationProviders ?? [],
                                     issueConversationView: issueConversationView,
                                     refresh: refreshDashboard,
+                                    onRelatedMessageOpen: onRelatedMessageOpen,
                                     onSkillSessionMaterialized: onSkillSessionMaterialized,
                                     onSkillSessionOpen: onSkillSessionOpen
                                 )
