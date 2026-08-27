@@ -16,6 +16,12 @@ const sections: KeyboardShortcutHelpSection[] = [
     items: [
       { id: "create", keys: ["C"], label: "Create new issue" },
       { id: "palette", keys: ["⌘K"], label: "Open command palette" },
+      {
+        id: "palette-alternative",
+        join: "or",
+        keys: ["Ctrl+K", "/"],
+        label: "Open command palette another way",
+      },
     ],
   },
   {
@@ -68,6 +74,26 @@ describe("KeyboardShortcutsDialog", () => {
     expect(dialog?.textContent).toContain("Go to inbox");
     expect(document.activeElement).toBe(input);
 
+    const singleKey = document.querySelector<HTMLElement>('dd[aria-label="C"]');
+    expect(singleKey?.querySelectorAll('[data-slot="kbd-group"]')).toHaveLength(0);
+    expect(singleKey?.querySelectorAll('[data-slot="kbd"]')).toHaveLength(1);
+
+    const modifierGroup = [...document.querySelectorAll<HTMLElement>(
+      '[data-slot="kbd-group"]',
+    )].find((group) => group.textContent === "⌘K");
+    expect(modifierGroup?.tagName).toBe("DIV");
+    expect(modifierGroup?.querySelectorAll('[data-slot="kbd"]')).toHaveLength(2);
+
+    const alternative = document.querySelector<HTMLElement>(
+      'dd[aria-label="Ctrl+K or /"]',
+    );
+    expect(alternative?.querySelectorAll('[data-slot="kbd-group"]')).toHaveLength(1);
+    const alternativeGroup = alternative?.querySelector<HTMLElement>(
+      '[data-slot="kbd-group"]',
+    );
+    expect(alternativeGroup?.nextElementSibling?.textContent).toBe("or");
+    expect(alternativeGroup?.parentElement).toBe(alternative);
+
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
         HTMLInputElement.prototype,
@@ -81,6 +107,14 @@ describe("KeyboardShortcutsDialog", () => {
     expect(dialog?.textContent).toContain("Go to inbox");
     expect(dialog?.textContent).toContain("G");
     expect(dialog?.textContent).toContain("I");
+
+    const sequence = document.querySelector<HTMLElement>('dd[aria-label="G → I"]');
+    const sequenceSeparator = sequence?.querySelector<HTMLElement>(
+      '[aria-hidden="true"]',
+    );
+    expect(sequence?.querySelectorAll('[data-slot="kbd-group"]')).toHaveLength(0);
+    expect(sequenceSeparator?.textContent).toBe("→");
+    expect(sequenceSeparator?.parentElement).toBe(sequence);
   });
 
   it("shows an empty result state", async () => {

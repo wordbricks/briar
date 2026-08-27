@@ -1,5 +1,5 @@
 import { Keyboard, Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   Dialog,
@@ -7,7 +7,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Kbd } from "@/components/ui/kbd";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
 
@@ -31,6 +31,29 @@ function normalizedSearchText(value: string): string {
     .replace(/\p{Mark}+/gu, "")
     .toLocaleLowerCase()
     .trim();
+}
+
+const namedModifierPrefix = /^(?:(?:Ctrl|Alt|Shift|Cmd|Meta|Control|Option|Command)\+)+/u;
+const symbolModifierPrefix = /^[⌘⌃⌥⇧]+/u;
+
+function shortcutKeyParts(key: string): readonly string[] {
+  const namedPrefix = key.match(namedModifierPrefix)?.[0];
+  if (namedPrefix) {
+    const primaryKey = key.slice(namedPrefix.length);
+    if (primaryKey) {
+      return [
+        ...namedPrefix.split("+").filter(Boolean),
+        primaryKey,
+      ];
+    }
+  }
+
+  const symbolPrefix = key.match(symbolModifierPrefix)?.[0];
+  if (symbolPrefix && symbolPrefix.length < key.length) {
+    return [...symbolPrefix, key.slice(symbolPrefix.length)];
+  }
+
+  return [key];
 }
 
 export function KeyboardShortcutsDialog({
@@ -154,7 +177,7 @@ export function KeyboardShortcutsDialog({
                           className="flex shrink-0 items-center gap-1"
                         >
                           {item.keys.map((key, index) => (
-                            <span className="contents" key={`${item.id}-${key}-${index}`}>
+                            <Fragment key={`${item.id}-${key}-${index}`}>
                               {index > 0 ? (
                                 <span
                                   aria-hidden="true"
@@ -167,10 +190,23 @@ export function KeyboardShortcutsDialog({
                                   )}
                                 </span>
                               ) : null}
-                              <Kbd className="h-auto min-w-6 rounded-md border border-border bg-card px-1.5 py-1 text-center font-mono text-[10px] font-semibold text-foreground shadow-xs">
-                                {key}
-                              </Kbd>
-                            </span>
+                              {shortcutKeyParts(key).length > 1 ? (
+                                <KbdGroup>
+                                  {shortcutKeyParts(key).map((part, partIndex) => (
+                                    <Kbd
+                                      className="h-auto min-w-6 rounded-md border border-border bg-card px-1.5 py-1 text-center font-mono text-[10px] font-semibold text-foreground shadow-xs"
+                                      key={`${item.id}-${key}-${index}-${partIndex}`}
+                                    >
+                                      {part}
+                                    </Kbd>
+                                  ))}
+                                </KbdGroup>
+                              ) : (
+                                <Kbd className="h-auto min-w-6 rounded-md border border-border bg-card px-1.5 py-1 text-center font-mono text-[10px] font-semibold text-foreground shadow-xs">
+                                  {key}
+                                </Kbd>
+                              )}
+                            </Fragment>
                           ))}
                         </dd>
                       </div>
