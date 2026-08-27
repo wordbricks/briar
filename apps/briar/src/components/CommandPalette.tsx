@@ -440,14 +440,14 @@ export function CommandPalette({
 
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border/70 bg-muted/30 px-4 py-2.5 text-[10px] text-muted-foreground">
           <span>{t("commandPalette.scopeHint")}</span>
-          <span className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
               <KbdGroup>
                 <Kbd className="h-auto rounded border border-border bg-background px-1 py-0.5 font-mono text-[10px]">↑</Kbd>
                 <Kbd className="h-auto rounded border border-border bg-background px-1 py-0.5 font-mono text-[10px]">↓</Kbd>
               </KbdGroup>
               {t("commandPalette.select")}
-            </span>
+            </div>
             <span className="flex items-center gap-1">
               <Kbd className="h-auto rounded border border-border bg-background px-1 py-0.5 font-mono text-[10px]">↵</Kbd>
               {t("common.open")}
@@ -456,7 +456,7 @@ export function CommandPalette({
               <Kbd className="h-auto rounded border border-border bg-background px-1 py-0.5 font-mono text-[10px]">esc</Kbd>
               {t("common.close")}
             </span>
-          </span>
+          </div>
         </div>
         {groups.length > 0 ? (
           <span aria-live="polite" className="sr-only">
