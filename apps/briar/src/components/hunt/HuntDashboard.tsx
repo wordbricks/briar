@@ -168,6 +168,7 @@ export function HuntDashboard({
   },
   onDeleteIssueMessage = async () => undefined,
   requestedRunId = null,
+  requestedRunMessageId = null,
   requestedRunInitialTab = null,
   selectedRunId: controlledSelectedRunId,
   issueListRequestKey = 0,
@@ -248,6 +249,7 @@ export function HuntDashboard({
   }) => Promise<IssueMessage>;
   onDeleteIssueMessage?: (runId: string, messageId: string) => Promise<unknown>;
   requestedRunId?: string | null;
+  requestedRunMessageId?: string | null;
   requestedRunInitialTab?: IssueDetailTab | null;
   selectedRunId?: string | null;
   issueListRequestKey?: number;
@@ -283,6 +285,7 @@ export function HuntDashboard({
     onSelectedRunChange?.(runId);
   }, [controlledSelectedRunId, onSelectedRunChange]);
   const [selectedRunInitialTab, setSelectedRunInitialTab] = useState<IssueDetailTab | null>(null);
+  const [selectedRunMessageId, setSelectedRunMessageId] = useState<string | null>(null);
   const [internalIsIssueDialogOpen, setInternalIsIssueDialogOpen] = useState(false);
   const isIssueDialogOpen = controlledIsIssueDialogOpen ?? internalIsIssueDialogOpen;
   const [createIssuePlacement, setCreateIssuePlacement] = useState<HuntRunPlacement | null>(null);
@@ -315,6 +318,7 @@ export function HuntDashboard({
       return true;
     }
     if (selectedRunId) {
+      setSelectedRunMessageId(null);
       setSelectedRunInitialTab(null);
       setSelectedRunId(null);
       return true;
@@ -516,16 +520,18 @@ export function HuntDashboard({
     return sortAgentProviders([...new Set((dashboard?.workers ?? []).flatMap(worker => worker.providers ?? []))]);
   }, [dashboard?.organizationProviders, dashboard?.workers]);
   useEffect(() => {
+    setSelectedRunMessageId(null);
     setSelectedRunInitialTab(null);
     setSelectedRunId(null);
   }, [issueListRequestKey]);
   useEffect(() => {
     if (!requestedRunId) return;
     if (!runs.some(run => run.id === requestedRunId)) return;
+    setSelectedRunMessageId(requestedRunMessageId);
     setSelectedRunInitialTab(requestedRunInitialTab);
     setSelectedRunId(requestedRunId);
     onRequestedRunOpen?.();
-  }, [onRequestedRunOpen, requestedRunId, requestedRunInitialTab, runs]);
+  }, [onRequestedRunOpen, requestedRunId, requestedRunInitialTab, requestedRunMessageId, runs]);
   useEffect(() => {
     if (!selected || !selectedInboxVersion) return;
     onIssueViewed?.(selected.id);
@@ -765,18 +771,22 @@ export function HuntDashboard({
   }
   if (selected) {
     return <>
-      <RunPage assignedWorker={workerById.get(selected.workerId ?? "") ?? workerById.get(selected.requestedWorkerId ?? "") ?? null} companionMode={companionMode} conversationInboxSyncSignal={conversationInboxSyncSignal} initialDetailTab={selectedRunInitialTab ?? undefined} issueKeyPrefix={dashboard?.project.issueKeyPrefix} currentUserId={currentUserId} error={displayedError} showErrorToast={false} isDeletingIssue={deletingIssueId === selected.id} isRecovering={recoveringRunId === selected.id} isUpdatingIssue={updatingIssueId === selected.id} isSidebarOpen={isSidebarOpen} onBack={() => {
+      <RunPage assignedWorker={workerById.get(selected.workerId ?? "") ?? workerById.get(selected.requestedWorkerId ?? "") ?? null} companionMode={companionMode} conversationInboxSyncSignal={conversationInboxSyncSignal} highlightedMessageId={selectedRunMessageId} initialDetailTab={selectedRunInitialTab ?? undefined} issueKeyPrefix={dashboard?.project.issueKeyPrefix} currentUserId={currentUserId} error={displayedError} showErrorToast={false} isDeletingIssue={deletingIssueId === selected.id} isRecovering={recoveringRunId === selected.id} isUpdatingIssue={updatingIssueId === selected.id} isSidebarOpen={isSidebarOpen} onBack={() => {
+        setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(null);
       }} onCancel={() => onCancelRun(selected.id)} onDelete={async () => {
         await onDeleteIssue(selected.id);
+        setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(null);
       }} onTransfer={onTransferIssue ? async targetProjectId => {
         await onTransferIssue(selected.id, targetProjectId);
+        setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(null);
       } : undefined} transferProjects={transferDestinationProjects} onAddDependency={onAddIssueDependency ? prerequisiteRunId => onAddIssueDependency(selected.id, prerequisiteRunId) : undefined} onAcceptIssueAction={onAcceptIssueAction ? proposal => onAcceptIssueAction(selected.id, proposal) : undefined} onAcceptIssueExecution={onAcceptIssueExecution ? (proposal, input) => onAcceptIssueExecution(selected.id, proposal, input) : undefined} onAcceptSkillExecution={onAcceptSkillExecution ? (proposal, input) => onAcceptSkillExecution(selected.id, proposal, input) : undefined} onRemoveDependency={onRemoveIssueDependency ? prerequisiteRunId => onRemoveIssueDependency(selected.id, prerequisiteRunId) : undefined} onRelatedMessageOpen={onRelatedMessageOpen} onDependencyOpen={runId => {
+        setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(runId);
       }} onLoadAttachment={onLoadAttachment} onLoadIssueMessages={() => onLoadIssueMessages(selected.id)} onLoadRunEvents={() => onLoadRunEvents(selected.id)} onLoadRunEvidence={() => onLoadRunEvidence(selected.id)} onLoadRunEvidenceImage={onLoadRunEvidenceImage} onViewingIssueConversationChange={onViewingIssueConversationChange} onCompleteResultReview={onCompleteResultReview ? () => onCompleteResultReview(selected.id) : undefined} mentionMembers={dashboard?.members ?? []} mentionAgents={agents.filter(agent => agent.projectId === dashboard?.project.id)} onMove={placement => onMoveRun(selected.id, placement)} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(selected) : undefined} onRetry={() => onRetryRun(selected.id)} onRework={onReworkRun ? input => onReworkRun(selected.id, input) : undefined} onResume={() => onResumeRun(selected.id)} onSendIssueMessage={input => onSendIssueMessage(selected.id, input)} onEditIssueMessage={(messageId, input) => onEditIssueMessage(selected.id, messageId, input)} onDeleteIssueMessage={messageId => onDeleteIssueMessage(selected.id, messageId)} onUpdateIssue={input => onUpdateIssue(selected.id, input)} onUpdateIssueCheckpoints={checkpoints => onUpdateIssueCheckpoints(selected.id, checkpoints)} onUpdateIssuePreferences={input => onUpdateIssuePreferences(selected.id, input)} onUpdateIssueSubscription={onUpdateIssueSubscription ? subscribed => onUpdateIssueSubscription(selected.id, subscribed) : undefined} availableProviders={availableProviders} executionPolicy={dashboard?.executionPolicy} executionWorkers={dashboard?.workers ?? []} performedAgentName={agentAssociationsByRunId.performedAgents.get(selected.id)?.name ?? null} performedAgentProvider={agentAssociationsByRunId.performedAgents.get(selected.id)?.provider ?? null} performedAgentModel={agentAssociationsByRunId.performedAgents.get(selected.id)?.model ?? null} organizationId={dashboard!.project.organizationId} projectId={dashboard!.project.id} run={selected} isProcessing={processingIssueIds.has(selected.id)} availableRuns={dashboard!.runs} token={token} />
@@ -866,6 +876,7 @@ export function HuntDashboard({
         setTransferTargetProjectId(transferDestinationProjects[0]?.id ?? "");
         setTransferringRunFromMenuId(runId);
       } : undefined} onMove={(run, placement) => onMoveRun(run.id, placement).catch(() => undefined)} onOpen={runId => {
+        setSelectedRunMessageId(null);
         setSelectedRunInitialTab(null);
         setSelectedRunId(runId);
       }} onProcessIssueNow={onProcessIssueNow} onPriorityChange={(run, priority) => onUpdateIssue(run.id, {
@@ -974,6 +985,7 @@ export function HuntDashboard({
                       }
                       setKanbanCursorRunId(run.id);
                       rememberKanbanScrollPosition();
+                      setSelectedRunMessageId(null);
                       setSelectedRunInitialTab(null);
                       setSelectedRunId(run.id);
                     }} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(run) : undefined} onPriorityChange={priority => onUpdateIssue(run.id, {
@@ -1111,6 +1123,7 @@ export function HuntDashboard({
             void onTransferIssue(transferringRunFromMenu.id, transferTargetProjectId).then(() => {
               setTransferringRunFromMenuId(null);
               if (selectedRunId === transferringRunFromMenu.id) {
+                setSelectedRunMessageId(null);
                 setSelectedRunInitialTab(null);
                 setSelectedRunId(null);
               }

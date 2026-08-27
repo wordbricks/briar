@@ -64,6 +64,7 @@ export function RunPage({
   executionPolicy,
   executionWorkers = [],
   executionCostEstimate: providedExecutionCostEstimate = null,
+  highlightedMessageId = null,
   initialDetailTab,
   isDeletingIssue = false,
   isProcessing = false,
@@ -127,6 +128,7 @@ export function RunPage({
   executionPolicy?: ProjectExecutionWorkerPolicy;
   executionWorkers?: ExecutionWorker[];
   executionCostEstimate?: AgentExecutionCostEstimate | null;
+  highlightedMessageId?: string | null;
   initialDetailTab?: IssueDetailTab;
   isDeletingIssue?: boolean;
   isProcessing?: boolean;
@@ -1308,14 +1310,14 @@ export function RunPage({
                     </div> : activeDetailTab === "agentActivity" ? <IssueAgentActivityPanel activity={agentActivity} error={workerEvents.error} id={`${detailTabsId}-agent-activity-panel`} isLive={workerExecutionIsLive && hasWorkerExecution} labelledBy={`${detailTabsId}-agent-activity-tab`} loading={workerEvents.isLoading} provider={activityProvider} /> : activeDetailTab === "statusHistory" ? <IssueStatusHistoryPanel events={runEvents} id={`${detailTabsId}-status-history-panel`} labelledBy={`${detailTabsId}-status-history-tab`} loadError={runEventsLoadError} loading={runEventsLoading} onRetry={() => void loadRunEvents()} workflow={run.workflow} /> : <RunEvidencePanel id={`${detailTabsId}-evidence-panel`} labelledBy={`${detailTabsId}-evidence-tab`} onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} run={run} />}
                 </section>
                 {usesConversationTab ? <div aria-labelledby={`${detailTabsId}-conversation-tab`} className="issue-conversation-tab-panel min-h-0 flex-1 overflow-hidden" hidden={activeDetailTab !== "conversation"} id={`${detailTabsId}-conversation-panel`} role="tabpanel">
-                    <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} organizationId={organizationId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
+                    <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} highlightedMessageId={highlightedMessageId} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} organizationId={organizationId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
                   </div> : null}
                 </div>
                 <IssueWorkflowProgress onCheckpointsChange={onUpdateIssueCheckpoints} run={run} />
               </div>
               {!usesConversationTab ? <>
                   <div aria-label={t("run.resizeContentPanels")} aria-orientation="vertical" aria-valuemax={conversationPaneWidthMax} aria-valuemin={conversationPaneWidthMin} aria-valuenow={effectiveConversationPaneWidth} className="run-page-conversation-resizer relative z-[1] min-h-0 w-[6px] cursor-col-resize touch-none bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-ring" role="separator" tabIndex={0} {...conversationResizeProps} />
-                  <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} organizationId={organizationId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
+                  <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} highlightedMessageId={highlightedMessageId} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} organizationId={organizationId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
                 </> : null}
               {isPropertiesOpen ? <div className="run-properties-layer absolute inset-0 z-10" onClick={event => {
               if (event.target === event.currentTarget) {

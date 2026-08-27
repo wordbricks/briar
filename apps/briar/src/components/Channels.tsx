@@ -389,6 +389,7 @@ export function Channels({
   const channelLoadAbortController = useRef<AbortController | null>(null);
   const preparedChannelId = useRef<string | null>(null);
   const shouldScrollChannelToEnd = useRef<string | null>(null);
+  const requestedMessageFocusKeyRef = useRef<string | null>(null);
   const suppressEarlierLoadOnNextScroll = useRef(false);
   const displaySource = useRef<DesktopChannelDisplaySource>("network");
   const initialSettingsHandledChannelId = useRef<string | null>(null);
@@ -993,6 +994,16 @@ export function Channels({
             ].find(
               (element) => element.dataset.channelMessageId === target.messageId,
             ) ?? null;
+            const focusRequestedMessage = () => {
+              const targetKey = `${activeChannelId}:${target.messageId}`;
+              if (requestedMessageFocusKeyRef.current === targetKey) return false;
+              const targetElement = findTarget();
+              if (!targetElement) return false;
+              scrollElementToCenter(messageScroller, targetElement);
+              targetElement.focus({ preventScroll: true });
+              requestedMessageFocusKeyRef.current = targetKey;
+              return true;
+            };
             const requestedMessageElement = findTarget();
             if (
               !requestedMessageElement &&
@@ -1010,14 +1021,12 @@ export function Channels({
                 suppressEarlierLoadOnNextScroll.current = true;
                 messageScroller.dispatchEvent(new Event("scroll"));
                 window.requestAnimationFrame(() => {
-                  scrollElementToCenter(messageScroller, findTarget());
-                  onRequestedMessageOpen?.();
+                  if (focusRequestedMessage()) onRequestedMessageOpen?.();
                 });
                 return;
               }
             }
-            scrollElementToCenter(messageScroller, requestedMessageElement);
-            onRequestedMessageOpen?.();
+            if (focusRequestedMessage()) onRequestedMessageOpen?.();
           });
         }
       } finally {
@@ -1105,8 +1114,48 @@ export function Channels({
 
   useEffect(() => {
     if (!threadParentId) return;
+    if (
+      requestedMessage?.rootMessageId === threadParentId &&
+      requestedMessage.messageId !== threadParentId
+    ) {
+      return;
+    }
     scrollContainerToEnd(threadMessagesScrollRef.current);
-  }, [threadMessages, threadParentId]);
+  }, [requestedMessage, threadMessages, threadParentId]);
+
+  useLayoutEffect(() => {
+    if (!requestedMessage || !activeChannelId || channelLoading) {
+      if (!requestedMessage) requestedMessageFocusKeyRef.current = null;
+      return;
+    }
+    const targetKey = `${activeChannelId}:${requestedMessage.messageId}`;
+    if (requestedMessageFocusKeyRef.current === targetKey) return;
+    const messageScroller =
+      requestedMessage.rootMessageId === requestedMessage.messageId
+        ? messagesScrollRef.current
+        : threadMessagesScrollRef.current;
+    const targetElement = [
+      ...(messageScroller?.querySelectorAll<HTMLElement>(
+        "[data-channel-message-id]",
+      ) ?? []),
+    ].find(
+      (element) =>
+        element.dataset.channelMessageId === requestedMessage.messageId,
+    ) ?? null;
+    if (!messageScroller || !targetElement) return;
+    scrollElementToCenter(messageScroller, targetElement);
+    targetElement.focus({ preventScroll: true });
+    requestedMessageFocusKeyRef.current = targetKey;
+    onRequestedMessageOpen?.();
+  }, [
+    activeChannelId,
+    channelLoading,
+    messages.length,
+    onRequestedMessageOpen,
+    requestedMessage,
+    threadMessages.length,
+    threadParentId,
+  ]);
 
   const openThread = useCallback(
     async (parentId: string) => {
@@ -1264,6 +1313,7 @@ export function Channels({
                       <MessageRow
                       agents={agents}
                       channel={activeChannel}
+                      highlighted={message.id === requestedMessage?.messageId}
                       message={message}
                       members={members}
                       localeTag={localeTag}
@@ -1417,6 +1467,7 @@ export function Channels({
               <MessageRow
                 agents={agents}
                 channel={activeChannel}
+                highlighted={message.id === requestedMessage?.messageId}
                 key={message.id}
                 message={message}
                 members={members}
@@ -2730,6 +2781,7 @@ const MessageRow = memo(function MessageRow({
   acceptingProposal,
   agents,
   channel,
+  highlighted = false,
   loadCreateExecutionProposalContext,
   loadExecutionProposalContext,
   loadSkillExecutionProposalContext,
@@ -2758,6 +2810,7 @@ const MessageRow = memo(function MessageRow({
   acceptingProposal: boolean;
   agents: ChannelAgentSummary[];
   channel: ChannelSummary;
+  highlighted?: boolean;
   loadCreateExecutionProposalContext: (projectId: string) => Promise<{
     run: HuntRun | null;
     workers: ExecutionWorker[];
@@ -2843,8 +2896,11 @@ const MessageRow = memo(function MessageRow({
 
   return (
     <article
-      className={`channel-message ${message.author.type}${reacting ? " is-reacting" : ""}${message.optimistic ? " is-optimistic" : ""}`}
+      aria-current={highlighted ? "true" : undefined}
+      className={`channel-message ${message.author.type}${reacting ? " is-reacting" : ""}${highlighted ? " is-inbox-target" : ""}${message.optimistic ? " is-optimistic" : ""}`}
       data-channel-message-id={message.id}
+      data-inbox-highlighted={highlighted ? "true" : undefined}
+      tabIndex={highlighted ? -1 : undefined}
     >
       <div className="channel-message-avatar" aria-hidden="true">
         {image ? (
