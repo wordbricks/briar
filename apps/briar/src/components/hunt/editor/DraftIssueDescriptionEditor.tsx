@@ -7,6 +7,7 @@ import type { IssueAttachment } from "@/types";
 import { IssueDescriptionField } from "./IssueDescriptionField";
 import { IssueInlineAttachmentPreview } from "./IssueInlineAttachmentPreview";
 import { IssueDraftInlineAttachment, draftIssueDescriptionParts } from "./model";
+import { cn } from "@/lib/utils";
 export function DraftIssueDescriptionEditor({
   attachments,
   autoSizeTextFields = false,
@@ -36,7 +37,7 @@ export function DraftIssueDescriptionEditor({
 }) {
   const parts = useMemo(() => draftIssueDescriptionParts(description, attachments), [attachments, description]);
   const hasInlineAttachments = parts.some(part => part.type === "attachment");
-  return <div className={`issue-description-editor${className ? ` ${className}` : ""}${hasInlineAttachments ? " has-inline-attachments" : ""}`} onKeyDown={onKeyDown} ref={editorRef}>
+  return <div className={cn("issue-description-editor flex min-h-0 min-w-0 flex-1 flex-col", className, hasInlineAttachments && "has-inline-attachments")} onKeyDown={onKeyDown} ref={editorRef}>
       {parts.map((part, index) => part.type === "text" ? <IssueDescriptionField autoSize={autoSizeTextFields || hasInlineAttachments} end={part.end} key={`text-${index}`} label={label} maxLength={Math.max(0, 100000 - (description.length - part.value.length))} onChange={nextValue => onChange(`${description.slice(0, part.start)}${nextValue}${description.slice(part.end)}`)} placeholder={parts.length === 1 ? placeholder : undefined} rows={Math.max(1, part.value.split("\n").length)} start={part.start} value={part.value} /> : <IssueInlineAttachmentPreview attachment={part.attachment} key={`attachment-${part.attachment.reference}`} onLoadAttachment={onLoadAttachment} onRemove={() => onRemoveAttachment(part.attachment.reference)} removeLabel={removeLabel(part.attachment.type === "new" ? part.attachment.file.name : part.attachment.attachment.filename)} />)}
     </div>;
 }

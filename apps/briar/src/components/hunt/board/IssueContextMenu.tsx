@@ -12,6 +12,14 @@ import type { MessageKey } from "@/i18n/messages";
 import { canEditIssueCheckpoints, checkpointBoundaryKey, inheritedCheckpointBoundaries, toggleIssueCheckpoint } from "../model/checkpoints";
 import { localizeWorkflowStage } from "../model/formatters";
 import { placementForId, placementIdForRun, placementMatchesRun } from "../model/kanban";
+import { cn } from "@/lib/utils";
+
+const contextMenuClass = "issue-context-menu z-[150] min-w-[224px] overflow-hidden rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-md";
+const contextItemClass = "issue-context-item relative flex min-h-[39px] select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg:first-child]:shrink-0 [&>svg:first-child]:text-muted-foreground [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate [&>small]:ml-auto [&>small]:max-w-[140px] [&>small]:truncate [&>small]:text-2xs [&>small]:text-muted-foreground";
+const contextChoiceClass = "issue-context-item issue-context-choice relative grid min-h-[38px] select-none grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2 py-1.5 pl-8 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>span]:min-w-0 [&>span]:truncate";
+const contextCheckClass = "issue-context-check absolute left-2 grid size-[18px] place-items-center text-[#654bb8]";
+const contextSeparatorClass = "issue-context-separator my-1.5 h-px bg-border";
+const contextLabelClass = "issue-context-label px-2 py-1.5 text-2xs font-semibold uppercase tracking-[.04em] text-muted-foreground";
 export function IssueContextMenu({
   availableProviders,
   children,
@@ -105,8 +113,8 @@ export function IssueContextMenu({
         {children}
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content aria-label={t("issue.actions")} className="issue-context-menu" collisionPadding={10}>
-          <ContextMenu.Item className="issue-context-item" disabled={processNowDisabled} onSelect={() => onProcessNow?.()}>
+        <ContextMenu.Content aria-label={t("issue.actions")} className={contextMenuClass} collisionPadding={10}>
+          <ContextMenu.Item className={contextItemClass} disabled={processNowDisabled} onSelect={() => onProcessNow?.()}>
             {isProcessing ? <Spinner aria-hidden="true" size={17} /> : <Bot aria-hidden="true" size={17} />}
             <span>{t(canReassign ? "worker.reassign" : "issue.processNow")}</span>
             {isProcessing ? <small>{t("issue.processNowRunning")}</small> : run.executionReadiness === "waiting" ? <small>{t("issue.waitingOnPrerequisites", {
@@ -114,26 +122,26 @@ export function IssueContextMenu({
             })}</small> : run.status !== "queued" ? <small>{t("issue.processNowQueuedOnly")}</small> : isClaimed ? <small>{t("issue.processNowClaimed")}</small> : null}
           </ContextMenu.Item>
 
-          <ContextMenu.Separator className="issue-context-separator" />
+          <ContextMenu.Separator className={contextSeparatorClass} />
 
           <ContextMenu.Sub>
-            <ContextMenu.SubTrigger className="issue-context-item" disabled={run.status === "paused"}>
+            <ContextMenu.SubTrigger className={contextItemClass} disabled={run.status === "paused"}>
               <Activity aria-hidden="true" size={17} />
               <span>{t("dashboard.status")}</span>
               <small>{currentStatusLabel}</small>
               <ChevronRight aria-hidden="true" size={14} />
             </ContextMenu.SubTrigger>
             <ContextMenu.Portal>
-              <ContextMenu.SubContent className="issue-context-menu issue-context-submenu" collisionPadding={10} sideOffset={7}>
+              <ContextMenu.SubContent className={cn(contextMenuClass, "issue-context-submenu w-[246px]")} collisionPadding={10} sideOffset={7}>
                 <ContextMenu.RadioGroup value={currentStatus}>
-                  {statusOptions.map(option => <ContextMenu.RadioItem className="issue-context-item issue-context-choice" disabled={run.status === "paused"} key={option.value} onSelect={() => {
+                  {statusOptions.map(option => <ContextMenu.RadioItem className={contextChoiceClass} disabled={run.status === "paused"} key={option.value} onSelect={() => {
                   const placement = placementForId(option.value);
                   if (run.status === "paused" || !placement || placementMatchesRun(run, placement)) {
                     return;
                   }
                   onMove(placement);
                 }} value={option.value}>
-                      <ContextMenu.ItemIndicator className="issue-context-check" forceMount>
+                      <ContextMenu.ItemIndicator className={contextCheckClass} forceMount>
                         {option.value === currentStatus ? <Check aria-hidden="true" size={14} /> : null}
                       </ContextMenu.ItemIndicator>
                       <span>{option.label}</span>
@@ -144,20 +152,20 @@ export function IssueContextMenu({
           </ContextMenu.Sub>
 
           <ContextMenu.Sub>
-            <ContextMenu.SubTrigger className="issue-context-item">
+            <ContextMenu.SubTrigger className={contextItemClass}>
               <Signal aria-hidden="true" size={17} />
               <span>{t("issue.priority")}</span>
               <small>{currentPriorityLabel}</small>
               <ChevronRight aria-hidden="true" size={14} />
             </ContextMenu.SubTrigger>
             <ContextMenu.Portal>
-              <ContextMenu.SubContent className="issue-context-menu issue-context-submenu" collisionPadding={10} sideOffset={7}>
+              <ContextMenu.SubContent className={cn(contextMenuClass, "issue-context-submenu w-[246px]")} collisionPadding={10} sideOffset={7}>
                 <ContextMenu.RadioGroup value={currentPriority}>
-                  {priorityOptions.map(option => <ContextMenu.RadioItem className="issue-context-item issue-context-choice" key={option.value} onSelect={() => {
+                  {priorityOptions.map(option => <ContextMenu.RadioItem className={contextChoiceClass} key={option.value} onSelect={() => {
                   if (option.value === currentPriority) return;
                   onPriorityChange(option.value === "none" ? null : Number(option.value));
                 }} value={option.value}>
-                      <ContextMenu.ItemIndicator className="issue-context-check" forceMount>
+                      <ContextMenu.ItemIndicator className={contextCheckClass} forceMount>
                         {option.value === currentPriority ? <Check aria-hidden="true" size={14} /> : null}
                       </ContextMenu.ItemIndicator>
                       <span>{option.label}</span>
@@ -168,7 +176,7 @@ export function IssueContextMenu({
           </ContextMenu.Sub>
 
           <ContextMenu.Sub>
-            <ContextMenu.SubTrigger className="issue-context-item" disabled={run.fullAuto}>
+            <ContextMenu.SubTrigger className={contextItemClass} disabled={run.fullAuto}>
               <Clock3 aria-hidden="true" size={17} />
               <span>{t("issue.checkpoints")}</span>
               <small>
@@ -179,17 +187,17 @@ export function IssueContextMenu({
               <ChevronRight aria-hidden="true" size={14} />
             </ContextMenu.SubTrigger>
             <ContextMenu.Portal>
-              <ContextMenu.SubContent className="issue-context-menu issue-context-submenu issue-checkpoint-context-menu" collisionPadding={10} sideOffset={7}>
+              <ContextMenu.SubContent className={cn(contextMenuClass, "issue-context-submenu issue-checkpoint-context-menu w-[310px] max-h-[75vh] overflow-y-auto")} collisionPadding={10} sideOffset={7}>
                 {run.workflow.stages.flatMap(stage => (["before", "after"] as const).map(position => {
                 const boundary = `${stage.id}:${position}`;
                 const inherited = inheritedBoundaries.has(boundary);
                 const checked = inherited || selectedIssueBoundaries.has(boundary);
                 const stageLabel = localizeWorkflowStage(t, stage.id, stage.label);
-                return <ContextMenu.CheckboxItem checked={checked} className="issue-context-item issue-context-choice" disabled={inherited || !checkpointsEditable} key={boundary} onSelect={() => {
+                return <ContextMenu.CheckboxItem checked={checked} className={contextChoiceClass} disabled={inherited || !checkpointsEditable} key={boundary} onSelect={() => {
                   if (inherited || !checkpointsEditable) return;
                   onCheckpointsChange(toggleIssueCheckpoint(issueCheckpoints, stage.id, position));
                 }}>
-                        <ContextMenu.ItemIndicator className="issue-context-check" forceMount>
+                        <ContextMenu.ItemIndicator className={contextCheckClass} forceMount>
                           {checked ? <Check aria-hidden="true" size={14} /> : null}
                         </ContextMenu.ItemIndicator>
                         <span>
@@ -207,16 +215,16 @@ export function IssueContextMenu({
           </ContextMenu.Sub>
 
           <ContextMenu.Sub>
-            <ContextMenu.SubTrigger className="issue-context-item">
+            <ContextMenu.SubTrigger className={contextItemClass}>
               <Waypoints aria-hidden="true" size={17} />
               <span>{t("issue.preferredProvider")}</span>
               <small>{currentProviderLabel}</small>
               <ChevronRight aria-hidden="true" size={14} />
             </ContextMenu.SubTrigger>
             <ContextMenu.Portal>
-              <ContextMenu.SubContent className="issue-context-menu issue-context-submenu" collisionPadding={10} sideOffset={7}>
+              <ContextMenu.SubContent className={cn(contextMenuClass, "issue-context-submenu w-[246px]")} collisionPadding={10} sideOffset={7}>
                 <ContextMenu.RadioGroup value={currentProvider}>
-                  <ContextMenu.RadioItem className="issue-context-item issue-context-choice" onSelect={() => {
+                  <ContextMenu.RadioItem className={contextChoiceClass} onSelect={() => {
                   if (!run.preferredProvider) return;
                   onPreferencesChange({
                     provider: null,
@@ -224,12 +232,12 @@ export function IssueContextMenu({
                     effort: null
                   });
                 }} value="none">
-                    <ContextMenu.ItemIndicator className="issue-context-check" forceMount>
+                    <ContextMenu.ItemIndicator className={contextCheckClass} forceMount>
                       {!run.preferredProvider ? <Check aria-hidden="true" size={14} /> : null}
                     </ContextMenu.ItemIndicator>
                     <span>{t("issue.agentDefault")}</span>
                   </ContextMenu.RadioItem>
-                  {availableProviders.map(provider => <ContextMenu.RadioItem className="issue-context-item issue-context-choice" key={provider} onSelect={() => {
+                  {availableProviders.map(provider => <ContextMenu.RadioItem className={contextChoiceClass} key={provider} onSelect={() => {
                   if (provider === run.preferredProvider) return;
                   onPreferencesChange({
                     provider,
@@ -237,7 +245,7 @@ export function IssueContextMenu({
                     effort: null
                   });
                 }} value={provider}>
-                      <ContextMenu.ItemIndicator className="issue-context-check" forceMount>
+                      <ContextMenu.ItemIndicator className={contextCheckClass} forceMount>
                         {provider === run.preferredProvider ? <Check aria-hidden="true" size={14} /> : null}
                       </ContextMenu.ItemIndicator>
                       <span>
@@ -245,7 +253,7 @@ export function IssueContextMenu({
                         {agentProviderLabels[provider]}
                       </span>
                     </ContextMenu.RadioItem>)}
-                  {availableProviders.length === 0 ? <ContextMenu.Item className="issue-context-item" disabled>
+                  {availableProviders.length === 0 ? <ContextMenu.Item className={contextItemClass} disabled>
                       <span>{t("issue.noProviders")}</span>
                     </ContextMenu.Item> : null}
                 </ContextMenu.RadioGroup>
@@ -254,19 +262,19 @@ export function IssueContextMenu({
           </ContextMenu.Sub>
 
           <ContextMenu.Sub>
-            <ContextMenu.SubTrigger className="issue-context-item" disabled={!run.preferredProvider}>
+            <ContextMenu.SubTrigger className={contextItemClass} disabled={!run.preferredProvider}>
               <BrainCircuit aria-hidden="true" size={17} />
               <span>{t("issue.preferredModel")}</span>
               <small>{currentModelLabel}</small>
               <ChevronRight aria-hidden="true" size={14} />
             </ContextMenu.SubTrigger>
             {run.preferredProvider ? <ContextMenu.Portal>
-                <ContextMenu.SubContent className="issue-context-menu issue-context-submenu" collisionPadding={10} sideOffset={7}>
-                  <ContextMenu.Label className="issue-context-label">
+                <ContextMenu.SubContent className={cn(contextMenuClass, "issue-context-submenu w-[246px]")} collisionPadding={10} sideOffset={7}>
+                  <ContextMenu.Label className={contextLabelClass}>
                     {t("settings.model")}
                   </ContextMenu.Label>
                   <ContextMenu.RadioGroup value={run.preferredModel ?? ""}>
-                    {currentProviderModelOptions.map(option => <ContextMenu.RadioItem className="issue-context-item issue-context-choice" key={option.value || "default"} onSelect={() => {
+                    {currentProviderModelOptions.map(option => <ContextMenu.RadioItem className={contextChoiceClass} key={option.value || "default"} onSelect={() => {
                   if ((run.preferredModel ?? "") === option.value) {
                     return;
                   }
@@ -276,7 +284,7 @@ export function IssueContextMenu({
                     effort: null
                   });
                 }} value={option.value}>
-                        <ContextMenu.ItemIndicator className="issue-context-check" forceMount>
+                        <ContextMenu.ItemIndicator className={contextCheckClass} forceMount>
                           {(run.preferredModel ?? "") === option.value ? <Check aria-hidden="true" size={14} /> : null}
                         </ContextMenu.ItemIndicator>
                         <span>
@@ -285,17 +293,17 @@ export function IssueContextMenu({
                       </ContextMenu.RadioItem>)}
                   </ContextMenu.RadioGroup>
                   {run.preferredModel ? <>
-                      <ContextMenu.Separator className="issue-context-separator" />
-                      <ContextMenu.Label className="issue-context-label">
+                      <ContextMenu.Separator className={contextSeparatorClass} />
+                      <ContextMenu.Label className={contextLabelClass}>
                         {t("settings.effort")}
                       </ContextMenu.Label>
                       <ContextMenu.RadioGroup value={run.preferredEffort ?? ""}>
-                        {[null, ...agentEffortOptions(providerModels, run.preferredProvider, run.preferredModel, run.preferredEffort).map(option => option.value)].map(effort => <ContextMenu.RadioItem className="issue-context-item issue-context-choice" key={effort ?? "default"} onSelect={() => onPreferencesChange({
+                        {[null, ...agentEffortOptions(providerModels, run.preferredProvider, run.preferredModel, run.preferredEffort).map(option => option.value)].map(effort => <ContextMenu.RadioItem className={contextChoiceClass} key={effort ?? "default"} onSelect={() => onPreferencesChange({
                     provider: run.preferredProvider!,
                     model: run.preferredModel!,
                     effort
                   })} value={effort ?? ""}>
-                            <ContextMenu.ItemIndicator className="issue-context-check" forceMount>
+                            <ContextMenu.ItemIndicator className={contextCheckClass} forceMount>
                               {(run.preferredEffort ?? null) === effort ? <Check aria-hidden="true" size={14} /> : null}
                             </ContextMenu.ItemIndicator>
                             <span>
@@ -308,24 +316,24 @@ export function IssueContextMenu({
               </ContextMenu.Portal> : null}
           </ContextMenu.Sub>
 
-          <ContextMenu.Separator className="issue-context-separator" />
+          <ContextMenu.Separator className={contextSeparatorClass} />
 
-          <ContextMenu.Item className="issue-context-item" onSelect={onOpen}>
+          <ContextMenu.Item className={contextItemClass} onSelect={onOpen}>
             <ChevronRight aria-hidden="true" size={17} />
             <span>{t("common.open")}</span>
           </ContextMenu.Item>
-          <ContextMenu.Item className="issue-context-item" onSelect={onEdit}>
+          <ContextMenu.Item className={contextItemClass} onSelect={onEdit}>
             <Pencil aria-hidden="true" size={17} />
             <span>{t("issue.edit")}</span>
           </ContextMenu.Item>
-          {onTransfer ? <ContextMenu.Item className="issue-context-item" onSelect={onTransfer}>
+          {onTransfer ? <ContextMenu.Item className={contextItemClass} onSelect={onTransfer}>
               <FolderInput aria-hidden="true" size={17} />
               <span>{t("issue.transfer")}</span>
             </ContextMenu.Item> : null}
 
-          <ContextMenu.Separator className="issue-context-separator" />
+          <ContextMenu.Separator className={contextSeparatorClass} />
 
-          <ContextMenu.Item className="issue-context-item danger" onSelect={onDelete}>
+          <ContextMenu.Item className={`${contextItemClass} danger text-destructive`} onSelect={onDelete}>
             <Trash2 aria-hidden="true" size={17} />
             <span>{t("issue.delete")}</span>
           </ContextMenu.Item>
