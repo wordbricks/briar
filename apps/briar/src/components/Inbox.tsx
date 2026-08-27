@@ -320,7 +320,7 @@ export function Inbox({
             <header className="inbox-filter-bar flex min-h-[58px] shrink-0 items-center justify-between gap-4 overflow-hidden border-b border-border/80 bg-card/95 py-2.5 pl-[21px] pr-[18px] max-[760px]:gap-2 max-[760px]:px-3">
               <div className="inbox-filter-controls flex min-w-0 flex-1 items-center gap-2.5 max-[760px]:items-stretch max-[760px]:flex-col max-[760px]:gap-2">
                 <SelectMenu
-                  className="inbox-project-filter w-[176px] shrink-0 max-[760px]:w-full max-[760px]:flex-auto"
+                  className="inbox-project-filter !w-[176px] !shrink-0 max-[760px]:!w-full max-[760px]:!flex-auto"
                   label={t("inbox.projectFilter")}
                   onValueChange={setSelectedProjectId}
                   options={projectOptions}
@@ -389,7 +389,7 @@ export function Inbox({
               </div>
               <Typography
                 as="span"
-                className="shrink-0 font-mono text-2xs font-medium"
+                className="shrink-0 font-mono text-2xs font-medium max-[760px]:hidden"
                 tone="muted"
                 variant="caption"
               >

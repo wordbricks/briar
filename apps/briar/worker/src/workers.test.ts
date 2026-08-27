@@ -251,7 +251,8 @@ describe("detached execution workers", () => {
         "0133_channel_reply_sessions.sql",
         "0136_issue_difficulty.sql",
         "0137_execution_worker_lifecycle_telemetry.sql",
-        "0140_agent_designated_workers.sql",
+        "0140_issue_difficulty_optional.sql",
+        "0141_agent_designated_workers.sql",
       ],
     });
     await executeD1Sql(

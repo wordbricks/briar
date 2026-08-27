@@ -6,10 +6,7 @@ import {
   issueTitleAbsoluteMaxLength,
   issueTitleOverLimitMessage,
 } from "../../src/lib/issue-title";
-import {
-  defaultIssueDifficulty,
-  issueDifficulties,
-} from "../../src/lib/issue-difficulty";
+import { issueDifficulties } from "../../src/lib/issue-difficulty";
 import {
   defaulted,
   defaultedWith,
@@ -34,8 +31,8 @@ const IssueInputBaseFields = {
   ),
   priority: Schema.optional(Schema.NullOr(integerBetween(1, 4))),
   difficulty: defaulted(
-    Schema.Literals(issueDifficulties),
-    defaultIssueDifficulty,
+    Schema.NullOr(Schema.Literals(issueDifficulties)),
+    null,
   ),
   assigneeUserId: Schema.optional(Schema.NullOr(trimmedText(1, 200))),
   status: defaulted(Schema.Literals(["backlog", "queued"]), "queued"),
@@ -83,7 +80,7 @@ export const IssueUpdateInput = strictSchema(Schema.Struct({
     Schema.Trim.check(Schema.isMaxLength(100_000)),
   ),
   priority: Schema.NullOr(integerBetween(1, 4)),
-  difficulty: Schema.Literals(issueDifficulties),
+  difficulty: Schema.NullOr(Schema.Literals(issueDifficulties)),
   assigneeUserId: Schema.optional(Schema.NullOr(trimmedText(1, 200))),
 }));
 export type IssueUpdateInput = typeof IssueUpdateInput.Type;

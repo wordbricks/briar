@@ -282,7 +282,7 @@ describe("issue multipart input", () => {
       title: "Screenshot issue",
       description: "Please inspect the attachment",
       priority: 2,
-      difficulty: "normal",
+      difficulty: null,
       assigneeUserId: null,
       status: "backlog",
       preferredProvider: null,

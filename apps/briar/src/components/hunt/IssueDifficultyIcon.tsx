@@ -15,10 +15,11 @@ export function IssueDifficultyIcon({
   size = 13,
 }: {
   className?: string;
-  difficulty: IssueDifficulty;
+  difficulty: IssueDifficulty | null;
   size?: number;
 }) {
   const { t } = useI18n();
+  if (!difficulty) return null;
   const Icon = difficultyIcons[difficulty];
   const difficultyLabel = t(
     `issue.difficulty.${difficulty}` as MessageKey,

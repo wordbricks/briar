@@ -2588,13 +2588,16 @@
             "maximum": 4
           },
           "difficulty": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "enum": [
               "easy",
               "normal",
-              "hard"
-            ],
-            "default": "normal"
+              "hard",
+              null
+            ]
           },
           "assigneeUserId": {
             "type": [

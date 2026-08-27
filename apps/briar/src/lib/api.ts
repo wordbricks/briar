@@ -59,6 +59,7 @@ import type {
   ChannelAgentSkillInput,
   ChannelAgentSummary,
   ChannelDelta,
+  ChannelLinkPreview,
   ChannelMember,
   ChannelMessage,
   ChannelMessageAttachment,
@@ -1449,7 +1450,7 @@ export async function createIssue(
   form.set("title", input.title);
   form.set("description", input.description ?? "");
   form.set("priority", input.priority === null ? "" : String(input.priority));
-  form.set("difficulty", input.difficulty);
+  form.set("difficulty", input.difficulty ?? "");
   form.set("assigneeUserId", input.assigneeUserId ?? "");
   form.set("status", input.status);
   form.set("preferredProvider", input.preferredProvider ?? "");
@@ -1695,6 +1696,19 @@ export async function loadChannelMessageDocument(
 ) {
   return request<{ document: ChannelMessageDocumentContent }>(
     `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/document`,
+    token,
+  );
+}
+
+export async function loadChannelLinkPreview(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  targetUrl: string,
+) {
+  const params = new URLSearchParams({ url: targetUrl });
+  return request<{ preview: ChannelLinkPreview | null }>(
+    `/organizations/${organizationId}/channels/${channelId}/link-preview?${params}`,
     token,
   );
 }
@@ -2071,7 +2085,7 @@ export async function updateIssue(
   form.set("title", input.title);
   form.set("description", input.description ?? "");
   form.set("priority", input.priority === null ? "" : String(input.priority));
-  form.set("difficulty", input.difficulty);
+  form.set("difficulty", input.difficulty ?? "");
   form.set("assigneeUserId", input.assigneeUserId ?? "");
   if (input.attachmentReferences?.length) {
     form.set(

@@ -25,7 +25,7 @@ export type HuntRunRow = {
   issue_checkpoints_json: string;
   detail: string | null;
   priority: number | null;
-  difficulty: IssueDifficulty;
+  difficulty: IssueDifficulty | null;
   assignee_user_id: string | null;
   created_by_user_id?: string | null;
   subscribers_json?: string;
