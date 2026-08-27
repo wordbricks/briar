@@ -2898,7 +2898,7 @@ const MessageRow = memo(function MessageRow({
   const isWebhook = message.author.type === "webhook";
   const isSelf =
     message.author.type === "user" && message.author.id === currentUserId;
-  const displayName = isSelf ? t("channel.you") : message.author.name;
+  const displayName = message.author.name;
   const agentProvider =
     message.author.type === "agent" ? message.author.provider : null;
   const image =

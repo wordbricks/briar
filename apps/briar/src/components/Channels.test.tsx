@@ -220,6 +220,9 @@ describe("Channels", () => {
     );
     expect(highlighted?.dataset.channelMessageId).toBe(message.id);
     expect(highlighted?.tabIndex).toBe(-1);
+    expect(
+      container.querySelector(".channel-message header strong")?.textContent,
+    ).toBe("Sam");
     expect(document.activeElement).toBe(highlighted);
 
     requestAnimationFrame.mockRestore();
