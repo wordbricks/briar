@@ -30,6 +30,22 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.167",
+        date: "2026년 8월 27일",
+        title: "Hunt와 협업 흐름을 더 선명하고 안정적으로 연결합니다",
+        summary:
+          "Hunt 화면의 익숙한 작업 흐름을 복원하고, 답글 탐색·채널 맥락·관리형 런타임·GitHub 연결을 개선합니다.",
+        items: [
+          "Hunt Board, Issue Queue, Issue Detail, Run Result 화면의 레이아웃과 상호작용을 복원하면서 데이터와 실행 동작은 유지합니다.",
+          "Inbox 답글 알림을 선택하면 해당 답글을 대화 패널 중앙으로 이동하고 강조하며 포커스합니다.",
+          "채널에서 생성한 이슈가 원본 메시지로 돌아갈 수 있도록 관련 메시지 정보를 저장하고 웹과 모바일에 전달합니다.",
+          "채널 반응 작성자의 조직 구성원 이름을 표시하고, 오래된 구성원 ID에는 안전한 대체 표시를 사용합니다.",
+          "관리형 컴퓨터 런타임을 안전하게 업데이트하고 컴퓨터 이미지를 최신 버전으로 전환합니다.",
+          "Production GitHub App 인증을 보강하고 OAuth 연결 실패 원인을 더 분명하게 전달합니다.",
+          "프로젝트·설정·Hunt 화면의 공통 스타일과 키보드 단축키 조합 표시를 정리했습니다.",
+        ],
+      },
+      {
         version: "1.2.166",
         date: "2026년 8월 27일",
         title: "저장소 워크플로 생성과 실행 계약을 일관되게 만듭니다",
@@ -1208,6 +1224,22 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.167",
+        date: "August 27, 2026",
+        title: "Make the Hunt and collaboration flow clearer and more reliable",
+        summary:
+          "Restore the familiar Hunt workflow while improving reply navigation, channel context, managed runtimes, and the GitHub connection.",
+        items: [
+          "Restored the Hunt Board, Issue Queue, Issue Detail, and Run Result layouts and interactions while preserving data and execution behavior.",
+          "Selecting an Inbox reply notification now centers, highlights, and focuses the referenced reply in the conversation.",
+          "Keep the source channel message linked to issues created from channels and expose that context on web and mobile.",
+          "Show organization member names in channel reaction details with a safe fallback for stale member IDs.",
+          "Update managed-computer runtimes safely and roll the managed fleet to the latest image version.",
+          "Harden Production GitHub App authentication and make OAuth connection failures more actionable.",
+          "Refined shared styling across project, settings, and Hunt screens and clarified keyboard shortcut combinations.",
+        ],
+      },
       {
         version: "1.2.166",
         date: "August 27, 2026",
@@ -2478,7 +2510,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-163">
+          <a href="#v1-2-167">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2500,7 +2532,13 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.163"
+                      entry.version === "1.2.167" ||
+                      entry.version === "1.2.166" ||
+                      entry.version === "1.2.165"
+                        ? "2026-08-27"
+                        : entry.version === "1.2.164"
+                        ? "2026-08-26"
+                        : entry.version === "1.2.163"
                         ? "2026-08-26"
                         : entry.version === "1.2.162"
                         ? "2026-08-26"
