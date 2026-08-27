@@ -188,20 +188,26 @@ describe("channel reply agent attachments", () => {
     ).toThrow();
   });
 
-  it("reads workspace images and keeps a JSON complete body when none exist", async () => {
+  it("reads workspace images and HTML artifacts and keeps JSON when none exist", async () => {
     const workspacePath = await temporaryWorkspace();
     const imagePath = join(workspacePath, "screenshot.png");
     await writeFile(imagePath, new Uint8Array([137, 80, 78, 71]));
+    await writeFile(join(workspacePath, "lesson.html"), "<h1>Lesson</h1>");
 
     const files = await collectChannelReplyAttachments({
       workspacePath,
-      paths: ["screenshot.png"],
+      paths: ["screenshot.png", "lesson.html"],
     });
-    expect(files).toHaveLength(1);
+    expect(files).toHaveLength(2);
     expect(files[0]).toMatchObject({
       name: "screenshot.png",
       type: "image/png",
       size: 4,
+    });
+    expect(files[1]).toMatchObject({
+      name: "lesson.html",
+      type: "text/html",
+      size: 15,
     });
 
     const jsonBody = channelReplyCompleteRequestBody({
@@ -235,10 +241,10 @@ describe("channel reply agent attachments", () => {
     const payload = JSON.parse(String((form as FormData).get("complete")));
     expect(payload.result.body).toBe("Here is the screen.");
     expect(payload.result).not.toHaveProperty("attachments");
-    expect((form as FormData).getAll("attachments")).toHaveLength(1);
+    expect((form as FormData).getAll("attachments")).toHaveLength(2);
   });
 
-  it("rejects missing, escaped, or non-image workspace paths", async () => {
+  it("rejects missing, escaped, or unsupported workspace paths", async () => {
     const workspacePath = await temporaryWorkspace();
     await writeFile(join(workspacePath, "notes.txt"), "not an image");
     await writeFile(join(workspacePath, "inside.png"), new Uint8Array([1, 2, 3]));
@@ -260,7 +266,7 @@ describe("channel reply agent attachments", () => {
         workspacePath,
         paths: ["notes.txt"],
       }),
-    ).rejects.toThrow("must be images");
+    ).rejects.toThrow("must be images or HTML files");
     await expect(
       collectChannelReplyAttachments({
         workspacePath,

@@ -404,7 +404,7 @@ async function runClaimedIssueReply(
   const cleanupContext = () =>
     cleanupChannelReplyResources([
       {
-        label: "issue reply images",
+        label: "issue reply attachments",
         run: async () => {
           if (imagesCleaned) return;
           await rm(imageDirectory, { recursive: true, force: true });
@@ -564,7 +564,7 @@ async function runClaimedIssueReply(
     });
     const result = parsedResult.result;
     if (!result.reply) throw new Error("Agent returned an empty issue reply");
-    const replyImages = validateReplyAttachments([
+    const replyAttachments = validateReplyAttachments([
       ...await collectIssueReplyAttachments({
         workspacePath,
         paths: parsedResult.attachmentPaths,
@@ -585,7 +585,7 @@ async function runClaimedIssueReply(
           workerId: registered.workerId,
           claimToken: issue.claimToken,
           result,
-          attachments: replyImages,
+          attachments: replyAttachments,
         }),
       },
     );
@@ -990,9 +990,9 @@ async function runClaimedChannelReply(
         "Channel reply Agent Skill execution target is not authorized",
       );
     }
-    // Read reply images before the disposable workspace disappears. Private
+    // Read reply attachments before the disposable workspace disappears. Private
     // inbound context must still be gone before the durable reply completes.
-    const replyImages = validateReplyAttachments([
+    const replyAttachments = validateReplyAttachments([
       ...await collectChannelReplyAttachments({
         workspacePath,
         paths: attachmentPaths,
@@ -1014,7 +1014,7 @@ async function runClaimedChannelReply(
           claimToken: reply.claimToken,
           conversationId,
           result,
-          attachments: replyImages,
+          attachments: replyAttachments,
         }),
       },
     );

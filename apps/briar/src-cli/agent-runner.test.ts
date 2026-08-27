@@ -1341,6 +1341,8 @@ describe("detached Agent runner", () => {
     expect(projectPrompt).toContain('"executionProposal":{"projectId"');
     expect(projectPrompt).toContain("workspace-relative path in attachments");
     expect(projectPrompt).toContain('"attachments":["screenshot.png"]');
+    expect(projectPrompt).toContain("self-contained HTML artifact");
+    expect(projectPrompt).toContain('"attachments":["explanation.html"]');
   });
 
   it.each([
