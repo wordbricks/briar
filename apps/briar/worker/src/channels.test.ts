@@ -2508,7 +2508,8 @@ describe("organization channels", () => {
            readiness_state, last_heartbeat_at, created_at, updated_at
          ) values (?, ?, ?, 'Session owner Worker', ?, 'claude', ?,
                    'online', 1, 'ready', ?, ?, ?)
-         on conflict (id) do update set state = 'online', accepting_work = 1,
+         on conflict (id) do update set label = excluded.label,
+           state = 'online', accepting_work = 1,
            readiness_state = 'ready', capabilities_json = excluded.capabilities_json,
            last_heartbeat_at = excluded.last_heartbeat_at`,
       ).bind(
@@ -2846,7 +2847,7 @@ describe("organization channels", () => {
       failoverJob.id,
     )).resolves.toMatchObject({
       status: "failed",
-      error: expect.stringContaining('Worker "Worker"'),
+      error: expect.stringContaining('Worker "Session owner Worker"'),
     });
     await db.prepare(
       `update briar_execution_workers set state = 'online' where id = ?`,
