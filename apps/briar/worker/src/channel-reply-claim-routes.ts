@@ -144,6 +144,30 @@ export async function claimNextChannelReplyWork(
     const liveActiveSkill = job.skill_id
       ? liveAgent.skills.find((skill) => skill.id === job.skill_id) ?? null
       : null;
+    const approvedSkillExecution = job.approved_skill_execution_proposal_id
+      ? await db.prepare(
+        `select * from briar_agent_skill_execution_proposals
+         where id = ? and organization_id = ? and channel_id = ?
+           and source_kind = 'channel'`,
+      ).bind(
+        job.approved_skill_execution_proposal_id,
+        job.organization_id,
+        job.channel_id,
+      ).first<import("./agent-skill-execution-proposal-repository").AgentSkillExecutionProposalRow>()
+      : null;
+    const approvedSkillExecutionMatches = approvedSkillExecution !== null &&
+      approvedSkillExecution.status === "accepted" &&
+      approvedSkillExecution.execution_mode === "conversation" &&
+      approvedSkillExecution.result_reply_job_id === job.id &&
+      approvedSkillExecution.result_message_id === job.reply_message_id &&
+      approvedSkillExecution.result_session_id === job.session_id &&
+      approvedSkillExecution.project_id === job.project_id &&
+      approvedSkillExecution.agent_id === job.agent_id &&
+      approvedSkillExecution.skill_id === job.skill_id &&
+      approvedSkillExecution.channel_id === job.channel_id &&
+      approvedSkillExecution.thread_root_message_id === job.parent_message_id &&
+      approvedSkillExecution.reply_message_id === job.trigger_message_id &&
+      approvedSkillExecution.request === job.skill_execution_request_snapshot;
     if (
       job.selected_skill_id_snapshot !== job.skill_id ||
       (job.skill_id && (
@@ -155,10 +179,12 @@ export async function claimNextChannelReplyWork(
         job.selected_skill_instructions_snapshot == null ||
         !job.selected_skill_provider_snapshot ||
         !job.skill_execution_request_snapshot ||
-        job.skill_execution_request_snapshot !==
-          (job.delegated_by_reply_job_id
-            ? job.delegation_request
-            : triggerMessage.body)
+        (job.approved_skill_execution_proposal_id
+          ? !approvedSkillExecutionMatches
+          : job.skill_execution_request_snapshot !==
+            (job.delegated_by_reply_job_id
+              ? job.delegation_request
+              : triggerMessage.body))
       ))
     ) {
       throw new HttpError(409, "Reply job lost its selected Agent Skill");
@@ -320,6 +346,9 @@ export async function claimNextChannelReplyWork(
                 skillId: activeSkill.id,
                 skillName: activeSkill.name,
                 request: skillExecutionRequest,
+                executionMode: activeSkill.execution_mode,
+                approvalPolicy: activeSkill.approval_policy,
+                approved: Boolean(job.approved_skill_execution_proposal_id),
               }
             : null,
         agent: {

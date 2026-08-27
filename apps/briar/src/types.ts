@@ -100,7 +100,7 @@ export type IssueExecutionApprovalInput = {
 
 /** The only mutable choice a member makes when approving a saved Skill run. */
 export type AgentSkillExecutionApprovalInput = {
-  workerId: string;
+  workerId?: string;
 };
 
 export type IssueDependencyReference = {
@@ -709,6 +709,10 @@ export type ProjectAgent = {
 };
 
 export type ProjectAgentSkillKind = "issue_processing" | "custom";
+export type ProjectAgentSkillExecutionMode = "conversation" | "task";
+export type ProjectAgentSkillApprovalPolicy =
+  | "invoke_is_consent"
+  | "explicit";
 
 export type ProjectAgentSkill = {
   id: string;
@@ -720,6 +724,8 @@ export type ProjectAgentSkill = {
   model: string | null;
   effort: ModelEffort | null;
   kind: ProjectAgentSkillKind;
+  executionMode: ProjectAgentSkillExecutionMode;
+  approvalPolicy: ProjectAgentSkillApprovalPolicy;
   position: number;
   createdAt: string;
   updatedAt: string;
@@ -737,6 +743,8 @@ export type ProjectAgentSkillInput = Pick<
   | "position"
 > & {
   id?: string;
+  executionMode?: ProjectAgentSkillExecutionMode;
+  approvalPolicy?: ProjectAgentSkillApprovalPolicy;
 };
 
 export type CreateProjectAgentInput = {

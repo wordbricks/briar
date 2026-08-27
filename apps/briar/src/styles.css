@@ -1598,8 +1598,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .skill-execution-proposal-details>.skill-execution-proposal-request { grid-template-columns:1fr; gap:2px; }
 .skill-execution-proposal-card>p { margin:0; font-size:var(--text-xs); line-height:1.45; overflow-wrap:anywhere; }
 .skill-execution-proposal-accepted { min-width:0; display:flex; align-items:flex-start; gap:6px; color:#6f56c9; font-size:var(--text-xs); overflow-wrap:anywhere; }
+.skill-execution-proposal-accepted.is-failed { color:var(--destructive); }
+.skill-execution-proposal-accepted>svg { margin-top:2px; flex:0 0 auto; }
 .skill-execution-proposal-accepted>span { min-width:0; display:grid; gap:2px; }
 .skill-execution-proposal-accepted small { color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:400; }
+.skill-execution-proposal-accepted>button { margin-left:auto; min-height:28px; padding:4px 8px; display:inline-flex; flex:0 0 auto; align-items:center; gap:5px; border:1px solid color-mix(in srgb,#6f56c9 38%,var(--border)); border-radius:7px; color:#6f56c9; background:var(--card); font-size:var(--text-2xs); font-weight:650; }
 .skill-execution-proposal-error { min-width:0; margin:0; display:flex; align-items:flex-start; gap:6px; color:var(--destructive); font-size:var(--text-xs); overflow-wrap:anywhere; }
 .skill-execution-proposal-error svg { margin-top:1px; flex:0 0 auto; }
 .skill-execution-proposal-card>footer { display:flex; flex-wrap:wrap; gap:8px; }

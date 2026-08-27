@@ -820,7 +820,7 @@ final class IssueMutationTests: XCTestCase {
         )
 
         XCTAssertEqual(response.proposal.id, proposalID)
-        XCTAssertEqual(response.session.id, "session-1")
+        XCTAssertEqual(try XCTUnwrap(response.session).id, "session-1")
         let recordedPath = await recorder.lastPath()
         XCTAssertEqual(
             recordedPath,

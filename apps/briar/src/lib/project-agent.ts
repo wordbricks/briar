@@ -114,6 +114,8 @@ export function defaultProjectAgentSkill(input: {
     model: input.model ?? null,
     effort: input.effort ?? null,
     kind: "issue_processing",
+    executionMode: "task",
+    approvalPolicy: "explicit",
     position: 0,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt ?? input.createdAt,

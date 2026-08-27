@@ -433,9 +433,10 @@ final class MobileAPIContractTests: XCTestCase {
         )
 
         XCTAssertEqual(response.outcome, .accepted)
-        XCTAssertEqual(response.proposal.resultSessionId, response.session.id)
+        let session = try XCTUnwrap(response.session)
+        XCTAssertEqual(response.proposal.resultSessionId, session.id)
         XCTAssertEqual(response.proposal.requestedWorkerLabel, "Build Mac")
-        XCTAssertEqual(response.session.requestedWorkerId, "worker-1")
+        XCTAssertEqual(session.requestedWorkerId, "worker-1")
     }
 
     func testChannelAndIssueMessagesRoundTripAcceptedSkillExecutionHistory() throws {

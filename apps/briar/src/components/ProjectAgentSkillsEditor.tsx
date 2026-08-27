@@ -38,6 +38,8 @@ export function projectAgentSkillInputs(
       model: skill.model,
       effort: skill.effort,
       kind: skill.kind,
+      executionMode: skill.executionMode ?? "task",
+      approvalPolicy: skill.approvalPolicy ?? "explicit",
       position,
     };
     return skill.id ? { id: skill.id, ...input } : input;
@@ -109,6 +111,8 @@ export function ProjectAgentSkillsEditor({
         model: defaultModel,
         effort: defaultEffort,
         kind: "custom",
+        executionMode: "task",
+        approvalPolicy: "explicit",
         position: skills.length,
       },
     ]);
@@ -317,6 +321,42 @@ export function ProjectAgentSkillsEditor({
                           ),
                         ]}
                         value={skill.effort ?? ""}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2.5 min-[761px]:grid-cols-2">
+                    <div className="grid min-w-0 gap-2">
+                      <Label>{t("agents.skillExecutionMode")}</Label>
+                      <NativeSelect
+                        disabled={disabled}
+                        label={`${accessibleSkillName} · ${t("agents.skillExecutionMode")}`}
+                        onValueChange={(value) =>
+                          updateSkill(index, {
+                            executionMode: value as ProjectAgentSkillInput["executionMode"],
+                          })
+                        }
+                        options={[
+                          { label: t("agents.skillExecutionModeConversation"), value: "conversation" },
+                          { label: t("agents.skillExecutionModeTask"), value: "task" },
+                        ]}
+                        value={skill.executionMode ?? "task"}
+                      />
+                    </div>
+                    <div className="grid min-w-0 gap-2">
+                      <Label>{t("agents.skillApprovalPolicy")}</Label>
+                      <NativeSelect
+                        disabled={disabled}
+                        label={`${accessibleSkillName} · ${t("agents.skillApprovalPolicy")}`}
+                        onValueChange={(value) =>
+                          updateSkill(index, {
+                            approvalPolicy: value as ProjectAgentSkillInput["approvalPolicy"],
+                          })
+                        }
+                        options={[
+                          { label: t("agents.skillApprovalInvokeIsConsent"), value: "invoke_is_consent" },
+                          { label: t("agents.skillApprovalExplicit"), value: "explicit" },
+                        ]}
+                        value={skill.approvalPolicy ?? "explicit"}
                       />
                     </div>
                   </div>

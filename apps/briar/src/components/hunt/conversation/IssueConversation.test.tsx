@@ -9,7 +9,7 @@ import { demoDashboard, demoRunEvents } from "@/lib/demo-data";
 import * as api from "@/lib/api";
 import * as channelRealtime from "@/lib/channel-realtime";
 import * as issueActivityHook from "@/hooks/use-issue-agent-activity";
-import type { ExecutionWorker, HuntRun, IssueMessage, IssueMessageSendResult, ProjectAgent, RunEvidence, UpdateIssueInput } from "@/types";
+import type { AgentSkillExecutionProposal, ExecutionWorker, HuntRun, IssueMessage, IssueMessageSendResult, ProjectAgent, RunEvidence, UpdateIssueInput } from "@/types";
 import { CreateIssueDialog, EditIssueDialog, HuntDashboard, IssueAgentActivityPanel, RunPage, runMatchesIssuePropertyFilters, type IssuePropertyFilters } from "@/components/HuntDashboard";
 import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -421,7 +421,7 @@ describe("IssueConversation", () => {
   });
   it("uses the shared exact-Worker Skill approval in issue conversations", async () => {
     const run = demoDashboard.runs[0];
-    const pending = {
+    const pending: AgentSkillExecutionProposal = {
       id: "skill-issue-approval",
       type: "request_agent_skill_execute" as const,
       status: "pending" as const,
@@ -434,11 +434,16 @@ describe("IssueConversation", () => {
       provider: "codex" as const,
       model: null,
       effort: null,
+      executionMode: "task",
+      approvalPolicy: "explicit",
+      executionStatus: "waiting",
       createdAt: "2026-08-11T00:00:00.000Z",
       acceptedAt: null,
       requestedWorkerId: null,
       requestedWorkerLabel: null,
       resultSessionId: null,
+      resultMessageId: null,
+      error: null,
       delegatedByAgentId: null,
       delegatedByAgentName: null
     };

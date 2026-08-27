@@ -150,6 +150,8 @@ export function OrganizationAgentsSettings({
           model: skill.model,
           effort: skill.effort,
           kind: skill.kind,
+          executionMode: skill.executionMode,
+          approvalPolicy: skill.approvalPolicy,
           position: skill.position,
         })),
       ),
@@ -177,7 +179,11 @@ export function OrganizationAgentsSettings({
           effort: editingAgent.effort,
           description: editingAgent.description ?? "",
           responsibility: editingAgent.responsibility,
-          skills: projectAgentSkillInputs(editingSkills),
+          skills: projectAgentSkillInputs(editingSkills).map((skill) => ({
+            ...skill,
+            executionMode: skill.executionMode ?? "task",
+            approvalPolicy: skill.approvalPolicy ?? "explicit",
+          })),
         },
       );
       setAgents((current) =>

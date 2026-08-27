@@ -267,6 +267,9 @@ export async function handleIssueReplyWorkerRoute(input: {
               skillId: selectedSkill.id,
               skillName: selectedSkill.name,
               request: job.skill_execution_request_snapshot!,
+              executionMode: selectedSkill.execution_mode,
+              approvalPolicy: selectedSkill.approval_policy,
+              approved: false,
             }
           : null,
         agent: agent

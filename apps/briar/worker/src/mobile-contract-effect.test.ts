@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import * as Option from "effect/Option";
 import { describe, expect, it } from "vitest";
 import {
+  mobileAgentSkillExecutionApprovalRequestSchema,
   mobileAgentSkillExecutionApprovalResponseSchema,
   mobileChannelIssueProposalPayloadSchema,
   mobileChannelMessageSchema,
@@ -162,6 +163,25 @@ describe("Effect mobile contract behavior", () => {
       mobileAgentSkillExecutionApprovalResponseSchema,
       approval,
     ))).toBe(true);
+
+    const conversation = structuredClone(
+      fixture.operations.acceptChannelSkillExecutionProposal.response,
+    ) as {
+      proposal: Record<string, unknown>;
+      session: unknown;
+    };
+    conversation.proposal.executionMode = "conversation";
+    conversation.proposal.resultMessageId =
+      "16161616-1616-4616-8616-161616161616";
+    conversation.session = null;
+    expect(() => decodeMobileSchema(
+      mobileAgentSkillExecutionApprovalRequestSchema,
+      {},
+    )).not.toThrow();
+    expect(() => decodeMobileSchema(
+      mobileAgentSkillExecutionApprovalResponseSchema,
+      conversation,
+    )).not.toThrow();
   });
 
   it("defaults omitted issue difficulty and rejects unsupported values", () => {

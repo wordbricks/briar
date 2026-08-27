@@ -520,12 +520,22 @@ export const mobileAgentSkillExecutionProposalSchema = strict(mutableStruct({
   provider: mobileProviderSchema,
   model: nullable(Schema.String),
   effort: nullable(mobileEffortSchema),
+  executionMode: Schema.Literals(["conversation", "task"]),
+  approvalPolicy: Schema.Literals(["invoke_is_consent", "explicit"]),
+  executionStatus: Schema.Literals([
+    "waiting",
+    "running",
+    "completed",
+    "failed",
+  ]),
   request: Schema.Trim.check(Schema.isLengthBetween(1, 10_000)),
   delegatedByAgentId: nullable(uuidString),
   delegatedByAgentName: nullable(Schema.String),
   requestedWorkerId: nullable(Schema.String),
   requestedWorkerLabel: nullable(Schema.String),
   resultSessionId: nullable(Schema.String),
+  resultMessageId: nullable(uuidString),
+  error: nullable(Schema.String),
   createdAt: isoDateTime,
   acceptedAt: nullable(isoDateTime),
 })).check(Schema.makeFilter((proposal) => {
@@ -533,6 +543,10 @@ export const mobileAgentSkillExecutionProposalSchema = strict(mutableStruct({
     proposal.requestedWorkerLabel !== null &&
     proposal.resultSessionId !== null && proposal.acceptedAt !== null;
   return (proposal.status === "accepted") === hasAcceptedFields &&
+      (proposal.status === "pending") ===
+        (proposal.executionStatus === "waiting") &&
+      (proposal.executionMode !== "conversation" ||
+        proposal.status !== "accepted" || proposal.resultMessageId !== null) &&
       !(proposal.status === "pending" && (
         proposal.requestedWorkerId !== null ||
         proposal.requestedWorkerLabel !== null ||
@@ -868,13 +882,13 @@ export const mobileIssueExecutionApprovalRequestSchema = strict(mutableStruct({
 
 export const mobileAgentSkillExecutionApprovalRequestSchema = strict(
   mutableStruct({
-    workerId: Schema.String.check(
+    workerId: optional(Schema.String.check(
       Schema.isLengthBetween(1, 128),
       Schema.makeFilter((workerId) =>
         workerId === workerId.trim() ||
         "workerId cannot contain leading or trailing whitespace"
       ),
-    ),
+    )),
   }),
 );
 
@@ -1250,17 +1264,18 @@ export const mobileAgentSkillExecutionApprovalResponseSchema = strict(
     outcome: Schema.Literals(["accepted", "already_accepted"]),
     proposal: mobileAgentSkillExecutionProposalSchema,
     projectId: uuidString,
-    session: mobileProjectAgentSessionSchema,
+    session: nullable(mobileProjectAgentSessionSchema),
   }),
 ).check(Schema.makeFilter((response) => {
   const proposal = response.proposal;
   const session = response.session;
-  return proposal.status === "accepted" &&
+  const common = proposal.status === "accepted" &&
       proposal.resultSessionId !== null &&
       proposal.requestedWorkerId !== null &&
       proposal.requestedWorkerLabel !== null &&
       proposal.acceptedAt !== null &&
-      response.projectId === proposal.projectId &&
+      response.projectId === proposal.projectId;
+  const sessionMatches = session !== null &&
       session.id === proposal.resultSessionId &&
       session.projectId === proposal.projectId &&
       session.agentId === proposal.agentId &&
@@ -1270,7 +1285,11 @@ export const mobileAgentSkillExecutionApprovalResponseSchema = strict(
       session.trigger === "manual" &&
       session.request === proposal.request &&
       session.requestedWorkerId === proposal.requestedWorkerId &&
-      session.workerId === proposal.requestedWorkerId
+      session.workerId === proposal.requestedWorkerId;
+  return common && (
+      (proposal.executionMode === "conversation" && session === null) ||
+      (proposal.executionMode === "task" && sessionMatches)
+    )
     ? undefined
     : "Approved Agent Skill execution response is not canonical";
 }));

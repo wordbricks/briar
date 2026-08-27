@@ -27,6 +27,17 @@ export const channelAgentSkillKinds = [
 ] as const;
 export type ChannelAgentSkillKind = (typeof channelAgentSkillKinds)[number];
 
+export const agentSkillExecutionModes = ["conversation", "task"] as const;
+export type AgentSkillExecutionMode =
+  (typeof agentSkillExecutionModes)[number];
+
+export const agentSkillApprovalPolicies = [
+  "invoke_is_consent",
+  "explicit",
+] as const;
+export type AgentSkillApprovalPolicy =
+  (typeof agentSkillApprovalPolicies)[number];
+
 export const channelVisibilities = ["public", "private"] as const;
 export type ChannelVisibility = (typeof channelVisibilities)[number];
 
@@ -300,6 +311,8 @@ export function channelMessageBlocksFallback(blocks: ChannelMessageBlock[]) {
 const Uuid = Schema.String.check(Schema.isUUID());
 const AgentProviderSchema = Schema.Literals(channelAgentProviders);
 const ChannelAgentSkillKindSchema = Schema.Literals(channelAgentSkillKinds);
+const AgentSkillExecutionModeSchema = Schema.Literals(agentSkillExecutionModes);
+const AgentSkillApprovalPolicySchema = Schema.Literals(agentSkillApprovalPolicies);
 
 const channelAgentSkillInputSourceSchema = strict(Schema.Struct({
   id: Schema.optional(Uuid),
@@ -321,6 +334,8 @@ const channelAgentSkillInputSourceSchema = strict(Schema.Struct({
   ),
   effort: nullableDefault(ModelEffort),
   kind: defaulted(ChannelAgentSkillKindSchema, "custom"),
+  executionMode: defaulted(AgentSkillExecutionModeSchema, "task"),
+  approvalPolicy: defaulted(AgentSkillApprovalPolicySchema, "explicit"),
   // Accepted only so clients from before Skill selection was explicit can
   // roll forward without a hard API failure. It has no runtime meaning.
   isDefault: Schema.optional(Schema.Boolean),
@@ -336,6 +351,8 @@ const channelAgentSkillInputTypeSchema = strict(Schema.Struct({
   model: Schema.NullOr(Schema.String),
   effort: Schema.NullOr(Schema.String),
   kind: ChannelAgentSkillKindSchema,
+  executionMode: AgentSkillExecutionModeSchema,
+  approvalPolicy: AgentSkillApprovalPolicySchema,
   position: Schema.Int,
 }));
 
@@ -604,6 +621,8 @@ export type ChannelAgentSkill = {
   model: string | null;
   effort: ChannelAgentEffort | null;
   kind: ChannelAgentSkillKind;
+  executionMode: AgentSkillExecutionMode;
+  approvalPolicy: AgentSkillApprovalPolicy;
   position: number;
   createdAt: string;
   updatedAt: string;
@@ -712,12 +731,17 @@ export type AgentSkillExecutionProposal = {
   provider: AgentProvider;
   model: string | null;
   effort: ModelEffort | null;
+  executionMode: AgentSkillExecutionMode;
+  approvalPolicy: AgentSkillApprovalPolicy;
+  executionStatus: "waiting" | "running" | "completed" | "failed";
   request: string;
   delegatedByAgentId: string | null;
   delegatedByAgentName: string | null;
   requestedWorkerId: string | null;
   requestedWorkerLabel: string | null;
   resultSessionId: string | null;
+  resultMessageId: string | null;
+  error: string | null;
   createdAt: string;
   acceptedAt: string | null;
 };

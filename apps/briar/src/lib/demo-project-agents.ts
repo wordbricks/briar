@@ -25,6 +25,8 @@ export function demoProjectAgents(
     ...input,
     effort: null,
     kind: "custom",
+    executionMode: "task",
+    approvalPolicy: "explicit",
     position: 0,
     createdAt,
     updatedAt: createdAt,

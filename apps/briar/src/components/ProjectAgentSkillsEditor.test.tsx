@@ -54,6 +54,8 @@ describe("ProjectAgentSkillsEditor", () => {
         model: "gpt-5.6-sol",
         effort: "high",
         kind: "issue_processing",
+        executionMode: "task",
+        approvalPolicy: "explicit",
         position: 0,
       },
     ]);

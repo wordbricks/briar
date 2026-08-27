@@ -106,6 +106,8 @@ describe("scheduled project agent execution", () => {
       model: "claude-sonnet-4-5",
       effort: "high",
       kind: "custom",
+      executionMode: "task",
+      approvalPolicy: "explicit",
       position: 0,
       createdAt: "2026-07-27T00:00:00.000Z",
       updatedAt: "2026-07-27T00:00:00.000Z",

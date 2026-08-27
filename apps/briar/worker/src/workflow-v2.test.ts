@@ -192,6 +192,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // 0139 installs channel approval triggers that depend on the
         // approval columns deliberately excluded from this historical schema.
         "0139_channel_related_message.sql",
+        // 0140 extends the Agent Skill approval tables and result projections
+        // deliberately excluded from this historical workflow fixture.
+        "0140_agent_skill_execution_modes.sql",
       ],
     });
 

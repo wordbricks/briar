@@ -38,6 +38,14 @@ const ProjectAgentSkillResponseSource = Schema.Struct({
   model: Schema.NullOr(Schema.String),
   effort: defaulted(Schema.NullOr(ModelEffort), null),
   kind: Schema.Literals(["issue_processing", "custom"]),
+  executionMode: defaulted(
+    Schema.Literals(["conversation", "task"]),
+    "task",
+  ),
+  approvalPolicy: defaulted(
+    Schema.Literals(["invoke_is_consent", "explicit"]),
+    "explicit",
+  ),
   position: NonNegativeInteger,
   createdAt: Schema.String,
   updatedAt: Schema.String,
@@ -53,6 +61,8 @@ const ProjectAgentSkillResponseType = Schema.Struct({
   model: Schema.NullOr(Schema.String),
   effort: Schema.NullOr(ModelEffort),
   kind: Schema.Literals(["issue_processing", "custom"]),
+  executionMode: Schema.Literals(["conversation", "task"]),
+  approvalPolicy: Schema.Literals(["invoke_is_consent", "explicit"]),
   position: NonNegativeInteger,
   createdAt: Schema.String,
   updatedAt: Schema.String,

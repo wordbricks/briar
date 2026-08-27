@@ -1213,6 +1213,9 @@ describe("detached Agent runner", () => {
       skillId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       skillName: "iOS deployment",
       request: "iOS 앱을 배포해 줘",
+      executionMode: "task" as const,
+      approvalPolicy: "explicit" as const,
+      approved: false,
     };
     const authorizedIssuePrompt = detachedIssueReplyPrompt({
       agent,
@@ -1226,6 +1229,26 @@ describe("detached Agent runner", () => {
     expect(authorizedIssuePrompt).toContain(
       '"skillExecutionProposal":{"type":"request_agent_skill_execute"}',
     );
+    const conversationTarget = {
+      ...skillExecutionTarget,
+      executionMode: "conversation" as const,
+      approvalPolicy: "invoke_is_consent" as const,
+    };
+    const conversationPrompt = detachedChannelReplyPrompt({
+      agent,
+      snapshot: { messages: [] },
+      workspaceAvailable: true,
+      skillExecutionTarget: conversationTarget,
+    });
+    expect(conversationPrompt).toContain("Carry out its instructions now");
+    expect(conversationPrompt).toContain("keep skillExecutionProposal null");
+    expect(detachedIssueReplyPrompt({
+      agent,
+      snapshot: { messages: [] },
+      userMessage: conversationTarget.request,
+      workspaceAvailable: true,
+      skillExecutionTarget: conversationTarget,
+    })).toContain("must be invoked from its channel thread");
     expect(detachedIssueReplyPrompt({
       agent,
       snapshot: { messages: [] },
