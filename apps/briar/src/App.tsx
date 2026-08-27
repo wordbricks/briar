@@ -1336,6 +1336,7 @@ export function App({
     [],
   );
   const [issueListRequestKey, setIssueListRequestKey] = useState(0);
+  const [agentListRequestKey, setAgentListRequestKey] = useState(0);
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
     null,
   );
@@ -2419,7 +2420,11 @@ export function App({
       navigateToPage("issues");
       setIsIssueDialogOpen(true);
     },
-    goAgents: () => navigateToPage("agents"),
+    goAgents: () => {
+      setRequestedSessionId(null);
+      setAgentListRequestKey((key) => key + 1);
+      navigateToPage("agents");
+    },
     goChannels: () => navigateToPage("channels"),
     goDms: () => navigateToPage("dms"),
     goInbox: () => navigateToPage("inbox"),
@@ -2974,7 +2979,11 @@ export function App({
       id: `navigation:agents:${activeProject.id}`,
       keywords: ["agents", "sessions", "에이전트", "세션", "智能体", activeProject.name],
       label: t("sidebar.agents"),
-      onSelect: () => navigateToPage("agents"),
+      onSelect: () => {
+        setRequestedSessionId(null);
+        setAgentListRequestKey((key) => key + 1);
+        navigateToPage("agents");
+      },
       priority: activePage === "agents" ? 120 : 60,
       scope: "navigation",
     }, paletteSections.navigation);
@@ -3603,7 +3612,11 @@ export function App({
               setRequestedSessionId(sessionId);
               navigateToPage("agents");
             }}
-            onAgentsOpen={() => navigateToPage("agents")}
+            onAgentsOpen={() => {
+              setRequestedSessionId(null);
+              setAgentListRequestKey((key) => key + 1);
+              navigateToPage("agents");
+            }}
             onLobbyOpen={() => navigateToPage("lobby")}
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
@@ -4028,7 +4041,11 @@ export function App({
             dashboard={briar.dashboard}
             isSidebarOpen={isSidebarOpen}
             onLoadUsageSummary={loadProjectHomeUsage}
-            onOpenAgents={() => navigateToPage("agents")}
+            onOpenAgents={() => {
+              setRequestedSessionId(null);
+              setAgentListRequestKey((key) => key + 1);
+              navigateToPage("agents");
+            }}
             onOpenIssue={(runId) => {
               setRequestedSessionId(null);
               setRequestedRunId(runId);
@@ -4053,6 +4070,7 @@ export function App({
           />
         ) : activePage === "agents" && activeProject ? (
           <ProjectAgents
+            agentListRequestKey={agentListRequestKey}
             dashboard={briar.dashboard}
             error={briar.error}
             isSidebarOpen={isSidebarOpen}

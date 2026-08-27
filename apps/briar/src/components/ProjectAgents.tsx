@@ -84,6 +84,7 @@ import {
 import { cn } from "../lib/utils";
 
 export function ProjectAgents({
+  agentListRequestKey = 0,
   companionMode = false,
   dashboard,
   error: appError,
@@ -100,6 +101,7 @@ export function ProjectAgents({
   sessions,
   token,
 }: {
+  agentListRequestKey?: number;
   companionMode?: boolean;
   dashboard: DashboardPayload | null;
   error: string | null;
@@ -222,7 +224,8 @@ export function ProjectAgents({
     setSelectedAgent(null);
     setSettingsAgent(null);
     setTaskDialogAgent(null);
-  }, [project.id]);
+    setIsDialogOpen(false);
+  }, [agentListRequestKey, project.id]);
 
   useEffect(() => {
     if (!requestedSessionId || agents.length === 0) return;
