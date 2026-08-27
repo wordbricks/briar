@@ -85,24 +85,116 @@
 
 .dark .app-content-surface,
 .dark .main-content,
-.dark .organization-create {
+.dark .organization-create,
+.dark .kanban-board,
+.dark .issue-list {
   color: var(--foreground);
   background: var(--background) !important;
 }
 
 .dark .topbar,
 .dark .app-status-bar,
-.dark .page-header {
+.dark .page-header,
+.dark .queue-header {
   border-color: var(--border);
   color: var(--foreground);
   background: var(--card);
 }
 
+.dark .kanban-column,
+.dark .issue-list-header {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.dark .kanban-column.slate:not(.drag-over) {
+  background: color-mix(in srgb, var(--muted) 94%, #aab2a8);
+}
+
+.dark .kanban-column.blue:not(.drag-over),
+.dark .kanban-column.cyan:not(.drag-over) {
+  background: color-mix(in srgb, var(--muted) 91%, #58a0d1);
+}
+
+.dark .kanban-column.violet:not(.drag-over) {
+  background: color-mix(in srgb, var(--muted) 91%, #8167d6);
+}
+
+.dark .kanban-column.indigo:not(.drag-over) {
+  background: color-mix(in srgb, var(--muted) 91%, #6f8fc4);
+}
+
+.dark .kanban-column.amber:not(.drag-over) {
+  background: color-mix(in srgb, var(--muted) 91%, #d79a41);
+}
+
+.dark .kanban-column.orange:not(.drag-over) {
+  background: color-mix(in srgb, var(--muted) 91%, #d87d45);
+}
+
+.dark .kanban-column.rose:not(.drag-over),
+.dark .kanban-column.red:not(.drag-over) {
+  background: color-mix(in srgb, var(--muted) 91%, #d65f72);
+}
+
+.dark .kanban-column.emerald:not(.drag-over) {
+  background: color-mix(in srgb, var(--muted) 91%, #43a47f);
+}
+
+.dark .kanban-column.drag-over {
+  background: color-mix(in srgb, var(--muted) 82%, #8068ce);
+}
+
+.dark .kanban-column-add {
+  border-color: var(--border);
+  color: var(--muted-foreground);
+}
+
+.dark .kanban-column-add:hover {
+  border-color: #8068ce;
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.dark .kanban-hidden-column {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--card);
+}
+
+.dark .kanban-hidden-columns-toggle,
+.dark .kanban-column-menu {
+  color: var(--muted-foreground);
+}
+
+.dark .kanban-hidden-columns-toggle:hover,
+.dark .kanban-column-menu:hover,
+.dark .kanban-column-menu[data-state="open"] {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.dark .kanban-checkpoint-marker > strong {
+  border-color: var(--background);
+}
+
+.dark .kanban-card,
+.dark .issue-list-body,
+.dark .issue-list-row {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--card);
+}
+
+.dark .issue-list-row:hover,
+.dark .issue-list-row:focus-visible,
 .dark .status-tabs button:hover {
   color: var(--foreground);
   background: var(--secondary);
 }
 
+.dark .search-box input,
 .dark input,
 .dark textarea,
 .dark select {
@@ -140,7 +232,19 @@
   background: var(--secondary);
 }
 
+.dark .companion-shell .kanban-column > header,
+.dark .companion-shell .kanban-card,
+.dark .companion-shell .run-properties {
+  border-color: var(--border);
+}
+
+.dark .companion-shell .kanban-card:active {
+  background: var(--secondary);
+}
+
 .dark .dialog,
+.dark .issue-dialog,
+.dark .run-dialog,
 .dark .delete-project-dialog {
   border-color: var(--border);
   color: var(--foreground);

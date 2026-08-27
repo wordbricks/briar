@@ -5,14 +5,6 @@ import { describe, expect, it } from "vitest";
 const styles = readFileSync(resolve("src", "styles.css"), "utf8");
 const tokens = readFileSync(resolve("src", "styles", "tokens.css"), "utf8");
 const inbox = readFileSync(resolve("src", "components", "Inbox.tsx"), "utf8");
-const createIssueDialog = readFileSync(
-  resolve("src", "components", "hunt", "editor", "CreateIssueDialog.tsx"),
-  "utf8",
-);
-const editIssueDialog = readFileSync(
-  resolve("src", "components", "hunt", "editor", "EditIssueDialog.tsx"),
-  "utf8",
-);
 const settingsLayout = readFileSync(
   resolve("src", "components", "settings", "layout.tsx"),
   "utf8",
@@ -56,11 +48,8 @@ describe("subtle scrollbar design system", () => {
 
   it("preserves intentional hidden horizontal scrollbar exceptions", () => {
     expect(styles).toMatch(/\.status-tabs \{[^}]+scrollbar-width:none;/u);
+    expect(styles).toMatch(/\.issue-metadata-bar \{[^}]+scrollbar-width: none;/u);
     expect(inbox).toContain("[scrollbar-width:none]");
     expect(inbox).toContain("[&::-webkit-scrollbar]:hidden");
-    expect(createIssueDialog).toContain("[scrollbar-width:none]");
-    expect(createIssueDialog).toContain("[&::-webkit-scrollbar]:hidden");
-    expect(editIssueDialog).toContain("[scrollbar-width:none]");
-    expect(editIssueDialog).toContain("[&::-webkit-scrollbar]:hidden");
   });
 });

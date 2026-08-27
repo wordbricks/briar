@@ -42,13 +42,13 @@ export function IssueAgentActivityPanel({
     if (!panel) return;
     stickToBottomRef.current = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 24;
   };
-  return <div aria-labelledby={labelledBy} className="issue-agent-activity-panel min-h-0 min-w-0 overflow-y-auto" id={id} onScroll={handleScroll} ref={panelRef} role="tabpanel">
-      <header className="flex items-start justify-between gap-3 border-b border-border px-0.5 pb-2">
+  return <div aria-labelledby={labelledBy} className="issue-agent-activity-panel" id={id} onScroll={handleScroll} ref={panelRef} role="tabpanel">
+      <header>
         <div>
           <strong>{t("run.agentActivity")}</strong>
-          <p className="mt-0.5 text-2xs text-muted-foreground">{t("run.agentActivityDescription")}</p>
+          <p>{t("run.agentActivityDescription")}</p>
         </div>
-        <span className="auto-hunt-event-count text-2xs text-muted-foreground">
+        <span className="auto-hunt-event-count">
           {isLive ? <i>
               <span />
               {t("autoHunt.live")}

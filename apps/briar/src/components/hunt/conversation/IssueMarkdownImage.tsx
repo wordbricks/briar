@@ -36,13 +36,13 @@ export function IssueMarkdownImage({
     return src ? <ImageLightbox alt={alt} source={src} /> : null;
   }
   if (!attachment || failed) {
-    return <span className="issue-markdown-image-state my-2 flex min-h-10 max-w-full items-center gap-2 rounded-lg border border-border bg-muted px-2.5 text-2xs text-muted-foreground" role="img" aria-label={alt}>
+    return <span className="issue-markdown-image-state" role="img" aria-label={alt}>
         <CircleAlert aria-hidden="true" size={16} />
         {failed ? t("run.loadFailed") : alt}
       </span>;
   }
   if (!source) {
-    return <span className="issue-markdown-image-state my-2 flex min-h-10 max-w-full items-center gap-2 rounded-lg border border-border bg-muted px-2.5 text-2xs text-muted-foreground" role="img" aria-label={alt}>
+    return <span className="issue-markdown-image-state" role="img" aria-label={alt}>
         <Spinner aria-hidden="true" size={16} />
         {alt}
       </span>;

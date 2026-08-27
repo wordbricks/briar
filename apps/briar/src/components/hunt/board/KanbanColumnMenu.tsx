@@ -21,15 +21,15 @@ export function KanbanColumnMenu({
         label
       }) : t("dashboard.columnMenu", {
         label
-      })} className="kanban-column-menu inline-grid size-[22px] place-items-center rounded-md border-0 bg-transparent text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring data-[state=open]:bg-accent data-[state=open]:text-foreground" type="button">
+      })} className="kanban-column-menu" type="button">
           <MoreHorizontal aria-hidden="true" size={14} />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align="end" className="run-page-actions-menu z-[150] min-w-44 overflow-hidden rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl" sideOffset={6}>
-          {hidden ? <DropdownMenu.Item className="run-page-actions-item flex min-h-9 items-center rounded-lg px-2.5 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground" onSelect={onShow}>
+        <DropdownMenu.Content align="end" className="run-page-actions-menu" sideOffset={6}>
+          {hidden ? <DropdownMenu.Item className="run-page-actions-item" onSelect={onShow}>
               {t("dashboard.showColumn")}
-            </DropdownMenu.Item> : <DropdownMenu.Item className="run-page-actions-item flex min-h-9 items-center rounded-lg px-2.5 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground" onSelect={onHide}>
+            </DropdownMenu.Item> : <DropdownMenu.Item className="run-page-actions-item" onSelect={onHide}>
               {t("dashboard.hideColumn")}
             </DropdownMenu.Item>}
         </DropdownMenu.Content>

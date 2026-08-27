@@ -20,13 +20,6 @@ import { RunStatusPill } from "../detail/RunStatusPill";
 import { localizeStatus, relativeTime } from "../model/formatters";
 import { hasResultReviews } from "../results/model";
 import { IssueDifficultyIcon } from "../IssueDifficultyIcon";
-import { cn } from "@/lib/utils";
-
-const sourceDotClasses = {
-  error: "bg-[#dd687a]",
-  feedback: "bg-[#58a0d1]",
-  issue: "bg-[#8167d6]",
-} as const;
 export function KanbanCard({
   availableProviders,
   activeAgent,
@@ -102,12 +95,12 @@ export function KanbanCard({
   return <IssueContextMenu availableProviders={availableProviders} disabled={contextMenuDisabled || isMoving || isDragging || deletingIssueId === run.id || updatingIssueId === run.id} onDelete={onDelete} onTransfer={onTransfer} onEdit={onEdit} onMove={onMove} onOpen={onOpen} onProcessNow={onProcessNow} onPriorityChange={onPriorityChange} onPreferencesChange={onPreferencesChange} onCheckpointsChange={onCheckpointsChange} run={run} isProcessing={isProcessing}>
       <div aria-label={t("run.details", {
       title: run.title
-    })} aria-disabled={isMoving} className={cn("kanban-card group relative flex min-h-0 w-full min-w-0 select-none flex-col items-stretch gap-2 overflow-visible rounded-[11px] border border-border bg-card p-3 text-left text-foreground shadow-sm transition-[border-color,box-shadow,transform,opacity] duration-150 hover:-translate-y-px hover:border-input hover:shadow-md active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", meta.tone, run.status === "paused" && "awaiting-review cursor-pointer", isMoving && "moving cursor-wait opacity-55", isDragging && "dragging scale-[1.01] cursor-grabbing border-[#b7a8e4] opacity-70 shadow-lg", assignmentBadgeCount > 0 && "has-assignees", assignmentBadgeCount > 1 && "has-multiple-assignees", assignmentBadgeCount > 2 && "has-three-assignees", assignmentBadgeCount > 3 && "has-four-assignees")} data-keyboard-list-current={isKeyboardCursor ? "" : undefined} data-keyboard-list-item="" data-run-id={run.id} draggable={false} onClick={onOpen} onFocus={onFocus} onKeyDown={event => {
+    })} aria-disabled={isMoving} className={`kanban-card ${meta.tone}${run.status === "paused" ? " awaiting-review" : ""}${isMoving ? " moving" : ""}${isDragging ? " dragging" : ""}${assignmentBadgeCount > 0 ? " has-assignees" : ""}${assignmentBadgeCount > 1 ? " has-multiple-assignees" : ""}${assignmentBadgeCount > 2 ? " has-three-assignees" : ""}${assignmentBadgeCount > 3 ? " has-four-assignees" : ""}`} data-keyboard-list-current={isKeyboardCursor ? "" : undefined} data-keyboard-list-item="" data-run-id={run.id} draggable={false} onClick={onOpen} onFocus={onFocus} onKeyDown={event => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
       onOpen();
     }} onPointerCancel={onPointerCancel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} ref={cardRef} role="button" tabIndex={0}>
-        {assignmentBadgeCount > 0 && <span className="kanban-card-assignee-badges absolute right-1.5 top-1.5 z-[1] flex items-center [&>span]:grid [&>span]:size-[22px] [&>span]:place-items-center [&>span]:overflow-hidden [&>span]:rounded-full [&>span]:border [&>span]:border-border [&>span]:bg-card [&>span+span]:-ml-1">
+        {assignmentBadgeCount > 0 && <span className="kanban-card-assignee-badges">
             {!hideAssignmentBadges && activeAgent && <span aria-label={t("run.assigned", {
           agent: activeAgent.name
         })} className="kanban-card-agent-badge" title={t("run.assigned", {
@@ -129,41 +122,41 @@ export function KanbanCard({
                 <Rocket aria-hidden="true" size={12} strokeWidth={2.2} />
               </span>}
           </span>}
-        <span className={cn("kanban-card-kicker flex shrink-0 items-center justify-between gap-2", assignmentBadgeCount > 0 && "pr-[22px]", assignmentBadgeCount > 1 && "pr-[39px]", assignmentBadgeCount > 2 && "pr-[56px]", assignmentBadgeCount > 3 && "pr-[73px]")}>
-          <small className="font-mono text-2xs font-medium text-muted-foreground">{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>
+        <span className="kanban-card-kicker">
+          <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>
         </span>
-        <span className="kanban-card-copy grid min-w-0 shrink-0 gap-0.5">
-          <strong className="break-words whitespace-pre-wrap text-xs leading-[1.45]">{run.title}</strong>
-          {run.issueDescription && <span className="kanban-card-description line-clamp-3 break-words whitespace-pre-wrap text-2xs leading-[1.45] text-muted-foreground">
+        <span className="kanban-card-copy">
+          <strong>{run.title}</strong>
+          {run.issueDescription && <span className="kanban-card-description">
               {run.issueDescription}
             </span>}
         </span>
-        <span className="kanban-card-badges mt-auto flex shrink-0 flex-wrap items-center gap-1.5 [&>i:not(.status-pill)]:inline-flex [&>i:not(.status-pill)]:min-h-[22px] [&>i:not(.status-pill)]:items-center [&>i:not(.status-pill)]:gap-1 [&>i:not(.status-pill)]:rounded-md [&>i:not(.status-pill)]:border [&>i:not(.status-pill)]:border-border [&>i:not(.status-pill)]:bg-muted [&>i:not(.status-pill)]:px-1.5 [&>i:not(.status-pill)]:font-mono [&>i:not(.status-pill)]:text-2xs [&>i:not(.status-pill)]:font-medium [&>i:not(.status-pill)]:not-italic">
+        <span className="kanban-card-badges">
           <RunStatusPill label={label} reviewed={hasResultReviews(run)} status={run.status} tone={meta.tone} />
-          <i className="kanban-source inline-flex min-h-[22px] items-center gap-1 rounded-md border border-border bg-muted px-1.5 font-mono text-2xs font-medium not-italic">
-            <span className={cn("source-dot size-2 shrink-0 rounded-full", sourceDotClasses[run.source])} />
+          <i className="kanban-source">
+            <span className={`source-dot ${run.source}`} />
             {t(`source.${run.source}` as MessageKey)}
           </i>
-          {assignee && <i aria-label={`${t("issue.assignee")}: ${assignee.name}`} className="kanban-assignee inline-flex size-[22px] min-h-[22px] min-w-[22px] items-center justify-center overflow-hidden rounded-full border border-border bg-muted p-0 not-italic" title={`${t("issue.assignee")}: ${assignee.name}`}>
+          {assignee && <i aria-label={`${t("issue.assignee")}: ${assignee.name}`} className="kanban-assignee" title={`${t("issue.assignee")}: ${assignee.name}`}>
               <IssueAssigneeAvatar member={assignee} />
             </i>}
-          {run.executionReadiness === "waiting" && <i className="not-italic">{t("issue.waitingOnPrerequisites", {
+          {run.executionReadiness === "waiting" && <i>{t("issue.waitingOnPrerequisites", {
             count: run.waitingOnPrerequisiteCount ?? 0
           })}</i>}
-          {run.priority !== null && <i className="kanban-priority border-[#f0d9b6]! bg-[#fff7e9]! text-[#a2632d]!">P{run.priority}</i>}
+          {run.priority !== null && <i className="kanban-priority">P{run.priority}</i>}
           <IssueDifficultyIcon difficulty={run.difficulty} />
         </span>
-        <span className="kanban-card-footer flex shrink-0 min-w-0 items-center justify-between gap-2 pt-0.5 text-muted-foreground">
-          <small className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-2xs font-medium">{isClaimed ? t("run.assigned", {
+        <span className="kanban-card-footer">
+          <small>{isClaimed ? t("run.assigned", {
             agent: run.claimedBy ?? "agent"
           }) : relativeTime(run.updatedAt, t)}</small>
-          <span className="kanban-card-footer-actions flex shrink-0 items-center gap-1.5">
+          <span className="kanban-card-footer-actions">
             <PullRequestIconLink urls={run.pullRequestUrls} />
             <ChevronRight size={14} />
           </span>
         </span>
-        {run.status === "paused" ? <span className="kanban-card-review-banner -mx-3 -mb-3 mt-1 flex shrink-0 items-center gap-1.5 rounded-b-[10px] border-t border-[var(--status-warning-border)] bg-[var(--status-warning-surface)] px-3 py-1.5 text-2xs font-semibold leading-[1.35] text-[var(--status-warning-foreground)]" role="status">
-            <i aria-hidden="true" className="size-2 shrink-0 rounded-full border-2 border-[var(--warning)]" />
+        {run.status === "paused" ? <span className="kanban-card-review-banner" role="status">
+            <i aria-hidden="true" />
             {t("run.awaitingReviewBanner")}
           </span> : null}
       </div>

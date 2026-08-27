@@ -1,7 +1,6 @@
 import { Play } from "lucide-react";
 import { useEffect, useRef, useState, type ReactElement, type PointerEvent as ReactPointerEvent } from "react";
 import { useI18n } from "@/i18n";
-import { cn } from "@/lib/utils";
 export const companionSwipeActionWidth = 72;
 export const companionSwipeOpenThreshold = 44;
 export function CompanionTaskSwipeAction({
@@ -49,7 +48,7 @@ export function CompanionTaskSwipeAction({
     setIsDragging(false);
     setOffset(gesture.origin);
   };
-  return <div className={cn("companion-task-swipe relative min-w-0 overflow-hidden", offset > 0 && "open", isDragging && "dragging")} onClickCapture={event => {
+  return <div className={`companion-task-swipe${offset > 0 ? " open" : ""}${isDragging ? " dragging" : ""}`} onClickCapture={event => {
     if ((event.target as Element).closest(".companion-task-swipe-action")) {
       suppressClickRef.current = false;
       return;
@@ -81,13 +80,13 @@ export function CompanionTaskSwipeAction({
     setIsDragging(true);
     setOffset(Math.min(companionSwipeActionWidth, Math.max(0, gesture.origin - deltaX)));
   }} onPointerUp={finishGesture}>
-      <button aria-hidden={offset < companionSwipeOpenThreshold} aria-label={t("issue.processNow")} className="companion-task-swipe-action absolute inset-y-0 right-0 z-[1] grid w-[72px] place-items-center border-0 bg-primary text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" disabled={disabled} onClick={() => {
+      <button aria-hidden={offset < companionSwipeOpenThreshold} aria-label={t("issue.processNow")} className="companion-task-swipe-action" disabled={disabled} onClick={() => {
       setOffset(0);
       onProcessNow();
     }} tabIndex={offset >= companionSwipeOpenThreshold ? 0 : -1} type="button">
         <Play aria-hidden="true" fill="currentColor" size={22} />
       </button>
-      <div className="companion-task-swipe-content relative min-w-0 transition-transform duration-150" style={{
+      <div className="companion-task-swipe-content" style={{
       transform: `translateX(${-offset}px)`
     }}>
         {children}
