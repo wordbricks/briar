@@ -2,9 +2,10 @@ import { access, readFile, stat } from "node:fs/promises";
 import { basename, isAbsolute, resolve } from "node:path";
 import * as Schema from "effect/Schema";
 import {
-  issueAttachmentMimeTypeFromName,
-  validateIssueAttachments,
-} from "../src/lib/issue-attachments";
+  agentReplyAttachmentMimeTypeFromName,
+  normalizeAgentReplyAttachmentFile,
+  validateAgentReplyAttachments,
+} from "../src/lib/agent-reply-attachments";
 import { isPathWithinRoot } from "./worktree";
 
 const maxReplyAttachmentPathLength = 4096;
@@ -27,12 +28,10 @@ export function validateReplyAttachments(
   attachments: readonly File[],
   replyLabel: string,
 ): File[] {
-  if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
-    throw new Error(`${replyLabel} attachments must be images`);
-  }
-  const validationError = validateIssueAttachments(attachments);
+  const normalized = attachments.map(normalizeAgentReplyAttachmentFile);
+  const validationError = validateAgentReplyAttachments(normalized);
   if (validationError) throw new Error(validationError);
-  return [...attachments];
+  return normalized;
 }
 
 export function replyCompleteRequestBody(input: {
@@ -49,7 +48,7 @@ export function replyCompleteRequestBody(input: {
 }
 
 /**
- * Read reply images before a disposable workspace is deleted. Paths must stay
+ * Read reply attachments before a disposable workspace is deleted. Paths must stay
  * inside that workspace so provider output cannot attach arbitrary host files.
  */
 export async function collectReplyAttachments(input: {
@@ -65,19 +64,21 @@ export async function collectReplyAttachments(input: {
     try {
       await access(resolved);
     } catch {
-      throw new Error(`${input.replyLabel} image does not exist: ${path}`);
+      throw new Error(`${input.replyLabel} attachment does not exist: ${path}`);
     }
     if (!isPathWithinRoot(resolved, input.workspacePath)) {
-      throw new Error(`${input.replyLabel} image is outside the workspace: ${path}`);
+      throw new Error(`${input.replyLabel} attachment is outside the workspace: ${path}`);
     }
     const fileStat = await stat(resolved);
     if (!fileStat.isFile()) {
-      throw new Error(`${input.replyLabel} image is not a file: ${path}`);
+      throw new Error(`${input.replyLabel} attachment is not a file: ${path}`);
     }
     const filename = basename(resolved).normalize("NFC").trim();
-    const type = issueAttachmentMimeTypeFromName(filename) ?? "";
-    if (!type.startsWith("image/")) {
-      throw new Error(`${input.replyLabel} attachments must be images: ${path}`);
+    const type = agentReplyAttachmentMimeTypeFromName(filename) ?? "";
+    if (!type) {
+      throw new Error(
+        `${input.replyLabel} attachments must be images or HTML files: ${path}`,
+      );
     }
     files.push(new File([await readFile(resolved)], filename, { type }));
   }

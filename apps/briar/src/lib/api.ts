@@ -1677,13 +1677,13 @@ export async function loadChannelMessageAttachment(
   attachment: ChannelMessageAttachment,
 ) {
   if (!apiUrl || !attachment.url.startsWith("/")) {
-    throw new Error("첨부 이미지 경로가 유효하지 않습니다.");
+    throw new Error("첨부 파일 경로가 유효하지 않습니다.");
   }
   const response = await fetch(`${apiUrl}${attachment.url}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
-    throw new Error(`첨부 이미지를 열 수 없습니다. (${response.status})`);
+    throw new Error(`첨부 파일을 열 수 없습니다. (${response.status})`);
   }
   return response.blob();
 }

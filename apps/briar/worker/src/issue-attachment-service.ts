@@ -1,4 +1,8 @@
 import { issueAttachmentReferences } from "../../src/lib/issue-markdown";
+import {
+  htmlArtifactContentSecurityPolicy,
+  isHtmlArtifactAttachment,
+} from "../../src/lib/agent-reply-attachments";
 import { contentDisposition } from "./attachment-storage";
 import {
   deleteIssueAttachments,
@@ -27,6 +31,13 @@ export function issueAttachmentResponse(
   headers.set("X-Content-Type-Options", "nosniff");
   if (attachment.content_type.toLowerCase() === "image/svg+xml") {
     headers.set("Content-Security-Policy", "sandbox");
+  } else if (
+    isHtmlArtifactAttachment(attachment.content_type, attachment.filename)
+  ) {
+    headers.set(
+      "Content-Security-Policy",
+      `sandbox allow-scripts; ${htmlArtifactContentSecurityPolicy}`,
+    );
   }
   return new Response(body, { headers });
 }

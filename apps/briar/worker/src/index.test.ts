@@ -1488,6 +1488,54 @@ describe("Worker HTTP contract", () => {
     });
   });
 
+  it("parses HTML artifacts from channel and issue reply completion", async () => {
+    const html = new File(["<h1>Lesson</h1>"], "lesson.html", {
+      type: "text/html",
+    });
+    const channelForm = new FormData();
+    channelForm.append("complete", JSON.stringify({
+      organizationId: "11111111-1111-4111-8111-111111111111",
+      workerId: "worker-1",
+      claimToken: "briar_channel_claim_secret",
+      result: { body: "Open the lesson.", document: null, issueProposal: null },
+    }));
+    channelForm.append("attachments", html);
+    const channel = await readChannelReplyCompleteRequest(
+      new Request("https://briar-api.example/channel-reply-claims/job/complete", {
+        method: "POST",
+        headers: { "Content-Length": "2048" },
+        body: channelForm,
+      }),
+    );
+    expect(channel.attachments[0]).toMatchObject({
+      name: "lesson.html",
+      type: "text/html",
+    });
+
+    const issueForm = new FormData();
+    issueForm.append("complete", JSON.stringify({
+      projectId: "11111111-1111-4111-8111-111111111111",
+      workerId: "worker-1",
+      claimToken: `briar_reply_claim_${"c".repeat(64)}`,
+      body: "Open the lesson.",
+      proposedAction: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+    }));
+    issueForm.append("attachments", html);
+    const issue = await readIssueReplyCompleteRequest(
+      new Request("https://briar-api.example/issue-reply-claims/job/complete", {
+        method: "POST",
+        headers: { "Content-Length": "2048" },
+        body: issueForm,
+      }),
+    );
+    expect(issue.attachments[0]).toMatchObject({
+      name: "lesson.html",
+      type: "text/html",
+    });
+  });
+
   it("keeps JSON channel reply completion compatible when no image is attached", async () => {
     const parsed = await readChannelReplyCompleteRequest(
       new Request("https://briar-api.example/channel-reply-claims/job/complete", {
@@ -1557,7 +1605,7 @@ describe("Worker HTTP contract", () => {
     expect(parsed.input.body).toBe("Answer");
   });
 
-  it("rejects a failed channel reply that also includes images", async () => {
+  it("rejects a failed channel reply that also includes attachments", async () => {
     const form = new FormData();
     form.append("complete", JSON.stringify({
       organizationId: "11111111-1111-4111-8111-111111111111",
@@ -1579,7 +1627,7 @@ describe("Worker HTTP contract", () => {
           body: form,
         }),
       ),
-    ).rejects.toThrow("cannot include images");
+    ).rejects.toThrow("cannot include attachments");
   });
 
   it("requires an explicit earlier stage and reason for run rework", () => {
