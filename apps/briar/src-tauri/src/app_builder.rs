@@ -203,6 +203,8 @@ pub(super) fn run() {
             current_execution_worker_device_id,
             show_inbox_notification,
             request_inbox_notification_permission,
+            inbox_notification_permission_status,
+            open_inbox_notification_settings,
             drain_pending_inbox_notification_opens,
             arm_macos_password_editor,
             sync_status_tray,

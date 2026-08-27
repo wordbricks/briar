@@ -45,6 +45,7 @@ objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSResponder", "NSView", "NSWindow"] }
 objc2-foundation = "0.3"
 objc2-user-notifications = { version = "0.3", features = [
+  "UNNotificationSettings",
   "UNNotification",
   "UNNotificationContent",
   "UNNotificationRequest",
