@@ -252,9 +252,7 @@ install -o root -g root -m 0755 "$download_dir/antigravity" \
 
 install -d -o briar -g briar -m 0700 \
   /home/briar/.config /home/briar/.config/xfce4 \
-  /home/briar/.config/xfce4/terminal /home/briar/Desktop \
-  /home/briar/.local /home/briar/.local/state \
-  /home/briar/.local/state/briar
+  /home/briar/.config/xfce4/terminal /home/briar/Desktop
 install -o briar -g briar -m 0600 "$source_dir/xfce4-helpers.rc" \
   /home/briar/.config/xfce4/helpers.rc
 install -o briar -g briar -m 0600 "$source_dir/xfce4-terminalrc" \
@@ -279,8 +277,8 @@ for shell_profile in /home/briar/.profile /home/briar/.bashrc; do
 done
 
 install -o root -g root -m 0755 \
-  "$source_dir/briar-open-browser-style" \
-  /opt/briar/bin/briar-open-browser-style
+  "$source_dir/briar-open-browser" \
+  /opt/briar/bin/briar-open-browser
 install -o root -g root -m 0755 \
   "$source_dir/briar-managed-runtime-update-request" \
   "$source_dir/briar-managed-runtime-updater" \

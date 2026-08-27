@@ -114,7 +114,9 @@ describe("project doctor repository workflow sync", () => {
       fetchProjectSettings: async () => pendingSettings,
     });
 
-    await projectDoctor(deps.values);
+    await expect(projectDoctor(deps.values)).rejects.toThrow(
+      "server_generation_pending",
+    );
 
     expect(JSON.parse(deps.writeOutput.mock.calls[0]![0])).toMatchObject({
       ok: false,
@@ -135,7 +137,9 @@ describe("project doctor repository workflow sync", () => {
         throw new HttpRequestError("Unauthorized", 401, null);
       },
     });
-    await projectDoctor(expired.values);
+    await expect(projectDoctor(expired.values)).rejects.toThrow(
+      "session_unavailable",
+    );
 
     expect(JSON.parse(expired.writeOutput.mock.calls[0]![0])).toMatchObject({
       ok: false,
@@ -147,7 +151,9 @@ describe("project doctor repository workflow sync", () => {
         throw new HttpRequestError("Unavailable", 503, null);
       },
     });
-    await projectDoctor(unavailable.values);
+    await expect(projectDoctor(unavailable.values)).rejects.toThrow(
+      "api_unavailable",
+    );
 
     expect(JSON.parse(unavailable.writeOutput.mock.calls[0]![0])).toMatchObject({
       ok: false,
@@ -163,7 +169,9 @@ describe("project doctor repository workflow sync", () => {
       },
     });
 
-    await projectDoctor(deps.values);
+    await expect(projectDoctor(deps.values)).rejects.toThrow(
+      "network_unavailable",
+    );
 
     expect(JSON.parse(deps.writeOutput.mock.calls[0]![0])).toMatchObject({
       ok: false,
@@ -179,7 +187,9 @@ describe("project doctor repository workflow sync", () => {
       },
     });
 
-    await projectDoctor(deps.values);
+    await expect(projectDoctor(deps.values)).rejects.toThrow(
+      "local_persistence_failed",
+    );
 
     expect(JSON.parse(deps.writeOutput.mock.calls[0]![0])).toMatchObject({
       ok: false,

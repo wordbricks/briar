@@ -33,7 +33,7 @@ for file in \
   briar \
   briar-managed-enroll \
   briar-managed-enroll.service \
-  briar-open-browser-style \
+  briar-open-browser \
   briar-managed-runtime-update-request \
   briar-managed-runtime-updater \
   briar-managed-runtime-updater.service \
@@ -59,7 +59,7 @@ for file in \
 done
 for executable in \
   assert-debian-13-x86_64 briar briar-managed-enroll \
-  briar-open-browser-style \
+  briar-open-browser \
   briar-managed-runtime-update-request briar-managed-runtime-updater \
   briar-remote-desktop \
   configure-debian-snapshot install-image-runtime install-remote-desktop \

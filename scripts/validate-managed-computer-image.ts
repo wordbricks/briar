@@ -159,18 +159,17 @@ if (
 
 const artifactPreparer = await text(join(image, "prepare-image-artifacts"));
 if (
-  artifactPreparer.match(/\bbriar-open-browser-style\b/gu)?.length !== 2
+  artifactPreparer.match(/\bbriar-open-browser\b/gu)?.length !== 2
 ) {
   fail("browser helper must be packaged once and marked executable once");
 }
 
-const browserHelperPath = join(image, "briar-open-browser-style");
+const browserHelperPath = join(image, "briar-open-browser");
 const browserHelper = await text(browserHelperPath);
 for (const required of [
   "/usr/bin/nohup /usr/bin/setsid --fork",
   '/usr/bin/google-chrome-stable --new-window "$url"',
-  '</dev/null >>"$log_file" 2>&1 &',
-  'log_file="$log_directory/google-chrome.log"',
+  '</dev/null >/dev/null 2>&1 &',
 ]) {
   if (!browserHelper.includes(required)) {
     fail(`browser helper omits detached launch behavior: ${required}`);
@@ -191,11 +190,10 @@ if (!installer.includes("agent-browser/bin/agent-browser-linux-x64")) {
   fail("agent-browser must install its pinned Linux native binary directly");
 }
 if (
-  !installer.includes('"$source_dir/briar-open-browser-style"') ||
-  !installer.includes("/opt/briar/bin/briar-open-browser-style") ||
-  !installer.includes("/home/briar/.local/state/briar")
+  !installer.includes('"$source_dir/briar-open-browser"') ||
+  !installer.includes("/opt/briar/bin/briar-open-browser")
 ) {
-  fail("image installer must install the browser helper and its log directory");
+  fail("image installer must install the browser helper");
 }
 for (const required of [
   "/home/briar/.cargo/bin",
@@ -231,7 +229,7 @@ const profile = await text(join(image, "briar-runtime-profile.sh"));
 for (const required of [
   "CARGO_HOME=/home/briar/.cargo",
   "RUSTUP_HOME=/home/briar/.rustup",
-  "export GH_BROWSER=/opt/briar/bin/briar-open-browser-style",
+  "export GH_BROWSER=/opt/briar/bin/briar-open-browser",
   "BRIAR_CI_SERIAL_CONTEXTS=true",
   "VITEST_MAX_WORKERS=2",
   "/opt/briar/bin",
@@ -288,7 +286,7 @@ if (!verifier.includes("command -v xfdesktop >/dev/null")) {
 }
 for (const required of [
   "command -v gh >/dev/null",
-  "test -x /opt/briar/bin/briar-open-browser-style",
+  "test -x /opt/briar/bin/briar-open-browser",
   'printf %s "$GH_BROWSER"',
   "gh auth login --help",
   "for required_flag in --hostname --git-protocol --web",
@@ -417,7 +415,7 @@ for (const required of [
   "gh auth login --hostname github.com --git-protocol https --web",
   "gh auth status --hostname github.com",
   "GH_BROWSER",
-  "/opt/briar/bin/briar-open-browser-style",
+  "/opt/briar/bin/briar-open-browser",
 ]) {
   if (!pilotGuide.includes(required)) {
     fail(`managed-computer guidance omits GitHub login detail: ${required}`);
@@ -431,7 +429,7 @@ for (const executable of [
   "briar",
   "briar-managed-runtime-update-request",
   "briar-managed-runtime-updater",
-  "briar-open-browser-style",
+  "briar-open-browser",
   "build-managed-computer-image",
   "configure-debian-snapshot",
   "install-image-runtime",

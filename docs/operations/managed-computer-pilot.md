@@ -19,7 +19,7 @@
 
 1. `/opt/briar/bin/briar` CLI와 여섯 provider runner bundle. `/opt/briar/bin`에는 버전이 고정된 Bun·Node.js·Rust(`rustfmt`, `clippy`)·`cargo-audit`·`gitleaks`, Codex·Claude·Cursor Agent·Grok·Antigravity·OpenCode CLI와 `agent-browser`를 설치한다. OpenRouter는 같은 OpenCode 실행파일을 사용한다. 로그인 terminal과 managed Worker 모두 이 경로와 같은 `CARGO_HOME`·`RUSTUP_HOME`을 사용한다.
 2. 승인 시점의 AWS Systems Manager Agent(`amazon-ssm-agent`). 버전과 설치 파일 SHA-256은 `image-lock.env`에 함께 고정한다.
-3. 비특권 `briar` 사용자와 XFCE, 실제 Google Chrome, GitHub CLI, TigerVNC, D-Bus, C/C++ build toolchain과 Noto CJK 글꼴. XFCE Terminal은 Korean glyph를 포함하는 `Noto Sans Mono CJK KR`을 기본으로 사용한다. `remote-desktop-packages.txt`의 각 Debian 패키지는 승인된 Debian 13 snapshot에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다. `briar` 사용자 세션의 `GH_BROWSER`만 `/opt/briar/bin/briar-open-browser-style`로 설정하며, 다른 CLI 로그인을 방해하지 않도록 전역 `BROWSER`는 변경하지 않는다.
+3. 비특권 `briar` 사용자와 XFCE, 실제 Google Chrome, GitHub CLI, TigerVNC, D-Bus, C/C++ build toolchain과 Noto CJK 글꼴. XFCE Terminal은 Korean glyph를 포함하는 `Noto Sans Mono CJK KR`을 기본으로 사용한다. `remote-desktop-packages.txt`의 각 Debian 패키지는 승인된 Debian 13 snapshot에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다. `briar` 사용자 세션의 `GH_BROWSER`만 `/opt/briar/bin/briar-open-browser`로 설정하며, 다른 CLI 로그인을 방해하지 않도록 전역 `BROWSER`는 변경하지 않는다.
 4. `briar-managed-enroll.service`, `briar-managed-worker.service`, loopback 원격 데스크톱과 outbound 원격 세션 서비스를 설치하고 부팅 대상으로 활성화한다. Worker supervisor는 `/var/lib/briar/worker-credential.json`의 machine credential을 값으로 복사하지 않고 파일에서 읽으며, 설정된 각 프로젝트에 Worker 프로세스를 하나씩 유지한다.
 5. `briar managed-computer setup`이 소유자의 사용자 세션과 이미 등록된 machine credential을 짧게 연결한다. 저장소와 provider가 준비되고 heartbeat 건강 검사를 통과하기 전에는 Worker가 `acceptingWork=false`, 동시 실행 수 1을 보고한다.
 
@@ -226,7 +226,7 @@ Identity public key는 AWS의 **해당 리전 RSA 인증서**를 공식 `regions
 
 Enrollment이 끝나면 `/var/lib/briar/worker-credential.json`에는 컴퓨터 전용 machine credential만 있고 사용자·저장소·provider 로그인은 없다. 컴퓨터 소유자가 원격 화면에서 대상 저장소를 clone하고 필요한 provider CLI에 로그인한 뒤 다음 명령을 실행한다.
 
-GitHub 저장소를 사용할 때는 원격 Terminal의 `briar` 사용자 세션에서 다음 브라우저 인증을 먼저 실행한다. `gh`가 전달한 HTTPS URL은 `GH_BROWSER` helper가 Google Chrome 새 창으로 분리 실행하고 즉시 반환하며, Chrome 출력은 `/home/briar/.local/state/briar/google-chrome.log`에 기록된다. 이 로그인은 AMI 빌드 중 실행하지 않으며 GitHub credential을 이미지에 포함하지 않는다.
+GitHub 저장소를 사용할 때는 원격 Terminal의 `briar` 사용자 세션에서 다음 브라우저 인증을 먼저 실행한다. `gh`가 전달한 HTTPS URL은 `GH_BROWSER` helper가 Google Chrome 새 창으로 분리 실행하고 즉시 반환하며, Chrome 출력은 터미널이나 디스크에 남기지 않는다. 이 로그인은 AMI 빌드 중 실행하지 않으며 GitHub credential을 이미지에 포함하지 않는다.
 
 ```bash
 gh auth login --hostname github.com --git-protocol https --web
@@ -254,7 +254,7 @@ CLI는 로그인 사용자가 해당 컴퓨터의 신청자인지, credential의
 4. EC2의 Launch Template 버전, `HttpTokens=required`, 암호화 EBS, 네 가지 Briar 태그, 빈 inbound 규칙, SSH key 미설정을 확인한다.
 5. SSM이 Online인 실제 인스턴스만 enrollment에 성공하고, nonce 만료·원본 document 변조·다른 instance identity·다른 조직 ID는 거절된다.
 6. 인스턴스에서 `/opt/briar/bin/verify-remote-desktop`을 실행한다. 5901 포트가 loopback에만 열리고 데스크톱·세션 에이전트가 `briar` 사용자로 실행되며 package lock checksum이 일치해야 한다.
-7. `sudo -u briar -H bash -lc 'command -v bun node cargo rustc cargo-audit gitleaks codex claude cursor-agent grok agy opencode agent-browser'`에서 모든 실행파일이 `/opt/briar/bin`으로 해석되는지 확인한다. `gh`는 `/usr/bin/gh`, `GH_BROWSER`는 실행 가능한 `/opt/briar/bin/briar-open-browser-style`로 해석되어야 한다. `gh auth login --help`에서 `--hostname`, `--git-protocol`, `--web`을, `gh auth status --help`에서 `--hostname`을 확인하되 AMI 검증 중에는 인증하지 않는다. 버전은 `/opt/briar/image-manifest.json`과 같아야 하며 provider와 GitHub는 아직 인증되지 않은 상태여야 한다.
+7. `sudo -u briar -H bash -lc 'command -v bun node cargo rustc cargo-audit gitleaks codex claude cursor-agent grok agy opencode agent-browser'`에서 모든 실행파일이 `/opt/briar/bin`으로 해석되는지 확인한다. `gh`는 `/usr/bin/gh`, `GH_BROWSER`는 실행 가능한 `/opt/briar/bin/briar-open-browser`로 해석되어야 한다. `gh auth login --help`에서 `--hostname`, `--git-protocol`, `--web`을, `gh auth status --help`에서 `--hostname`을 확인하되 AMI 검증 중에는 인증하지 않는다. 버전은 `/opt/briar/image-manifest.json`과 같아야 하며 provider와 GitHub는 아직 인증되지 않은 상태여야 한다.
 8. 빈 테스트 저장소를 새 worktree로 clone한 뒤 `bun run ci:local`을 실행한다. `bun install --frozen-lockfile`로 `node_modules`를 bootstrap하고 C linker, Rust, `cargo-audit`, `gitleaks` 누락 없이 완료되는지 확인한다. `node_modules`나 사용자 저장소를 AMI 자체에 미리 넣지 않는다.
 9. 원격 Terminal과 Chrome에서 한글 안내 문구와 한글 파일명이 네모 상자 없이 보이는지 확인하고 `fc-match ':lang=ko'`가 Noto CJK KR 글꼴을 고르는지 확인한다.
 10. `aws ec2 describe-security-groups --group-ids <SecurityGroupId>`에서 `IpPermissions=[]`, `aws ec2 describe-instances --instance-ids <id>`에서 public IP 없음과 정확한 AMI ID를 독립적으로 확인한다. 원격 화면 서비스 때문에 SSH/VNC/RDP ingress를 추가하지 않는다.

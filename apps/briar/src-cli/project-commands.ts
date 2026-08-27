@@ -512,39 +512,43 @@ async function projectDoctor(
   } catch (error) {
     velenError = error instanceof Error ? error.message : String(error);
   }
-  resolved.writeOutput(
-    JSON.stringify({
-      ok: Boolean(workflow) && workflowSync.status !== "local_persistence_failed",
-      projectId: project.id,
-      repositoryPath: project.repositoryPath,
-      velenOrg: effectiveProject.autoHunt?.velenOrg ?? null,
-      linearEnabled: effectiveProject.autoHunt?.linear?.enabled ?? false,
-      linearSource: effectiveProject.autoHunt?.linear?.source ?? null,
-      dataSource: effectiveProject.autoHunt?.dataSource ?? null,
-      githubRepository: effectiveProject.autoHunt?.githubRepository ?? null,
-      workflow: workflow ?? null,
-      workflowSync,
-      worktrees: {
-        enabled: worktreesEnabled(effectiveProject),
-        root: projectWorktreeRoot(
-          worktreeSettings(effectiveProject).root,
-          effectiveProject.id,
-        ),
-        branchPrefix: worktreeSettings(effectiveProject).branchPrefix,
-        // null means no origin/HEAD and no main/master: allocation would fail.
-        baseRef: resolved.resolveProjectBaseRef(effectiveProject),
-      },
-      sandbox: {
-        // true is the default; false opts into checkout/worktree-confined writes.
-        fullAccess: effectiveProject.autoHunt?.sandbox?.fullAccess ?? true,
-      },
-      velenHealthy: velenError === null,
-      velenError,
-      requestIds: [velen?.auth.requestId, velen?.org.requestId, velen?.linear?.requestId].filter(
-        Boolean,
+  const result = {
+    ok: Boolean(workflow) && workflowSync.status !== "local_persistence_failed",
+    projectId: project.id,
+    repositoryPath: project.repositoryPath,
+    velenOrg: effectiveProject.autoHunt?.velenOrg ?? null,
+    linearEnabled: effectiveProject.autoHunt?.linear?.enabled ?? false,
+    linearSource: effectiveProject.autoHunt?.linear?.source ?? null,
+    dataSource: effectiveProject.autoHunt?.dataSource ?? null,
+    githubRepository: effectiveProject.autoHunt?.githubRepository ?? null,
+    workflow: workflow ?? null,
+    workflowSync,
+    worktrees: {
+      enabled: worktreesEnabled(effectiveProject),
+      root: projectWorktreeRoot(
+        worktreeSettings(effectiveProject).root,
+        effectiveProject.id,
       ),
-    }),
-  );
+      branchPrefix: worktreeSettings(effectiveProject).branchPrefix,
+      // null means no origin/HEAD and no main/master: allocation would fail.
+      baseRef: resolved.resolveProjectBaseRef(effectiveProject),
+    },
+    sandbox: {
+      // true is the default; false opts into checkout/worktree-confined writes.
+      fullAccess: effectiveProject.autoHunt?.sandbox?.fullAccess ?? true,
+    },
+    velenHealthy: velenError === null,
+    velenError,
+    requestIds: [velen?.auth.requestId, velen?.org.requestId, velen?.linear?.requestId].filter(
+      Boolean,
+    ),
+  };
+  resolved.writeOutput(JSON.stringify(result));
+  if (!result.ok) {
+    throw new Error(
+      `Project doctor could not use the repository workflow: ${workflowSync.status}`,
+    );
+  }
 }
 
 async function showWorkflow() {
