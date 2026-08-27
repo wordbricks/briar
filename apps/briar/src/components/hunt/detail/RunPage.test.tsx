@@ -742,6 +742,7 @@ describe("RunPage", () => {
     const prerequisite = demoDashboard.runs[1];
     const dependent = demoDashboard.runs[0];
     const addDependency = vi.fn(async () => undefined);
+    const openRelatedMessage = vi.fn();
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
@@ -760,6 +761,7 @@ describe("RunPage", () => {
           onLoadIssueMessages={async () => []}
           onLoadRunEvidence={async () => []}
           onMove={async () => undefined}
+          onRelatedMessageOpen={openRelatedMessage}
           onRemoveDependency={async () => undefined}
           onRetry={async () => undefined}
           onSendIssueMessage={async () => {
@@ -774,6 +776,12 @@ describe("RunPage", () => {
               status: prerequisite.status,
             }],
             dependents: [],
+            relatedMessage: {
+              organizationId: "11111111-1111-4111-8111-111111111111",
+              channelId: "22222222-2222-4222-8222-222222222222",
+              messageId: "33333333-3333-4333-8333-333333333333",
+              rootMessageId: "44444444-4444-4444-8444-444444444444",
+            },
           }}
         />
       </TooltipProvider>,
@@ -783,6 +791,7 @@ describe("RunPage", () => {
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".run-page-properties-toggle")?.click();
     });
+    const properties = container.querySelector(".run-properties");
     const dependencies = container.querySelector(".run-properties .issue-dependencies");
     expect(dependencies).not.toBeNull();
     expect(dependencies?.textContent).toContain("선행 이슈");
@@ -790,6 +799,16 @@ describe("RunPage", () => {
     expect(dependencies?.textContent).toContain(prerequisite.title);
     expect(dependencies?.textContent).toContain("후속 이슈");
     expect(dependencies?.querySelector('[aria-label*="의존성 제거"]')).not.toBeNull();
+    const relatedMessageButton = properties?.querySelector<HTMLButtonElement>(".run-related-message-property");
+    expect(relatedMessageButton?.textContent).toContain("관련 메시지");
+    expect(relatedMessageButton?.textContent).toContain("관련 메시지로 돌아가기");
+    await act(async () => relatedMessageButton?.click());
+    expect(openRelatedMessage).toHaveBeenCalledWith({
+      organizationId: "11111111-1111-4111-8111-111111111111",
+      channelId: "22222222-2222-4222-8222-222222222222",
+      messageId: "33333333-3333-4333-8333-333333333333",
+      rootMessageId: "44444444-4444-4444-8444-444444444444",
+    });
     await act(async () => {
       dependencies?.querySelector<HTMLButtonElement>(".issue-dependency-add-button")?.click();
     });

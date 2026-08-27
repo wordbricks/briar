@@ -3101,6 +3101,10 @@ export function App({
           setInboxDetailTarget((current) =>
             current ? { ...current, kind: "issue", targetId: runId } : current,
           )}
+        onRelatedMessageOpen={(relatedMessage) => {
+          setInboxDetailTarget(null);
+          setPendingBriarLink({ kind: "channel", ...relatedMessage });
+        }}
         onLoadAttachment={briar.readIssueAttachment}
         onLoadIssueMessages={() => briar.readIssueMessages(inboxDetailRun.id)}
         onLoadRunEvents={() => briar.readRunEvents(inboxDetailRun.id)}
@@ -3937,6 +3941,9 @@ export function App({
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}
             onAcceptSkillExecution={briar.acceptConversationSkillExecution}
             onRemoveIssueDependency={briar.removeIssueDependency}
+            onRelatedMessageOpen={(relatedMessage) => {
+              setPendingBriarLink({ kind: "channel", ...relatedMessage });
+            }}
             onUpdateIssue={briar.editIssue}
             onUpdateIssueSubscription={briar.editIssueSubscription}
             onUpdateIssueCheckpoints={briar.editIssueCheckpoints}
@@ -4243,6 +4250,9 @@ export function App({
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}
             onAcceptSkillExecution={briar.acceptConversationSkillExecution}
             onRemoveIssueDependency={briar.removeIssueDependency}
+            onRelatedMessageOpen={(relatedMessage) => {
+              setPendingBriarLink({ kind: "channel", ...relatedMessage });
+            }}
             onUpdateIssue={briar.editIssue}
             onUpdateIssueSubscription={briar.editIssueSubscription}
             onUpdateIssueCheckpoints={briar.editIssueCheckpoints}

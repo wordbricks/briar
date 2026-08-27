@@ -1,4 +1,4 @@
-import { Activity, ArrowLeft, ArrowUp, BadgeCheck, Bot, BrainCircuit, Check, ChevronRight, CircleAlert, Clock3, Columns3, FolderGit2, FolderInput, GitCommitHorizontal, GitFork, GitPullRequest, Image as ImageIcon, ListChecks, Maximize2, Play, RefreshCw, RotateCcw, Signal, Trash2, UserRound, Waypoints, X } from "lucide-react";
+import { Activity, ArrowLeft, ArrowUp, BadgeCheck, Bot, BrainCircuit, Check, ChevronRight, CircleAlert, Clock3, Columns3, FolderGit2, FolderInput, GitCommitHorizontal, GitFork, GitPullRequest, Image as ImageIcon, ListChecks, Maximize2, MessageSquare, Play, RefreshCw, RotateCcw, Signal, Trash2, UserRound, Waypoints, X } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { MainContent } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ import { clampConversationPaneWidth, conversationPaneWidthDefault, conversationP
 import { loadRunCostEstimate } from "@/lib/api";
 import { copyIssueId, copyIssueShareLink, shareIssueLink } from "@/lib/issue-links";
 import { formatIssueKey } from "@/lib/issue-key";
-import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, AgentExecutionCostEstimate, ExecutionWorker, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, OrganizationMember, Project, ProjectAgent, ProjectExecutionWorkerPolicy, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
+import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, AgentExecutionCostEstimate, ExecutionWorker, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, OrganizationMember, Project, ProjectAgent, ProjectExecutionWorkerPolicy, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
 import { agentEffortOptions, agentModelDisplayName, agentModelOptions, agentProviderLabels, type AgentProvider, type ModelEffort } from "@/lib/project-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
 import { useI18n } from "@/i18n";
@@ -82,6 +82,7 @@ export function RunPage({
   onTransfer,
   transferProjects = [],
   onDependencyOpen,
+  onRelatedMessageOpen,
   onLoadAttachment,
   onLoadIssueMessages,
   onLoadRunEvents = async () => [],
@@ -144,6 +145,7 @@ export function RunPage({
   onTransfer?: (targetProjectId: string) => Promise<unknown>;
   transferProjects?: Project[];
   onDependencyOpen?: (runId: string) => void;
+  onRelatedMessageOpen?: (relatedMessage: RelatedMessageReference) => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: () => Promise<IssueMessage[]>;
   onLoadRunEvents?: () => Promise<HuntEvent[]>;
@@ -1413,6 +1415,13 @@ export function RunPage({
                     <span className="run-property-icon assignee"><UserRound size={15} /></span>
                     <span className="run-property-copy"><strong>{creator?.name ?? t("run.creatorUnknown")}</strong></span>
                   </div>
+                  {run.relatedMessage && onRelatedMessageOpen ? <button aria-label={t("run.openRelatedMessage")} className="run-property run-property-button run-related-message-property" onClick={() => onRelatedMessageOpen(run.relatedMessage!)} title={t("run.openRelatedMessage")} type="button">
+                      <span className="run-property-icon related-message"><MessageSquare size={15} /></span>
+                      <span className="run-property-copy">
+                        <strong>{t("run.relatedMessage")}</strong>
+                        <small>{t("run.openRelatedMessage")}</small>
+                      </span>
+                    </button> : null}
                   <div aria-label={`${t("run.agent")}: ${performedAgentName ?? t("run.unassigned")}`} className="run-property" title={t("run.agent")}>
                     <span className="run-property-icon agent"><Bot size={15} /></span>
                     <span className="run-property-copy"><strong>{performedAgentName ?? t("run.unassigned")}</strong></span>

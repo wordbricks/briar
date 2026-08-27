@@ -2339,6 +2339,34 @@
         },
         "additionalProperties": true
       },
+      "RelatedMessageReference": {
+        "type": "object",
+        "required": [
+          "organizationId",
+          "channelId",
+          "messageId",
+          "rootMessageId"
+        ],
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channelId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rootMessageId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": true
+      },
       "MessageAuthor": {
         "type": "object",
         "required": [
@@ -2603,6 +2631,16 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "relatedMessage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RelatedMessageReference"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "attachments": {

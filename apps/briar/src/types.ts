@@ -346,6 +346,7 @@ export type HuntRun = {
   commitSha: string | null;
   tracker: TrackerReference | null;
   issueDescription: string | null;
+  relatedMessage?: RelatedMessageReference | null;
   attachments: IssueAttachment[];
   prerequisites?: IssueDependencyReference[];
   dependents?: IssueDependencyReference[];
@@ -384,6 +385,13 @@ export type HuntRun = {
   completedAt: string | null;
   lastEventAt: string;
   eventCount: number;
+};
+
+export type RelatedMessageReference = {
+  organizationId: string;
+  channelId: string;
+  messageId: string;
+  rootMessageId: string;
 };
 
 export type StatusTrayRun = {
