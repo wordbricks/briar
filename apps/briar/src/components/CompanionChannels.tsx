@@ -81,6 +81,7 @@ import { ChannelThreadSubscribeControls } from "./ChannelThreadSubscribeControls
 import { ChannelTypingState } from "./ChannelTypingState";
 import { MentionComposerField } from "./MentionComposerField";
 import { ChannelMessageText } from "./ChannelMessageText";
+import { ChannelLinkPreview } from "./ChannelLinkPreview";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
 import {
   ConversationReplySummary,
@@ -1320,6 +1321,12 @@ function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
+        <ChannelLinkPreview
+          channelId={message.channelId}
+          message={message}
+          organizationId={channel.organizationId}
+          token={token}
+        />
         <ChannelMessageImages
           attachments={message.attachments}
           interactive={!showThreadSummary}

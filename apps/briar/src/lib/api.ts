@@ -59,6 +59,7 @@ import type {
   ChannelAgentSkillInput,
   ChannelAgentSummary,
   ChannelDelta,
+  ChannelLinkPreview,
   ChannelMember,
   ChannelMessage,
   ChannelMessageAttachment,
@@ -1695,6 +1696,19 @@ export async function loadChannelMessageDocument(
 ) {
   return request<{ document: ChannelMessageDocumentContent }>(
     `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/document`,
+    token,
+  );
+}
+
+export async function loadChannelLinkPreview(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  targetUrl: string,
+) {
+  const params = new URLSearchParams({ url: targetUrl });
+  return request<{ preview: ChannelLinkPreview | null }>(
+    `/organizations/${organizationId}/channels/${channelId}/link-preview?${params}`,
     token,
   );
 }
