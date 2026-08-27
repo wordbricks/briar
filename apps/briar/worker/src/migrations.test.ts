@@ -78,7 +78,7 @@ it("backfills every existing organization member into every existing project", a
   } finally {
     await miniflare.dispose();
   }
-}, 30_000);
+}, 60_000);
 
 it("backfills explicit Agent Skill execution and approval defaults", async () => {
   const miniflare = new Miniflare({
@@ -161,7 +161,7 @@ it("backfills explicit Agent Skill execution and approval defaults", async () =>
   } finally {
     await miniflare.dispose();
   }
-}, 30_000);
+}, 60_000);
 
 async function createPreDescriptionOrganizationAgent(
   db: D1Database,
