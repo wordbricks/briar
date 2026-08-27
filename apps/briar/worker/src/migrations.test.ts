@@ -5088,7 +5088,7 @@ describe("D1 migrations", () => {
     try {
       const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
       await applyD1Migrations(db, {
-        through: "0138_restore_cvs_slack_history.sql",
+        through: "0142_restore_cvs_slack_history.sql",
       });
 
       const org = await db
