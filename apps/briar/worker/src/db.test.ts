@@ -1034,6 +1034,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
+      await readFile(resolve("migrations/0140_issue_difficulty_optional.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
       await readFile(resolve("migrations/0138_project_members.sql"), "utf8"),
     );
     // The lifecycle suite intentionally uses a compact migration history, so
@@ -4548,8 +4552,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(
       await db.prepare("select difficulty from briar_hunt_runs where id = ?")
         .bind(runId)
-        .first<{ difficulty: string }>(),
-    ).toEqual({ difficulty: "normal" });
+        .first<{ difficulty: string | null }>(),
+    ).toEqual({ difficulty: null });
 
     const updated = await updateIssue(db, projectId, runId, {
       title: "Updated title",
@@ -4581,6 +4585,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       updatedAt: atMinute(20),
     });
     expect(unassigned?.assignee_user_id).toBeNull();
+    const cleared = await updateIssue(db, projectId, runId, {
+      title: "Updated title",
+      description: null,
+      priority: 1,
+      difficulty: null,
+      updatedAt: atMinute(21),
+    });
+    expect(cleared?.difficulty).toBeNull();
     await expect(
       db.prepare("update briar_hunt_runs set difficulty = ? where id = ?")
         .bind("extreme", runId)

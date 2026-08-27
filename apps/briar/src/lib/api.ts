@@ -1450,7 +1450,7 @@ export async function createIssue(
   form.set("title", input.title);
   form.set("description", input.description ?? "");
   form.set("priority", input.priority === null ? "" : String(input.priority));
-  form.set("difficulty", input.difficulty);
+  form.set("difficulty", input.difficulty ?? "");
   form.set("assigneeUserId", input.assigneeUserId ?? "");
   form.set("status", input.status);
   form.set("preferredProvider", input.preferredProvider ?? "");
@@ -2085,7 +2085,7 @@ export async function updateIssue(
   form.set("title", input.title);
   form.set("description", input.description ?? "");
   form.set("priority", input.priority === null ? "" : String(input.priority));
-  form.set("difficulty", input.difficulty);
+  form.set("difficulty", input.difficulty ?? "");
   form.set("assigneeUserId", input.assigneeUserId ?? "");
   if (input.attachmentReferences?.length) {
     form.set(

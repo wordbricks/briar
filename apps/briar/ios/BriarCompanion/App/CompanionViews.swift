@@ -707,7 +707,9 @@ struct RunRow: View {
                 Text(verbatim: "\(issueKeyPrefix)-\(runNumber)")
                     .fixedSize(horizontal: true, vertical: false)
             }
-            IssueDifficultyBadge(difficulty: run.difficulty ?? .normal)
+            if let difficulty = run.difficulty {
+                IssueDifficultyBadge(difficulty: difficulty)
+            }
             if let assignee {
                 ProfileImageView(
                     image: assignee.image,

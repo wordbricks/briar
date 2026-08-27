@@ -126,10 +126,18 @@ function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
 }
 describe("HuntBoard", () => {
   it("shows accessible difficulty icons in Kanban and list cards", async () => {
-    const runs = (["easy", "normal", "hard"] as const).map((difficulty, index) => ({
-      ...demoDashboard.runs[index]!,
-      difficulty
-    }));
+    const runs = [
+      ...(["easy", "normal", "hard"] as const).map((difficulty, index) => ({
+        ...demoDashboard.runs[index]!,
+        difficulty
+      })),
+      {
+        ...demoDashboard.runs[0]!,
+        id: "run-without-difficulty",
+        title: "Issue without difficulty",
+        difficulty: null
+      }
+    ];
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
@@ -322,7 +330,8 @@ describe("HuntBoard", () => {
     });
     expect(onCreateIssue).toHaveBeenCalledWith(demoDashboard.project.id, expect.objectContaining({
       status: "queued",
-      title: "Created in implementing"
+      title: "Created in implementing",
+      difficulty: null,
     }));
     expect(onMoveRun).toHaveBeenCalledWith("created-from-kanban", {
       status: "running",

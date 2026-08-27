@@ -120,6 +120,7 @@ async function createApprovedChannelProposalIssue(input: {
     repository: settings?.github_repository ?? input.project.name,
     detail: "채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
     priority: input.priority,
+    difficulty: null,
     assigneeUserId: null,
     issueCheckpoints: [],
     fullAuto: false,

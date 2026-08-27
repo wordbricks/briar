@@ -78,7 +78,7 @@ final class IssueMutationStore: ObservableObject {
                     "title": title,
                     "description": description,
                     "priority": draft.priority.map(String.init) ?? "",
-                    "difficulty": draft.difficulty.rawValue,
+                    "difficulty": draft.difficulty?.rawValue ?? "",
                     "assigneeUserId": draft.assigneeUserId ?? "",
                     "status": draft.status.rawValue,
                     "preferredProvider": draft.preferredProvider?.rawValue ?? "",
