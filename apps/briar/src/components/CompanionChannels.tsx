@@ -278,6 +278,10 @@ export function CompanionChannels({
   const [replies, setReplies] = useState<ChannelAgentReply[]>([]);
   const [thread, setThread] = useState<ChannelMessage[] | null>(null);
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
+  const [highlightedMessage, setHighlightedMessage] = useState<{
+    channelId: string;
+    messageId: string;
+  } | null>(null);
   const [messageNextCursor, setMessageNextCursor] = useState<string | null>(
     null,
   );
@@ -294,6 +298,8 @@ export function CompanionChannels({
   const localChannelCache = useRef<CompanionChannelCache>(new Map());
   const resolvedChannelCache = channelCache ?? localChannelCache.current;
   const renderedChannel = useRef<CachedCompanionChannel | null>(null);
+  const highlightedMessageRef = useRef(highlightedMessage);
+  highlightedMessageRef.current = highlightedMessage;
   const cachedThreads = channel
     ? resolvedChannelCache.get(channel.id)?.threads ?? new Map()
     : new Map<string, ChannelMessage[]>();
@@ -526,6 +532,28 @@ export function CompanionChannels({
     setThreadIsAwayFromBottom(false);
   }, [channel?.id, threadParentId]);
 
+  useEffect(() => {
+    if (requestedMessage) {
+      const next = {
+        channelId: requestedMessage.channelId,
+        messageId: requestedMessage.messageId,
+      };
+      highlightedMessageRef.current = next;
+      setHighlightedMessage(next);
+      return;
+    }
+    if (
+      !channel ||
+      highlightedMessageRef.current?.channelId !== channel.id
+    ) {
+      highlightedMessageRef.current = null;
+      setHighlightedMessage(null);
+    }
+  }, [channel?.id, requestedMessage?.channelId, requestedMessage?.messageId]);
+
+  const activeHighlightedMessageId =
+    requestedMessage?.messageId ?? highlightedMessage?.messageId ?? null;
+
   const persistRenderedChannel = useCallback(() => {
     const snapshot = renderedChannel.current;
     if (!snapshot) return;
@@ -743,6 +771,9 @@ export function CompanionChannels({
           if (requestedMessageElement?.scrollIntoView) {
             requestedMessageElement.scrollIntoView({ block: "center" });
           }
+          if (requestedMessageElement instanceof HTMLElement) {
+            requestedMessageElement.focus({ preventScroll: true });
+          }
           onRequestedMessageOpen?.();
         });
       } finally {
@@ -859,6 +890,7 @@ export function CompanionChannels({
               busy={busy}
               channel={channel}
               currentUserId={currentUserId}
+              highlighted={item.id === activeHighlightedMessageId}
               key={item.id}
               members={members}
               message={item}
@@ -967,6 +999,7 @@ export function CompanionChannels({
               busy={busy}
               channel={channel}
               currentUserId={currentUserId}
+              highlighted={item.id === activeHighlightedMessageId}
               key={item.id}
               members={members}
               message={item}
@@ -1187,6 +1220,7 @@ function MessageRow({
   busy,
   channel,
   currentUserId,
+  highlighted = false,
   loadCreateExecutionProposalContext,
   loadExecutionProposalContext,
   loadSkillExecutionProposalContext,
@@ -1215,6 +1249,7 @@ function MessageRow({
   busy: boolean;
   channel: ChannelSummary;
   currentUserId: string | null;
+  highlighted?: boolean;
   loadCreateExecutionProposalContext: (projectId: string) => Promise<{
     run: HuntRun | null;
     workers: ExecutionWorker[];
@@ -1296,8 +1331,11 @@ function MessageRow({
     : null;
   return (
     <article
-      className={`companion-channel-message${reacting ? " is-reacting" : ""}${message.optimistic ? " is-optimistic" : ""}`}
+      aria-current={highlighted ? "true" : undefined}
+      className={`companion-channel-message${reacting ? " is-reacting" : ""}${highlighted ? " is-inbox-target" : ""}${message.optimistic ? " is-optimistic" : ""}`}
       data-companion-channel-message-id={message.id}
+      data-inbox-highlighted={highlighted ? "true" : undefined}
+      tabIndex={highlighted ? -1 : undefined}
       onContextMenu={(event) => {
         if (message.optimistic) return;
         if ((event.target as HTMLElement).closest("button,a,input,select,textarea")) {

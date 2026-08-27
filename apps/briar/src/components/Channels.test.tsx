@@ -4,7 +4,7 @@ import { act } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
-import type { ChannelSummary } from "../lib/channels-contract";
+import type { ChannelMessage, ChannelSummary } from "../lib/channels-contract";
 import { Channels } from "./Channels";
 
 const selectedChannel: ChannelSummary = {
@@ -94,6 +94,214 @@ describe("Channels", () => {
       container.querySelector(".channel-main")?.getAttribute("aria-busy"),
     ).toBe("false");
 
+    await cleanup();
+  });
+
+  it("highlights and focuses a requested Inbox channel message", async () => {
+    const message: ChannelMessage = {
+      id: "channel-message-1",
+      channelId: selectedChannel.id,
+      parentMessageId: null,
+      author: {
+        type: "user",
+        id: "user-1",
+        name: "Sam",
+        email: "sam@example.com",
+        image: null,
+      },
+      body: "Inbox에서 연 채널 메시지",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      attachments: [],
+      reactions: [],
+      replyCount: 0,
+      lastReplyAt: null,
+      document: null,
+      proposal: null,
+      executionProposal: null,
+      createdAt: "2026-08-15T00:00:00.000Z",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (init?.method === "POST") {
+          return new Response(JSON.stringify({
+            url: "ws://realtime.test/socket",
+          }), {
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (url.endsWith("/organizations/org-1/channels")) {
+          return new Response(JSON.stringify({
+            channels: [selectedChannel],
+            cursor: 1,
+          }), {
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({
+          channel: selectedChannel,
+          members: [],
+          agents: [],
+          messages: [message],
+          agentReplies: [],
+          nextCursor: null,
+        }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+    const requestAnimationFrame = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        callback(0);
+        return 0;
+      });
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <Channels
+          activeChannelId={selectedChannel.id}
+          channelCatalogCursor={0}
+          channels={[selectedChannel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          requestedMessage={{
+            channelId: selectedChannel.id,
+            messageId: message.id,
+            rootMessageId: message.id,
+          }}
+          token="token"
+        />
+      </I18nProvider>,
+    );
+    await act(async () => Promise.resolve());
+
+    const highlighted = container.querySelector<HTMLElement>(
+      '[data-inbox-highlighted="true"]',
+    );
+    expect(highlighted?.dataset.channelMessageId).toBe(message.id);
+    expect(highlighted?.tabIndex).toBe(-1);
+    expect(document.activeElement).toBe(highlighted);
+
+    requestAnimationFrame.mockRestore();
+    await cleanup();
+  });
+
+  it("keeps an Inbox thread reply centered instead of jumping to the thread end", async () => {
+    const rootMessage: ChannelMessage = {
+      id: "channel-root-1",
+      channelId: selectedChannel.id,
+      parentMessageId: null,
+      author: {
+        type: "user",
+        id: "user-1",
+        name: "Sam",
+        email: "sam@example.com",
+        image: null,
+      },
+      body: "스레드 원본",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      attachments: [],
+      reactions: [],
+      replyCount: 1,
+      lastReplyAt: "2026-08-15T00:01:00.000Z",
+      document: null,
+      proposal: null,
+      executionProposal: null,
+      createdAt: "2026-08-15T00:00:00.000Z",
+    };
+    const replyMessage: ChannelMessage = {
+      ...rootMessage,
+      id: "channel-reply-1",
+      parentMessageId: rootMessage.id,
+      body: "Inbox에서 연 스레드 답글",
+      replyCount: 0,
+      lastReplyAt: null,
+      createdAt: "2026-08-15T00:01:00.000Z",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (init?.method === "POST") {
+          return new Response(JSON.stringify({
+            url: "ws://realtime.test/socket",
+          }), {
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (url.endsWith("/organizations/org-1/channels")) {
+          return new Response(JSON.stringify({
+            channels: [selectedChannel],
+            cursor: 1,
+          }), {
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        const isThreadRequest = url.includes("/messages?parentMessageId=");
+        return new Response(JSON.stringify({
+          channel: selectedChannel,
+          members: [],
+          agents: [],
+          messages: isThreadRequest ? [rootMessage, replyMessage] : [],
+          agentReplies: [],
+          nextCursor: null,
+        }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+    const requestAnimationFrame = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        callback(0);
+        return 0;
+      });
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <Channels
+          activeChannelId={selectedChannel.id}
+          channelCatalogCursor={0}
+          channels={[selectedChannel]}
+          currentUserId="user-1"
+          inboxDetail
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          onInboxDetailClose={() => undefined}
+          organizationId="org-1"
+          requestedMessage={{
+            channelId: selectedChannel.id,
+            messageId: replyMessage.id,
+            rootMessageId: rootMessage.id,
+          }}
+          token="token"
+        />
+      </I18nProvider>,
+    );
+    await act(async () => Promise.resolve());
+
+    const highlighted = container.querySelector<HTMLElement>(
+      '[data-inbox-highlighted="true"]',
+    );
+    expect(highlighted?.dataset.channelMessageId).toBe(replyMessage.id);
+    expect(container.querySelector(".channel-thread")).not.toBeNull();
+    expect(document.activeElement).toBe(highlighted);
+
+    requestAnimationFrame.mockRestore();
     await cleanup();
   });
 });

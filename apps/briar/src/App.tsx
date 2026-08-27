@@ -1320,6 +1320,7 @@ export function App({
   );
   useInboxNotificationClicks(handleInboxNotificationClick);
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
+  const [requestedRunMessageId, setRequestedRunMessageId] = useState<string | null>(null);
   const [requestedRunInitialTab, setRequestedRunInitialTab] =
     useState<IssueDetailTab | null>(null);
   const clearRequestedChannelMessage = useCallback(
@@ -1369,6 +1370,7 @@ export function App({
   useEffect(() => {
     if (!pendingBriarLink || !briar.user || briar.loading) return;
     if (pendingBriarLink.kind === "channel") {
+      setRequestedRunMessageId(null);
       if (
         !briar.organizations.some(
           (organization) => organization.id === pendingBriarLink.organizationId,
@@ -1442,12 +1444,14 @@ export function App({
     }
     if (pendingBriarLink.kind === "issue") {
       setRequestedSessionId(null);
+      setRequestedRunMessageId(null);
       setRequestedRunInitialTab(null);
       setRequestedRunId(pendingBriarLink.runId);
       setCompanionPage("issues");
       setCompanionStatus("all");
       navigateToIssue(pendingBriarLink.runId, pendingBriarLink.projectId);
     } else {
+      setRequestedRunMessageId(null);
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(pendingBriarLink.sessionId);
@@ -1498,6 +1502,11 @@ export function App({
       pendingInboxNotificationTarget.kind === "conversation"
     ) {
       setRequestedSessionId(null);
+      setRequestedRunMessageId(
+        pendingInboxNotificationTarget.kind === "conversation"
+          ? pendingInboxNotificationTarget.conversationMessageId ?? null
+          : null,
+      );
       setRequestedRunInitialTab(
         pendingInboxNotificationTarget.kind === "conversation"
           ? "conversation"
@@ -1516,6 +1525,7 @@ export function App({
     } else if (pendingInboxNotificationTarget.kind === "channel") {
       const { channelMessageId, rootMessageId } = pendingInboxNotificationTarget;
       if (!channelMessageId || !rootMessageId) return;
+      setRequestedRunMessageId(null);
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(null);
@@ -1547,6 +1557,7 @@ export function App({
         );
       }
     } else {
+      setRequestedRunMessageId(null);
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(pendingInboxNotificationTarget.targetId);
@@ -3063,6 +3074,11 @@ export function App({
         availableRuns={briar.dashboard?.runs ?? []}
         conversationInboxSyncSignal={conversationInboxSyncSignal}
         error={briar.recoveryError}
+        highlightedMessageId={
+          inboxDetailTarget.kind === "conversation"
+            ? inboxDetailTarget.conversationMessageId ?? null
+            : null
+        }
         initialDetailTab={
           inboxDetailTarget.kind === "conversation"
             ? "conversation"
@@ -3099,7 +3115,14 @@ export function App({
         }}
         onDependencyOpen={(runId) =>
           setInboxDetailTarget((current) =>
-            current ? { ...current, kind: "issue", targetId: runId } : current,
+            current
+              ? {
+                  ...current,
+                  kind: "issue",
+                  targetId: runId,
+                  conversationMessageId: undefined,
+                }
+              : current,
           )}
         onRelatedMessageOpen={(relatedMessage) => {
           setInboxDetailTarget(null);
@@ -3117,6 +3140,11 @@ export function App({
           setInboxDetailTarget(null);
           setRequestedSessionId(null);
           setRequestedRunId(inboxDetailRun.id);
+          setRequestedRunMessageId(
+            inboxDetailTarget.kind === "conversation"
+              ? inboxDetailTarget.conversationMessageId ?? null
+              : null,
+          );
           setRequestedRunInitialTab(
             inboxDetailTarget.kind === "conversation"
               ? "conversation"
@@ -3905,6 +3933,8 @@ export function App({
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
+            requestedRunMessageId={requestedRunMessageId}
+            requestedRunInitialTab={requestedRunInitialTab}
             selectedRunId={selectedRunId}
             issueListRequestKey={issueListRequestKey}
             isSidebarOpen={isSidebarOpen}
@@ -3963,6 +3993,7 @@ export function App({
             onResumeRun={briar.resumeRun}
             onRequestedRunOpen={() => {
               setRequestedRunId(null);
+              setRequestedRunMessageId(null);
               setRequestedRunInitialTab(null);
             }}
             onSendIssueMessage={sendIssueMessage}
@@ -4227,6 +4258,7 @@ export function App({
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
+            requestedRunMessageId={requestedRunMessageId}
             requestedRunInitialTab={requestedRunInitialTab}
             isSidebarOpen
             onCompanionDmsOpen={() => setCompanionPage("dms")}
@@ -4267,6 +4299,7 @@ export function App({
             onProcessIssueNow={processIssueNow}
             onRequestedRunOpen={() => {
               setRequestedRunId(null);
+              setRequestedRunMessageId(null);
               setRequestedRunInitialTab(null);
             }}
             onRetryRun={briar.retryRun}

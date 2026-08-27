@@ -26,6 +26,8 @@ export type InboxNotificationTarget = {
   projectId: string;
   targetId: string;
   kind: InboxMessage["kind"];
+  /** Actual IssueMessage.id; messageId remains the Inbox row id for read state. */
+  conversationMessageId?: string;
   channelMessageId?: string;
   rootMessageId?: string;
 };
@@ -111,7 +113,9 @@ export function inboxNotificationTarget(
     projectId: message.projectId,
     targetId: message.targetId,
     kind: message.kind,
-    ...(message.kind === "channel"
+    ...(message.kind === "conversation"
+      ? { conversationMessageId: message.messageId }
+      : message.kind === "channel"
       ? {
           channelMessageId: message.messageId,
           rootMessageId: message.rootMessageId,
@@ -273,6 +277,9 @@ export function targetFromNotificationAction(payload: unknown) {
         projectId: stored.projectId,
         targetId: stored.targetId,
         kind: stored.kind,
+        ...(stored.conversationMessageId
+          ? { conversationMessageId: stored.conversationMessageId }
+          : {}),
         ...(stored.channelMessageId
           ? { channelMessageId: stored.channelMessageId }
           : {}),

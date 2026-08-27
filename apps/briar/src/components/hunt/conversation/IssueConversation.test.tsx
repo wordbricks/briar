@@ -124,6 +124,69 @@ function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
   return pending;
 }
 describe("IssueConversation", () => {
+  it("highlights and focuses the reply selected from Inbox", async () => {
+    const run = demoDashboard.runs[0];
+    const rootMessage: IssueMessage = {
+      id: "issue-root-message",
+      runId: run.id,
+      parentMessageId: null,
+      body: "원본 메시지",
+      author: {
+        id: "jay",
+        name: "Jay",
+        image: null,
+        provider: null,
+      },
+      replyCount: 1,
+      createdAt: "2026-08-15T00:00:00.000Z",
+      updatedAt: "2026-08-15T00:00:00.000Z",
+    };
+    const replyMessage: IssueMessage = {
+      ...rootMessage,
+      id: "issue-reply-message",
+      parentMessageId: rootMessage.id,
+      body: "Inbox에서 연 답글",
+      createdAt: "2026-08-15T00:01:00.000Z",
+      updatedAt: "2026-08-15T00:01:00.000Z",
+      replyCount: 0,
+    };
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        error={null}
+        highlightedMessageId={replyMessage.id}
+        initialDetailTab="conversation"
+        isRecovering={false}
+        isSidebarOpen
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => [rootMessage, replyMessage]}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }}
+        run={run}
+      />,
+    );
+
+    const highlighted = container.querySelector<HTMLElement>(
+      '[data-inbox-highlighted="true"]',
+    );
+    expect(highlighted?.dataset.issueMessageId).toBe(replyMessage.id);
+    expect(highlighted?.getAttribute("aria-current")).toBe("true");
+    expect(highlighted?.tabIndex).toBe(-1);
+    expect(document.activeElement).toBe(highlighted);
+
+    await cleanup();
+  });
+
   it("keeps loaded messages visible when the run snapshot refreshes", async () => {
     const createdAt = new Date().toISOString();
     const loadedMessage: IssueMessage = {
