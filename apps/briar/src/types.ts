@@ -699,6 +699,8 @@ export type ProjectAgent = {
   provider: AgentProvider;
   model: string | null;
   effort: ModelEffort | null;
+  designatedWorkerId?: string | null;
+  designatedWorkerLabel?: string | null;
   description?: string;
   responsibility: string;
   skill: string;
@@ -746,6 +748,7 @@ export type CreateProjectAgentInput = {
   provider: AgentProvider;
   model: string | null;
   effort?: ModelEffort | null;
+  designatedWorkerId?: string | null;
   description?: string;
   responsibility: string;
   skills?: ProjectAgentSkillInput[];

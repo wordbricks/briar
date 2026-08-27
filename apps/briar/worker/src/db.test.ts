@@ -1030,6 +1030,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
+      await readFile(
+        resolve("migrations/0133_channel_reply_sessions.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
       await readFile(resolve("migrations/0136_issue_difficulty.sql"), "utf8"),
     );
     await executeSql(
@@ -1039,6 +1046,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await executeSql(
       db,
       await readFile(resolve("migrations/0138_project_members.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0141_agent_designated_workers.sql"),
+        "utf8",
+      ),
     );
     // The lifecycle suite intentionally uses a compact migration history, so
     // add the issue-reply job columns that production migration 0116 supplies

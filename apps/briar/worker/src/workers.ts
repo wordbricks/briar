@@ -983,6 +983,49 @@ export async function hasAvailableChannelReplyWorker(
   return await channelReplyWorkerAvailability(db, input) === "available";
 }
 
+export async function getProjectDesignatedWorker(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    projectId: string;
+    workerId: string;
+    provider: AgentProvider;
+    model: string | null;
+    effort: ModelEffort | null;
+    observedAt: string;
+  },
+) {
+  const worker = await db.prepare(
+    `select worker.id, worker.device_id, worker.label
+     from briar_execution_workers worker
+     join briar_execution_worker_devices device on device.id = worker.device_id
+     join briar_projects project on project.id = worker.project_id
+     where worker.id = ? and worker.project_id = ?
+       and device.organization_id = ?
+       and project.organization_id = device.organization_id`,
+  ).bind(
+    input.workerId,
+    input.projectId,
+    input.organizationId,
+  ).first<{ id: string; device_id: string; label: string }>();
+  if (!worker) return null;
+  return {
+    id: worker.id,
+    deviceId: worker.device_id,
+    label: worker.label,
+    availability: await channelReplyWorkerAvailability(db, {
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      preferredDeviceId: worker.device_id,
+      preferredWorkerId: worker.id,
+      provider: input.provider,
+      model: input.model,
+      effort: input.effort,
+      observedAt: input.observedAt,
+    }),
+  };
+}
+
 export async function userOwnsExecutionWorkerDevice(
   db: D1Database,
   input: { organizationId: string; userId: string; deviceId: string },
@@ -1547,6 +1590,50 @@ export async function disableExecutionWorker(
   return (await disableExecutionWorkerMutation(db, deviceId, observedAt)).disabled;
 }
 
+async function executionWorkerPinnedUse(
+  db: D1Database,
+  input: { deviceId: string; projectId?: string; observedAt: string },
+) {
+  return db.prepare(
+    `select pin.kind, pin.worker_label, pin.agent_name
+     from (
+       select 'designated' as kind, worker.label as worker_label,
+              agent.name as agent_name, worker.project_id
+       from briar_execution_workers worker
+       join briar_project_agents agent
+         on agent.designated_worker_id = worker.id
+       where worker.device_id = ?
+       union all
+       select 'retained_thread' as kind, worker.label as worker_label,
+              null as agent_name, worker.project_id
+       from briar_execution_workers worker
+       join briar_channel_reply_sessions session
+         on session.owner_worker_id = worker.id
+       where worker.device_id = ? and session.retained_until > ?
+     ) pin
+     where (? is null or pin.project_id = ?)
+     limit 1`,
+  ).bind(
+    input.deviceId,
+    input.deviceId,
+    input.observedAt,
+    input.projectId ?? null,
+    input.projectId ?? null,
+  ).first<{
+    kind: "designated" | "retained_thread";
+    worker_label: string;
+    agent_name: string | null;
+  }>();
+}
+
+function pinnedWorkerDeleteError(pin: NonNullable<
+  Awaited<ReturnType<typeof executionWorkerPinnedUse>>
+>) {
+  return pin.kind === "designated"
+    ? `Worker "${pin.worker_label}" is the Designated Worker for Agent "${pin.agent_name ?? "Agent"}"; select another Worker or automatic placement before deleting it`
+    : `Worker "${pin.worker_label}" owns a retained channel thread; wait for that session to expire before deleting it`;
+}
+
 /**
  * Permanently remove an idle organization Worker and its project bindings.
  *
@@ -1584,6 +1671,20 @@ export async function deleteExecutionWorker(
       metrics,
       d1MutationMetrics([bindingCountResult]),
     );
+    const pinned = await executionWorkerPinnedUse(db, {
+      deviceId,
+      observedAt,
+    });
+    if (pinned) {
+      await failWorkerHardDelete(db, context, {
+        attemptCount: attempt.attemptCount,
+        outcome: "blocked",
+        reasonCode: "active_sessions",
+        metrics,
+      });
+      failureRecorded = true;
+      throw new WorkerConflictError(pinnedWorkerDeleteError(pinned));
+    }
     const disabled = await disableExecutionWorkerMutation(db, deviceId, observedAt);
     metrics = addD1MutationMetrics(metrics, disabled.metrics);
     if (!disabled.disabled) {
@@ -1693,6 +1794,21 @@ export async function unbindExecutionWorker(
   let metrics: D1MutationMetrics = { rowsRead: 0, rowsWritten: 0, changes: 0 };
   let failureRecorded = false;
   try {
+    const pinned = await executionWorkerPinnedUse(db, {
+      deviceId,
+      projectId,
+      observedAt,
+    });
+    if (pinned) {
+      await failWorkerHardDelete(db, context, {
+        attemptCount: attempt.attemptCount,
+        outcome: "blocked",
+        reasonCode: "active_sessions",
+        metrics,
+      });
+      failureRecorded = true;
+      throw new WorkerConflictError(pinnedWorkerDeleteError(pinned));
+    }
     const deleted = await db
       .prepare(
         `delete from briar_execution_workers
@@ -2381,6 +2497,22 @@ export async function updateExecutionWorkerLabel(
          where device_id = ? and state != 'disabled'`,
       )
       .bind(label, observedAt, deviceId),
+    db
+      .prepare(
+        `update briar_project_agents set designated_worker_label = ?
+         where designated_worker_id in (
+           select id from briar_execution_workers where device_id = ?
+         )`,
+      )
+      .bind(label, deviceId),
+    db
+      .prepare(
+        `update briar_channel_reply_sessions set owner_worker_label = ?
+         where owner_worker_id in (
+           select id from briar_execution_workers where device_id = ?
+         )`,
+      )
+      .bind(label, deviceId),
   ]);
   return (deviceUpdate.results[0] as ExecutionWorkerDeviceRow | undefined) ?? null;
 }

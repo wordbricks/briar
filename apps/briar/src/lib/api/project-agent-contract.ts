@@ -98,6 +98,11 @@ export const ProjectAgentResponse = Schema.Struct({
   provider: Schema.Literals(agentProviders),
   model: Schema.NullOr(Schema.String),
   effort: defaulted(Schema.NullOr(ModelEffort), null),
+  designatedWorkerId: defaulted(
+    Schema.NullOr(Schema.String.check(Schema.isLengthBetween(1, 128))),
+    null,
+  ),
+  designatedWorkerLabel: defaulted(Schema.NullOr(Schema.String), null),
   description: defaulted(Schema.String, ""),
   responsibility: Schema.String,
   skill: Schema.String,

@@ -23,6 +23,8 @@ export type ProjectAgentRow = {
   provider: ProjectAgentProvider;
   model: string | null;
   effort: AgentSkillEffort | null;
+  designated_worker_id: string | null;
+  designated_worker_label: string | null;
   description: string;
   responsibility: string;
   skill_markdown: string;
