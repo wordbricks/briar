@@ -101,15 +101,18 @@ function UsageMeter({
           style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
         />
       </i>
-      <strong
+      <small
         className={cn(
-          "min-w-[25px] font-mono text-micro font-semibold text-muted-foreground",
+          "text-micro text-muted-foreground",
+          compact
+            ? "font-normal"
+            : "min-w-[25px] font-mono font-semibold",
           tone === "warning" && "text-[var(--status-warning-foreground)]",
           tone === "critical" && "text-[var(--status-destructive-foreground)]",
         )}
       >
         {percentage}%
-      </strong>
+      </small>
     </span>
   );
 }
