@@ -12,6 +12,7 @@ type NavigationAction<T extends string> =
   | { type: "back" }
   | { type: "backTo"; predicate: (value: T) => boolean; fallback?: T }
   | { type: "forward" }
+  | { type: "goTo"; index: number }
   | { type: "replace"; value: T }
   | { type: "reset"; value: T };
 
@@ -43,6 +44,14 @@ export function reduceNavigationHistory<T extends string>(
     return state.index === state.entries.length - 1
       ? state
       : { ...state, index: state.index + 1 };
+  }
+  if (action.type === "goTo") {
+    return Number.isInteger(action.index) &&
+        action.index >= 0 &&
+        action.index < state.entries.length &&
+        action.index !== state.index
+      ? { ...state, index: action.index }
+      : state;
   }
   if (action.type === "reset") {
     return createNavigationHistory(action.value);
@@ -100,6 +109,10 @@ export function useNavigationHistory<T extends string>(initial: T) {
     [],
   );
   const goForward = useCallback(() => dispatch({ type: "forward" }), []);
+  const goTo = useCallback(
+    (index: number) => dispatch({ type: "goTo", index }),
+    [],
+  );
   const replace = useCallback(
     (value: T) => dispatch({ type: "replace", value }),
     [],
@@ -111,12 +124,15 @@ export function useNavigationHistory<T extends string>(initial: T) {
 
   return {
     current: history.entries[history.index],
+    entries: history.entries,
+    index: history.index,
     canGoBack: history.index > 0,
     canGoForward: history.index < history.entries.length - 1,
     navigate,
     goBack,
     goBackTo,
     goForward,
+    goTo,
     replace,
     reset,
   };
