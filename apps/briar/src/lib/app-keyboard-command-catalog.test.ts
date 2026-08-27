@@ -41,6 +41,7 @@ const expectedPhysicalSequences = {
 const additionalCommandIds = [
   "historyBack",
   "historyForward",
+  "openNavigationHistory",
   "openSettings",
   "createIssueFromSystemShortcut",
   "zoomIn",
@@ -192,6 +193,7 @@ describe("app keyboard command catalog", () => {
       "openCommandPalette",
       "historyBack",
       "historyForward",
+      "openNavigationHistory",
       "openSettings",
       "createIssueFromSystemShortcut",
     ] as const) {
@@ -199,6 +201,7 @@ describe("app keyboard command catalog", () => {
         createIssueFromSystemShortcut: { code: "KeyN", metaKey: true },
         historyBack: { code: "BracketLeft", metaKey: true },
         historyForward: { code: "BracketRight", metaKey: true },
+        openNavigationHistory: { code: "KeyY", metaKey: true },
         openCommandPalette: { code: "KeyK", metaKey: true },
         openSettings: { code: "Comma", metaKey: true },
       } satisfies Record<typeof commandId, KeyboardCommandInput>;

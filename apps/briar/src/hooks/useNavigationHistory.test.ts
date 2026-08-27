@@ -108,6 +108,26 @@ describe("navigation history", () => {
     expect(history.index).toBe(2);
   });
 
+  it("jumps to an existing destination without changing the visit stack", () => {
+    let history = createNavigationHistory<string>("issues");
+    for (const value of ["inbox", "auto-hunt", "settings"]) {
+      history = reduceNavigationHistory(history, {
+        type: "navigate",
+        value,
+      });
+    }
+
+    history = reduceNavigationHistory(history, { type: "goTo", index: 1 });
+
+    expect(history).toEqual({
+      entries: ["issues", "inbox", "auto-hunt", "settings"],
+      index: 1,
+    });
+    expect(
+      reduceNavigationHistory(history, { type: "goTo", index: 99 }),
+    ).toBe(history);
+  });
+
   it("does not add consecutive duplicate destinations", () => {
     const initial = createNavigationHistory<string>("issues");
     const history = reduceNavigationHistory(initial, {
