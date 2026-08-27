@@ -50,7 +50,6 @@ import { formatDate, formatExecutionUsdTicks, formatRatePerMillion, localizeEven
 import { placementForId, placementIdForRun, placementMatchesRun } from "../model/kanban";
 import { IssueResultReviewers } from "../results/IssueResultReviewers";
 import { RunEvidencePanel } from "../results/RunEvidencePanel";
-import { RunResultArtifacts } from "../results/RunResultArtifacts";
 import { RunResultScreenshots } from "../results/RunResultScreenshots";
 import { hasResultReviews } from "../results/model";
 import { cn } from "@/lib/utils";
@@ -1143,7 +1142,7 @@ export function RunPage({
                                   <strong className="text-2xs font-semibold text-foreground">{t("run.resultNextAction")}</strong>
                                   <span className="text-2xs leading-relaxed text-foreground">{run.structuredResult.nextAction}</span>
                                 </div> : null}
-                              <RunResultArtifacts onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} run={run} />
+                              <RunResultScreenshots onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} runId={run.id} />
                             </section>
                           </div>
                           {run.pullRequestUrls.length > 0 ? <div className="run-result-links mt-3 flex flex-wrap gap-2">
@@ -1263,7 +1262,7 @@ export function RunPage({
                               <strong className="text-2xs font-semibold text-foreground">{t("run.resultNextAction")}</strong>
                               <span className="text-2xs leading-relaxed text-foreground">{run.structuredResult.nextAction}</span>
                             </div> : null}
-                          <RunResultArtifacts onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} run={run} />
+                          <RunResultScreenshots onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} runId={run.id} />
                           {run.pullRequestUrls.length > 0 ? <div className="run-result-links mt-3 flex flex-wrap gap-2">
                               {run.pullRequestUrls.map((url, index) => {
                           const pullRequestLabel = pullRequestDisplayName(url, index);
@@ -1305,7 +1304,7 @@ export function RunPage({
                           <p className="m-0 max-w-[420px] text-xs leading-relaxed">{run.detail?.trim() || t("run.resultEmpty")}</p>
                           {executionMetricsPanel}
                         </div>}
-                      {run.status === "completed" && !completionSummary ? <RunResultArtifacts onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} run={run} /> : run.status !== "paused" && !completionSummary ? <RunResultScreenshots onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} runId={run.id} /> : null}
+                      {run.status !== "paused" && !completionSummary ? <RunResultScreenshots onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} runId={run.id} /> : null}
                     </div> : activeDetailTab === "agentActivity" ? <IssueAgentActivityPanel activity={agentActivity} error={workerEvents.error} id={`${detailTabsId}-agent-activity-panel`} isLive={workerExecutionIsLive && hasWorkerExecution} labelledBy={`${detailTabsId}-agent-activity-tab`} loading={workerEvents.isLoading} provider={activityProvider} /> : activeDetailTab === "statusHistory" ? <IssueStatusHistoryPanel events={runEvents} id={`${detailTabsId}-status-history-panel`} labelledBy={`${detailTabsId}-status-history-tab`} loadError={runEventsLoadError} loading={runEventsLoading} onRetry={() => void loadRunEvents()} workflow={run.workflow} /> : <RunEvidencePanel id={`${detailTabsId}-evidence-panel`} labelledBy={`${detailTabsId}-evidence-tab`} onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} run={run} />}
                 </section>
                 {usesConversationTab ? <div aria-labelledby={`${detailTabsId}-conversation-tab`} className="issue-conversation-tab-panel min-h-0 flex-1 overflow-hidden" hidden={activeDetailTab !== "conversation"} id={`${detailTabsId}-conversation-panel`} role="tabpanel">
