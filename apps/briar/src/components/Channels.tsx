@@ -139,6 +139,12 @@ import { IssueExecutionApproval } from "./IssueExecutionApproval";
 import { IssueCreateExecutionApproval } from "./IssueCreateExecutionApproval";
 import { AgentSkillExecutionApproval } from "./AgentSkillExecutionApproval";
 import {
+  resizeObserverEntryHeight,
+  useChannelScrollStability,
+  type ChannelScrollRowMeasurement,
+  type ChannelScrollRowsResize,
+} from "../hooks/use-channel-scroll-stability";
+import {
   scrollContainerToEnd,
   scrollElementToCenter,
 } from "../lib/scroll-container";
@@ -389,12 +395,23 @@ export function Channels({
   const channelCache = useRef(new Map<string, CachedDesktopChannel>());
   const channelLoadAbortController = useRef<AbortController | null>(null);
   const preparedChannelId = useRef<string | null>(null);
-  const shouldScrollChannelToEnd = useRef<string | null>(null);
   const requestedMessageFocusKeyRef = useRef<string | null>(null);
   const suppressEarlierLoadOnNextScroll = useRef(false);
   const displaySource = useRef<DesktopChannelDisplaySource>("network");
   const initialSettingsHandledChannelId = useRef<string | null>(null);
   activeChannelIdRef.current = activeChannelId;
+  const {
+    onScroll: handleChannelScroll,
+    reportRowsResize: reportChannelRowsResize,
+    requestStickToBottom,
+    requestStickToBottomIfAtBottom,
+    restoreScrollTop,
+    setStickToBottom,
+    stickToBottomRef,
+  } = useChannelScrollStability({
+    channelKey: activeChannelId,
+    scrollerRef: messagesScrollRef,
+  });
 
   const updateRootMessages = useCallback(
     (update: (current: ChannelMessage[]) => ChannelMessage[]) => {
@@ -467,14 +484,8 @@ export function Channels({
     onChannelFallback(remaining[0]?.id ?? null);
   }, [activeChannelId, channels, onChannelFallback]);
   const handleIncomingRootMessages = useCallback(() => {
-    const scroller = messagesScrollRef.current;
-    if (
-      scroller &&
-      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= 80
-    ) {
-      shouldScrollChannelToEnd.current = activeChannelIdRef.current;
-    }
-  }, []);
+    requestStickToBottomIfAtBottom();
+  }, [requestStickToBottomIfAtBottom]);
   const channelDeltaIsBlocked = useCallback(
     () => authoritativeLoadVersion.current != null,
     [],
@@ -540,7 +551,7 @@ export function Channels({
     onIssueOpen: onIssueCreated,
     onSkillSessionAccepted,
     onRootMessagePending: () => {
-      shouldScrollChannelToEnd.current = activeChannelIdRef.current;
+      requestStickToBottomIfAtBottom();
     },
     realtime: {
       enabled: true,
@@ -933,7 +944,7 @@ export function Channels({
     channelLoadAbortController.current?.abort();
     const cached = channelCache.current.get(activeChannelId) ?? null;
     displaySource.current = cached ? "cache" : "network";
-    shouldScrollChannelToEnd.current = activeChannelId;
+    requestStickToBottom();
     setMembers(cached?.members ?? []);
     setAgents(cached?.agents ?? []);
     setMessages(cached?.messages ?? []);
@@ -948,6 +959,7 @@ export function Channels({
     activeChannelId,
     channelListReady,
     invalidateChannelSurface,
+    requestStickToBottom,
     setError,
     setProposalProjects,
   ]);
@@ -979,7 +991,7 @@ export function Channels({
           displaySource.current = loaded.messages.length > 0
             ? "network"
             : "empty";
-          shouldScrollChannelToEnd.current = activeChannelId;
+          requestStickToBottom();
         }
         const target = loaded.requestedMessage;
         if (target) {
@@ -1000,6 +1012,7 @@ export function Channels({
               if (requestedMessageFocusKeyRef.current === targetKey) return false;
               const targetElement = findTarget();
               if (!targetElement) return false;
+              setStickToBottom(false);
               scrollElementToCenter(messageScroller, targetElement);
               targetElement.focus({ preventScroll: true });
               requestedMessageFocusKeyRef.current = targetKey;
@@ -1017,6 +1030,7 @@ export function Channels({
                   (message) => message.id === target.messageId,
                 ) ?? -1;
               if (targetIndex >= 0) {
+                setStickToBottom(false);
                 messageScroller.scrollTop =
                   targetIndex * desktopChannelEstimatedMessageHeight;
                 suppressEarlierLoadOnNextScroll.current = true;
@@ -1058,6 +1072,8 @@ export function Channels({
     loadChannelConversation,
     onRequestedMessageOpen,
     requestedMessage,
+    requestStickToBottom,
+    setStickToBottom,
   ]);
 
   useEffect(() => {
@@ -1086,13 +1102,14 @@ export function Channels({
       }
       window.requestAnimationFrame(() => {
         if (!scroller) return;
-        scroller.scrollTop = previousScrollTop +
-          (scroller.scrollHeight - previousScrollHeight);
+        restoreScrollTop(
+          previousScrollTop + (scroller.scrollHeight - previousScrollHeight),
+        );
         suppressEarlierLoadOnNextScroll.current = true;
         scroller.dispatchEvent(new Event("scroll"));
       });
     }
-  }, [loadEarlierConversationMessages]);
+  }, [loadEarlierConversationMessages, restoreScrollTop]);
 
   useLayoutEffect(() => {
     if (!activeChannelId || channelLoading) return;
@@ -1104,14 +1121,19 @@ export function Channels({
     ) {
       return;
     }
-    if (shouldScrollChannelToEnd.current === activeChannelId) {
-      scrollContainerToEnd(messagesScrollRef.current);
+    if (stickToBottomRef.current) {
+      requestStickToBottom();
       suppressEarlierLoadOnNextScroll.current = true;
       messagesScrollRef.current?.dispatchEvent(new Event("scroll"));
-      shouldScrollChannelToEnd.current = null;
     }
     recordDesktopChannelFirstMessage(activeChannelId, displaySource.current);
-  }, [activeChannelId, channelLoading, messages]);
+  }, [
+    activeChannelId,
+    channelLoading,
+    messages,
+    requestStickToBottom,
+    stickToBottomRef,
+  ]);
 
   useEffect(() => {
     if (!threadParentId) return;
@@ -1144,6 +1166,7 @@ export function Channels({
         element.dataset.channelMessageId === requestedMessage.messageId,
     ) ?? null;
     if (!messageScroller || !targetElement) return;
+    setStickToBottom(false);
     scrollElementToCenter(messageScroller, targetElement);
     targetElement.focus({ preventScroll: true });
     requestedMessageFocusKeyRef.current = targetKey;
@@ -1154,6 +1177,7 @@ export function Channels({
     messages.length,
     onRequestedMessageOpen,
     requestedMessage,
+    setStickToBottom,
     threadMessages.length,
     threadParentId,
   ]);
@@ -1283,6 +1307,7 @@ export function Channels({
                   suppressEarlierLoadOnNextScroll.current = false;
                   return;
                 }
+                handleChannelScroll(event.currentTarget);
                 if (event.currentTarget.scrollTop <= 80) {
                   void loadEarlierChannelMessages();
                 }
@@ -1308,8 +1333,10 @@ export function Channels({
                     </div>
                   ) : null}
                   <VirtualizedChannelMessageList
+                    key={`${organizationId}:${activeChannelId}`}
                     localeTag={localeTag}
                     messages={messages}
+                    onRowsResize={reportChannelRowsResize}
                     renderMessage={(message) => (
                       <MessageRow
                       agents={agents}
@@ -1772,12 +1799,14 @@ function ChannelMessageSkeleton({ label }: { label: string }) {
 function VirtualizedChannelMessageList({
   localeTag,
   messages,
+  onRowsResize,
   renderMessage,
   scrollerRef,
   t,
 }: {
   localeTag: string;
   messages: ChannelMessage[];
+  onRowsResize: ChannelScrollRowsResize;
   renderMessage: (message: ChannelMessage) => ReactNode;
   scrollerRef: RefObject<HTMLDivElement | null>;
   t: Translate;
@@ -1842,28 +1871,35 @@ function VirtualizedChannelMessageList({
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver((entries) => {
       let changed = false;
+      const measurements: ChannelScrollRowMeasurement[] = [];
       for (const entry of entries) {
         const id = (entry.target as HTMLElement).dataset.channelVirtualMessageId;
         if (!id) continue;
-        const borderBox = entry.borderBoxSize;
-        const borderBoxHeight = Array.isArray(borderBox)
-          ? borderBox[0]?.blockSize
-          : (borderBox as unknown as ResizeObserverSize | undefined)?.blockSize;
-        const height = borderBoxHeight ?? entry.contentRect.height;
-        if (height <= 0 || Math.abs((heights.current.get(id) ?? 0) - height) < 1) {
+        const height = resizeObserverEntryHeight(entry);
+        const previousHeight = heights.current.get(id) ??
+          desktopChannelEstimatedMessageHeight;
+        if (height <= 0 || Math.abs(previousHeight - height) < 1) {
           continue;
         }
         heights.current.set(id, height);
+        measurements.push({
+          element: entry.target as HTMLElement,
+          height,
+          previousHeight,
+        });
         changed = true;
       }
-      if (changed) setMeasurementVersion((version) => version + 1);
+      if (changed) {
+        onRowsResize(measurements);
+        setMeasurementVersion((version) => version + 1);
+      }
     });
     const rows = listRef.current?.querySelectorAll<HTMLElement>(
       "[data-channel-virtual-message-id]",
     ) ?? [];
     for (const row of rows) observer.observe(row);
     return () => observer.disconnect();
-  }, [end, start]);
+  }, [end, onRowsResize, start]);
 
   return (
     <div

@@ -67,6 +67,7 @@ import {
   conversationIsAwayFromBottom,
   scrollConversationToBottom,
 } from "../lib/conversation-scroll";
+import { useChannelScrollStability } from "../hooks/use-channel-scroll-stability";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type { ChannelAgentActivityDescriptor } from "../lib/channel-agent-activity";
 import {
@@ -286,20 +287,34 @@ export function CompanionChannels({
     null,
   );
   const [loading, setLoading] = useState(true);
-  const [channelIsAwayFromBottom, setChannelIsAwayFromBottom] = useState(false);
   const [threadIsAwayFromBottom, setThreadIsAwayFromBottom] = useState(false);
   const cursor = useRef(0);
   const channelSelectionVersion = useRef(0);
   const channelMessagesScrollRef = useRef<HTMLDivElement | null>(null);
   const threadMessagesScrollRef = useRef<HTMLDivElement | null>(null);
-  const channelMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const threadMessagesEndRef = useRef<HTMLDivElement | null>(null);
-  const shouldScrollChannelToEnd = useRef(false);
   const localChannelCache = useRef<CompanionChannelCache>(new Map());
   const resolvedChannelCache = channelCache ?? localChannelCache.current;
   const renderedChannel = useRef<CachedCompanionChannel | null>(null);
   const highlightedMessageRef = useRef(highlightedMessage);
   highlightedMessageRef.current = highlightedMessage;
+  const {
+    isAwayFromBottom: channelIsAwayFromBottom,
+    onScroll: handleChannelScroll,
+    requestStickToBottom,
+    requestStickToBottomIfAtBottom,
+    restoreScrollTop,
+    scrollToBottom,
+    setStickToBottom,
+    stickToBottomRef,
+  } = useChannelScrollStability({
+    channelKey: channel?.id ?? null,
+    rowContainerRef: channelMessagesScrollRef,
+    rowCount: threadParentId ? 0 : messages.length,
+    rowSelector: "[data-companion-channel-message-id]",
+    scrollerRef: channelMessagesScrollRef,
+    observeRows: true,
+  });
   const cachedThreads = channel
     ? resolvedChannelCache.get(channel.id)?.threads ?? new Map()
     : new Map<string, ChannelMessage[]>();
@@ -409,14 +424,8 @@ export function CompanionChannels({
     [channel?.id, resolvedChannelCache],
   );
   const handleIncomingRootMessages = useCallback(() => {
-    const scroller = channelMessagesScrollRef.current;
-    if (
-      scroller &&
-      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= 80
-    ) {
-      shouldScrollChannelToEnd.current = true;
-    }
-  }, []);
+    requestStickToBottomIfAtBottom();
+  }, [requestStickToBottomIfAtBottom]);
   const channelDeltaIsBlocked = useCallback(() => loading, [loading]);
   const {
     acceptExecutionProposal,
@@ -480,11 +489,11 @@ export function CompanionChannels({
     onIssueOpen,
     onSkillSessionAccepted,
     onRootMessagePending: () => {
-      shouldScrollChannelToEnd.current = true;
+      requestStickToBottomIfAtBottom();
     },
     onThreadClosed: () => {
       setLoading(false);
-      shouldScrollChannelToEnd.current = true;
+      requestStickToBottomIfAtBottom();
     },
     realtime: {
       enabled: Boolean(channel),
@@ -515,11 +524,9 @@ export function CompanionChannels({
   }, [channel?.id, onViewingChannelChange, threadParentId]);
 
   useLayoutEffect(() => {
-    if (!channel || threadParentId || !shouldScrollChannelToEnd.current) return;
-    channelMessagesEndRef.current?.scrollIntoView?.({ block: "end" });
-    shouldScrollChannelToEnd.current = false;
-    setChannelIsAwayFromBottom(false);
-  }, [channel, messages, threadParentId]);
+    if (!channel || threadParentId || !stickToBottomRef.current) return;
+    requestStickToBottom();
+  }, [channel, messages, requestStickToBottom, stickToBottomRef, threadParentId]);
 
   useEffect(() => {
     if (!threadParentId) return;
@@ -528,7 +535,6 @@ export function CompanionChannels({
   }, [thread, threadParentId, replies.length]);
 
   useEffect(() => {
-    setChannelIsAwayFromBottom(false);
     setThreadIsAwayFromBottom(false);
   }, [channel?.id, threadParentId]);
 
@@ -627,6 +633,7 @@ export function CompanionChannels({
     async (summary: ChannelSummary) => {
       persistRenderedChannel();
       invalidateChannelSurface(summary.id, null);
+      requestStickToBottom();
       const selectionVersion = ++channelSelectionVersion.current;
       const cached = readCachedChannel(resolvedChannelCache, summary.id);
       setChannel(markSelectedChannelRead(cached?.channel ?? summary));
@@ -661,7 +668,7 @@ export function CompanionChannels({
             channel: nextChannel,
           });
         }
-        shouldScrollChannelToEnd.current = true;
+        requestStickToBottom();
       } finally {
         if (selectionVersion === channelSelectionVersion.current) {
           setLoading(false);
@@ -673,6 +680,7 @@ export function CompanionChannels({
       loadChannelConversation,
       markSelectedChannelRead,
       persistRenderedChannel,
+      requestStickToBottom,
       resolvedChannelCache,
     ],
   );
@@ -703,12 +711,14 @@ export function CompanionChannels({
     if (result.applied) {
       window.requestAnimationFrame(() => {
         if (!scroller) return;
-        scroller.scrollTop = previousScrollTop +
-          (scroller.scrollHeight - previousScrollHeight);
+        restoreScrollTop(
+          previousScrollTop + (scroller.scrollHeight - previousScrollHeight),
+        );
       });
     }
   }, [
     loadEarlierConversationMessages,
+    restoreScrollTop,
   ]);
 
   const openThread = useCallback(
@@ -744,7 +754,7 @@ export function CompanionChannels({
     setThread(null);
     setThreadParentId(null);
     setMessageNextCursor(null);
-    shouldScrollChannelToEnd.current = false;
+    setStickToBottom(false);
     setError(null);
     setLoading(true);
     void (async () => {
@@ -769,6 +779,7 @@ export function CompanionChannels({
             `[data-companion-channel-message-id="${requestedMessage.messageId}"]`,
           );
           if (requestedMessageElement?.scrollIntoView) {
+            setStickToBottom(false);
             requestedMessageElement.scrollIntoView({ block: "center" });
           }
           if (requestedMessageElement instanceof HTMLElement) {
@@ -799,6 +810,7 @@ export function CompanionChannels({
     onRequestedMessageOpen,
     organizationId,
     requestedMessage,
+    setStickToBottom,
   ]);
 
   const send = useCallback(
@@ -981,9 +993,7 @@ export function CompanionChannels({
           <div
             className="companion-channel-messages"
             onScroll={(event) => {
-              setChannelIsAwayFromBottom(
-                conversationIsAwayFromBottom(event.currentTarget),
-              );
+              handleChannelScroll(event.currentTarget);
               if (event.currentTarget.scrollTop <= 32) {
                 void loadEarlierChannelMessages();
               }
@@ -1049,16 +1059,12 @@ export function CompanionChannels({
                 {t("companion.channelsEmpty")}
               </p>
             ) : null}
-            <div ref={channelMessagesEndRef} />
           </div>
           {channelIsAwayFromBottom ? (
             <ConversationScrollToBottomButton
               label={t("run.jumpToLatest")}
               onClick={() => {
-                const scroller = channelMessagesScrollRef.current;
-                if (!scroller) return;
-                setChannelIsAwayFromBottom(false);
-                scrollConversationToBottom(scroller);
+                scrollToBottom();
               }}
             />
           ) : null}

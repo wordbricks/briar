@@ -22,6 +22,37 @@ const selectedChannel: ChannelSummary = {
   updatedAt: "2026-08-01T00:00:00.000Z",
 };
 
+const secondChannel: ChannelSummary = {
+  ...selectedChannel,
+  id: "channel-2",
+  name: "Second",
+  slug: "second",
+};
+
+const virtualMessage = (channelId: string, index: number): ChannelMessage => ({
+  id: `${channelId}-message-${index}`,
+  channelId,
+  parentMessageId: null,
+  author: {
+    type: "user",
+    id: "user-1",
+    name: "Sam",
+    email: "sam@example.com",
+    image: null,
+  },
+  body: `메시지 ${index}`,
+  mentionedUserIds: [],
+  mentionedAgentIds: [],
+  attachments: [],
+  reactions: [],
+  replyCount: 0,
+  lastReplyAt: null,
+  document: null,
+  proposal: null,
+  executionProposal: null,
+  createdAt: `2026-08-01T00:${String(index).padStart(2, "0")}:00.000Z`,
+});
+
 describe("Channels", () => {
   beforeEach(() => {
     class FakeWebSocket extends EventTarget {
@@ -303,5 +334,105 @@ describe("Channels", () => {
 
     requestAnimationFrame.mockRestore();
     await cleanup();
+  });
+
+  it("resets virtualized row measurements when switching channels", async () => {
+    const observers: Array<{
+      disconnected: boolean;
+      targets: Set<Element>;
+    }> = [];
+    class TrackingResizeObserver {
+      readonly targets = new Set<Element>();
+      disconnected = false;
+
+      constructor(_callback: ResizeObserverCallback) {
+        observers.push(this);
+      }
+
+      observe(target: Element) {
+        this.targets.add(target);
+      }
+
+      disconnect() {
+        this.disconnected = true;
+      }
+    }
+    Object.assign(globalThis, { ResizeObserver: TrackingResizeObserver });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          return new Response(JSON.stringify({
+            url: "ws://realtime.test/socket",
+          }), {
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        const channel = String(input).includes(`/channels/${secondChannel.id}`)
+          ? secondChannel
+          : selectedChannel;
+        return new Response(JSON.stringify({
+          channel,
+          members: [],
+          agents: [],
+          messages: Array.from({ length: 45 }, (_, index) =>
+            virtualMessage(channel.id, index)),
+          agentReplies: [],
+          nextCursor: null,
+        }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+    const view = createReactTestRoot({ attachToDocument: true });
+    const render = (activeChannelId: string) => (
+      <I18nProvider>
+        <Channels
+          activeChannelId={activeChannelId}
+          channelCatalogCursor={0}
+          channels={[selectedChannel, secondChannel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          token="token"
+        />
+      </I18nProvider>
+    );
+
+    await view.render(render(selectedChannel.id));
+    await act(async () => Promise.resolve());
+    expect(
+      view.container.querySelector('[data-virtualized="true"]'),
+    ).not.toBeNull();
+    const firstRowObserver = observers.find((observer) =>
+      [...observer.targets].some((target) =>
+        (target as HTMLElement).dataset.channelVirtualMessageId?.startsWith(
+          `${selectedChannel.id}-`,
+        ),
+      ),
+    );
+    expect(firstRowObserver).not.toBeUndefined();
+
+    await view.render(render(secondChannel.id));
+    await act(async () => Promise.resolve());
+    const secondRowObserver = observers.find((observer) =>
+      [...observer.targets].some((target) =>
+        (target as HTMLElement).dataset.channelVirtualMessageId?.startsWith(
+          `${secondChannel.id}-`,
+        ),
+      ),
+    );
+    expect(firstRowObserver?.disconnected).toBe(true);
+    expect(secondRowObserver).not.toBeUndefined();
+    expect(
+      [...(secondRowObserver?.targets ?? [])].every((target) =>
+        (target as HTMLElement).dataset.channelVirtualMessageId?.startsWith(
+          `${secondChannel.id}-`,
+        ),
+      ),
+    ).toBe(true);
+
+    await view.cleanup();
   });
 });
