@@ -680,6 +680,12 @@ const mobileChannelMessageAuthorSchema = Schema.Union([
   }),
 ]);
 
+const mobileChannelMessageReactionPersonSchema = mutableStruct({
+  userId: Schema.String,
+  name: Schema.String,
+  image: nullable(Schema.String),
+});
+
 const mobileChannelProposalSchema = Schema.Union([
   mutableStruct({
     ...mobileChannelProposalBaseFields,
@@ -714,6 +720,10 @@ export const mobileChannelMessageSchema = mutableStruct({
       emoji: Schema.String.check(Schema.isLengthBetween(1, 32)),
       count: positiveInteger,
       userIds: mutableArray(Schema.String).check(Schema.isMinLength(1)),
+      people: defaultedWith(
+        mutableArray(mobileChannelMessageReactionPersonSchema),
+        () => [],
+      ),
     })),
     () => [],
   ),
