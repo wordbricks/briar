@@ -81,6 +81,49 @@ describe("CLI Worker claim contracts", () => {
     ).toThrow("Organization context snapshot does not match its claim");
   });
 
+  it("rejects a Skill target whose saved execution policy changed", () => {
+    const agentId = "88888888-8888-4888-8888-888888888888";
+    const skillId = "99999999-9999-4999-8999-999999999999";
+    const activeSkill = {
+      id: skillId,
+      name: "Explain",
+      description: "Explain in the current thread.",
+      body: "Explain simply.",
+      provider: "codex",
+      model: null,
+      effort: null,
+      kind: "custom",
+      executionMode: "conversation",
+      approvalPolicy: "explicit",
+      position: 0,
+    };
+    expect(() => decodeClaimedChannelReply({
+      ...channelReply,
+      projectId,
+      scope: { kind: "project", organizationId, projectId },
+      organizationContext: null,
+      agent: {
+        id: agentId,
+        name: "Explainer",
+        provider: "codex",
+        model: null,
+        responsibility: "Explain",
+        skills: [activeSkill],
+      },
+      activeSkill,
+      skillExecutionTarget: {
+        projectId,
+        agentId,
+        skillId,
+        skillName: activeSkill.name,
+        request: "Explain this",
+        executionMode: "task",
+        approvalPolicy: "explicit",
+        approved: false,
+      },
+    })).toThrow("Skill execution target does not match the claimed Agent Skill");
+  });
+
   it("applies detached Agent defaults and canonical effort trimming", () => {
     const task = decodeClaimedProjectAgentTask({
       workType: "projectAgentTask",
@@ -117,6 +160,8 @@ describe("CLI Worker claim contracts", () => {
       model: null,
       effort: null,
       kind: "custom",
+      executionMode: "task",
+      approvalPolicy: "explicit",
       position: 0,
     });
     expect(task.agent.skills).toHaveLength(1);

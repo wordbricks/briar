@@ -110,11 +110,21 @@ export type ChannelMessageRow = {
   skill_execution_provider: AgentProvider | null;
   skill_execution_model: string | null;
   skill_execution_effort: AgentSkillEffort | null;
+  skill_execution_execution_mode: "conversation" | "task" | null;
+  skill_execution_approval_policy: "invoke_is_consent" | "explicit" | null;
+  skill_execution_execution_status:
+    | "waiting"
+    | "running"
+    | "completed"
+    | "failed"
+    | null;
+  skill_execution_error: string | null;
   skill_execution_request: string | null;
   skill_execution_status: "pending" | "accepted" | null;
   skill_execution_requested_worker_id: string | null;
   skill_execution_requested_worker_label: string | null;
   skill_execution_result_session_id: string | null;
+  skill_execution_result_message_id: string | null;
   skill_execution_created_at: string | null;
   skill_execution_accepted_at: string | null;
   skill_execution_delegated_by_agent_id: string | null;
@@ -217,6 +227,7 @@ export type ChannelReplyJobRow = {
   delegation_request: string | null;
   execution_target_ids_json?: string;
   session_id: string | null;
+  approved_skill_execution_proposal_id?: string | null;
 };
 
 export type ChannelReplySessionRow = {
@@ -436,6 +447,30 @@ const messageSelect = (
          skill_execution.provider as skill_execution_provider,
          skill_execution.model as skill_execution_model,
          skill_execution.effort as skill_execution_effort,
+         skill_execution.execution_mode as skill_execution_execution_mode,
+         skill_execution.approval_policy as skill_execution_approval_policy,
+         case
+           when skill_execution.status = 'pending' then 'waiting'
+           when skill_execution.execution_mode = 'task' then coalesce((
+             select case task.status when 'completed' then 'completed'
+               when 'failed' then 'failed' else 'running' end
+             from briar_project_agent_task_jobs task
+             where task.id = skill_execution.result_session_id
+           ), 'running')
+           else coalesce((
+             select case result_reply.status when 'completed' then 'completed'
+               when 'failed' then 'failed' else 'running' end
+             from briar_channel_agent_reply_jobs result_reply
+             where result_reply.id = skill_execution.result_reply_job_id
+           ), 'running')
+         end as skill_execution_execution_status,
+         case when skill_execution.execution_mode = 'task' then (
+           select task.error from briar_project_agent_task_jobs task
+           where task.id = skill_execution.result_session_id
+         ) else (
+           select result_reply.error from briar_channel_agent_reply_jobs result_reply
+           where result_reply.id = skill_execution.result_reply_job_id
+         ) end as skill_execution_error,
          skill_execution.request as skill_execution_request,
          skill_execution.status as skill_execution_status,
          skill_execution.requested_worker_id
@@ -444,6 +479,8 @@ const messageSelect = (
            as skill_execution_requested_worker_label,
          skill_execution.result_session_id
            as skill_execution_result_session_id,
+         skill_execution.result_message_id
+           as skill_execution_result_message_id,
          skill_execution.created_at as skill_execution_created_at,
          skill_execution.accepted_at as skill_execution_accepted_at,
          skill_execution.delegated_by_agent_id
@@ -460,11 +497,16 @@ const messageSelect = (
          null as skill_execution_provider,
          null as skill_execution_model,
          null as skill_execution_effort,
+         null as skill_execution_execution_mode,
+         null as skill_execution_approval_policy,
+         null as skill_execution_execution_status,
+         null as skill_execution_error,
          null as skill_execution_request,
          null as skill_execution_status,
          null as skill_execution_requested_worker_id,
          null as skill_execution_requested_worker_label,
          null as skill_execution_result_session_id,
+         null as skill_execution_result_message_id,
          null as skill_execution_created_at,
          null as skill_execution_accepted_at,
          null as skill_execution_delegated_by_agent_id,
@@ -504,9 +546,16 @@ export async function channelSkillExecutionProposalTablesAvailable(
 ) {
   return Boolean(await db
     .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table'
-         and name = 'briar_agent_skill_execution_proposals'`,
+      `select 1 as available
+       where exists (
+         select 1 from sqlite_master
+         where type = 'table'
+           and name = 'briar_agent_skill_execution_proposals'
+       ) and exists (
+         select 1 from pragma_table_info(
+           'briar_agent_skill_execution_proposals'
+         ) where name = 'execution_mode'
+       )`,
     )
     .first<{ available: number }>());
 }
@@ -568,12 +617,17 @@ const channelSkillExecutionProposalJson = (
       provider: row.skill_execution_provider ?? "codex",
       model: row.skill_execution_model,
       effort: row.skill_execution_effort,
+      executionMode: row.skill_execution_execution_mode ?? "task",
+      approvalPolicy: row.skill_execution_approval_policy ?? "explicit",
+      executionStatus: row.skill_execution_execution_status ?? "waiting",
       request: row.skill_execution_request ?? "",
       delegatedByAgentId: row.skill_execution_delegated_by_agent_id,
       delegatedByAgentName: row.skill_execution_delegated_by_agent_name,
       requestedWorkerId: row.skill_execution_requested_worker_id,
       requestedWorkerLabel: row.skill_execution_requested_worker_label,
       resultSessionId: row.skill_execution_result_session_id,
+      resultMessageId: row.skill_execution_result_message_id,
+      error: row.skill_execution_error,
       createdAt: row.skill_execution_created_at ?? row.created_at,
       acceptedAt: row.skill_execution_accepted_at,
     }
@@ -2995,11 +3049,34 @@ export async function claimNextChannelAgentReply(
                and snapshot_skill.effort is
                  ${job}.selected_skill_effort_snapshot
                and (
-                 (${job}.delegated_by_reply_job_id is null
+                 (${job}.approved_skill_execution_proposal_id is not null
+                   and exists (
+                     select 1
+                     from briar_agent_skill_execution_proposals approved
+                     where approved.id =
+                         ${job}.approved_skill_execution_proposal_id
+                       and approved.status = 'accepted'
+                       and approved.execution_mode = 'conversation'
+                       and approved.result_reply_job_id = ${job}.id
+                       and approved.result_message_id = ${job}.reply_message_id
+                       and approved.result_session_id = ${job}.session_id
+                       and approved.reply_message_id = ${job}.trigger_message_id
+                       and approved.channel_id = ${job}.channel_id
+                       and approved.thread_root_message_id =
+                         ${job}.parent_message_id
+                       and approved.agent_id = ${job}.agent_id
+                       and approved.skill_id = ${job}.skill_id
+                       and approved.request =
+                         ${job}.skill_execution_request_snapshot
+                   ))
+                 or
+                 (${job}.approved_skill_execution_proposal_id is null
+                   and ${job}.delegated_by_reply_job_id is null
                    and ${job}.skill_execution_request_snapshot =
                      snapshot_trigger.body)
                  or
-                 (${job}.delegated_by_reply_job_id is not null
+                 (${job}.approved_skill_execution_proposal_id is null
+                   and ${job}.delegated_by_reply_job_id is not null
                    and ${job}.skill_execution_request_snapshot =
                      ${job}.delegation_request)
                )
@@ -4041,6 +4118,8 @@ export async function completeChannelReply(
             and snapshot_roster.channel_id =
               briar_channel_agent_reply_jobs.channel_id
            where snapshot_agent.id = briar_channel_agent_reply_jobs.agent_id
+             and briar_channel_agent_reply_jobs
+               .approved_skill_execution_proposal_id is null
              and snapshot_agent.organization_id =
                briar_channel_agent_reply_jobs.organization_id
              and snapshot_agent.project_id =
@@ -4067,6 +4146,10 @@ export async function completeChannelReply(
              and snapshot_skill.effort is
                briar_channel_agent_reply_jobs.selected_skill_effort_snapshot
              and (
+               snapshot_skill.execution_mode = 'task'
+               or snapshot_skill.approval_policy = 'explicit'
+             )
+             and (
                (briar_channel_agent_reply_jobs.delegated_by_reply_job_id is null
                  and briar_channel_agent_reply_jobs
                    .skill_execution_request_snapshot = snapshot_trigger.body)
@@ -4084,6 +4167,12 @@ export async function completeChannelReply(
     input.skillExecutionProposal ? 1 : 0,
   ];
   const retainedUntil = channelReplySessionRetentionUntil(input.completedAt);
+  const skillExecutionProposalId = input.skillExecutionProposal
+    ? crypto.randomUUID()
+    : null;
+  const consentTaskSessionId = input.skillExecutionProposal
+    ? crypto.randomUUID()
+    : null;
   const statements = [
     db
       .prepare(
@@ -4422,7 +4511,8 @@ export async function completeChannelReply(
              source_reply_job_id, delegated_by_reply_job_id,
              agent_id, agent_name, agent_responsibility,
              skill_id, skill_name, skill_instructions, skill_kind,
-             provider, model, effort,
+             provider, model, effort, execution_mode, approval_policy,
+             thread_root_message_id,
              request, delegated_by_agent_id, delegated_by_agent_name,
              created_at, updated_at
            )
@@ -4437,6 +4527,8 @@ export async function completeChannelReply(
                   job.selected_skill_provider_snapshot,
                   job.selected_skill_model_snapshot,
                   job.selected_skill_effort_snapshot,
+                  skill.execution_mode, skill.approval_policy,
+                  job.parent_message_id,
                   job.skill_execution_request_snapshot,
                   parent_agent.id, parent_agent.name, ?, ?
            from briar_channel_agent_reply_jobs job
@@ -4469,6 +4561,11 @@ export async function completeChannelReply(
              and skill.provider = job.selected_skill_provider_snapshot
              and skill.model is job.selected_skill_model_snapshot
              and skill.effort is job.selected_skill_effort_snapshot
+             and job.approved_skill_execution_proposal_id is null
+             and (
+               skill.execution_mode = 'task'
+               or skill.approval_policy = 'explicit'
+             )
              and (
                (job.delegated_by_reply_job_id is null
                  and trigger_message.body = job.skill_execution_request_snapshot)
@@ -4478,7 +4575,7 @@ export async function completeChannelReply(
              )`,
         )
         .bind(
-          crypto.randomUUID(),
+          skillExecutionProposalId,
           input.completedAt,
           input.completedAt,
           input.jobId,
@@ -4487,6 +4584,53 @@ export async function completeChannelReply(
           input.claimTokenHash,
           input.completedAt,
         ),
+    );
+    statements.push(
+      db.prepare(
+        `update briar_agent_skill_execution_proposals
+         set status = 'accepted',
+             requested_worker_id = (
+               select job.claimed_worker_id
+               from briar_channel_agent_reply_jobs job
+               where job.id = source_reply_job_id
+             ),
+             requested_worker_label = (
+               select worker.label
+               from briar_channel_agent_reply_jobs job
+               join briar_execution_workers worker
+                 on worker.id = job.claimed_worker_id
+                and worker.device_id = job.claimed_device_id
+               where job.id = source_reply_job_id
+             ),
+             result_session_id = ?,
+             accepted_by_user_id = (
+               select trigger_message.author_user_id
+               from briar_channel_agent_reply_jobs job
+               join briar_channel_messages trigger_message
+                 on trigger_message.id = job.trigger_message_id
+                and trigger_message.channel_id = job.channel_id
+               where job.id = source_reply_job_id
+             ),
+             accepted_at = ?, updated_at = ?
+         where id = ? and status = 'pending' and execution_mode = 'task'
+           and approval_policy = 'invoke_is_consent'
+           and exists (
+             select 1 from briar_channel_agent_reply_jobs job
+             join briar_channel_messages trigger_message
+               on trigger_message.id = job.trigger_message_id
+              and trigger_message.channel_id = job.channel_id
+             join briar_execution_workers worker
+               on worker.id = job.claimed_worker_id
+              and worker.device_id = job.claimed_device_id
+             where job.id = source_reply_job_id
+               and trigger_message.author_user_id is not null
+           )`,
+      ).bind(
+        consentTaskSessionId,
+        input.completedAt,
+        input.completedAt,
+        skillExecutionProposalId,
+      ),
     );
   }
   if (delegation) {
@@ -5026,7 +5170,29 @@ export async function getChannelAgentSkillExecutionProposal(
 ) {
   return db
     .prepare(
-      `select proposal.*
+      `select proposal.*,
+              case
+                when proposal.status = 'pending' then 'waiting'
+                when proposal.execution_mode = 'task' then coalesce((
+                  select case task.status when 'completed' then 'completed'
+                    when 'failed' then 'failed' else 'running' end
+                  from briar_project_agent_task_jobs task
+                  where task.id = proposal.result_session_id
+                ), 'running')
+                else coalesce((
+                  select case reply.status when 'completed' then 'completed'
+                    when 'failed' then 'failed' else 'running' end
+                  from briar_channel_agent_reply_jobs reply
+                  where reply.id = proposal.result_reply_job_id
+                ), 'running')
+              end as execution_status,
+              case when proposal.execution_mode = 'task' then (
+                select task.error from briar_project_agent_task_jobs task
+                where task.id = proposal.result_session_id
+              ) else (
+                select reply.error from briar_channel_agent_reply_jobs reply
+                where reply.id = proposal.result_reply_job_id
+              ) end as execution_error
        from briar_agent_skill_execution_proposals proposal
        join briar_channels channel on channel.id = proposal.channel_id
        where proposal.id = ? and proposal.source_kind = 'channel'

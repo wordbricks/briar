@@ -24,6 +24,8 @@ const skill = (
   model: input.model ?? null,
   effort: input.effort ?? null,
   kind: input.kind ?? "custom",
+  execution_mode: input.execution_mode ?? "task",
+  approval_policy: input.approval_policy ?? "explicit",
   is_default: input.is_default ?? 0,
   position: input.position ?? 0,
   created_at: "2026-08-09T00:00:00.000Z",
@@ -76,6 +78,37 @@ describe("Agent Skill normalization", () => {
     effort: null,
     kind: "custom" as const,
   };
+
+  it("defaults existing Skills and preserves explicit execution settings", () => {
+    expect(normalizedAgentSkillRows(
+      "agent-1",
+      [{
+        ...fallback,
+        kind: "custom",
+        position: 0,
+      }],
+      fallback,
+      "2026-08-10T00:00:00.000Z",
+    )[0]).toMatchObject({
+      execution_mode: "task",
+      approval_policy: "explicit",
+    });
+    expect(normalizedAgentSkillRows(
+      "agent-1",
+      [{
+        ...fallback,
+        kind: "custom",
+        executionMode: "conversation",
+        approvalPolicy: "invoke_is_consent",
+        position: 0,
+      }],
+      fallback,
+      "2026-08-10T00:00:00.000Z",
+    )[0]).toMatchObject({
+      execution_mode: "conversation",
+      approval_policy: "invoke_is_consent",
+    });
+  });
 
   it("rejects a sixth Skill and document fields above their limits", () => {
     const input = (index: number) => ({

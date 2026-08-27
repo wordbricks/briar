@@ -76,11 +76,16 @@ struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, 
     let provider: AgentProvider
     let model: String?
     let effort: ModelEffort?
+    let executionMode: ExecutionMode
+    let approvalPolicy: ApprovalPolicy
+    let executionStatus: ExecutionStatus
     let createdAt: Date
     let acceptedAt: Date?
     let requestedWorkerId: String?
     let requestedWorkerLabel: String?
     let resultSessionId: String?
+    let resultMessageId: UUID?
+    let error: String?
     let delegatedByAgentId: UUID?
     let delegatedByAgentName: String?
 
@@ -93,10 +98,29 @@ struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, 
         case accepted
     }
 
+    enum ExecutionMode: String, Codable, Hashable, Sendable {
+        case conversation
+        case task
+    }
+
+    enum ApprovalPolicy: String, Codable, Hashable, Sendable {
+        case invokeIsConsent = "invoke_is_consent"
+        case explicit
+    }
+
+    enum ExecutionStatus: String, Codable, Hashable, Sendable {
+        case waiting
+        case running
+        case completed
+        case failed
+    }
+
     private enum CodingKeys: String, CodingKey {
         case id, type, status, projectId, agentId, agentName, skillId, skillName
         case request, provider, model, effort, createdAt, acceptedAt
+        case executionMode, approvalPolicy, executionStatus
         case requestedWorkerId, requestedWorkerLabel, resultSessionId
+        case resultMessageId, error
         case delegatedByAgentId, delegatedByAgentName
     }
 
@@ -113,11 +137,16 @@ struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, 
         provider: AgentProvider,
         model: String? = nil,
         effort: ModelEffort? = nil,
+        executionMode: ExecutionMode = .task,
+        approvalPolicy: ApprovalPolicy = .explicit,
+        executionStatus: ExecutionStatus? = nil,
         createdAt: Date,
         acceptedAt: Date? = nil,
         requestedWorkerId: String? = nil,
         requestedWorkerLabel: String? = nil,
         resultSessionId: String? = nil,
+        resultMessageId: UUID? = nil,
+        error: String? = nil,
         delegatedByAgentId: UUID? = nil,
         delegatedByAgentName: String? = nil
     ) {
@@ -133,11 +162,18 @@ struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, 
         self.provider = provider
         self.model = model
         self.effort = effort
+        self.executionMode = executionMode
+        self.approvalPolicy = approvalPolicy
+        self.executionStatus = executionStatus ?? (
+            status == .pending ? .waiting : .running
+        )
         self.createdAt = createdAt
         self.acceptedAt = acceptedAt
         self.requestedWorkerId = requestedWorkerId
         self.requestedWorkerLabel = requestedWorkerLabel
         self.resultSessionId = resultSessionId
+        self.resultMessageId = resultMessageId
+        self.error = error
         self.delegatedByAgentId = delegatedByAgentId
         self.delegatedByAgentName = delegatedByAgentName
     }
@@ -158,6 +194,18 @@ struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, 
         // proposal instead of silently inventing mutable runtime metadata.
         model = try container.decode(String?.self, forKey: .model)
         effort = try container.decode(ModelEffort?.self, forKey: .effort)
+        executionMode = try container.decodeIfPresent(
+            ExecutionMode.self,
+            forKey: .executionMode
+        ) ?? .task
+        approvalPolicy = try container.decodeIfPresent(
+            ApprovalPolicy.self,
+            forKey: .approvalPolicy
+        ) ?? .explicit
+        executionStatus = try container.decodeIfPresent(
+            ExecutionStatus.self,
+            forKey: .executionStatus
+        ) ?? (status == .pending ? .waiting : .running)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         acceptedAt = try container.decode(Date?.self, forKey: .acceptedAt)
         requestedWorkerId = try container.decode(String?.self, forKey: .requestedWorkerId)
@@ -166,6 +214,8 @@ struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, 
             forKey: .requestedWorkerLabel
         )
         resultSessionId = try container.decode(String?.self, forKey: .resultSessionId)
+        resultMessageId = try container.decodeIfPresent(UUID.self, forKey: .resultMessageId)
+        error = try container.decodeIfPresent(String.self, forKey: .error)
         delegatedByAgentId = try container.decode(UUID?.self, forKey: .delegatedByAgentId)
         delegatedByAgentName = try container.decode(
             String?.self,
@@ -187,11 +237,16 @@ struct AgentSkillExecutionProposal: Codable, Equatable, Hashable, Identifiable, 
         try container.encode(provider, forKey: .provider)
         try container.encode(model, forKey: .model)
         try container.encode(effort, forKey: .effort)
+        try container.encode(executionMode, forKey: .executionMode)
+        try container.encode(approvalPolicy, forKey: .approvalPolicy)
+        try container.encode(executionStatus, forKey: .executionStatus)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(acceptedAt, forKey: .acceptedAt)
         try container.encode(requestedWorkerId, forKey: .requestedWorkerId)
         try container.encode(requestedWorkerLabel, forKey: .requestedWorkerLabel)
         try container.encode(resultSessionId, forKey: .resultSessionId)
+        try container.encode(resultMessageId, forKey: .resultMessageId)
+        try container.encode(error, forKey: .error)
         try container.encode(delegatedByAgentId, forKey: .delegatedByAgentId)
         try container.encode(delegatedByAgentName, forKey: .delegatedByAgentName)
     }
@@ -408,14 +463,14 @@ struct ProjectAgentTaskResponse: Codable, Equatable, Sendable {
 }
 
 struct AcceptAgentSkillExecutionProposalRequest: Codable, Equatable, Sendable {
-    let workerId: String
+    let workerId: String?
 }
 
 struct AcceptAgentSkillExecutionProposalResponse: Codable, Equatable, Sendable {
     let outcome: Outcome
     let proposal: AgentSkillExecutionProposal
     let projectId: UUID
-    let session: ProjectAgentSession
+    let session: ProjectAgentSession?
 
     enum Outcome: String, Codable, Equatable, Sendable {
         case accepted

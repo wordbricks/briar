@@ -1186,7 +1186,7 @@ export function useChannelConversation({
         proposal,
         input,
       );
-      onSkillSessionAccepted?.(result.session);
+      if (result.session) onSkillSessionAccepted?.(result.session);
       return result.proposal;
     },
     [onSkillSessionAccepted, organizationId, t, token],

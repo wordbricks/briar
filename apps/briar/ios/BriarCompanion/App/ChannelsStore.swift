@@ -1561,17 +1561,21 @@ final class ChannelsStore: ObservableObject {
         guard channels.first(where: { $0.id == channelID })?.archivedAt == nil else {
             return nil
         }
-        guard !request.workerId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              request.workerId == request.workerId.trimmingCharacters(
-                  in: .whitespacesAndNewlines
-              ),
-              acceptingProposalID == nil,
+        guard acceptingProposalID == nil,
               approvingExecutionProposalID == nil,
               preparingExecutionProposalID == nil,
               approvingSkillExecutionProposalID == nil,
               preparingSkillExecutionProposalID == nil,
               let expectedProposal = latestSkillExecutionProposals[proposalID],
               expectedProposal.status == .pending
+        else { return nil }
+        let requestedWorkerID = request.workerId?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard expectedProposal.executionMode == .conversation
+            ? request.workerId == nil
+            : requestedWorkerID?.isEmpty == false &&
+                requestedWorkerID == request.workerId
         else { return nil }
 
         let expectedGeneration = generation
@@ -1654,7 +1658,8 @@ final class ChannelsStore: ObservableObject {
                     latest = latestSkillExecutionProposals[proposalID]
                 }
                 if latest?.status == .accepted {
-                    guard latest?.resultSessionId == response.session.id else { return nil }
+                    guard latest?.resultSessionId == response.proposal.resultSessionId
+                    else { return nil }
                     return response
                 }
                 guard errorMessage == nil, latest == expectedProposal else { return nil }

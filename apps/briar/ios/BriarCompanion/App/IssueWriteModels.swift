@@ -736,6 +736,8 @@ func agentSkillExecutionImmutableFieldsMatch(
         candidate.provider == expected.provider &&
         candidate.model == expected.model &&
         candidate.effort == expected.effort &&
+        candidate.executionMode == expected.executionMode &&
+        candidate.approvalPolicy == expected.approvalPolicy &&
         candidate.createdAt == expected.createdAt &&
         candidate.delegatedByAgentId == expected.delegatedByAgentId &&
         candidate.delegatedByAgentName == expected.delegatedByAgentName
@@ -765,6 +767,12 @@ func validateAgentSkillExecutionApproval(
     guard snapshot.project.id == proposal.projectId else {
         throw AgentSkillExecutionApprovalError.projectUnavailable
     }
+    if proposal.executionMode == .conversation {
+        guard request?.workerId == nil else {
+            throw AgentSkillExecutionApprovalError.workerUnavailable
+        }
+        return []
+    }
     let workers = eligibleAgentSkillExecutionWorkers(
         snapshot: snapshot,
         proposal: proposal
@@ -773,7 +781,9 @@ func validateAgentSkillExecutionApproval(
         throw AgentSkillExecutionApprovalError.workerUnavailable
     }
     if let request {
-        let workerID = request.workerId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let workerID = request.workerId?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ) ?? ""
         guard !workerID.isEmpty else {
             throw AgentSkillExecutionApprovalError.workerRequired
         }
@@ -792,25 +802,33 @@ func agentSkillExecutionApprovalResponseMatches(
     request: AcceptAgentSkillExecutionProposalRequest
 ) -> Bool {
     let proposal = response.proposal
-    return response.projectId == expected.projectId &&
+    let common = response.projectId == expected.projectId &&
         agentSkillExecutionImmutableFieldsMatch(proposal, expected) &&
         proposal.status == .accepted &&
         proposal.acceptedAt != nil &&
-        proposal.requestedWorkerId == request.workerId &&
+        proposal.requestedWorkerId != nil &&
         proposal.requestedWorkerLabel?.trimmingCharacters(
             in: .whitespacesAndNewlines
         ).isEmpty == false &&
-        proposal.resultSessionId != nil &&
-        proposal.resultSessionId == response.session.id &&
-        response.session.projectId == expected.projectId &&
-        response.session.agentId == expected.agentId &&
-        response.session.agentName == expected.agentName &&
-        response.session.skillId == expected.skillId &&
-        response.session.sessionType == .task &&
-        response.session.trigger == .manual &&
-        response.session.request == expected.request &&
-        response.session.requestedWorkerId == request.workerId &&
-        response.session.workerId == request.workerId
+        proposal.resultSessionId != nil
+    if expected.executionMode == .conversation {
+        return common && request.workerId == nil && response.session == nil &&
+            proposal.resultMessageId != nil
+    }
+    guard let session = response.session, let workerID = request.workerId else {
+        return false
+    }
+    return common && proposal.requestedWorkerId == workerID &&
+        proposal.resultSessionId == session.id &&
+        session.projectId == expected.projectId &&
+        session.agentId == expected.agentId &&
+        session.agentName == expected.agentName &&
+        session.skillId == expected.skillId &&
+        session.sessionType == .task &&
+        session.trigger == .manual &&
+        session.request == expected.request &&
+        session.requestedWorkerId == workerID &&
+        session.workerId == workerID
 }
 
 struct IssueExecutionPreferencesResponse: Codable, Sendable {

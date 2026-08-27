@@ -91,6 +91,9 @@ export async function completeIssueAgentReplyOutput(
   const skillExecutionProposalId = input.output.skillExecutionProposal
     ? crypto.randomUUID()
     : null;
+  const consentTaskSessionId = input.output.skillExecutionProposal
+    ? crypto.randomUUID()
+    : null;
   const staleExecutionGuard = executionApprovalsAvailable
     ? `and not exists (
          select 1 from briar_issue_execution_proposals stale_execution
@@ -407,7 +410,8 @@ export async function completeIssueAgentReplyOutput(
          source_reply_job_id, delegated_by_reply_job_id,
          agent_id, agent_name, agent_responsibility,
          skill_id, skill_name, skill_instructions,
-         skill_kind, provider, model, effort, request, delegated_by_agent_id,
+         skill_kind, provider, model, effort, execution_mode, approval_policy,
+         thread_root_message_id, request, delegated_by_agent_id,
          delegated_by_agent_name, created_at, updated_at
        )
        select ?, project.organization_id, job.project_id, 'issue', null,
@@ -420,6 +424,8 @@ export async function completeIssueAgentReplyOutput(
               job.selected_skill_provider_snapshot,
               job.selected_skill_model_snapshot,
               job.selected_skill_effort_snapshot,
+              skill.execution_mode, skill.approval_policy,
+              job.parent_message_id,
               job.skill_execution_request_snapshot, null, null, ?, ?
        from briar_issue_agent_reply_jobs job
        join briar_hunt_runs run
@@ -443,6 +449,7 @@ export async function completeIssueAgentReplyOutput(
        and skill.provider = job.selected_skill_provider_snapshot
        and skill.model is job.selected_skill_model_snapshot
        and skill.effort is job.selected_skill_effort_snapshot
+       and skill.execution_mode = 'task'
        and trigger.body = job.skill_execution_request_snapshot
        where ${completedClaim("job")}`,
     ).bind(
@@ -450,6 +457,51 @@ export async function completeIssueAgentReplyOutput(
       input.completedAt,
       input.completedAt,
       ...claimBindings,
+    ));
+    statements.push(db.prepare(
+      `update briar_agent_skill_execution_proposals
+       set status = 'accepted',
+           requested_worker_id = (
+             select job.claimed_worker_id
+             from briar_issue_agent_reply_jobs job
+             where job.id = source_reply_job_id
+           ),
+           requested_worker_label = (
+             select worker.label
+             from briar_issue_agent_reply_jobs job
+             join briar_execution_workers worker
+               on worker.id = job.claimed_worker_id
+             where job.id = source_reply_job_id
+           ),
+           result_session_id = ?,
+           accepted_by_user_id = (
+             select trigger.author_user_id
+             from briar_issue_agent_reply_jobs job
+             join briar_issue_messages trigger
+               on trigger.id = job.trigger_message_id
+              and trigger.project_id = job.project_id
+              and trigger.run_id = job.run_id
+             where job.id = source_reply_job_id
+           ),
+           accepted_at = ?, updated_at = ?
+       where id = ? and status = 'pending' and execution_mode = 'task'
+         and approval_policy = 'invoke_is_consent'
+         and exists (
+           select 1 from briar_issue_agent_reply_jobs job
+           join briar_issue_messages trigger
+             on trigger.id = job.trigger_message_id
+            and trigger.project_id = job.project_id
+            and trigger.run_id = job.run_id
+           join briar_execution_workers worker
+             on worker.id = job.claimed_worker_id
+           where job.id = source_reply_job_id
+             and trigger.author_user_id is not null
+         )`,
+    ).bind(
+      consentTaskSessionId,
+      input.completedAt,
+      input.completedAt,
+      skillExecutionProposalId,
     ));
   }
 

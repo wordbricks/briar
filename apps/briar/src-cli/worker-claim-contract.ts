@@ -46,6 +46,14 @@ const NonNegativeInteger = Schema.Int.check(
 );
 const StringRecord = Schema.Record(Schema.String, Schema.Unknown);
 const AgentProviderSchema = Schema.Literals(agentProviders);
+const AgentSkillExecutionModeSchema = Schema.Literals([
+  "conversation",
+  "task",
+]);
+const AgentSkillApprovalPolicySchema = Schema.Literals([
+  "invoke_is_consent",
+  "explicit",
+]);
 
 const ClaimedHandoffContext = strict(Schema.Struct({
   requestId: Uuid,
@@ -182,6 +190,8 @@ const DetachedAgentSkillSource = Schema.Struct({
   model: Schema.NullOr(Schema.String),
   effort: Schema.NullOr(ModelEffort),
   kind: Schema.Literals(["issue_processing", "custom"]),
+  executionMode: defaulted(AgentSkillExecutionModeSchema, "task"),
+  approvalPolicy: defaulted(AgentSkillApprovalPolicySchema, "explicit"),
   position: NonNegativeInteger,
 });
 
@@ -194,6 +204,8 @@ const DetachedAgentSkillType = Schema.Struct({
   model: Schema.NullOr(Schema.String),
   effort: Schema.NullOr(ModelEffort),
   kind: Schema.Literals(["issue_processing", "custom"]),
+  executionMode: AgentSkillExecutionModeSchema,
+  approvalPolicy: AgentSkillApprovalPolicySchema,
   position: NonNegativeInteger,
 });
 
@@ -234,6 +246,9 @@ export const DetachedAgentSkillExecutionTarget = strict(Schema.Struct({
   skillId: Uuid,
   skillName: Schema.Trim.check(Schema.isLengthBetween(1, 100)),
   request: Schema.Trim.check(Schema.isLengthBetween(1, 10_000)),
+  executionMode: AgentSkillExecutionModeSchema,
+  approvalPolicy: AgentSkillApprovalPolicySchema,
+  approved: Schema.Boolean,
 }));
 
 export const DetachedAgentClaim = Schema.Struct({
@@ -691,7 +706,11 @@ const ClaimedChannelReplyInput = Schema.Struct({
       (reply.skillExecutionTarget.projectId !== scope.projectId ||
         reply.skillExecutionTarget.agentId !== reply.agent?.id ||
         reply.skillExecutionTarget.skillId !== reply.activeSkill?.id ||
-        reply.skillExecutionTarget.skillName !== reply.activeSkill?.name)
+        reply.skillExecutionTarget.skillName !== reply.activeSkill?.name ||
+        reply.skillExecutionTarget.executionMode !==
+          reply.activeSkill?.executionMode ||
+        reply.skillExecutionTarget.approvalPolicy !==
+          reply.activeSkill?.approvalPolicy)
     ) {
       issues.push({
         path: ["skillExecutionTarget"],
