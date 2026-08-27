@@ -36,6 +36,7 @@ import {
   getIncomingChannelWebhook,
   listChannelAgents,
   listChannelMessagePage,
+  listChannelMembers,
   listChannelRootMessages,
   listChannelThreadMessages,
   listChannelThreadSubscriptions,
@@ -4010,8 +4011,15 @@ describe("organization channels", () => {
       emoji: "👍",
       createdAt: at(52),
     });
+    const roster = await listChannelMembers(db, channelId);
+    expect(roster.map((member) => member.userId)).not.toContain(outsiderId);
     expect(added?.reactions).toEqual([
-      { emoji: "👍", count: 1, userIds: [ownerId] },
+      {
+        emoji: "👍",
+        count: 1,
+        userIds: [ownerId],
+        people: [{ userId: ownerId, name: "Owner", image: null }],
+      },
     ]);
 
     const second = await toggleChannelMessageReaction(db, {
@@ -4025,6 +4033,10 @@ describe("organization channels", () => {
     expect(second?.reactions[0]?.userIds).toEqual(
       expect.arrayContaining([ownerId, outsiderId]),
     );
+    expect(second?.reactions[0]?.people).toEqual([
+      { userId: ownerId, name: "Owner", image: null },
+      { userId: outsiderId, name: "Outsider", image: null },
+    ]);
 
     const heart = await toggleChannelMessageReaction(db, {
       channelId,
@@ -4046,8 +4058,18 @@ describe("organization channels", () => {
       createdAt: at(55),
     });
     expect(removed?.reactions).toEqual([
-      { emoji: "👍", count: 1, userIds: [outsiderId] },
-      { emoji: "❤️", count: 1, userIds: [ownerId] },
+      {
+        emoji: "👍",
+        count: 1,
+        userIds: [outsiderId],
+        people: [{ userId: outsiderId, name: "Outsider", image: null }],
+      },
+      {
+        emoji: "❤️",
+        count: 1,
+        userIds: [ownerId],
+        people: [{ userId: ownerId, name: "Owner", image: null }],
+      },
     ]);
 
     const listed = await listChannelRootMessages(db, channelId);
