@@ -43,18 +43,18 @@ export function IssueCheckpointDropdown({
   }, []);
   return <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <button className="issue-checkpoint-trigger inline-flex h-[34px] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground outline-none hover:border-input hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-55" disabled={disabled} ref={triggerRef} type="button">
+        <button className="issue-checkpoint-trigger" disabled={disabled} ref={triggerRef} type="button">
           <Clock3 aria-hidden="true" size={13} />
           <span>{t("issue.checkpoints")}</span>
-          {(checkpoints.length > 0 || inherited.size > 0) && <strong className="grid min-w-[17px] h-[17px] place-items-center rounded-full bg-[#765bd0] px-1 text-[9px] text-white">{checkpoints.length + inherited.size}</strong>}
+          {(checkpoints.length > 0 || inherited.size > 0) && <strong>{checkpoints.length + inherited.size}</strong>}
           <ChevronDown aria-hidden="true" size={12} />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align="start" className="issue-checkpoint-menu z-[130] max-h-[70vh] w-[min(340px,calc(100vw-24px))] overflow-y-auto rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl" collisionPadding={10} sideOffset={6} style={{
+        <DropdownMenu.Content align="start" className="issue-checkpoint-menu" collisionPadding={10} sideOffset={6} style={{
         zIndex: menuZIndex
       }}>
-          <DropdownMenu.Label className="issue-checkpoint-menu-heading px-2 py-1.5 text-2xs leading-relaxed text-muted-foreground">
+          <DropdownMenu.Label className="issue-checkpoint-menu-heading">
             {t("issue.checkpointsDescription")}
           </DropdownMenu.Label>
           {workflow.stages.flatMap(stage => (["before", "after"] as const).map(position => {
@@ -62,12 +62,12 @@ export function IssueCheckpointDropdown({
           const locked = inherited.has(boundary);
           const checked = locked || selected.has(boundary);
           const stageLabel = localizeWorkflowStage(t, stage.id, stage.label);
-          return <DropdownMenu.CheckboxItem checked={checked} className="issue-checkpoint-menu-item relative flex min-h-[34px] items-center gap-2 rounded-md px-2 py-1.5 pl-[30px] text-xs outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:cursor-not-allowed data-[disabled]:opacity-60 [&>span:not(.issue-checkpoint-menu-check)]:min-w-0 [&>span:not(.issue-checkpoint-menu-check)]:flex-1 [&>small]:text-2xs [&>small]:text-muted-foreground" disabled={locked} key={boundary} onSelect={event => {
+          return <DropdownMenu.CheckboxItem checked={checked} className="issue-checkpoint-menu-item" disabled={locked} key={boundary} onSelect={event => {
             event.preventDefault();
             if (locked) return;
             onChange(toggleIssueCheckpoint(checkpoints, stage.id, position));
           }}>
-                  <DropdownMenu.ItemIndicator className="issue-checkpoint-menu-check absolute left-2 grid size-[18px] place-items-center text-[#654bb8]">
+                  <DropdownMenu.ItemIndicator className="issue-checkpoint-menu-check">
                     <Check aria-hidden="true" size={13} />
                   </DropdownMenu.ItemIndicator>
                   <span>

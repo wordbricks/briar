@@ -105,7 +105,7 @@ export function ChannelDocumentPreview({
                 </button>
               </div>
             ) : content ? (
-              <MarkdownContent className="issue-description-markdown channel-document-markdown markdown-content min-w-0 text-xs leading-[1.7] text-foreground [overflow-wrap:anywhere]">
+              <MarkdownContent className="issue-description-markdown channel-document-markdown">
                 {content.markdown}
               </MarkdownContent>
             ) : null}

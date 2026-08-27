@@ -41,21 +41,6 @@ import { EditIssueDialog } from "./editor/EditIssueDialog";
 import { DashboardView, IssuePropertyFilters, SourceFilter, StatusFilter, emptyIssuePropertyFilters, runMatchesIssuePropertyFilters } from "./model/filters";
 import { localizeWorkflowStage } from "./model/formatters";
 import { KanbanColumn, KanbanPointerDrag, kanbanAutoScrollEdge, kanbanAutoScrollInterval, kanbanColumnForRun, kanbanPointerDragThreshold, placementMatchesRun } from "./model/kanban";
-import { cn } from "@/lib/utils";
-
-const kanbanToneClasses = {
-  amber: "border-[#f0e2c5] bg-[#fffaf0] [&>header>span>i]:border-[#d79a41] [&>header>span>i]:bg-[#fff3d9]",
-  blue: "border-[#d9e9f3] bg-[#f3f9fd] [&>header>span>i]:border-[#58a0d1] [&>header>span>i]:bg-[#e8f4ff]",
-  cyan: "border-[#d7edf2] bg-[#f1fafc] [&>header>span>i]:border-[#58a0d1] [&>header>span>i]:bg-[#e8f4ff]",
-  emerald: "border-[#d6ebe0] bg-[#f2faf6] [&>header>span>i]:border-[#43a47f] [&>header>span>i]:bg-[#e8f7f1]",
-  indigo: "border-[#dce5f3] bg-[#f3f7fd] [&>header>span>i]:border-[#58a0d1] [&>header>span>i]:bg-[#e8f4ff]",
-  orange: "border-[#f0dcc9] bg-[#fff7f0] [&>header>span>i]:border-[#d79a41] [&>header>span>i]:bg-[#fff3d9]",
-  red: "border-[#efd9d9] bg-[#fff5f5] [&>header>span>i]:border-[#d65f72] [&>header>span>i]:bg-[#fff0f2]",
-  rose: "border-[#f0d9de] bg-[#fff5f7] [&>header>span>i]:border-[#d65f72] [&>header>span>i]:bg-[#fff0f2]",
-  slate: "border-border bg-muted",
-  violet: "border-[#e3dbf7] bg-[#f7f4ff] [&>header>span>i]:border-[#8167d6] [&>header>span>i]:bg-[#eee9ff]",
-} as const;
-const kanbanToneClass = (tone: string) => kanbanToneClasses[tone as keyof typeof kanbanToneClasses] ?? "";
 function runIdFromCreateIssueResult(value: unknown) {
   if (typeof value !== "object" || value === null || !("runId" in value) || typeof value.runId !== "string") {
     return null;
@@ -750,7 +735,7 @@ export function HuntDashboard({
     }
   } : undefined} workflowProjectId={dashboard?.project.id} /> : null;
   if (noProject) {
-    return <MainContent companionMode={companionMode} id="issues">
+    return <MainContent id="issues">
         {!companionMode && <header className={`topbar${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region="deep" />}
         <EmptyState action={<Button onClick={onAddProject} type="button">
               <Plus size={15} />
@@ -783,14 +768,14 @@ export function HuntDashboard({
         {createIssueDialog}
       </>;
   }
-  return <MainContent companionMode={companionMode} id="issues">
-      {!companionMode ? <PageHeader action={<div className="queue-tools flex flex-wrap items-center justify-end gap-2 max-[760px]:w-full">
-              <label className="search-box flex h-[34px] w-[196px] items-center gap-2 rounded-lg border border-border bg-card px-2.5 shadow-sm max-[760px]:min-w-[120px] max-[760px]:flex-1">
+  return <MainContent id="issues">
+      {!companionMode ? <PageHeader action={<div className="queue-tools">
+              <label className="search-box">
                 <Input className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" onChange={e => setQuery(e.target.value)} placeholder={t("dashboard.search")} value={query} />
                 <Search aria-hidden="true" size={15} />
               </label>
               <IssuePropertyFilterMenu agents={agents} filters={propertyFilters} members={dashboard?.members ?? []} onChange={setPropertyFilters} />
-              <div aria-label={t("dashboard.viewMode")} className="view-switch flex h-[34px] gap-0.5 rounded-lg border border-border bg-card p-0.5" role="group">
+              <div aria-label={t("dashboard.viewMode")} className="view-switch" role="group">
                 <button aria-label={t("dashboard.kanbanView")} aria-pressed={view === "kanban"} className={view === "kanban" ? "active" : ""} onClick={() => setView("kanban")} title={t("dashboard.kanbanView")} type="button">
                   <Columns3 size={14} />
                   <span>{t("dashboard.kanban")}</span>
@@ -800,34 +785,34 @@ export function HuntDashboard({
                   <span>{t("dashboard.list")}</span>
                 </button>
               </div>
-              <Button aria-keyshortcuts="Meta+N" aria-label={t("dashboard.createIssue")} className="create-issue-button inline-flex h-[34px] items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring" onClick={() => openCreateIssueDialog()} type="button">
+              <Button aria-keyshortcuts="Meta+N" aria-label={t("dashboard.createIssue")} className="create-issue-button" onClick={() => openCreateIssueDialog()} type="button">
                 <Plus size={16} />
                 {t("issue.newIssue")}
               </Button>
-            </div>} className={cn("app-page-header queue-header flex min-h-12 items-center justify-between gap-2.5 border-b border-border px-[18px]", !isSidebarOpen && "sidebar-closed")} data-tauri-drag-region="deep" title={<span className="queue-heading-copy flex min-w-0 items-baseline gap-2">
-              <span className="truncate text-lg font-semibold">{t("dashboard.queue")}</span>
+            </div>} className={`app-page-header queue-header${isSidebarOpen ? "" : " sidebar-closed"}`} data-tauri-drag-region="deep" title={<span className="queue-heading-copy">
+              <span>{t("dashboard.queue")}</span>
               <Typography as="span" className="queue-task-count" tone="muted" variant="caption">
                 {t("dashboard.taskCount", {
           count: runs.length
         })}
               </Typography>
             </span>} /> : null}
-      <div className="dashboard-scroll flex min-h-0 flex-1 flex-col overflow-hidden">
-        {companionMode ? <div className="queue-header flex min-h-12 items-center border-b border-border px-3">
-            <div className="queue-heading flex w-full items-center justify-between gap-2">
-              <div className="queue-heading-copy min-w-0 truncate">
+      <div className="dashboard-scroll">
+        {companionMode ? <div className="queue-header">
+            <div className="queue-heading">
+              <div className="queue-heading-copy">
                 <Typography as="span" tone="muted" variant="caption">
                   {t("dashboard.taskCount", {
                 count: filtered.length
               })}
                 </Typography>
               </div>
-              <div className="companion-source-filter relative" ref={sourceFilterRef}>
-                <button aria-controls="companion-source-filter-menu" aria-expanded={isSourceFilterOpen} aria-haspopup="menu" aria-label={t("dashboard.filter")} className={cn("companion-filter-trigger inline-flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", source !== "all" && "active border-primary bg-primary/10 text-primary")} onClick={() => setIsSourceFilterOpen(current => !current)} type="button">
+              <div className="companion-source-filter" ref={sourceFilterRef}>
+                <button aria-controls="companion-source-filter-menu" aria-expanded={isSourceFilterOpen} aria-haspopup="menu" aria-label={t("dashboard.filter")} className={`companion-filter-trigger${source !== "all" ? " active" : ""}`} onClick={() => setIsSourceFilterOpen(current => !current)} type="button">
                   <ListFilter size={18} />
                 </button>
-                {isSourceFilterOpen && <div aria-label={t("dashboard.filter")} className="companion-filter-menu absolute right-0 top-[calc(100%+0.35rem)] z-30 grid min-w-40 gap-0.5 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-lg" id="companion-source-filter-menu" role="menu">
-                    {(["all", "issue", "feedback", "error"] as const).map(value => <button aria-checked={source === value} className={cn("flex items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", source === value && "active bg-accent font-semibold")} key={value} onClick={() => {
+                {isSourceFilterOpen && <div aria-label={t("dashboard.filter")} className="companion-filter-menu" id="companion-source-filter-menu" role="menu">
+                    {(["all", "issue", "feedback", "error"] as const).map(value => <button aria-checked={source === value} className={source === value ? "active" : ""} key={value} onClick={() => {
                 setSource(value);
                 setIsSourceFilterOpen(false);
               }} role="menuitemradio" type="button">
@@ -840,23 +825,23 @@ export function HuntDashboard({
               </div>
             </div>
           </div> : null}
-        {!companionMode && <div className="queue-filter-bar flex min-h-11 items-center justify-between gap-3 border-b border-border px-[18px] max-[760px]:flex-wrap max-[760px]:py-2">
-            <div className="status-tabs flex min-w-0 items-center gap-1 overflow-x-auto">
-              <button className={cn("rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", status === "all" && "active bg-accent text-foreground")} onClick={() => setStatus("all")}>{t("dashboard.all")} <span className="ml-1 text-[11px] text-muted-foreground">{runs.length}</span></button>
-              <button className={cn("rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", status === "active" && "active bg-accent text-foreground")} onClick={() => setStatus("active")}>{t("dashboard.active")} <span className="ml-1 text-[11px] text-muted-foreground">{activeCount}</span></button>
-              <button className={cn("rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", status === "attention" && "active bg-accent text-foreground")} onClick={() => setStatus("attention")}>{t("dashboard.attention")} <span className="ml-1 text-[11px] text-muted-foreground">{attentionCount}</span></button>
-              <button className={cn("rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", status === "completed" && "active bg-accent text-foreground")} onClick={() => setStatus("completed")}>{t("dashboard.completed")} <span className="ml-1 text-[11px] text-muted-foreground">{completedCount}</span></button>
+        {!companionMode && <div className="queue-filter-bar">
+            <div className="status-tabs">
+              <button className={status === "all" ? "active" : ""} onClick={() => setStatus("all")}>{t("dashboard.all")} <span>{runs.length}</span></button>
+              <button className={status === "active" ? "active" : ""} onClick={() => setStatus("active")}>{t("dashboard.active")} <span>{activeCount}</span></button>
+              <button className={status === "attention" ? "active" : ""} onClick={() => setStatus("attention")}>{t("dashboard.attention")} <span>{attentionCount}</span></button>
+              <button className={status === "completed" ? "active" : ""} onClick={() => setStatus("completed")}>{t("dashboard.completed")} <span>{completedCount}</span></button>
             </div>
-            <div className="source-filter-group flex items-center gap-2 text-xs text-muted-foreground max-[760px]:w-full">
+            <div className="source-filter-group">
               <span>{t("dashboard.type")}</span>
-              <div className="source-filter flex flex-wrap items-center gap-1">
-                {(["all", "issue", "feedback", "error"] as const).map(value => <button key={value} className={cn("rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", source === value && "active bg-accent font-semibold text-foreground")} onClick={() => setSource(value)}>
+              <div className="source-filter">
+                {(["all", "issue", "feedback", "error"] as const).map(value => <button key={value} className={source === value ? "active" : ""} onClick={() => setSource(value)}>
                     {value === "all" ? t("dashboard.all") : t(`source.${value}` as MessageKey)}
                   </button>)}
               </div>
             </div>
           </div>}
-        {issuesLoading ? <div aria-live="polite" aria-busy="true" className="issues-loading-overlay absolute inset-0 z-10 grid place-items-center bg-background/70 backdrop-blur-[1px]" role="status">
+        {issuesLoading ? <div aria-live="polite" aria-busy="true" className="issues-loading-overlay" role="status">
             <LoadingState label={t("dashboard.loadingIssues")} />
           </div> : view === "list" && !companionMode ? <IssueList availableProviders={availableProviders} issueKeyPrefix={dashboard?.project.issueKeyPrefix} deletingIssueId={deletingIssueId} onDelete={runId => {
         setContextDeleteError(null);
@@ -874,15 +859,15 @@ export function HuntDashboard({
         priority,
         difficulty: run.difficulty,
         attachments: []
-      }).catch(() => undefined)} onPreferencesChange={(run, preferences) => onUpdateIssuePreferences(run.id, preferences).catch(() => undefined)} onCheckpointsChange={(run, checkpoints) => onUpdateIssueCheckpoints(run.id, checkpoints).catch(() => undefined)} runs={filtered} members={dashboard?.members ?? []} processingIssueIds={processingIssueIds} updatingIssueId={updatingIssueId} /> : <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board grid min-h-0 flex-1 grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-3 overflow-auto p-[18px] max-[760px]:flex max-[760px]:snap-x max-[760px]:snap-mandatory max-[760px]:overflow-x-auto max-[760px]:p-3" data-keyboard-list="" ref={kanbanBoardRef}>
-          {kanbanColumns.length === 0 ? <div className="companion-no-runs col-span-full grid min-h-48 place-items-center content-center gap-1 rounded-xl border border-dashed border-border p-6 text-center text-muted-foreground">
+      }).catch(() => undefined)} onPreferencesChange={(run, preferences) => onUpdateIssuePreferences(run.id, preferences).catch(() => undefined)} onCheckpointsChange={(run, checkpoints) => onUpdateIssueCheckpoints(run.id, checkpoints).catch(() => undefined)} runs={filtered} members={dashboard?.members ?? []} processingIssueIds={processingIssueIds} updatingIssueId={updatingIssueId} /> : <div aria-label={t("dashboard.kanbanBoard")} className="kanban-board" data-keyboard-list="" ref={kanbanBoardRef}>
+          {kanbanColumns.length === 0 ? <div className="companion-no-runs">
               <Bot size={22} />
               <strong>{t("dashboard.emptyTitle")}</strong>
               <span>{t("dashboard.emptyDescription")}</span>
             </div> : <>
             {visibleKanbanColumns.map(column => {
             const isCollapsed = !companionMode && collapsedColumnIdSet.has(column.id);
-            return <div className={cn("kanban-column-shell relative min-w-0 [&>.kanban-checkpoint-marker]:absolute [&>.kanban-checkpoint-marker]:-top-2 [&>.kanban-checkpoint-marker]:left-1/2 [&>.kanban-checkpoint-marker]:z-10 [&>.kanban-checkpoint-marker]:inline-flex [&>.kanban-checkpoint-marker]:size-5 [&>.kanban-checkpoint-marker]:-translate-x-1/2 [&>.kanban-checkpoint-marker]:items-center [&>.kanban-checkpoint-marker]:justify-center [&>.kanban-checkpoint-marker]:rounded-full [&>.kanban-checkpoint-marker]:border [&>.kanban-checkpoint-marker]:border-border [&>.kanban-checkpoint-marker]:bg-background [&>.kanban-checkpoint-marker]:text-[10px] [&>.kanban-checkpoint-marker]:font-bold [&>.kanban-checkpoint-marker]:text-muted-foreground [&>.kanban-checkpoint-marker]:shadow-sm [&>.kanban-checkpoint-marker>svg]:h-2.5 [&>.kanban-checkpoint-marker>svg]:w-3 [&>.kanban-checkpoint-marker>svg]:overflow-visible [&>.kanban-checkpoint-marker>svg]:fill-rose-500 [&>.kanban-checkpoint-marker>strong]:absolute [&>.kanban-checkpoint-marker>strong]:-right-0.5 [&>.kanban-checkpoint-marker>strong]:-top-0.5 [&>.kanban-checkpoint-marker>strong]:grid [&>.kanban-checkpoint-marker>strong]:h-2.5 [&>.kanban-checkpoint-marker>strong]:min-w-2.5 [&>.kanban-checkpoint-marker>strong]:place-items-center [&>.kanban-checkpoint-marker>strong]:rounded-full [&>.kanban-checkpoint-marker>strong]:bg-rose-700 [&>.kanban-checkpoint-marker>strong]:px-0.5 [&>.kanban-checkpoint-marker>strong]:text-[7px] [&>.kanban-checkpoint-marker>strong]:leading-none [&>.kanban-checkpoint-marker>strong]:text-white [&>.kanban-checkpoint-marker:focus-visible]:outline-2 [&>.kanban-checkpoint-marker:focus-visible]:outline-rose-700 [&>.kanban-checkpoint-marker:focus-visible]:outline-offset-1", companionMode && "snap-start", isCollapsed && "is-collapsed")} key={column.id}>
+            return <div className={`kanban-column-shell${isCollapsed ? " is-collapsed" : ""}`} key={column.id}>
               {!companionMode && column.checkpointsBefore.length > 0 ? <span aria-label={`${t("settings.workflowCheckpoints")}: ${column.checkpointsBefore.join(", ")}`} className="kanban-checkpoint-marker" data-checkpoint-count={column.checkpointsBefore.length} role="img" tabIndex={0} title={column.checkpointsBefore.join(" · ")}>
                   <svg aria-hidden="true" viewBox="0 0 12 10">
                     <path d="M2 0C1.2 0 .7.8 1.1 1.5l4.1 7.4c.35.65 1.25.65 1.6 0l4.1-7.4C11.3.8 10.8 0 10 0Z" />
@@ -891,16 +876,16 @@ export function HuntDashboard({
                       {column.checkpointsBefore.length}
                     </strong> : null}
                 </span> : null}
-              <section aria-label={column.label} className={cn(`kanban-column ${column.tone}`, kanbanToneClass(column.tone), "flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm", dragOverColumnId === column.id && "drag-over ring-2 ring-primary/50", companionMode && "companion-task-stream border-0 bg-transparent shadow-none", isCollapsed && "is-collapsed")} data-kanban-column-id={column.id} data-kanban-column-collapsed={isCollapsed ? "true" : "false"}>
-              {!companionMode ? <header className="flex min-h-11 items-center justify-between gap-2 border-b border-border px-3 py-2">
-                  <span className="flex min-w-0 items-center gap-2 truncate text-xs font-semibold"><i aria-hidden="true" className="size-2 shrink-0 rounded-full bg-current opacity-70" />{column.label}</span>
-                  <div className="kanban-column-header-actions flex items-center gap-1">
+              <section aria-label={column.label} className={`kanban-column ${column.tone}${dragOverColumnId === column.id ? " drag-over" : ""}${companionMode ? " companion-task-stream" : ""}${isCollapsed ? " is-collapsed" : ""}`} data-kanban-column-id={column.id} data-kanban-column-collapsed={isCollapsed ? "true" : "false"}>
+              {!companionMode ? <header>
+                  <span><i aria-hidden="true" />{column.label}</span>
+                  <div className="kanban-column-header-actions">
                     <strong>{column.runs.length}</strong>
                     <button aria-expanded={!isCollapsed} aria-label={isCollapsed ? t("dashboard.expandColumn", {
                       label: column.label
                     }) : t("dashboard.collapseColumn", {
                       label: column.label
-                    })} className="kanban-column-collapse inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => toggleKanbanColumnCollapsed(column.id)} title={isCollapsed ? t("dashboard.expandColumn", {
+                    })} className="kanban-column-collapse" onClick={() => toggleKanbanColumnCollapsed(column.id)} title={isCollapsed ? t("dashboard.expandColumn", {
                       label: column.label
                     }) : t("dashboard.collapseColumn", {
                       label: column.label
@@ -910,7 +895,7 @@ export function HuntDashboard({
                     <KanbanColumnMenu label={column.label} onHide={() => toggleKanbanColumnHidden(column.id)} />
                   </div>
                 </header> : null}
-              {isCollapsed ? null : <div className="kanban-column-content flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
+              {isCollapsed ? null : <div className="kanban-column-content">
                 {column.runs.length ? column.runs.map(run => <CompanionTaskSwipeAction disabled={!onProcessIssueNow || run.executionReadiness === "waiting" || run.status === "queued" && Boolean(run.leaseExpiresAt) && Date.parse(run.leaseExpiresAt!) > Date.now() || processingIssueIds.has(run.id)} enabled={companionMode && (run.status === "backlog" || run.status === "queued")} key={run.id} onProcessNow={() => onProcessIssueNow?.(run)}>
                     <KanbanCard availableProviders={availableProviders} issueKeyPrefix={dashboard?.project.issueKeyPrefix} activeAgent={agentAssociationsByRunId.activeAgents.get(run.id) ?? null} assignee={dashboard?.members?.find(member => member.userId === run.assigneeUserId) ?? null} assignedWorker={workerById.get(run.workerId ?? "") ?? workerById.get(run.requestedWorkerId ?? "") ?? null} cardRef={kanbanNavigation.getItemRef(run.id)} hideAssignmentBadges={!companionMode && ["completed", "cancelled", "paused", "blocked", "failed"].includes(run.status)} contextMenuDisabled={companionMode} deletingIssueId={deletingIssueId} isDragging={draggedRunId === run.id} isKeyboardCursor={kanbanCursorRunId === run.id} isMoving={recoveringRunId === run.id} onDelete={() => {
                       setContextDeleteError(null);
@@ -989,7 +974,7 @@ export function HuntDashboard({
                   </div>}
                 {!companionMode && <button aria-label={t("dashboard.createIssueInColumn", {
                   label: column.label
-                })} className="kanban-column-add inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-kanban-column-add="" onClick={() => openCreateIssueDialog(column.placement)} title={t("dashboard.createIssueInColumn", {
+                })} className="kanban-column-add" data-kanban-column-add="" onClick={() => openCreateIssueDialog(column.placement)} title={t("dashboard.createIssueInColumn", {
                   label: column.label
                 })} type="button">
                     <Plus aria-hidden="true" size={15} />
@@ -999,15 +984,15 @@ export function HuntDashboard({
               </section>
             </div>;
           })}
-            {hiddenKanbanColumns.length > 0 ? <aside aria-label={t("dashboard.hiddenColumns")} className={cn("kanban-hidden-columns flex min-w-44 flex-col gap-2 rounded-xl border border-dashed border-border bg-card/60 p-2", !hiddenColumnsExpanded && "is-collapsed")} data-kanban-hidden-columns="">
-                <button aria-expanded={hiddenColumnsExpanded} aria-label={hiddenColumnsExpanded ? t("dashboard.collapseHiddenColumns") : t("dashboard.expandHiddenColumns")} className="kanban-hidden-columns-toggle inline-flex min-h-8 items-center gap-1.5 rounded-md px-2 text-left text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setHiddenColumnsExpanded(current => !current)} type="button">
+            {hiddenKanbanColumns.length > 0 ? <aside aria-label={t("dashboard.hiddenColumns")} className={`kanban-hidden-columns${hiddenColumnsExpanded ? "" : " is-collapsed"}`} data-kanban-hidden-columns="">
+                <button aria-expanded={hiddenColumnsExpanded} aria-label={hiddenColumnsExpanded ? t("dashboard.collapseHiddenColumns") : t("dashboard.expandHiddenColumns")} className="kanban-hidden-columns-toggle" onClick={() => setHiddenColumnsExpanded(current => !current)} type="button">
                   {hiddenColumnsExpanded ? <ChevronDown aria-hidden="true" size={14} /> : <ChevronRight aria-hidden="true" size={14} />}
                   <span>{t("dashboard.hiddenColumns")}</span>
                 </button>
-                {hiddenColumnsExpanded ? <ul className="kanban-hidden-column-list grid gap-1">
-                    {hiddenKanbanColumns.map(column => <li className={cn(`kanban-hidden-column ${column.tone}`, "flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs", kanbanToneClass(column.tone))} data-kanban-hidden-column-id={column.id} key={column.id}>
-                        <span className="flex min-w-0 items-center gap-1.5 truncate">
-                          <i aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current opacity-70" />
+                {hiddenColumnsExpanded ? <ul className="kanban-hidden-column-list">
+                    {hiddenKanbanColumns.map(column => <li className={`kanban-hidden-column ${column.tone}`} data-kanban-hidden-column-id={column.id} key={column.id}>
+                        <span>
+                          <i aria-hidden="true" />
                           {column.label}
                         </span>
                         <strong>{column.runs.length}</strong>

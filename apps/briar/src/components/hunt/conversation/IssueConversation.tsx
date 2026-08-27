@@ -21,7 +21,6 @@ import { IssueMessageItem } from "./IssueMessageItem";
 import { MessageComposer } from "./MessageComposer";
 import { issueReplyParticipant } from "./model";
 import { localizeWorkflowStage } from "../model/formatters";
-import { cn } from "@/lib/utils";
 export function IssueConversation({
   currentUserId = null,
   executionPolicy,
@@ -679,38 +678,38 @@ export function IssueConversation({
       setSubscriptionPending(false);
     }
   };
-  return <section className="issue-conversation flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border-l border-border bg-card" aria-label={t("run.messages")}>
-      <header className="issue-conversation-header flex min-h-[46px] shrink-0 items-center justify-between gap-2.5 border-b border-border px-[18px]">
-        <strong className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">
+  return <section className="issue-conversation" aria-label={t("run.messages")}>
+      <header className="issue-conversation-header">
+        <strong>
           {t("run.messages")}
-          {!loading && <span className="font-mono text-2xs font-medium text-muted-foreground">{messages.length}</span>}
+          {!loading && <span>{messages.length}</span>}
         </strong>
-        <div className="issue-conversation-header-actions flex min-w-0 items-center justify-end gap-2">
+        <div className="issue-conversation-header-actions">
           {subscriberMembers.length > 0 ? <div aria-label={t("run.subscribers", {
           count: subscriberMembers.length
-        })} className="issue-subscriber-avatars flex items-center pl-1.5" title={subscriberMembers.map(member => member.name).join(", ")}>
-              {subscriberMembers.slice(0, 4).map(member => <span className="issue-subscriber-avatar -ml-1.5 grid size-[23px] shrink-0 place-items-center overflow-hidden rounded-full border-2 border-card bg-gradient-to-br from-[#8068ce] to-[#5943a4] text-[9px] font-bold text-white [&>img]:block [&>img]:size-full [&>img]:object-cover" key={member.userId}>
+        })} className="issue-subscriber-avatars" title={subscriberMembers.map(member => member.name).join(", ")}>
+              {subscriberMembers.slice(0, 4).map(member => <span className="issue-subscriber-avatar" key={member.userId}>
                   {member.image ? <img alt="" src={member.image} /> : member.name.trim().charAt(0).toUpperCase() || "?"}
                 </span>)}
-              {subscriberMembers.length > 4 ? <span className="issue-subscriber-overflow -ml-1.5 grid size-[23px] shrink-0 place-items-center rounded-full border-2 border-card bg-muted text-[8px] text-muted-foreground">
+              {subscriberMembers.length > 4 ? <span className="issue-subscriber-overflow">
                   +{subscriberMembers.length - 4}
                 </span> : null}
             </div> : null}
-          {currentUserId && onUpdateSubscription ? <button aria-pressed={isSubscribed} className={cn("issue-subscribe-button inline-flex min-h-7 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-background px-2.5 text-2xs font-semibold text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60", isSubscribed && "active border-primary/30 bg-primary/10 text-primary")} disabled={subscriptionPending || isSubscribed && assigneeSubscriptionRequired} onClick={() => void toggleSubscription()} title={assigneeSubscriptionRequired ? t("run.assigneeSubscriptionRequired") : isSubscribed ? t("run.unsubscribe") : t("run.subscribe")} type="button">
+          {currentUserId && onUpdateSubscription ? <button aria-pressed={isSubscribed} className={`issue-subscribe-button${isSubscribed ? " active" : ""}`} disabled={subscriptionPending || isSubscribed && assigneeSubscriptionRequired} onClick={() => void toggleSubscription()} title={assigneeSubscriptionRequired ? t("run.assigneeSubscriptionRequired") : isSubscribed ? t("run.unsubscribe") : t("run.subscribe")} type="button">
               {subscriptionPending ? <Spinner aria-hidden="true" size={13} /> : <Bell aria-hidden="true" size={13} />}
               {isSubscribed ? t("run.subscribed") : t("run.subscribe")}
             </button> : <small>{t("run.agentRepliesHere")}</small>}
         </div>
       </header>
-      <div className="conversation-scroll-region relative min-h-0 min-w-0 flex-1">
-        <div className="issue-message-list m-0 grid h-full min-h-0 min-w-0 content-start overflow-x-hidden overflow-y-auto px-2 [scrollbar-gutter:stable] before:h-2.5 after:h-3" onScroll={event => setIsAwayFromBottom(conversationIsAwayFromBottom(event.currentTarget))} ref={messageListRef}>
-        {loading ? <div className="issue-message-state flex min-h-[86px] items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted text-2xs text-muted-foreground">
+      <div className="conversation-scroll-region">
+        <div className="issue-message-list" onScroll={event => setIsAwayFromBottom(conversationIsAwayFromBottom(event.currentTarget))} ref={messageListRef}>
+        {loading ? <div className="issue-message-state">
             <Spinner size={16} />
             {t("run.messagesLoading")}
-          </div> : loadError ? <button className="issue-message-state error flex min-h-[86px] items-center justify-center gap-2 rounded-lg border border-destructive/35 bg-destructive/10 text-2xs text-foreground" onClick={() => void loadMessages()} type="button">
+          </div> : loadError ? <button className="issue-message-state error" onClick={() => void loadMessages()} type="button">
             <CircleAlert size={15} />
             {loadError}
-          </button> : orderedMessages.length === 0 ? <p className="issue-message-empty flex min-h-[86px] items-center justify-center text-2xs text-muted-foreground">{t("run.messagesEmpty")}</p> : orderedMessages.map(message => {
+          </button> : orderedMessages.length === 0 ? <p className="issue-message-empty">{t("run.messagesEmpty")}</p> : orderedMessages.map(message => {
           const replyComposerId = `issue-reply-composer-${message.id}`;
           const editComposerId = `issue-edit-composer-${message.id}`;
           const isReplying = activeReplyMessageId === message.id;
@@ -718,7 +717,7 @@ export function IssueConversation({
           const parentMessage = message.parentMessageId ? messagesById.get(message.parentMessageId) ?? null : null;
           const replySummary = replySummaries.get(message.id);
           const replyParticipants = [issueReplyParticipant(message.author), ...(replySummary?.participants ?? [])].filter((participant, index, participants) => participants.findIndex(candidate => candidate.id === participant.id) === index).slice(0, 3);
-          return <div className="issue-message-group min-w-0 max-w-full [&+_.issue-message-group]:mt-1.5 [&+_.issue-message-group]:border-t [&+_.issue-message-group]:border-border [&+_.issue-message-group]:pt-1.5" key={message.id}>
+          return <div className="issue-message-group" key={message.id}>
                 <IssueMessageItem currentUserId={currentUserId} isEditing={isEditing} isReplying={isReplying} localeTag={localeTag} message={message} mentionHandles={mentionHandles} onMentionOpen={openMentionProfile} onAcceptIssueAction={onAcceptIssueAction && message.proposedAction ? () => void acceptIssueAction(message.proposedAction!) : undefined} onAcceptIssueExecution={onAcceptIssueExecution && message.executionProposal ? input => onAcceptIssueExecution(message.executionProposal!, input) : undefined} onIssueOpen={onIssueOpen} onAcceptSkillExecution={onAcceptSkillExecution && message.skillExecutionProposal ? input => onAcceptSkillExecution(message.skillExecutionProposal!, input) : undefined} onExecutionProposalAccepted={accepted => {
               setMessages(current => current.map(candidate => candidate.id === message.id ? {
                 ...candidate,
@@ -731,13 +730,13 @@ export function IssueConversation({
               } : candidate));
             }} loadSkillExecutionContext={() => loadSkillExecutionContext(message.skillExecutionProposal!)} executionPolicy={executionPolicy} executionRun={message.executionProposal ? executionRuns.find(candidate => candidate.id === message.executionProposal?.runId) ?? null : run} executionWorkers={executionWorkers} onDelete={message.optimistic ? undefined : () => void deleteMessage(message.id)} onEdit={message.optimistic ? undefined : () => setActiveEditMessageId(current => current === message.id ? null : message.id)} onLoadAttachment={onLoadAttachment} onReply={message.optimistic ? undefined : () => setActiveReplyMessageId(current => current === message.id ? null : message.id)} parentMessage={parentMessage} replyParticipants={replyParticipants} lastReplyAt={replySummary?.lastReplyAt ?? null} replyComposerId={replyComposerId} editComposerId={editComposerId} actionProposalState={message.proposedAction ? actionProposalStates[message.proposedAction.id] : undefined} actionError={messageErrors[message.id] ?? null} reworkStageLabel={message.proposedAction?.type === "request_issue_rework" ? localizeWorkflowStage(t, message.proposedAction.workflowStage, run.workflow.stages.find(stage => message.proposedAction?.type === "request_issue_rework" && stage.id === message.proposedAction.workflowStage)?.label ?? message.proposedAction.workflowStage) : null} />
                 <AgentReplyState indicators={agentReplyIndicatorsByThreadId[message.id]} state={agentReplyStates[message.id]} />
-                {isReplying && <div className="issue-inline-reply-composer px-2.5" id={replyComposerId}>
+                {isReplying && <div className="issue-inline-reply-composer" id={replyComposerId}>
                     <MessageComposer autoFocus compact mentionMembers={mentionMembers} mentionAgents={mentionAgents} onCancel={() => setActiveReplyMessageId(null)} onMentionOpen={openMentionProfile} onSubmit={async (body, mentionedUserIds, mentionedAgentIds, attachments, references) => {
                 await sendMessage(body, message.id, mentionedUserIds, mentionedAgentIds, attachments, references);
                 setActiveReplyMessageId(current => current === message.id ? null : current);
               }} placeholder={t("run.threadPlaceholder")} />
                   </div>}
-                {isEditing && <div className="issue-inline-reply-composer px-2.5" id={editComposerId}>
+                {isEditing && <div className="issue-inline-reply-composer" id={editComposerId}>
                     <MessageComposer autoFocus compact disableAttachments initialBody={message.body} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onCancel={() => setActiveEditMessageId(null)} onMentionOpen={openMentionProfile} onSubmit={async (body, mentionedUserIds, _mentionedAgentIds, _attachments, _references) => {
                 await editMessage(message.id, body, mentionedUserIds);
               }} placeholder={t("run.editMessagePlaceholder")} />
