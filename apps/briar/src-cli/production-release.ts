@@ -101,6 +101,8 @@ const productionArtifactNames = (version: string) =>
   new Set([
     "Briar.app.tar.gz",
     "Briar.app.tar.gz.sig",
+    `briar-managed-runtime-${version}-linux-x86_64.tar.gz`,
+    `briar-managed-runtime-${version}-linux-x86_64.tar.gz.sig`,
     `Briar_${version}_aarch64.dmg`,
     `Briar_${version}_macos.app.zip`,
     "SHA256SUMS",
@@ -192,6 +194,8 @@ export async function verifyProductionArtifacts(input: {
   );
   const platforms = objectValue(latest.platforms, "latest.json platforms");
   const darwin = objectValue(platforms["darwin-aarch64"], "darwin-aarch64 updater");
+  const linux = objectValue(platforms["linux-x86_64"], "linux-x86_64 updater");
+  const runtimeName = `briar-managed-runtime-${input.version}-linux-x86_64.tar.gz`;
   if (
     latest.version !== input.version ||
     darwin.url !== `${baseUrl}/v${input.version}/Briar.app.tar.gz` ||
@@ -200,6 +204,15 @@ export async function verifyProductionArtifacts(input: {
       (await readFile(join(input.root, "Briar.app.tar.gz.sig"), "utf8")).trim()
   ) {
     throw new Error("Updater metadata does not match the verified Production artifacts.");
+  }
+  if (
+    linux.url !== `${baseUrl}/v${input.version}/${runtimeName}` ||
+    typeof linux.signature !== "string" ||
+    linux.signature.trim() !==
+      (await readFile(join(input.root, `${runtimeName}.sig`), "utf8")).trim() ||
+    linux.sha256 !== checksums.get(runtimeName)
+  ) {
+    throw new Error("Managed runtime metadata does not match the verified artifact.");
   }
 
   const provenance = objectValue(
@@ -233,6 +246,8 @@ export async function verifyProductionArtifacts(input: {
   for (const name of [
     "Briar.app.tar.gz",
     "Briar.app.tar.gz.sig",
+    runtimeName,
+    `${runtimeName}.sig`,
     `Briar_${input.version}_aarch64.dmg`,
     `Briar_${input.version}_macos.app.zip`,
     "briar.spdx.json",
@@ -288,6 +303,11 @@ export async function generateProductionMetadata(input: {
   const signatureName = `${updaterName}.sig`;
   const signature = (await readFile(join(input.root, signatureName), "utf8")).trim();
   if (!signature) throw new Error("Updater signature is empty.");
+  const runtimeName = `briar-managed-runtime-${input.version}-linux-x86_64.tar.gz`;
+  const runtimeSignature = (
+    await readFile(join(input.root, `${runtimeName}.sig`), "utf8")
+  ).trim();
+  if (!runtimeSignature) throw new Error("Managed runtime signature is empty.");
 
   const latest = {
     version: input.version,
@@ -297,6 +317,11 @@ export async function generateProductionMetadata(input: {
       "darwin-aarch64": {
         signature,
         url: `${baseUrl}/v${input.version}/${encodeURIComponent(updaterName)}`,
+      },
+      "linux-x86_64": {
+        signature: runtimeSignature,
+        sha256: await sha256(join(input.root, runtimeName)),
+        url: `${baseUrl}/v${input.version}/${runtimeName}`,
       },
     },
   };

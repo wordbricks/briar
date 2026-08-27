@@ -46,6 +46,27 @@ mise exec -- bun run managed-computer:image:build
 
 빌드는 `verify-managed-image`를 통과해야만 AMI를 캡처하고, AMI ID·base AMI ID·source commit·Debian snapshot·Bun·Node.js·Rust·감사 도구·Briar·에이전트 버전·Google Chrome·SSM Agent 버전·패키지 lock SHA-256을 `release-artifacts/managed-computers/<source-commit>/release.json`에 남긴다. Google Chrome과 TigerVNC의 재배포·보안 고지를 검토하고, 웹 번들에 포함되는 noVNC 1.7.0의 MPL-2.0 고지를 유지한다. Worker credential, 사용자 로그인, 저장소, provider 인증, AWS 키, `.env`, shell history 또는 기존 홈 디렉터리는 AMI에 포함하지 않는다.
 
+### 1.1 관리형 런타임 업데이트
+
+AMI는 Briar CLI, provider runner, 원격 세션 agent와 기본 Skill을
+`/opt/briar/releases/<version>`에 설치하고 `/opt/briar/current`를 현재 버전으로
+연결한다. `briar-managed-runtime-updater.service`는 root로 실행되지만 Production
+minisign 공개키로 검증된 `linux-x86_64` 런타임 번들만 설치할 수 있다. 일반
+Worker는 `/opt`에 쓸 수 없으며 서버가 보낸 request ID, 목표 버전, Worker ID만
+`/run/briar-runtime-updater`에 전달한다.
+
+조직 관리자나 Worker 소유자가 원격 업데이트를 요청하면 기존 Worker update
+프로토콜이 새 claim을 중단하고 실행 중인 작업을 durable queue로 인계한다. 모든
+device session이 비워진 뒤 updater가 버전 고정 URL에서 번들과 서명을 내려받아
+검증하고 새 release directory를 만든 다음 `current` 링크를 원자적으로 전환한다.
+새 Worker가 목표 버전 heartbeat를 보내면 완료된다. 제한 시간 안에 확인되지
+않으면 이전 release 링크로 롤백하고 update request를 `failed`로 기록한다.
+
+이 경로는 Briar CLI, runner, 원격 세션 agent와 `briar-workflow`/`browser` Skill을
+업데이트한다. Debian, Chrome, Bun, Rust와 provider CLI 같은 base toolchain은 계속
+AMI 교체로 배포한다. updater가 포함되기 전에 생성된 기존 managed computer는 이
+기능을 스스로 설치할 수 없으므로 updater-capable AMI로 한 번 교체해야 한다.
+
 ## 2. AWS 스택
 
 네트워크 스택과 컴퓨터 스택은 저장소의 CloudFormation 템플릿으로 순서대로 적용한다. 두 템플릿 모두 계정·리전별 값을 파라미터로 받으며, AWS 콘솔에 수동으로 리소스를 만들거나 템플릿의 실제 값을 코드에 하드코딩하지 않는다.

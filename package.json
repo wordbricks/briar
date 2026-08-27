@@ -84,6 +84,7 @@
     "worker:deploy": "turbo run worker:deploy --filter=@briar/app",
     "worker:startup": "turbo run worker:startup --filter=@briar/app",
     "managed-computer:image:check": "bun run scripts/validate-managed-computer-image.ts",
+    "managed-computer:runtime-updater:check": "bash scripts/qa-managed-runtime-updater.sh",
     "managed-computer:image:build": "infrastructure/managed-computers/build-managed-computer-image"
   },
   "devDependencies": {

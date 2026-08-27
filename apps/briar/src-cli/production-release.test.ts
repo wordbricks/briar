@@ -113,6 +113,14 @@ describe("Production release contract", () => {
     directories.push(root);
     await writeFile(join(root, "Briar.app.tar.gz"), "signed updater archive");
     await writeFile(join(root, "Briar.app.tar.gz.sig"), "trusted signature");
+    await writeFile(
+      join(root, "briar-managed-runtime-1.0.0-linux-x86_64.tar.gz"),
+      "managed runtime",
+    );
+    await writeFile(
+      join(root, "briar-managed-runtime-1.0.0-linux-x86_64.tar.gz.sig"),
+      "managed runtime signature",
+    );
     await writeFile(join(root, "briar.spdx.json"), "{}");
     const result = await generateProductionMetadata({
       root,
@@ -128,6 +136,11 @@ describe("Production release contract", () => {
     expect(result.latest.platforms["darwin-aarch64"]).toEqual({
       signature: "trusted signature",
       url: "https://briar-api.example/releases/v1.0.0/Briar.app.tar.gz",
+    });
+    expect(result.latest.platforms["linux-x86_64"]).toMatchObject({
+      signature: "managed runtime signature",
+      url:
+        "https://briar-api.example/releases/v1.0.0/briar-managed-runtime-1.0.0-linux-x86_64.tar.gz",
     });
     expect(result.provenance.subject.map((subject) => subject.name)).toContain(
       "briar.spdx.json",
@@ -149,6 +162,8 @@ describe("Production release contract", () => {
     const artifacts = new Map([
       ["Briar.app.tar.gz", "archive"],
       ["Briar.app.tar.gz.sig", "updater signature"],
+      [`briar-managed-runtime-${version}-linux-x86_64.tar.gz`, "runtime"],
+      [`briar-managed-runtime-${version}-linux-x86_64.tar.gz.sig`, "runtime signature"],
       [`Briar_${version}_aarch64.dmg`, "dmg"],
       [`Briar_${version}_macos.app.zip`, "app"],
       ["briar.spdx.json", "{}"],
@@ -175,6 +190,12 @@ describe("Production release contract", () => {
             signature: "updater signature",
             url: `${baseUrl}/v${version}/Briar.app.tar.gz`,
           },
+          "linux-x86_64": {
+            signature: "runtime signature",
+            sha256: createHash("sha256").update("runtime").digest("hex"),
+            url:
+              `${baseUrl}/v${version}/briar-managed-runtime-${version}-linux-x86_64.tar.gz`,
+          },
         },
       })}\n`,
     );
@@ -193,6 +214,8 @@ describe("Production release contract", () => {
       [
         "Briar.app.tar.gz",
         "Briar.app.tar.gz.sig",
+        `briar-managed-runtime-${version}-linux-x86_64.tar.gz`,
+        `briar-managed-runtime-${version}-linux-x86_64.tar.gz.sig`,
         `Briar_${version}_aarch64.dmg`,
         `Briar_${version}_macos.app.zip`,
         "briar.spdx.json",

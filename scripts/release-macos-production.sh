@@ -246,6 +246,9 @@ if [[ "$publish" == true ]]; then
 
   curl --fail --silent --show-error --head \
     "${BRIAR_RELEASE_BASE_URL}/${tag}/Briar.app.tar.gz" >/dev/null
+  curl --fail --silent --show-error --head \
+    "${BRIAR_RELEASE_BASE_URL}/${tag}/briar-managed-runtime-${version}-linux-x86_64.tar.gz" \
+    >/dev/null
   gh release edit "$tag" --repo "$repository" --draft=false --latest
   bunx wrangler r2 object put \
     "briar-releases/releases/latest.json" \
