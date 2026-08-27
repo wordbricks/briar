@@ -11,6 +11,7 @@ import {
   type ChannelMessageBlock,
   type ChannelMessageAttachment,
   type ChannelMessageReaction,
+  type ChannelMessageReactionPerson,
   type ChannelReplyStatus,
   type ChannelSkillExecutionProposal,
   type ChannelSummary,
@@ -718,11 +719,22 @@ export function isChannelReactionEmoji(value: string) {
 }
 
 function aggregateReactions(
-  rows: Array<{ message_id: string; user_id: string; emoji: string; created_at: string }>,
+  rows: Array<{
+    message_id: string;
+    user_id: string;
+    emoji: string;
+    created_at: string;
+    user_name: string | null;
+    user_image: string | null;
+  }>,
 ): Map<string, ChannelMessageReaction[]> {
   const byMessage = new Map<
     string,
-    Map<string, { userIds: string[]; firstCreatedAt: string }>
+    Map<string, {
+      userIds: string[];
+      people: ChannelMessageReactionPerson[];
+      firstCreatedAt: string;
+    }>
   >();
   for (const row of rows) {
     let emojiMap = byMessage.get(row.message_id);
@@ -731,11 +743,20 @@ function aggregateReactions(
       byMessage.set(row.message_id, emojiMap);
     }
     const current = emojiMap.get(row.emoji);
+    const person = row.user_name === null
+      ? null
+      : {
+          userId: row.user_id,
+          name: row.user_name,
+          image: row.user_image,
+        } satisfies ChannelMessageReactionPerson;
     if (current) {
       current.userIds.push(row.user_id);
+      if (person) current.people.push(person);
     } else {
       emojiMap.set(row.emoji, {
         userIds: [row.user_id],
+        people: person ? [person] : [],
         firstCreatedAt: row.created_at,
       });
     }
@@ -747,6 +768,7 @@ function aggregateReactions(
         emoji,
         count: value.userIds.length,
         userIds: value.userIds,
+        people: value.people,
         firstCreatedAt: value.firstCreatedAt,
       }))
       .sort((left, right) => {
@@ -1536,10 +1558,23 @@ async function attachMessageRelations(
       .all<ChannelMessageAttachmentRow>(),
     db
       .prepare(
-        `select message_id, user_id, emoji, created_at
-         from briar_channel_message_reactions
-         where message_id in (${placeholders})
-         order by created_at, emoji, user_id`,
+        `select reaction.message_id, reaction.user_id, reaction.emoji,
+                reaction.created_at,
+                case when membership.user_id is null then null
+                     else author.name end as user_name,
+                case when membership.user_id is null then null
+                     else author.image end as user_image
+         from briar_channel_message_reactions reaction
+         join briar_channel_messages message
+          on message.id = reaction.message_id
+         join briar_channels channel
+          on channel.id = message.channel_id
+         left join briar_organization_members membership
+          on membership.organization_id = channel.organization_id
+         and membership.user_id = reaction.user_id
+         left join "user" author on author.id = reaction.user_id
+         where reaction.message_id in (${placeholders})
+         order by reaction.created_at, reaction.emoji, reaction.user_id`,
       )
       .bind(...ids)
       .all<{
@@ -1547,6 +1582,8 @@ async function attachMessageRelations(
         user_id: string;
         emoji: string;
         created_at: string;
+        user_name: string | null;
+        user_image: string | null;
       }>(),
     db
       .prepare(

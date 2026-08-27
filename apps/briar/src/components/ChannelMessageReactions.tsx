@@ -478,6 +478,7 @@ function ReactionChip({
   const people = resolveChannelReactionPeople({
     currentUserId,
     members,
+    reactionPeople: reaction.people,
     userIds: reaction.userIds,
   });
   const { visible, hiddenCount } = previewChannelReactionPeople(people);
