@@ -10,6 +10,11 @@ describe("organization Inbox realtime outbox", () => {
     const { miniflare, db } = database;
     try {
       const organizationId = "22222222-2222-4222-8222-222222222222";
+      // The migration fixture may contain pending rows from data-import triggers.
+      // This test owns the outbox state it exercises.
+      await db
+        .prepare(`delete from briar_organization_inbox_realtime_outbox`)
+        .run();
       await db.prepare(
         `insert into briar_organization_inbox_sync_state (
            organization_id, current_version

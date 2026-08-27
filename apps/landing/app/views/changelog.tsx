@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.168",
+        date: "2026년 8월 27일",
+        title: "협업 기록과 첨부 미리보기를 더 안정적으로 연결합니다",
+        summary:
+          "CVS 협업 기록을 복원하고 HTML 첨부 미리보기, Agent 탐색, 채널 스크롤 흐름을 개선합니다.",
+        items: [
+          "CVS 조직의 Slack 채널, 사용자, 스레드 메시지와 이모지 반응을 복원해 기존 협업 기록을 다시 확인할 수 있습니다.",
+          "Agent가 만든 self-contained HTML 첨부를 채널과 이슈 답변에서 앱 크기의 안전한 모달로 미리 볼 수 있습니다.",
+          "HTML 미리보기는 iframe sandbox와 Content Security Policy로 앱 권한, 네트워크, 폼, 외부 프레임 접근을 차단합니다.",
+          "Sidebar의 Agent 탭을 다시 열면 세션이나 상세 화면에 머무르지 않고 Agent 목록으로 돌아갑니다.",
+          "이미지, 링크 미리보기, 스트리밍 등으로 채널 메시지 높이가 바뀌어도 하단 고정과 사용자의 읽는 위치를 안정적으로 유지합니다.",
+        ],
+      },
+      {
         version: "1.2.167",
         date: "2026년 8월 27일",
         title: "Hunt와 협업 흐름을 더 선명하고 안정적으로 연결합니다",
@@ -1224,6 +1238,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.168",
+        date: "August 27, 2026",
+        title: "Make collaboration history and attachment previews more reliable",
+        summary:
+          "Restore CVS collaboration history while improving HTML attachment previews, Agent navigation, and channel scrolling.",
+        items: [
+          "Restore CVS organization Slack channels, users, threaded messages, and emoji reactions so teams can revisit their collaboration history.",
+          "Preview self-contained HTML attachments created by Agents in a safe, app-sized modal from channel and issue replies.",
+          "Protect HTML previews with an iframe sandbox and Content Security Policy that block app access, network requests, forms, and external frames.",
+          "Opening the Agent tab from a session or detail view now returns to the Agent list instead of leaving the previous selection active.",
+          "Keep the channel pinned to the bottom, or preserve the reader's position, when images, link previews, streaming, or virtualization change message heights.",
+        ],
+      },
       {
         version: "1.2.167",
         date: "August 27, 2026",
@@ -2510,7 +2538,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-167">
+          <a href="#v1-2-168">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2532,6 +2560,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
+                      entry.version === "1.2.168" ||
                       entry.version === "1.2.167" ||
                       entry.version === "1.2.166" ||
                       entry.version === "1.2.165"
