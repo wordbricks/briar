@@ -641,4 +641,31 @@ describe("Inbox", () => {
     expect(container.textContent).toContain("Important issue 0");
     expect(container.textContent).not.toContain("Urgent issue 0");
   });
+
+  it("renders the project select with fixed width utility and responsive filtered count", async () => {
+    await renderReactTestRoot(
+      root,
+      <TestProviders>
+        <Inbox
+          isSidebarOpen
+          messages={[]}
+          onMarkAllRead={vi.fn()}
+          onMarkRead={vi.fn()}
+          onOpen={vi.fn()}
+          projects={projects}
+          unreadCount={0}
+        />
+      </TestProviders>,
+    );
+
+    const filterBar = container.querySelector(".inbox-filter-bar");
+    const projectFilter = filterBar?.querySelector(".inbox-project-filter");
+    expect(projectFilter?.classList.contains("!w-[176px]")).toBe(true);
+    expect(projectFilter?.classList.contains("!shrink-0")).toBe(true);
+    expect(projectFilter?.classList.contains("max-[760px]:!w-full")).toBe(true);
+    expect(projectFilter?.classList.contains("max-[760px]:!flex-auto")).toBe(true);
+
+    const count = filterBar?.querySelector(".font-mono");
+    expect(count?.classList.contains("max-[760px]:hidden")).toBe(true);
+  });
 });
