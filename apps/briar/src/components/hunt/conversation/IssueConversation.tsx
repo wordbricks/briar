@@ -22,6 +22,7 @@ import { MessageComposer } from "./MessageComposer";
 import { issueReplyParticipant } from "./model";
 import { localizeWorkflowStage } from "../model/formatters";
 import { cn } from "@/lib/utils";
+import { scrollElementToCenter } from "@/lib/scroll-container";
 export function IssueConversation({
   currentUserId = null,
   executionPolicy,
@@ -43,6 +44,7 @@ export function IssueConversation({
   organizationId,
   projectId,
   run,
+  highlightedMessageId = null,
   showsScrollToLatest = false,
   token
 }: {
@@ -77,6 +79,7 @@ export function IssueConversation({
   organizationId: string | null;
   projectId: string;
   run: HuntRun;
+  highlightedMessageId?: string | null;
   showsScrollToLatest?: boolean;
   token: string | null;
 }) {
@@ -115,6 +118,7 @@ export function IssueConversation({
   const [conversationCursor, setConversationCursor] = useState<number | null>(null);
   const isSubscribed = subscriptionOverride ?? backendSubscribed;
   const messageListRef = useRef<HTMLDivElement | null>(null);
+  const focusedHighlightedMessageKeyRef = useRef<string | null>(null);
   const onLoadRef = useRef(onLoad);
   const mountedRef = useRef(true);
   const activeRunIdRef = useRef(run.id);
@@ -196,6 +200,7 @@ export function IssueConversation({
     agentRepliesByIdRef.current.clear();
     setConversationCursor(null);
     setAgentReplyStates({});
+    focusedHighlightedMessageKeyRef.current = null;
   }, [run.id]);
   useEffect(() => {
     mountedRef.current = true;
@@ -445,11 +450,27 @@ export function IssueConversation({
   }, [profilesByHandle]);
   useLayoutEffect(() => {
     const messageList = messageListRef.current;
-    if (messageList) {
+    if (messageList && !highlightedMessageId) {
       messageList.scrollTop = messageList.scrollHeight;
       setIsAwayFromBottom(false);
     }
-  }, [loading, messages.length, pendingAgentReplyCount]);
+  }, [highlightedMessageId, loading, messages.length, pendingAgentReplyCount]);
+  useLayoutEffect(() => {
+    if (!highlightedMessageId || loading) return;
+    const targetKey = `${run.id}:${highlightedMessageId}`;
+    if (focusedHighlightedMessageKeyRef.current === targetKey) return;
+    const messageList = messageListRef.current;
+    const target = [...(messageList?.querySelectorAll<HTMLElement>(
+      "[data-issue-message-id]",
+    ) ?? [])].find(
+      (element) => element.dataset.issueMessageId === highlightedMessageId,
+    );
+    if (!messageList || !target) return;
+    scrollElementToCenter(messageList, target);
+    target.focus({ preventScroll: true });
+    focusedHighlightedMessageKeyRef.current = targetKey;
+    setIsAwayFromBottom(false);
+  }, [highlightedMessageId, loading, messages.length, orderedMessages.length, run.id]);
   const sendMessage = async (body: string, parentMessageId: string | null, mentionedUserIds: string[], mentionedAgentIds: string[], attachments: File[], attachmentReferences: string[]) => {
     const appendMessage = (message: IssueMessage) => setMessages(current => {
       if (current.some(candidate => candidate.id === message.id)) {
@@ -719,7 +740,7 @@ export function IssueConversation({
           const replySummary = replySummaries.get(message.id);
           const replyParticipants = [issueReplyParticipant(message.author), ...(replySummary?.participants ?? [])].filter((participant, index, participants) => participants.findIndex(candidate => candidate.id === participant.id) === index).slice(0, 3);
           return <div className="issue-message-group min-w-0 max-w-full [&+_.issue-message-group]:mt-1.5 [&+_.issue-message-group]:border-t [&+_.issue-message-group]:border-border [&+_.issue-message-group]:pt-1.5" key={message.id}>
-                <IssueMessageItem currentUserId={currentUserId} isEditing={isEditing} isReplying={isReplying} localeTag={localeTag} message={message} mentionHandles={mentionHandles} onMentionOpen={openMentionProfile} onAcceptIssueAction={onAcceptIssueAction && message.proposedAction ? () => void acceptIssueAction(message.proposedAction!) : undefined} onAcceptIssueExecution={onAcceptIssueExecution && message.executionProposal ? input => onAcceptIssueExecution(message.executionProposal!, input) : undefined} onIssueOpen={onIssueOpen} onAcceptSkillExecution={onAcceptSkillExecution && message.skillExecutionProposal ? input => onAcceptSkillExecution(message.skillExecutionProposal!, input) : undefined} onExecutionProposalAccepted={accepted => {
+                <IssueMessageItem currentUserId={currentUserId} highlighted={message.id === highlightedMessageId} isEditing={isEditing} isReplying={isReplying} localeTag={localeTag} message={message} mentionHandles={mentionHandles} onMentionOpen={openMentionProfile} onAcceptIssueAction={onAcceptIssueAction && message.proposedAction ? () => void acceptIssueAction(message.proposedAction!) : undefined} onAcceptIssueExecution={onAcceptIssueExecution && message.executionProposal ? input => onAcceptIssueExecution(message.executionProposal!, input) : undefined} onIssueOpen={onIssueOpen} onAcceptSkillExecution={onAcceptSkillExecution && message.skillExecutionProposal ? input => onAcceptSkillExecution(message.skillExecutionProposal!, input) : undefined} onExecutionProposalAccepted={accepted => {
               setMessages(current => current.map(candidate => candidate.id === message.id ? {
                 ...candidate,
                 executionProposal: accepted

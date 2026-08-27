@@ -16,6 +16,7 @@ import { formatDate, relativeTime } from "../model/formatters";
 import { cn } from "@/lib/utils";
 export function IssueMessageItem({
   currentUserId = null,
+  highlighted = false,
   isEditing = false,
   isReplying = false,
   localeTag,
@@ -46,6 +47,7 @@ export function IssueMessageItem({
   reworkStageLabel
 }: {
   currentUserId?: string | null;
+  highlighted?: boolean;
   isEditing?: boolean;
   isReplying?: boolean;
   localeTag: string;
@@ -95,7 +97,7 @@ export function IssueMessageItem({
   const proposal = message.proposedAction;
   const proposalTitle = proposal?.type === "request_issue_update" ? t("run.issueUpdateProposalTitle") : proposal?.type === "request_issue_create" ? t("run.issueCreateProposalTitle") : t("run.reworkProposalTitle");
   const proposalAcceptLabel = proposal?.type === "request_issue_update" ? t("run.issueUpdateProposalAccept") : proposal?.type === "request_issue_create" ? t("run.issueCreateProposalAccept") : t("run.reworkProposalAccept");
-  return <article className={cn("issue-message group relative grid min-w-0 max-w-full grid-cols-[34px_minmax(0,1fr)] items-start gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors hover:bg-muted", message.optimistic && "is-optimistic bg-muted/60")}>
+  return <article aria-current={highlighted ? "true" : undefined} className={cn("issue-message group relative grid min-w-0 max-w-full grid-cols-[34px_minmax(0,1fr)] items-start gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors hover:bg-muted", highlighted && "is-inbox-target", message.optimistic && "is-optimistic bg-muted/60")} data-issue-message-id={message.id} data-inbox-highlighted={highlighted ? "true" : undefined} tabIndex={highlighted ? -1 : undefined}>
       <MessageAvatar message={message} />
       <div className="min-w-0 max-w-full">
         <header className="flex min-w-0 min-h-[19px] items-baseline gap-2">
