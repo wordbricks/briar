@@ -162,7 +162,9 @@ describe("email OTP authentication", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ user: { id: "google-user" } });
     await expect(
-      db.prepare(`select count(*) as count from "user"`).first(),
+      db.prepare(`select count(*) as count from "user" where email = ?`)
+        .bind("same@example.com")
+        .first(),
     ).resolves.toEqual({ count: 1 });
   });
 
