@@ -153,4 +153,78 @@ describe("ProjectAgentSessions", () => {
 
     await cleanup();
   });
+
+  it("renders stop button for running session and handles stopping", async () => {
+    const onSessionOpen = vi.fn();
+    const onStopSession = vi.fn().mockResolvedValue(true);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    const runningSession: AutoHuntSession = {
+      ...taskSession,
+      id: "running-session",
+      status: "running",
+      completedAt: null,
+      localOwner: true,
+    };
+
+    await renderReactTestRoot(
+      root,
+      <ProjectAgentSessions
+        agent={agent}
+        onSessionOpen={onSessionOpen}
+        onStopSession={onStopSession}
+        projectId="project-1"
+        sessions={[runningSession]}
+      />,
+    );
+
+    const stopButton = container.querySelector<HTMLButtonElement>(
+      ".auto-hunt-session-row-stop",
+    );
+    expect(stopButton).not.toBeNull();
+    expect(stopButton?.getAttribute("aria-label")).toBe("세션 정지");
+
+    await act(async () => {
+      stopButton?.click();
+    });
+
+    expect(onStopSession).toHaveBeenCalledWith("running-session");
+    expect(onSessionOpen).not.toHaveBeenCalled();
+
+    await cleanup();
+  });
+
+  it("does not render stop button for non-running or remote sessions", async () => {
+    const onSessionOpen = vi.fn();
+    const onStopSession = vi.fn().mockResolvedValue(true);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    const remoteRunningSession: AutoHuntSession = {
+      ...taskSession,
+      id: "remote-running-session",
+      status: "running",
+      completedAt: null,
+      localOwner: false,
+    };
+
+    await renderReactTestRoot(
+      root,
+      <ProjectAgentSessions
+        agent={agent}
+        onSessionOpen={onSessionOpen}
+        onStopSession={onStopSession}
+        projectId="project-1"
+        sessions={[taskSession, remoteRunningSession]}
+      />,
+    );
+
+    const stopButtons = container.querySelectorAll(
+      ".auto-hunt-session-row-stop",
+    );
+    expect(stopButtons).toHaveLength(0);
+
+    await cleanup();
+  });
 });
