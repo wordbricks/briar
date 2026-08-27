@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { I18nProvider } from "../i18n";
 import type {
@@ -60,32 +60,31 @@ const message: ChannelMessage = {
 };
 
 describe("ChannelMessageText", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
 
   beforeEach(() => {
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
-  afterEach(() => {
-    act(() => root.unmount());
-    container.remove();
+  afterEach(async () => {
+    await cleanup();
   });
 
   it("links structured channel mentions and opens their profiles", async () => {
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ChannelMessageText
-            agents={[agent]}
-            members={[member]}
-            message={message}
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ChannelMessageText
+          agents={[agent]}
+          members={[member]}
+          message={message}
+        />
+      </I18nProvider>,
+    );
 
     const buttons = container.querySelectorAll<HTMLButtonElement>(
       "button.channel-mention-button",
@@ -108,21 +107,20 @@ describe("ChannelMessageText", () => {
   });
 
   it("renders a localized tombstone without exposing the stored body", async () => {
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ChannelMessageText
-            agents={[]}
-            members={[]}
-            message={{
-              ...message,
-              body: "private deleted text",
-              deletedAt: "2026-08-24T00:00:00.000Z",
-            }}
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ChannelMessageText
+          agents={[]}
+          members={[]}
+          message={{
+            ...message,
+            body: "private deleted text",
+            deletedAt: "2026-08-24T00:00:00.000Z",
+          }}
+        />
+      </I18nProvider>,
+    );
 
     expect(container.textContent).toContain("This message was deleted.");
     expect(container.textContent).not.toContain("private deleted text");
@@ -130,22 +128,21 @@ describe("ChannelMessageText", () => {
 
   it("leaves duplicate Agent Names unlinked instead of opening the wrong profile", async () => {
     const duplicate = { ...agent, agentId: "agent-2", responsibility: "Research" };
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ChannelMessageText
-            agents={[agent, duplicate]}
-            members={[]}
-            message={{
-              ...message,
-              body: "@Honey Bee please compare notes",
-              mentionedUserIds: [],
-              mentionedAgentIds: [agent.agentId, duplicate.agentId],
-            }}
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ChannelMessageText
+          agents={[agent, duplicate]}
+          members={[]}
+          message={{
+            ...message,
+            body: "@Honey Bee please compare notes",
+            mentionedUserIds: [],
+            mentionedAgentIds: [agent.agentId, duplicate.agentId],
+          }}
+        />
+      </I18nProvider>,
+    );
 
     expect(container.textContent).toContain("@Honey Bee");
     expect(container.querySelector("button.channel-mention-button")).toBeNull();
@@ -181,17 +178,16 @@ describe("ChannelMessageText", () => {
       ],
     };
 
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ChannelMessageText
-            agents={[]}
-            members={[]}
-            message={webhookMessage}
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ChannelMessageText
+          agents={[]}
+          members={[]}
+          message={webhookMessage}
+        />
+      </I18nProvider>,
+    );
 
     expect(container.querySelector("h3")?.textContent).toBe("Deployment complete");
     expect(container.querySelector("strong")?.textContent).toBe("Production");

@@ -43,7 +43,7 @@ export async function updateIssue(
     title: string;
     description: string | null;
     priority: number | null;
-    difficulty?: IssueDifficulty;
+    difficulty?: IssueDifficulty | null;
     assigneeUserId?: string | null;
     updatedAt: string;
   },
@@ -52,7 +52,7 @@ export async function updateIssue(
     .prepare(
       `update briar_hunt_runs
        set title = ?, issue_description = ?, priority = ?,
-           difficulty = coalesce(?, difficulty),
+           difficulty = case when ? = 1 then ? else difficulty end,
            assignee_user_id = case when ? = 1 then ? else assignee_user_id end,
            updated_at = ?
        where id = ? and project_id = ?
@@ -62,6 +62,7 @@ export async function updateIssue(
       input.title,
       input.description,
       input.priority,
+      input.difficulty === undefined ? 0 : 1,
       input.difficulty ?? null,
       input.assigneeUserId === undefined ? 0 : 1,
       input.assigneeUserId ?? null,

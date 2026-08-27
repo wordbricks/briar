@@ -552,13 +552,26 @@ fn updates_the_connected_project_workflow_locally() {
         checks: vec!["cargo test".to_string()],
     }];
     workflow.completion.required_stages = vec!["repository_qa".to_string()];
+    workflow.requirements = vec![WorkflowRequirementConfig {
+        id: "xcode".to_string(),
+        label: "Xcode".to_string(),
+        kind: WorkflowRequirementKind::Xcode,
+        tool: "wrong".to_string(),
+        reason: "Builds the iOS app.".to_string(),
+    }];
     workflow.execution.checkpoints = vec![WorkflowCheckpointConfig {
-        key: "project-after-repository_qa".to_string(),
+        key: "human_review".to_string(),
         stage: "repository_qa".to_string(),
         position: WorkflowCheckpointPosition::After,
     }];
 
-    update_project_workflow_at(&config_path, "project-1", workflow).expect("workflow should save");
+    let canonical = update_project_workflow_at(&config_path, "project-1", workflow)
+        .expect("workflow should save");
+    assert_eq!(canonical.requirements[0].tool, "xcodebuild");
+    assert_eq!(
+        canonical.execution.checkpoints[0].key,
+        "project-after-repository_qa"
+    );
 
     let saved: serde_json::Value = serde_json::from_str(
         &fs::read_to_string(&config_path).expect("saved config should be readable"),
@@ -568,6 +581,10 @@ fn updates_the_connected_project_workflow_locally() {
         saved["projects"][0]["autoHunt"]["workflow"]["stages"][0]["checks"][0],
         "cargo test"
     );
+    assert_eq!(
+        saved["projects"][0]["autoHunt"]["workflow"]["requirements"][0]["tool"],
+        "xcodebuild"
+    );
     let runtime_workflow = project_auto_hunt_workflow_json(&config_path, "project-1")
         .expect("runtime workflow should load");
     assert!(runtime_workflow.contains("repository_qa"));
@@ -576,6 +593,33 @@ fn updates_the_connected_project_workflow_locally() {
     assert!(!runtime_workflow.contains("\"release\""));
 
     fs::remove_dir_all(directory).expect("test config directory should be removed");
+}
+
+#[test]
+fn canonicalizes_long_checkpoint_keys_identically_to_the_web_contract() {
+    let stage_id = format!("a{}c", "b".repeat(62));
+    let mut workflow = repository_workflow_bootstrap();
+    workflow.stages = vec![WorkflowStageConfig {
+        id: stage_id.clone(),
+        label: "Long custom stage".to_string(),
+        required: true,
+        evidence: vec![],
+        checks: vec![],
+    }];
+    workflow.completion.required_stages = vec![stage_id.clone()];
+    workflow.execution.checkpoints = vec![WorkflowCheckpointConfig {
+        key: "human-review".to_string(),
+        stage: stage_id,
+        position: WorkflowCheckpointPosition::After,
+    }];
+
+    let canonical = canonicalize_workflow(workflow);
+
+    assert_eq!(
+        canonical.execution.checkpoints[0].key,
+        "project-after-abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-5210d1375021b160"
+    );
+    validate_generated_workflow(&canonical).expect("canonical key should remain valid");
 }
 
 #[test]
@@ -810,6 +854,12 @@ fn saving_project_settings_keeps_cli_owned_worktree_settings() {
             extra: BTreeMap::new(),
         },
     );
+    let mut config = read_cli_config(&config_path).expect("config should load");
+    config.projects[0].extra.insert(
+        "executionWorker".to_string(),
+        serde_json::json!({ "workerId": "worker-1" }),
+    );
+    write_cli_config(&config_path, &config).expect("worker binding should save");
 
     write_cli_connection(
         &config_path,
@@ -835,12 +885,18 @@ fn saving_project_settings_keeps_cli_owned_worktree_settings() {
     )
     .expect("settings should save");
 
-    let worktrees = read_cli_config(&config_path)
+    let saved_project = read_cli_config(&config_path)
         .expect("config should reload")
         .projects
         .into_iter()
         .find(|project| project.id == "project-1")
-        .and_then(|project| project.auto_hunt)
+        .expect("project should survive the app-side save");
+    assert_eq!(
+        saved_project.extra["executionWorker"]["workerId"],
+        "worker-1",
+    );
+    let worktrees = saved_project
+        .auto_hunt
         .and_then(|auto_hunt| auto_hunt.worktrees)
         .expect("worktree settings should survive an app-side save");
     assert_eq!(worktrees.root.as_deref(), Some("/custom/worktrees"));

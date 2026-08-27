@@ -23,6 +23,146 @@ import {
   executeD1Sql,
 } from "./test-helpers/d1";
 
+it("backfills every existing organization member into every existing project", async () => {
+  const miniflare = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    d1Databases: { DB: "briar-project-members-backfill-test" },
+  });
+  try {
+    const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    await applyD1Migrations(db, { through: "0137_execution_worker_lifecycle_telemetry.sql" });
+    const now = "2026-08-26T00:00:00.000Z";
+    await executeD1Sql(
+      db,
+      `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+       values ('backfill-owner', 'Owner', 'owner-backfill@example.com', 1, '${now}', '${now}');
+       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+       values ('backfill-member', 'Member', 'member-backfill@example.com', 1, '${now}', '${now}');
+       insert into briar_organizations (id, name, handle, created_at, updated_at)
+       values ('backfill-org', 'Backfill', 'backfill', '${now}', '${now}');
+       insert into briar_organization_members (
+         organization_id, user_id, role, created_at, updated_at
+       ) values ('backfill-org', 'backfill-owner', 'owner', '${now}', '${now}');
+       insert into briar_organization_members (
+         organization_id, user_id, role, created_at, updated_at
+       ) values ('backfill-org', 'backfill-member', 'member', '${now}', '${now}');
+       insert into briar_projects (
+         id, owner_user_id, organization_id, name, agent_token_hash,
+         created_at, updated_at
+       ) values (
+         'backfill-project-a', 'backfill-owner', 'backfill-org', 'A',
+         '${"a".repeat(64)}', '${now}', '${now}'
+       );
+       insert into briar_projects (
+         id, owner_user_id, organization_id, name, agent_token_hash,
+         created_at, updated_at
+       ) values (
+         'backfill-project-b', 'backfill-owner', 'backfill-org', 'B',
+         '${"b".repeat(64)}', '${now}', '${now}'
+       );`,
+    );
+
+    await applyD1Migrations(db, { files: ["0138_project_members.sql"] });
+    const memberships = await db.prepare(
+      `select project_id, user_id
+       from briar_project_members
+       order by project_id, user_id`,
+    ).all<{ project_id: string; user_id: string }>();
+    expect(memberships.results).toEqual([
+      { project_id: "backfill-project-a", user_id: "backfill-member" },
+      { project_id: "backfill-project-a", user_id: "backfill-owner" },
+      { project_id: "backfill-project-b", user_id: "backfill-member" },
+      { project_id: "backfill-project-b", user_id: "backfill-owner" },
+    ]);
+  } finally {
+    await miniflare.dispose();
+  }
+}, 60_000);
+
+it("backfills explicit Agent Skill execution and approval defaults", async () => {
+  const miniflare = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    d1Databases: { DB: "briar-agent-skill-execution-mode-migration-test" },
+  });
+  try {
+    const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    await applyD1Migrations(db, { through: "0139_channel_related_message.sql" });
+    const now = "2026-08-27T00:00:00.000Z";
+    const userId = "00000000-0000-4000-8000-000000000001";
+    const organizationId = "00000000-0000-4000-8000-000000000002";
+    const projectId = "00000000-0000-4000-8000-000000000003";
+    const agentId = "00000000-0000-4000-8000-000000000004";
+    await executeD1Sql(db, `
+      insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+      values ('${userId}', 'Owner', 'skill-defaults@example.com', 1,
+              '${now}', '${now}');
+      insert into briar_organizations (id, name, handle, created_at, updated_at)
+      values ('${organizationId}', 'Skill Defaults', 'skill-defaults',
+              '${now}', '${now}');
+      insert into briar_projects (
+        id, owner_user_id, organization_id, name, agent_token_hash,
+        created_at, updated_at
+      ) values (
+        '${projectId}', '${userId}', '${organizationId}', 'Skill Defaults',
+        '${"a".repeat(64)}', '${now}', '${now}'
+      );
+      insert into briar_project_agents (
+        id, organization_id, project_id, name, provider, responsibility,
+        created_at, updated_at
+      ) values (
+        '${agentId}', '${organizationId}', '${projectId}', 'Skill Agent',
+        'codex', 'Run saved skills.', '${now}', '${now}'
+      );
+      insert into briar_agent_skills (
+        id, agent_id, name, description, body, provider, kind, position,
+        created_at, updated_at
+      ) values
+        ('00000000-0000-4000-8000-000000000005', '${agentId}', '/eli5',
+         'Explain simply.', 'Explain simply.', 'codex', 'custom', 0,
+         '${now}', '${now}'),
+        ('00000000-0000-4000-8000-000000000006', '${agentId}', 'iOS release',
+         'Release iOS.', 'Release iOS.', 'codex', 'custom', 1,
+         '${now}', '${now}'),
+        ('00000000-0000-4000-8000-000000000007', '${agentId}', 'Existing',
+         'Existing behavior.', 'Existing behavior.', 'codex', 'custom', 2,
+         '${now}', '${now}');
+    `);
+
+    await applyD1Migrations(db, {
+      files: ["0140_agent_skill_execution_modes.sql"],
+    });
+    const skills = await db.prepare(
+      `select name, execution_mode, approval_policy
+       from briar_agent_skills order by position`,
+    ).all<{
+      name: string;
+      execution_mode: string;
+      approval_policy: string;
+    }>();
+    expect(skills.results).toEqual([
+      {
+        name: "/eli5",
+        execution_mode: "conversation",
+        approval_policy: "invoke_is_consent",
+      },
+      {
+        name: "iOS release",
+        execution_mode: "task",
+        approval_policy: "explicit",
+      },
+      {
+        name: "Existing",
+        execution_mode: "task",
+        approval_policy: "explicit",
+      },
+    ]);
+  } finally {
+    await miniflare.dispose();
+  }
+}, 60_000);
+
 async function createPreDescriptionOrganizationAgent(
   db: D1Database,
   input: {
@@ -355,6 +495,25 @@ describe("D1 migrations", () => {
           .bind(migrationFixture.runId)
           .run(),
       ).resolves.toBeDefined();
+      await executeD1Sql(
+        db,
+        await readFile(resolve("migrations/0140_issue_difficulty_optional.sql"), "utf8"),
+      );
+      await expect(
+        db.prepare("select difficulty from briar_hunt_runs where id = ?")
+          .bind(migrationFixture.runId)
+          .first<{ difficulty: string | null }>(),
+      ).resolves.toEqual({ difficulty: "easy" });
+      await expect(
+        db.prepare("update briar_hunt_runs set difficulty = null where id = ?")
+          .bind(migrationFixture.runId)
+          .run(),
+      ).resolves.toBeDefined();
+      await expect(
+        db.prepare("select difficulty from briar_hunt_runs where id = ?")
+          .bind(migrationFixture.runId)
+          .first<{ difficulty: string | null }>(),
+      ).resolves.toEqual({ difficulty: null });
       await expect(
         db.prepare("update briar_hunt_runs set difficulty = 'extreme' where id = ?")
           .bind(migrationFixture.runId)
@@ -1226,6 +1385,7 @@ describe("D1 migrations", () => {
           "0099_project_usage_analytics.sql",
           "0102_channel_read_states.sql",
           "0136_issue_difficulty.sql",
+          "0140_issue_difficulty_optional.sql",
         ],
       });
       const ownerId = "channel-canonical-owner";
@@ -1541,6 +1701,7 @@ describe("D1 migrations", () => {
           "0099_project_usage_analytics.sql",
           "0102_channel_read_states.sql",
           "0136_issue_difficulty.sql",
+          "0140_issue_difficulty_optional.sql",
         ],
       });
       const userId = "channel-upgrade-owner";

@@ -25,6 +25,7 @@ import {
 import {
   authenticateExecutionWorker,
   bindExecutionWorkerProject,
+  channelReplyWorkerAvailability,
   countExecutionWorkerDeviceSessions,
   completeExecutionWorkerUpdates,
   countLeasedRuns,
@@ -247,8 +248,11 @@ describe("detached execution workers", () => {
         "0123_native_merge_queue_coordinator.sql",
         "0125_managed_computers.sql",
         "0128_agent_skill_documents.sql",
+        "0133_channel_reply_sessions.sql",
         "0136_issue_difficulty.sql",
         "0137_execution_worker_lifecycle_telemetry.sql",
+        "0140_issue_difficulty_optional.sql",
+        "0141_agent_designated_workers.sql",
       ],
     });
     await executeD1Sql(
@@ -356,6 +360,8 @@ describe("detached execution workers", () => {
        delete from briar_hunt_events;
        delete from briar_hunt_runs;
        delete from briar_channel_agent_reply_jobs;
+       delete from briar_channel_reply_session_events;
+       delete from briar_channel_reply_sessions;
        delete from briar_project_execution_worker_allowlist;
        delete from briar_project_execution_worker_policies;
        delete from briar_execution_worker_update_requests;
@@ -924,6 +930,91 @@ describe("detached execution workers", () => {
        where update_request_id = ? and work_id = ?`
     ).bind(request.id, workId).first()).toMatchObject({
       status: "failed",
+    });
+  });
+
+  it("records a managed runtime installation failure for an explicit retry", async () => {
+    const credential = "briar_worker_runtime-update-failed-test";
+    const worker = await register(
+      "runtime-update-failed",
+      1,
+      createHash("sha256").update(credential).digest("hex"),
+    );
+    const request = await requestExecutionWorkerUpdate(db, {
+      id: "77777777-7777-4777-8777-777777777775",
+      organizationId: projectId,
+      deviceId: worker.device.id,
+      requestedByUserId: "owner",
+      targetVersion: "2.0.0",
+      requestedAt: atMinute(2),
+    });
+    const env = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "runtime-update-failed-secret-runtime-update-failed-secret",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const headers = {
+      authorization: `Bearer ${credential}`,
+      "content-type": "application/json",
+    };
+    const failure = await apiWorker.fetch(
+      new Request(
+        `https://briar-api.example/workers/${worker.worker.id}/update-handoff/fail`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            requestId: request.id,
+            error: "signed runtime failed its health check",
+          }),
+        },
+      ),
+      env,
+    );
+    expect(failure.status).toBe(204);
+
+    expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toMatchObject({
+      id: request.id,
+      handoffState: "failed",
+      handoffError: "signed runtime failed its health check",
+    });
+    const heartbeat = await apiWorker.fetch(
+      new Request(
+        `https://briar-api.example/workers/${worker.worker.id}/heartbeat`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            versions: { briar: "1.0.0" },
+            acceptingWork: true,
+            readinessState: "ready",
+          }),
+        },
+      ),
+      env,
+    );
+    expect(heartbeat.status).toBe(200);
+    expect(await heartbeat.json()).toMatchObject({
+      updateDirective: {
+        id: request.id,
+        handoffState: "failed",
+      },
+      worker: {
+        acceptingWork: false,
+        readiness: "needs_attention",
+      },
+    });
+    expect((await listOrganizationExecutionWorkers(
+      db,
+      projectId,
+      atMinute(3),
+    ))[0]).toMatchObject({
+      bindings: [{
+        acceptingWork: false,
+        readiness: "needs_attention",
+      }],
     });
   });
 
@@ -1716,6 +1807,82 @@ describe("detached execution workers", () => {
     ).resolves.toBe(true);
   });
 
+  it("distinguishes exhausted Agent usage from an unavailable Worker", async () => {
+    const worker = await register("channel-reply-usage", 1);
+    const reply = {
+      organizationId: projectId,
+      projectId,
+      provider: "grok" as const,
+      model: "grok-4.6",
+      effort: "high" as const,
+      observedAt: atMinute(2),
+    };
+
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: worker.worker.id,
+      acceptingWork: false,
+      readinessState: "needs_attention",
+      capabilities: {
+        providerHealth: {
+          grok: {
+            installed: true,
+            authenticated: true,
+            healthy: false,
+            reason: "usage_exhausted",
+            usageExhausted: true,
+            maxUsedPercent: 100,
+          },
+        },
+      },
+      observedAt: atMinute(2),
+    });
+    await expect(channelReplyWorkerAvailability(db, reply))
+      .resolves.toBe("usage_exhausted");
+    await expect(hasAvailableChannelReplyWorker(db, reply))
+      .resolves.toBe(false);
+
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: worker.worker.id,
+      acceptingWork: true,
+      readinessState: "ready",
+      capabilities: {
+        providerHealth: {
+          grok: {
+            installed: true,
+            authenticated: true,
+            healthy: true,
+          },
+        },
+      },
+      observedAt: atMinute(3),
+    });
+    await expect(channelReplyWorkerAvailability(db, {
+      ...reply,
+      observedAt: atMinute(3),
+    })).resolves.toBe("available");
+
+    await recordWorkerHeartbeat(db, projectId, {
+      workerId: worker.worker.id,
+      acceptingWork: false,
+      readinessState: "needs_attention",
+      capabilities: {
+        providerHealth: {
+          grok: {
+            installed: true,
+            authenticated: false,
+            healthy: false,
+            reason: "not_authenticated",
+          },
+        },
+      },
+      observedAt: atMinute(4),
+    });
+    await expect(channelReplyWorkerAvailability(db, {
+      ...reply,
+      observedAt: atMinute(4),
+    })).resolves.toBe("unavailable");
+  });
+
   it("renames a device and all of its project bindings together", async () => {
     const first = await register("rename");
     const second = await bindExecutionWorkerProject(db, secondProjectId, {
@@ -2145,6 +2312,72 @@ describe("detached execution workers", () => {
       hard_delete_rows_written: expect.any(Number),
       detail_json: expect.stringContaining('"bindingCount":2'),
     });
+  });
+
+  it("does not delete or clear a Worker that is designated by an Agent", async () => {
+    const registered = await register("designated-delete");
+    const agentId = crypto.randomUUID();
+    await db.prepare(
+      `insert into briar_project_agents (
+         id, organization_id, project_id, name, provider, model, effort,
+         designated_worker_id, designated_worker_label, responsibility,
+         created_at, updated_at
+       ) values (?, ?, ?, 'Pinned Agent', 'codex', null, null, ?, ?,
+                 'Stay on one Worker', ?, ?)`,
+    ).bind(
+      agentId,
+      projectId,
+      projectId,
+      registered.worker.id,
+      registered.worker.label,
+      atMinute(3),
+      atMinute(3),
+    ).run();
+
+    await expect(updateExecutionWorkerLabel(
+      db,
+      registered.device.id,
+      "renamed designated Worker",
+      atMinute(4),
+    )).resolves.toMatchObject({ label: "renamed designated Worker" });
+    await expect(db.prepare(
+      `select designated_worker_label from briar_project_agents where id = ?`,
+    ).bind(agentId).first()).resolves.toMatchObject({
+      designated_worker_label: "renamed designated Worker",
+    });
+
+    await expect(
+      deleteExecutionWorker(db, registered.device.id, atMinute(5), {
+        requestId: "worker-deprovision:designated-delete",
+        organizationId: projectId,
+        projectId: null,
+        workerId: null,
+        reason: "explicit_user_deprovision",
+      }),
+    ).rejects.toThrow("Designated Worker");
+    await expect(db.prepare(
+      `select designated_worker_id from briar_project_agents where id = ?`,
+    ).bind(agentId).first()).resolves.toMatchObject({
+      designated_worker_id: registered.worker.id,
+    });
+    await expect(
+      executionWorkerBindingForProject(db, registered.device.id, projectId),
+    ).resolves.not.toBeNull();
+
+    await db.prepare(
+      `update briar_project_agents
+       set designated_worker_id = null, designated_worker_label = null
+       where id = ?`,
+    ).bind(agentId).run();
+    await expect(
+      deleteExecutionWorker(db, registered.device.id, atMinute(10), {
+        requestId: "worker-deprovision:designated-delete",
+        organizationId: projectId,
+        projectId: null,
+        workerId: null,
+        reason: "explicit_user_deprovision",
+      }),
+    ).resolves.toBe(true);
   });
 
   it("disables but does not delete a Worker with an active session", async () => {

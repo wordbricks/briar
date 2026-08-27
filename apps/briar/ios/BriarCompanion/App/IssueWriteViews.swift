@@ -184,9 +184,10 @@ struct CreateIssueSheet: View {
                 }
             }
             Picker(L10n.text("난이도"), selection: $draft.difficulty) {
+                Text(L10n.text("없음")).tag(IssueDifficulty?.none)
                 ForEach(IssueDifficulty.allCases, id: \.self) { difficulty in
                     Label(difficulty.displayName, systemImage: difficulty.systemImage)
-                        .tag(difficulty)
+                        .tag(IssueDifficulty?.some(difficulty))
                 }
             }
             Picker(L10n.text("등록 위치"), selection: $draft.status) {
@@ -365,7 +366,7 @@ struct EditIssueSheet: View {
             title: run.title,
             description: run.issueDescription ?? "",
             priority: run.priority,
-            difficulty: run.difficulty ?? .normal,
+            difficulty: run.difficulty,
             assigneeUserId: run.assigneeUserId,
             status: run.status
         ))
@@ -395,9 +396,10 @@ struct EditIssueSheet: View {
                     ForEach(1...4, id: \.self) { Text("P\($0)").tag(Int?.some($0)) }
                 }
                 Picker(L10n.text("난이도"), selection: $draft.difficulty) {
+                    Text(L10n.text("없음")).tag(IssueDifficulty?.none)
                     ForEach(IssueDifficulty.allCases, id: \.self) { difficulty in
                         Label(difficulty.displayName, systemImage: difficulty.systemImage)
-                            .tag(difficulty)
+                            .tag(IssueDifficulty?.some(difficulty))
                     }
                 }
                 if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
@@ -766,6 +768,10 @@ struct AgentSkillExecutionApprovalSheet: View {
         ].compactMap { $0 }.joined(separator: " · ")
     }
 
+    private var conversationExecution: Bool {
+        proposal.executionMode == .conversation
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -773,6 +779,12 @@ struct AgentSkillExecutionApprovalSheet: View {
                     LabeledContent("Agent", value: proposal.agentName)
                     LabeledContent(L10n.text("Skill", locale: locale), value: proposal.skillName)
                     LabeledContent(L10n.text("런타임", locale: locale), value: runtimeLabel)
+                    LabeledContent(
+                        L10n.text("실행 위치", locale: locale),
+                        value: conversationExecution
+                            ? L10n.text("이 대화에서 계속", locale: locale)
+                            : L10n.text("독립 Agent 세션", locale: locale)
+                    )
                     Text(
                         L10n.text(
                             "Agent, Skill, 요청과 런타임은 제안 시점의 읽기 전용 값입니다.",
@@ -803,7 +815,8 @@ struct AgentSkillExecutionApprovalSheet: View {
                     }
                 }
 
-                Section("Worker") {
+                if !conversationExecution {
+                    Section("Worker") {
                     Picker(
                         L10n.text("실행 Worker", locale: locale),
                         selection: $workerID
@@ -824,6 +837,7 @@ struct AgentSkillExecutionApprovalSheet: View {
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    }
                 }
 
                 if let errorMessage {
@@ -858,22 +872,22 @@ struct AgentSkillExecutionApprovalSheet: View {
     }
 
     private var canSubmit: Bool {
+        if conversationExecution { return true }
         guard let workerID else { return false }
         return eligibleWorkers.contains(where: { $0.id == workerID })
     }
 
     @MainActor
     private func submit() async {
-        guard !submitting, !completed,
-              let workerID,
-              eligibleWorkers.contains(where: { $0.id == workerID })
-        else { return }
+        guard !submitting, !completed, canSubmit else { return }
         let expectedRevision = presentationRevision
         submitting = true
         errorMessage = nil
         do {
             let accepted = try await approve(
-                AcceptAgentSkillExecutionProposalRequest(workerId: workerID)
+                AcceptAgentSkillExecutionProposalRequest(
+                    workerId: conversationExecution ? nil : workerID
+                )
             )
             guard expectedRevision == presentationRevision else { return }
             guard accepted else {

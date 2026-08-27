@@ -192,6 +192,7 @@ export async function listProjectUsageRuns(
   db: D1Database,
   projectId: string,
   since: string,
+  until: string,
 ) {
   const runs = await db
     .prepare(
@@ -230,9 +231,11 @@ export async function listProjectUsageRuns(
        left join briar_execution_workers worker on worker.id = run.worker_id
        where run.project_id = ?
          and (
-           coalesce(run.source_created_at, run.started_at) >= ?
+           (coalesce(run.source_created_at, run.started_at) >= ?
+             and coalesce(run.source_created_at, run.started_at) < ?)
            or
-           coalesce(run.completed_at, run.updated_at, run.started_at) >= ?
+           (coalesce(run.completed_at, run.updated_at, run.started_at) >= ?
+             and coalesce(run.completed_at, run.updated_at, run.started_at) < ?)
            or exists (
              select 1
              from briar_run_execution_attempts attempt
@@ -240,13 +243,13 @@ export async function listProjectUsageRuns(
                on usage.execution_id = attempt.id
              where attempt.run_id = run.id
                and attempt.project_id = run.project_id
-               and usage.observed_at >= ?
+               and usage.observed_at >= ? and usage.observed_at < ?
            )
          )
        order by coalesce(run.completed_at, run.updated_at, run.started_at),
                 run.id`,
     )
-    .bind(projectId, since, since, since)
+    .bind(projectId, since, until, since, until, since, until)
     .all<OrganizationUsageRunRow>();
 
   return runs.results;
@@ -445,6 +448,7 @@ export async function listProjectUsageTotals(
   db: D1Database,
   projectId: string,
   since: string,
+  until: string,
 ) {
   const result = await db
     .prepare(
@@ -461,11 +465,12 @@ export async function listProjectUsageTotals(
                 as observed_at
        from briar_run_execution_attempts attempt
        join briar_run_usage_records usage on usage.execution_id = attempt.id
-       where attempt.project_id = ? and usage.observed_at >= ?
+       where attempt.project_id = ?
+         and usage.observed_at >= ? and usage.observed_at < ?
        group by attempt.run_id, substr(usage.observed_at, 1, 10)
        order by observed_at, attempt.run_id`,
     )
-    .bind(projectId, since)
+    .bind(projectId, since, until)
     .all<ProjectUsageTotalRow>();
   return result.results;
 }

@@ -23,29 +23,18 @@ import {
   type ReactNode,
 } from "react";
 import {
-  acceptChannelSkillExecutionProposal,
-  acceptChannelExecutionProposal,
-  acceptChannelProposal,
-  deleteChannelMessage,
-  listChannelMessages,
   listChannels,
-  loadChannel,
-  loadChannelDelta,
   markChannelRead,
-  loadDashboard,
-  sendChannelMessage,
-  toggleChannelMessageReaction,
-  updateChannelThreadSubscription,
 } from "../lib/api";
 import {
   groupChannels,
   type ChannelGroupProject,
 } from "../lib/channel-grouping";
 import {
-  applyChannelThreadSubscribers,
   channelQuickReactionEmojis,
   type ChannelAgentReply,
   type ChannelAgentSummary,
+  type ChannelDelta,
   type ChannelExecutionProposal,
   type ChannelMember,
   type ChannelMessage,
@@ -68,30 +57,19 @@ import type {
 import type { MentionTarget } from "../lib/channel-mentions";
 import {
   mergeChannelMessages,
-  mergeChannelMessageSnapshot,
 } from "../lib/channel-message-merge";
-import { applyChannelMessageDeletion } from "../lib/channel-message-deletion";
-import {
-  createOptimisticChannelMessage,
-  removeOptimisticChannelMessage,
-} from "../lib/optimistic-channel-message";
-import { toggleOptimisticChannelReaction } from "../lib/optimistic-channel-reaction";
 import { useToast } from "./ui/toast";
-import { channelReplyErrorText } from "../lib/channel-reply-error";
 import { maxIssueAttachmentCount } from "../lib/issue-attachments";
 import { useI18n } from "../i18n";
 import { useChannelComposer } from "../hooks/useChannelComposer";
 import { useMobileBackHandler } from "../hooks/useMobileNavigation";
-import { useChannelAgentActivity } from "../hooks/use-channel-agent-activity";
 import {
   conversationIsAwayFromBottom,
   scrollConversationToBottom,
 } from "../lib/conversation-scroll";
+import { useChannelScrollStability } from "../hooks/use-channel-scroll-stability";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
-import type {
-  ChannelAgentActivityDescriptor,
-  ChannelAgentActivityFrame,
-} from "../lib/channel-agent-activity";
+import type { ChannelAgentActivityDescriptor } from "../lib/channel-agent-activity";
 import {
   ChannelDraftImages,
   ChannelMessageImageCacheProvider,
@@ -104,6 +82,7 @@ import { ChannelThreadSubscribeControls } from "./ChannelThreadSubscribeControls
 import { ChannelTypingState } from "./ChannelTypingState";
 import { MentionComposerField } from "./MentionComposerField";
 import { ChannelMessageText } from "./ChannelMessageText";
+import { ChannelLinkPreview } from "./ChannelLinkPreview";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
 import {
   ConversationReplySummary,
@@ -128,14 +107,13 @@ import { IssueCreateExecutionApproval } from "./IssueCreateExecutionApproval";
 import { AgentSkillExecutionApproval } from "./AgentSkillExecutionApproval";
 import { ConversationScrollToBottomButton } from "./ConversationScrollToBottomButton";
 import {
-  CHANNEL_REALTIME_FALLBACK_MS,
-  createChannelRealtimeTransport,
-  MAX_CHANNEL_DELTA_PAGES_PER_SYNC,
-} from "../lib/channel-realtime";
-import {
   copyChannelMessageText,
   copyChannelShareLink,
 } from "../lib/issue-links";
+import {
+  channelConversationError,
+  useChannelConversation,
+} from "../hooks/use-channel-conversation";
 
 const mergeChannels = (
   current: ChannelSummary[],
@@ -152,69 +130,6 @@ const mergeChannels = (
     if (!removed.has(item.id)) byId.set(item.id, item);
   }
   return [...byId.values()];
-};
-
-const mergeReplies = (
-  current: ChannelAgentReply[],
-  incoming: ChannelAgentReply[],
-) => {
-  const byId = new Map(current.map((item) => [item.id, item]));
-  for (const item of incoming) byId.set(item.id, item);
-  return [...byId.values()];
-};
-
-const typingAgentNamesForMessage = (
-  replies: ChannelAgentReply[],
-  agents: ChannelAgentSummary[],
-  messageId: string,
-  fallbackName: string,
-) => [
-  ...new Set(
-    replies
-      .filter((reply) => reply.parentMessageId === messageId)
-      .map(
-        (reply) =>
-          agents.find((agent) => agent.agentId === reply.agentId)?.name ??
-          fallbackName,
-      ),
-  ),
-];
-
-const typingAgentNamesForMessages = (
-  replies: ChannelAgentReply[],
-  agents: ChannelAgentSummary[],
-  messageIds: readonly string[],
-  fallbackName: string,
-) => {
-  const messageIdSet = new Set(messageIds);
-  return [
-    ...new Set(
-      replies
-        .filter((reply) => messageIdSet.has(reply.parentMessageId))
-        .map(
-          (reply) =>
-            agents.find((agent) => agent.agentId === reply.agentId)?.name ??
-            fallbackName,
-        ),
-    ),
-  ];
-};
-
-const activityByAgentNameForReplies = (
-  replies: ChannelAgentReply[],
-  agents: ChannelAgentSummary[],
-  activity: ReadonlyMap<string, ChannelAgentActivityFrame>,
-  fallbackName: string,
-) => {
-  const result: Record<string, ChannelAgentActivityDescriptor> = {};
-  for (const reply of replies) {
-    const frame = activity.get(reply.id);
-    if (!frame?.activity || frame.attempt !== reply.attempts) continue;
-    const name = agents.find((agent) => agent.agentId === reply.agentId)?.name ??
-      fallbackName;
-    result[name] = frame.activity;
-  }
-  return result;
 };
 
 type CompanionChannelsProps = {
@@ -251,12 +166,6 @@ export type CachedCompanionChannel = {
 };
 
 export type CompanionChannelCache = Map<string, CachedCompanionChannel>;
-
-type ChannelSurfaceContext = {
-  generation: number;
-  channelId: string | null;
-  threadParentId: string | null;
-};
 
 const mobileChannelMessagePageSize = 20;
 export const mobileChannelCacheLimit = 5;
@@ -361,7 +270,6 @@ export function CompanionChannels({
   channelCache,
 }: CompanionChannelsProps) {
   const { t } = useI18n();
-  const { toast } = useToast();
   const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [channel, setChannel] = useState<ChannelSummary | null>(null);
@@ -369,52 +277,44 @@ export function CompanionChannels({
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [agents, setAgents] = useState<ChannelAgentSummary[]>([]);
   const [replies, setReplies] = useState<ChannelAgentReply[]>([]);
-  const liveActivity = useChannelAgentActivity(
-    token,
-    organizationId,
-    channel?.id ?? null,
-  );
   const [thread, setThread] = useState<ChannelMessage[] | null>(null);
   const [threadParentId, setThreadParentId] = useState<string | null>(null);
-  const [threadSubscriptionPending, setThreadSubscriptionPending] = useState(false);
+  const [highlightedMessage, setHighlightedMessage] = useState<{
+    channelId: string;
+    messageId: string;
+  } | null>(null);
   const [messageNextCursor, setMessageNextCursor] = useState<string | null>(
     null,
   );
-  const [loadingEarlierMessages, setLoadingEarlierMessages] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [channelIsAwayFromBottom, setChannelIsAwayFromBottom] = useState(false);
   const [threadIsAwayFromBottom, setThreadIsAwayFromBottom] = useState(false);
-  const [acceptingProposalId, setAcceptingProposalId] = useState<string | null>(
-    null,
-  );
-  const [error, setError] = useState<string | null>(null);
-  const [proposalProjects, setProposalProjects] = useState<
-    Record<string, string>
-  >({});
   const cursor = useRef(0);
   const channelSelectionVersion = useRef(0);
-  const channelSurfaceGeneration = useRef(0);
-  const channelIdRef = useRef(channel?.id ?? null);
-  const threadParentIdRef = useRef(threadParentId);
   const channelMessagesScrollRef = useRef<HTMLDivElement | null>(null);
   const threadMessagesScrollRef = useRef<HTMLDivElement | null>(null);
-  const channelMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const threadMessagesEndRef = useRef<HTMLDivElement | null>(null);
-  const loadingEarlierMessagesRef = useRef(false);
-  const shouldScrollChannelToEnd = useRef(false);
-  const proposalVersions = useRef(new Map<string, number>());
-  const latestProposals = useRef(
-    new Map<string, NonNullable<ChannelMessage["proposal"]>>(),
-  );
-  const executionHistoryDashboards = useRef(
-    new Map<string, ReturnType<typeof loadDashboard>>(),
-  );
   const localChannelCache = useRef<CompanionChannelCache>(new Map());
   const resolvedChannelCache = channelCache ?? localChannelCache.current;
   const renderedChannel = useRef<CachedCompanionChannel | null>(null);
-  channelIdRef.current = channel?.id ?? null;
-  threadParentIdRef.current = threadParentId;
+  const highlightedMessageRef = useRef(highlightedMessage);
+  highlightedMessageRef.current = highlightedMessage;
+  const {
+    isAwayFromBottom: channelIsAwayFromBottom,
+    onScroll: handleChannelScroll,
+    requestStickToBottom,
+    requestStickToBottomIfAtBottom,
+    restoreScrollTop,
+    scrollToBottom,
+    setStickToBottom,
+    stickToBottomRef,
+  } = useChannelScrollStability({
+    channelKey: channel?.id ?? null,
+    rowContainerRef: channelMessagesScrollRef,
+    rowCount: threadParentId ? 0 : messages.length,
+    rowSelector: "[data-companion-channel-message-id]",
+    scrollerRef: channelMessagesScrollRef,
+    observeRows: true,
+  });
   const cachedThreads = channel
     ? resolvedChannelCache.get(channel.id)?.threads ?? new Map()
     : new Map<string, ChannelMessage[]>();
@@ -428,6 +328,187 @@ export function CompanionChannels({
         threads: cachedThreads,
       }
     : null;
+
+  const markSelectedChannelRead = useCallback(
+    (summary: ChannelSummary) => {
+      if (!channelHasUnread(summary)) return summary;
+      const lastReadAt = laterTimestamp(
+        summary.lastMessageAt,
+        new Date().toISOString(),
+      );
+      const next = markChannelSummaryRead(summary, lastReadAt);
+      setChannels((current) =>
+        markChannelCatalogRead(current, summary.id, lastReadAt)
+      );
+      void markChannelRead(token, organizationId, summary.id, { lastReadAt })
+        .catch(() => {
+          // The next catalog snapshot restores unread if the write failed.
+        });
+      return next;
+    },
+    [organizationId, token],
+  );
+
+  const updateRootMessages = useCallback(
+    (update: (current: ChannelMessage[]) => ChannelMessage[]) => {
+      setMessages(update);
+    },
+    [],
+  );
+  const updateThreadMessages = useCallback(
+    (update: (current: ChannelMessage[]) => ChannelMessage[]) => {
+      setThread((current) => update(current ?? []));
+    },
+    [],
+  );
+  const applyConversationSnapshot = useCallback(
+    (snapshot: Omit<CachedCompanionChannel, "threads">) => {
+      cacheCompanionChannelSnapshot(resolvedChannelCache, {
+        ...snapshot,
+        threads: resolvedChannelCache.get(snapshot.channel.id)?.threads ??
+          new Map(),
+      });
+    },
+    [resolvedChannelCache],
+  );
+  const applyChannelCatalogDelta = useCallback(
+    (delta: ChannelDelta) => {
+      setChannels((current) =>
+        mergeChannels(current, delta.channels, delta.removedChannelIds)
+      );
+    },
+    [],
+  );
+  const handleSelectedChannelRemoved = useCallback(() => {
+    channelSelectionVersion.current += 1;
+    setChannel(null);
+    setMessages([]);
+    setMessageNextCursor(null);
+    setMembers([]);
+    setAgents([]);
+    setReplies([]);
+    setThread(null);
+    setThreadParentId(null);
+    setLoading(false);
+  }, []);
+  const handleSelectedChannelSummary = useCallback(
+    (summary: ChannelSummary) => {
+      setChannel(markSelectedChannelRead(summary));
+    },
+    [markSelectedChannelRead],
+  );
+  const applyCachedDeltaMessages = useCallback(
+    (incoming: ChannelMessage[], removedMessageIds: string[]) => {
+      const activeId = channel?.id;
+      if (!activeId) return;
+      const storedThreads = resolvedChannelCache.get(activeId)?.threads;
+      if (!storedThreads) return;
+      for (const [parentId, storedThread] of storedThreads) {
+        if (removedMessageIds.includes(parentId)) {
+          storedThreads.delete(parentId);
+          continue;
+        }
+        storedThreads.set(
+          parentId,
+          mergeChannelMessages(
+            storedThread,
+            incoming.filter(
+              (item) =>
+                item.id === parentId || item.parentMessageId === parentId,
+            ),
+            removedMessageIds,
+          ),
+        );
+      }
+    },
+    [channel?.id, resolvedChannelCache],
+  );
+  const handleIncomingRootMessages = useCallback(() => {
+    requestStickToBottomIfAtBottom();
+  }, [requestStickToBottomIfAtBottom]);
+  const channelDeltaIsBlocked = useCallback(() => loading, [loading]);
+  const {
+    acceptExecutionProposal,
+    acceptProposal,
+    acceptSkillExecutionProposal,
+    acceptingProposalId,
+    applyAcceptedExecutionProposal,
+    applyAcceptedSkillExecutionProposal,
+    applyAgentReplies,
+    applyIncomingMessages,
+    busy,
+    captureChannelSurface,
+    channelSurfaceIsCurrent,
+    clearProposalHistory,
+    closeThread: closeConversationThread,
+    error,
+    invalidateChannelSurface,
+    loadCreateExecutionProposalContext,
+    loadChannelConversation,
+    loadEarlierChannelMessages: loadEarlierConversationMessages,
+    loadExecutionProposalContext,
+    loadSkillExecutionProposalContext,
+    loadingEarlierMessages,
+    openIssue,
+    openThread: openConversationThread,
+    proposalProjects,
+    removeMessage,
+    send: sendConversationMessage,
+    setError,
+    setProposalProjects,
+    threadActivityByAgentName,
+    threadLoading,
+    threadSubscriptionPending,
+    threadTypingAgentNames,
+    toggleReaction,
+    toggleThreadSubscription,
+    typingActivityByAgentName,
+    typingAgentNames,
+  } = useChannelConversation({
+    token,
+    organizationId,
+    currentUserId,
+    channel,
+    members,
+    agents,
+    messages,
+    replies,
+    threadParentId,
+    threadMessages: thread ?? [],
+    messageNextCursor,
+    pageSize: mobileChannelMessagePageSize,
+    updateRootMessages,
+    updateThreadMessages,
+    setMembers,
+    setAgents,
+    setReplies,
+    setThreadParentId,
+    setMessageNextCursor,
+    onChannelLoaded: setChannel,
+    onConversationLoaded: applyConversationSnapshot,
+    onIssueOpen,
+    onSkillSessionAccepted,
+    onRootMessagePending: () => {
+      requestStickToBottomIfAtBottom();
+    },
+    onThreadClosed: () => {
+      setLoading(false);
+      requestStickToBottomIfAtBottom();
+    },
+    realtime: {
+      enabled: Boolean(channel),
+      catalogCursor: cursor,
+      catalogReady: Boolean(channel),
+      syncSignal: channelInboxSyncSignal,
+      isBlocked: channelDeltaIsBlocked,
+      onCatalogDelta: applyChannelCatalogDelta,
+      onSelectedChannelRemoved: handleSelectedChannelRemoved,
+      onSelectedChannelSummary: handleSelectedChannelSummary,
+      onSelectedMessages: applyCachedDeltaMessages,
+      onIncomingRootMessages: handleIncomingRootMessages,
+      warningLabel: "Companion channel delta refresh failed",
+    },
+  });
 
   useLayoutEffect(() => {
     if (!channel || !threadParentId || thread === null) return;
@@ -443,11 +524,9 @@ export function CompanionChannels({
   }, [channel?.id, onViewingChannelChange, threadParentId]);
 
   useLayoutEffect(() => {
-    if (!channel || threadParentId || !shouldScrollChannelToEnd.current) return;
-    channelMessagesEndRef.current?.scrollIntoView?.({ block: "end" });
-    shouldScrollChannelToEnd.current = false;
-    setChannelIsAwayFromBottom(false);
-  }, [channel, messages, threadParentId]);
+    if (!channel || threadParentId || !stickToBottomRef.current) return;
+    requestStickToBottom();
+  }, [channel, messages, requestStickToBottom, stickToBottomRef, threadParentId]);
 
   useEffect(() => {
     if (!threadParentId) return;
@@ -456,37 +535,30 @@ export function CompanionChannels({
   }, [thread, threadParentId, replies.length]);
 
   useEffect(() => {
-    setChannelIsAwayFromBottom(false);
     setThreadIsAwayFromBottom(false);
   }, [channel?.id, threadParentId]);
 
-  const captureChannelSurface = useCallback(
-    (): ChannelSurfaceContext => ({
-      generation: channelSurfaceGeneration.current,
-      channelId: channelIdRef.current,
-      threadParentId: threadParentIdRef.current,
-    }),
-    [],
-  );
+  useEffect(() => {
+    if (requestedMessage) {
+      const next = {
+        channelId: requestedMessage.channelId,
+        messageId: requestedMessage.messageId,
+      };
+      highlightedMessageRef.current = next;
+      setHighlightedMessage(next);
+      return;
+    }
+    if (
+      !channel ||
+      highlightedMessageRef.current?.channelId !== channel.id
+    ) {
+      highlightedMessageRef.current = null;
+      setHighlightedMessage(null);
+    }
+  }, [channel?.id, requestedMessage?.channelId, requestedMessage?.messageId]);
 
-  const channelSurfaceIsCurrent = useCallback(
-    (context: ChannelSurfaceContext) =>
-      context.generation === channelSurfaceGeneration.current &&
-      context.channelId === channelIdRef.current &&
-      context.threadParentId === threadParentIdRef.current,
-    [],
-  );
-
-  const invalidateChannelSurface = useCallback(
-    (channelId: string | null, parentMessageId: string | null) => {
-      channelSurfaceGeneration.current += 1;
-      channelIdRef.current = channelId;
-      threadParentIdRef.current = parentMessageId;
-      setBusy(false);
-      setAcceptingProposalId(null);
-    },
-    [],
-  );
+  const activeHighlightedMessageId =
+    requestedMessage?.messageId ?? highlightedMessage?.messageId ?? null;
 
   const persistRenderedChannel = useCallback(() => {
     const snapshot = renderedChannel.current;
@@ -501,48 +573,20 @@ export function CompanionChannels({
   useEffect(
     () => () => {
       persistRenderedChannel();
-      channelSurfaceGeneration.current += 1;
-      channelIdRef.current = null;
-      threadParentIdRef.current = null;
     },
     [persistRenderedChannel],
   );
-
-  useEffect(() => {
-    executionHistoryDashboards.current.clear();
-  }, [token]);
-
-  const recordProposalMessages = useCallback((incoming: ChannelMessage[]) => {
-    const recorded = new Set<string>();
-    for (const item of incoming) {
-      const proposal = item.proposal;
-      if (!proposal || recorded.has(proposal.id)) continue;
-      recorded.add(proposal.id);
-      const previous = latestProposals.current.get(proposal.id);
-      latestProposals.current.set(proposal.id, proposal);
-      if (previous && JSON.stringify(previous) === JSON.stringify(proposal)) {
-        continue;
-      }
-      proposalVersions.current.set(
-        proposal.id,
-        (proposalVersions.current.get(proposal.id) ?? 0) + 1,
-      );
-    }
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
     channelSelectionVersion.current += 1;
     invalidateChannelSurface(null, null);
     cursor.current = 0;
-    proposalVersions.current.clear();
-    latestProposals.current.clear();
+    clearProposalHistory();
     setChannels([]);
     setChannel(null);
     setMessages([]);
     setMessageNextCursor(null);
-    setLoadingEarlierMessages(false);
-    loadingEarlierMessagesRef.current = false;
     setMembers([]);
     setAgents([]);
     setReplies([]);
@@ -558,7 +602,7 @@ export function CompanionChannels({
           setChannels(result.channels);
         }
       } catch (cause) {
-        if (!cancelled) setError(message(cause));
+        if (!cancelled) setError(channelConversationError(cause));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -566,7 +610,13 @@ export function CompanionChannels({
     return () => {
       cancelled = true;
     };
-  }, [invalidateChannelSurface, organizationId, token]);
+  }, [
+    clearProposalHistory,
+    invalidateChannelSurface,
+    organizationId,
+    setError,
+    token,
+  ]);
 
   const groups = useMemo(
     () =>
@@ -579,30 +629,11 @@ export function CompanionChannels({
     [activeProjectId, channels, projects, t],
   );
 
-  const markSelectedChannelRead = useCallback(
-    (summary: ChannelSummary) => {
-      if (!channelHasUnread(summary)) return summary;
-      const lastReadAt = laterTimestamp(
-        summary.lastMessageAt,
-        new Date().toISOString(),
-      );
-      const next = markChannelSummaryRead(summary, lastReadAt);
-      setChannels((current) =>
-        markChannelCatalogRead(current, summary.id, lastReadAt),
-      );
-      void markChannelRead(token, organizationId, summary.id, { lastReadAt })
-        .catch(() => {
-          // The next catalog snapshot restores unread if the write failed.
-        });
-      return next;
-    },
-    [organizationId, token],
-  );
-
   const openChannel = useCallback(
     async (summary: ChannelSummary) => {
       persistRenderedChannel();
       invalidateChannelSurface(summary.id, null);
+      requestStickToBottom();
       const selectionVersion = ++channelSelectionVersion.current;
       const cached = readCachedChannel(resolvedChannelCache, summary.id);
       setChannel(markSelectedChannelRead(cached?.channel ?? summary));
@@ -610,8 +641,6 @@ export function CompanionChannels({
       setThreadParentId(null);
       setMessages(cached?.messages ?? []);
       setMessageNextCursor(cached?.nextCursor ?? null);
-      setLoadingEarlierMessages(false);
-      loadingEarlierMessagesRef.current = false;
       setMembers(cached?.members ?? []);
       setAgents(cached?.agents ?? []);
       // Reply jobs are live execution state. A cached running job can finish
@@ -621,34 +650,25 @@ export function CompanionChannels({
       setError(null);
       setLoading(true);
       try {
-        const result = await loadChannel(token, organizationId, summary.id, {
+        const result = await loadChannelConversation({
+          channelId: summary.id,
           messageLimit: mobileChannelMessagePageSize,
+          mergeWithCurrentMessages: false,
         });
-        if (selectionVersion !== channelSelectionVersion.current) return;
+        if (
+          !result ||
+          selectionVersion !== channelSelectionVersion.current
+        ) return;
         const nextChannel = markSelectedChannelRead(result.channel);
-        const nextMessages = result.messages;
-        const nextCursor = result.nextCursor ?? null;
-        const nextReplies = result.agentReplies ?? [];
-        cacheCompanionChannelSnapshot(resolvedChannelCache, {
-          channel: nextChannel,
-          members: result.members,
-          agents: result.agents,
-          messages: nextMessages,
-          nextCursor,
-          threads: cached?.threads ?? new Map(),
-        });
         setChannel(nextChannel);
-        recordProposalMessages(result.messages);
-        shouldScrollChannelToEnd.current = true;
-        setMessages(nextMessages);
-        setMessageNextCursor(nextCursor);
-        setMembers(result.members);
-        setAgents(result.agents);
-        setReplies(nextReplies);
-      } catch (cause) {
-        if (selectionVersion === channelSelectionVersion.current) {
-          setError(message(cause));
+        const refreshed = resolvedChannelCache.get(summary.id);
+        if (refreshed) {
+          cacheCompanionChannelSnapshot(resolvedChannelCache, {
+            ...refreshed,
+            channel: nextChannel,
+          });
         }
+        requestStickToBottom();
       } finally {
         if (selectionVersion === channelSelectionVersion.current) {
           setLoading(false);
@@ -657,12 +677,11 @@ export function CompanionChannels({
     },
     [
       invalidateChannelSurface,
+      loadChannelConversation,
       markSelectedChannelRead,
-      organizationId,
       persistRenderedChannel,
-      recordProposalMessages,
+      requestStickToBottom,
       resolvedChannelCache,
-      token,
     ],
   );
 
@@ -685,311 +704,37 @@ export function CompanionChannels({
   ]);
 
   const loadEarlierChannelMessages = useCallback(async () => {
-    if (
-      !channel ||
-      threadParentId ||
-      !messageNextCursor ||
-      loadingEarlierMessagesRef.current
-    ) return;
-    const context = captureChannelSurface();
     const scroller = channelMessagesScrollRef.current;
     const previousScrollHeight = scroller?.scrollHeight ?? 0;
     const previousScrollTop = scroller?.scrollTop ?? 0;
-    loadingEarlierMessagesRef.current = true;
-    setLoadingEarlierMessages(true);
-    try {
-      const result = await listChannelMessages(
-        token,
-        organizationId,
-        channel.id,
-        undefined,
-        {
-          limit: mobileChannelMessagePageSize,
-          cursor: messageNextCursor,
-        },
-      );
-      if (!channelSurfaceIsCurrent(context)) return;
-      recordProposalMessages(result.messages);
-      setMessages((current) =>
-        mergeChannelMessages(current, result.messages, []));
-      setMessageNextCursor(result.nextCursor ?? null);
+    const result = await loadEarlierConversationMessages();
+    if (result.applied) {
       window.requestAnimationFrame(() => {
-        if (!channelSurfaceIsCurrent(context) || !scroller) return;
-        scroller.scrollTop = previousScrollTop +
-          (scroller.scrollHeight - previousScrollHeight);
+        if (!scroller) return;
+        restoreScrollTop(
+          previousScrollTop + (scroller.scrollHeight - previousScrollHeight),
+        );
       });
-    } catch (cause) {
-      if (channelSurfaceIsCurrent(context)) setError(message(cause));
-    } finally {
-      loadingEarlierMessagesRef.current = false;
-      if (channelSurfaceIsCurrent(context)) setLoadingEarlierMessages(false);
     }
   }, [
-    captureChannelSurface,
-    channel,
-    channelSurfaceIsCurrent,
-    messageNextCursor,
-    organizationId,
-    recordProposalMessages,
-    threadParentId,
-    token,
-  ]);
-
-  useEffect(() => {
-    const selectedChannelId = channel?.id;
-    // Keep the organization cursor behind an authoritative channel/thread
-    // load. Otherwise a delta can advance first and then be overwritten by a
-    // slower full response, permanently hiding that reply.
-    if (!selectedChannelId || loading) return;
-    const pollingSelectionVersion = channelSelectionVersion.current;
-    let stopped = false;
-    let inFlight = false;
-    let pending = false;
-    const abortController = new AbortController();
-    const transport = createChannelRealtimeTransport(token, organizationId);
-
-    const sync = async () => {
-      pending = true;
-      if (stopped || inFlight || document.hidden) return;
-      inFlight = true;
-      try {
-        while (pending && !stopped) {
-          pending = false;
-          for (
-            let page = 0;
-            page < MAX_CHANNEL_DELTA_PAGES_PER_SYNC;
-            page += 1
-          ) {
-            const requestedCursor = cursor.current;
-            const delta = await loadChannelDelta(
-              token,
-              organizationId,
-              requestedCursor,
-              abortController.signal,
-            );
-            if (
-              stopped ||
-              pollingSelectionVersion !== channelSelectionVersion.current
-            ) return;
-            cursor.current = delta.cursor;
-
-            setChannels((current) =>
-              mergeChannels(
-                current,
-                delta.channels,
-                delta.removedChannelIds,
-              ),
-            );
-            if (delta.removedChannelIds.includes(selectedChannelId)) {
-              channelSelectionVersion.current += 1;
-              invalidateChannelSurface(null, null);
-              setChannel(null);
-              setMessages([]);
-              setMessageNextCursor(null);
-              setMembers([]);
-              setAgents([]);
-              setReplies([]);
-              setThread(null);
-              setThreadParentId(null);
-              return;
-            }
-
-            const selectedSummary = delta.channels.find(
-              (item) => item.id === selectedChannelId,
-            );
-            if (selectedSummary) {
-              setChannel(markSelectedChannelRead(selectedSummary));
-            }
-
-            const selectedMessages = delta.messages.filter(
-              (item) => item.channelId === selectedChannelId,
-            );
-            recordProposalMessages(selectedMessages);
-            const storedThreads = resolvedChannelCache
-              .get(selectedChannelId)?.threads;
-            if (storedThreads) {
-              for (const [parentId, storedThread] of storedThreads) {
-                if (delta.removedMessageIds.includes(parentId)) {
-                  storedThreads.delete(parentId);
-                  continue;
-                }
-                storedThreads.set(
-                  parentId,
-                  mergeChannelMessages(
-                    storedThread,
-                    selectedMessages.filter(
-                      (item) =>
-                        item.id === parentId ||
-                        item.parentMessageId === parentId,
-                    ),
-                    delta.removedMessageIds,
-                  ),
-                );
-              }
-            }
-            if (
-              selectedMessages.some((item) => item.parentMessageId === null) &&
-              channelMessagesScrollRef.current &&
-              channelMessagesScrollRef.current.scrollHeight -
-                  channelMessagesScrollRef.current.scrollTop -
-                  channelMessagesScrollRef.current.clientHeight <= 80
-            ) {
-              shouldScrollChannelToEnd.current = true;
-            }
-            setMessages((current) =>
-              mergeChannelMessages(
-                current,
-                selectedMessages.filter(
-                  (item) => item.parentMessageId === null,
-                ),
-                delta.removedMessageIds,
-              ),
-            );
-            if (threadParentId) {
-              setThread((current) =>
-                current
-                  ? mergeChannelMessages(
-                      current,
-                      selectedMessages.filter(
-                        (item) =>
-                          item.id === threadParentId ||
-                          item.parentMessageId === threadParentId,
-                      ),
-                      delta.removedMessageIds,
-                    )
-                  : current,
-              );
-            }
-
-            const selectedReplies = delta.agentReplies.filter(
-              (item) => item.channelId === selectedChannelId,
-            );
-            if (selectedReplies.length > 0) {
-              setReplies((current) => mergeReplies(current, selectedReplies));
-              const failed = selectedReplies.find(
-                (item) => item.status === "failed",
-              );
-              if (failed) {
-                setError(
-                  t("run.briarReplyFailed", {
-                    error: channelReplyErrorText(failed.error, {
-                      fallback: t("run.failed"),
-                      noAvailableWorker: t("agents.agentWorkerUnavailable"),
-                    }),
-                  }),
-                );
-              }
-            }
-
-            if (!delta.hasMore || delta.cursor <= requestedCursor) break;
-          }
-        }
-      } catch (error) {
-        if (!abortController.signal.aborted) {
-          console.warn("Companion channel delta refresh failed", error);
-        }
-      } finally {
-        inFlight = false;
-        if (pending && !stopped) window.queueMicrotask(() => void sync());
-      }
-    };
-
-    const unsubscribe = transport.subscribe((notification) => {
-      if (
-        notification.topic === "channels" &&
-        notification.cursor > cursor.current
-      ) {
-        void sync();
-      }
-    });
-    const updateVisibility = () => {
-      if (document.hidden) transport.stop();
-      else {
-        transport.start();
-      }
-    };
-    document.addEventListener("visibilitychange", updateVisibility);
-    const fallback = window.setInterval(
-      () => void sync(),
-      CHANNEL_REALTIME_FALLBACK_MS,
-    );
-    updateVisibility();
-    if (channelInboxSyncSignal !== undefined && !document.hidden) {
-      void sync();
-    }
-    return () => {
-      stopped = true;
-      unsubscribe();
-      transport.stop();
-      abortController.abort();
-      document.removeEventListener("visibilitychange", updateVisibility);
-      window.clearInterval(fallback);
-    };
-  }, [
-    channel?.id,
-    channelInboxSyncSignal,
-    invalidateChannelSurface,
-    loading,
-    markSelectedChannelRead,
-    organizationId,
-    recordProposalMessages,
-    resolvedChannelCache,
-    t,
-    threadParentId,
-    token,
+    loadEarlierConversationMessages,
+    restoreScrollTop,
   ]);
 
   const openThread = useCallback(
     async (parent: ChannelMessage) => {
       if (!channel) return;
-      invalidateChannelSurface(channel.id, parent.id);
-      const selectionVersion = ++channelSelectionVersion.current;
+      channelSelectionVersion.current += 1;
       const cachedThread = readCachedThread(
         readCachedChannel(resolvedChannelCache, channel.id)?.threads,
         parent.id,
-      );
-      setThreadParentId(parent.id);
-      setThread(cachedThread);
-      setError(null);
-      setLoading(true);
-      try {
-        const result = await listChannelMessages(
-          token,
-          organizationId,
-          channel.id,
-          parent.id,
-        );
-        if (selectionVersion !== channelSelectionVersion.current) return;
-        recordProposalMessages(result.messages);
-        setThread((current) => {
-          const refreshed = mergeChannelMessageSnapshot(
-            current ?? [],
-            result.messages,
-          );
-          const cached = resolvedChannelCache.get(channel.id);
-          if (cached) {
-            cacheCompanionThreadSnapshot(cached.threads, parent.id, refreshed);
-            cacheCompanionChannelSnapshot(resolvedChannelCache, cached);
-          }
-          return refreshed;
-        });
-      } catch (cause) {
-        if (selectionVersion === channelSelectionVersion.current) {
-          setError(message(cause));
-        }
-      } finally {
-        if (selectionVersion === channelSelectionVersion.current) {
-          setLoading(false);
-        }
-      }
+      ) ?? [];
+      await openConversationThread(parent.id, cachedThread);
     },
     [
       channel,
-      invalidateChannelSurface,
-      organizationId,
-      recordProposalMessages,
+      openConversationThread,
       resolvedChannelCache,
-      token,
     ],
   );
 
@@ -1001,100 +746,32 @@ export function CompanionChannels({
         candidate.id === requestedMessage.channelId,
     );
     if (!summary) return;
-    invalidateChannelSurface(
-      summary.id,
-      requestedMessage.rootMessageId !== requestedMessage.messageId
-        ? requestedMessage.rootMessageId
-        : null,
-    );
+    invalidateChannelSurface(summary.id, null);
     const selectionVersion = ++channelSelectionVersion.current;
     let cancelled = false;
+    setChannel(summary);
     setReplies([]);
     setThread(null);
     setThreadParentId(null);
     setMessageNextCursor(null);
-    setLoadingEarlierMessages(false);
-    loadingEarlierMessagesRef.current = false;
-    shouldScrollChannelToEnd.current = false;
+    setStickToBottom(false);
     setError(null);
     setLoading(true);
     void (async () => {
       try {
-        const result = await loadChannel(token, organizationId, summary.id, {
+        const result = await loadChannelConversation({
+          channelId: summary.id,
           messageLimit: mobileChannelMessagePageSize,
+          mergeWithCurrentMessages: false,
+          requestedMessage,
         });
         if (
+          !result ||
           cancelled ||
           selectionVersion !== channelSelectionVersion.current
         ) return;
-        setChannel(result.channel);
-        recordProposalMessages(result.messages);
-        setMessages((current) =>
-          mergeChannelMessageSnapshot(current, result.messages));
-        const nextCursor = result.nextCursor ?? null;
-        setMessageNextCursor(nextCursor);
-        setMembers(result.members);
-        setAgents(result.agents);
-        setReplies(result.agentReplies ?? []);
-        const storedThreads = resolvedChannelCache.get(summary.id)?.threads ??
-          new Map<string, ChannelMessage[]>();
-        cacheCompanionChannelSnapshot(resolvedChannelCache, {
-          channel: result.channel,
-          members: result.members,
-          agents: result.agents,
-          messages: result.messages,
-          nextCursor,
-          threads: storedThreads,
-        });
-        let requestedThread: Awaited<ReturnType<typeof listChannelMessages>> | null =
-          null;
-        if (
-          !result.messages.some(
-            (item) => item.id === requestedMessage.rootMessageId,
-          )
-        ) {
-          requestedThread = await listChannelMessages(
-            token,
-            organizationId,
-            summary.id,
-            requestedMessage.rootMessageId,
-          );
-          if (
-            cancelled ||
-            selectionVersion !== channelSelectionVersion.current
-          ) return;
-          const requestedRoot = requestedThread.messages.find(
-            (item) =>
-              item.id === requestedMessage.rootMessageId &&
-              item.parentMessageId === null,
-          );
-          if (requestedRoot) {
-            recordProposalMessages([requestedRoot]);
-            setMessages((current) =>
-              mergeChannelMessages(current, [requestedRoot], []));
-          }
-        }
-        if (requestedMessage.rootMessageId !== requestedMessage.messageId) {
-          const threadResult = requestedThread ?? await listChannelMessages(
-              token,
-              organizationId,
-              summary.id,
-              requestedMessage.rootMessageId,
-            );
-          if (
-            cancelled ||
-            selectionVersion !== channelSelectionVersion.current
-          ) return;
-          recordProposalMessages(threadResult.messages);
-          storedThreads.set(
-            requestedMessage.rootMessageId,
-            threadResult.messages,
-          );
-          setThreadParentId(requestedMessage.rootMessageId);
-          setThread((current) =>
-            mergeChannelMessageSnapshot(current ?? [], threadResult.messages));
-        } else {
-          setThreadParentId(null);
+        setChannel(markSelectedChannelRead(result.channel));
+        if (requestedMessage.rootMessageId === requestedMessage.messageId) {
           setThread(null);
         }
         window.requestAnimationFrame(() => {
@@ -1102,17 +779,14 @@ export function CompanionChannels({
             `[data-companion-channel-message-id="${requestedMessage.messageId}"]`,
           );
           if (requestedMessageElement?.scrollIntoView) {
+            setStickToBottom(false);
             requestedMessageElement.scrollIntoView({ block: "center" });
+          }
+          if (requestedMessageElement instanceof HTMLElement) {
+            requestedMessageElement.focus({ preventScroll: true });
           }
           onRequestedMessageOpen?.();
         });
-      } catch (cause) {
-        if (
-          !cancelled &&
-          selectionVersion === channelSelectionVersion.current
-        ) {
-          setError(message(cause));
-        }
       } finally {
         if (
           !cancelled &&
@@ -1131,601 +805,38 @@ export function CompanionChannels({
   }, [
     channels,
     invalidateChannelSurface,
+    loadChannelConversation,
+    markSelectedChannelRead,
     onRequestedMessageOpen,
     organizationId,
-    recordProposalMessages,
-    resolvedChannelCache,
     requestedMessage,
-    token,
+    setStickToBottom,
   ]);
 
   const send = useCallback(
-    async (
+    (
       body: string,
       mentions: MentionTarget[],
       attachments: File[],
       attachmentReferences: string[],
-    ) => {
-      if (!channel || !body.trim()) return;
-      const clientMessageId = crypto.randomUUID();
-      const attachmentUrls = attachments.map((attachment) =>
-        URL.createObjectURL(attachment)
-      );
-      const optimisticMessage = createOptimisticChannelMessage({
-        id: clientMessageId,
-        channelId: channel.id,
-        parentMessageId: threadParentId,
-        body: body.trim(),
-        currentUserId,
-        fallbackAuthorName: t("channel.you"),
-        members,
+    ) =>
+      sendConversationMessage(
+        body,
         mentions,
+        threadParentId,
         attachments,
         attachmentReferences,
-        attachmentUrls,
-      });
-      setBusy(true);
-      setError(null);
-      if (threadParentId) {
-        setThread((current) =>
-          mergeChannelMessages(current ?? [], [optimisticMessage], [])
-        );
-      } else {
-        shouldScrollChannelToEnd.current = true;
-        setMessages((current) =>
-          mergeChannelMessages(current, [optimisticMessage], [])
-        );
-      }
-      try {
-        const result = await sendChannelMessage(token, organizationId, channel.id, {
-          body: body.trim(),
-          clientMessageId,
-          parentMessageId: threadParentId,
-          mentionedUserIds: mentions
-            .filter((mention) => mention.type === "user")
-            .map((mention) => mention.id),
-          mentionedAgentIds: mentions
-            .filter((mention) => mention.type === "agent")
-            .map((mention) => mention.id),
-          attachments,
-          attachmentReferences,
-        });
-        setReplies((current) => mergeReplies(current, result.agentReplies));
-        const failed = result.agentReplies.find(
-          (reply) => reply.status === "failed",
-        );
-        if (failed) {
-          setError(
-            t("run.briarReplyFailed", {
-              error: channelReplyErrorText(failed.error, {
-                fallback: t("run.failed"),
-                noAvailableWorker: t("agents.agentWorkerUnavailable"),
-              }),
-            }),
-          );
-        }
-        if (threadParentId) {
-          setThread((current) =>
-            mergeChannelMessages(current ?? [], [result.message], []),
-          );
-        } else {
-          shouldScrollChannelToEnd.current = true;
-          setMessages((current) =>
-            mergeChannelMessages(current, [result.message], []));
-        }
-      } catch (cause) {
-        setThread((current) =>
-          removeOptimisticChannelMessage(current ?? [], clientMessageId)
-        );
-        setMessages((current) =>
-          removeOptimisticChannelMessage(current, clientMessageId)
-        );
-        setError(message(cause));
-      } finally {
-        for (const url of attachmentUrls) URL.revokeObjectURL(url);
-        setBusy(false);
-      }
-    },
-    [channel, currentUserId, members, organizationId, t, threadParentId, token],
-  );
-
-  const pendingReplies = replies.filter(
-    (item) =>
-      item.channelId === channel?.id &&
-      (item.status === "queued" || item.status === "running"),
-  );
-  const threadMessageIds = threadParentId
-    ? new Set([threadParentId, ...(thread ?? []).map((message) => message.id)])
-    : new Set<string>();
-  const threadPendingReplies = pendingReplies.filter((reply) =>
-    threadMessageIds.has(reply.parentMessageId)
-  );
-  const threadTypingAgentNames = threadParentId
-    ? typingAgentNamesForMessages(
-        threadPendingReplies,
-        agents,
-        [...threadMessageIds],
-        t("channel.projectAgent"),
-      )
-    : [];
-  const threadActivityByAgentName = activityByAgentNameForReplies(
-    threadPendingReplies,
-    agents,
-    liveActivity,
-    t("channel.projectAgent"),
-  );
-
-  const openIssue = useCallback(
-    async (
-      projectId: string,
-      runId: string,
-      context: ChannelSurfaceContext = captureChannelSurface(),
-    ) => {
-      try {
-        await onIssueOpen?.(projectId, runId);
-      } catch (cause) {
-        if (channelSurfaceIsCurrent(context)) {
-          setError(message(cause));
-        }
-      }
-    },
-    [captureChannelSurface, channelSurfaceIsCurrent, onIssueOpen],
-  );
-
-  const loadExecutionProposalContext = useCallback(
-    async (proposal: ChannelExecutionProposal) => {
-      const cacheHistory = proposal.status === "accepted";
-      let dashboardRequest = cacheHistory
-        ? executionHistoryDashboards.current.get(proposal.projectId)
-        : undefined;
-      if (!dashboardRequest) {
-        dashboardRequest = loadDashboard(token, proposal.projectId);
-        if (cacheHistory) {
-          executionHistoryDashboards.current.set(
-            proposal.projectId,
-            dashboardRequest,
-          );
-        }
-      }
-      let dashboard: Awaited<ReturnType<typeof loadDashboard>>;
-      try {
-        dashboard = await dashboardRequest;
-      } catch (cause) {
-        if (
-          cacheHistory &&
-          executionHistoryDashboards.current.get(proposal.projectId) ===
-            dashboardRequest
-        ) {
-          executionHistoryDashboards.current.delete(proposal.projectId);
-        }
-        throw cause;
-      }
-      return {
-        run: dashboard.runs.find((run) => run.id === proposal.runId) ?? null,
-        workers: dashboard.workers ?? [],
-        policy: dashboard.executionPolicy,
-      };
-    },
-    [token],
-  );
-
-  const loadCreateExecutionProposalContext = useCallback(
-    async (projectId: string) => {
-      const dashboard = await loadDashboard(token, projectId);
-      return {
-        run: null,
-        workers: dashboard.workers ?? [],
-        policy: dashboard.executionPolicy,
-      };
-    },
-    [token],
-  );
-
-  const loadSkillExecutionProposalContext = useCallback(
-    async (proposal: AgentSkillExecutionProposal) => {
-      const dashboard = await loadDashboard(token, proposal.projectId);
-      return {
-        workers: dashboard.workers ?? [],
-        policy: dashboard.executionPolicy,
-      };
-    },
-    [token],
-  );
-
-  const acceptExecutionProposal = useCallback(
-    async (item: ChannelMessage, input: IssueExecutionApprovalInput) => {
-      const proposal = item.executionProposal;
-      if (
-        !proposal ||
-        proposal.status !== "pending" ||
-        !channel ||
-        channel.id !== item.channelId
-      ) {
-        throw new Error(t("executionApproval.targetUnavailable"));
-      }
-      const result = await acceptChannelExecutionProposal(
-        token,
-        organizationId,
-        item.channelId,
-        proposal.id,
-        input,
-      );
-      return result.proposal;
-    },
-    [channel, organizationId, t, token],
-  );
-
-  const applyAcceptedExecutionProposal = useCallback(
-    (messageId: string, proposal: ChannelExecutionProposal) => {
-      const apply = (item: ChannelMessage): ChannelMessage =>
-        item.id === messageId && item.executionProposal?.id === proposal.id
-          ? { ...item, executionProposal: proposal }
-          : item;
-      setMessages((current) => current.map(apply));
-      setThread((current) => current?.map(apply) ?? null);
-    },
-    [],
-  );
-
-  const acceptSkillExecutionProposal = useCallback(
-    async (
-      item: ChannelMessage,
-      input: AgentSkillExecutionApprovalInput,
-    ) => {
-      const proposal = item.skillExecutionProposal;
-      if (
-        !proposal ||
-        proposal.status !== "pending" ||
-        !channel ||
-        channel.id !== item.channelId
-      ) {
-        throw new Error(t("skillExecution.approvalUnavailable"));
-      }
-      const result = await acceptChannelSkillExecutionProposal(
-        token,
-        organizationId,
-        item.channelId,
-        proposal,
-        input,
-      );
-      onSkillSessionAccepted?.(result.session);
-      return result.proposal;
-    },
-    [channel, onSkillSessionAccepted, organizationId, t, token],
-  );
-
-  const applyAcceptedSkillExecutionProposal = useCallback(
-    (messageId: string, proposal: AgentSkillExecutionProposal) => {
-      const apply = (item: ChannelMessage): ChannelMessage =>
-        item.id === messageId &&
-        item.skillExecutionProposal?.id === proposal.id
-          ? { ...item, skillExecutionProposal: proposal }
-          : item;
-      setMessages((current) => current.map(apply));
-      setThread((current) => current?.map(apply) ?? null);
-    },
-    [],
-  );
-
-  const refreshProposalState = useCallback(
-    async (item: ChannelMessage, proposalId: string) => {
-      if (!channel) return null;
-      const selectionVersion = ++channelSelectionVersion.current;
-      setLoading(true);
-      try {
-        if (item.parentMessageId) {
-          const result = await listChannelMessages(
-            token,
-            organizationId,
-            channel.id,
-            item.parentMessageId,
-          );
-          if (selectionVersion !== channelSelectionVersion.current) {
-            return latestProposals.current.get(proposalId) ?? null;
-          }
-          recordProposalMessages(result.messages);
-          setThread((current) =>
-            mergeChannelMessageSnapshot(current ?? [], result.messages));
-        } else {
-          const result = await loadChannel(token, organizationId, channel.id);
-          if (selectionVersion !== channelSelectionVersion.current) {
-            return latestProposals.current.get(proposalId) ?? null;
-          }
-          recordProposalMessages(result.messages);
-          setChannel(result.channel);
-          setMessages((current) =>
-            mergeChannelMessageSnapshot(current, result.messages));
-          setMembers(result.members);
-          setAgents(result.agents);
-        }
-        return latestProposals.current.get(proposalId) ?? null;
-      } finally {
-        if (selectionVersion === channelSelectionVersion.current) {
-          setLoading(false);
-        }
-      }
-    },
-    [channel, organizationId, recordProposalMessages, token],
-  );
-
-  const acceptProposal = useCallback(
-    async (
-      item: ChannelMessage,
-      execution: IssueExecutionApprovalInput | null = null,
-    ): Promise<string | null | undefined> => {
-      if (
-        !channel ||
-        item.proposal?.actionType !== "request_issue_create" ||
-        !channelIssueProposalIsValid(item.proposal)
-      ) return t("executionApproval.targetUnavailable");
-      const proposalId = item.proposal.id;
-      const requestsExecution = channelIssueProposalRequestsExecution(
-        item.proposal,
-      );
-      const projectId =
-        item.proposal.projectId ??
-        channel.defaultProjectId ??
-        proposalProjects[item.proposal.id];
-      if (!projectId) return;
-      const approvalChannelId = channel.id;
-      const approvalThreadParentId = threadParentIdRef.current;
-      const approvalContext = captureChannelSurface();
-      const approvalContextIsCurrent = () =>
-        approvalContext.channelId === approvalChannelId &&
-        approvalContext.threadParentId === approvalThreadParentId &&
-        channelSurfaceIsCurrent(approvalContext);
-      const approvalProposalVersion = proposalVersions.current.get(proposalId) ?? 0;
-      setBusy(true);
-      setAcceptingProposalId(proposalId);
-      setError(null);
-      try {
-        const result = execution
-          ? await acceptChannelProposal(
-              token,
-              organizationId,
-              channel.id,
-              proposalId,
-              projectId,
-              execution,
-            )
-          : await acceptChannelProposal(
-              token,
-              organizationId,
-              channel.id,
-              proposalId,
-              projectId,
-            );
-        const hasExecutionFollowUp =
-          requestsExecution || result.executionProposal != null;
-        if (!approvalContextIsCurrent()) return;
-        const applyResult = (candidate: ChannelMessage): ChannelMessage => {
-          if (candidate.proposal?.id !== proposalId) return candidate;
-          return {
-            ...candidate,
-            proposal: {
-              ...candidate.proposal,
-              status: "accepted",
-              projectId: result.projectId,
-              resultRunId: result.resultRunId,
-              resultItems: result.resultItems,
-            },
-            executionProposal:
-              result.executionProposal ?? candidate.executionProposal,
-          };
-        };
-        if (
-          (proposalVersions.current.get(proposalId) ?? 0) ===
-            approvalProposalVersion
-        ) {
-          setMessages((current) => current.map(applyResult));
-          setThread((current) => current?.map(applyResult) ?? null);
-          recordProposalMessages([applyResult(item)]);
-          if (hasExecutionFollowUp) {
-            if (!result.executionProposal) {
-              await refreshProposalState(applyResult(item), proposalId);
-            }
-          }
-        } else {
-          let latest = latestProposals.current.get(proposalId);
-          if (latest?.status !== "accepted") {
-            latest =
-              (await refreshProposalState(item, proposalId)) ?? undefined;
-          }
-          if (!approvalContextIsCurrent()) return;
-          if (
-            latest?.status === "accepted" && latest.projectId &&
-            latest.resultRunId && channelIssueProposalIsValid(latest)
-          ) {
-            if (hasExecutionFollowUp) {
-              if (result.executionProposal) {
-                setMessages((current) => current.map(applyResult));
-                setThread((current) => current?.map(applyResult) ?? null);
-                recordProposalMessages([applyResult(item)]);
-              } else {
-                await refreshProposalState(item, proposalId);
-              }
-            }
-          } else if (
-            latest?.status === "pending" &&
-            latest.projectId === result.projectId
-          ) {
-            setMessages((current) => current.map(applyResult));
-            setThread((current) => current?.map(applyResult) ?? null);
-            recordProposalMessages([applyResult(item)]);
-            if (hasExecutionFollowUp) {
-              if (!result.executionProposal) {
-                await refreshProposalState(applyResult(item), proposalId);
-              }
-            }
-          }
-        }
-        return null;
-      } catch (cause) {
-        const failure = message(cause);
-        if (approvalContextIsCurrent()) {
-          setError(failure);
-        }
-        return failure;
-      } finally {
-        if (approvalContextIsCurrent()) {
-          setBusy(false);
-          setAcceptingProposalId(null);
-        }
-      }
-    },
-    [
-      channel,
-      captureChannelSurface,
-      channelSurfaceIsCurrent,
-      organizationId,
-      proposalProjects,
-      recordProposalMessages,
-      refreshProposalState,
-      token,
-      t,
-    ],
-  );
-
-  const toggleReaction = useCallback(
-    async (item: ChannelMessage, emoji: string) => {
-      if (!channel) return;
-      const optimisticReactions = (candidate: ChannelMessage) =>
-        candidate.id === item.id
-          ? {
-              ...candidate,
-              reactions: toggleOptimisticChannelReaction(
-                candidate.reactions,
-                emoji,
-                currentUserId,
-              ),
-            }
-          : candidate;
-      setMessages((current) => current.map(optimisticReactions));
-      setThread((current) => current?.map(optimisticReactions) ?? null);
-      try {
-        const result = await toggleChannelMessageReaction(
-          token,
-          organizationId,
-          channel.id,
-          item.id,
-          emoji,
-        );
-        const applyReactions = (candidate: ChannelMessage) =>
-          candidate.id === result.message.id
-            ? { ...candidate, reactions: result.message.reactions }
-            : candidate;
-        setMessages((current) => current.map(applyReactions));
-        setThread((current) => current?.map(applyReactions) ?? null);
-      } catch (cause) {
-        const revertReactions = (candidate: ChannelMessage) =>
-          candidate.id === item.id
-            ? {
-                ...candidate,
-                reactions: toggleOptimisticChannelReaction(
-                  candidate.reactions,
-                  emoji,
-                  currentUserId,
-                ),
-              }
-            : candidate;
-        setMessages((current) => current.map(revertReactions));
-        setThread((current) => current?.map(revertReactions) ?? null);
-        toast(message(cause), { tone: "error" });
-      }
-    },
-    [channel, currentUserId, organizationId, toast, token],
-  );
-
-  const removeMessage = useCallback(
-    async (item: ChannelMessage) => {
-      if (!channel || item.deletedAt) return;
-      if (!window.confirm(t("channel.deleteMessageConfirm"))) return;
-      const deletionContext = captureChannelSurface();
-      setBusy(true);
-      try {
-        const result = await deleteChannelMessage(
-          token,
-          organizationId,
-          channel.id,
-          item.id,
-        );
-        if (!channelSurfaceIsCurrent(deletionContext)) return;
-        setMessages((current) =>
-          applyChannelMessageDeletion(current, item.id, result)
-        );
-        setThread((current) => current
-          ? applyChannelMessageDeletion(current, item.id, result)
-          : current
-        );
-        if (result.deleted) {
-          setReplies((current) => current.filter((reply) =>
-            reply.triggerMessageId !== item.id && reply.replyMessageId !== item.id
-          ));
-          if (threadParentId === item.id && !result.message) {
-            setThreadParentId(null);
-          }
-        }
-      } catch (cause) {
-        if (channelSurfaceIsCurrent(deletionContext)) {
-          toast(message(cause), { tone: "error" });
-        }
-      } finally {
-        if (channelSurfaceIsCurrent(deletionContext)) setBusy(false);
-      }
-    },
-    [
-      captureChannelSurface,
-      channel,
-      channelSurfaceIsCurrent,
-      organizationId,
-      t,
-      threadParentId,
-      toast,
-      token,
-    ],
-  );
-
-  const toggleThreadSubscription = useCallback(
-    async (subscribed: boolean) => {
-      if (!channel || !threadParentId || threadSubscriptionPending) return;
-      setThreadSubscriptionPending(true);
-      setError(null);
-      try {
-        const result = await updateChannelThreadSubscription(
-          token,
-          organizationId,
-          channel.id,
-          threadParentId,
-          subscribed,
-        );
-        const apply = (current: ChannelMessage[]) =>
-          applyChannelThreadSubscribers(
-            current,
-            result.rootMessageId,
-            result.subscribers,
-          );
-        setMessages(apply);
-        setThread((current) => (current ? apply(current) : current));
-      } catch (cause) {
-        setError(message(cause));
-      } finally {
-        setThreadSubscriptionPending(false);
-      }
-    },
-    [channel, organizationId, threadParentId, threadSubscriptionPending, token],
+      ),
+    [sendConversationMessage, threadParentId],
   );
 
   const closeThread = useCallback(() => {
     if (!channel || !threadParentId) return false;
     channelSelectionVersion.current += 1;
-    invalidateChannelSurface(channel.id, null);
-    shouldScrollChannelToEnd.current = true;
-    setThreadParentId(null);
+    const closed = closeConversationThread();
     setThread(null);
-    setLoading(false);
-    setError(null);
-    return true;
-  }, [channel, invalidateChannelSurface, threadParentId]);
+    return closed;
+  }, [channel, closeConversationThread, threadParentId]);
 
   const closeChannel = useCallback(() => {
     if (!channel) return false;
@@ -1735,13 +846,11 @@ export function CompanionChannels({
     setChannel(null);
     setMessages([]);
     setMessageNextCursor(null);
-    setLoadingEarlierMessages(false);
-    loadingEarlierMessagesRef.current = false;
     setReplies([]);
     setLoading(false);
     setError(null);
     return true;
-  }, [channel, invalidateChannelSurface, persistRenderedChannel]);
+  }, [channel, invalidateChannelSurface, persistRenderedChannel, setError]);
 
   useMobileBackHandler(
     () => closeThread() || closeChannel(),
@@ -1751,7 +860,10 @@ export function CompanionChannels({
   if (channel && threadParentId) {
     return (
       <ChannelMessageImageCacheProvider cache={imageCache}>
-        <section className="companion-channels companion-channel-detail">
+        <section
+          aria-busy={threadLoading}
+          className="companion-channels companion-channel-detail"
+        >
         <ChannelBar
           onBack={closeThread}
           subscribe={(
@@ -1770,7 +882,7 @@ export function CompanionChannels({
           )}
           title={t("companion.channelThread")}
         />
-        {error ? <p className="companion-channel-error">{error}</p> : null}
+        {error ? <p className="companion-channel-error" role="alert">{error}</p> : null}
         <div className="conversation-scroll-region">
           <div
             className="companion-channel-messages"
@@ -1780,7 +892,9 @@ export function CompanionChannels({
               )}
             ref={threadMessagesScrollRef}
           >
-            {loading && !thread ? <CompanionChannelLoadingSpinner /> : null}
+            {threadLoading && (thread?.length ?? 0) === 0
+              ? <CompanionChannelLoadingSpinner />
+              : null}
             {(thread ?? []).map((item) => (
             <MessageRow
               acceptingProposal={acceptingProposalId === item.proposal?.id}
@@ -1788,6 +902,7 @@ export function CompanionChannels({
               busy={busy}
               channel={channel}
               currentUserId={currentUserId}
+              highlighted={item.id === activeHighlightedMessageId}
               key={item.id}
               members={members}
               message={item}
@@ -1826,20 +941,8 @@ export function CompanionChannels({
                 item.proposal ? proposalProjects[item.proposal.id] ?? null : null
               }
               token={token}
-              typingAgentNames={typingAgentNamesForMessage(
-                pendingReplies,
-                agents,
-                item.id,
-                t("channel.projectAgent"),
-              )}
-              typingActivityByAgentName={activityByAgentNameForReplies(
-                pendingReplies.filter((reply) =>
-                  reply.parentMessageId === item.id
-                ),
-                agents,
-                liveActivity,
-                t("channel.projectAgent"),
-              )}
+              typingAgentNames={typingAgentNames(item.id)}
+              typingActivityByAgentName={typingActivityByAgentName(item.id)}
               showTypingState={false}
             />
             ))}
@@ -1877,19 +980,20 @@ export function CompanionChannels({
   if (channel) {
     return (
       <ChannelMessageImageCacheProvider cache={imageCache}>
-        <section className="companion-channels companion-channel-detail">
+        <section
+          aria-busy={loading}
+          className="companion-channels companion-channel-detail"
+        >
         <ChannelBar
           onBack={closeChannel}
           channel={channel}
         />
-        {error ? <p className="companion-channel-error">{error}</p> : null}
+        {error ? <p className="companion-channel-error" role="alert">{error}</p> : null}
         <div className="conversation-scroll-region">
           <div
             className="companion-channel-messages"
             onScroll={(event) => {
-              setChannelIsAwayFromBottom(
-                conversationIsAwayFromBottom(event.currentTarget),
-              );
+              handleChannelScroll(event.currentTarget);
               if (event.currentTarget.scrollTop <= 32) {
                 void loadEarlierChannelMessages();
               }
@@ -1905,6 +1009,7 @@ export function CompanionChannels({
               busy={busy}
               channel={channel}
               currentUserId={currentUserId}
+              highlighted={item.id === activeHighlightedMessageId}
               key={item.id}
               members={members}
               message={item}
@@ -1945,20 +1050,8 @@ export function CompanionChannels({
               }
               showThreadSummary
               token={token}
-              typingAgentNames={typingAgentNamesForMessage(
-                pendingReplies,
-                agents,
-                item.id,
-                t("channel.projectAgent"),
-              )}
-              typingActivityByAgentName={activityByAgentNameForReplies(
-                pendingReplies.filter((reply) =>
-                  reply.parentMessageId === item.id
-                ),
-                agents,
-                liveActivity,
-                t("channel.projectAgent"),
-              )}
+              typingAgentNames={typingAgentNames(item.id)}
+              typingActivityByAgentName={typingActivityByAgentName(item.id)}
             />
             ))}
             {!loading && messages.length === 0 ? (
@@ -1966,16 +1059,12 @@ export function CompanionChannels({
                 {t("companion.channelsEmpty")}
               </p>
             ) : null}
-            <div ref={channelMessagesEndRef} />
           </div>
           {channelIsAwayFromBottom ? (
             <ConversationScrollToBottomButton
               label={t("run.jumpToLatest")}
               onClick={() => {
-                const scroller = channelMessagesScrollRef.current;
-                if (!scroller) return;
-                setChannelIsAwayFromBottom(false);
-                scrollConversationToBottom(scroller);
+                scrollToBottom();
               }}
             />
           ) : null}
@@ -1994,8 +1083,8 @@ export function CompanionChannels({
 
   return (
     <ChannelMessageImageCacheProvider cache={imageCache}>
-      <section className="companion-channels">
-      {error ? <p className="companion-channel-error">{error}</p> : null}
+      <section aria-busy={loading} className="companion-channels">
+      {error ? <p className="companion-channel-error" role="alert">{error}</p> : null}
       {loading && channels.length === 0 ? <CompanionChannelLoadingSpinner /> : null}
       {groups.map((group) => (
         <div className="companion-channel-group" key={group.key}>
@@ -2137,6 +1226,7 @@ function MessageRow({
   busy,
   channel,
   currentUserId,
+  highlighted = false,
   loadCreateExecutionProposalContext,
   loadExecutionProposalContext,
   loadSkillExecutionProposalContext,
@@ -2165,6 +1255,7 @@ function MessageRow({
   busy: boolean;
   channel: ChannelSummary;
   currentUserId: string | null;
+  highlighted?: boolean;
   loadCreateExecutionProposalContext: (projectId: string) => Promise<{
     run: HuntRun | null;
     workers: ExecutionWorker[];
@@ -2246,8 +1337,11 @@ function MessageRow({
     : null;
   return (
     <article
-      className={`companion-channel-message${reacting ? " is-reacting" : ""}${message.optimistic ? " is-optimistic" : ""}`}
+      aria-current={highlighted ? "true" : undefined}
+      className={`companion-channel-message${reacting ? " is-reacting" : ""}${highlighted ? " is-inbox-target" : ""}${message.optimistic ? " is-optimistic" : ""}`}
       data-companion-channel-message-id={message.id}
+      data-inbox-highlighted={highlighted ? "true" : undefined}
+      tabIndex={highlighted ? -1 : undefined}
       onContextMenu={(event) => {
         if (message.optimistic) return;
         if ((event.target as HTMLElement).closest("button,a,input,select,textarea")) {
@@ -2271,6 +1365,12 @@ function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
+        <ChannelLinkPreview
+          channelId={message.channelId}
+          message={message}
+          organizationId={channel.organizationId}
+          token={token}
+        />
         <ChannelMessageImages
           attachments={message.attachments}
           interactive={!showThreadSummary}
@@ -2768,8 +1868,4 @@ function CompanionChannelLoadingSpinner() {
       <Spinner size={16} />
     </p>
   );
-}
-
-function message(cause: unknown) {
-  return cause instanceof Error ? cause.message : String(cause);
 }

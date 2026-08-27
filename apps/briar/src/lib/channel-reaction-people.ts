@@ -1,4 +1,7 @@
-import type { ChannelMember } from "./channels-contract";
+import type {
+  ChannelMember,
+  ChannelMessageReactionPerson,
+} from "./channels-contract";
 
 export const channelReactionPeoplePreviewLimit = 8;
 
@@ -17,17 +20,22 @@ export type ChannelReactionPeoplePreview<T> = {
 export function resolveChannelReactionPeople({
   currentUserId,
   members,
+  reactionPeople = [],
   userIds,
 }: {
   currentUserId: string | null;
   members: readonly ChannelMember[];
+  reactionPeople?: readonly ChannelMessageReactionPerson[];
   userIds: readonly string[];
 }): ChannelReactionPerson[] {
   const memberById = new Map(
     members.map((member) => [member.userId, member]),
   );
+  const reactionPersonById = new Map(
+    reactionPeople.map((person) => [person.userId, person]),
+  );
   return userIds.map((userId) => {
-    const member = memberById.get(userId);
+    const member = memberById.get(userId) ?? reactionPersonById.get(userId);
     return {
       userId,
       name: member?.name ?? null,

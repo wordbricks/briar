@@ -1,8 +1,4 @@
-import {
-  CircleDashed,
-  RefreshCw,
-  Trash2,
-} from "lucide-react";
+import { CircleDashed, RefreshCw, Trash2 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import {
   useCallback,
@@ -43,18 +39,19 @@ import { AGENT_EXECUTION_USD_TICKS_PER_DOLLAR } from "../lib/agent-execution-cos
 import { LITELLM_MAIN_PRICING_SOURCE } from "../lib/agent-usage-pricing";
 import type { AgentUsagePricing, AgentUsageReport } from "../types";
 import { AgentProviderIcon } from "./AgentIcons";
+import { cn } from "../lib/utils";
 
 const rangeOptions = [7, 30, 90] as const satisfies readonly UsageRangeDays[];
 
 const providerColors = {
   claude: "#d97757",
-  codex: "var(--usage-codex-color)",
-  cursor: "#24241f",
+  codex: "var(--foreground)",
+  cursor: "var(--foreground)",
   grok: "#7765b5",
   agy: "#4285f4",
   opencode: "#4f8a70",
   openrouter: "#6d5bd0",
-  unknown: "var(--usage-unknown-color)",
+  unknown: "var(--muted-foreground)",
 } satisfies Record<UsageAttribution, string>;
 
 type ChartMetric = "tokens" | "cost" | "runs";
@@ -100,7 +97,9 @@ function formatUsdTicks(value: number, locale: string, compact = false) {
 }
 
 function chartValue(
-  point: ReturnType<typeof aggregateAgentUsageOverview>["daily"][number]["byProvider"][UsageAttribution],
+  point: ReturnType<
+    typeof aggregateAgentUsageOverview
+  >["daily"][number]["byProvider"][UsageAttribution],
   metric: ChartMetric,
 ) {
   return metric === "cost" ? point.costUsdTicks : point[metric];
@@ -153,15 +152,24 @@ function formatDateRange(startAt: number, endAt: number, locale: string) {
 }
 
 function ProviderMark({ provider }: { provider: UsageAttribution }) {
+  const className = cn(
+    "grid size-5 shrink-0 place-items-center rounded-md border border-border bg-card text-foreground",
+    provider === "claude" && "text-[#d97757]",
+    provider === "grok" && "text-[#7765b5]",
+    provider === "agy" && "text-[#4285f4]",
+    provider === "opencode" && "text-[#4f8a70]",
+    provider === "openrouter" && "text-[#6d5bd0]",
+    provider === "unknown" && "text-muted-foreground",
+  );
   if (provider === "unknown") {
     return (
-      <span className="usage-overview-provider-mark unknown">
+      <span className={className}>
         <CircleDashed aria-hidden size={14} />
       </span>
     );
   }
   return (
-    <span className={`usage-overview-provider-mark ${provider}`}>
+    <span className={className}>
       <AgentProviderIcon provider={provider} size={14} />
     </span>
   );
@@ -232,24 +240,24 @@ function DailyUsageChart({
   const runTickStep = Math.max(1, Math.ceil(maximum / 4));
   const runTickCount = Math.max(1, Math.ceil(maximum / runTickStep));
   const yMaximum =
-    metric === "runs"
-      ? runTickStep * runTickCount
-      : niceTokenMaximum(maximum);
+    metric === "runs" ? runTickStep * runTickCount : niceTokenMaximum(maximum);
   const xAt = (index: number) =>
     left +
     (overview.daily.length <= 1
       ? plotWidth / 2
       : (index / (overview.daily.length - 1)) * plotWidth);
-  const yAt = (value: number) => top + plotHeight - (value / yMaximum) * plotHeight;
+  const yAt = (value: number) =>
+    top + plotHeight - (value / yMaximum) * plotHeight;
   const baseline = top + plotHeight;
-  const tickValues = maximum === 0
-    ? [0]
-    : metric === "runs"
-      ? Array.from(
-          { length: runTickCount + 1 },
-          (_, index) => index * runTickStep,
-        )
-      : [0, 0.25, 0.5, 0.75, 1].map((ratio) => ratio * yMaximum);
+  const tickValues =
+    maximum === 0
+      ? [0]
+      : metric === "runs"
+        ? Array.from(
+            { length: runTickCount + 1 },
+            (_, index) => index * runTickStep,
+          )
+        : [0, 0.25, 0.5, 0.75, 1].map((ratio) => ratio * yMaximum);
   const dateFormatter = new Intl.DateTimeFormat(localeTag, {
     day: "numeric",
     month: "short",
@@ -268,7 +276,7 @@ function DailyUsageChart({
   ).filter((index) => index >= 0);
 
   return (
-    <div className="usage-overview-chart-frame">
+    <div className="relative mt-1.5 h-[286px] min-w-0 max-[560px]:h-60">
       <svg
         aria-describedby={dataTableId}
         aria-label={
@@ -278,7 +286,7 @@ function DailyUsageChart({
               ? t("usage.chartLabelCost")
               : t("usage.chartLabelRuns")
         }
-        className="usage-overview-chart-svg"
+        className="block size-full overflow-visible"
         role="img"
         viewBox={`0 0 ${width} ${height}`}
       >
@@ -294,14 +302,14 @@ function DailyUsageChart({
           return (
             <g key={value}>
               <line
-                className="usage-overview-chart-grid"
+                className="stroke-border [stroke-width:1] [vector-effect:non-scaling-stroke]"
                 x1={left}
                 x2={width - right}
                 y1={y}
                 y2={y}
               />
               <text
-                className="usage-overview-chart-axis"
+                className="fill-muted-foreground font-mono text-[10px] font-medium"
                 textAnchor="end"
                 x={left - 12}
                 y={y + 4}
@@ -345,7 +353,7 @@ function DailyUsageChart({
 
         {dateIndexes.map((index) => (
           <text
-            className="usage-overview-chart-axis date"
+            className="fill-muted-foreground text-[10px] font-medium"
             key={overview.daily[index]?.dateKey ?? index}
             textAnchor={
               index === 0
@@ -402,13 +410,15 @@ function DailyUsageChart({
                       : new Intl.NumberFormat(localeTag).format(value)}
                   </td>
                 </tr>
-              ) : [];
+              ) : (
+                []
+              );
             }),
           )}
         </tbody>
       </table>
       {maximum === 0 ? (
-        <p className="usage-overview-chart-empty">
+        <p className="absolute inset-x-5 top-[45%] m-0 ml-[54px] text-center text-xs text-muted-foreground">
           {!dataReady
             ? unavailableMessage
             : t(
@@ -432,24 +442,32 @@ function ProviderLimitRow({ provider }: { provider: AgentUsageProvider }) {
   const percentage = window ? Math.round(window.usedPercent) : null;
   const providerLabel = providerName(provider.provider) ?? provider.provider;
   return (
-    <div className={`usage-overview-limit ${provider.status}`}>
-      <div className="usage-overview-limit-heading">
+    <div>
+      <div className="flex items-center gap-2">
         <ProviderMark provider={provider.provider} />
-        <strong>{providerLabel}</strong>
-        <span>
+        <strong className="min-w-0 truncate text-xs font-semibold">
+          {providerLabel}
+        </strong>
+        <span className="ml-auto font-mono text-xs font-semibold text-muted-foreground">
           {percentage === null
             ? t(`usage.status.${provider.status}`)
             : `${percentage}%`}
         </span>
       </div>
-      <i>
+      <i className="mt-1.5 ml-7 block h-1 overflow-hidden rounded-full bg-secondary">
         <b
+          className={cn(
+            "block h-full rounded-[inherit] bg-[var(--status-success-foreground)]",
+            (provider.status === "error" ||
+              provider.status === "unavailable") &&
+              "bg-[var(--status-warning-foreground)]",
+          )}
           style={{
             width: `${Math.min(100, Math.max(0, percentage ?? 0))}%`,
           }}
         />
       </i>
-      <small>
+      <small className="mt-1 ml-7 block truncate text-micro text-muted-foreground">
         {window
           ? `${formatUsageWindowLabel(window)} · ${
               window.resetsAt && window.resetsAt > Date.now()
@@ -458,7 +476,7 @@ function ProviderLimitRow({ provider }: { provider: AgentUsageProvider }) {
                   })
                 : t("usage.resetUnknown")
             }`
-          : provider.error ?? t("usage.noProviderUsage")}
+          : (provider.error ?? t("usage.noProviderUsage"))}
       </small>
     </div>
   );
@@ -482,8 +500,7 @@ export function AgentUsageSettings({
   );
   const [rangeDays, setRangeDays] = useState<UsageRangeDays>(30);
   const [chartMetric, setChartMetric] = useState<ChartMetric>("tokens");
-  const [breakdownMode, setBreakdownMode] =
-    useState<BreakdownMode>("model");
+  const [breakdownMode, setBreakdownMode] = useState<BreakdownMode>("model");
   const [refreshing, setRefreshing] = useState(false);
   const [providerError, setProviderError] = useState<string | null>(null);
   const [usageRunsError, setUsageRunsError] = useState<string | null>(null);
@@ -496,49 +513,50 @@ export function AgentUsageSettings({
   const refreshGenerationRef = useRef(0);
   const latest = history[0] ?? null;
 
-  const refresh = useCallback(async (
-    generation = refreshGenerationRef.current,
-  ) => {
-    setRefreshing(true);
-    setProviderError(null);
-    setUsageRunsError(null);
-    const [providerResult, reportResult] = await Promise.allSettled([
-      loadProviderUsageRef.current(),
-      loadUsageReportRef.current
-        ? loadUsageReportRef.current()
-        : Promise.resolve({
-            runs: [],
-            generatedAt: new Date().toISOString(),
-            pricing: {
-              status: "unavailable" as const,
-              source: LITELLM_MAIN_PRICING_SOURCE,
-              fetchedAt: null,
-              knownModels: 0,
-            },
-          }),
-    ]);
-    if (generation !== refreshGenerationRef.current) return;
-    if (providerResult.status === "fulfilled") {
-      setHistory(recordAgentUsageSnapshot(providerResult.value));
-    } else {
-      setProviderError(
-        providerResult.reason instanceof Error
-          ? providerResult.reason.message
-          : String(providerResult.reason),
-      );
-    }
-    if (reportResult.status === "fulfilled") {
-      setUsageReport(reportResult.value);
-    } else {
-      setUsageRunsError(
-        reportResult.reason instanceof Error
-          ? reportResult.reason.message
-          : String(reportResult.reason),
-      );
-    }
-    setNow(Date.now());
-    setRefreshing(false);
-  }, []);
+  const refresh = useCallback(
+    async (generation = refreshGenerationRef.current) => {
+      setRefreshing(true);
+      setProviderError(null);
+      setUsageRunsError(null);
+      const [providerResult, reportResult] = await Promise.allSettled([
+        loadProviderUsageRef.current(),
+        loadUsageReportRef.current
+          ? loadUsageReportRef.current()
+          : Promise.resolve({
+              runs: [],
+              generatedAt: new Date().toISOString(),
+              pricing: {
+                status: "unavailable" as const,
+                source: LITELLM_MAIN_PRICING_SOURCE,
+                fetchedAt: null,
+                knownModels: 0,
+              },
+            }),
+      ]);
+      if (generation !== refreshGenerationRef.current) return;
+      if (providerResult.status === "fulfilled") {
+        setHistory(recordAgentUsageSnapshot(providerResult.value));
+      } else {
+        setProviderError(
+          providerResult.reason instanceof Error
+            ? providerResult.reason.message
+            : String(providerResult.reason),
+        );
+      }
+      if (reportResult.status === "fulfilled") {
+        setUsageReport(reportResult.value);
+      } else {
+        setUsageRunsError(
+          reportResult.reason instanceof Error
+            ? reportResult.reason.message
+            : String(reportResult.reason),
+        );
+      }
+      setNow(Date.now());
+      setRefreshing(false);
+    },
+    [],
+  );
 
   useEffect(() => {
     const generation = refreshGenerationRef.current + 1;
@@ -603,8 +621,7 @@ export function AgentUsageSettings({
     overview.observedRuns > 0
       ? overview.reportedRuns / overview.observedRuns
       : 0;
-  const missingCoverage =
-    overview.observedRuns > 0 ? 1 - coverage : 0;
+  const missingCoverage = overview.observedRuns > 0 ? 1 - coverage : 0;
   const actualModelCoverage =
     overview.reportedRuns > 0
       ? overview.actualModelRuns / overview.reportedRuns
@@ -630,16 +647,20 @@ export function AgentUsageSettings({
     : t("usage.loadingRuns");
 
   return (
-    <SettingsSection className="usage-overview">
-      <header className="usage-overview-header">
-        <div>
-          <h1>{t("usage.title")}</h1>
-          <p>{dateRange}</p>
+    <SettingsSection className="max-w-[1240px] text-foreground">
+      <header className="mb-5 flex min-h-[72px] items-start justify-between gap-7 max-[820px]:items-stretch max-[820px]:flex-col max-[820px]:gap-3.5">
+        <div className="min-w-0">
+          <h1 className="m-0 text-[27px] leading-tight font-bold tracking-tighter">
+            {t("usage.title")}
+          </h1>
+          <p className="mt-2.5 mb-0 text-sm text-muted-foreground">
+            {dateRange}
+          </p>
         </div>
-        <div className="usage-overview-toolbar">
+        <div className="flex items-center gap-2.5 max-[820px]:justify-between max-[560px]:items-end">
           <div
             aria-label={`${t("usage.title")} · ${dateRange}`}
-            className="usage-overview-segmented range"
+            className="flex items-stretch rounded-lg border border-border bg-muted p-0.5 max-[560px]:w-full [&>button]:min-h-[29px] [&>button]:cursor-pointer [&>button]:whitespace-nowrap [&>button]:rounded-md [&>button]:border-0 [&>button]:bg-transparent [&>button]:px-3 [&>button]:py-0 [&>button]:text-micro [&>button]:font-semibold [&>button]:text-muted-foreground [&>button]:transition-colors [&>button]:hover:text-foreground [&>button[aria-pressed=true]]:bg-card [&>button[aria-pressed=true]]:text-foreground [&>button[aria-pressed=true]]:shadow-sm motion-reduce:[&>button]:transition-none max-[560px]:[&>button]:min-w-0 max-[560px]:[&>button]:flex-1 max-[560px]:[&>button]:px-1.5"
             role="group"
           >
             {rangeOptions.map((days) => (
@@ -664,12 +685,13 @@ export function AgentUsageSettings({
         </div>
       </header>
 
-      <section className="usage-overview-hero">
-        <div className="usage-overview-summary">
-          <span className="usage-overview-eyebrow">
+      <section className="grid min-w-0 grid-cols-[minmax(260px,.68fr)_minmax(480px,1.32fr)] gap-12 border-b border-border px-0 pt-2.5 pb-8 max-[1050px]:grid-cols-[minmax(220px,.55fr)_minmax(420px,1.45fr)] max-[1050px]:gap-7 max-[820px]:grid-cols-1">
+        <div className="min-w-0 max-[820px]:max-w-[480px]">
+          <span className="block text-micro font-bold tracking-wider text-muted-foreground uppercase">
             {t("usage.observedTokens")}
           </span>
           <strong
+            className="mt-3.5 block truncate font-mono text-[clamp(36px,4.5vw,48px)] leading-none font-semibold tracking-tighter"
             title={
               usageRunsLoaded
                 ? new Intl.NumberFormat(localeTag).format(totalTokens)
@@ -678,7 +700,7 @@ export function AgentUsageSettings({
           >
             {usageRunsLoaded ? formatCompact(totalTokens, localeTag) : "—"}
           </strong>
-          <p>
+          <p className="mt-3 mb-0 text-micro leading-relaxed text-muted-foreground">
             {usageRunsLoaded
               ? t("usage.runsReportedSummary", {
                   reported: overview.reportedRuns,
@@ -687,23 +709,27 @@ export function AgentUsageSettings({
               : unavailableMessage}
           </p>
 
-          <div className="usage-overview-provider-shares">
+          <div className="mt-7 grid gap-5">
             {providerRows.length > 0 ? (
               providerRows.map((provider) => {
                 const share =
                   totalTokens > 0 ? provider.totalTokens / totalTokens : 0;
                 const label =
-                  providerName(provider.provider) ??
-                  t("usage.unknownProvider");
+                  providerName(provider.provider) ?? t("usage.unknownProvider");
                 return (
-                  <div key={provider.provider}>
-                    <header>
+                  <div className="min-w-0" key={provider.provider}>
+                    <header className="flex min-w-0 items-center gap-2">
                       <ProviderMark provider={provider.provider} />
-                      <strong>{label}</strong>
-                      <b>{formatCompact(provider.totalTokens, localeTag)}</b>
+                      <strong className="min-w-0 truncate text-sm font-semibold">
+                        {label}
+                      </strong>
+                      <b className="ml-auto font-mono text-sm font-semibold">
+                        {formatCompact(provider.totalTokens, localeTag)}
+                      </b>
                     </header>
-                    <i>
+                    <i className="mt-2 block h-1.25 overflow-hidden rounded-full bg-secondary">
                       <b
+                        className="block h-full rounded-[inherit] bg-[var(--usage-provider-color)]"
                         style={
                           {
                             "--usage-provider-color":
@@ -713,7 +739,7 @@ export function AgentUsageSettings({
                         }
                       />
                     </i>
-                    <small>
+                    <small className="mt-1.5 block text-micro text-muted-foreground">
                       {formatPercent(share, localeTag)} · {provider.runs}{" "}
                       {t("usage.runs").toLocaleLowerCase(localeTag)}
                     </small>
@@ -721,7 +747,7 @@ export function AgentUsageSettings({
                 );
               })
             ) : (
-              <p className="usage-overview-provider-empty">
+              <p className="m-0 px-0 py-5 text-xs text-muted-foreground">
                 {usageRunsLoaded
                   ? t("usage.noRecordedTokens")
                   : unavailableMessage}
@@ -730,13 +756,15 @@ export function AgentUsageSettings({
           </div>
         </div>
 
-        <div className="usage-overview-chart-panel">
-          <header>
-            <h2>{t("usage.dailyUsage")}</h2>
-            <div className="usage-overview-chart-actions">
+        <div className="min-w-0">
+          <header className="flex min-h-8 items-start justify-between gap-4 max-[560px]:items-stretch max-[560px]:flex-col">
+            <h2 className="m-0 text-base font-semibold tracking-tight">
+              {t("usage.dailyUsage")}
+            </h2>
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-2 max-[560px]:justify-between">
               <div
                 aria-label={t("usage.dailyUsage")}
-                className="usage-overview-segmented metric"
+                className="flex items-stretch rounded-lg border border-border bg-muted p-0.5 [&>button]:min-h-6 [&>button]:cursor-pointer [&>button]:whitespace-nowrap [&>button]:rounded-md [&>button]:border-0 [&>button]:bg-transparent [&>button]:px-2.5 [&>button]:py-0 [&>button]:text-[10px] [&>button]:font-semibold [&>button]:tracking-wide [&>button]:text-muted-foreground [&>button]:uppercase [&>button]:hover:text-foreground [&>button[aria-pressed=true]]:bg-card [&>button[aria-pressed=true]]:text-foreground [&>button[aria-pressed=true]]:shadow-sm"
                 role="group"
               >
                 {(["tokens", "cost", "runs"] as const).map((metric) => (
@@ -750,7 +778,7 @@ export function AgentUsageSettings({
                   </button>
                 ))}
               </div>
-              <div className="usage-overview-legend">
+              <div className="flex min-h-6 flex-wrap items-center justify-end gap-x-3 gap-y-1.5 max-[560px]:justify-start [&>span]:flex [&>span]:items-center [&>span]:gap-1.5 [&>span]:whitespace-nowrap [&>span]:text-micro [&>span]:text-muted-foreground [&_i]:size-1.5 [&_i]:rounded-full">
                 {chartProviders.map((provider) => (
                   <span key={provider.provider}>
                     <i
@@ -776,11 +804,13 @@ export function AgentUsageSettings({
 
       <section
         aria-busy={!usageRunsLoaded && !usageRunsError}
-        className="usage-overview-metrics"
+        className="grid grid-cols-6 border-b border-border max-[820px]:grid-cols-2 [&>div]:flex [&>div]:min-h-[116px] [&>div]:min-w-0 [&>div]:flex-col [&>div]:justify-center [&>div]:border-l [&>div]:border-border [&>div]:px-4 [&>div]:py-5 [&>div:first-child]:border-l-0 [&>div:first-child]:pl-0 [&>div:last-child]:pr-0 [&_span]:text-micro [&_span]:text-muted-foreground [&_strong]:mt-2 [&_strong]:truncate [&_strong]:font-mono [&_strong]:text-[20px] [&_strong]:leading-tight [&_strong]:font-semibold [&_strong]:tracking-tighter [&_small]:mt-1.5 [&_small]:truncate [&_small]:text-micro [&_small]:leading-snug [&_small]:text-muted-foreground max-[1050px]:[&>div]:px-3 max-[820px]:[&>div]:min-h-0 max-[820px]:[&>div]:border-t max-[820px]:[&>div]:border-l-0 max-[820px]:[&>div]:px-3.5 max-[820px]:[&>div]:py-4 max-[820px]:[&>div:nth-child(even)]:border-l max-[820px]:[&>div:nth-child(-n+2)]:border-t-0"
       >
         <div>
           <span>{t("usage.processedTokens")}</span>
-          <strong>{usageRunsLoaded ? formatCompact(totalTokens, localeTag) : "—"}</strong>
+          <strong>
+            {usageRunsLoaded ? formatCompact(totalTokens, localeTag) : "—"}
+          </strong>
           <small>
             {usageRunsLoaded
               ? t("usage.perActiveDay", {
@@ -883,13 +913,18 @@ export function AgentUsageSettings({
 
       {usageRunsError ? <SettingsAlert>{usageRunsError}</SettingsAlert> : null}
 
-      <section className="usage-overview-detail-grid">
-        <div className="usage-overview-breakdown">
-          <header>
-            <h2 id={breakdownTitleId}>{t("usage.breakdown")}</h2>
+      <section className="grid min-w-0 grid-cols-[minmax(0,2.05fr)_minmax(255px,.82fr)] items-start gap-10 pt-7 max-[1050px]:gap-7 max-[820px]:grid-cols-1">
+        <div className="min-w-0">
+          <header className="flex min-h-8 items-start justify-between gap-4">
+            <h2
+              className="m-0 text-base font-semibold tracking-tight"
+              id={breakdownTitleId}
+            >
+              {t("usage.breakdown")}
+            </h2>
             <div
               aria-label={t("usage.breakdown")}
-              className="usage-overview-segmented breakdown"
+              className="flex items-stretch rounded-lg border border-border bg-muted p-0.5 [&>button]:min-h-6 [&>button]:cursor-pointer [&>button]:whitespace-nowrap [&>button]:rounded-md [&>button]:border-0 [&>button]:bg-transparent [&>button]:px-2.5 [&>button]:py-0 [&>button]:text-[10px] [&>button]:font-semibold [&>button]:tracking-wide [&>button]:text-muted-foreground [&>button]:uppercase [&>button]:hover:text-foreground [&>button[aria-pressed=true]]:bg-card [&>button[aria-pressed=true]]:text-foreground [&>button[aria-pressed=true]]:shadow-sm"
               role="group"
             >
               {(["model", "day"] as const).map((mode) => (
@@ -906,7 +941,7 @@ export function AgentUsageSettings({
           </header>
           <div
             aria-labelledby={breakdownTitleId}
-            className="usage-overview-table-wrap"
+            className="scrollbar-subtle max-h-[420px] overflow-auto focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring [&_table]:w-full [&_table]:min-w-[650px] [&_table]:table-fixed [&_table]:border-collapse [&_th]:h-[38px] [&_th]:border-b [&_th]:border-border [&_th]:px-2.5 [&_th]:py-2 [&_th]:text-right [&_th]:text-micro [&_th]:font-medium [&_th]:text-muted-foreground [&_td]:h-12 [&_td]:border-b [&_td]:border-border [&_td]:px-2.5 [&_td]:py-2 [&_td]:text-right [&_td]:text-xs [&_td:not(:first-child)]:font-mono [&_th:first-child]:w-[43%] [&_th:first-child]:pl-0 [&_th:first-child]:text-left [&_td:first-child]:w-[43%] [&_td:first-child]:pl-0 [&_td:first-child]:text-left [&_th:last-child]:pr-0 [&_td:last-child]:pr-0"
             role="region"
             tabIndex={0}
           >
@@ -916,7 +951,9 @@ export function AgentUsageSettings({
               </caption>
               <thead>
                 <tr>
-                  <th>{t(breakdownMode === "model" ? "usage.model" : "usage.day")}</th>
+                  <th>
+                    {t(breakdownMode === "model" ? "usage.model" : "usage.day")}
+                  </th>
                   <th>{t("usage.tokens")}</th>
                   <th>{t("usage.cost")}</th>
                   <th>{t("usage.share")}</th>
@@ -926,24 +963,29 @@ export function AgentUsageSettings({
               <tbody>
                 {breakdownRows.length > 0 ? (
                   breakdownRows.map((row) => {
-                    const share = totalTokens > 0 ? row.tokens / totalTokens : 0;
+                    const share =
+                      totalTokens > 0 ? row.tokens / totalTokens : 0;
                     return (
                       <tr key={row.key}>
                         <td>
-                          <div className="usage-overview-breakdown-name">
+                          <div className="flex min-w-0 items-center gap-2">
                             {row.provider ? (
                               <ProviderMark provider={row.provider} />
                             ) : null}
-                            <span>
+                            <span className="flex min-w-0 flex-col gap-0.5 [&>strong]:truncate [&>strong]:text-xs [&>strong]:font-semibold [&>time]:truncate [&>time]:text-xs [&>time]:font-semibold">
                               {row.timestamp ? (
-                                <time dateTime={new Date(row.timestamp).toISOString()}>
+                                <time
+                                  dateTime={new Date(
+                                    row.timestamp,
+                                  ).toISOString()}
+                                >
                                   {row.label}
                                 </time>
                               ) : (
                                 <strong>{row.label}</strong>
                               )}
                               {row.provider ? (
-                                <small>
+                                <small className="truncate text-micro text-muted-foreground">
                                   {providerName(row.provider) ??
                                     t("usage.unknownProvider")}
                                   {row.modelSource
@@ -966,7 +1008,10 @@ export function AgentUsageSettings({
                   })
                 ) : (
                   <tr>
-                    <td className="usage-overview-table-empty" colSpan={5}>
+                    <td
+                      className="h-[130px]! text-center! text-muted-foreground"
+                      colSpan={5}
+                    >
                       {usageRunsLoaded
                         ? t("usage.noRecordedTokens")
                         : unavailableMessage}
@@ -978,13 +1023,15 @@ export function AgentUsageSettings({
           </div>
         </div>
 
-        <aside className="usage-overview-sidebar">
+        <aside className="grid min-w-0 gap-7 [&_h2]:m-0 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:tracking-tight [&>section>p]:mt-2.5 [&>section>p]:mb-0 [&>section>p]:text-micro [&>section>p]:leading-relaxed [&>section>p]:text-muted-foreground">
           <section>
             <h2>{t("usage.dataCoverage")}</h2>
-            <dl className="usage-overview-coverage">
+            <dl className="mt-3 mb-0 [&>div]:flex [&>div]:min-h-11 [&>div]:items-center [&>div]:justify-between [&>div]:gap-3 [&>div]:border-b [&>div]:border-border [&_dt]:text-xs [&_dt]:text-muted-foreground [&_dd]:m-0 [&_dd]:text-right [&_dd]:font-mono [&_dd]:text-xs [&_dd]:font-semibold">
               <div>
                 <dt>{t("usage.tokenReported")}</dt>
-                <dd>{usageRunsLoaded ? formatPercent(coverage, localeTag) : "—"}</dd>
+                <dd>
+                  {usageRunsLoaded ? formatPercent(coverage, localeTag) : "—"}
+                </dd>
               </div>
               <div>
                 <dt>{t("usage.actualModelReported")}</dt>
@@ -1012,7 +1059,9 @@ export function AgentUsageSettings({
               </div>
               <div>
                 <dt>{t("usage.cacheShare")}</dt>
-                <dd>{usageRunsLoaded ? formatPercent(cacheShare, localeTag) : "—"}</dd>
+                <dd>
+                  {usageRunsLoaded ? formatPercent(cacheShare, localeTag) : "—"}
+                </dd>
               </div>
             </dl>
             <p>
@@ -1026,14 +1075,14 @@ export function AgentUsageSettings({
             </p>
           </section>
 
-          <section className="usage-overview-pricing">
+          <section>
             <h2>{t("usage.costCalculation")}</h2>
-            <strong>
+            <strong className="mt-3 block text-xs font-semibold leading-snug">
               {usageReport
                 ? pricingStatusLabel(usageReport.pricing, localeTag, t)
                 : "—"}
             </strong>
-            <dl className="usage-overview-coverage">
+            <dl className="mt-3 mb-0 [&>div]:flex [&>div]:min-h-11 [&>div]:items-center [&>div]:justify-between [&>div]:gap-3 [&>div]:border-b [&>div]:border-border [&_dt]:text-xs [&_dt]:text-muted-foreground [&_dd]:m-0 [&_dd]:text-right [&_dd]:font-mono [&_dd]:text-xs [&_dd]:font-semibold">
               <div>
                 <dt>{t("usage.providerReportedCost")}</dt>
                 <dd>
@@ -1075,6 +1124,7 @@ export function AgentUsageSettings({
             <p>{t("usage.currentPricingNote")}</p>
             {usageReport ? (
               <a
+                className="mt-2.5 inline-flex text-micro text-muted-foreground underline decoration-current/45 underline-offset-3 hover:text-foreground"
                 href={LITELLM_MAIN_PRICING_SOURCE}
                 rel="noreferrer"
                 target="_blank"
@@ -1087,10 +1137,14 @@ export function AgentUsageSettings({
           </section>
 
           <section>
-            <header className="usage-overview-limit-title">
+            <header className="flex min-h-8 items-start justify-between gap-3">
               <h2>{t("usage.providerLimits")}</h2>
-              <div>
-                <button onClick={onManageAccounts} type="button">
+              <div className="flex items-center gap-0.5">
+                <button
+                  className="min-h-7 cursor-pointer rounded-md border-0 bg-transparent px-1.5 py-0 text-micro text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  onClick={onManageAccounts}
+                  type="button"
+                >
                   {t("usage.manageAccounts")}
                 </button>
                 <SettingsIconButton
@@ -1106,11 +1160,13 @@ export function AgentUsageSettings({
                 </SettingsIconButton>
               </div>
             </header>
-            <p className="usage-overview-limit-scope">
+            <p className="mt-2.5 mb-0 text-micro leading-relaxed text-muted-foreground">
               {t("usage.localLimitsScope")}
             </p>
-            {providerError ? <SettingsAlert>{providerError}</SettingsAlert> : null}
-            <div className="usage-overview-limits">
+            {providerError ? (
+              <SettingsAlert>{providerError}</SettingsAlert>
+            ) : null}
+            <div className="mt-3 grid gap-4 [&>p]:m-0 [&>p]:text-xs [&>p]:text-muted-foreground">
               {latest ? (
                 quotaUsageProviders.map((provider) => (
                   <ProviderLimitRow
@@ -1126,7 +1182,9 @@ export function AgentUsageSettings({
         </aside>
       </section>
 
-      <p className="usage-overview-note">{t("usage.metricsScope")}</p>
+      <p className="mt-6 mb-0 text-micro leading-relaxed text-muted-foreground">
+        {t("usage.metricsScope")}
+      </p>
     </SettingsSection>
   );
 }

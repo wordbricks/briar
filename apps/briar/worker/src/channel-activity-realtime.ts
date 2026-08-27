@@ -19,6 +19,43 @@ const issueActivityHubName = (
   runId: string,
 ) => `${organizationId}:issue:${projectId}:${runId}`;
 
+type ActivitySubscription = {
+  userId: string;
+  authorizationExpiresAt: number;
+};
+
+async function subscribeToActivity(
+  env: Env,
+  hubName: string,
+  input: ActivitySubscription,
+) {
+  const hub = env.CHANNEL_ACTIVITY_REALTIME.getByName(hubName);
+  const query = new URLSearchParams({
+    userId: input.userId,
+    authorizationExpiresAt: String(input.authorizationExpiresAt),
+  });
+  return hub.fetch(`https://channel-activity.internal/subscribe?${query}`, {
+    headers: { Upgrade: "websocket" },
+  });
+}
+
+async function publishActivity(
+  env: Env,
+  hubName: string,
+  frame: AgentReplyActivityFrame,
+  failureMessage: string,
+) {
+  const hub = env.CHANNEL_ACTIVITY_REALTIME.getByName(hubName);
+  const response = await hub.fetch("https://channel-activity.internal/publish", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(frame),
+  });
+  if (!response.ok) {
+    throw new Error(`${failureMessage} (${response.status})`);
+  }
+}
+
 /**
  * Conversation-scoped, ephemeral fan-out for user-visible Agent activity.
  *
@@ -152,16 +189,11 @@ export async function subscribeToChannelActivity(
     authorizationExpiresAt: number;
   },
 ) {
-  const hub = env.CHANNEL_ACTIVITY_REALTIME.getByName(
+  return subscribeToActivity(
+    env,
     activityHubName(input.organizationId, input.channelId),
+    input,
   );
-  const query = new URLSearchParams({
-    userId: input.userId,
-    authorizationExpiresAt: String(input.authorizationExpiresAt),
-  });
-  return hub.fetch(`https://channel-activity.internal/subscribe?${query}`, {
-    headers: { Upgrade: "websocket" },
-  });
 }
 
 export async function publishChannelActivity(
@@ -169,17 +201,12 @@ export async function publishChannelActivity(
   organizationId: string,
   frame: ChannelAgentActivityFrame,
 ) {
-  const hub = env.CHANNEL_ACTIVITY_REALTIME.getByName(
+  return publishActivity(
+    env,
     activityHubName(organizationId, frame.channelId),
+    frame,
+    "Channel activity publish failed",
   );
-  const response = await hub.fetch("https://channel-activity.internal/publish", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(frame),
-  });
-  if (!response.ok) {
-    throw new Error(`Channel activity publish failed (${response.status})`);
-  }
 }
 
 export async function subscribeToIssueActivity(
@@ -192,16 +219,11 @@ export async function subscribeToIssueActivity(
     authorizationExpiresAt: number;
   },
 ) {
-  const hub = env.CHANNEL_ACTIVITY_REALTIME.getByName(
+  return subscribeToActivity(
+    env,
     issueActivityHubName(input.organizationId, input.projectId, input.runId),
+    input,
   );
-  const query = new URLSearchParams({
-    userId: input.userId,
-    authorizationExpiresAt: String(input.authorizationExpiresAt),
-  });
-  return hub.fetch(`https://channel-activity.internal/subscribe?${query}`, {
-    headers: { Upgrade: "websocket" },
-  });
 }
 
 export async function publishIssueActivity(
@@ -209,17 +231,12 @@ export async function publishIssueActivity(
   organizationId: string,
   frame: IssueAgentActivityFrame,
 ) {
-  const hub = env.CHANNEL_ACTIVITY_REALTIME.getByName(
+  return publishActivity(
+    env,
     issueActivityHubName(organizationId, frame.projectId, frame.runId),
+    frame,
+    "Issue activity publish failed",
   );
-  const response = await hub.fetch("https://channel-activity.internal/publish", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(frame),
-  });
-  if (!response.ok) {
-    throw new Error(`Issue activity publish failed (${response.status})`);
-  }
 }
 
 export async function disconnectChannelActivitySubscribers(

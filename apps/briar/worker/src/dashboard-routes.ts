@@ -1,4 +1,8 @@
-import { projectUsageSummaryWindow } from "../../src/lib/project-usage-summary";
+import {
+  isProjectUsageDateRange,
+  projectUsageSummaryWindow,
+  type ProjectUsageDateRange,
+} from "../../src/lib/project-usage-summary";
 import { parseExecutionMetrics } from "./agent-result-json";
 import { listArchivedRunEvents } from "./archive";
 import type { BriarAuth } from "./auth";
@@ -43,7 +47,7 @@ import {
 import { organizationMemberJson } from "./organization-json";
 import {
   getOrganizationRole,
-  listOrganizationMembers,
+  listProjectMembers,
 } from "./organization-repository";
 import { projectJson } from "./project-json";
 import { settingsJson } from "./project-settings-json";
@@ -86,7 +90,11 @@ export async function handleDashboardRoute(input: {
       session.user.id,
     );
     if (!role) throw new HttpError(404, "Organization not found");
-    const runs = await listOrganizationStatusTrayRuns(db, organizationId);
+    const runs = await listOrganizationStatusTrayRuns(
+      db,
+      organizationId,
+      session.user.id,
+    );
     return json({
       runs: runs.map(statusTrayRunJson),
       generatedAt: new Date().toISOString(),
@@ -107,15 +115,38 @@ export async function handleDashboardRoute(input: {
     const period = decodeProjectUsagePeriod(
       new URL(request.url).searchParams.get("period") ?? "day",
     );
+    const search = new URL(request.url).searchParams;
+    const from = search.get("from");
+    const to = search.get("to");
+    let range: ProjectUsageDateRange | undefined;
+    if (from !== null || to !== null) {
+      range = { from: from ?? "", to: to ?? "" };
+      if (!isProjectUsageDateRange(range, period)) {
+        throw new HttpError(
+          400,
+          "Usage range is invalid or contains more than 400 timeline buckets",
+        );
+      }
+    }
     const generatedAt = Date.now();
-    const since = new Date(
-      projectUsageSummaryWindow(period, generatedAt).startAt,
-    ).toISOString();
+    const window = projectUsageSummaryWindow(
+      period,
+      generatedAt,
+      range,
+    );
+    const since = new Date(window.startAt).toISOString();
+    const until = new Date(window.endAt).toISOString();
     const [runs, totals] = await Promise.all([
-      listProjectUsageRuns(db, project.id, since),
-      listProjectUsageTotals(db, project.id, since),
+      listProjectUsageRuns(db, project.id, since, until),
+      listProjectUsageTotals(db, project.id, since, until),
     ]);
-    return json(projectUsageSummaryJson(runs, totals, period, generatedAt));
+    return json(projectUsageSummaryJson(
+      runs,
+      totals,
+      period,
+      generatedAt,
+      range,
+    ));
   }
 
   const dashboardDeltaMatch = url.pathname.match(
@@ -222,7 +253,7 @@ export async function handleDashboardRoute(input: {
           getProjectSettings(db, project.id),
           loadWorkflowCheckpointPolicy(db, project.id, session.user.id),
           getProjectExecutionWorkerPolicy(db, project.id),
-          listOrganizationMembers(db, project.organization_id),
+          listProjectMembers(db, project.id),
         ])
       : null;
     const conversationNotifications = notificationsChanged
@@ -269,7 +300,7 @@ export async function handleDashboardRoute(input: {
           checkpointPolicyJson(metadata[1]),
         ),
         executionPolicy: metadata[2],
-        members: metadata[3].map(organizationMemberJson),
+        members: metadata[3].map((member) => organizationMemberJson(member)),
       });
     }
     if (conversationNotifications) {
@@ -326,7 +357,7 @@ export async function handleDashboardRoute(input: {
           project.organization_id,
         ),
         getProjectExecutionWorkerPolicy(db, project.id),
-        listOrganizationMembers(db, project.organization_id),
+        listProjectMembers(db, project.id),
         listIssueConversationNotifications(
           db,
           project.id,
@@ -377,7 +408,7 @@ export async function handleDashboardRoute(input: {
       workers: workers.map((worker) => workerJson(worker, observedAt)),
       organizationProviders,
       executionPolicy,
-      members: members.map(organizationMemberJson),
+      members: members.map((member) => organizationMemberJson(member)),
       conversationNotifications: conversationNotifications.map(
         issueConversationNotificationJson,
       ),

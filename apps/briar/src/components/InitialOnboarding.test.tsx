@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import type { Root } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InitialOnboarding } from "./InitialOnboarding";
 
@@ -14,34 +15,31 @@ const createProps = () => ({
 });
 
 describe("InitialOnboarding", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
-Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
     vi.clearAllMocks();
   });
 
-
   it("starts email verification from the primary second-step action", async () => {
     const props = createProps();
-    await act(async () => root.render(<InitialOnboarding {...props} />));
+    await renderReactTestRoot(root, <InitialOnboarding {...props} />);
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".initial-welcome-copy button")
-        ?.click();
+      container.querySelector<HTMLButtonElement>("main section button")?.click();
     });
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".email-button")?.click();
+      container.querySelectorAll<HTMLButtonElement>("button")[0]?.click();
     });
 
     expect(props.onLogin).toHaveBeenCalledOnce();
@@ -54,16 +52,12 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       loading: true,
       loginCode: "RZEHG4T5",
     };
-    await act(async () => root.render(<InitialOnboarding {...props} />));
+    await renderReactTestRoot(root, <InitialOnboarding {...props} />);
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".initial-welcome-copy button")
-        ?.click();
+      container.querySelector<HTMLButtonElement>("main section button")?.click();
     });
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".initial-login-back")
-        ?.click();
+      container.querySelector<HTMLButtonElement>("main > section > button")?.click();
     });
 
     expect(props.onCancelLogin).toHaveBeenCalledOnce();

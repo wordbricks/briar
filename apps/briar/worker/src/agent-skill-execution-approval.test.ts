@@ -9,6 +9,7 @@ import {
   createChannelMessage,
   enqueueChannelAgentReplies,
   getChannelMessage,
+  type ChannelReplyJobRow,
 } from "./channels";
 import {
   acceptAgentSkillExecutionProposal,
@@ -60,6 +61,55 @@ const staleWorkerDeviceId = "95000000-0000-4000-8000-000000000004";
 
 const sha256 = (value: string) =>
   createHash("sha256").update(value).digest("hex");
+
+const providerCapabilities = {
+  codex: {
+    models: [{
+      id: "gpt-5.6-sol",
+      label: "GPT-5.6 Sol",
+      efforts: [{ id: "high", label: "High" }],
+    }],
+    defaultEfforts: [],
+    allowCustomModels: false,
+    error: null,
+  },
+  claude: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
+  cursor: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
+  grok: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: false,
+    error: null,
+  },
+  agy: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: false,
+    error: null,
+  },
+  opencode: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
+  openrouter: {
+    models: [],
+    defaultEfforts: [],
+    allowCustomModels: true,
+    error: null,
+  },
+};
 
 const backlogEvent = (
   sourceKey: string,
@@ -196,6 +246,17 @@ describe("conversational Agent Skill execution approval", () => {
         observedAt,
       ),
       db.prepare(
+        `insert into briar_project_members (
+           project_id, organization_id, user_id, created_at, updated_at
+         ) values (?, ?, ?, ?, ?)`,
+      ).bind(
+        projectId,
+        organizationId,
+        memberId,
+        observedAt,
+        observedAt,
+      ),
+      db.prepare(
         `insert into briar_project_settings (
            project_id, workflow_json, mandatory_checkpoints_json,
            created_at, updated_at
@@ -249,6 +310,7 @@ describe("conversational Agent Skill execution approval", () => {
         providerHealth: {
           codex: { installed: true, authenticated: true, healthy: true },
         },
+        providerCapabilities,
         versions: { briar: "1.0.0" },
         maxConcurrentSessions: 4,
         observedAt,
@@ -318,6 +380,8 @@ describe("conversational Agent Skill execution approval", () => {
 
   const createAgent = async (
     kind: "issue_processing" | "custom" = "custom",
+    executionMode: "conversation" | "task" = "task",
+    approvalPolicy: "invoke_is_consent" | "explicit" = "explicit",
   ) => createProjectAgent(db, projectId, {
     name: `Release Agent ${sequence + 1}`,
     provider: "codex",
@@ -333,14 +397,17 @@ describe("conversational Agent Skill execution approval", () => {
       model: "gpt-5.6-sol",
       effort: "high",
       kind,
+      executionMode,
+      approvalPolicy,
       position: 0,
     }],
   });
 
   const seedIssueProposal = async (
     kind: "issue_processing" | "custom" = "custom",
+    approvalPolicy: "invoke_is_consent" | "explicit" = "explicit",
   ) => {
-    const agent = await createAgent(kind);
+    const agent = await createAgent(kind, "task", approvalPolicy);
     const observedAt = new Date().toISOString();
     const request = `Run ${agent.skills[0].name} for request ${sequence + 1}.`;
     const runId = await recordHuntEvent(
@@ -658,6 +725,19 @@ describe("conversational Agent Skill execution approval", () => {
         requestedByUserId: ownerId,
       },
     });
+    const publishedIssueResult = await db.prepare(
+      `select proposal.result_message_id, message.body
+       from briar_agent_skill_execution_proposals proposal
+       join briar_issue_messages message
+         on message.id = proposal.result_message_id
+        and message.run_id = proposal.conversation_run_id
+       where proposal.id = ?`,
+    ).bind(seeded.proposal.id).first<{
+      result_message_id: string;
+      body: string;
+    }>();
+    expect(publishedIssueResult?.body).toContain(completionPayload.summary);
+    expect(publishedIssueResult?.body).toContain("briar-companion://sessions/");
     const hotReplay = await completeTask(
       claimed!.id,
       claimToken,
@@ -837,7 +917,8 @@ describe("conversational Agent Skill execution approval", () => {
         workerId,
       },
     });
-    const taskClaimHash = sha256("channel-approved-task");
+    const taskClaimToken = "briar_agent_task_claim_channel_approved_task";
+    const taskClaimHash = sha256(taskClaimToken);
     const task = await claimNextProjectAgentTask(db, projectId, {
       workerId,
       agentProviders: ["codex"],
@@ -846,12 +927,281 @@ describe("conversational Agent Skill execution approval", () => {
       leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
     });
     expect(task?.id).toBe(responseBody.proposal.resultSessionId);
-    expect(await completeProjectAgentTask(db, projectId, task!.id, {
-      workerId,
-      claimTokenHash: taskClaimHash,
+    expect((await completeTask(task!.id, taskClaimToken, {
       summary: "Channel Skill completed.",
-      updatedAt: new Date().toISOString(),
-    })).toMatchObject({ status: "completed" });
+      conversationId: null,
+    })).status).toBe(200);
+    const publishedChannelResult = await db.prepare(
+      `select proposal.result_message_id, message.body
+       from briar_agent_skill_execution_proposals proposal
+       join briar_channel_messages message
+         on message.id = proposal.result_message_id
+        and message.channel_id = proposal.channel_id
+       where proposal.id = ?`,
+    ).bind(proposal!.id).first<{
+      result_message_id: string;
+      body: string;
+    }>();
+    expect(publishedChannelResult?.body).toContain("Channel Skill completed.");
+  }, 60_000);
+
+  it("treats a task invocation as consent without waiting for another click", async () => {
+    const taskCountBefore = await tableCount("briar_project_agent_task_jobs");
+    const seeded = await seedIssueProposal("custom", "invoke_is_consent");
+    expect(seeded.proposal).toMatchObject({
+      status: "accepted",
+      execution_mode: "task",
+      approval_policy: "invoke_is_consent",
+      requested_worker_id: workerId,
+      accepted_by_user_id: ownerId,
+    });
+    expect(seeded.proposal.result_session_id).not.toBeNull();
+    expect(await tableCount("briar_project_agent_task_jobs"))
+      .toBe(taskCountBefore + 1);
+    const claimToken = "briar_agent_task_claim_invoke_is_consent";
+    expect(await claimNextProjectAgentTask(db, projectId, {
+      workerId,
+      agentProviders: ["codex"],
+      claimTokenHash: sha256(claimToken),
+      claimedAt: new Date().toISOString(),
+      leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+    })).toMatchObject({ id: seeded.proposal.result_session_id });
+    expect((await completeTask(
+      seeded.proposal.result_session_id!,
+      claimToken,
+      { summary: "Invocation-consent task completed.", conversationId: null },
+    )).status).toBe(200);
+  }, 60_000);
+
+  it("continues explicit approval in the original channel session", async () => {
+    const agent = await createAgent("custom", "conversation", "explicit");
+    await addChannelAgent(db, {
+      channelId,
+      agentId: agent.id,
+      addedByUserId: ownerId,
+      createdAt: new Date().toISOString(),
+    });
+    const request = "Explain this release flow in the current thread.";
+    const triggerMessageId = nextId(0xc1000000);
+    await createChannelMessage(db, {
+      id: triggerMessageId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: request,
+      mentionedUserIds: [],
+      mentionedAgentIds: [agent.id],
+      createdAt: new Date().toISOString(),
+    });
+    const [source] = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId,
+      parentMessageId: triggerMessageId,
+      agents: [{
+        id: agent.id,
+        projectId,
+        skillId: agent.skills[0].id,
+        provider: "codex",
+      }],
+      createdAt: new Date().toISOString(),
+    });
+    const sourceClaimHash = sha256(`conversation-source-${source.id}`);
+    const sourceClaim = await claimNextChannelAgentReply(db, organizationId, {
+      deviceId: workerDeviceId,
+      workerId,
+      providers: ["codex"],
+      supportsOrganizationAgentContext: true,
+      claimTokenHash: sourceClaimHash,
+      claimedAt: new Date().toISOString(),
+      leaseExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+    expect(sourceClaim?.id).toBe(source.id);
+    expect(await completeChannelReply(db, sourceClaim!, {
+      jobId: source.id,
+      deviceId: workerDeviceId,
+      workerId,
+      claimTokenHash: sourceClaimHash,
+      body: "Approve this Skill to continue in the conversation.",
+      document: null,
+      issueProposal: null,
+      executionProposal: null,
+      skillExecutionProposal: true,
+      delegation: null,
+      agentName: agent.name,
+      agentProvider: "codex",
+      completedAt: new Date().toISOString(),
+      conversationId: "retained-conversation-id",
+    })).not.toBeNull();
+    const proposal = await db.prepare(
+      `select * from briar_agent_skill_execution_proposals
+       where source_reply_job_id = ?`,
+    ).bind(source.id).first<AgentSkillExecutionProposalRow>();
+    expect(proposal).toMatchObject({
+      status: "pending",
+      execution_mode: "conversation",
+      approval_policy: "explicit",
+      channel_id: channelId,
+      thread_root_message_id: triggerMessageId,
+      trigger_message_id: triggerMessageId,
+    });
+    await db.prepare(
+      `update briar_channel_reply_sessions
+       set owner_device_id = null, owner_worker_id = null,
+           conversation_id = null,
+           last_activity_at = '2026-01-01T00:00:00.000Z',
+           retained_until = '2026-01-01T00:00:00.000Z',
+           updated_at = '2026-01-01T00:00:00.000Z'
+       where id = ?`,
+    ).bind(source.session_id).run();
+    const taskCountBefore = await tableCount("briar_project_agent_task_jobs");
+    const response = await apiWorker.fetch(new Request(
+      `https://briar.example/organizations/${organizationId}/channels/${channelId}` +
+        `/skill-execution-proposals/${proposal!.id}/accept`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+          "content-type": "application/json",
+        },
+        body: "{}",
+      },
+    ), env());
+    expect(response.status).toBe(200);
+    const accepted = await response.json() as {
+      proposal: {
+        resultSessionId: string;
+        resultMessageId: string;
+        requestedWorkerId: string;
+        executionStatus: string;
+      };
+      session: unknown;
+    };
+    expect(accepted).toMatchObject({
+      proposal: {
+        resultSessionId: source.session_id,
+        requestedWorkerId: workerId,
+        executionStatus: "running",
+      },
+      session: null,
+    });
+    expect(await tableCount("briar_project_agent_task_jobs"))
+      .toBe(taskCountBefore);
+    const continuedJob = await db.prepare(
+      `select * from briar_channel_agent_reply_jobs where id = (
+         select result_reply_job_id
+         from briar_agent_skill_execution_proposals where id = ?
+       )`,
+    ).bind(proposal!.id).first<ChannelReplyJobRow>();
+    expect(continuedJob).toMatchObject({
+      status: "queued",
+      session_id: source.session_id,
+      parent_message_id: triggerMessageId,
+      trigger_message_id: source.reply_message_id,
+      reply_message_id: accepted.proposal.resultMessageId,
+      approved_skill_execution_proposal_id: proposal!.id,
+    });
+    const continuedClaimResponse = await apiWorker.fetch(new Request(
+      "https://briar.example/channel-reply-claims",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer briar_worker_skill_credential_one",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ organizationId, workerId }),
+      },
+    ), env());
+    expect(continuedClaimResponse.status).toBe(200);
+    const continuedClaim = await continuedClaimResponse.json() as {
+      work: {
+        workId: string;
+        claimToken: string;
+        triggerMessageId: string;
+        parentMessageId: string;
+        session: {
+          id: string;
+          conversationId: string | null;
+          claimReason: string;
+        };
+        skillExecutionTarget: {
+          request: string;
+          executionMode: string;
+          approvalPolicy: string;
+          approved: boolean;
+        };
+        snapshot: { messages: Array<{ id: string; body: string }> };
+      };
+    };
+    expect(continuedClaim.work).toMatchObject({
+      workId: continuedJob!.id,
+      triggerMessageId: source.reply_message_id,
+      parentMessageId: triggerMessageId,
+      session: {
+        id: source.session_id,
+        conversationId: null,
+        claimReason: "ttl_expired_reactivated",
+      },
+      skillExecutionTarget: {
+        request,
+        executionMode: "conversation",
+        approvalPolicy: "explicit",
+        approved: true,
+      },
+    });
+    expect(continuedClaim.work.snapshot.messages.map((message) => message.id))
+      .toEqual([triggerMessageId, source.reply_message_id]);
+    const continuedClaimHash = sha256(continuedClaim.work.claimToken);
+    expect(await completeChannelReply(db, continuedJob!, {
+      jobId: continuedJob!.id,
+      deviceId: workerDeviceId,
+      workerId,
+      claimTokenHash: continuedClaimHash,
+      body: "Conversation Skill result with an HTML artifact.",
+      document: {
+        title: "ELI5 result",
+        markdown: "<div><strong>A tiny visual explanation.</strong></div>",
+        projectId,
+      },
+      issueProposal: null,
+      executionProposal: null,
+      skillExecutionProposal: false,
+      delegation: null,
+      agentName: agent.name,
+      agentProvider: "codex",
+      completedAt: new Date().toISOString(),
+      conversationId: "retained-conversation-id",
+    })).not.toBeNull();
+    expect(await getChannelMessage(
+      db,
+      channelId,
+      accepted.proposal.resultMessageId,
+    )).toMatchObject({
+      body: "Conversation Skill result with an HTML artifact.",
+      document: {
+        title: "ELI5 result",
+        projectId,
+      },
+    });
+    expect(await db.prepare(
+      `select title, markdown, project_id
+       from briar_channel_message_documents where message_id = ?`,
+    ).bind(accepted.proposal.resultMessageId).first()).toEqual({
+      title: "ELI5 result",
+      markdown: "<div><strong>A tiny visual explanation.</strong></div>",
+      project_id: projectId,
+    });
+    expect((await getChannelMessage(
+      db,
+      channelId,
+      source.reply_message_id,
+    ))?.skillExecutionProposal).toMatchObject({
+      executionStatus: "completed",
+      resultMessageId: accepted.proposal.resultMessageId,
+    });
   }, 60_000);
 
   it("receipts a retryable failure without consuming the claim twice", async () => {
@@ -1204,6 +1554,15 @@ describe("conversational Agent Skill execution approval", () => {
         error: "retryable failure 3",
       },
     });
+    expect(await db.prepare(
+      `select message.body
+       from briar_agent_skill_execution_proposals proposal
+       join briar_issue_messages message
+         on message.id = proposal.result_message_id
+       where proposal.id = ?`,
+    ).bind(seeded.proposal.id).first<{ body: string }>()).toMatchObject({
+      body: expect.stringContaining("retryable failure 3"),
+    });
     expect((await completeTask(
       body.proposal.resultSessionId,
       "briar_agent_task_claim_retry_claim_3",
@@ -1242,6 +1601,17 @@ describe("conversational Agent Skill execution approval", () => {
       projectId,
       reapedBody.proposal.resultSessionId,
     ))?.status).toBe("failed");
+    expect(await db.prepare(
+      `select message.body
+       from briar_agent_skill_execution_proposals proposal
+       join briar_issue_messages message
+         on message.id = proposal.result_message_id
+       where proposal.id = ?`,
+    ).bind(reapedSeed.proposal.id).first<{ body: string }>()).toMatchObject({
+      body: expect.stringContaining(
+        "Worker lease expired after repeated attempts.",
+      ),
+    });
   }, 60_000);
 
   it("reconciles permanent Agent, Skill, Worker, and policy revocation", async () => {

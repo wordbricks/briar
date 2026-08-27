@@ -32,7 +32,8 @@ async function registerRows(
 }
 
 /**
- * The PR webhook may race the ci_qa completion response in either direction.
+ * The PR webhook may race the configured readiness-stage completion response
+ * in either direction.
  * Re-reading canonical D1 state makes both callbacks safe and idempotent.
  */
 export async function reconcileMergeQueuePullRequest(
@@ -47,11 +48,6 @@ export async function reconcileMergeQueuePullRequest(
     `select distinct run.project_id, run.id as run_id,
             run.current_attempt, run.current_revision
      from briar_hunt_runs run
-     join briar_run_stage_progress progress
-       on progress.run_id = run.id
-      and progress.attempt = run.current_attempt
-      and progress.revision = run.current_revision
-      and progress.stage_id = 'ci_qa' and progress.state = 'completed'
      join briar_run_pull_requests link
        on link.project_id = run.project_id and link.run_id = run.id
       and link.attempt = run.current_attempt
@@ -62,6 +58,12 @@ export async function reconcileMergeQueuePullRequest(
       and profile.repository = link.repository
       and profile.base_branch = coalesce(link.base_branch, 'main')
       and profile.enabled = 1
+     join briar_run_stage_progress progress
+       on progress.run_id = run.id
+      and progress.attempt = run.current_attempt
+      and progress.revision = run.current_revision
+      and progress.stage_id = profile.readiness_stage_id
+      and progress.state = 'completed'
      where run.status = 'running' and link.repository_id = ?
        and link.pull_request_number = ?`,
   ).bind(
@@ -81,11 +83,6 @@ export async function reconcileEnabledMergeQueueRuns(
     `select distinct run.project_id, run.id as run_id,
             run.current_attempt, run.current_revision
      from briar_hunt_runs run
-     join briar_run_stage_progress progress
-       on progress.run_id = run.id
-      and progress.attempt = run.current_attempt
-      and progress.revision = run.current_revision
-      and progress.stage_id = 'ci_qa' and progress.state = 'completed'
      join briar_run_pull_requests link
        on link.project_id = run.project_id and link.run_id = run.id
       and link.attempt = run.current_attempt
@@ -96,6 +93,12 @@ export async function reconcileEnabledMergeQueueRuns(
       and profile.repository = link.repository
       and profile.base_branch = coalesce(link.base_branch, 'main')
       and profile.enabled = 1
+     join briar_run_stage_progress progress
+       on progress.run_id = run.id
+      and progress.attempt = run.current_attempt
+      and progress.revision = run.current_revision
+      and progress.stage_id = profile.readiness_stage_id
+      and progress.state = 'completed'
      where run.status = 'running'
      order by run.project_id, run.started_at, run.id
      limit ?`,

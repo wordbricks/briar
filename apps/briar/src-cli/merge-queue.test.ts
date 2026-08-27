@@ -310,6 +310,7 @@ describe("local provider-independent merge-queue worker", () => {
       repository: "wordbricks/briar",
       baseBranch: "main" as const,
       enabled: true,
+      readinessStageId: "ci_qa",
       quietWindowMs: 30_000,
       maxBatchSize: 5,
       updatedAt: "2026-08-21T01:00:00Z",

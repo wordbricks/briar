@@ -228,6 +228,39 @@
             "$ref": "#/components/responses/Error"
           }
         }
+      },
+      "delete": {
+        "operationId": "deleteInboxReadState",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InboxUnreadStateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated account inbox read versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxReadStates"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/projects": {
@@ -2008,6 +2041,14 @@
         },
         "additionalProperties": false
       },
+      "InboxUnreadStateRequest": {
+        "type": "object",
+        "required": ["messageId"],
+        "properties": {
+          "messageId": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
       "MobileClientId": {
         "type": "string",
         "enum": [
@@ -2298,6 +2339,34 @@
         },
         "additionalProperties": true
       },
+      "RelatedMessageReference": {
+        "type": "object",
+        "required": [
+          "organizationId",
+          "channelId",
+          "messageId",
+          "rootMessageId"
+        ],
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channelId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rootMessageId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": true
+      },
       "MessageAuthor": {
         "type": "object",
         "required": [
@@ -2519,13 +2588,16 @@
             "maximum": 4
           },
           "difficulty": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "enum": [
               "easy",
               "normal",
-              "hard"
-            ],
-            "default": "normal"
+              "hard",
+              null
+            ]
           },
           "assigneeUserId": {
             "type": [
@@ -2562,6 +2634,16 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "relatedMessage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RelatedMessageReference"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "attachments": {

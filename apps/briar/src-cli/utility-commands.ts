@@ -124,6 +124,17 @@ async function configureMergeQueueCommand() {
     `/projects/${project.id}/merge-queue-profile`,
     userToken,
   ));
+  const readinessStageId = value("--readiness-stage") ??
+    current?.readinessStageId;
+  if (has("--enable") && !readinessStageId) {
+    throw new Error(
+      "--readiness-stage is required when enabling a new merge queue profile",
+    );
+  }
+  if (has("--disable") && !current && !readinessStageId) {
+    console.log(JSON.stringify({ profile: null }, null, 2));
+    return;
+  }
   const quietWindowMs = mergeQueueIntegerOption(
     "--quiet-window-ms",
     current?.quietWindowMs ?? 300_000,
@@ -144,6 +155,7 @@ async function configureMergeQueueCommand() {
       method: "PUT",
       body: JSON.stringify({
         enabled: has("--enable"),
+        ...(readinessStageId ? { readinessStageId } : {}),
         quietWindowMs,
         maxBatchSize,
       }),

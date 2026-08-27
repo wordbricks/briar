@@ -47,7 +47,10 @@ import type { ProjectAgentLocale } from "./project-agent";
 import type { ModelEffort } from "./agent-provider-contract";
 import type { AgentProvider } from "./agent-provider";
 import type { UsageRangeDays } from "./agent-usage-overview";
-import type { ProjectUsagePeriod } from "./project-usage-summary";
+import type {
+  ProjectUsageDateRange,
+  ProjectUsagePeriod,
+} from "./project-usage-summary";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./agent-usage-pricing";
 import type { AutoHuntSession } from "../hooks/useAutoHuntSessions";
 import type { InboxMessage } from "../hooks/useInbox";
@@ -56,6 +59,7 @@ import type {
   ChannelAgentSkillInput,
   ChannelAgentSummary,
   ChannelDelta,
+  ChannelLinkPreview,
   ChannelMember,
   ChannelMessage,
   ChannelMessageAttachment,
@@ -84,6 +88,8 @@ import type {
   ManagedComputer,
   ManagedComputerProduct,
   ManagedComputerRemoteSessionTicket,
+  MergeQueueProfile,
+  MergeQueueStatus,
   ProjectExecutionWorkerPolicy,
   HuntRunPlacement,
   HuntEvent,
@@ -296,6 +302,21 @@ export async function saveInboxReadStates(
     {
       method: "PUT",
       body: JSON.stringify({ readVersions }),
+    },
+  );
+  return decodeInboxReadVersions(result.readVersions ?? {});
+}
+
+export async function deleteInboxReadState(
+  token: string,
+  messageId: string,
+): Promise<Record<string, string>> {
+  const result = await request<{ readVersions?: unknown }>(
+    "/inbox/read-states",
+    token,
+    {
+      method: "DELETE",
+      body: JSON.stringify({ messageId }),
     },
   );
   return decodeInboxReadVersions(result.readVersions ?? {});
@@ -670,6 +691,22 @@ export async function updateOrganizationMemberRole(
   );
 }
 
+export async function updateOrganizationMemberProjects(
+  token: string,
+  organizationId: string,
+  userId: string,
+  projectIds: string[],
+) {
+  return request<{ members: OrganizationMember[] }>(
+    `/organizations/${organizationId}/members/${encodeURIComponent(userId)}/projects`,
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify({ projectIds }),
+    },
+  );
+}
+
 export async function removeOrganizationMember(
   token: string,
   organizationId: string,
@@ -812,10 +849,16 @@ export async function loadProjectUsageSummary(
   token: string,
   projectId: string,
   period: ProjectUsagePeriod = "day",
+  range?: ProjectUsageDateRange,
   signal?: AbortSignal,
 ): Promise<ProjectUsageSummary> {
+  const search = new URLSearchParams({ period });
+  if (range) {
+    search.set("from", range.from);
+    search.set("to", range.to);
+  }
   return decodeProjectUsageSummaryResponse(await request<ProjectUsageSummary>(
-    `/projects/${encodeURIComponent(projectId)}/usage/summary?period=${period}`,
+    `/projects/${encodeURIComponent(projectId)}/usage/summary?${search}`,
     token,
     { signal },
   ));
@@ -1407,7 +1450,7 @@ export async function createIssue(
   form.set("title", input.title);
   form.set("description", input.description ?? "");
   form.set("priority", input.priority === null ? "" : String(input.priority));
-  form.set("difficulty", input.difficulty);
+  form.set("difficulty", input.difficulty ?? "");
   form.set("assigneeUserId", input.assigneeUserId ?? "");
   form.set("status", input.status);
   form.set("preferredProvider", input.preferredProvider ?? "");
@@ -1634,13 +1677,13 @@ export async function loadChannelMessageAttachment(
   attachment: ChannelMessageAttachment,
 ) {
   if (!apiUrl || !attachment.url.startsWith("/")) {
-    throw new Error("첨부 이미지 경로가 유효하지 않습니다.");
+    throw new Error("첨부 파일 경로가 유효하지 않습니다.");
   }
   const response = await fetch(`${apiUrl}${attachment.url}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
-    throw new Error(`첨부 이미지를 열 수 없습니다. (${response.status})`);
+    throw new Error(`첨부 파일을 열 수 없습니다. (${response.status})`);
   }
   return response.blob();
 }
@@ -1653,6 +1696,19 @@ export async function loadChannelMessageDocument(
 ) {
   return request<{ document: ChannelMessageDocumentContent }>(
     `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/document`,
+    token,
+  );
+}
+
+export async function loadChannelLinkPreview(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  targetUrl: string,
+) {
+  const params = new URLSearchParams({ url: targetUrl });
+  return request<{ preview: ChannelLinkPreview | null }>(
+    `/organizations/${organizationId}/channels/${channelId}/link-preview?${params}`,
     token,
   );
 }
@@ -1833,8 +1889,9 @@ function assertPendingAgentSkillExecutionApproval(
     proposal.requestedWorkerId !== null ||
     proposal.requestedWorkerLabel !== null ||
     proposal.resultSessionId !== null ||
-    !input.workerId ||
-    input.workerId !== input.workerId.trim()
+    (proposal.executionMode === "task" &&
+      (!input.workerId || input.workerId !== input.workerId.trim())) ||
+    (proposal.executionMode === "conversation" && input.workerId !== undefined)
   ) {
     throw new Error(
       "Skill execution approval requires one exact Worker and a pending proposal.",
@@ -1854,6 +1911,8 @@ const skillExecutionSnapshotKeys = [
   "provider",
   "model",
   "effort",
+  "executionMode",
+  "approvalPolicy",
   "createdAt",
   "delegatedByAgentId",
   "delegatedByAgentName",
@@ -1864,10 +1923,12 @@ function validateAgentSkillExecutionAcceptance(
   expected: AgentSkillExecutionProposal,
   input: AgentSkillExecutionApprovalInput,
 ) {
-  const session = {
-    ...decodeProjectAgentSessionResponse(result.session),
-    localOwner: false,
-  } as AutoHuntSession;
+  const session = result.session === null
+    ? null
+    : {
+      ...decodeProjectAgentSessionResponse(result.session),
+      localOwner: false,
+    } as AutoHuntSession;
   const snapshotChanged = skillExecutionSnapshotKeys.some(
     (key) => result.proposal[key] !== expected[key],
   );
@@ -1877,18 +1938,23 @@ function validateAgentSkillExecutionAcceptance(
     result.projectId !== expected.projectId ||
     result.proposal.status !== "accepted" ||
     !result.proposal.acceptedAt ||
-    result.proposal.requestedWorkerId !== input.workerId ||
     !result.proposal.requestedWorkerLabel?.trim() ||
-    result.proposal.resultSessionId !== session.id ||
-    session.projectId !== expected.projectId ||
-    session.agentId !== expected.agentId ||
-    session.agentName !== expected.agentName ||
-    session.skillId !== expected.skillId ||
-    session.sessionType !== "task" ||
-    session.trigger !== "manual" ||
-    session.request !== expected.request ||
-    session.requestedWorkerId !== input.workerId ||
-    session.workerId !== input.workerId
+    (expected.executionMode === "conversation"
+      ? session !== null ||
+        !result.proposal.requestedWorkerId ||
+        !result.proposal.resultMessageId
+      : session === null ||
+        result.proposal.requestedWorkerId !== input.workerId ||
+        result.proposal.resultSessionId !== session.id ||
+        session.projectId !== expected.projectId ||
+        session.agentId !== expected.agentId ||
+        session.agentName !== expected.agentName ||
+        session.skillId !== expected.skillId ||
+        session.sessionType !== "task" ||
+        session.trigger !== "manual" ||
+        session.request !== expected.request ||
+        session.requestedWorkerId !== input.workerId ||
+        session.workerId !== input.workerId)
   ) {
     throw new Error(
       "Skill execution approval returned inconsistent immutable evidence.",
@@ -2029,7 +2095,7 @@ export async function updateIssue(
   form.set("title", input.title);
   form.set("description", input.description ?? "");
   form.set("priority", input.priority === null ? "" : String(input.priority));
-  form.set("difficulty", input.difficulty);
+  form.set("difficulty", input.difficulty ?? "");
   form.set("assigneeUserId", input.assigneeUserId ?? "");
   if (input.attachmentReferences?.length) {
     form.set(
@@ -2738,6 +2804,38 @@ export async function updateProjectSettings(
       workflow: normalizeDashboardWorkflow(result.settings.workflow),
     },
   };
+}
+
+export async function loadMergeQueueProfile(
+  token: string,
+  projectId: string,
+) {
+  return request<{ profile: MergeQueueProfile | null }>(
+    `/projects/${projectId}/merge-queue-profile`,
+    token,
+  );
+}
+
+export async function loadMergeQueueStatus(
+  token: string,
+  projectId: string,
+) {
+  return request<{ status: MergeQueueStatus; generatedAt: string }>(
+    `/projects/${projectId}/merge-queue-status`,
+    token,
+  );
+}
+
+export async function updateMergeQueueProfile(
+  token: string,
+  projectId: string,
+  input: { enabled: boolean; readinessStageId: string },
+) {
+  return request<{ profile: MergeQueueProfile }>(
+    `/projects/${projectId}/merge-queue-profile`,
+    token,
+    { method: "PUT", body: JSON.stringify(input) },
+  );
 }
 
 export async function connectLinearImport(

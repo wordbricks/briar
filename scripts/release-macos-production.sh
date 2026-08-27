@@ -246,6 +246,9 @@ if [[ "$publish" == true ]]; then
 
   curl --fail --silent --show-error --head \
     "${BRIAR_RELEASE_BASE_URL}/${tag}/Briar.app.tar.gz" >/dev/null
+  curl --fail --silent --show-error --head \
+    "${BRIAR_RELEASE_BASE_URL}/${tag}/briar-managed-runtime-${version}-linux-x86_64.tar.gz" \
+    >/dev/null
   gh release edit "$tag" --repo "$repository" --draft=false --latest
   bunx wrangler r2 object put \
     "briar-releases/releases/latest.json" \
@@ -286,9 +289,11 @@ scripts/with-release-env.sh \
   bun run apps/briar/src-cli/production-release.ts config \
     --version "$version" \
     --output "$production_config"
-# Tauri's DMG bundler invokes Finder AppleScript unless CI is set. Production
-# builds must remain reproducible in headless CI and agent environments.
-CI=true scripts/with-release-env.sh \
+# Tauri uses Finder to apply the configured background and icon positions.
+# Explicitly clear CI so a caller's environment cannot silently publish the
+# unstyled fallback DMG. Production releases therefore require a macOS GUI
+# session; updater-only QA remains headless-safe in its separate script.
+env -u CI scripts/with-release-env.sh \
   bun --cwd apps/briar tauri build --config "$production_config"
 
 dmg_directory="$BRIAR_RELEASE_CARGO_TARGET_DIR/release/bundle/dmg"

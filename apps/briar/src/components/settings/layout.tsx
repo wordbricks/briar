@@ -43,15 +43,15 @@ export function SettingsSidebar({
       aria-hidden={!isOpen}
       aria-label={label}
       className={cn(
-        "settings-sidebar sidebar flex h-full min-w-0 flex-col overflow-hidden border-r border-border/80 bg-muted shadow-none",
-        isOpen ? "w-[252px] flex-[0_0_252px]" : "sidebar-collapsed w-0 flex-none overflow-hidden border-r-0",
+        "flex h-full min-w-0 flex-col overflow-hidden border-r border-border/80 bg-muted shadow-none",
+        isOpen ? "w-[252px] flex-[0_0_252px]" : "w-0 flex-none overflow-hidden border-r-0",
         className,
       )}
       id="app-sidebar"
       inert={!isOpen ? true : undefined}
     >
       <div
-        className="settings-sidebar-toolbar h-[46px] shrink-0 pl-[var(--traffic-light-safe-inset)]"
+        className="h-[46px] shrink-0 pl-[var(--traffic-light-safe-inset)]"
         data-tauri-drag-region
       />
       {children}
@@ -67,7 +67,7 @@ export function SettingsBackButton({
   return (
     <button
       className={cn(
-        "settings-back mx-2.5 mb-2.5 flex h-[34px] w-[calc(100%-20px)] items-center gap-2 rounded-md border-0 bg-transparent px-2.5 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.985]",
+        "mx-2.5 mb-2.5 flex h-[34px] w-[calc(100%-20px)] items-center gap-2 rounded-md border-0 bg-transparent px-2.5 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.985]",
         className,
       )}
       type="button"
@@ -95,7 +95,7 @@ export function SettingsSearch({
   return (
     <label
       className={cn(
-        "settings-search mx-3 mb-3.5 flex h-[34px] items-center gap-2 rounded-md border border-border bg-card px-2.5 text-muted-foreground focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20",
+        "mx-3 mb-3.5 flex h-[34px] items-center gap-2 rounded-md border border-border bg-card px-2.5 text-muted-foreground focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20",
         className,
       )}
     >
@@ -122,7 +122,7 @@ export function SettingsNav({
   return (
     <nav
       className={cn(
-        "settings-nav scrollbar-subtle grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-2.5 pb-5",
+        "scrollbar-subtle grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-2.5 pb-5",
         className,
       )}
     >
@@ -141,7 +141,7 @@ export function SettingsNavGroup({
   label?: string;
 }) {
   return (
-    <div className={cn("settings-nav-group grid gap-0.5", className)}>
+    <div className={cn("grid gap-0.5", className)}>
       {label ? (
         <Typography
           as="p"
@@ -171,7 +171,7 @@ export function SettingsNavItem({
     <button
       aria-current={active ? "page" : undefined}
       className={cn(
-        "settings-nav-item flex h-[34px] w-full items-center gap-2.5 rounded-md border-0 bg-transparent px-2.5 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.985]",
+        "flex h-[34px] w-full items-center gap-2.5 rounded-md border-0 bg-transparent px-2.5 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.985]",
         active && "bg-sidebar-accent font-semibold text-sidebar-accent-foreground",
         className,
       )}
@@ -205,13 +205,13 @@ export function SettingsMain({
   return (
     <section
       className={cn(
-        "settings-main main-content flex h-full min-w-0 flex-1 flex-col bg-card",
+        "flex h-full min-w-0 flex-1 flex-col bg-card",
         className,
       )}
     >
       <div
         className={cn(
-          "settings-main-toolbar h-[46px] shrink-0",
+          "h-[46px] shrink-0",
           !isSidebarOpen && "pl-[var(--window-navigation-content-inset)]",
         )}
         data-tauri-drag-region="deep"
@@ -231,7 +231,7 @@ export function SettingsScroll({
   return (
     <div
       className={cn(
-        "settings-scroll scrollbar-subtle min-h-0 flex-1 overflow-auto px-[clamp(28px,5vw,80px)] pb-[72px] pt-2 [scrollbar-gutter:stable]",
+        "scrollbar-subtle min-h-0 flex-1 overflow-auto px-[clamp(28px,5vw,80px)] pb-[72px] pt-2 [scrollbar-gutter:stable]",
         className,
       )}
     >
@@ -252,7 +252,7 @@ export function SettingsPageHeader({
   return (
     <header
       className={cn(
-        "settings-page-header mx-auto mb-7 w-full max-w-[720px]",
+        "mx-auto mb-7 w-full max-w-[720px]",
         className,
       )}
     >
@@ -278,7 +278,7 @@ export function SettingsSection({
   return (
     <div
       className={cn(
-        "settings-section mx-auto w-full max-w-[720px] pb-6",
+        "mx-auto w-full max-w-[720px] pb-6",
         className,
       )}
     >
@@ -299,7 +299,7 @@ export function SettingsGroupHeading({
   return (
     <div
       className={cn(
-        "settings-group-heading mb-3 mt-0 flex min-h-7 items-center justify-between gap-3 first:mt-0 not-first:mt-8 mx-0.5",
+        "mb-3 mt-0 flex min-h-7 items-center justify-between gap-3 first:mt-0 not-first:mt-8 mx-0.5",
         className,
       )}
     >
@@ -319,7 +319,7 @@ export function SettingsCard({
   return (
     <div
       className={cn(
-        "settings-card overflow-hidden rounded-xl border border-border bg-card",
+        "overflow-hidden rounded-xl border border-border bg-card",
         className,
       )}
       {...props}

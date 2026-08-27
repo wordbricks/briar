@@ -267,6 +267,9 @@ export async function handleIssueReplyWorkerRoute(input: {
               skillId: selectedSkill.id,
               skillName: selectedSkill.name,
               request: job.skill_execution_request_snapshot!,
+              executionMode: selectedSkill.execution_mode,
+              approvalPolicy: selectedSkill.approval_policy,
+              approved: false,
             }
           : null,
         agent: agent
@@ -508,7 +511,7 @@ export async function handleIssueReplyWorkerRoute(input: {
       ),
     ].filter(Boolean).join("\n\n");
     const uploadedKeys: string[] = [];
-    const discardUploadedReplyImages = () =>
+    const discardUploadedReplyAttachments = () =>
       deleteUnreferencedUploadedIssueObjects(
         db,
         attachmentsBucket,
@@ -548,11 +551,11 @@ export async function handleIssueReplyWorkerRoute(input: {
         },
       );
     } catch (error) {
-      await discardUploadedReplyImages().catch(() => undefined);
+      await discardUploadedReplyAttachments().catch(() => undefined);
       throw error;
     }
     if (!completed) {
-      await discardUploadedReplyImages().catch(() => undefined);
+      await discardUploadedReplyAttachments().catch(() => undefined);
       throw new HttpError(409, "Reply claim is no longer active");
     }
     scheduleProjectRealtimePublish(env, db, input.projectId, context);

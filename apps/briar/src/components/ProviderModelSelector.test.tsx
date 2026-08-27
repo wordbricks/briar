@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import type { Root } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { defaultAgentProviderModelCatalog } from "../lib/project-llm";
@@ -27,43 +28,43 @@ const catalog = {
 };
 
 describe("ProviderModelSelector", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
+  let root: Root;
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     window.localStorage.clear();
-    container = document.createElement("div");
-    document.body.append(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
-  afterEach(() => {
-    container.remove();
+  afterEach(async () => {
+    await cleanup();
     document.body.innerHTML = "";
   });
 
   it("combines provider filtering, model search, favorites, and shortcuts", async () => {
     const onModelChange = vi.fn();
     const onProviderChange = vi.fn();
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <ProviderModelSelector
-          groupLabel="실행 프로바이더 · 선호 모델"
-          modelLabel="선호 모델"
-          modelSearchEmptyMessage="검색 결과 없음"
-          modelSearchPlaceholder="모델 검색"
-          modelValue="gpt-5.6-sol"
-          onModelChange={onModelChange}
-          onProviderChange={onProviderChange}
-          providerDefaultModelLabel="프로바이더 기본 모델"
-          providerLabel="실행 프로바이더"
-          providerModels={catalog}
-          providers={["codex", "claude"]}
-          providerValue="codex"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <ProviderModelSelector
+        groupLabel="실행 프로바이더 · 선호 모델"
+        modelLabel="선호 모델"
+        modelSearchEmptyMessage="검색 결과 없음"
+        modelSearchPlaceholder="모델 검색"
+        modelValue="gpt-5.6-sol"
+        onModelChange={onModelChange}
+        onProviderChange={onProviderChange}
+        providerDefaultModelLabel="프로바이더 기본 모델"
+        providerLabel="실행 프로바이더"
+        providerModels={catalog}
+        providers={["codex", "claude"]}
+        providerValue="codex"
+      />,
+    );
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
@@ -137,6 +138,5 @@ describe("ProviderModelSelector", () => {
     expect(onProviderChange).not.toHaveBeenCalled();
     expect(onModelChange).toHaveBeenCalledWith("gpt-5.6-terra");
 
-    await act(async () => root.unmount());
   });
 });

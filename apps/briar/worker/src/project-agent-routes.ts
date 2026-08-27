@@ -1,4 +1,5 @@
 import { agentProviderLabels } from "../../src/lib/agent-provider";
+import { channelReplyAssignedWorkerUnavailableError } from "../../src/lib/channels-contract";
 import type { BriarAuth } from "./auth";
 import {
   codexPetSpriteSheetObjectKey,
@@ -18,6 +19,7 @@ import { getProject } from "./project-command-repository";
 import { decodeProjectAgentInput } from "./project-request-contract";
 import { readJson } from "./request-readers";
 import { requireSession } from "./session-auth";
+import { getProjectDesignatedWorker } from "./workers";
 
 export type ProjectAgentRouteInput = {
   request: Request;
@@ -26,6 +28,42 @@ export type ProjectAgentRouteInput = {
   db: D1Database;
   attachmentsBucket: R2Bucket;
 };
+
+async function resolveDesignatedWorker(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    projectId: string;
+    workerId: string | null;
+    provider: ProjectAgentRow["provider"];
+    model: string | null;
+    effort: ProjectAgentRow["effort"];
+  },
+) {
+  if (!input.workerId) return null;
+  const worker = await getProjectDesignatedWorker(db, {
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+    workerId: input.workerId,
+    provider: input.provider,
+    model: input.model,
+    effort: input.effort,
+    observedAt: new Date().toISOString(),
+  });
+  if (!worker) {
+    throw new HttpError(
+      400,
+      "Designated Worker must belong to the same organization and project",
+    );
+  }
+  if (worker.availability !== "available") {
+    throw new HttpError(
+      409,
+      channelReplyAssignedWorkerUnavailableError(worker.label),
+    );
+  }
+  return worker;
+}
 
 export async function handleProjectAgentRoute(
   routeInput: ProjectAgentRouteInput,
@@ -65,12 +103,22 @@ export async function handleProjectAgentRoute(
       );
     }
     const providerName = agentProviderLabels[input.provider];
+    const designatedWorker = await resolveDesignatedWorker(db, {
+      organizationId: project.organization_id,
+      projectId: project.id,
+      workerId: input.designatedWorkerId ?? null,
+      provider: input.provider,
+      model: input.model ?? null,
+      effort: input.effort ?? null,
+    });
     const agent = await createProjectAgent(db, project.id, {
       name: input.name ?? `${providerName} Agent`,
       avatar: input.avatar ?? null,
       provider: input.provider,
       model: input.model ?? null,
       effort: input.effort ?? null,
+      designatedWorkerId: designatedWorker?.id ?? null,
+      designatedWorkerLabel: designatedWorker?.label ?? null,
       description: input.description ?? "",
       responsibility: input.responsibility,
       skills: input.skills ?? [],
@@ -93,6 +141,16 @@ export async function handleProjectAgentRoute(
       projectAgentMatch[2],
     );
     if (!existing) throw new HttpError(404, "Agent not found");
+    const designatedWorker = await resolveDesignatedWorker(db, {
+      organizationId: project.organization_id,
+      projectId: project.id,
+      workerId: input.designatedWorkerId === undefined
+        ? existing.designated_worker_id
+        : input.designatedWorkerId,
+      provider: input.provider,
+      model: input.model ?? null,
+      effort: input.effort ?? null,
+    });
     let nextCodexPet:
       | {
           json: string;
@@ -148,6 +206,8 @@ export async function handleProjectAgentRoute(
           provider: input.provider,
           model: input.model ?? null,
           effort: input.effort ?? null,
+          designatedWorkerId: designatedWorker?.id ?? null,
+          designatedWorkerLabel: designatedWorker?.label ?? null,
           description: input.description ?? existing.description,
           responsibility: input.responsibility,
           skills: input.skills,

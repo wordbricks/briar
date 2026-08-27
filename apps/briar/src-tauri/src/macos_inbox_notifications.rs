@@ -11,10 +11,10 @@ use objc2::{
 };
 use objc2_foundation::{NSBundle, NSError, NSObject, NSObjectProtocol, NSString};
 use objc2_user_notifications::{
-    UNAuthorizationOptions, UNMutableNotificationContent, UNNotification,
+    UNAuthorizationOptions, UNAuthorizationStatus, UNMutableNotificationContent, UNNotification,
     UNNotificationDefaultActionIdentifier, UNNotificationPresentationOptions,
-    UNNotificationRequest, UNNotificationResponse, UNNotificationSound, UNUserNotificationCenter,
-    UNUserNotificationCenterDelegate,
+    UNNotificationRequest, UNNotificationResponse, UNNotificationSettings, UNNotificationSound,
+    UNUserNotificationCenter, UNUserNotificationCenterDelegate,
 };
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -91,8 +91,10 @@ define_class!(
             _notification: &UNNotification,
             completion_handler: &DynBlock<dyn Fn(UNNotificationPresentationOptions)>,
         ) {
-            completion_handler.call((UNNotificationPresentationOptions::Banner
-                | UNNotificationPresentationOptions::Sound,));
+            // The inbox already updates in place while Briar is active. Keep
+            // foreground delivery discoverable there instead of interrupting
+            // the user with another banner and sound.
+            completion_handler.call((UNNotificationPresentationOptions(0),));
         }
 
         #[unsafe(method(userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:))]
@@ -152,6 +154,31 @@ pub(crate) async fn request_permission() -> Result<bool, String> {
     receiver
         .await
         .map_err(|_| "Notification permission request was cancelled".to_string())?
+}
+
+pub(crate) async fn permission_status() -> Result<String, String> {
+    let (sender, receiver) = oneshot::channel::<String>();
+    let sender = Cell::new(Some(sender));
+    notification_center()?.getNotificationSettingsWithCompletionHandler(&RcBlock::new(
+        move |settings: NonNull<UNNotificationSettings>| {
+            let Some(sender) = sender.take() else {
+                return;
+            };
+            let authorization = unsafe { settings.as_ref() }.authorizationStatus();
+            let status = match authorization {
+                UNAuthorizationStatus::Denied => "denied",
+                UNAuthorizationStatus::Authorized
+                | UNAuthorizationStatus::Provisional
+                | UNAuthorizationStatus::Ephemeral => "authorized",
+                UNAuthorizationStatus::NotDetermined => "not_determined",
+                _ => "not_determined",
+            };
+            let _ = sender.send(status.to_string());
+        },
+    ));
+    receiver
+        .await
+        .map_err(|_| "Notification settings request was cancelled".to_string())
 }
 
 pub(crate) fn show(

@@ -15,13 +15,6 @@
   color: var(--sidebar-foreground);
 }
 
-.dark .app-settings-sidebar,
-.dark .organization-settings-sidebar {
-  border-color: var(--sidebar-border);
-  color: var(--sidebar-foreground);
-  background: var(--sidebar-fallback);
-}
-
 .dark .sidebar-channel-list button.unread {
   color: var(--sidebar-accent-foreground);
 }
@@ -58,12 +51,8 @@
 .dark .sidebar-channel-context-menu,
 .dark .channel-create-dialog,
 .dark .account-popover,
-.dark .agent-usage-popover,
-.dark .worker-status-popover,
 .dark .app-version-popover,
-.dark .health-popover,
-.dark .companion-account-popover,
-.dark .project-schedule-context-menu {
+.dark .companion-account-popover {
   border-color: var(--sidebar-border);
   color: var(--sidebar-popover-foreground);
   background: var(--sidebar-popover);
@@ -96,12 +85,7 @@
 
 .dark .app-content-surface,
 .dark .main-content,
-.dark .organization-settings-layout,
-.dark .organization-settings,
 .dark .organization-create,
-.dark .project-settings-page,
-.dark .settings-main,
-.dark .app-settings-main,
 .dark .kanban-board,
 .dark .issue-list {
   color: var(--foreground);
@@ -111,10 +95,7 @@
 .dark .topbar,
 .dark .app-status-bar,
 .dark .page-header,
-.dark .queue-header,
-.dark .inbox-heading,
-.dark .project-agents-heading,
-.dark .project-schedule-heading {
+.dark .queue-header {
   border-color: var(--border);
   color: var(--foreground);
   background: var(--card);
@@ -200,11 +181,7 @@
 
 .dark .kanban-card,
 .dark .issue-list-body,
-.dark .issue-list-row,
-.dark .inbox-panel,
-.dark .inbox-message,
-.dark .project-schedule-calendar,
-.dark .project-schedule-toolbar {
+.dark .issue-list-row {
   border-color: var(--border);
   color: var(--foreground);
   background: var(--card);
@@ -212,97 +189,9 @@
 
 .dark .issue-list-row:hover,
 .dark .issue-list-row:focus-visible,
-.dark .inbox-message.unread,
-.dark .inbox-message.unread:hover,
-.dark .status-tabs button:hover,
-.dark .health-trigger:hover,
-.dark .health-trigger[aria-expanded="true"] {
+.dark .status-tabs button:hover {
   color: var(--foreground);
   background: var(--secondary);
-}
-
-.dark .inbox-mark-read {
-  color: var(--primary-foreground);
-}
-
-.dark .inbox-mark-read:hover,
-.dark .inbox-mark-read:focus-visible {
-  background: var(--accent);
-}
-
-.dark .inbox-filter-bar {
-  border-color: var(--border);
-  background: var(--card);
-}
-
-.dark .inbox-filter-bar > span {
-  color: var(--muted-foreground);
-}
-
-.dark .inbox-project-filter.select-menu .select-menu-trigger,
-.dark .inbox-filter {
-  border-color: var(--input);
-  color: var(--muted-foreground);
-  background: var(--secondary);
-}
-
-.dark
-  .inbox-project-filter.select-menu
-  .select-menu-trigger:hover:not(:disabled),
-.dark .inbox-filter:hover {
-  border-color: color-mix(in srgb, var(--primary) 38%, var(--input));
-  color: var(--foreground);
-  background: var(--accent);
-}
-
-.dark .inbox-filter-count {
-  color: var(--muted-foreground);
-  background: var(--muted);
-  box-shadow: 0 0 0 1.5px var(--card);
-}
-
-.dark .inbox-filter[aria-pressed="true"].urgent {
-  border-color: color-mix(in srgb, var(--destructive) 45%, var(--border));
-  color: var(--destructive);
-  background: color-mix(in srgb, var(--card) 82%, var(--destructive));
-}
-
-.dark .inbox-filter[aria-pressed="true"].urgent .inbox-filter-count {
-  color: var(--destructive);
-  background: color-mix(in srgb, var(--card) 70%, var(--destructive));
-}
-
-.dark .inbox-filter[aria-pressed="true"].action_required {
-  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
-  color: var(--warning);
-  background: color-mix(in srgb, var(--card) 82%, var(--warning));
-}
-
-.dark .inbox-filter[aria-pressed="true"].action_required .inbox-filter-count {
-  color: var(--warning);
-  background: color-mix(in srgb, var(--card) 70%, var(--warning));
-}
-
-.dark .inbox-filter[aria-pressed="true"].important {
-  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
-  color: var(--primary);
-  background: color-mix(in srgb, var(--card) 82%, var(--primary));
-}
-
-.dark .inbox-filter[aria-pressed="true"].important .inbox-filter-count {
-  color: var(--primary);
-  background: color-mix(in srgb, var(--card) 70%, var(--primary));
-}
-
-.dark .inbox-filter[aria-pressed="true"].activity {
-  border-color: var(--input);
-  color: var(--foreground);
-  background: var(--secondary);
-}
-
-.dark .inbox-filter[aria-pressed="true"].activity .inbox-filter-count {
-  color: var(--foreground);
-  background: var(--muted);
 }
 
 .dark .search-box input,
@@ -349,69 +238,27 @@
   border-color: var(--border);
 }
 
-.dark .companion-shell .kanban-card:active,
-.dark .companion-shell .inbox-message-open:active {
+.dark .companion-shell .kanban-card:active {
   background: var(--secondary);
 }
 
 .dark .dialog,
 .dark .issue-dialog,
 .dark .run-dialog,
-.dark .delete-project-dialog,
-.dark .project-schedule-dialog,
-.dark .project-schedule-detail {
+.dark .delete-project-dialog {
   border-color: var(--border);
   color: var(--foreground);
   background: var(--card);
 }
 
-.dark .agent-usage-status-trigger,
-.dark .worker-status-trigger,
-.dark .app-version-trigger,
-.dark .health-trigger {
+.dark .app-version-trigger {
   color: var(--muted-foreground);
 }
 
-.dark .agent-usage-status-trigger:hover,
-.dark .agent-usage-status-trigger[aria-expanded="true"],
-.dark .worker-status-trigger:hover,
-.dark .worker-status-trigger[aria-expanded="true"],
 .dark .app-version-trigger:hover,
 .dark .app-version-trigger[aria-expanded="true"] {
   color: var(--foreground);
   background: var(--secondary);
-}
-
-.dark .agent-usage-status-provider > small,
-.dark .agent-usage-meter > strong,
-.dark .worker-slot-usage,
-.dark .worker-slot-usage > small {
-  color: var(--muted-foreground);
-}
-
-.dark .usage-overview {
-  --muted-foreground:#9b9ba3;
-  --usage-codex-color:#eceee9;
-  --usage-unknown-color:#a8aaa5;
-}
-
-.dark .health-item {
-  border-color: var(--border);
-}
-
-.dark .health-item strong {
-  color: var(--foreground);
-}
-
-.dark .health-item em,
-.dark .health-actions button {
-  color: var(--muted-foreground);
-}
-
-.dark .health-actions button:hover:not(:disabled) {
-  color: var(--accent-foreground);
-  border-color: var(--input);
-  background: var(--accent);
 }
 
 .dark .channel-message-avatar .channel-agent-badge {

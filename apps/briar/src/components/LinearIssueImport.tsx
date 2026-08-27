@@ -27,8 +27,8 @@ import {
 } from "../lib/linear-import";
 import { MacSecurePasswordInput } from "./MacSecurePasswordInput";
 import { SelectMenu } from "./SelectMenu";
+import { SettingsAlert } from "@/components/settings";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { StatusPanel } from "@/components/ui/status-panel";
 import { Typography } from "@/components/ui/typography";
 
@@ -219,36 +219,44 @@ export function LinearIssueImport({
   };
 
   return (
-    <section className="project-settings-linear-import">
-      <header>
-        <span className="project-settings-linear-import-icon">
+    <section className="mt-4 rounded-xl border border-border bg-card p-5 shadow-xs">
+      <header className="flex items-start gap-3">
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
           <Download size={18} strokeWidth={1.8} />
         </span>
-        <span>
-          <strong>{t("settings.linearImportTitle")}</strong>
-          <small>{t("settings.linearImportDescription")}</small>
+        <span className="grid min-w-0 gap-1">
+          <Typography as="strong" variant="bodySm">
+            {t("settings.linearImportTitle")}
+          </Typography>
+          <Typography as="small" tone="muted" variant="caption">
+            {t("settings.linearImportDescription")}
+          </Typography>
         </span>
       </header>
 
       {!hasProjectStatuses ? (
-        <div className="project-settings-linear-import-body">
-          <p className="project-settings-linear-import-blocked">
+        <div className="mt-4 grid gap-3">
+          <StatusPanel density="compact" tone="warning">
             {t("settings.linearImportNeedsRepository")}
-          </p>
-          <p>{t("settings.linearImportNeedsRepositoryHelp")}</p>
+          </StatusPanel>
+          <Typography tone="muted" variant="caption">
+            {t("settings.linearImportNeedsRepositoryHelp")}
+          </Typography>
         </div>
       ) : null}
 
       {hasProjectStatuses && step === "apiKey" ? (
-        <div className="project-settings-linear-import-body">
-          <p>{t("settings.linearImportApiKeyHelp")}</p>
-          <label>
+        <div className="mt-4 grid gap-3">
+          <Typography tone="muted" variant="caption">
+            {t("settings.linearImportApiKeyHelp")}
+          </Typography>
+          <label className="grid gap-1.5 text-xs font-semibold text-foreground">
             <span>{t("settings.linearImportApiKey")}</span>
             <MacSecurePasswordInput
               autoCapitalize="none"
               autoComplete="off"
               autoCorrect="off"
-              className="project-settings-linear-import-api-key"
+              className="font-mono"
               disabled={busy}
               onChange={(event) => setApiKey(event.currentTarget.value)}
               onKeyDown={(event) => {
@@ -260,31 +268,35 @@ export function LinearIssueImport({
               value={apiKey}
             />
           </label>
-          <footer>
-            <p>{t("settings.linearImportOneTimeNote")}</p>
-            <button disabled={busy || !apiKey.trim()} onClick={() => void connect()} type="button">
+          <footer className="flex flex-wrap items-center justify-between gap-3 max-[760px]:items-stretch max-[760px]:[&>button]:w-full">
+            <Typography className="min-w-44 flex-1" tone="muted" variant="caption">
+              {t("settings.linearImportOneTimeNote")}
+            </Typography>
+            <Button disabled={busy || !apiKey.trim()} onClick={() => void connect()} type="button">
               {busy ? <Spinner size={14} /> : <Link2 size={14} />}
               {busy
                 ? t("settings.linearImportConnecting")
                 : t("settings.linearImportConnect")}
-            </button>
+            </Button>
           </footer>
         </div>
       ) : null}
 
       {hasProjectStatuses && step === "teams" ? (
-        <div className="project-settings-linear-import-body">
+        <div className="mt-4 grid gap-3">
           {viewer ? (
-            <p className="project-settings-linear-import-viewer">
+            <p className="rounded-lg bg-accent px-2.5 py-2 text-2xs font-semibold text-accent-foreground">
               {t("settings.linearImportConnectedAs", {
                 name: viewer.name,
                 org: viewer.organizationName,
               })}
             </p>
           ) : null}
-          <div className="project-settings-linear-import-teams-header">
-            <strong>{t("settings.linearImportTeams")}</strong>
-            <button
+          <div className="flex items-center justify-between gap-2.5">
+            <Typography as="strong" variant="caption">
+              {t("settings.linearImportTeams")}
+            </Typography>
+            <Button
               disabled={busy || teams.length === 0}
               onClick={() =>
                 setSelectedTeamIds(
@@ -293,31 +305,40 @@ export function LinearIssueImport({
                     : teams.map((team) => team.id),
                 )
               }
+              size="sm"
               type="button"
+              variant="outline"
             >
               {selectedTeamIds.length === teams.length
                 ? t("settings.linearImportDeselectAll")
                 : t("settings.linearImportSelectAll")}
-            </button>
+            </Button>
           </div>
           {teams.length === 0 ? (
-            <p className="project-settings-empty">{t("settings.linearImportNoTeams")}</p>
+            <p className="rounded-lg border border-dashed border-border bg-muted p-4 text-center text-2xs text-muted-foreground">
+              {t("settings.linearImportNoTeams")}
+            </p>
           ) : (
-            <ul className="project-settings-linear-import-teams">
+            <ul className="scrollbar-subtle grid max-h-56 list-none gap-1.5 overflow-auto p-0">
               {teams.map((team) => {
                 const checked = selectedTeamIds.includes(team.id);
                 return (
                   <li key={team.id}>
-                    <label>
+                    <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2.5 hover:bg-muted">
                       <input
                         checked={checked}
+                        className="size-4 accent-primary"
                         disabled={busy}
                         onChange={() => toggleTeam(team.id)}
                         type="checkbox"
                       />
-                      <span>
-                        <strong>{team.name}</strong>
-                        <small>{team.key}</small>
+                      <span className="grid min-w-0 gap-0.5">
+                        <Typography as="strong" variant="caption">
+                          {team.name}
+                        </Typography>
+                        <Typography as="small" className="font-mono" tone="muted" variant="micro">
+                          {team.key}
+                        </Typography>
                       </span>
                     </label>
                   </li>
@@ -325,11 +346,11 @@ export function LinearIssueImport({
               })}
             </ul>
           )}
-          <footer>
-            <button disabled={busy} onClick={reset} type="button">
+          <footer className="flex flex-wrap items-center justify-between gap-3 max-[760px]:flex-col max-[760px]:items-stretch max-[760px]:[&>button]:w-full">
+            <Button disabled={busy} onClick={reset} type="button" variant="outline">
               {t("common.cancel")}
-            </button>
-            <button
+            </Button>
+            <Button
               disabled={busy || selectedCount === 0}
               onClick={() => void loadStates()}
               type="button"
@@ -340,21 +361,23 @@ export function LinearIssueImport({
                 : t("settings.linearImportContinueMapping", {
                     count: selectedCount,
                   })}
-            </button>
+            </Button>
           </footer>
         </div>
       ) : null}
 
       {hasProjectStatuses && step === "mapping" ? (
-        <div className="project-settings-linear-import-body">
-          <p>{t("settings.linearImportMappingHelp")}</p>
+        <div className="mt-4 grid gap-3">
+          <Typography tone="muted" variant="caption">
+            {t("settings.linearImportMappingHelp")}
+          </Typography>
           {states.length === 0 ? (
-            <p className="project-settings-empty">
+            <p className="rounded-lg border border-dashed border-border bg-muted p-4 text-center text-2xs text-muted-foreground">
               {t("settings.linearImportNoStates")}
             </p>
           ) : (
-            <div className="project-settings-linear-import-mapping">
-              <div className="project-settings-linear-import-mapping-head">
+            <div className="grid gap-2">
+              <div className="grid items-center gap-2.5 px-1 text-2xs font-semibold tracking-wide text-muted-foreground uppercase min-[761px]:grid-cols-[minmax(0,1.2fr)_minmax(160px,1fr)]">
                 <span>{t("settings.linearImportLinearStatus")}</span>
                 <span>{t("settings.linearImportBriarStatus")}</span>
               </div>
@@ -362,18 +385,23 @@ export function LinearIssueImport({
                 const current = statusMapping[state.id];
                 const value = current ? placementKey(current) : "";
                 return (
-                  <div className="project-settings-linear-import-mapping-row" key={state.id}>
-                    <div className="project-settings-linear-import-state">
+                  <div
+                    className="grid items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-2 min-[761px]:grid-cols-[minmax(0,1.2fr)_minmax(160px,1fr)]"
+                    key={state.id}
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
                       <span
                         aria-hidden
-                        className="project-settings-linear-import-state-dot"
+                        className="size-2.5 shrink-0 rounded-full"
                         style={{ background: state.color || "#9ca3af" }}
                       />
-                      <span>
-                        <strong>{state.name}</strong>
-                        <small>
+                      <span className="grid min-w-0 gap-0.5">
+                        <Typography as="strong" variant="caption">
+                          {state.name}
+                        </Typography>
+                        <Typography as="small" tone="muted" variant="micro">
                           {state.teamKey} · {state.type}
-                        </small>
+                        </Typography>
                       </span>
                     </div>
                     <SelectMenu
@@ -396,18 +424,19 @@ export function LinearIssueImport({
               })}
             </div>
           )}
-          <footer>
-            <button
+          <footer className="flex flex-wrap items-center justify-between gap-3 max-[760px]:flex-col max-[760px]:items-stretch max-[760px]:[&>button]:w-full">
+            <Button
               disabled={busy}
               onClick={() => {
                 setStep("teams");
                 setError(null);
               }}
               type="button"
+              variant="outline"
             >
               {t("settings.linearImportBack")}
-            </button>
-            <button
+            </Button>
+            <Button
               disabled={busy || !mappingComplete}
               onClick={() => void runImport()}
               type="button"
@@ -420,15 +449,15 @@ export function LinearIssueImport({
               {busy
                 ? t("settings.linearImportImporting")
                 : t("settings.linearImportConfirm")}
-            </button>
+            </Button>
           </footer>
         </div>
       ) : null}
 
       {hasProjectStatuses && step === "done" && result ? (
-        <div className="project-settings-linear-import-body">
+        <div className="mt-4 grid gap-3">
           <StatusPanel
-            className="project-settings-linear-import-success"
+            className="items-center text-2xs font-semibold"
             density="compact"
             role="status"
             tone="success"
@@ -442,27 +471,32 @@ export function LinearIssueImport({
             })}
           </StatusPanel>
           {result.truncated ? (
-            <p className="project-settings-linear-import-truncated">
+            <p className="text-2xs text-[var(--status-warning-foreground)]">
               {t("settings.linearImportTruncated")}
             </p>
           ) : null}
-          <footer>
-            <button onClick={reset} type="button">
+          <footer className="flex justify-end max-[760px]:[&>button]:w-full">
+            <Button onClick={reset} type="button">
               <RefreshCw size={14} />
               {t("settings.linearImportAgain")}
-            </button>
+            </Button>
           </footer>
         </div>
       ) : null}
 
       {error ? (
-        <p className="project-settings-linear-import-error" role="alert">
+        <SettingsAlert>
           {error}
-        </p>
+        </SettingsAlert>
       ) : null}
-      <p className="project-settings-linear-import-footnote" data-project-id={projectId}>
+      <Typography
+        className="mt-3"
+        data-project-id={projectId}
+        tone="muted"
+        variant="micro"
+      >
         {t("settings.linearImportProjectNote")}
-      </p>
+      </Typography>
     </section>
   );
 }

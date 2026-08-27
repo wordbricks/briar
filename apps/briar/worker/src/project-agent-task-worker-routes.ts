@@ -1,4 +1,5 @@
 import { agentSkillJson } from "./agent-skills";
+import { publishAgentSkillTaskResult } from "./agent-skill-execution-proposal-repository";
 import { getArchivedProjectAgentSession } from "./archive";
 import { sha256 } from "./crypto-digest";
 import {
@@ -18,7 +19,11 @@ import {
   decodeProjectAgentTaskLease,
 } from "./project-request-contract";
 import { readJson } from "./request-readers";
-import { scheduleProjectAgentSessionRealtimePublish } from "./realtime-scheduling";
+import {
+  scheduleChannelRealtimePublish,
+  scheduleProjectAgentSessionRealtimePublish,
+  scheduleProjectRealtimePublish,
+} from "./realtime-scheduling";
 import {
   type AuthenticatedWorkerProject,
   requireWorkerProjectBinding,
@@ -105,6 +110,21 @@ export async function handleProjectAgentTaskWorkerRoute(input: {
           );
           if (!session) return;
           await upsertProjectAgentSessionSummary(db, session, false);
+          const published = await publishAgentSkillTaskResult(
+            db,
+            job,
+            observedAt,
+          );
+          if (published?.source_kind === "channel") {
+            scheduleChannelRealtimePublish(
+              env,
+              db,
+              published.organization_id,
+              context,
+            );
+          } else if (published?.source_kind === "issue") {
+            scheduleProjectRealtimePublish(env, db, job.project_id, context);
+          }
           scheduleProjectAgentSessionRealtimePublish(
             env,
             db,
@@ -259,6 +279,19 @@ export async function handleProjectAgentTaskWorkerRoute(input: {
         false,
       );
       sessionChanged ||= (summaryResult.meta.changes ?? 0) > 0;
+    }
+    const publishedResult = completed
+      ? await publishAgentSkillTaskResult(db, completed, observedAt)
+      : null;
+    if (publishedResult?.source_kind === "channel") {
+      scheduleChannelRealtimePublish(
+        env,
+        db,
+        publishedResult.organization_id,
+        context,
+      );
+    } else if (publishedResult?.source_kind === "issue") {
+      scheduleProjectRealtimePublish(env, db, input.projectId, context);
     }
     if (sessionChanged) {
       scheduleProjectAgentSessionRealtimePublish(

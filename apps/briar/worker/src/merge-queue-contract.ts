@@ -16,8 +16,11 @@ const MergeGroupContext = Schema.Literals(MERGE_GROUP_CI_CONTEXTS);
 
 export const MergeQueueProfileUpdate = strictSchema(Schema.Struct({
   enabled: Schema.Boolean,
-  quietWindowMs: integerBetween(1_000, 300_000),
-  maxBatchSize: integerBetween(2, 5),
+  readinessStageId: Schema.optional(Schema.String.check(
+    Schema.isPattern(/^[a-z][a-z0-9_-]{0,63}$/u),
+  )),
+  quietWindowMs: Schema.optional(integerBetween(1_000, 300_000)),
+  maxBatchSize: Schema.optional(integerBetween(2, 5)),
 }));
 
 export const MergeBatchClaimInput = strictSchema(Schema.Struct({

@@ -31,6 +31,13 @@ const OrganizationMemberRow = Schema.Struct({
 });
 export type OrganizationMemberRow = typeof OrganizationMemberRow.Type;
 
+const OrganizationProjectMembershipRow = Schema.Struct({
+  user_id: Schema.String,
+  project_id: Schema.String,
+});
+export type OrganizationProjectMembershipRow =
+  typeof OrganizationProjectMembershipRow.Type;
+
 const OrganizationInvitationRow = Schema.Struct({
   id: Schema.String,
   organization_id: Schema.String,
@@ -52,6 +59,7 @@ export type OrganizationInvitationRow =
 
 const ListOrganizationsRequest = Schema.Struct({ userId: Schema.String });
 const OrganizationRequest = Schema.Struct({ organizationId: Schema.String });
+const ProjectRequest = Schema.Struct({ projectId: Schema.String });
 const OrganizationMemberRequest = Schema.Struct({
   organizationId: Schema.String,
   userId: Schema.String,
@@ -117,6 +125,41 @@ const makeOrganizationQueries = (sql: SqlClient.SqlClient) => {
     `,
   });
 
+  const findOrganizationProjectMemberships = SqlSchema.findAll({
+    Request: OrganizationRequest,
+    Result: OrganizationProjectMembershipRow,
+    execute: ({ organizationId }) => sql`
+      select user_id, project_id
+      from briar_project_members
+      where organization_id = ${organizationId}
+      order by user_id, project_id
+    `,
+  });
+
+  const findProjectMembers = SqlSchema.findAll({
+    Request: ProjectRequest,
+    Result: OrganizationMemberRow,
+    execute: ({ projectId }) => sql`
+      select member.user_id, user.name, user.email, user.image,
+             member.role, member.created_at
+      from briar_projects project
+      join briar_organization_members member
+        on member.organization_id = project.organization_id
+      join "user" on user.id = member.user_id
+      left join briar_project_members project_membership
+        on project_membership.project_id = project.id
+       and project_membership.organization_id = project.organization_id
+       and project_membership.user_id = member.user_id
+      where project.id = ${projectId}
+        and (
+          member.role in ('owner', 'admin')
+          or project_membership.user_id is not null
+        )
+      order by case member.role when 'owner' then 0 when 'admin' then 1 else 2 end,
+               lower(user.name), lower(user.email)
+    `,
+  });
+
   const findOrganizationInvitations = SqlSchema.findAll({
     Request: OrganizationRequest,
     Result: OrganizationInvitationRow,
@@ -152,8 +195,10 @@ const makeOrganizationQueries = (sql: SqlClient.SqlClient) => {
     findOrganizationInvitationByTokenHash,
     findOrganizationInvitations,
     findOrganizationMembers,
+    findOrganizationProjectMemberships,
     findOrganizationRole,
     findOrganizations,
+    findProjectMembers,
   };
 };
 const organizationQueries = createSqlQueryCache(makeOrganizationQueries);
@@ -175,6 +220,22 @@ const getOrganizationRoleEffect = Effect.fn("getOrganizationRoleEffect")(
       onNone: () => null,
       onSome: ({ role }) => role,
     });
+  },
+);
+
+const listOrganizationProjectMembershipsEffect = Effect.fn(
+  "listOrganizationProjectMembershipsEffect",
+)(function*(organizationId: string) {
+  const sql = yield* SqlClient.SqlClient;
+  const queries = organizationQueries(sql);
+  return yield* queries.findOrganizationProjectMemberships({ organizationId });
+});
+
+const listProjectMembersEffect = Effect.fn("listProjectMembersEffect")(
+  function*(projectId: string) {
+    const sql = yield* SqlClient.SqlClient;
+    const queries = organizationQueries(sql);
+    return yield* queries.findProjectMembers({ projectId });
   },
 );
 
@@ -232,6 +293,18 @@ export const listOrganizationMembers = (
   organizationId: string,
 ): Promise<Array<OrganizationMemberRow>> =>
   runD1(db, listOrganizationMembersEffect(organizationId));
+
+export const listOrganizationProjectMemberships = (
+  db: D1Database,
+  organizationId: string,
+): Promise<Array<OrganizationProjectMembershipRow>> =>
+  runD1(db, listOrganizationProjectMembershipsEffect(organizationId));
+
+export const listProjectMembers = (
+  db: D1Database,
+  projectId: string,
+): Promise<Array<OrganizationMemberRow>> =>
+  runD1(db, listProjectMembersEffect(projectId));
 
 export const listOrganizationInvitations = (
   db: D1Database,

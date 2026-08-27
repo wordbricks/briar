@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 export function ProviderRow({
   available,
+  availabilityLabel,
   badge,
   className,
   description,
@@ -21,10 +22,12 @@ export function ProviderRow({
   name,
   onExpandedChange,
   onToggle,
+  statusTone,
   title,
   trailing,
 }: {
   available: boolean;
+  availabilityLabel?: string;
   badge?: string;
   className?: string;
   description: string;
@@ -38,22 +41,28 @@ export function ProviderRow({
   name: string;
   onExpandedChange?: (expanded: boolean) => void;
   onToggle?: (enabled: boolean) => void;
+  statusTone?: "success" | "warning" | "neutral";
   title: ReactNode;
   trailing?: ReactNode;
 }) {
+  const resolvedStatusTone = statusTone ?? (available ? "success" : "warning");
   const row = (
     <div
       className={cn(
-        "settings-provider-row relative grid min-h-[72px] grid-cols-[34px_minmax(0,1fr)_auto_46px] items-center gap-x-3 border-b border-border/80 px-[18px] py-4 last:border-b-0",
+        "relative grid min-h-[72px] grid-cols-[34px_minmax(0,1fr)_auto_46px] items-center gap-x-3 border-b border-border/80 px-[18px] py-4 last:border-b-0",
         details && "border-b-0",
         className,
       )}
     >
       <span
-        aria-label={available ? "Available" : "Unavailable"}
+        aria-label={
+          availabilityLabel ?? (available ? "Available" : "Unavailable")
+        }
         className={cn(
           "absolute top-[18px] left-[19px] z-[1] size-[7px] rounded-full border-2 border-card box-content",
-          available ? "bg-success" : "bg-warning",
+          resolvedStatusTone === "success" && "bg-success",
+          resolvedStatusTone === "warning" && "bg-warning",
+          resolvedStatusTone === "neutral" && "bg-muted-foreground/60",
         )}
       />
       {icon}

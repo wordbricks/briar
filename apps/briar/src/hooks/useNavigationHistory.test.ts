@@ -7,6 +7,10 @@ import {
 import {
   channelNavigationLocation,
   issueNavigationLocation,
+  pageFromNavigationLocation,
+  projectNavigationLocation,
+  settingsNavigationLocation,
+  type AppNavigationLocation,
 } from "../lib/app-navigation";
 
 describe("navigation history", () => {
@@ -26,6 +30,58 @@ describe("navigation history", () => {
 
     history = reduceNavigationHistory(history, { type: "forward" });
     expect(history.entries[history.index]).toBe("auto-hunt");
+  });
+
+  it("returns to the app past every visited settings scope in one action", () => {
+    const appDestination = projectNavigationLocation("issues", "project-a");
+    const settingsDestinations: AppNavigationLocation[] = [
+      settingsNavigationLocation({
+        scope: "application",
+        section: "account",
+      }),
+      settingsNavigationLocation({
+        scope: "organization",
+        organizationId: "organization-a",
+        section: "members",
+      }),
+      settingsNavigationLocation({
+        scope: "project",
+        projectId: "project-a",
+        section: "workflow",
+      }),
+    ];
+    let history =
+      createNavigationHistory<AppNavigationLocation>(appDestination);
+    for (const value of settingsDestinations) {
+      history = reduceNavigationHistory(history, { type: "navigate", value });
+    }
+
+    history = reduceNavigationHistory(history, {
+      type: "backTo",
+      predicate: (value) => pageFromNavigationLocation(value) !== "settings",
+    });
+
+    expect(history.entries[history.index]).toBe(appDestination);
+    expect(history.entries).toEqual([appDestination, ...settingsDestinations]);
+
+    history = reduceNavigationHistory(history, { type: "forward" });
+    expect(history.entries[history.index]).toBe(settingsDestinations[0]);
+  });
+
+  it("uses a clean fallback when no earlier destination matches", () => {
+    let history = createNavigationHistory<string>("settings:account");
+    history = reduceNavigationHistory(history, {
+      type: "navigate",
+      value: "settings:keybindings",
+    });
+
+    history = reduceNavigationHistory(history, {
+      type: "backTo",
+      fallback: "issues",
+      predicate: (value) => !value.startsWith("settings:"),
+    });
+
+    expect(history).toEqual(createNavigationHistory("issues"));
   });
 
   it("drops forward history after navigating from a previous destination", () => {
@@ -50,6 +106,26 @@ describe("navigation history", () => {
       "project-settings",
     ]);
     expect(history.index).toBe(2);
+  });
+
+  it("jumps to an existing destination without changing the visit stack", () => {
+    let history = createNavigationHistory<string>("issues");
+    for (const value of ["inbox", "auto-hunt", "settings"]) {
+      history = reduceNavigationHistory(history, {
+        type: "navigate",
+        value,
+      });
+    }
+
+    history = reduceNavigationHistory(history, { type: "goTo", index: 1 });
+
+    expect(history).toEqual({
+      entries: ["issues", "inbox", "auto-hunt", "settings"],
+      index: 1,
+    });
+    expect(
+      reduceNavigationHistory(history, { type: "goTo", index: 99 }),
+    ).toBe(history);
   });
 
   it("does not add consecutive duplicate destinations", () => {

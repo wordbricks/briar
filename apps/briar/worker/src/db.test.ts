@@ -110,6 +110,7 @@ import {
   updateProjectAgent,
   updateProjectAgentSchedule,
   updateOrganizationMemberRole,
+  updateOrganizationMemberProjects,
   updateIssue,
   unsubscribeIssue,
   upsertProjectAgentSession,
@@ -1029,7 +1030,42 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
+      await readFile(
+        resolve("migrations/0133_channel_reply_sessions.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
       await readFile(resolve("migrations/0136_issue_difficulty.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0140_issue_difficulty_optional.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0138_project_members.sql"), "utf8"),
+    );
+    // The compact lifecycle schema intentionally skips the approval tables
+    // required by production migration 0140. Keep the shared Agent Skill
+    // helpers on their current schema without pulling those unrelated tables
+    // into this suite.
+    await executeSql(
+      db,
+      `alter table briar_agent_skills add column execution_mode text not null
+         default 'task'
+         check (execution_mode in ('conversation', 'task'));
+       alter table briar_agent_skills add column approval_policy text not null
+         default 'explicit'
+         check (approval_policy in ('invoke_is_consent', 'explicit'));`,
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0141_agent_designated_workers.sql"),
+        "utf8",
+      ),
     );
     // The lifecycle suite intentionally uses a compact migration history, so
     // add the issue-reply job columns that production migration 0116 supplies
@@ -1088,6 +1124,64 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         detail: "The same event key now has different persisted data",
       }),
     ).rejects.toBeInstanceOf(EventKeyConflictError);
+  });
+
+  it("does not let run event ingestion overwrite issue titles", async () => {
+    const sourceKey = "event-title-boundary";
+    await setStoredWorkflow(db, projectId, releaseWorkflow);
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 78.6, {
+        sourceKey,
+        eventKey: `${sourceKey}:backlog:intake`,
+        title: "User-authored title",
+        status: "backlog",
+      }),
+    );
+
+    expect(await getHuntRunForProject(db, projectId, runId)).toMatchObject({
+      title: "User-authored title",
+      status: "backlog",
+    });
+
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 78.7, {
+        sourceKey,
+        eventKey: `${sourceKey}:queued:worker`,
+        title: "Worker queue title",
+        status: "queued",
+      }),
+    );
+    expect(await getHuntRunForProject(db, projectId, runId)).toMatchObject({
+      title: "User-authored title",
+      status: "queued",
+    });
+
+    await updateIssue(db, projectId, runId, {
+      title: "User-edited title",
+      description: null,
+      priority: null,
+      updatedAt: atMinute(78.8),
+    });
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("blocked", 78.9, {
+        sourceKey,
+        eventKey: `${sourceKey}:blocked:worker`,
+        title: "Worker checkpoint title",
+        status: "blocked",
+        workflowStage: null,
+      }),
+    );
+    expect(await getHuntRunForProject(db, projectId, runId)).toMatchObject({
+      title: "User-edited title",
+      status: "blocked",
+    });
+    await setStoredWorkflow(db, projectId, repositoryWorkflowBootstrap);
   });
 
   it("preserves the issue creator from intake across later events", async () => {
@@ -1504,7 +1598,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       expect.objectContaining({ run_id: changedRunId, user_id: "owner" }),
     ]);
     await expect(
-      listOrganizationStatusTrayRuns(db, projectId),
+      listOrganizationStatusTrayRuns(db, projectId, "owner"),
     ).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1851,6 +1945,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       usageProject.id,
       atMinute(100),
+      atMinute(1_000),
     );
     expect(projectRows).toHaveLength(208);
     expect(projectRows.every((row) => row.project_id === usageProject.id))
@@ -1862,10 +1957,17 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(
       projectRows.find((row) => row.id === "usage-cap-001"),
     ).toMatchObject({ has_usage_ledger: 1 });
+    expect(await listProjectUsageRuns(
+      db,
+      usageProject.id,
+      atMinute(100),
+      recentAt,
+    )).toEqual([]);
     const projectTotals = await listProjectUsageTotals(
       db,
       usageProject.id,
       atMinute(100),
+      atMinute(1_000),
     );
     expect(projectTotals).toHaveLength(1);
     expect(projectTotals[0]).toMatchObject({
@@ -1873,6 +1975,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       total_tokens: 37,
       usage_records: 1,
     });
+    expect(await listProjectUsageTotals(
+      db,
+      usageProject.id,
+      atMinute(100),
+      recentAt,
+    )).toEqual([]);
     const usagePlan = await db
       .prepare(
         `explain query plan
@@ -3112,9 +3220,47 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       issueProjectAgentToken(db, projectId, "not-a-member", "f".repeat(64)),
     ).resolves.toBe(false);
 
+    const accessAssignedRunId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 14, {
+        sourceKey: "project-access-removal-assignment",
+        assigneeUserId: "member",
+      }),
+    );
+    const cursorBeforeAccessRemoval = await getDashboardSyncCursor(
+      db,
+      projectId,
+    );
+    await expect(
+      updateOrganizationMemberProjects(db, projectId, "member", []),
+    ).resolves.toBe("updated");
+    expect(await getDashboardSyncCursor(db, projectId)).toBeGreaterThan(
+      cursorBeforeAccessRemoval,
+    );
+    await expect(listProjects(db, "member")).resolves.toEqual([]);
+    await expect(getProject(db, projectId, "member")).resolves.toBeNull();
+    await expect(
+      updateOrganizationMemberRole(db, projectId, "member", "member"),
+    ).resolves.toBe(true);
+    await expect(getProject(db, projectId, "member")).resolves.toBeNull();
+    await expect(
+      getHuntRunForProject(db, projectId, accessAssignedRunId),
+    ).resolves.toMatchObject({ assignee_user_id: null });
+    await expect(
+      findProjectIdByAgentTokenHash(db, memberTokenHash),
+    ).resolves.toBeNull();
+    await expect(
+      updateOrganizationMemberProjects(db, projectId, "member", [projectId]),
+    ).resolves.toBe("updated");
+    await expect(getProject(db, projectId, "member")).resolves.not.toBeNull();
+
     await expect(
       updateOrganizationMemberRole(db, projectId, "member", "admin"),
     ).resolves.toBe(true);
+    await expect(
+      updateOrganizationMemberProjects(db, projectId, "member", []),
+    ).resolves.toBe("role_has_full_access");
     const members = await listOrganizationMembers(db, projectId);
     expect(members.map((member) => member.email)).toEqual([
       "owner@example.com",
@@ -3146,6 +3292,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("invites an unregistered email and grants organization access on exact-email acceptance", async () => {
+    const secondProject = await createProject(db, {
+      ownerUserId: "owner",
+      organizationId: projectId,
+      name: "Invitation-isolated project",
+      agentTokenHash: "6".repeat(64),
+    });
     const tokenHash = "1".repeat(64);
     const invitation = await createOrganizationInvitation(db, {
       id: "invitation-new-member",
@@ -3193,10 +3345,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         acceptedAt: atMinute(31),
       }),
     ).resolves.toMatchObject({ outcome: "accepted" });
-    await expect(listProjects(db, "new-invitee")).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: projectId, member_role: "member" }),
-      ]),
+    const invitedProjects = await listProjects(db, "new-invitee");
+    expect(invitedProjects).toEqual([
+      expect.objectContaining({ id: projectId, member_role: "member" }),
+    ]);
+    expect(invitedProjects.map((project) => project.id)).not.toContain(
+      secondProject.id,
     );
     await expect(
       acceptOrganizationInvitation(db, {
@@ -3734,6 +3888,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
     const memberAgentTokenHash = "4".repeat(64);
     await expect(
+      updateOrganizationMemberProjects(
+        db,
+        organization.id,
+        memberId,
+        [sharedProject.id],
+      ),
+    ).resolves.toBe("updated");
+    await expect(
       issueProjectAgentToken(
         db,
         sharedProject.id,
@@ -4206,6 +4368,12 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ) values (
         '${projectId}', 'subscription-member', 'member',
         '${atMinute(0)}', '${atMinute(0)}'
+      );
+      insert into briar_project_members (
+        project_id, organization_id, user_id, created_at, updated_at
+      ) values (
+        '${projectId}', '${projectId}', 'subscription-member',
+        '${atMinute(0)}', '${atMinute(0)}'
       );`,
     );
     const runId = await recordHuntEvent(
@@ -4411,8 +4579,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(
       await db.prepare("select difficulty from briar_hunt_runs where id = ?")
         .bind(runId)
-        .first<{ difficulty: string }>(),
-    ).toEqual({ difficulty: "normal" });
+        .first<{ difficulty: string | null }>(),
+    ).toEqual({ difficulty: null });
 
     const updated = await updateIssue(db, projectId, runId, {
       title: "Updated title",
@@ -4444,6 +4612,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       updatedAt: atMinute(20),
     });
     expect(unassigned?.assignee_user_id).toBeNull();
+    const cleared = await updateIssue(db, projectId, runId, {
+      title: "Updated title",
+      description: null,
+      priority: 1,
+      difficulty: null,
+      updatedAt: atMinute(21),
+    });
+    expect(cleared?.difficulty).toBeNull();
     await expect(
       db.prepare("update briar_hunt_runs set difficulty = ? where id = ?")
         .bind("extreme", runId)

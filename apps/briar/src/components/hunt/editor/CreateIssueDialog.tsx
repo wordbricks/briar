@@ -1,4 +1,5 @@
 import { CircleAlert, Image as ImageIcon, Paperclip, X } from "lucide-react";
+import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { useCallback, useEffect, useState } from "react";
 import { NativeSelect } from "@/components/NativeSelect";
@@ -10,7 +11,7 @@ import { issueAttachmentAccept, maxIssueAttachmentCount } from "@/lib/issue-atta
 import { issueTitleInputMaxLength, issueTitleLength, isIssueTitleWithinLimit } from "@/lib/issue-title";
 import { clearCreateIssueDraft, loadCreateIssueDraft, saveCreateIssueDraft } from "@/lib/create-issue-draft";
 import { removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
-import { defaultIssueDifficulty, type IssueDifficulty } from "@/lib/issue-difficulty";
+import { type IssueDifficulty } from "@/lib/issue-difficulty";
 import type { CreateIssueInput, OrganizationMember, Project } from "@/types";
 import { agentEffortOptions, agentProviders, type AgentProvider, type ModelEffort } from "@/lib/project-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
@@ -61,7 +62,7 @@ export function CreateIssueDialog({
   const [description, setDescription] = useState(initialDraft?.description ?? "");
   const [status, setStatus] = useState<"backlog" | "queued">(initialDraft?.status ?? defaultStatus);
   const [priority, setPriority] = useState(initialDraft?.priority ?? "2");
-  const [difficulty, setDifficulty] = useState<IssueDifficulty>(initialDraft?.difficulty ?? defaultIssueDifficulty);
+  const [difficulty, setDifficulty] = useState<IssueDifficulty | null>(initialDraft?.difficulty ?? null);
   const [assigneeUserId, setAssigneeUserId] = useState(initialDraft?.assigneeUserId ?? "");
   const [preferredProvider, setPreferredProvider] = useState(initialDraft?.preferredProvider ?? "");
   const [preferredModel, setPreferredModel] = useState(() => initialDraft?.preferredModel ?? (initialDraft?.preferredProvider ? providerModelPreferences[initialDraft.preferredProvider as AgentProvider].defaultModel : null) ?? "");
@@ -266,7 +267,10 @@ export function CreateIssueDialog({
             label: t("issue.priority4"),
             value: "4"
           }]} value={priority} />
-            <NativeSelect className="issue-priority-select issue-difficulty-select" label={t("issue.difficulty")} onValueChange={value => setDifficulty(value as IssueDifficulty)} options={[{
+            <NativeSelect className="issue-priority-select issue-difficulty-select" label={t("issue.difficulty")} onValueChange={value => setDifficulty(value ? value as IssueDifficulty : null)} options={[{
+            label: t("run.notSet"),
+            value: ""
+          }, {
             label: t("issue.difficulty.easy"),
             value: "easy"
           }, {
@@ -275,7 +279,7 @@ export function CreateIssueDialog({
           }, {
             label: t("issue.difficulty.hard"),
             value: "hard"
-          }]} value={difficulty} />
+          }]} value={difficulty ?? ""} />
             <ProviderModelSelector className="issue-provider-model-selector" compact disabled={isSubmitting} groupLabel={`${t("issue.preferredProvider")} · ${t("issue.preferredModel")}`} modelLabel={t("issue.preferredModel")} modelSearchEmptyMessage={t("issue.noModelsFound")} modelSearchPlaceholder={t("issue.searchModels")} modelValue={preferredModel} onModelChange={value => {
             setPreferredModel(value);
             setPreferredEffort("");
@@ -308,7 +312,7 @@ export function CreateIssueDialog({
         </div>
         <footer>
           <span className="issue-submit-hint">
-            <kbd>⌘</kbd>
+            <Kbd>⌘</Kbd>
             {t("issue.submitHint")}
           </span>
           <div>

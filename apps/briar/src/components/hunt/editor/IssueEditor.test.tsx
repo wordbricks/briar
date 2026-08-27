@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
@@ -9,6 +9,11 @@ import { demoDashboard, demoRunEvents } from "@/lib/demo-data";
 import * as api from "@/lib/api";
 import * as channelRealtime from "@/lib/channel-realtime";
 import * as issueActivityHook from "@/hooks/use-issue-agent-activity";
+import {
+  AppKeyboardCommandProvider,
+  useAppKeyboardCommandScope,
+  useAppKeyboardCommandState,
+} from "@/hooks/appKeyboardCommands";
 import type { ExecutionWorker, HuntRun, IssueMessage, IssueMessageSendResult, ProjectAgent, RunEvidence, UpdateIssueInput } from "@/types";
 import { CreateIssueDialog, EditIssueDialog, HuntDashboard, IssueAgentActivityPanel, RunPage, runMatchesIssuePropertyFilters, type IssuePropertyFilters } from "@/components/HuntDashboard";
 import { ToastProvider } from "@/components/ui/toast";
@@ -131,13 +136,30 @@ describe("IssueEditor", () => {
       ...demoDashboard.runs[0],
       workerId: null
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     try {
-      await act(async () => root.render(<RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-        throw new Error("not implemented in this test");
-      }} onUpdateIssue={onUpdateIssue} run={run} />));
+      await renderReactTestRoot(
+        root,
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          onUpdateIssue={onUpdateIssue}
+          run={run}
+        />,
+      );
       const title = container.querySelector<HTMLInputElement>(".run-page-inline-title");
       const description = container.querySelector<HTMLTextAreaElement>(".issue-description-inline-editor .issue-description-input");
       expect(title?.value).toBe(run.title);
@@ -171,8 +193,130 @@ describe("IssueEditor", () => {
       expect(container.querySelector(".run-page-save-status")?.getAttribute("aria-label")).toBe("저장됨");
       expect(container.querySelector(".run-page-save-status")?.classList.contains("saved")).toBe(true);
     } finally {
-      await act(async () => root.unmount());
-      container.remove();
+      await cleanup();
+      vi.useRealTimers();
+    }
+  });
+  it("leaves inline editing on Escape before entering go-to mode", async () => {
+    vi.useFakeTimers();
+    const onGoInbox = vi.fn();
+    const onUpdateIssue = vi.fn(async () => undefined);
+    const run = {
+      ...demoDashboard.runs[0],
+      workerId: null
+    };
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    const dispatchKey = (target: HTMLElement, init: KeyboardEventInit) => {
+      const event = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        ...init
+      });
+      target.dispatchEvent(event);
+      return event;
+    };
+    function Harness() {
+      const keyboardState = useAppKeyboardCommandState();
+      useAppKeyboardCommandScope({
+        fallthrough: true,
+        handlers: {
+          goInbox: {
+            run: () => {
+              onGoInbox();
+              return "handled";
+            }
+          }
+        },
+        id: "issue-editor-keyboard-regression",
+        priority: 0
+      });
+      return <>
+        <output data-testid="shortcut-mode">
+          {`${keyboardState.mode}:${keyboardState.pending?.sequence.join("+") ?? "idle"}`}
+        </output>
+        <RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
+          throw new Error("not implemented in this test");
+        }} onUpdateIssue={onUpdateIssue} run={run} />
+      </>;
+    }
+    try {
+      await renderReactTestRoot(
+        root,
+        <AppKeyboardCommandProvider>
+          <Harness />
+        </AppKeyboardCommandProvider>,
+      );
+      const mode = container.querySelector('[data-testid="shortcut-mode"]');
+      const title = container.querySelector<HTMLInputElement>(
+        ".run-page-inline-title"
+      )!;
+      const description = container.querySelector<HTMLTextAreaElement>(
+        ".issue-description-inline-editor .issue-description-input"
+      )!;
+
+      await act(async () => {
+        title.focus();
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")
+          ?.set?.call(title, "Escape saves this title");
+        title.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      expect(mode?.textContent).toBe("insert:idle");
+      expect(dispatchKey(title, { code: "KeyG", key: "g" }).defaultPrevented)
+        .toBe(false);
+      expect(mode?.textContent).toBe("insert:idle");
+
+      let escape!: KeyboardEvent;
+      await act(async () => {
+        escape = dispatchKey(title, { code: "Escape", key: "Escape" });
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(escape.defaultPrevented).toBe(true);
+      expect(document.activeElement).not.toBe(title);
+      expect(mode?.textContent).toBe("normal:idle");
+      expect(onUpdateIssue).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Escape saves this title"
+      }));
+
+      await act(async () => {
+        dispatchKey(document.body, { code: "KeyG", key: "g" });
+      });
+      expect(mode?.textContent).toBe("normal:KeyG");
+      await act(async () => {
+        dispatchKey(document.body, { code: "KeyI", key: "i" });
+      });
+      expect(onGoInbox).toHaveBeenCalledTimes(1);
+      expect(mode?.textContent).toBe("normal:idle");
+
+      await act(async () => {
+        description.focus();
+      });
+      expect(mode?.textContent).toBe("insert:idle");
+      expect(
+        dispatchKey(description, { code: "KeyG", key: "g" })
+          .defaultPrevented
+      ).toBe(false);
+      expect(mode?.textContent).toBe("insert:idle");
+      await act(async () => {
+        escape = dispatchKey(description, {
+          code: "Escape",
+          key: "Escape"
+        });
+      });
+      expect(escape.defaultPrevented).toBe(true);
+      expect(document.activeElement).not.toBe(description);
+      expect(mode?.textContent).toBe("normal:idle");
+
+      await act(async () => {
+        dispatchKey(document.body, { code: "KeyG", key: "g" });
+        dispatchKey(document.body, { code: "KeyI", key: "i" });
+      });
+      expect(onGoInbox).toHaveBeenCalledTimes(2);
+      expect(mode?.textContent).toBe("normal:idle");
+    } finally {
+      await cleanup();
       vi.useRealTimers();
     }
   });
@@ -214,13 +358,30 @@ describe("IssueEditor", () => {
     const onLoadAttachment = vi.fn(async (attachment: typeof inlineAttachment) => new Blob([attachment.filename], {
       type: attachment.contentType
     }));
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     try {
-      await act(async () => root.render(<RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={onLoadAttachment} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-        throw new Error("not implemented in this test");
-      }} onUpdateIssue={onUpdateIssue} run={run} />));
+      await renderReactTestRoot(
+        root,
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={onLoadAttachment}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          onUpdateIssue={onUpdateIssue}
+          run={run}
+        />,
+      );
       const editor = container.querySelector(".issue-description-inline-editor");
       expect(editor?.tagName).toBe("DIV");
       expect(Array.from(editor?.querySelectorAll<HTMLTextAreaElement>(".issue-description-input") ?? []).map(textarea => textarea.value)).toEqual(["before\n\n", "\n\nafter"]);
@@ -244,8 +405,7 @@ describe("IssueEditor", () => {
         keptAttachmentIds: ["attachment-gallery"]
       });
     } finally {
-      await act(async () => root.unmount());
-      container.remove();
+      await cleanup();
       vi.useRealTimers();
     }
   });
@@ -260,13 +420,30 @@ describe("IssueEditor", () => {
       ...demoDashboard.runs[0],
       workerId: null
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
     try {
-      await act(async () => root.render(<RunPage isSidebarOpen error={null} isRecovering={false} onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
-        throw new Error("not implemented in this test");
-      }} onUpdateIssue={onUpdateIssue} run={run} />));
+      await renderReactTestRoot(
+        root,
+        <RunPage
+          isSidebarOpen
+          error={null}
+          isRecovering={false}
+          onBack={() => undefined}
+          onCancel={async () => undefined}
+          onLoadAttachment={async () => new Blob()}
+          onLoadIssueMessages={async () => []}
+          onLoadRunEvidence={async () => []}
+          onMove={async () => undefined}
+          onRetry={async () => undefined}
+          onSendIssueMessage={async () => {
+            throw new Error("not implemented in this test");
+          }}
+          onUpdateIssue={onUpdateIssue}
+          run={run}
+        />,
+      );
       const title = container.querySelector<HTMLInputElement>(".run-page-inline-title");
       await act(async () => {
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(title, "먼저 저장할 제목");
@@ -300,30 +477,35 @@ describe("IssueEditor", () => {
       expect(container.querySelector(".run-page-save-status")?.getAttribute("aria-label")).toBe("저장됨");
       expect(container.querySelector(".run-page-save-status")?.classList.contains("saved")).toBe(true);
     } finally {
-      await act(async () => root.unmount());
-      container.remove();
+      await cleanup();
       vi.useRealTimers();
     }
   });
   it("edits an issue title, description, and priority", async () => {
     let updated: UpdateIssueInput | undefined;
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<EditIssueDialog isSubmitting={false} members={[{
-        userId: "user-1",
-        name: "Kim",
-        email: "kim@example.com",
-        image: null,
-        role: "member",
-        createdAt: "2026-07-01T00:00:00.000Z"
-      }]} onClose={() => undefined} onUpdate={async input => {
-        updated = input;
-      }} run={{
-        ...demoDashboard.runs[0],
-        priority: 3
-      }} />);
-    });
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(
+      root,
+      <EditIssueDialog
+        isSubmitting={false}
+        members={[{
+          userId: "user-1",
+          name: "Kim",
+          email: "kim@example.com",
+          image: null,
+          role: "member",
+          createdAt: "2026-07-01T00:00:00.000Z",
+        }]}
+        onClose={() => undefined}
+        onUpdate={async input => {
+          updated = input;
+        }}
+        run={{
+          ...demoDashboard.runs[0],
+          priority: 3,
+        }}
+      />,
+    );
     const title = container.querySelector<HTMLInputElement>(".issue-title-input");
     const description = container.querySelector<HTMLTextAreaElement>(".issue-description-input");
     await act(async () => {
@@ -364,7 +546,7 @@ describe("IssueEditor", () => {
       attachments: [],
       keptAttachmentIds: []
     });
-    await act(async () => root.unmount());
+    await cleanup();
   });
   it("pastes an image into the edit description and submits it with kept attachments", async () => {
     URL.createObjectURL = vi.fn(() => "blob:preview");
@@ -381,13 +563,20 @@ describe("IssueEditor", () => {
         url: "/projects/project/runs/run/attachments/existing-1"
       }]
     };
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<EditIssueDialog isSubmitting={false} members={[]} onClose={() => undefined} onLoadAttachment={async () => new Blob()} onUpdate={async input => {
-        updated = input;
-      }} run={run} />);
-    });
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(
+      root,
+      <EditIssueDialog
+        isSubmitting={false}
+        members={[]}
+        onClose={() => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onUpdate={async input => {
+          updated = input;
+        }}
+        run={run}
+      />,
+    );
     const textarea = container.querySelector<HTMLTextAreaElement>(".issue-description-input");
     await act(async () => {
       textarea?.focus();
@@ -423,7 +612,7 @@ describe("IssueEditor", () => {
     expect(updated!.attachmentReferences).toHaveLength(1);
     expect(updated!.keptAttachmentIds).toEqual(["existing-1"]);
     expect(updated!.description).toContain(`briar-attachment://${updated!.attachmentReferences?.[0]}`);
-    await act(async () => root.unmount());
+    await cleanup();
   });
   it("removes an existing inline image while editing", async () => {
     URL.createObjectURL = vi.fn(() => "blob:preview");
@@ -440,13 +629,20 @@ describe("IssueEditor", () => {
         url: "/projects/project/runs/run/attachments/existing-1"
       }]
     };
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(<EditIssueDialog isSubmitting={false} members={[]} onClose={() => undefined} onLoadAttachment={async () => new Blob()} onUpdate={async input => {
-        updated = input;
-      }} run={run} />);
-    });
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(
+      root,
+      <EditIssueDialog
+        isSubmitting={false}
+        members={[]}
+        onClose={() => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onUpdate={async input => {
+          updated = input;
+        }}
+        run={run}
+      />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".issue-inline-attachment button")?.click();
     });
@@ -456,6 +652,6 @@ describe("IssueEditor", () => {
     });
     expect(updated!.description).not.toContain("briar-attachment://");
     expect(updated!.keptAttachmentIds).toEqual([]);
-    await act(async () => root.unmount());
+    await cleanup();
   });
 });

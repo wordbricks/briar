@@ -12,10 +12,7 @@ import {
   issueTitleOverLimitMessage,
 } from "../../src/lib/issue-title";
 import { channelMessageBlockSchema } from "../../src/lib/channels-contract";
-import {
-  defaultIssueDifficulty,
-  issueDifficulties,
-} from "../../src/lib/issue-difficulty";
+import { issueDifficulties } from "../../src/lib/issue-difficulty";
 import {
   defaulted,
   defaultedWith,
@@ -193,6 +190,13 @@ const mobileRunDependencySchema = mutableStruct({
   status: mobileRunStatusSchema,
 });
 
+const mobileRelatedMessageSchema = mutableStruct({
+  organizationId: uuidString,
+  channelId: uuidString,
+  messageId: uuidString,
+  rootMessageId: uuidString,
+});
+
 const mobileStructuredResultSchema = mutableStruct({
   summary: Schema.String,
   outcome: Schema.Literals(["completed", "partial", "blocked", "failed"]),
@@ -227,11 +231,15 @@ export const mobileDashboardRunSchema = mutableStruct({
   progress: optional(numberBetween(0, 100)),
   detail: optionalNullable(Schema.String),
   priority: optionalNullable(integerBetween(1, 4)),
-  difficulty: defaulted(mobileIssueDifficultySchema, defaultIssueDifficulty),
+  difficulty: defaulted(
+    nullable(mobileIssueDifficultySchema),
+    null,
+  ),
   assigneeUserId: optionalNullable(Schema.String),
   createdByUserId: optionalNullable(Schema.String),
   subscribers: optional(mutableArray(mobileIssueSubscriberSchema)),
   issueDescription: optionalNullable(Schema.String),
+  relatedMessage: optionalNullable(mobileRelatedMessageSchema),
   attachments: optional(mutableArray(mobileIssueAttachmentSchema)),
   prerequisites: optional(mutableArray(mobileRunDependencySchema)),
   dependents: optional(mutableArray(mobileRunDependencySchema)),
@@ -512,12 +520,22 @@ export const mobileAgentSkillExecutionProposalSchema = strict(mutableStruct({
   provider: mobileProviderSchema,
   model: nullable(Schema.String),
   effort: nullable(mobileEffortSchema),
+  executionMode: Schema.Literals(["conversation", "task"]),
+  approvalPolicy: Schema.Literals(["invoke_is_consent", "explicit"]),
+  executionStatus: Schema.Literals([
+    "waiting",
+    "running",
+    "completed",
+    "failed",
+  ]),
   request: Schema.Trim.check(Schema.isLengthBetween(1, 10_000)),
   delegatedByAgentId: nullable(uuidString),
   delegatedByAgentName: nullable(Schema.String),
   requestedWorkerId: nullable(Schema.String),
   requestedWorkerLabel: nullable(Schema.String),
   resultSessionId: nullable(Schema.String),
+  resultMessageId: nullable(uuidString),
+  error: nullable(Schema.String),
   createdAt: isoDateTime,
   acceptedAt: nullable(isoDateTime),
 })).check(Schema.makeFilter((proposal) => {
@@ -525,6 +543,10 @@ export const mobileAgentSkillExecutionProposalSchema = strict(mutableStruct({
     proposal.requestedWorkerLabel !== null &&
     proposal.resultSessionId !== null && proposal.acceptedAt !== null;
   return (proposal.status === "accepted") === hasAcceptedFields &&
+      (proposal.status === "pending") ===
+        (proposal.executionStatus === "waiting") &&
+      (proposal.executionMode !== "conversation" ||
+        proposal.status !== "accepted" || proposal.resultMessageId !== null) &&
       !(proposal.status === "pending" && (
         proposal.requestedWorkerId !== null ||
         proposal.requestedWorkerLabel !== null ||
@@ -680,6 +702,12 @@ const mobileChannelMessageAuthorSchema = Schema.Union([
   }),
 ]);
 
+const mobileChannelMessageReactionPersonSchema = mutableStruct({
+  userId: Schema.String,
+  name: Schema.String,
+  image: nullable(Schema.String),
+});
+
 const mobileChannelProposalSchema = Schema.Union([
   mutableStruct({
     ...mobileChannelProposalBaseFields,
@@ -714,6 +742,10 @@ export const mobileChannelMessageSchema = mutableStruct({
       emoji: Schema.String.check(Schema.isLengthBetween(1, 32)),
       count: positiveInteger,
       userIds: mutableArray(Schema.String).check(Schema.isMinLength(1)),
+      people: defaultedWith(
+        mutableArray(mobileChannelMessageReactionPersonSchema),
+        () => [],
+      ),
     })),
     () => [],
   ),
@@ -850,13 +882,13 @@ export const mobileIssueExecutionApprovalRequestSchema = strict(mutableStruct({
 
 export const mobileAgentSkillExecutionApprovalRequestSchema = strict(
   mutableStruct({
-    workerId: Schema.String.check(
+    workerId: optional(Schema.String.check(
       Schema.isLengthBetween(1, 128),
       Schema.makeFilter((workerId) =>
         workerId === workerId.trim() ||
         "workerId cannot contain leading or trailing whitespace"
       ),
-    ),
+    )),
   }),
 );
 
@@ -911,7 +943,10 @@ const mobileIssueWriteFields = {
     Schema.String.check(Schema.isMaxLength(100_000)),
   ),
   priority: nullable(integerBetween(1, 4)),
-  difficulty: defaulted(mobileIssueDifficultySchema, defaultIssueDifficulty),
+  difficulty: defaulted(
+    nullable(mobileIssueDifficultySchema),
+    null,
+  ),
   assigneeUserId: nullable(Schema.String),
   status: Schema.Literals(["backlog", "queued"]),
   preferredProvider: optionalNullable(mobileProviderSchema),
@@ -943,7 +978,7 @@ export const mobileCreateIssueResponseSchema = mutableStruct({
   status: Schema.Literals(["backlog", "queued"]),
   assigneeUserId: nullable(Schema.String),
   createdByUserId: Schema.String,
-  difficulty: mobileIssueDifficultySchema,
+  difficulty: nullable(mobileIssueDifficultySchema),
   attachments: mutableArray(mobileIssueAttachmentSchema),
 });
 
@@ -953,7 +988,10 @@ export const mobileUpdateIssueRequestSchema = strict(mutableStruct({
     Schema.String.check(Schema.isMaxLength(100_000)),
   ),
   priority: nullable(integerBetween(1, 4)),
-  difficulty: mobileIssueDifficultySchema,
+  difficulty: defaulted(
+    nullable(mobileIssueDifficultySchema),
+    null,
+  ),
   assigneeUserId: nullable(Schema.String),
 }));
 
@@ -962,7 +1000,7 @@ export const mobileUpdateIssueResponseSchema = mutableStruct({
   title: Schema.String,
   description: nullable(Schema.String),
   priority: nullable(integerBetween(1, 4)),
-  difficulty: mobileIssueDifficultySchema,
+  difficulty: nullable(mobileIssueDifficultySchema),
   assigneeUserId: nullable(Schema.String),
 });
 
@@ -1232,17 +1270,18 @@ export const mobileAgentSkillExecutionApprovalResponseSchema = strict(
     outcome: Schema.Literals(["accepted", "already_accepted"]),
     proposal: mobileAgentSkillExecutionProposalSchema,
     projectId: uuidString,
-    session: mobileProjectAgentSessionSchema,
+    session: nullable(mobileProjectAgentSessionSchema),
   }),
 ).check(Schema.makeFilter((response) => {
   const proposal = response.proposal;
   const session = response.session;
-  return proposal.status === "accepted" &&
+  const common = proposal.status === "accepted" &&
       proposal.resultSessionId !== null &&
       proposal.requestedWorkerId !== null &&
       proposal.requestedWorkerLabel !== null &&
       proposal.acceptedAt !== null &&
-      response.projectId === proposal.projectId &&
+      response.projectId === proposal.projectId;
+  const sessionMatches = session !== null &&
       session.id === proposal.resultSessionId &&
       session.projectId === proposal.projectId &&
       session.agentId === proposal.agentId &&
@@ -1252,7 +1291,11 @@ export const mobileAgentSkillExecutionApprovalResponseSchema = strict(
       session.trigger === "manual" &&
       session.request === proposal.request &&
       session.requestedWorkerId === proposal.requestedWorkerId &&
-      session.workerId === proposal.requestedWorkerId
+      session.workerId === proposal.requestedWorkerId;
+  return common && (
+      (proposal.executionMode === "conversation" && session === null) ||
+      (proposal.executionMode === "task" && sessionMatches)
+    )
     ? undefined
     : "Approved Agent Skill execution response is not canonical";
 }));

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import type {
@@ -41,6 +41,8 @@ const agents: ChannelAgentSummary[] = [
         model: null,
         effort: null,
         kind: "custom",
+        executionMode: "task",
+        approvalPolicy: "explicit",
         position: 0,
         createdAt: "2026-08-01T00:00:00.000Z",
         updatedAt: "2026-08-01T00:00:00.000Z",
@@ -55,6 +57,8 @@ const agents: ChannelAgentSummary[] = [
         model: null,
         effort: null,
         kind: "custom",
+        executionMode: "task",
+        approvalPolicy: "explicit",
         position: 1,
         createdAt: "2026-08-01T00:00:00.000Z",
         updatedAt: "2026-08-01T00:00:00.000Z",
@@ -181,14 +185,14 @@ async function typeInto(input: HTMLInputElement, value: string) {
 }
 
 async function renderHarness(props: React.ComponentProps<typeof Harness>) {
-  const container = document.createElement("div");
-  const root = createRoot(container);
-  await act(async () => root.render(
+  const { cleanup, container, root } = createReactTestRoot();
+  await renderReactTestRoot(
+    root,
     <I18nProvider>
       <Harness {...props} />
     </I18nProvider>,
-  ));
-  return { container, root };
+  );
+  return { cleanup, container };
 }
 
 describe("useChannelComposer", () => {
@@ -199,7 +203,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
   it("localizes candidates and picks the active mention with the keyboard", async () => {
     const onSend = vi.fn<OnSend>();
-    const { container, root } = await renderHarness({ onSend });
+    const { cleanup, container } = await renderHarness({ onSend });
     const input = container.querySelector<HTMLInputElement>(
       '[data-testid="composer"]',
     )!;
@@ -230,13 +234,13 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       [],
     );
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("handles the desktop invite command from Enter without sending it", async () => {
     const onInvite = vi.fn();
     const onSend = vi.fn<OnSend>();
-    const { container, root } = await renderHarness({
+    const { cleanup, container } = await renderHarness({
       onInvite,
       onSend,
       submitOnEnter: true,
@@ -257,12 +261,12 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(onInvite).toHaveBeenCalledOnce();
     expect(onSend).not.toHaveBeenCalled();
     expect(input.value).toBe("");
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("selects an Agent Skill when slash is the first character", async () => {
     const onSend = vi.fn<OnSend>();
-    const { container, root } = await renderHarness({
+    const { cleanup, container } = await renderHarness({
       enableSkillCommands: true,
       onSend,
       submitOnEnter: true,
@@ -311,12 +315,12 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await typeInto(input, "Ask / for help");
     expect(container.querySelectorAll('[data-testid="skills"] button'))
       .toHaveLength(0);
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("adds a pasted image and submits its multipart references", async () => {
     const onSend = vi.fn<OnSend>();
-    const { container, root } = await renderHarness({ onSend });
+    const { cleanup, container } = await renderHarness({ onSend });
     const input = container.querySelector<HTMLInputElement>(
       '[data-testid="composer"]',
     )!;
@@ -343,11 +347,11 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       [image],
       [expect.any(String)],
     );
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("shows a localized error and leaves drag mode after a non-image drop", async () => {
-    const { container, root } = await renderHarness({
+    const { cleanup, container } = await renderHarness({
       onSend: vi.fn<OnSend>(),
     });
     const form = container.querySelector("form")!;
@@ -372,6 +376,6 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(container.querySelector('[data-testid="error"]')?.textContent).toBe(
       "Only image files can be attached.",
     );
-    await act(async () => root.unmount());
+    await cleanup();
   });
 });

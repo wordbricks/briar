@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+request_id="${1:-}"
+target_version="${2:-}"
+worker_id="${3:-}"
+request_directory="${BRIAR_RUNTIME_UPDATE_REQUEST_DIR:-/run/briar-runtime-updater}"
+
+if [[ ! "$request_id" =~ ^[0-9a-fA-F-]{36}$ ]]; then
+  echo "runtime update request ID is invalid" >&2
+  exit 2
+fi
+if [[ ! "$target_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "runtime update target version is invalid" >&2
+  exit 2
+fi
+if [[ ! "$worker_id" =~ ^[0-9a-zA-Z-]{1,128}$ ]]; then
+  echo "runtime update worker ID is invalid" >&2
+  exit 2
+fi
+if [[ "$request_directory" != /* || ! -d "$request_directory" ||
+  ! -w "$request_directory" ]]; then
+  echo "runtime updater request directory is unavailable" >&2
+  exit 1
+fi
+
+umask 0027
+temporary="$(mktemp "$request_directory/.request-${request_id}.XXXXXX")"
+trap 'rm -f -- "$temporary"' EXIT
+jq -n \
+  --arg requestId "$request_id" \
+  --arg targetVersion "$target_version" \
+  --arg workerId "$worker_id" \
+  '{requestId: $requestId, targetVersion: $targetVersion, workerId: $workerId}' \
+  > "$temporary"
+chmod 0640 "$temporary"
+mv -f -- "$temporary" "$request_directory/request-${request_id}.json"
+trap - EXIT
+

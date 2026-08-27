@@ -6,12 +6,14 @@ import {
   inboxNotificationContent,
   inboxNotificationLabelKey,
   inboxNotificationTarget,
+  inboxNotificationsEnabled,
   isInboxChannelTarget,
   isInboxRunDetailTarget,
   listenForMacInboxNotificationClicks,
   listenForInboxNotificationClicks,
   readInboxNotificationPreferences,
   readInboxNotificationSoundPreference,
+  recommendedInboxNotificationPreferences,
   sendInboxNotification,
   targetFromNotificationAction,
   writeInboxNotificationPreferences,
@@ -79,6 +81,24 @@ describe("inbox notification preferences", () => {
     writeInboxNotificationSoundPreference(false);
 
     expect(readInboxNotificationSoundPreference()).toBe(false);
+  });
+
+  it("uses important inbox categories as the recommended enabled set", () => {
+    const recommended = recommendedInboxNotificationPreferences();
+
+    expect(recommended).toEqual({
+      urgent: true,
+      action_required: true,
+      important: true,
+      activity: false,
+    });
+    expect(inboxNotificationsEnabled(recommended)).toBe(true);
+    expect(inboxNotificationsEnabled({
+      urgent: false,
+      action_required: false,
+      important: false,
+      activity: false,
+    })).toBe(false);
   });
 });
 
@@ -181,6 +201,7 @@ describe("inbox notification navigation", () => {
     expect(isInboxRunDetailTarget(issueTarget)).toBe(true);
     expect(isInboxChannelTarget(conversationTarget)).toBe(false);
     expect(isInboxRunDetailTarget(conversationTarget)).toBe(true);
+    expect(conversationTarget.conversationMessageId).toBe("message-2");
     expect(isInboxChannelTarget(sessionTarget)).toBe(false);
     expect(isInboxRunDetailTarget(sessionTarget)).toBe(false);
   });

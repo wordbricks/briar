@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   defaultAgentProviderModelCatalog,
@@ -71,24 +71,23 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
   it("uses explicit approval language without changing the selected execution input", async () => {
     const onSubmit = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          intent="approve_execution"
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={onSubmit}
-          open
-          run={{ title: "Approval boundary" } as never}
-          workers={[worker("worker-approval", "Approval Mac")]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        intent="approve_execution"
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={onSubmit}
+        open
+        run={{ title: "Approval boundary" } as never}
+        workers={[worker("worker-approval", "Approval Mac")]}
+      />,
+    );
 
     expect(document.body.textContent).toContain("이슈 실행 승인");
     expect(document.body.textContent).toContain("명시적으로 승인");
@@ -103,28 +102,61 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       workerId: null,
     });
 
-    await act(async () => root.unmount());
+    await cleanup();
+  });
+
+  it("preselects the first supported recommendation for the issue difficulty", async () => {
+    const onSubmit = vi.fn();
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        intent="approve_execution"
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={onSubmit}
+        open
+        run={{ title: "Hard issue", difficulty: "hard" } as never}
+        workers={[worker("worker-hard", "Hard Work Mac")]}
+      />,
+    );
+
+    const approveButton = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("승인하고 실행"));
+    await act(async () => approveButton?.click());
+    expect(onSubmit).toHaveBeenCalledWith({
+      effort: "high",
+      model: "opus",
+      provider: "claude",
+      workerId: null,
+    });
+
+    await cleanup();
   });
 
   it("shows a disabled completion state after dispatch succeeds", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          didDispatchSuccessfully
-          error={null}
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={vi.fn()}
-          open
-          run={null}
-          workers={[worker("worker-complete", "Complete Mac")]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        didDispatchSuccessfully
+        error={null}
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={vi.fn()}
+        open
+        run={null}
+        workers={[worker("worker-complete", "Complete Mac")]}
+      />,
+    );
 
     const completeButton = document.body.querySelector<HTMLButtonElement>(
       'button[aria-label="실행 완료"]',
@@ -132,27 +164,26 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(completeButton?.disabled).toBe(true);
     expect(completeButton?.textContent).toContain("실행 완료");
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("groups provider and model selection and locks both while dispatching", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          isDispatching
-          onOpenChange={vi.fn()}
-          onSubmit={vi.fn()}
-          open
-          run={null}
-          workers={[worker("worker-loading", "Loading Mac")]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        isDispatching
+        onOpenChange={vi.fn()}
+        onSubmit={vi.fn()}
+        open
+        run={null}
+        workers={[worker("worker-loading", "Loading Mac")]}
+      />,
+    );
 
     const selector = document.body.querySelector(
       '.worker-provider-model-selector[role="group"]',
@@ -167,61 +198,59 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       selector?.querySelector(".provider-model-selector-trigger-icon svg"),
     ).not.toBeNull();
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("announces an approval error inside the active dialog", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error="승인 상태가 변경되었습니다."
-          intent="approve_execution"
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={vi.fn()}
-          open
-          run={{ title: "Approval conflict" } as never}
-          workers={[worker("worker-error", "Error Mac")]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error="승인 상태가 변경되었습니다."
+        intent="approve_execution"
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={vi.fn()}
+        open
+        run={{ title: "Approval conflict" } as never}
+        workers={[worker("worker-error", "Error Mac")]}
+      />,
+    );
 
     const alert = document.body.querySelector('[role="alert"]');
     expect(alert?.textContent).toContain("승인 상태가 변경되었습니다.");
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("shows only policy-allowed Workers and preselects the project default", async () => {
     const allowed = worker("worker-allowed", "Allowed Mac");
     const denied = worker("worker-denied", "Denied Mac");
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={vi.fn()}
-          open
-          policy={{
-            selectionMode: "allowlist",
-            defaultWorkerId: allowed.id,
-            allowedWorkerIds: [allowed.id],
-            updatedAt: "2026-07-29T00:00:00Z",
-          }}
-          run={null}
-          workers={[allowed, denied]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={vi.fn()}
+        open
+        policy={{
+          selectionMode: "allowlist",
+          defaultWorkerId: allowed.id,
+          allowedWorkerIds: [allowed.id],
+          updatedAt: "2026-07-29T00:00:00Z",
+        }}
+        run={null}
+        workers={[allowed, denied]}
+      />,
+    );
 
     expect(document.body.textContent).toContain("Allowed Mac");
     expect(document.body.textContent).not.toContain("Denied Mac");
@@ -245,28 +274,27 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       ),
     ).not.toBeNull();
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("submits an auto-assigned Worker when no specific Worker is chosen", async () => {
     const onSubmit = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={onSubmit}
-          open
-          run={null}
-          workers={[worker("worker-auto", "Auto Mac")]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={onSubmit}
+        open
+        run={null}
+        workers={[worker("worker-auto", "Auto Mac")]}
+      />,
+    );
 
     expect(
       document.body.querySelector('[aria-pressed="true"]')?.textContent,
@@ -284,7 +312,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       workerId: null,
     });
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("falls back to auto-assign when the preselected Worker is not available", async () => {
@@ -293,31 +321,30 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       readiness: "busy" as const,
     } satisfies ExecutionWorker;
     const onSubmit = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={onSubmit}
-          open
-          run={{
-            requestedWorkerId: "worker-busy",
-          } as never}
-          workers={[busy]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={onSubmit}
+        open
+        run={{
+          requestedWorkerId: "worker-busy",
+        } as never}
+        workers={[busy]}
+      />,
+    );
 
     expect(
       document.body.querySelector('[aria-pressed="true"]')?.textContent,
     ).toContain("사용 가능한 Worker 자동 선택");
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("selects an execution provider independently", async () => {
@@ -329,23 +356,22 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       ...worker("worker-claude", "Claude Mac"),
       providers: ["claude"] as ExecutionWorker["providers"],
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={vi.fn()}
-          open
-          run={null}
-          workers={[codexWorker, claudeWorker]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={vi.fn()}
+        open
+        run={null}
+        workers={[codexWorker, claudeWorker]}
+      />,
+    );
 
     expect(document.body.textContent).toContain("Codex Mac");
     expect(document.body.textContent).not.toContain("Claude Mac");
@@ -378,7 +404,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(document.body.textContent).toContain("Claude Mac");
     expect(document.body.textContent).not.toContain("Codex Mac");
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("clears an incompatible preferred model when its provider is unavailable", async () => {
@@ -388,29 +414,28 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       providers: ["claude"] as ExecutionWorker["providers"],
       agentProvider: "claude" as const,
     };
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          intent="approve_execution"
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={onSubmit}
-          open
-          run={{
-            title: "Provider fallback",
-            preferredProvider: "codex",
-            preferredModel: "gpt-5.6-sol",
-            preferredEffort: "ultra",
-          } as never}
-          workers={[claudeWorker]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        intent="approve_execution"
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={onSubmit}
+        open
+        run={{
+          title: "Provider fallback",
+          preferredProvider: "codex",
+          preferredModel: "gpt-5.6-sol",
+          preferredEffort: "ultra",
+        } as never}
+        workers={[claudeWorker]}
+      />,
+    );
     const approve = Array.from(
       document.body.querySelectorAll<HTMLButtonElement>("button"),
     ).find((button) => button.textContent?.includes("승인하고 실행"));
@@ -422,7 +447,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       effort: null,
       workerId: null,
     });
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("searches OpenCode supported models and defaults to the provider model", async () => {
@@ -445,23 +470,22 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       providers: ["opencode"] as ExecutionWorker["providers"],
     };
     const onSubmit = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={onSubmit}
-          open
-          run={null}
-          workers={[openCodeWorker]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={onSubmit}
+        open
+        run={null}
+        workers={[openCodeWorker]}
+      />,
+    );
 
     const modelSelect = document.body.querySelector<HTMLButtonElement>(
       '[aria-label="선호 모델"]',
@@ -513,35 +537,34 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       effort: null,
       workerId: null,
     });
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("shows an unknown strict-provider model until the user selects a supported one", async () => {
     const onSubmit = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          intent="approve_execution"
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={onSubmit}
-          open
-          run={{
-            id: "run-retired-model",
-            title: "Retired model",
-            preferredProvider: "codex",
-            preferredModel: "gpt-retired-preview",
-            preferredEffort: "high",
-          } as never}
-          workers={[worker("worker-strict", "Strict Mac")]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        intent="approve_execution"
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={onSubmit}
+        open
+        run={{
+          id: "run-retired-model",
+          title: "Retired model",
+          preferredProvider: "codex",
+          preferredModel: "gpt-retired-preview",
+          preferredEffort: "high",
+        } as never}
+        workers={[worker("worker-strict", "Strict Mac")]}
+      />,
+    );
 
     const modelSelect = document.body.querySelector<HTMLButtonElement>(
       '[aria-label="선호 모델"]',
@@ -570,7 +593,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       model: "gpt-5.6-sol",
       effort: null,
     }));
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("cannot submit a hidden provider value when every Worker is offline", async () => {
@@ -580,24 +603,23 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       state: "stale" as const,
     };
     const onSubmit = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          intent="approve_execution"
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={onSubmit}
-          open
-          run={{ id: "run-offline", title: "Offline approval" } as never}
-          workers={[offlineWorker]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        intent="approve_execution"
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={onSubmit}
+        open
+        run={{ id: "run-offline", title: "Offline approval" } as never}
+        workers={[offlineWorker]}
+      />,
+    );
 
     const providerModelSelect = document.body.querySelector<HTMLButtonElement>(
       '[aria-label="선호 모델"]',
@@ -610,30 +632,29 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await act(async () => approve.click());
     expect(onSubmit).not.toHaveBeenCalled();
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("selects a Worker card and submits the Worker and provider", async () => {
     const first = worker("worker-first", "First Mac");
     const second = worker("worker-second", "Second Mac");
     const onSubmit = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={onSubmit}
-          open
-          run={null}
-          workers={[first, second]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={onSubmit}
+        open
+        run={null}
+        workers={[first, second]}
+      />,
+    );
 
     const secondCard = Array.from(
       document.body.querySelectorAll<HTMLButtonElement>(
@@ -657,28 +678,27 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       workerId: second.id,
     });
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("submits the selected model and effort", async () => {
     const onSubmit = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={onSubmit}
-          open
-          run={null}
-          workers={[worker("worker-model", "Model Mac")]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={onSubmit}
+        open
+        run={null}
+        workers={[worker("worker-model", "Model Mac")]}
+      />,
+    );
     await act(async () => {
       document.body
         .querySelector<HTMLButtonElement>('[aria-label="선호 모델"]')
@@ -723,7 +743,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       }),
     );
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("shows the deterministic model union advertised by project Workers", async () => {
@@ -738,32 +758,39 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         error: null,
       },
     });
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
 
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={vi.fn()}
-          open
-          run={null}
-          workers={[
-            worker("worker-zeta", "Zeta Mac", catalog([
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={vi.fn()}
+        open
+        run={null}
+        workers={[
+          worker(
+            "worker-zeta",
+            "Zeta Mac",
+            catalog([
               { id: "remote-zeta", label: "Remote Zeta" },
               { id: "remote-shared", label: "Remote Shared" },
-            ])),
-            worker("worker-alpha", "Alpha Mac", catalog([
+            ]),
+          ),
+          worker(
+            "worker-alpha",
+            "Alpha Mac",
+            catalog([
               { id: "remote-alpha", label: "Remote Alpha" },
               { id: "remote-shared", label: "Remote Shared" },
-            ])),
-          ]}
-        />,
-      );
-    });
+            ]),
+          ),
+        ]}
+      />,
+    );
 
     await act(async () => {
       document.body
@@ -783,7 +810,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     ]);
     expect(modelValues).not.toContain("gpt-5.6-sol");
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("rejects an explicitly selected Worker that does not support the model", async () => {
@@ -801,29 +828,28 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     const alpha = worker("worker-alpha", "Alpha Mac", catalog("model-alpha"));
     const beta = worker("worker-beta", "Beta Mac", catalog("model-beta"));
     const onSubmit = vi.fn();
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <WorkerDispatchDialog
-          error={null}
-          initialSelection={{
-            provider: "codex",
-            model: "model-beta",
-            effort: null,
-            workerId: alpha.id,
-          }}
-          isDispatching={false}
-          onOpenChange={vi.fn()}
-          onSubmit={onSubmit}
-          open
-          run={null}
-          workers={[alpha, beta]}
-        />,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+
+    await renderReactTestRoot(
+      root,
+      <WorkerDispatchDialog
+        error={null}
+        initialSelection={{
+          provider: "codex",
+          model: "model-beta",
+          effort: null,
+          workerId: alpha.id,
+        }}
+        isDispatching={false}
+        onOpenChange={vi.fn()}
+        onSubmit={onSubmit}
+        open
+        run={null}
+        workers={[alpha, beta]}
+      />,
+    );
 
     expect(document.body.querySelector('[role="alert"]')?.textContent).toContain(
       "이 Worker는 선택한 프로바이더·모델·effort 조합을 지원하지 않습니다.",
@@ -835,7 +861,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await act(async () => dispatch.click());
     expect(onSubmit).not.toHaveBeenCalled();
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
 });

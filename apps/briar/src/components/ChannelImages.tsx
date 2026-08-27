@@ -13,7 +13,9 @@ import { useObjectUrl } from "../hooks/useObjectUrl";
 import type { ChannelMessageAttachment } from "../lib/channels-contract";
 import { loadChannelMessageAttachment } from "../lib/api";
 import { formatAttachmentBytes } from "../lib/issue-attachments";
+import { isHtmlArtifactAttachment } from "../lib/agent-reply-attachments";
 import { issueAttachmentMarkdown } from "../lib/issue-markdown";
+import { HtmlArtifactPreview } from "./HtmlArtifactPreview";
 import { ImageLightbox } from "./ImageLightbox";
 
 export type DraftChannelImage = { file: File; reference: string };
@@ -257,6 +259,67 @@ export function ChannelMessageImages({
 }
 
 function ChannelMessageImage({
+  attachment,
+  interactive,
+  token,
+}: {
+  attachment: ChannelMessageAttachment;
+  interactive: boolean;
+  token: string;
+}) {
+  if (isHtmlArtifactAttachment(attachment.contentType, attachment.filename)) {
+    return (
+      <ChannelMessageHtmlArtifact
+        attachment={attachment}
+        interactive={interactive}
+        token={token}
+      />
+    );
+  }
+  return (
+    <ChannelMessageMediaAttachment
+      attachment={attachment}
+      interactive={interactive}
+      token={token}
+    />
+  );
+}
+
+function ChannelMessageHtmlArtifact({
+  attachment,
+  interactive,
+  token,
+}: {
+  attachment: ChannelMessageAttachment;
+  interactive: boolean;
+  token: string;
+}) {
+  const loadAttachment = useCallback(
+    () => loadChannelMessageAttachment(token, attachment),
+    [attachment.url, token],
+  );
+  if (!interactive) {
+    return (
+      <span className="html-artifact-card channel-html-artifact is-static">
+        <span className="html-artifact-card-copy">
+          <strong title={attachment.filename}>{attachment.filename}</strong>
+          <small>{formatAttachmentBytes(attachment.byteSize)}</small>
+        </span>
+        <span className="html-artifact-card-action">HTML</span>
+      </span>
+    );
+  }
+  return (
+    <HtmlArtifactPreview
+      byteSize={attachment.byteSize}
+      className="channel-html-artifact"
+      filename={attachment.filename}
+      loadAttachment={loadAttachment}
+    />
+  );
+}
+
+function ChannelMessageMediaAttachment({
   attachment,
   interactive,
   token,

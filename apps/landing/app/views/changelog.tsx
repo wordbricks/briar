@@ -30,6 +30,108 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.167",
+        date: "2026년 8월 27일",
+        title: "Hunt와 협업 흐름을 더 선명하고 안정적으로 연결합니다",
+        summary:
+          "Hunt 화면의 익숙한 작업 흐름을 복원하고, 답글 탐색·채널 맥락·관리형 런타임·GitHub 연결을 개선합니다.",
+        items: [
+          "Hunt Board, Issue Queue, Issue Detail, Run Result 화면의 레이아웃과 상호작용을 복원하면서 데이터와 실행 동작은 유지합니다.",
+          "Inbox 답글 알림을 선택하면 해당 답글을 대화 패널 중앙으로 이동하고 강조하며 포커스합니다.",
+          "채널에서 생성한 이슈가 원본 메시지로 돌아갈 수 있도록 관련 메시지 정보를 저장하고 웹과 모바일에 전달합니다.",
+          "채널 반응 작성자의 조직 구성원 이름을 표시하고, 오래된 구성원 ID에는 안전한 대체 표시를 사용합니다.",
+          "관리형 컴퓨터 런타임을 안전하게 업데이트하고 컴퓨터 이미지를 최신 버전으로 전환합니다.",
+          "Production GitHub App 인증을 보강하고 OAuth 연결 실패 원인을 더 분명하게 전달합니다.",
+          "프로젝트·설정·Hunt 화면의 공통 스타일과 키보드 단축키 조합 표시를 정리했습니다.",
+        ],
+      },
+      {
+        version: "1.2.166",
+        date: "2026년 8월 27일",
+        title: "저장소 워크플로 생성과 실행 계약을 일관되게 만듭니다",
+        summary:
+          "워크플로 초안과 실행 설정의 책임을 분리해 저장소 분석 결과를 안정적으로 저장하고, 잘못된 생성 응답을 안전하게 복구합니다.",
+        items: [
+          "필수 단계, 체크포인트 식별자, 특수 도구 이름처럼 서로 맞아야 하는 실행 설정을 Briar가 하나의 워크플로 초안에서 일관되게 계산합니다.",
+          "프로바이더 응답이 실행 계약을 충족하지 않으면 구조화된 진단을 바탕으로 같은 대화에서 한 번만 교정을 요청합니다.",
+          "기존 사용자 정의 단계와 긴 검증 명령을 재생성할 때 그대로 보존하고, 앱·Worker·네이티브 저장 경계가 동일한 규칙을 적용합니다.",
+        ],
+      },
+      {
+        version: "1.2.165",
+        date: "2026년 8월 27일",
+        title: "데스크톱 준비 상태와 작업 탐색을 더 빠르고 안정적으로 연결합니다",
+        summary:
+          "패키지 앱의 로컬 도구 탐색과 프로젝트 연결을 안정화하고, Inbox·채널·설정 전반의 키보드 흐름과 화면 구성을 다듬습니다.",
+        items: [
+          "macOS 패키지 앱이 mise와 Nix 환경의 Git·GitHub CLI 등 로컬 도구를 일관되게 찾고, 프로젝트 연결 전에 필수 준비 상태를 확인합니다.",
+          "연결 도중 일부만 생성된 Worker 구성을 안전하게 되돌리고, GitHub가 선택 사항인 워크플로에서는 불필요한 원격 검사를 건너뜁니다.",
+          "Effect와 Atom 기반 키보드 상태를 통해 Inbox 선택과 포커스를 격리하고, G D로 DM을 열며 프로젝트 선택 뒤 이슈 목록으로 바로 이동합니다.",
+          "Inbox 항목을 다시 읽지 않음으로 표시할 수 있으며, 목록·상세 패널·팝업의 키보드 및 접근성 의미를 강화했습니다.",
+          "이슈 난이도에 맞는 실행 모델을 추천하고, 프로젝트 Overview의 사용량 분석 기간을 선택할 수 있습니다.",
+          "채널 에이전트의 사용량 소진 상태를 정확히 알리고, 채널과 이슈의 활동·대화 처리를 공통 기반으로 통합했습니다.",
+          "Inbox, DM, 채널, 로그인, 온보딩, 프로젝트·에이전트·계정·조직 설정 화면을 공통 Tailwind 구성요소로 정리했습니다.",
+        ],
+      },
+      {
+        version: "1.2.164",
+        date: "2026년 8월 26일",
+        title: "프로젝트 워크플로와 병합 큐의 경계를 명확하게 연결합니다",
+        summary:
+          "프로젝트별 준비 단계를 병합 큐의 기준으로 설정하고 현재 큐 상태를 확인하면서, 프로필 저장과 채널 답글 라우팅, macOS 설치 화면을 안정화합니다.",
+        items: [
+          "프로젝트 설정에서 병합 큐를 켜고 워크플로의 준비 단계를 선택해 어떤 완료 시점부터 PR이 큐에 들어갈지 명시할 수 있습니다.",
+          "최근 배치와 후보 PR의 상태, 통합 SHA, 타임스탬프를 설정 화면에서 새로고침하며 확인할 수 있습니다.",
+          "준비 단계가 바뀌면 이후에 관찰된 완료만 새 경계의 증거로 인정하고, 활성 큐가 참조하는 단계를 워크플로에서 제거하지 못하도록 보호합니다.",
+          "Worker가 프로젝트별 병합 큐 경계를 API, CLI, D1 상태와 일관되게 적용하고 안전한 기본값과 진단 정보를 유지합니다.",
+          "활성 채널 스레드 세션의 Worker와 메시지의 선호 기기가 다를 때 서로 양보하며 답글이 대기 상태에 갇히는 교착을 방지합니다.",
+          "username이 아직 없는 계정도 nickname과 username을 저장할 수 있고, 실제 중복 username만 정확히 거부합니다.",
+          "macOS DMG 설치 화면에서 Briar와 Applications 아이콘, 배경, 드래그 안내가 다시 올바른 위치와 디자인으로 표시됩니다.",
+        ],
+      },
+      {
+        version: "1.2.163",
+        date: "2026년 8월 26일",
+        title: "키보드 탐색의 흐름과 포커스를 더 단단하게 다듬습니다",
+        summary:
+          "재사용 가능한 명령 시스템으로 키보드 모드와 포커스 이동을 통합해 Inbox와 이슈 작업을 더 예측 가능하게 이어갑니다.",
+        items: [
+          "G P로 프로젝트 선택기를 바로 열고, 기존 O P 단축키도 계속 사용할 수 있습니다.",
+          "Inbox, 이슈 목록, Kanban에서 J·K와 방향키 포커스가 선택 상태와 안정적으로 동기화됩니다.",
+          "이슈 편집 중 Escape를 누르면 Normal 모드로 돌아가 G 이동 명령을 바로 이어서 사용할 수 있고, 설정 화면에서는 Escape로 창을 닫습니다.",
+          "Effect와 Atom 기반 명령 컨트롤러가 모드, 시퀀스, 포커스 범위, 이벤트 소비를 한곳에서 관리해 앞으로 추가될 단축키의 일관성을 높입니다.",
+          "Worker 상태에서 연결된 관리형 컴퓨터를 바로 열고, 로컬 D1 테스트 템플릿을 고정된 Wrangler 흐름으로 더 안정적으로 준비합니다.",
+        ],
+      },
+      {
+        version: "1.2.162",
+        date: "2026년 8월 26일",
+        title: "키보드로 Briar 어디든 더 빠르게 탐색합니다",
+        summary:
+          "Linear 스타일의 모드 단축키와 목록 탐색을 도입해 마우스 없이도 프로젝트의 주요 화면과 항목을 빠르게 오갈 수 있습니다.",
+        items: [
+          "G와 O 접두어 모드로 프로젝트 홈, 이슈, Inbox, 채널, DM, 일정, 설정과 검색 대상을 두 번의 키 입력으로 바로 엽니다.",
+          "이슈 목록, Inbox, Kanban에서 J·K 또는 방향키로 이동하고 Enter로 선택한 항목을 열어 검토 흐름을 이어갑니다.",
+          "⌘/ 도움말과 모드 힌트로 사용 가능한 키를 확인하고, 설정에서 단일 키·시퀀스 단축키를 끌 수 있습니다.",
+          "입력 필드, IME 조합, 대화상자, 단축키 기록, 원격 데스크톱에서는 전역 키 입력을 안전하게 억제합니다.",
+          "실행 이벤트가 사용자가 편집한 이슈 제목을 이전 값으로 되돌리지 않도록 동기화 충돌을 수정했습니다.",
+        ],
+      },
+      {
+        version: "1.2.161",
+        date: "2026년 8월 26일",
+        title: "관리형 컴퓨터 운영과 이슈 탐색을 더 빠르고 안전하게 다듬습니다",
+        summary:
+          "관리형 컴퓨터의 운영 자동화와 Worker 비용을 개선하고, 이슈 난이도·CLI·원격 화면 사용성을 더 선명하게 연결합니다.",
+        items: [
+          "이슈 카드와 목록에 난이도 속성과 아이콘을 표시해 작업 규모를 한눈에 비교합니다.",
+          "관리형 컴퓨터 화면에서 클립보드 붙여넣기를 바로 사용할 수 있고, 관리자는 재사용 가능한 promotion campaign으로 파일럿 배포를 운영합니다.",
+          "retirement된 관리형 컴퓨터는 새 작업을 즉시 중단하고 Worker lifecycle telemetry와 보존 정책으로 삭제와 상태 전이를 추적합니다.",
+          "Worker heartbeat와 transcript session 합계를 증분 처리해 D1 읽기·쓰기와 비용을 줄이고, 터미널 실행 메트릭은 fenced payload만 수용해 안전성을 높입니다.",
+          "Briar CLI에 whoami 명령을 추가하고 계정 API·공통 TypeScript 설정·Effect/Oxlint 검증을 정리해 개발 환경을 안정화합니다.",
+        ],
+      },
+      {
         version: "1.2.160",
         date: "2026년 8월 25일",
         title: "채널 스레드 세션과 관리형 컴퓨터 수명 주기를 더 안전하게 운영합니다",
@@ -1122,6 +1224,108 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.167",
+        date: "August 27, 2026",
+        title: "Make the Hunt and collaboration flow clearer and more reliable",
+        summary:
+          "Restore the familiar Hunt workflow while improving reply navigation, channel context, managed runtimes, and the GitHub connection.",
+        items: [
+          "Restored the Hunt Board, Issue Queue, Issue Detail, and Run Result layouts and interactions while preserving data and execution behavior.",
+          "Selecting an Inbox reply notification now centers, highlights, and focuses the referenced reply in the conversation.",
+          "Keep the source channel message linked to issues created from channels and expose that context on web and mobile.",
+          "Show organization member names in channel reaction details with a safe fallback for stale member IDs.",
+          "Update managed-computer runtimes safely and roll the managed fleet to the latest image version.",
+          "Harden Production GitHub App authentication and make OAuth connection failures more actionable.",
+          "Refined shared styling across project, settings, and Hunt screens and clarified keyboard shortcut combinations.",
+        ],
+      },
+      {
+        version: "1.2.166",
+        date: "August 27, 2026",
+        title: "Make repository workflow generation and execution consistent",
+        summary:
+          "Separate workflow-draft and execution-setting ownership so repository analysis saves reliably and invalid generated responses can recover safely.",
+        items: [
+          "Derive required stages, checkpoint identifiers, and specialized tool names consistently inside Briar from one workflow draft.",
+          "When a provider response violates the execution contract, use structured diagnostics to request exactly one correction in the same conversation.",
+          "Preserve existing custom stages and long validation commands during regeneration, with the same rules across app, Worker, and native persistence boundaries.",
+        ],
+      },
+      {
+        version: "1.2.165",
+        date: "August 27, 2026",
+        title: "Connect desktop readiness to faster, more dependable navigation",
+        summary:
+          "Stabilize local tool discovery and project connections in the packaged app while refining keyboard flow and shared UI across Inbox, channels, and settings.",
+        items: [
+          "Find local tools such as Git and GitHub CLI consistently from mise and Nix environments in the packaged macOS app, then verify required readiness before connecting a project.",
+          "Roll back partially created Worker configuration safely and skip unnecessary remote probes when GitHub is optional for the selected workflow.",
+          "Use Effect- and Atom-based keyboard state to isolate Inbox selection and focus, open DMs with G D, and go straight to a project's issue list after choosing it.",
+          "Mark Inbox items as unread and strengthen keyboard and accessibility semantics across lists, detail panels, and popups.",
+          "Recommend an execution model based on issue difficulty and choose the usage-analysis period shown in Project Overview.",
+          "Report exhausted channel-agent usage accurately and unify channel and issue activity and conversation handling on shared foundations.",
+          "Move Inbox, DMs, channels, login, onboarding, and project, agent, account, and organization settings onto shared Tailwind components.",
+        ],
+      },
+      {
+        version: "1.2.164",
+        date: "August 26, 2026",
+        title: "Connect project workflows to clear merge-queue boundaries",
+        summary:
+          "Choose a project readiness stage as the merge-queue boundary, inspect current queue activity, and stabilize profile saving, channel-reply routing, and the macOS installer.",
+        items: [
+          "Enable the merge queue in project settings and select the workflow stage whose completion makes a pull request eligible for collection.",
+          "Refresh and inspect recent batches and candidate pull requests, including their state, integration SHA, and timestamps, from the settings view.",
+          "Treat only completions observed after a boundary change as fresh proof, and prevent workflow edits from removing a stage referenced by an active profile.",
+          "Apply each project's queue boundary consistently across the Worker, API, CLI, and D1 state while preserving safe defaults and diagnostics.",
+          "Prevent channel replies from remaining queued when a live thread-session owner and a message-level preferred device would otherwise yield to each other.",
+          "Let accounts without an existing username save their nickname and username while rejecting only genuine username conflicts.",
+          "Restore the Briar and Applications icons, background, and drag guidance to their intended layout in the macOS DMG installer.",
+        ],
+      },
+      {
+        version: "1.2.163",
+        date: "August 26, 2026",
+        title: "Make keyboard focus and navigation more dependable",
+        summary:
+          "Unify keyboard modes and focus movement through a reusable command system so Inbox and issue workflows stay predictable.",
+        items: [
+          "Open the project selector with G P while keeping the existing O P shortcut available.",
+          "Keep J, K, and arrow-key focus synchronized with selection across Inbox, issue lists, and Kanban.",
+          "Press Escape while editing an issue to return to Normal mode and continue with G navigation commands, or press Escape in settings to close the view.",
+          "Manage modes, sequences, focus scopes, and event consumption in one Effect- and Atom-based command controller for consistent future shortcuts.",
+          "Open a connected managed computer directly from Worker status and prepare local D1 test templates through the pinned Wrangler flow.",
+        ],
+      },
+      {
+        version: "1.2.162",
+        date: "August 26, 2026",
+        title: "Navigate anywhere in Briar faster from the keyboard",
+        summary:
+          "Use Linear-style command modes and list navigation to move through the project's main views and items without reaching for the mouse.",
+        items: [
+          "Use G and O prefix modes to open project home, issues, Inbox, channels, DMs, schedule, settings, and scoped searches with two keystrokes.",
+          "Move through issue lists, Inbox, and Kanban with J, K, or the arrow keys, then open the focused item with Enter.",
+          "Discover available keys through the Command+/ guide and mode hints, and disable single-key and sequence shortcuts in settings.",
+          "Suppress global keys safely in editable fields, IME composition, dialogs, shortcut recording, and remote-desktop sessions.",
+          "Prevent run events from reverting issue titles after a user edits them.",
+        ],
+      },
+      {
+        version: "1.2.161",
+        date: "August 26, 2026",
+        title: "Make managed-computer operations, issue triage, and the CLI faster and safer",
+        summary:
+          "Improve managed-computer operations and Worker cost, while connecting issue difficulty, the CLI, and remote-screen usability more clearly.",
+        items: [
+          "Show issue difficulty and an icon on cards and lists so teams can compare the size of work at a glance.",
+          "Paste directly into managed-computer screens, and let administrators run pilot deployments through reusable promotion campaigns.",
+          "Stop new work on retired managed computers promptly, and track deletion and lifecycle transitions with Worker telemetry and retention policy.",
+          "Update Worker heartbeats and transcript-session totals incrementally to reduce D1 reads, writes, and cost, while accepting terminal execution metrics only from fenced payloads.",
+          "Add the Briar CLI whoami command and tighten the account API, shared TypeScript configuration, and Effect/Oxlint checks for a more dependable development environment.",
+        ],
+      },
       {
         version: "1.2.160",
         date: "August 25, 2026",
@@ -2306,7 +2510,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-160">
+          <a href="#v1-2-167">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2328,7 +2532,19 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.160"
+                      entry.version === "1.2.167" ||
+                      entry.version === "1.2.166" ||
+                      entry.version === "1.2.165"
+                        ? "2026-08-27"
+                        : entry.version === "1.2.164"
+                        ? "2026-08-26"
+                        : entry.version === "1.2.163"
+                        ? "2026-08-26"
+                        : entry.version === "1.2.162"
+                        ? "2026-08-26"
+                        : entry.version === "1.2.161"
+                        ? "2026-08-26"
+                        : entry.version === "1.2.160"
                         ? "2026-08-25"
                         : entry.version === "1.2.159"
                         ? "2026-08-25"

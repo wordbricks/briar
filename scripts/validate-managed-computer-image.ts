@@ -96,11 +96,13 @@ for (const required of [
   "curl",
   "fontconfig",
   "fonts-noto-cjk",
+  "gh",
   "git",
   "libayatana-appindicator3-dev",
   "librsvg2-dev",
   "libssl-dev",
   "libwebkit2gtk-4.1-dev",
+  "minisign",
   "patchelf",
   "pkg-config",
   "sudo",
@@ -155,6 +157,28 @@ if (
   fail("Packer must create the artifact upload directory before file provisioning");
 }
 
+const artifactPreparer = await text(join(image, "prepare-image-artifacts"));
+if (
+  artifactPreparer.match(/\bbriar-open-browser\b/gu)?.length !== 2
+) {
+  fail("browser helper must be packaged once and marked executable once");
+}
+
+const browserHelperPath = join(image, "briar-open-browser");
+const browserHelper = await text(browserHelperPath);
+for (const required of [
+  "/usr/bin/nohup /usr/bin/setsid --fork",
+  '/usr/bin/google-chrome-stable --new-window "$url"',
+  '</dev/null >/dev/null 2>&1 &',
+]) {
+  if (!browserHelper.includes(required)) {
+    fail(`browser helper omits detached launch behavior: ${required}`);
+  }
+}
+if (!browserHelper.includes('case "$url" in') || browserHelper.includes("eval ")) {
+  fail("browser helper must validate and quote the URL without eval");
+}
+
 const installer = await text(join(image, "install-image-runtime"));
 if (!installer.includes("ln -sfn /opt/briar/bin/bun /opt/briar/bin/bunx")) {
   fail("image installer must provide the standard bunx command");
@@ -165,12 +189,21 @@ if (!installer.includes("--frozen-lockfile --production --ignore-scripts")) {
 if (!installer.includes("agent-browser/bin/agent-browser-linux-x64")) {
   fail("agent-browser must install its pinned Linux native binary directly");
 }
+if (
+  !installer.includes('"$source_dir/briar-open-browser"') ||
+  !installer.includes("/opt/briar/bin/briar-open-browser")
+) {
+  fail("image installer must install the browser helper");
+}
 for (const required of [
   "/home/briar/.cargo/bin",
   "/home/briar/.rustup/downloads",
   "/home/briar/.rustup/tmp",
   "/home/briar/.rustup/toolchains",
   'chown -h briar:briar "$user_toolchain"',
+  'initial_release="/opt/briar/releases/$briar_version"',
+  "ln -s /opt/briar/current/bin/briar /opt/briar/bin/briar",
+  "/home/briar/.codex/skills",
 ]) {
   if (!installer.includes(required)) {
     fail(`image installer omits writable managed-user Rust state: ${required}`);
@@ -196,11 +229,15 @@ const profile = await text(join(image, "briar-runtime-profile.sh"));
 for (const required of [
   "CARGO_HOME=/home/briar/.cargo",
   "RUSTUP_HOME=/home/briar/.rustup",
+  "export GH_BROWSER=/opt/briar/bin/briar-open-browser",
   "BRIAR_CI_SERIAL_CONTEXTS=true",
   "VITEST_MAX_WORKERS=2",
   "/opt/briar/bin",
 ]) {
   if (!profile.includes(required)) fail(`runtime profile omits ${required}`);
+}
+if (/^\s*(?:export\s+)?BROWSER=/mu.test(profile)) {
+  fail("runtime profile must not override global BROWSER");
 }
 
 const remoteDesktop = await text(join(image, "briar-remote-desktop"));
@@ -248,6 +285,18 @@ if (!verifier.includes("command -v xfdesktop >/dev/null")) {
   fail("image verifier must require the XFCE desktop process");
 }
 for (const required of [
+  "command -v gh >/dev/null",
+  "test -x /opt/briar/bin/briar-open-browser",
+  'printf %s "$GH_BROWSER"',
+  "gh auth login --help",
+  "for required_flag in --hostname --git-protocol --web",
+  "gh auth status --help",
+]) {
+  if (!verifier.includes(required)) {
+    fail(`image verifier omits GitHub browser-login check: ${required}`);
+  }
+}
+for (const required of [
   "test -w /home/briar/.cargo",
   "test -w /home/briar/.rustup/downloads",
   "test -w /home/briar/.rustup/tmp",
@@ -264,13 +313,20 @@ for (const forbidden of [
   "/home/briar/.ssh",
   "/home/briar/.git-credentials",
   "/home/briar/.config/gh",
-  "/home/briar/.cursor",
-  "/home/briar/.grok",
-  "/home/briar/.gemini",
   "/home/briar/.local/share/opencode/auth.json",
 ]) {
   if (!cleanup.includes(forbidden) || !verifier.includes(forbidden)) {
     fail(`capture credential boundary omits ${forbidden}`);
+  }
+}
+for (const [providerRoot, skillSubdirectory] of [
+  ["/home/briar/.cursor", "skills"],
+  ["/home/briar/.grok", "skills"],
+  ["/home/briar/.gemini", "config/skills"],
+]) {
+  const invocation = `verify_skill_only_provider_root ${providerRoot} ${skillSubdirectory}`;
+  if (!cleanup.includes(invocation) || !verifier.includes(invocation)) {
+    fail(`capture provider-state boundary omits ${providerRoot}`);
   }
 }
 
@@ -279,6 +335,7 @@ for (const required of [
   "User=briar",
   "Group=briar",
   "BRIAR_MANAGED_CREDENTIAL_FILE=/var/lib/briar/worker-credential.json",
+  "BRIAR_MANAGED_RUNTIME_UPDATER=/opt/briar/bin/briar-managed-runtime-update-request",
   "CARGO_HOME=/home/briar/.cargo",
   "RUSTUP_HOME=/home/briar/.rustup",
   "BRIAR_CI_SERIAL_CONTEXTS=true",
@@ -288,6 +345,52 @@ for (const required of [
   if (!service.includes(required)) fail(`managed worker unit omits ${required}`);
 }
 if (service.includes("briar_worker_")) fail("managed worker unit embeds a token");
+
+const updater = await text(join(image, "briar-managed-runtime-updater"));
+for (const required of [
+  "minisign_binary",
+  "wait_for_handoff",
+  "safe_archive",
+  "mv -Tf -- \"$temporary_link\" \"$current_link\"",
+  "wait_for_health",
+  "rollback_release",
+  "Refusing to downgrade the managed runtime",
+  "update-handoff/fail",
+]) {
+  if (!updater.includes(required)) fail(`runtime updater omits ${required}`);
+}
+if (updater.includes("curl | sh") || updater.includes("eval ")) {
+  fail("runtime updater must not execute an unverified download");
+}
+const updaterService = await text(
+  join(image, "briar-managed-runtime-updater.service"),
+);
+for (const required of [
+  "User=root",
+  "Group=briar",
+  "RuntimeDirectory=briar-runtime-updater",
+  "ProtectSystem=strict",
+  "ReadOnlyPaths=/var/lib/briar",
+  "ExecStart=/opt/briar/bin/briar-managed-runtime-updater",
+]) {
+  if (!updaterService.includes(required)) {
+    fail(`runtime updater unit omits ${required}`);
+  }
+}
+
+const releaseConfig = Object.fromEntries(
+  (await text(join(root, "config", "release.env")))
+    .split(/\r?\n/u)
+    .filter((line) => line && !line.startsWith("#"))
+    .map((line) => line.split("=", 2) as [string, string]),
+);
+const updaterPublicKey = Buffer.from(
+  releaseConfig.BRIAR_UPDATER_PUBLIC_KEY ?? "",
+  "base64",
+).toString("utf8");
+if (updaterPublicKey !== await text(join(image, "runtime-updater.pub"))) {
+  fail("managed runtime updater public key differs from Production releases");
+}
 
 const localCi = await text(join(root, "scripts", "ci-local.sh"));
 if (!localCi.includes('"${BRIAR_CI_SERIAL_CONTEXTS:-false}" == "true"')) {
@@ -305,8 +408,28 @@ if (!turboConfig.globalPassThroughEnv?.includes("VITEST_MAX_WORKERS")) {
   fail("Turborepo must pass the managed-computer Vitest worker limit");
 }
 
+const pilotGuide = await text(
+  join(root, "docs", "operations", "managed-computer-pilot.md"),
+);
+for (const required of [
+  "gh auth login --hostname github.com --git-protocol https --web",
+  "gh auth status --hostname github.com",
+  "GH_BROWSER",
+  "/opt/briar/bin/briar-open-browser",
+]) {
+  if (!pilotGuide.includes(required)) {
+    fail(`managed-computer guidance omits GitHub login detail: ${required}`);
+  }
+}
+if (pilotGuide.includes("--skip-ssh-key")) {
+  fail("managed-computer guidance must not use unsupported --skip-ssh-key");
+}
+
 for (const executable of [
   "briar",
+  "briar-managed-runtime-update-request",
+  "briar-managed-runtime-updater",
+  "briar-open-browser",
   "build-managed-computer-image",
   "configure-debian-snapshot",
   "install-image-runtime",

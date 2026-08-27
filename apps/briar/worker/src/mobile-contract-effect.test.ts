@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import * as Option from "effect/Option";
 import { describe, expect, it } from "vitest";
 import {
+  mobileAgentSkillExecutionApprovalRequestSchema,
   mobileAgentSkillExecutionApprovalResponseSchema,
   mobileChannelIssueProposalPayloadSchema,
   mobileChannelMessageSchema,
@@ -162,9 +163,28 @@ describe("Effect mobile contract behavior", () => {
       mobileAgentSkillExecutionApprovalResponseSchema,
       approval,
     ))).toBe(true);
+
+    const conversation = structuredClone(
+      fixture.operations.acceptChannelSkillExecutionProposal.response,
+    ) as {
+      proposal: Record<string, unknown>;
+      session: unknown;
+    };
+    conversation.proposal.executionMode = "conversation";
+    conversation.proposal.resultMessageId =
+      "16161616-1616-4616-8616-161616161616";
+    conversation.session = null;
+    expect(() => decodeMobileSchema(
+      mobileAgentSkillExecutionApprovalRequestSchema,
+      {},
+    )).not.toThrow();
+    expect(() => decodeMobileSchema(
+      mobileAgentSkillExecutionApprovalResponseSchema,
+      conversation,
+    )).not.toThrow();
   });
 
-  it("defaults omitted issue difficulty and rejects unsupported values", () => {
+  it("defaults omitted issue difficulty to unset and rejects unsupported values", () => {
     const request = fixture.operations.createIssue.request as Record<
       string,
       unknown
@@ -174,7 +194,13 @@ describe("Effect mobile contract behavior", () => {
     expect(
       decodeMobileSchema(mobileCreateIssueRequestSchema, withoutDifficulty)
         .difficulty,
-    ).toBe("normal");
+    ).toBeNull();
+    expect(
+      decodeMobileSchema(mobileCreateIssueRequestSchema, {
+        ...request,
+        difficulty: null,
+      }).difficulty,
+    ).toBeNull();
     expect(Option.isNone(decodeMobileSchemaOption(
       mobileCreateIssueRequestSchema,
       { ...request, difficulty: "extreme" },
@@ -189,5 +215,17 @@ describe("Effect mobile contract behavior", () => {
         assigneeUserId: null,
       },
     ))).toBe(true);
+    const updateWithoutDifficulty = {
+      title: "Updated issue",
+      description: null,
+      priority: null,
+      assigneeUserId: null,
+    };
+    expect(
+      decodeMobileSchema(
+        mobileUpdateIssueRequestSchema,
+        updateWithoutDifficulty,
+      ).difficulty,
+    ).toBeNull();
   });
 });

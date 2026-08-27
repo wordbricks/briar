@@ -1,36 +1,35 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ImageLightbox, imageDownloadFilename } from "./ImageLightbox";
 
 describe("ImageLightbox", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
 
   beforeEach(() => {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("opens the image in an app-sized modal with a named download", async () => {
-    await act(async () => {
-      root.render(
-        <ImageLightbox
-          alt="Finished dashboard"
-          filename="finished-dashboard.png"
-          source="blob:finished-dashboard"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <ImageLightbox
+        alt="Finished dashboard"
+        filename="finished-dashboard.png"
+        source="blob:finished-dashboard"
+      />,
+    );
 
     const trigger = container.querySelector<HTMLButtonElement>(
       '[aria-label="finished-dashboard.png 크게 보기"]',

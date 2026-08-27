@@ -27,6 +27,17 @@ export const channelAgentSkillKinds = [
 ] as const;
 export type ChannelAgentSkillKind = (typeof channelAgentSkillKinds)[number];
 
+export const agentSkillExecutionModes = ["conversation", "task"] as const;
+export type AgentSkillExecutionMode =
+  (typeof agentSkillExecutionModes)[number];
+
+export const agentSkillApprovalPolicies = [
+  "invoke_is_consent",
+  "explicit",
+] as const;
+export type AgentSkillApprovalPolicy =
+  (typeof agentSkillApprovalPolicies)[number];
+
 export const channelVisibilities = ["public", "private"] as const;
 export type ChannelVisibility = (typeof channelVisibilities)[number];
 
@@ -53,6 +64,21 @@ export const channelReplyClaimTokenHeader =
 /** Stable server error used when an Agent mention has no runnable Worker. */
 export const channelReplyNoAvailableWorkerError =
   "No available Worker can run this Agent.";
+
+/** Stable server error used when a compatible runtime reports exhausted usage. */
+export const channelReplyProviderUsageExhaustedError =
+  "The assigned Agent model has reached its usage limit.";
+
+/** Stable, actionable error for a pinned Agent or retained thread owner. */
+export const channelReplyAssignedWorkerUnavailableError = (
+  workerLabel: string,
+) =>
+  `Worker "${workerLabel}" is assigned to this Agent thread but is unavailable. Check that it is online, enabled, signed in, accepting work, allowed for this project, and supports the Agent provider, model, and effort.` as const;
+
+export type ChannelReplyUnavailableReason =
+  | typeof channelReplyNoAvailableWorkerError
+  | typeof channelReplyProviderUsageExhaustedError
+  | ReturnType<typeof channelReplyAssignedWorkerUnavailableError>;
 
 const strictSchemaOptions = {
   errors: "all",
@@ -292,6 +318,8 @@ export function channelMessageBlocksFallback(blocks: ChannelMessageBlock[]) {
 const Uuid = Schema.String.check(Schema.isUUID());
 const AgentProviderSchema = Schema.Literals(channelAgentProviders);
 const ChannelAgentSkillKindSchema = Schema.Literals(channelAgentSkillKinds);
+const AgentSkillExecutionModeSchema = Schema.Literals(agentSkillExecutionModes);
+const AgentSkillApprovalPolicySchema = Schema.Literals(agentSkillApprovalPolicies);
 
 const channelAgentSkillInputSourceSchema = strict(Schema.Struct({
   id: Schema.optional(Uuid),
@@ -313,6 +341,8 @@ const channelAgentSkillInputSourceSchema = strict(Schema.Struct({
   ),
   effort: nullableDefault(ModelEffort),
   kind: defaulted(ChannelAgentSkillKindSchema, "custom"),
+  executionMode: defaulted(AgentSkillExecutionModeSchema, "task"),
+  approvalPolicy: defaulted(AgentSkillApprovalPolicySchema, "explicit"),
   // Accepted only so clients from before Skill selection was explicit can
   // roll forward without a hard API failure. It has no runtime meaning.
   isDefault: Schema.optional(Schema.Boolean),
@@ -328,6 +358,8 @@ const channelAgentSkillInputTypeSchema = strict(Schema.Struct({
   model: Schema.NullOr(Schema.String),
   effort: Schema.NullOr(Schema.String),
   kind: ChannelAgentSkillKindSchema,
+  executionMode: AgentSkillExecutionModeSchema,
+  approvalPolicy: AgentSkillApprovalPolicySchema,
   position: Schema.Int,
 }));
 
@@ -596,6 +628,8 @@ export type ChannelAgentSkill = {
   model: string | null;
   effort: ChannelAgentEffort | null;
   kind: ChannelAgentSkillKind;
+  executionMode: AgentSkillExecutionMode;
+  approvalPolicy: AgentSkillApprovalPolicy;
   position: number;
   createdAt: string;
   updatedAt: string;
@@ -704,12 +738,17 @@ export type AgentSkillExecutionProposal = {
   provider: AgentProvider;
   model: string | null;
   effort: ModelEffort | null;
+  executionMode: AgentSkillExecutionMode;
+  approvalPolicy: AgentSkillApprovalPolicy;
+  executionStatus: "waiting" | "running" | "completed" | "failed";
   request: string;
   delegatedByAgentId: string | null;
   delegatedByAgentName: string | null;
   requestedWorkerId: string | null;
   requestedWorkerLabel: string | null;
   resultSessionId: string | null;
+  resultMessageId: string | null;
+  error: string | null;
   createdAt: string;
   acceptedAt: string | null;
 };
@@ -724,11 +763,29 @@ export type ChannelMessageAttachment = {
   url: string;
 };
 
+/** Public metadata used to render a channel message link preview. */
+export type ChannelLinkPreview = {
+  url: string;
+  title: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  faviconUrl: string | null;
+  siteName: string | null;
+};
+
 /** Aggregated emoji reaction on a channel message. */
+export type ChannelMessageReactionPerson = {
+  userId: string;
+  name: string;
+  image: string | null;
+};
+
 export type ChannelMessageReaction = {
   emoji: string;
   count: number;
   userIds: string[];
+  /** Profiles for reaction authors who are visible in the message's organization. */
+  people?: ChannelMessageReactionPerson[];
 };
 
 export type ChannelThreadSubscriber = {

@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import type { Root } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AutoHuntHealth } from "../lib/project-connection";
 import { I18nProvider } from "../i18n";
@@ -40,38 +41,39 @@ const health: AutoHuntHealth = {
 };
 
 describe("ConnectionHealth", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
+  let root: Root;
 
   beforeEach(() => {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     localStorage.setItem("briar.locale.v1", "ko");
-    container = document.createElement("div");
-    document.body.append(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
-  afterEach(() => {
-    container.remove();
+  afterEach(async () => {
+    await cleanup();
     localStorage.removeItem("briar.locale.v1");
     vi.restoreAllMocks();
   });
 
   it("opens health details from the status bar trigger and closes on Escape", async () => {
     const onRepair = vi.fn();
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <ConnectionHealth
-            error={null}
-            health={health}
-            loading={false}
-            onReconnect={() => undefined}
-            onRefresh={() => undefined}
-            onRepair={onRepair}
-          />
-        </I18nProvider>,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ConnectionHealth
+          error={null}
+          health={health}
+          loading={false}
+          onReconnect={() => undefined}
+          onRefresh={() => undefined}
+          onRepair={onRepair}
+        />
+      </I18nProvider>,
+    );
 
     const trigger = container.querySelector<HTMLButtonElement>(".health-trigger");
     expect(trigger?.getAttribute("aria-expanded")).toBe("false");
@@ -99,6 +101,5 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(trigger?.getAttribute("aria-expanded")).toBe("false");
     expect(container.querySelector('[role="dialog"]')).toBeNull();
 
-    await act(async () => root.unmount());
   });
 });

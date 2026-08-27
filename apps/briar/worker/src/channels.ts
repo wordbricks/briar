@@ -1,5 +1,7 @@
 import {
+  channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
+  type ChannelReplyUnavailableReason,
   type ChannelActionType,
   type ChannelAgentProvider as AgentProvider,
   type ChannelAgentReply,
@@ -10,6 +12,7 @@ import {
   type ChannelMessageBlock,
   type ChannelMessageAttachment,
   type ChannelMessageReaction,
+  type ChannelMessageReactionPerson,
   type ChannelReplyStatus,
   type ChannelSkillExecutionProposal,
   type ChannelSummary,
@@ -26,6 +29,7 @@ import type {
   IssueExecutionProposalRow,
 } from "./db";
 import {
+  channelReplyWorkerAvailability,
   executionWorkerSupportsSelection,
   hasAvailableChannelReplyWorker,
 } from "./workers";
@@ -106,11 +110,21 @@ export type ChannelMessageRow = {
   skill_execution_provider: AgentProvider | null;
   skill_execution_model: string | null;
   skill_execution_effort: AgentSkillEffort | null;
+  skill_execution_execution_mode: "conversation" | "task" | null;
+  skill_execution_approval_policy: "invoke_is_consent" | "explicit" | null;
+  skill_execution_execution_status:
+    | "waiting"
+    | "running"
+    | "completed"
+    | "failed"
+    | null;
+  skill_execution_error: string | null;
   skill_execution_request: string | null;
   skill_execution_status: "pending" | "accepted" | null;
   skill_execution_requested_worker_id: string | null;
   skill_execution_requested_worker_label: string | null;
   skill_execution_result_session_id: string | null;
+  skill_execution_result_message_id: string | null;
   skill_execution_created_at: string | null;
   skill_execution_accepted_at: string | null;
   skill_execution_delegated_by_agent_id: string | null;
@@ -213,6 +227,7 @@ export type ChannelReplyJobRow = {
   delegation_request: string | null;
   execution_target_ids_json?: string;
   session_id: string | null;
+  approved_skill_execution_proposal_id?: string | null;
 };
 
 export type ChannelReplySessionRow = {
@@ -227,6 +242,7 @@ export type ChannelReplySessionRow = {
   effort: AgentSkillEffort | null;
   owner_device_id: string | null;
   owner_worker_id: string | null;
+  owner_worker_label: string | null;
   conversation_id: string | null;
   last_activity_at: string;
   retained_until: string;
@@ -431,6 +447,30 @@ const messageSelect = (
          skill_execution.provider as skill_execution_provider,
          skill_execution.model as skill_execution_model,
          skill_execution.effort as skill_execution_effort,
+         skill_execution.execution_mode as skill_execution_execution_mode,
+         skill_execution.approval_policy as skill_execution_approval_policy,
+         case
+           when skill_execution.status = 'pending' then 'waiting'
+           when skill_execution.execution_mode = 'task' then coalesce((
+             select case task.status when 'completed' then 'completed'
+               when 'failed' then 'failed' else 'running' end
+             from briar_project_agent_task_jobs task
+             where task.id = skill_execution.result_session_id
+           ), 'running')
+           else coalesce((
+             select case result_reply.status when 'completed' then 'completed'
+               when 'failed' then 'failed' else 'running' end
+             from briar_channel_agent_reply_jobs result_reply
+             where result_reply.id = skill_execution.result_reply_job_id
+           ), 'running')
+         end as skill_execution_execution_status,
+         case when skill_execution.execution_mode = 'task' then (
+           select task.error from briar_project_agent_task_jobs task
+           where task.id = skill_execution.result_session_id
+         ) else (
+           select result_reply.error from briar_channel_agent_reply_jobs result_reply
+           where result_reply.id = skill_execution.result_reply_job_id
+         ) end as skill_execution_error,
          skill_execution.request as skill_execution_request,
          skill_execution.status as skill_execution_status,
          skill_execution.requested_worker_id
@@ -439,6 +479,8 @@ const messageSelect = (
            as skill_execution_requested_worker_label,
          skill_execution.result_session_id
            as skill_execution_result_session_id,
+         skill_execution.result_message_id
+           as skill_execution_result_message_id,
          skill_execution.created_at as skill_execution_created_at,
          skill_execution.accepted_at as skill_execution_accepted_at,
          skill_execution.delegated_by_agent_id
@@ -455,11 +497,16 @@ const messageSelect = (
          null as skill_execution_provider,
          null as skill_execution_model,
          null as skill_execution_effort,
+         null as skill_execution_execution_mode,
+         null as skill_execution_approval_policy,
+         null as skill_execution_execution_status,
+         null as skill_execution_error,
          null as skill_execution_request,
          null as skill_execution_status,
          null as skill_execution_requested_worker_id,
          null as skill_execution_requested_worker_label,
          null as skill_execution_result_session_id,
+         null as skill_execution_result_message_id,
          null as skill_execution_created_at,
          null as skill_execution_accepted_at,
          null as skill_execution_delegated_by_agent_id,
@@ -499,9 +546,16 @@ export async function channelSkillExecutionProposalTablesAvailable(
 ) {
   return Boolean(await db
     .prepare(
-      `select 1 as available from sqlite_master
-       where type = 'table'
-         and name = 'briar_agent_skill_execution_proposals'`,
+      `select 1 as available
+       where exists (
+         select 1 from sqlite_master
+         where type = 'table'
+           and name = 'briar_agent_skill_execution_proposals'
+       ) and exists (
+         select 1 from pragma_table_info(
+           'briar_agent_skill_execution_proposals'
+         ) where name = 'execution_mode'
+       )`,
     )
     .first<{ available: number }>());
 }
@@ -563,12 +617,17 @@ const channelSkillExecutionProposalJson = (
       provider: row.skill_execution_provider ?? "codex",
       model: row.skill_execution_model,
       effort: row.skill_execution_effort,
+      executionMode: row.skill_execution_execution_mode ?? "task",
+      approvalPolicy: row.skill_execution_approval_policy ?? "explicit",
+      executionStatus: row.skill_execution_execution_status ?? "waiting",
       request: row.skill_execution_request ?? "",
       delegatedByAgentId: row.skill_execution_delegated_by_agent_id,
       delegatedByAgentName: row.skill_execution_delegated_by_agent_name,
       requestedWorkerId: row.skill_execution_requested_worker_id,
       requestedWorkerLabel: row.skill_execution_requested_worker_label,
       resultSessionId: row.skill_execution_result_session_id,
+      resultMessageId: row.skill_execution_result_message_id,
+      error: row.skill_execution_error,
       createdAt: row.skill_execution_created_at ?? row.created_at,
       acceptedAt: row.skill_execution_accepted_at,
     }
@@ -717,11 +776,22 @@ export function isChannelReactionEmoji(value: string) {
 }
 
 function aggregateReactions(
-  rows: Array<{ message_id: string; user_id: string; emoji: string; created_at: string }>,
+  rows: Array<{
+    message_id: string;
+    user_id: string;
+    emoji: string;
+    created_at: string;
+    user_name: string | null;
+    user_image: string | null;
+  }>,
 ): Map<string, ChannelMessageReaction[]> {
   const byMessage = new Map<
     string,
-    Map<string, { userIds: string[]; firstCreatedAt: string }>
+    Map<string, {
+      userIds: string[];
+      people: ChannelMessageReactionPerson[];
+      firstCreatedAt: string;
+    }>
   >();
   for (const row of rows) {
     let emojiMap = byMessage.get(row.message_id);
@@ -730,11 +800,20 @@ function aggregateReactions(
       byMessage.set(row.message_id, emojiMap);
     }
     const current = emojiMap.get(row.emoji);
+    const person = row.user_name === null
+      ? null
+      : {
+          userId: row.user_id,
+          name: row.user_name,
+          image: row.user_image,
+        } satisfies ChannelMessageReactionPerson;
     if (current) {
       current.userIds.push(row.user_id);
+      if (person) current.people.push(person);
     } else {
       emojiMap.set(row.emoji, {
         userIds: [row.user_id],
+        people: person ? [person] : [],
         firstCreatedAt: row.created_at,
       });
     }
@@ -746,6 +825,7 @@ function aggregateReactions(
         emoji,
         count: value.userIds.length,
         userIds: value.userIds,
+        people: value.people,
         firstCreatedAt: value.firstCreatedAt,
       }))
       .sort((left, right) => {
@@ -1224,7 +1304,8 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
               project.name as project_name, agent.name, agent.avatar,
               agent.provider, agent.model, agent.description,
               agent.responsibility,
-              agent.effort, agent.created_at, agent.updated_at
+              agent.effort, agent.designated_worker_id,
+              agent.designated_worker_label, agent.created_at, agent.updated_at
        from briar_channel_agents roster
        join briar_project_agents agent on agent.id = roster.agent_id
        join briar_channels channel
@@ -1249,6 +1330,8 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
       description: string;
       responsibility: string;
       effort: AgentSkillEffort | null;
+      designated_worker_id: string | null;
+      designated_worker_label: string | null;
       created_at: string;
       updated_at: string;
     }>();
@@ -1535,10 +1618,23 @@ async function attachMessageRelations(
       .all<ChannelMessageAttachmentRow>(),
     db
       .prepare(
-        `select message_id, user_id, emoji, created_at
-         from briar_channel_message_reactions
-         where message_id in (${placeholders})
-         order by created_at, emoji, user_id`,
+        `select reaction.message_id, reaction.user_id, reaction.emoji,
+                reaction.created_at,
+                case when membership.user_id is null then null
+                     else author.name end as user_name,
+                case when membership.user_id is null then null
+                     else author.image end as user_image
+         from briar_channel_message_reactions reaction
+         join briar_channel_messages message
+          on message.id = reaction.message_id
+         join briar_channels channel
+          on channel.id = message.channel_id
+         left join briar_organization_members membership
+          on membership.organization_id = channel.organization_id
+         and membership.user_id = reaction.user_id
+         left join "user" author on author.id = reaction.user_id
+         where reaction.message_id in (${placeholders})
+         order by reaction.created_at, reaction.emoji, reaction.user_id`,
       )
       .bind(...ids)
       .all<{
@@ -1546,6 +1642,8 @@ async function attachMessageRelations(
         user_id: string;
         emoji: string;
         created_at: string;
+        user_name: string | null;
+        user_image: string | null;
       }>(),
     db
       .prepare(
@@ -2485,7 +2583,7 @@ export async function enqueueChannelAgentReplies(
       projectId: string | null;
       skillId?: string | null;
       provider: AgentProvider;
-      unavailableReason?: typeof channelReplyNoAvailableWorkerError | null;
+      unavailableReason?: ChannelReplyUnavailableReason | null;
     }>;
     preferredDeviceId?: string | null;
     createdAt: string;
@@ -2522,6 +2620,7 @@ export async function enqueueChannelAgentReplies(
           `insert into briar_channel_reply_sessions (
              id, organization_id, channel_id, thread_root_message_id,
              project_id, agent_id, provider, model, effort,
+             owner_device_id, owner_worker_id, owner_worker_label,
              last_activity_at, retained_until, created_at, updated_at
            )
            select ?, ?, ?, ?, ?, ?,
@@ -2531,12 +2630,17 @@ export async function enqueueChannelAgentReplies(
                     then current_agent.model else current_skill.model end,
                   case when current_skill.id is null
                     then current_agent.effort else current_skill.effort end,
+                  designated_worker.device_id, designated_worker.id,
+                  current_agent.designated_worker_label,
                   ?, ?, ?, ?
            from briar_channel_agents roster
            join briar_project_agents current_agent
              on current_agent.id = roster.agent_id
            left join briar_agent_skills current_skill
              on current_skill.id = ? and current_skill.agent_id = current_agent.id
+           left join briar_execution_workers designated_worker
+             on designated_worker.id = current_agent.designated_worker_id
+            and designated_worker.project_id = current_agent.project_id
            where roster.channel_id = ? and roster.agent_id = ?
              and current_agent.organization_id = ?
              and current_agent.project_id is ?
@@ -2557,11 +2661,18 @@ export async function enqueueChannelAgentReplies(
              owner_device_id = case
                when briar_channel_reply_sessions.retained_until <=
                       excluded.last_activity_at
-               then null else briar_channel_reply_sessions.owner_device_id end,
+               then excluded.owner_device_id
+               else briar_channel_reply_sessions.owner_device_id end,
              owner_worker_id = case
                when briar_channel_reply_sessions.retained_until <=
                       excluded.last_activity_at
-               then null else briar_channel_reply_sessions.owner_worker_id end,
+               then excluded.owner_worker_id
+               else briar_channel_reply_sessions.owner_worker_id end,
+             owner_worker_label = case
+               when briar_channel_reply_sessions.retained_until <=
+                      excluded.last_activity_at
+               then excluded.owner_worker_label
+               else briar_channel_reply_sessions.owner_worker_label end,
              provider = excluded.provider, model = excluded.model,
              effort = excluded.effort,
              last_activity_at = excluded.last_activity_at,
@@ -2740,6 +2851,20 @@ export async function getChannelReplySession(
   ).bind(sessionId).first<ChannelReplySessionRow>();
 }
 
+export async function getChannelReplySessionForThread(
+  db: D1Database,
+  input: { channelId: string; threadRootMessageId: string; agentId: string },
+) {
+  return db.prepare(
+    `select * from briar_channel_reply_sessions
+     where channel_id = ? and thread_root_message_id = ? and agent_id = ?`,
+  ).bind(
+    input.channelId,
+    input.threadRootMessageId,
+    input.agentId,
+  ).first<ChannelReplySessionRow>();
+}
+
 export async function checkpointChannelReplySession(
   db: D1Database,
   input: {
@@ -2837,7 +2962,7 @@ export async function cleanupExpiredChannelReplySessions(
       db.prepare(
         `update briar_channel_reply_sessions
          set owner_device_id = null, owner_worker_id = null,
-             conversation_id = null, updated_at = ?
+             owner_worker_label = null, conversation_id = null, updated_at = ?
          where id = ? and retained_until <= ?
            and not exists (
              select 1 from briar_channel_agent_reply_jobs job
@@ -2924,11 +3049,34 @@ export async function claimNextChannelAgentReply(
                and snapshot_skill.effort is
                  ${job}.selected_skill_effort_snapshot
                and (
-                 (${job}.delegated_by_reply_job_id is null
+                 (${job}.approved_skill_execution_proposal_id is not null
+                   and exists (
+                     select 1
+                     from briar_agent_skill_execution_proposals approved
+                     where approved.id =
+                         ${job}.approved_skill_execution_proposal_id
+                       and approved.status = 'accepted'
+                       and approved.execution_mode = 'conversation'
+                       and approved.result_reply_job_id = ${job}.id
+                       and approved.result_message_id = ${job}.reply_message_id
+                       and approved.result_session_id = ${job}.session_id
+                       and approved.reply_message_id = ${job}.trigger_message_id
+                       and approved.channel_id = ${job}.channel_id
+                       and approved.thread_root_message_id =
+                         ${job}.parent_message_id
+                       and approved.agent_id = ${job}.agent_id
+                       and approved.skill_id = ${job}.skill_id
+                       and approved.request =
+                         ${job}.skill_execution_request_snapshot
+                   ))
+                 or
+                 (${job}.approved_skill_execution_proposal_id is null
+                   and ${job}.delegated_by_reply_job_id is null
                    and ${job}.skill_execution_request_snapshot =
                      snapshot_trigger.body)
                  or
-                 (${job}.delegated_by_reply_job_id is not null
+                 (${job}.approved_skill_execution_proposal_id is null
+                   and ${job}.delegated_by_reply_job_id is not null
                    and ${job}.skill_execution_request_snapshot =
                      ${job}.delegation_request)
                )
@@ -2963,12 +3111,81 @@ export async function claimNextChannelAgentReply(
     )
     .bind(input.claimedAt, organizationId, MAX_REPLY_ATTEMPTS, input.claimedAt)
     .run();
+  const assignedJobs = await db.prepare(
+    `select job.id, job.project_id, job.agent_provider,
+            case when job.selected_skill_id_snapshot is null
+              then agent.model else job.selected_skill_model_snapshot end as runtime_model,
+            case when job.selected_skill_id_snapshot is null
+              then agent.effort else job.selected_skill_effort_snapshot end as runtime_effort,
+            session.owner_device_id, session.owner_worker_id,
+            session.owner_worker_label
+     from briar_channel_agent_reply_jobs job
+     join briar_project_agents agent on agent.id = job.agent_id
+     join briar_channel_reply_sessions session on session.id = job.session_id
+     where job.organization_id = ? and session.owner_worker_id is not null
+       and (job.status = 'queued'
+         or (job.status = 'running' and job.lease_expires_at <= ?))`,
+  ).bind(organizationId, input.claimedAt).all<{
+    id: string;
+    project_id: string | null;
+    agent_provider: AgentProvider | null;
+    runtime_model: string | null;
+    runtime_effort: AgentSkillEffort | null;
+    owner_device_id: string | null;
+    owner_worker_id: string;
+    owner_worker_label: string | null;
+  }>();
+  for (const assigned of assignedJobs.results) {
+    if (!assigned.agent_provider) continue;
+    const availability = await channelReplyWorkerAvailability(db, {
+      organizationId,
+      projectId: assigned.project_id,
+      preferredDeviceId: assigned.owner_device_id,
+      preferredWorkerId: assigned.owner_worker_id,
+      provider: assigned.agent_provider,
+      model: assigned.runtime_model,
+      effort: assigned.runtime_effort,
+      observedAt: input.claimedAt,
+    });
+    if (availability === "available") continue;
+    const error = channelReplyAssignedWorkerUnavailableError(
+      assigned.owner_worker_label ?? assigned.owner_worker_id,
+    );
+    await db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set status = 'failed', error = ?, completed_at = ?, updated_at = ?,
+           claimed_device_id = null, claimed_worker_id = null,
+           claim_token_hash = null, lease_expires_at = null
+       where id = ? and organization_id = ?
+         and (status = 'queued'
+           or (status = 'running' and lease_expires_at <= ?))
+         and exists (
+           select 1 from briar_channel_reply_sessions session
+           where session.id = briar_channel_agent_reply_jobs.session_id
+             and session.owner_worker_id = ?
+         )`,
+    ).bind(
+      error,
+      input.claimedAt,
+      input.claimedAt,
+      assigned.id,
+      organizationId,
+      input.claimedAt,
+      assigned.owner_worker_id,
+    ).run();
+  }
+  const claimingWorker = await db.prepare(
+    `select label from briar_execution_workers
+     where id = ? and device_id = ?`,
+  ).bind(input.workerId, input.deviceId).first<{ label: string }>();
+  if (!claimingWorker) return null;
   const candidates = await db.prepare(
     `select job.*,
             session.owner_device_id as session_owner_device_id,
             session.owner_worker_id as session_owner_worker_id,
             session.conversation_id as session_conversation_id,
             session.retained_until as session_retained_until,
+            session.created_at as session_created_at,
             session.updated_at as session_updated_at,
             session.provider as session_provider,
             session.model as session_model,
@@ -3066,6 +3283,7 @@ export async function claimNextChannelAgentReply(
     session_owner_worker_id: string | null;
     session_conversation_id: string | null;
     session_retained_until: string;
+    session_created_at: string;
     session_updated_at: string;
     session_provider: AgentProvider;
     session_model: string | null;
@@ -3073,7 +3291,6 @@ export async function claimNextChannelAgentReply(
   }>();
 
   const preferredAvailability = new Map<string, boolean>();
-  const sessionOwnerAvailability = new Map<string, boolean>();
   for (const candidate of candidates.results) {
     if (!candidate.agent_provider) continue;
     const supportsSelection = input.workerCapabilitiesJson &&
@@ -3094,40 +3311,18 @@ export async function claimNextChannelAgentReply(
     if (!supportsSelection) continue;
 
     const sessionExpired = candidate.session_retained_until <= input.claimedAt;
-    const replyLeaseExpired = candidate.status === "running" &&
-      candidate.lease_expires_at !== null &&
-      candidate.lease_expires_at <= input.claimedAt;
     if (
-      !sessionExpired && !replyLeaseExpired &&
       candidate.session_owner_worker_id &&
       candidate.session_owner_worker_id !== input.workerId
-    ) {
-      const ownerKey = JSON.stringify([
-        candidate.session_owner_device_id,
-        candidate.session_owner_worker_id,
-        candidate.project_id,
-        candidate.agent_provider,
-        candidate.runtime_model,
-        candidate.runtime_effort,
-      ]);
-      let ownerAvailable = sessionOwnerAvailability.get(ownerKey);
-      if (ownerAvailable === undefined) {
-        ownerAvailable = await hasAvailableChannelReplyWorker(db, {
-          organizationId,
-          projectId: candidate.project_id,
-          preferredDeviceId: candidate.session_owner_device_id,
-          preferredWorkerId: candidate.session_owner_worker_id,
-          provider: candidate.agent_provider,
-          model: candidate.runtime_model,
-          effort: candidate.runtime_effort,
-          observedAt: input.claimedAt,
-        });
-        sessionOwnerAvailability.set(ownerKey, ownerAvailable);
-      }
-      if (ownerAvailable) continue;
-    }
+    ) continue;
+    const claimingWorkerOwnsSession =
+      candidate.session_owner_worker_id === input.workerId;
 
+    // A healthy live session owner is the elected claimant. Reapplying a
+    // conflicting message-level device preference here would make the owner
+    // and preferred device yield to each other indefinitely.
     if (
+      !claimingWorkerOwnsSession &&
       candidate.preferred_device_id &&
       candidate.preferred_device_id !== input.deviceId
     ) {
@@ -3160,11 +3355,10 @@ export async function claimNextChannelAgentReply(
     const claimReason = sessionExpired
       ? "ttl_expired_reactivated"
       : candidate.session_owner_worker_id === input.workerId
-      ? runtimeChanged ? "worker_reused_runtime_changed" : "worker_reused"
-      : candidate.session_owner_worker_id && replyLeaseExpired
-      ? "worker_failover_lease_expired"
-      : candidate.session_owner_worker_id
-      ? "worker_failover_unavailable_or_incompatible"
+      ? candidate.attempts === 0 &&
+          candidate.session_created_at === candidate.session_updated_at
+        ? "designated_worker_claimed"
+        : runtimeChanged ? "worker_reused_runtime_changed" : "worker_reused"
       : "session_created";
     const retainedUntil = channelReplySessionRetentionUntil(input.claimedAt);
     const [claimResult, sessionResult] = await db.batch([
@@ -3241,7 +3435,8 @@ export async function claimNextChannelAgentReply(
       ),
       db.prepare(
         `update briar_channel_reply_sessions
-         set owner_device_id = ?, owner_worker_id = ?, provider = ?,
+         set owner_device_id = ?, owner_worker_id = ?, owner_worker_label = ?,
+             provider = ?,
              model = ?, effort = ?,
              conversation_id = case
                when retained_until > ? and provider = ? and model is ?
@@ -3260,6 +3455,7 @@ export async function claimNextChannelAgentReply(
       ).bind(
         input.deviceId,
         input.workerId,
+        claimingWorker.label,
         candidate.agent_provider,
         candidate.runtime_model,
         candidate.runtime_effort,
@@ -3922,6 +4118,8 @@ export async function completeChannelReply(
             and snapshot_roster.channel_id =
               briar_channel_agent_reply_jobs.channel_id
            where snapshot_agent.id = briar_channel_agent_reply_jobs.agent_id
+             and briar_channel_agent_reply_jobs
+               .approved_skill_execution_proposal_id is null
              and snapshot_agent.organization_id =
                briar_channel_agent_reply_jobs.organization_id
              and snapshot_agent.project_id =
@@ -3948,6 +4146,10 @@ export async function completeChannelReply(
              and snapshot_skill.effort is
                briar_channel_agent_reply_jobs.selected_skill_effort_snapshot
              and (
+               snapshot_skill.execution_mode = 'task'
+               or snapshot_skill.approval_policy = 'explicit'
+             )
+             and (
                (briar_channel_agent_reply_jobs.delegated_by_reply_job_id is null
                  and briar_channel_agent_reply_jobs
                    .skill_execution_request_snapshot = snapshot_trigger.body)
@@ -3965,6 +4167,12 @@ export async function completeChannelReply(
     input.skillExecutionProposal ? 1 : 0,
   ];
   const retainedUntil = channelReplySessionRetentionUntil(input.completedAt);
+  const skillExecutionProposalId = input.skillExecutionProposal
+    ? crypto.randomUUID()
+    : null;
+  const consentTaskSessionId = input.skillExecutionProposal
+    ? crypto.randomUUID()
+    : null;
   const statements = [
     db
       .prepare(
@@ -4303,7 +4511,8 @@ export async function completeChannelReply(
              source_reply_job_id, delegated_by_reply_job_id,
              agent_id, agent_name, agent_responsibility,
              skill_id, skill_name, skill_instructions, skill_kind,
-             provider, model, effort,
+             provider, model, effort, execution_mode, approval_policy,
+             thread_root_message_id,
              request, delegated_by_agent_id, delegated_by_agent_name,
              created_at, updated_at
            )
@@ -4318,6 +4527,8 @@ export async function completeChannelReply(
                   job.selected_skill_provider_snapshot,
                   job.selected_skill_model_snapshot,
                   job.selected_skill_effort_snapshot,
+                  skill.execution_mode, skill.approval_policy,
+                  job.parent_message_id,
                   job.skill_execution_request_snapshot,
                   parent_agent.id, parent_agent.name, ?, ?
            from briar_channel_agent_reply_jobs job
@@ -4350,6 +4561,11 @@ export async function completeChannelReply(
              and skill.provider = job.selected_skill_provider_snapshot
              and skill.model is job.selected_skill_model_snapshot
              and skill.effort is job.selected_skill_effort_snapshot
+             and job.approved_skill_execution_proposal_id is null
+             and (
+               skill.execution_mode = 'task'
+               or skill.approval_policy = 'explicit'
+             )
              and (
                (job.delegated_by_reply_job_id is null
                  and trigger_message.body = job.skill_execution_request_snapshot)
@@ -4359,7 +4575,7 @@ export async function completeChannelReply(
              )`,
         )
         .bind(
-          crypto.randomUUID(),
+          skillExecutionProposalId,
           input.completedAt,
           input.completedAt,
           input.jobId,
@@ -4368,6 +4584,53 @@ export async function completeChannelReply(
           input.claimTokenHash,
           input.completedAt,
         ),
+    );
+    statements.push(
+      db.prepare(
+        `update briar_agent_skill_execution_proposals
+         set status = 'accepted',
+             requested_worker_id = (
+               select job.claimed_worker_id
+               from briar_channel_agent_reply_jobs job
+               where job.id = source_reply_job_id
+             ),
+             requested_worker_label = (
+               select worker.label
+               from briar_channel_agent_reply_jobs job
+               join briar_execution_workers worker
+                 on worker.id = job.claimed_worker_id
+                and worker.device_id = job.claimed_device_id
+               where job.id = source_reply_job_id
+             ),
+             result_session_id = ?,
+             accepted_by_user_id = (
+               select trigger_message.author_user_id
+               from briar_channel_agent_reply_jobs job
+               join briar_channel_messages trigger_message
+                 on trigger_message.id = job.trigger_message_id
+                and trigger_message.channel_id = job.channel_id
+               where job.id = source_reply_job_id
+             ),
+             accepted_at = ?, updated_at = ?
+         where id = ? and status = 'pending' and execution_mode = 'task'
+           and approval_policy = 'invoke_is_consent'
+           and exists (
+             select 1 from briar_channel_agent_reply_jobs job
+             join briar_channel_messages trigger_message
+               on trigger_message.id = job.trigger_message_id
+              and trigger_message.channel_id = job.channel_id
+             join briar_execution_workers worker
+               on worker.id = job.claimed_worker_id
+              and worker.device_id = job.claimed_device_id
+             where job.id = source_reply_job_id
+               and trigger_message.author_user_id is not null
+           )`,
+      ).bind(
+        consentTaskSessionId,
+        input.completedAt,
+        input.completedAt,
+        skillExecutionProposalId,
+      ),
     );
   }
   if (delegation) {
@@ -4397,6 +4660,7 @@ export async function completeChannelReply(
         `insert into briar_channel_reply_sessions (
            id, organization_id, channel_id, thread_root_message_id,
            project_id, agent_id, provider, model, effort,
+           owner_device_id, owner_worker_id, owner_worker_label,
            last_activity_at, retained_until, created_at, updated_at
          )
          select ?, parent.organization_id, parent.channel_id,
@@ -4407,11 +4671,16 @@ export async function completeChannelReply(
                   then target.model else target_skill.model end,
                 case when target_skill.id is null
                   then target.effort else target_skill.effort end,
+                designated_worker.device_id, designated_worker.id,
+                target.designated_worker_label,
                 ?, ?, ?, ?
          from briar_channel_agent_reply_jobs parent
          join briar_project_agents target on target.id = ?
          left join briar_agent_skills target_skill
            on target_skill.id = ? and target_skill.agent_id = target.id
+         left join briar_execution_workers designated_worker
+           on designated_worker.id = target.designated_worker_id
+          and designated_worker.project_id = target.project_id
          join briar_channel_agents roster
            on roster.agent_id = target.id and roster.channel_id = parent.channel_id
          where parent.id = ? and parent.claimed_device_id = ?
@@ -4438,11 +4707,18 @@ export async function completeChannelReply(
            owner_device_id = case
              when briar_channel_reply_sessions.retained_until <=
                     excluded.last_activity_at
-             then null else briar_channel_reply_sessions.owner_device_id end,
+             then excluded.owner_device_id
+             else briar_channel_reply_sessions.owner_device_id end,
            owner_worker_id = case
              when briar_channel_reply_sessions.retained_until <=
                     excluded.last_activity_at
-             then null else briar_channel_reply_sessions.owner_worker_id end,
+             then excluded.owner_worker_id
+             else briar_channel_reply_sessions.owner_worker_id end,
+           owner_worker_label = case
+             when briar_channel_reply_sessions.retained_until <=
+                    excluded.last_activity_at
+             then excluded.owner_worker_label
+             else briar_channel_reply_sessions.owner_worker_label end,
            provider = excluded.provider, model = excluded.model,
            effort = excluded.effort,
            last_activity_at = excluded.last_activity_at,
@@ -4894,7 +5170,29 @@ export async function getChannelAgentSkillExecutionProposal(
 ) {
   return db
     .prepare(
-      `select proposal.*
+      `select proposal.*,
+              case
+                when proposal.status = 'pending' then 'waiting'
+                when proposal.execution_mode = 'task' then coalesce((
+                  select case task.status when 'completed' then 'completed'
+                    when 'failed' then 'failed' else 'running' end
+                  from briar_project_agent_task_jobs task
+                  where task.id = proposal.result_session_id
+                ), 'running')
+                else coalesce((
+                  select case reply.status when 'completed' then 'completed'
+                    when 'failed' then 'failed' else 'running' end
+                  from briar_channel_agent_reply_jobs reply
+                  where reply.id = proposal.result_reply_job_id
+                ), 'running')
+              end as execution_status,
+              case when proposal.execution_mode = 'task' then (
+                select task.error from briar_project_agent_task_jobs task
+                where task.id = proposal.result_session_id
+              ) else (
+                select reply.error from briar_channel_agent_reply_jobs reply
+                where reply.id = proposal.result_reply_job_id
+              ) end as execution_error
        from briar_agent_skill_execution_proposals proposal
        join briar_channels channel on channel.id = proposal.channel_id
        where proposal.id = ? and proposal.source_kind = 'channel'

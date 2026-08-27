@@ -218,6 +218,15 @@ describe("channel issue proposal approval route", () => {
         now,
       ).run();
     }
+    await db.batch(
+      [projectAId, projectBId].map((projectId) =>
+        db.prepare(
+          `insert into briar_project_members (
+             project_id, organization_id, user_id, created_at, updated_at
+           ) values (?, ?, ?, ?, ?)`,
+        ).bind(projectId, organizationId, memberId, now, now)
+      ),
+    );
     await createChannel(db, {
       id: channelId,
       organizationId,
@@ -468,6 +477,57 @@ describe("channel issue proposal approval route", () => {
     ).resolves.toMatchObject({ count: 0 });
   });
 
+  it("keeps the issue description unchanged and exposes its source message as structured data", async () => {
+    const proposalId = await seedProposal(2);
+    const accepted = await worker.fetch(request(proposalId, projectAId), env());
+    expect(accepted.status).toBe(200);
+    const acceptedBody = await accepted.json<{ resultRunId: string }>();
+    const created = await db.prepare(
+      `select issue_description, context_json
+       from briar_hunt_runs where id = ?`,
+    ).bind(acceptedBody.resultRunId).first<{
+      issue_description: string | null;
+      context_json: string | null;
+    }>();
+
+    expect(created?.issue_description).toBe("Create it, but do not execute it.");
+    expect(created?.issue_description).not.toContain("채널 메시지로 돌아가기");
+    expect(JSON.parse(created?.context_json ?? "null")).toMatchObject({
+      origin: "briar-channel",
+      relatedMessage: {
+        organizationId,
+        channelId,
+        messageId: "60000000-0000-4000-8000-000000000002",
+        rootMessageId: "50000000-0000-4000-8000-000000000002",
+      },
+    });
+
+    const dashboard = await worker.fetch(
+      new Request(`https://briar.example/projects/${projectAId}/dashboard`, {
+        headers: { authorization: `Bearer ${ownerToken}` },
+      }),
+      env(),
+    );
+    expect(dashboard.status).toBe(200);
+    const dashboardBody = await dashboard.json<{
+      runs: Array<{
+        id: string;
+        issueDescription: string | null;
+        relatedMessage: Record<string, string> | null;
+      }>;
+    }>();
+    expect(dashboardBody.runs.find((run) => run.id === acceptedBody.resultRunId))
+      .toMatchObject({
+        issueDescription: "Create it, but do not execute it.",
+        relatedMessage: {
+          organizationId,
+          channelId,
+          messageId: "60000000-0000-4000-8000-000000000002",
+          rootMessageId: "50000000-0000-4000-8000-000000000002",
+        },
+      });
+  });
+
   it("atomically creates a mapped issue batch and its dependency DAG", async () => {
     const payload = {
       batch: {
@@ -543,6 +603,33 @@ describe("channel issue proposal approval route", () => {
     expect(runs.results.every(
       (run) => run.status === "backlog" && run.project_id === projectAId,
     )).toBe(true);
+
+    const runDetails = await db.prepare(
+      `select title, issue_description, context_json
+       from briar_hunt_runs
+       where json_extract(context_json, '$.proposalId') = ?`,
+    ).bind(proposalId).all<{
+      title: string;
+      issue_description: string | null;
+      context_json: string | null;
+    }>();
+    const descriptionsByTitle = new Map(
+      runDetails.results.map((run) => [run.title, run.issue_description]),
+    );
+    expect(descriptionsByTitle).toEqual(new Map([
+      ["Batch API", "Build the API boundary."],
+      ["Batch QA", "Verify the integrated result."],
+      ["Batch web", "Build the web client."],
+    ]));
+    expect(runDetails.results.every((run) => {
+      const relatedMessage = JSON.parse(
+        run.context_json ?? "null",
+      ).relatedMessage;
+      return relatedMessage?.organizationId === organizationId &&
+        relatedMessage.channelId === channelId &&
+        relatedMessage.messageId === "60000000-0000-4000-8000-00000000001f" &&
+        relatedMessage.rootMessageId === "50000000-0000-4000-8000-00000000001f";
+    })).toBe(true);
 
     const mappings = await db.prepare(
       `select local_key, run_id from briar_channel_issue_batch_items

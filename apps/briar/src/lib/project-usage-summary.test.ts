@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createCachedProjectUsageSummaryLoader,
+  defaultProjectUsageDateRange,
+  isProjectUsageDateRange,
   projectUsageSummaryWindow,
   summarizeProjectUsage,
   type ProjectUsageSummaryRun,
@@ -36,6 +38,39 @@ const run = (
 });
 
 describe("project usage summary", () => {
+  it("defaults to the latest 14 complete UTC date keys", () => {
+    const now = Date.parse("2026-08-12T23:30:00.000Z");
+
+    expect(defaultProjectUsageDateRange(now)).toEqual({
+      from: "2026-07-30",
+      to: "2026-08-12",
+    });
+  });
+
+  it("accepts an inclusive custom date range and rejects invalid dates", () => {
+    const now = Date.parse("2026-08-12T12:00:00.000Z");
+    const range = { from: "2026-07-04", to: "2026-07-06" };
+
+    expect(isProjectUsageDateRange(range)).toBe(true);
+    expect(projectUsageSummaryWindow("day", now, range)).toEqual({
+      startAt: Date.parse("2026-07-04T00:00:00.000Z"),
+      endAt: Date.parse("2026-07-07T00:00:00.000Z"),
+    });
+    expect(isProjectUsageDateRange({ from: "2026-02-30", to: "2026-03-01" }))
+      .toBe(false);
+    expect(isProjectUsageDateRange({ from: "2026-03-02", to: "2026-03-01" }))
+      .toBe(false);
+  });
+
+  it("limits timeline size while allowing a wider range at coarser intervals", () => {
+    const range = { from: "2024-01-01", to: "2026-01-01" };
+
+    expect(isProjectUsageDateRange(range, "day")).toBe(false);
+    expect(isProjectUsageDateRange(range, "week")).toBe(true);
+    expect(() => projectUsageSummaryWindow("day", Date.now(), range))
+      .toThrow("too many buckets");
+  });
+
   it("uses complete UTC day, Monday week, and calendar month buckets", () => {
     const now = Date.parse("2026-01-01T23:30:00.000Z");
 
@@ -132,6 +167,18 @@ describe("project usage summary", () => {
 
     await cachedLoad("p1", "week");
     expect(load).toHaveBeenCalledTimes(5);
+
+    await cachedLoad("p1", "day", {
+      range: { from: "2026-08-01", to: "2026-08-02" },
+    });
+    await cachedLoad("p1", "day", {
+      range: { from: "2026-08-01", to: "2026-08-03" },
+    });
+    expect(load).toHaveBeenCalledTimes(7);
+    expect(load).toHaveBeenLastCalledWith("p1", "day", {
+      from: "2026-08-01",
+      to: "2026-08-03",
+    });
   });
 
   it("buckets completed issues and tokens while preserving creator and agent attribution", () => {
@@ -179,5 +226,30 @@ describe("project usage summary", () => {
       completedIssues: 2,
       totalTokens: 195,
     });
+  });
+
+  it("filters and buckets every metric inside a selected date range", () => {
+    const now = Date.parse("2026-08-12T12:00:00.000Z");
+    const summary = summarizeProjectUsage([
+      run("before", "2026-08-02T12:00:00.000Z"),
+      run("first", "2026-08-03T12:00:00.000Z"),
+      run("last", "2026-08-05T23:59:59.000Z"),
+      run("after", "2026-08-06T00:00:00.000Z"),
+    ], "day", now, { from: "2026-08-03", to: "2026-08-05" });
+
+    expect(summary).toMatchObject({
+      rangeStart: "2026-08-03T00:00:00.000Z",
+      rangeEnd: "2026-08-06T00:00:00.000Z",
+      totalTokens: 240,
+      trackedDurationMs: 2_000,
+      observedRuns: 2,
+      reportedRuns: 2,
+      completedIssues: 2,
+    });
+    expect(summary.timeline.map((point) => point.startAt)).toEqual([
+      "2026-08-03T00:00:00.000Z",
+      "2026-08-04T00:00:00.000Z",
+      "2026-08-05T00:00:00.000Z",
+    ]);
   });
 });

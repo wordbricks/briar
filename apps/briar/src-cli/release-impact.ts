@@ -11,7 +11,7 @@ const alwaysBuildPatterns = [
   /^apps\/briar\/turbo\.json$/u,
   /^bun\.lock$/u,
   /^config\/bun-runtime\.json$/u,
-  /^scripts\/(?:import-apple-signing-assets|package-macos-release|package-production-release|prepare-bun-sidecar|qa-macos-lifecycle|qa-production-updater-build|release-macos-candidate|release-macos-production|release-cargo-cache|verify-bundled-runtime|verify-release-config|with-release-env)\.(?:sh|ts)$/u,
+  /^scripts\/(?:import-apple-signing-assets|package-macos-release|package-managed-runtime-release|package-production-release|prepare-bun-sidecar|qa-macos-lifecycle|qa-managed-runtime-updater|qa-production-updater-build|release-macos-candidate|release-macos-production|release-cargo-cache|verify-bundled-runtime|verify-release-config|with-release-env)\.(?:sh|ts)$/u,
   /^apps\/briar\/src-cli\/(?:production-release|release-impact|release-manifest)\.(?:ts|test\.ts)$/u,
   /^apps\/briar\/src-tauri\/(?:Entitlements\.plist|Info\.plist|build\.rs)$/u,
   /^apps\/briar\/src-tauri\/(?:binaries|capabilities|icons)\//u,

@@ -630,6 +630,49 @@ export async function failExecutionWorkerUpdateHandoff(
   ]);
 }
 
+export async function failExecutionWorkerUpdate(
+  db: D1Database,
+  input: {
+    requestId: string;
+    organizationId: string;
+    deviceId: string;
+    error: string;
+    observedAt: string;
+  },
+) {
+  const error = input.error.trim().slice(0, 4_000) || "Unknown update failure";
+  const [updated] = await db.batch([
+    db
+      .prepare(
+        `update briar_execution_worker_update_requests
+         set handoff_state = 'failed', handoff_error = ?, updated_at = ?
+         where id = ? and device_id = ? and organization_id = ?
+           and status = 'requested'
+           and handoff_state in ('draining', 'ready', 'failed')`,
+      )
+      .bind(
+        error,
+        input.observedAt,
+        input.requestId,
+        input.deviceId,
+        input.organizationId,
+      ),
+    db
+      .prepare(
+        `update briar_execution_workers
+         set accepting_work = 0,
+             readiness_state = 'needs_attention',
+             readiness_detail = '원격 런타임 업데이트에 실패했습니다.',
+             updated_at = ?
+         where device_id = ? and state <> 'disabled'`,
+      )
+      .bind(input.observedAt, input.deviceId),
+  ]);
+  if ((updated.meta?.changes ?? 0) < 1) {
+    throw new WorkerConflictError("Worker update request is no longer active");
+  }
+}
+
 export type ExecutionWorkerCredentialPrincipal = {
   deviceId: string;
   organizationId: string;
@@ -705,6 +748,15 @@ export function executionWorkerSupportsSelection(
   effort: string | null,
 ) {
   if (!executionWorkerProviders(worker).includes(provider)) return false;
+  return executionWorkerAdvertisesSelection(worker, provider, model, effort);
+}
+
+function executionWorkerAdvertisesSelection(
+  worker: Pick<ExecutionWorkerRow, "capabilities_json">,
+  provider: AgentProvider,
+  model: string | null,
+  effort: string | null,
+) {
   // Provider defaults remain compatible with older workers. Any explicit
   // model/effort must be confirmed by the reporting worker.
   if (!model && !effort) return true;
@@ -717,6 +769,32 @@ export function executionWorkerSupportsSelection(
     );
     return Option.isSome(parsed) &&
       agentProviderSupportsSelection(parsed.value[provider], model, effort);
+  } catch {
+    return false;
+  }
+}
+
+function executionWorkerProviderUsageExhausted(
+  worker: Pick<ExecutionWorkerRow, "capabilities_json">,
+  provider: AgentProvider,
+) {
+  try {
+    const capabilities = JSON.parse(worker.capabilities_json) as {
+      providerHealth?: unknown;
+    };
+    if (
+      !capabilities.providerHealth ||
+      typeof capabilities.providerHealth !== "object" ||
+      Array.isArray(capabilities.providerHealth)
+    ) return false;
+    const health = (capabilities.providerHealth as Record<string, unknown>)[
+      provider
+    ];
+    return Boolean(
+      health && typeof health === "object" && !Array.isArray(health) &&
+        ((health as { reason?: unknown }).reason === "usage_exhausted" ||
+          (health as { usageExhausted?: unknown }).usageExhausted === true),
+    );
   } catch {
     return false;
   }
@@ -782,7 +860,12 @@ export function executionWorkerSupportsOrganizationAgentContext(
  * binding; Organization Agents additionally require the organization-context
  * protocol advertised by the claiming binding.
  */
-export async function hasAvailableChannelReplyWorker(
+export type ChannelReplyWorkerAvailability =
+  | "available"
+  | "usage_exhausted"
+  | "unavailable";
+
+export async function channelReplyWorkerAvailability(
   db: D1Database,
   input: {
     organizationId: string;
@@ -853,7 +936,7 @@ export async function hasAvailableChannelReplyWorker(
       device_last_heartbeat_at: string;
     }>();
 
-  return result.results.some((worker) =>
+  const liveWorkers = result.results.filter((worker) =>
     workerStateAt(
       worker.device_last_heartbeat_at,
       input.observedAt,
@@ -864,6 +947,10 @@ export async function hasAvailableChannelReplyWorker(
       input.observedAt,
       worker.worker_state,
     ) === "online" &&
+    (input.projectId !== null ||
+      executionWorkerSupportsOrganizationAgentContext(worker))
+  );
+  if (liveWorkers.some((worker) =>
     worker.accepting_work === 1 &&
     // Reply work is independent of regular execution slots. `busy` means
     // those slots are occupied, while `needs_attention` remains a hard stop.
@@ -873,10 +960,70 @@ export async function hasAvailableChannelReplyWorker(
       input.provider,
       input.model,
       input.effort,
-    ) &&
-    (input.projectId !== null ||
-      executionWorkerSupportsOrganizationAgentContext(worker))
-  );
+    )
+  )) return "available";
+
+  if (liveWorkers.some((worker) =>
+    executionWorkerProviderUsageExhausted(worker, input.provider) &&
+    executionWorkerAdvertisesSelection(
+      worker,
+      input.provider,
+      input.model,
+      input.effort,
+    )
+  )) return "usage_exhausted";
+
+  return "unavailable";
+}
+
+export async function hasAvailableChannelReplyWorker(
+  db: D1Database,
+  input: Parameters<typeof channelReplyWorkerAvailability>[1],
+) {
+  return await channelReplyWorkerAvailability(db, input) === "available";
+}
+
+export async function getProjectDesignatedWorker(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    projectId: string;
+    workerId: string;
+    provider: AgentProvider;
+    model: string | null;
+    effort: ModelEffort | null;
+    observedAt: string;
+  },
+) {
+  const worker = await db.prepare(
+    `select worker.id, worker.device_id, worker.label
+     from briar_execution_workers worker
+     join briar_execution_worker_devices device on device.id = worker.device_id
+     join briar_projects project on project.id = worker.project_id
+     where worker.id = ? and worker.project_id = ?
+       and device.organization_id = ?
+       and project.organization_id = device.organization_id`,
+  ).bind(
+    input.workerId,
+    input.projectId,
+    input.organizationId,
+  ).first<{ id: string; device_id: string; label: string }>();
+  if (!worker) return null;
+  return {
+    id: worker.id,
+    deviceId: worker.device_id,
+    label: worker.label,
+    availability: await channelReplyWorkerAvailability(db, {
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      preferredDeviceId: worker.device_id,
+      preferredWorkerId: worker.id,
+      provider: input.provider,
+      model: input.model,
+      effort: input.effort,
+      observedAt: input.observedAt,
+    }),
+  };
 }
 
 export async function userOwnsExecutionWorkerDevice(
@@ -1443,6 +1590,50 @@ export async function disableExecutionWorker(
   return (await disableExecutionWorkerMutation(db, deviceId, observedAt)).disabled;
 }
 
+async function executionWorkerPinnedUse(
+  db: D1Database,
+  input: { deviceId: string; projectId?: string; observedAt: string },
+) {
+  return db.prepare(
+    `select pin.kind, pin.worker_label, pin.agent_name
+     from (
+       select 'designated' as kind, worker.label as worker_label,
+              agent.name as agent_name, worker.project_id
+       from briar_execution_workers worker
+       join briar_project_agents agent
+         on agent.designated_worker_id = worker.id
+       where worker.device_id = ?
+       union all
+       select 'retained_thread' as kind, worker.label as worker_label,
+              null as agent_name, worker.project_id
+       from briar_execution_workers worker
+       join briar_channel_reply_sessions session
+         on session.owner_worker_id = worker.id
+       where worker.device_id = ? and session.retained_until > ?
+     ) pin
+     where (? is null or pin.project_id = ?)
+     limit 1`,
+  ).bind(
+    input.deviceId,
+    input.deviceId,
+    input.observedAt,
+    input.projectId ?? null,
+    input.projectId ?? null,
+  ).first<{
+    kind: "designated" | "retained_thread";
+    worker_label: string;
+    agent_name: string | null;
+  }>();
+}
+
+function pinnedWorkerDeleteError(pin: NonNullable<
+  Awaited<ReturnType<typeof executionWorkerPinnedUse>>
+>) {
+  return pin.kind === "designated"
+    ? `Worker "${pin.worker_label}" is the Designated Worker for Agent "${pin.agent_name ?? "Agent"}"; select another Worker or automatic placement before deleting it`
+    : `Worker "${pin.worker_label}" owns a retained channel thread; wait for that session to expire before deleting it`;
+}
+
 /**
  * Permanently remove an idle organization Worker and its project bindings.
  *
@@ -1480,6 +1671,20 @@ export async function deleteExecutionWorker(
       metrics,
       d1MutationMetrics([bindingCountResult]),
     );
+    const pinned = await executionWorkerPinnedUse(db, {
+      deviceId,
+      observedAt,
+    });
+    if (pinned) {
+      await failWorkerHardDelete(db, context, {
+        attemptCount: attempt.attemptCount,
+        outcome: "blocked",
+        reasonCode: "active_sessions",
+        metrics,
+      });
+      failureRecorded = true;
+      throw new WorkerConflictError(pinnedWorkerDeleteError(pinned));
+    }
     const disabled = await disableExecutionWorkerMutation(db, deviceId, observedAt);
     metrics = addD1MutationMetrics(metrics, disabled.metrics);
     if (!disabled.disabled) {
@@ -1589,6 +1794,21 @@ export async function unbindExecutionWorker(
   let metrics: D1MutationMetrics = { rowsRead: 0, rowsWritten: 0, changes: 0 };
   let failureRecorded = false;
   try {
+    const pinned = await executionWorkerPinnedUse(db, {
+      deviceId,
+      projectId,
+      observedAt,
+    });
+    if (pinned) {
+      await failWorkerHardDelete(db, context, {
+        attemptCount: attempt.attemptCount,
+        outcome: "blocked",
+        reasonCode: "active_sessions",
+        metrics,
+      });
+      failureRecorded = true;
+      throw new WorkerConflictError(pinnedWorkerDeleteError(pinned));
+    }
     const deleted = await db
       .prepare(
         `delete from briar_execution_workers
@@ -2277,6 +2497,22 @@ export async function updateExecutionWorkerLabel(
          where device_id = ? and state != 'disabled'`,
       )
       .bind(label, observedAt, deviceId),
+    db
+      .prepare(
+        `update briar_project_agents set designated_worker_label = ?
+         where designated_worker_id in (
+           select id from briar_execution_workers where device_id = ?
+         )`,
+      )
+      .bind(label, deviceId),
+    db
+      .prepare(
+        `update briar_channel_reply_sessions set owner_worker_label = ?
+         where owner_worker_id in (
+           select id from briar_execution_workers where device_id = ?
+         )`,
+      )
+      .bind(label, deviceId),
   ]);
   return (deviceUpdate.results[0] as ExecutionWorkerDeviceRow | undefined) ?? null;
 }

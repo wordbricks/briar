@@ -113,10 +113,23 @@ export async function listOrganizationIssueSubscriptionRunIds(
 ) {
   const result = await db
     .prepare(
-      `select run_id
-       from briar_issue_subscriptions
-       where organization_id = ? and user_id = ?
-       order by created_at, run_id`,
+      `select subscription.run_id
+       from briar_issue_subscriptions subscription
+       join briar_hunt_runs run on run.id = subscription.run_id
+       join briar_projects project on project.id = run.project_id
+       join briar_organization_members membership
+         on membership.organization_id = project.organization_id
+        and membership.user_id = subscription.user_id
+       left join briar_project_members project_membership
+         on project_membership.project_id = project.id
+        and project_membership.organization_id = project.organization_id
+        and project_membership.user_id = membership.user_id
+       where subscription.organization_id = ? and subscription.user_id = ?
+         and (
+           membership.role in ('owner', 'admin')
+           or project_membership.user_id is not null
+         )
+       order by subscription.created_at, subscription.run_id`,
     )
     .bind(organizationId, userId)
     .all<{ run_id: string }>();
@@ -141,7 +154,15 @@ export async function subscribeIssue(
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
         and membership.user_id = ?
+       left join briar_project_members project_membership
+         on project_membership.project_id = project.id
+        and project_membership.organization_id = project.organization_id
+        and project_membership.user_id = membership.user_id
        where run.id = ? and run.project_id = ?
+         and (
+           membership.role in ('owner', 'admin')
+           or project_membership.user_id is not null
+         )
        on conflict (run_id, user_id) do nothing
        returning run_id`,
     )

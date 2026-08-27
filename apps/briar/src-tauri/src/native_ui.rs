@@ -149,6 +149,34 @@ pub(super) async fn request_inbox_notification_permission() -> Result<bool, Stri
 }
 
 #[tauri::command]
+pub(super) async fn inbox_notification_permission_status() -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    {
+        macos_inbox_notifications::permission_status().await
+    }
+    #[cfg(not(target_os = "macos"))]
+    Ok("unsupported".to_string())
+}
+
+#[tauri::command]
+pub(super) fn open_inbox_notification_settings(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        app.opener()
+            .open_url(
+                "x-apple.systempreferences:com.apple.Notifications-Settings.extension",
+                None::<&str>,
+            )
+            .map_err(|error| error.to_string())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Err("Native macOS notification settings are unavailable on this platform".to_string())
+    }
+}
+
+#[tauri::command]
 pub(super) fn drain_pending_inbox_notification_opens(
     state: tauri::State<'_, PendingInboxNotificationOpens>,
 ) -> Vec<InboxNotificationTarget> {

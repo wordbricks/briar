@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   channelReplyClaimTokenHeader,
   channelReplyNoAvailableWorkerError,
+  channelReplyProviderUsageExhaustedError,
 } from "../../src/lib/channels-contract";
 import apiWorker from "./index";
 import {
@@ -35,6 +36,7 @@ import {
   getIncomingChannelWebhook,
   listChannelAgents,
   listChannelMessagePage,
+  listChannelMembers,
   listChannelRootMessages,
   listChannelThreadMessages,
   listChannelThreadSubscriptions,
@@ -56,6 +58,7 @@ import {
   createOrganizationAgent,
   listOrganizationAgents,
 } from "./organization-agents";
+import { channelReplyWorkerAvailability } from "./workers";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
 
 const organizationId = "a0000000-0000-4000-8000-000000000001";
@@ -2203,7 +2206,7 @@ describe("organization channels", () => {
     });
   });
 
-  it("reserves a project reply for a compatible preferred device, then releases preference on retry and policy fallback", async () => {
+  it("reserves a project reply for a preferred device without moving its retained owner", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000109";
     const agentId = "aa000000-0000-4000-8000-000000000109";
     const triggerId = "f0000000-0000-4000-8000-000000000109";
@@ -2261,7 +2264,7 @@ describe("organization channels", () => {
         fallbackDeviceId,
         organizationId,
         ownerId,
-        "8".repeat(64),
+        sha256Hex(fallbackDeviceId),
         observedAt,
         observedAt,
         observedAt,
@@ -2375,22 +2378,14 @@ describe("organization channels", () => {
       `update briar_execution_workers set state = 'disabled' where id = ?`,
     ).bind(boundWorkerId).run();
     const retryClaim = await claim({ claimTokenHash: "3".repeat(64) });
-    expect(retryClaim).toMatchObject({
-      id: job.id,
-      claimed_device_id: fallbackDeviceId,
-    });
-    await completeChannelReply(db, retryClaim!, {
-      jobId: retryClaim!.id,
-      deviceId: fallbackDeviceId,
-      workerId: fallbackWorkerId,
-      claimTokenHash: "3".repeat(64),
-      body: "Fallback completed the retry.",
-      document: null,
-      issueProposal: null,
-      executionProposal: null,
-      agentName: "Local Project Agent",
-      agentProvider: "claude",
-      completedAt: observedAt,
+    expect(retryClaim).toBeNull();
+    await expect(getChannelAgentReplyJob(
+      db,
+      organizationId,
+      job.id,
+    )).resolves.toMatchObject({
+      status: "failed",
+      error: expect.stringContaining("Worker"),
     });
 
     const policyTriggerId = "f0000000-0000-4000-8000-000000000110";
@@ -2461,7 +2456,7 @@ describe("organization channels", () => {
     ]);
   });
 
-  it("reuses and serializes a thread session, fails over once, and cleans it after the sliding TTL", async () => {
+  it("reuses one thread owner without failover and cleans it after the sliding TTL", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000201";
     const agentId = "aa000000-0000-4000-8000-000000000201";
     const rootId = "f0000000-0000-4000-8000-000000000201";
@@ -2513,7 +2508,8 @@ describe("organization channels", () => {
            readiness_state, last_heartbeat_at, created_at, updated_at
          ) values (?, ?, ?, 'Session owner Worker', ?, 'claude', ?,
                    'online', 1, 'ready', ?, ?, ?)
-         on conflict (id) do update set state = 'online', accepting_work = 1,
+         on conflict (id) do update set label = excluded.label,
+           state = 'online', accepting_work = 1,
            readiness_state = 'ready', capabilities_json = excluded.capabilities_json,
            last_heartbeat_at = excluded.last_heartbeat_at`,
       ).bind(
@@ -2648,6 +2644,11 @@ describe("organization channels", () => {
       id: firstSessionId,
       conversation_id: "provider-conversation-201",
     });
+    await db.prepare(
+      `update briar_project_agents
+       set designated_worker_id = ?, designated_worker_label = ?
+       where id = ?`,
+    ).bind(fallbackWorkerId, "Session fallback Worker", agentId).run();
 
     await message(followupId, rootId, time(3));
     const [followupJob] = await enqueueChannelAgentReplies(db, {
@@ -2656,8 +2657,20 @@ describe("organization channels", () => {
       triggerMessageId: followupId,
       parentMessageId: rootId,
       agents: [{ id: agentId, projectId, provider: "claude" }],
+      preferredDeviceId: fallbackDeviceId,
       createdAt: time(3),
     });
+    expect(followupJob.preferred_device_id).toBe(fallbackDeviceId);
+    await db.batch([
+      db.prepare(
+        `update briar_execution_workers set last_heartbeat_at = ?
+         where id in (?, ?)`,
+      ).bind(time(4), boundWorkerId, fallbackWorkerId),
+      db.prepare(
+        `update briar_execution_worker_devices set last_heartbeat_at = ?
+         where id in (?, ?)`,
+      ).bind(time(4), deviceId, fallbackDeviceId),
+    ]);
     await expect(claim(
       boundWorkerId,
       deviceId,
@@ -2688,12 +2701,29 @@ describe("organization channels", () => {
          where id in (?, ?)`,
       ).bind(time(6), deviceId, fallbackDeviceId),
     ]);
+    await expect(getChannelReplySession(db, firstSessionId)).resolves.toMatchObject({
+      owner_worker_id: boundWorkerId,
+      conversation_id: "provider-conversation-201",
+    });
+    await expect(channelReplyWorkerAvailability(db, {
+      organizationId,
+      projectId,
+      preferredDeviceId: deviceId,
+      preferredWorkerId: boundWorkerId,
+      provider: "claude",
+      model: null,
+      effort: null,
+      observedAt: time(6),
+    })).resolves.toBe("available");
     await expect(claim(
       fallbackWorkerId,
       fallbackDeviceId,
       "7".repeat(64),
       time(6),
     )).resolves.toBeNull();
+    // A live session owner wins over a conflicting message-level preference.
+    // Otherwise the owner yields to the preferred device while the preferred
+    // device yields back to the owner, leaving the reply queued forever.
     const concurrent = await Promise.all([
       claim(boundWorkerId, deviceId, "8".repeat(64), time(6)),
       claim(boundWorkerId, deviceId, "9".repeat(64), time(6)),
@@ -2755,25 +2785,32 @@ describe("organization channels", () => {
          where id in (?, ?)`,
       ).bind(time(25), deviceId, fallbackDeviceId),
     ]);
-    const leaseFailedOver = await claim(
+    const rejectedLeaseFailover = await claim(
       fallbackWorkerId,
       fallbackDeviceId,
       "b".repeat(64),
       time(25),
     );
-    expect(leaseFailedOver).toMatchObject({
+    expect(rejectedLeaseFailover).toBeNull();
+    const leaseOwnerRetry = await claim(
+      boundWorkerId,
+      deviceId,
+      "b".repeat(64),
+      time(25),
+    );
+    expect(leaseOwnerRetry).toMatchObject({
       id: leaseFailoverJob.id,
       session_id: firstSessionId,
-      session_claim_reason: "worker_failover_lease_expired",
+      session_claim_reason: "worker_reused",
       channel_reply_session: {
-        owner_worker_id: fallbackWorkerId,
+        owner_worker_id: boundWorkerId,
         conversation_id: "provider-conversation-201",
       },
     });
-    await completeChannelReply(db, leaseFailedOver!, {
-      jobId: leaseFailedOver!.id,
-      deviceId: fallbackDeviceId,
-      workerId: fallbackWorkerId,
+    await completeChannelReply(db, leaseOwnerRetry!, {
+      jobId: leaseOwnerRetry!.id,
+      deviceId,
+      workerId: boundWorkerId,
       claimTokenHash: "b".repeat(64),
       body: "Lease failover reply",
       document: null,
@@ -2796,35 +2833,86 @@ describe("organization channels", () => {
     });
     await db.prepare(
       `update briar_execution_workers set state = 'disabled' where id = ?`,
-    ).bind(fallbackWorkerId).run();
-    const failedOver = await claim(
-      boundWorkerId,
-      deviceId,
+    ).bind(boundWorkerId).run();
+    const rejectedUnavailableFailover = await claim(
+      fallbackWorkerId,
+      fallbackDeviceId,
       "c".repeat(64),
       time(28),
     );
-    expect(failedOver).toMatchObject({
-      id: failoverJob.id,
-      session_id: firstSessionId,
-      session_claim_reason: "worker_failover_unavailable_or_incompatible",
-      channel_reply_session: {
-        owner_worker_id: boundWorkerId,
-        conversation_id: "provider-conversation-201",
-      },
+    expect(rejectedUnavailableFailover).toBeNull();
+    await expect(getChannelAgentReplyJob(
+      db,
+      organizationId,
+      failoverJob.id,
+    )).resolves.toMatchObject({
+      status: "failed",
+      error: expect.stringContaining('Worker "Session owner Worker"'),
     });
-    await completeChannelReply(db, failedOver!, {
-      jobId: failedOver!.id,
+    await db.prepare(
+      `update briar_execution_workers set state = 'online' where id = ?`,
+    ).bind(boundWorkerId).run();
+
+    const designatedRootId = "f0000000-0000-4000-8000-000000000206";
+    await db.batch([
+      db.prepare(
+        `update briar_execution_workers
+         set last_heartbeat_at = ? where id in (?, ?)`,
+      ).bind(time(30), boundWorkerId, fallbackWorkerId),
+      db.prepare(
+        `update briar_execution_worker_devices
+         set last_heartbeat_at = ? where id in (?, ?)`,
+      ).bind(time(30), deviceId, fallbackDeviceId),
+    ]);
+    await message(designatedRootId, null, time(30));
+    const [designatedJob] = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: designatedRootId,
+      parentMessageId: designatedRootId,
+      agents: [{ id: agentId, projectId, provider: "claude" }],
+      createdAt: time(30),
+    });
+    await expect(getChannelReplySession(
+      db,
+      designatedJob.session_id!,
+    )).resolves.toMatchObject({
+      owner_worker_id: fallbackWorkerId,
+      owner_worker_label: "Session fallback Worker",
+    });
+    await expect(claim(
+      boundWorkerId,
       deviceId,
-      workerId: boundWorkerId,
-      claimTokenHash: "c".repeat(64),
-      body: "Failover reply",
+      "d".repeat(64),
+      time(31),
+    )).resolves.toBeNull();
+    const designatedConcurrent = await Promise.all([
+      claim(fallbackWorkerId, fallbackDeviceId, "d".repeat(64), time(31)),
+      claim(fallbackWorkerId, fallbackDeviceId, "e".repeat(64), time(31)),
+    ]);
+    const designatedClaim = designatedConcurrent.find(
+      (candidate) => candidate !== null,
+    )!;
+    expect(designatedConcurrent.filter((candidate) => candidate !== null))
+      .toHaveLength(1);
+    expect(designatedClaim).toMatchObject({
+      id: designatedJob.id,
+      session_claim_reason: "designated_worker_claimed",
+    });
+    await completeChannelReply(db, designatedClaim, {
+      jobId: designatedClaim.id,
+      deviceId: fallbackDeviceId,
+      workerId: fallbackWorkerId,
+      claimTokenHash: designatedClaim.claim_token_hash === "d".repeat(64)
+        ? "d".repeat(64)
+        : "e".repeat(64),
+      body: "Designated Worker reply",
       document: null,
       issueProposal: null,
       executionProposal: null,
       agentName: "Session Agent",
       agentProvider: "claude",
-      conversationId: "provider-conversation-201",
-      completedAt: time(29),
+      completedAt: time(32),
     });
 
     const isolatedRootId = "f0000000-0000-4000-8000-000000000205";
@@ -2898,10 +2986,10 @@ describe("organization channels", () => {
     ]));
 
     expect((await cleanupExpiredChannelReplySessions(db, {
-      observedAt: time(29 + 6 * 60 - 1),
+      observedAt: time(27 + 6 * 60 - 1),
     })).some((session) => session.id === firstSessionId)).toBe(false);
     expect((await cleanupExpiredChannelReplySessions(db, {
-      observedAt: time(29 + 6 * 60),
+      observedAt: time(27 + 6 * 60),
     })).some((session) => session.id === firstSessionId)).toBe(true);
     await expect(getChannelReplySession(db, firstSessionId)).resolves.toMatchObject({
       owner_worker_id: null,
@@ -2914,11 +3002,6 @@ describe("organization channels", () => {
     expect(events.results).toEqual(expect.arrayContaining([
       { event_type: "claimed", reason: "session_created" },
       { event_type: "claimed", reason: "worker_reused" },
-      { event_type: "claimed", reason: "worker_failover_lease_expired" },
-      {
-        event_type: "claimed",
-        reason: "worker_failover_unavailable_or_incompatible",
-      },
       { event_type: "cleaned", reason: "ttl_expired" },
     ]));
     await db.prepare(
@@ -3803,6 +3886,246 @@ describe("organization channels", () => {
     });
   });
 
+  it("names an unavailable Designated Worker without using another eligible Worker", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000098";
+    const agentId = "aa000000-0000-4000-8000-000000000098";
+    const fallbackDeviceId = "c0000000-0000-4000-8000-000000000098";
+    const fallbackWorkerId = "d0000000-0000-4000-8000-000000000098";
+    const observedAt = new Date().toISOString();
+    const capabilities = JSON.stringify({
+      providerHealth: { claude: { healthy: true } },
+      providerCapabilities: {
+        claude: {
+          models: [],
+          defaultEfforts: [],
+          allowCustomModels: true,
+          error: null,
+        },
+      },
+    });
+    await bindWorkerToProject();
+    await db.batch([
+      db.prepare(
+        `update briar_execution_worker_devices
+         set state = 'online', last_heartbeat_at = ? where id = ?`,
+      ).bind(observedAt, deviceId),
+      db.prepare(
+        `update briar_execution_workers
+         set label = 'Pinned Mac', state = 'disabled', accepting_work = 1,
+             readiness_state = 'ready', capabilities_json = ?,
+             last_heartbeat_at = ? where id = ?`,
+      ).bind(capabilities, observedAt, boundWorkerId),
+      db.prepare(
+        `insert into briar_execution_worker_devices (
+           id, organization_id, owner_user_id, label, device_identity_hash,
+           state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, 'Eligible Mac', ?, 'online', ?, ?, ?)`,
+      ).bind(
+        fallbackDeviceId,
+        organizationId,
+        ownerId,
+        "8".repeat(64),
+        observedAt,
+        observedAt,
+        observedAt,
+      ),
+      db.prepare(
+        `insert into briar_execution_worker_credentials (
+           device_id, token_hash, created_at
+         ) values (?, ?, ?)`,
+      ).bind(fallbackDeviceId, sha256Hex(fallbackWorkerId), observedAt),
+      db.prepare(
+        `insert into briar_execution_workers (
+           id, project_id, device_id, label, host_fingerprint,
+           agent_provider, capabilities_json, state, accepting_work,
+           readiness_state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, 'Eligible Mac', ?, 'claude', ?, 'online', 1,
+                   'ready', ?, ?, ?)`,
+      ).bind(
+        fallbackWorkerId,
+        projectId,
+        fallbackDeviceId,
+        sha256Hex(`${fallbackWorkerId}:host`),
+        capabilities,
+        observedAt,
+        observedAt,
+        observedAt,
+      ),
+      db.prepare(
+        `insert into briar_project_agents (
+           id, organization_id, project_id, name, provider, model,
+           responsibility, effort, designated_worker_id,
+           designated_worker_label, created_at, updated_at
+         ) values (?, ?, ?, 'Pinned Agent', 'claude', null,
+                   'Remain on the pinned Worker', null, ?, 'Pinned Mac', ?, ?)`,
+      ).bind(
+        agentId,
+        organizationId,
+        projectId,
+        boundWorkerId,
+        observedAt,
+        observedAt,
+      ),
+    ]);
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "designated-worker-error",
+      name: "Designated Worker error",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: projectId,
+      createdByUserId: ownerId,
+      createdAt: observedAt,
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId,
+      addedByUserId: ownerId,
+      createdAt: observedAt,
+    });
+
+    const response = await apiWorker.fetch(new Request(
+      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          body: "@Pinned-Agent stay pinned",
+          mentionedAgentIds: [agentId],
+        }),
+      },
+    ), {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "channels-context-test-secret-channels-context-test",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env);
+
+    expect(response.status).toBe(201);
+    const body = await response.json() as {
+      agentReplies: Array<{ status: string; error: string | null }>;
+    };
+    expect(body.agentReplies).toEqual([
+      expect.objectContaining({
+        status: "failed",
+        error: expect.stringContaining('Worker "Pinned Mac"'),
+      }),
+    ]);
+    await db.prepare(
+      `update briar_execution_workers
+       set label = 'Worker', state = 'online' where id = ?`,
+    ).bind(boundWorkerId).run();
+  });
+
+  it("reports exhausted assigned-model usage when posting a channel message", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000309";
+    const agentId = "aa000000-0000-4000-8000-000000000309";
+    const observedAt = new Date().toISOString();
+    await bindWorkerToProject();
+    await db.batch([
+      db.prepare(
+        `update briar_execution_worker_devices
+         set state = 'online', last_heartbeat_at = ?, updated_at = ?
+         where id = ?`,
+      ).bind(observedAt, observedAt, deviceId),
+      db.prepare(
+        `update briar_execution_workers
+         set state = 'online', accepting_work = 0,
+             readiness_state = 'needs_attention', capabilities_json = ?,
+             last_heartbeat_at = ?, updated_at = ? where id = ?`,
+      ).bind(
+        JSON.stringify({
+          providerHealth: {
+            grok: {
+              installed: true,
+              authenticated: true,
+              healthy: false,
+              reason: "usage_exhausted",
+              usageExhausted: true,
+              maxUsedPercent: 100,
+            },
+          },
+          providerCapabilities: {
+            grok: {
+              models: [{
+                id: "grok-4.6",
+                label: "Grok 4.6",
+                efforts: [{ id: "high", label: "High" }],
+              }],
+              defaultEfforts: [],
+              allowCustomModels: false,
+              error: null,
+            },
+          },
+        }),
+        observedAt,
+        observedAt,
+        boundWorkerId,
+      ),
+      db.prepare(
+        `insert into briar_project_agents (
+           id, organization_id, project_id, name, provider, model,
+           responsibility, effort, created_at, updated_at
+         ) values (?, ?, ?, 'Limit Agent', 'grok', 'grok-4.6',
+                   'Reply with Grok', 'high', ?, ?)`,
+      ).bind(agentId, organizationId, projectId, observedAt, observedAt),
+    ]);
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "usage-limit-error",
+      name: "Usage limit error",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: projectId,
+      createdByUserId: ownerId,
+      createdAt: observedAt,
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId,
+      addedByUserId: ownerId,
+      createdAt: observedAt,
+    });
+
+    const response = await apiWorker.fetch(new Request(
+      `https://briar-api.example/organizations/${organizationId}/channels/${channelId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          body: "@Limit-Agent help",
+          mentionedAgentIds: [agentId],
+        }),
+      },
+    ), {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "channels-context-test-secret-channels-context-test",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env);
+
+    expect(response.status).toBe(201);
+    const body = await response.json() as {
+      agentReplies: Array<{ status: string; error: string | null }>;
+    };
+    expect(body.agentReplies).toEqual([
+      expect.objectContaining({
+        status: "failed",
+        error: channelReplyProviderUsageExhaustedError,
+      }),
+    ]);
+  });
+
   it("excludes changes in channels the member cannot see from the delta", async () => {
     const hiddenId = "e0000000-0000-4000-8000-000000000008";
     await createChannel(db, {
@@ -3900,8 +4223,15 @@ describe("organization channels", () => {
       emoji: "👍",
       createdAt: at(52),
     });
+    const roster = await listChannelMembers(db, channelId);
+    expect(roster.map((member) => member.userId)).not.toContain(outsiderId);
     expect(added?.reactions).toEqual([
-      { emoji: "👍", count: 1, userIds: [ownerId] },
+      {
+        emoji: "👍",
+        count: 1,
+        userIds: [ownerId],
+        people: [{ userId: ownerId, name: "Owner", image: null }],
+      },
     ]);
 
     const second = await toggleChannelMessageReaction(db, {
@@ -3915,6 +4245,10 @@ describe("organization channels", () => {
     expect(second?.reactions[0]?.userIds).toEqual(
       expect.arrayContaining([ownerId, outsiderId]),
     );
+    expect(second?.reactions[0]?.people).toEqual([
+      { userId: ownerId, name: "Owner", image: null },
+      { userId: outsiderId, name: "Outsider", image: null },
+    ]);
 
     const heart = await toggleChannelMessageReaction(db, {
       channelId,
@@ -3936,8 +4270,18 @@ describe("organization channels", () => {
       createdAt: at(55),
     });
     expect(removed?.reactions).toEqual([
-      { emoji: "👍", count: 1, userIds: [outsiderId] },
-      { emoji: "❤️", count: 1, userIds: [ownerId] },
+      {
+        emoji: "👍",
+        count: 1,
+        userIds: [outsiderId],
+        people: [{ userId: outsiderId, name: "Outsider", image: null }],
+      },
+      {
+        emoji: "❤️",
+        count: 1,
+        userIds: [ownerId],
+        people: [{ userId: ownerId, name: "Owner", image: null }],
+      },
     ]);
 
     const listed = await listChannelRootMessages(db, channelId);

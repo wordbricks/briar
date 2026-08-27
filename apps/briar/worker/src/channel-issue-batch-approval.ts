@@ -3,10 +3,7 @@ import type {
   ChannelIssueBatchResultItem,
   ChannelIssueBatchProposalPayload,
 } from "../../src/lib/channels-contract";
-import {
-  appendChannelMessageBacklink,
-  channelMessageShareUrl,
-} from "./channel-proposal-helpers";
+import { channelRelatedMessageReference } from "./channel-proposal-helpers";
 import { stableJson } from "./hunt-run-codec";
 import type { ProjectRow } from "./project-repository";
 import { getProjectSettings } from "./project-settings-repository";
@@ -74,7 +71,6 @@ export async function materializeChannelIssueBatch(input: {
   proposalId: string;
   messageId: string;
   rootMessageId: string | null;
-  shareOrigin: string;
   proposalPayloadJson: string;
   proposalCreatedAt: string;
   approvedAt: string;
@@ -103,8 +99,7 @@ export async function materializeChannelIssueBatch(input: {
 
   const repository = settings?.github_repository ?? input.project.name;
   const recordedAt = new Date().toISOString();
-  const channelMessageUrl = channelMessageShareUrl({
-    origin: input.shareOrigin,
+  const relatedMessage = channelRelatedMessageReference({
     organizationId: input.organizationId,
     channelId: input.channelId,
     messageId: input.messageId,
@@ -141,7 +136,7 @@ export async function materializeChannelIssueBatch(input: {
         item.issue.priority,
         input.approvedByUserId,
         repository,
-        appendChannelMessageBacklink(item.issue.description, channelMessageUrl),
+        item.issue.description,
         input.proposalCreatedAt,
         stableJson({
           origin: "briar-channel",
@@ -149,6 +144,7 @@ export async function materializeChannelIssueBatch(input: {
           channelId: input.channelId,
           issueId: input.proposalId,
           batchKey: item.localKey,
+          relatedMessage,
           attachmentCount: 0,
           fullAuto: false,
         }),

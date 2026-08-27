@@ -19,7 +19,7 @@ const SessionEnvelope = Schema.Struct({
 });
 
 export type UpdateAccountProfileInput = {
-  username: string;
+  username: string | null;
   name: string;
   image: string | null;
 };

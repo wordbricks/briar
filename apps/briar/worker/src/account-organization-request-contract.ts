@@ -53,7 +53,7 @@ const AccountImage = Schema.Union([
 ]);
 
 export const AccountProfileInput = Schema.Struct({
-  username: LowercaseUsername,
+  username: Schema.NullOr(LowercaseUsername),
   name: trimmedText(1, 100),
   image: Schema.NullOr(AccountImage),
 });
@@ -81,6 +81,10 @@ export const InboxReadStatesInput = strictSchema(Schema.Struct({
         }
   ),
 ));
+
+export const InboxUnreadStateInput = strictSchema(Schema.Struct({
+  messageId: InboxReadStateMessageId,
+}));
 
 export const ProjectAgentScheduleBatchClaim = strictSchema(Schema.Struct({
   projectIds: Schema.mutable(Schema.Array(UuidString)).check(
@@ -132,6 +136,12 @@ export const OrganizationMemberRoleInput = strictSchema(Schema.Struct({
   role: Schema.Literals(["admin", "member"]),
 }));
 
+export const OrganizationMemberProjectsInput = strictSchema(Schema.Struct({
+  projectIds: Schema.mutable(Schema.Array(UuidString)).check(
+    Schema.isMaxLength(500),
+  ),
+}));
+
 export const SlackOAuthInput = strictSchema(Schema.Struct({
   defaultProjectId: UuidString,
 }));
@@ -139,6 +149,9 @@ export const SlackOAuthInput = strictSchema(Schema.Struct({
 export const decodeAccountProfileInput = decodeRequestSync(AccountProfileInput);
 export const decodeInboxReadStatesInput = decodeRequestSync(
   InboxReadStatesInput,
+);
+export const decodeInboxUnreadStateInput = decodeRequestSync(
+  InboxUnreadStateInput,
 );
 export const decodeProjectAgentScheduleBatchClaim = decodeRequestSync(
   ProjectAgentScheduleBatchClaim,
@@ -162,5 +175,8 @@ export const decodeOrganizationInvitationInput = decodeRequestSync(
 );
 export const decodeOrganizationMemberRoleInput = decodeRequestSync(
   OrganizationMemberRoleInput,
+);
+export const decodeOrganizationMemberProjectsInput = decodeRequestSync(
+  OrganizationMemberProjectsInput,
 );
 export const decodeSlackOAuthInput = decodeRequestSync(SlackOAuthInput);

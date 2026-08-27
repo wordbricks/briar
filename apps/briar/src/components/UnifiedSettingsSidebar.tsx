@@ -109,11 +109,11 @@ function SettingsTreeGroup<
           [`data-${scope}-settings`]: entity.id,
         };
         return (
-          <div className="settings-nav-tree" key={entity.id}>
+          <div className="grid gap-0.5" key={entity.id}>
             <SettingsNavItem
               active={active && !expanded}
               aria-expanded={expanded}
-              className="settings-nav-parent [&>span:last-child]:flex [&>span:last-child]:flex-1"
+              className="[&>span:last-child]:flex [&>span:last-child]:flex-1"
               icon={renderEntityIcon(entity)}
               onClick={() => {
                 onExpandedIdChange((current) =>
@@ -135,7 +135,7 @@ function SettingsTreeGroup<
               </span>
             </SettingsNavItem>
             {expanded ? (
-              <div className="settings-nav-children">
+              <div className="grid gap-0.5">
                 {items
                   .filter(
                     (item) => matches(entity.name) || matches(item.label),
@@ -302,7 +302,7 @@ export function UnifiedSettingsSidebar({
         value={searchQuery}
       />
 
-      <SettingsNav className="unified-settings-nav">
+      <SettingsNav>
         {filteredApplicationItems.length > 0 ? (
           <SettingsNavGroup label={t("appSettings.applicationSection")}>
             {filteredApplicationItems.map((item) => (

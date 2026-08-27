@@ -4,12 +4,19 @@ import {
   join,
   resolve,
 } from "node:path";
-import { repositoryWorkflowPendingStageId } from "../src/lib/auto-hunt-contract";
+import * as Schema from "effect/Schema";
+import {
+  isRepositoryWorkflowPending,
+  repositoryWorkflowPendingStageId,
+} from "../src/lib/auto-hunt-contract";
 import {
   projectWorktreeRoot,
   resolveBaseRef,
 } from "./worktree";
-import { type ProjectConfig } from "./config-contract";
+import {
+  type Config,
+  type ProjectConfig,
+} from "./config-contract";
 import { decodeVelenEnvelope } from "./command-contract";
 import {
   args,
@@ -27,6 +34,100 @@ import {
   worktreesEnabled,
   currentProject,
 } from "./command-support";
+import { HttpRequestError } from "./execution-metrics-upload";
+import {
+  configWithRemoteProjectSettings,
+  type FetchRemoteProjectSettings,
+  fetchRemoteProjectSettings,
+  projectWithRemoteSettings,
+  remoteWorkflowState,
+} from "./project-settings-sync";
+
+const ProjectListResponse = Schema.Struct({
+  projects: Schema.Array(Schema.Struct({
+    id: Schema.String,
+    name: Schema.String,
+    organizationId: Schema.String,
+    organizationName: Schema.String,
+    role: Schema.Literals(["owner", "admin", "member"]),
+  })),
+}).annotate({
+  parseOptions: { onExcessProperty: "preserve" },
+});
+
+const decodeProjectListResponse = Schema.decodeUnknownSync(ProjectListResponse);
+
+export type ProjectListDependencies = {
+  loadAuthentication: () => Promise<{
+    apiUrl: string;
+    userToken?: string;
+  }>;
+  environmentToken: () => string | undefined;
+  fetchProjects: (apiUrl: string, userToken: string) => Promise<unknown>;
+  jsonOutput: () => boolean;
+  writeOutput: (output: string) => void;
+};
+
+const defaultProjectListDependencies: ProjectListDependencies = {
+  loadAuthentication: loadConfig,
+  environmentToken: () => process.env.BRIAR_USER_TOKEN,
+  fetchProjects: (apiUrl, userToken) =>
+    request<unknown>(apiUrl, "/projects", userToken),
+  jsonOutput: () => has("--json"),
+  writeOutput: console.log,
+};
+
+async function listProjectsCommand(
+  dependencies: Partial<ProjectListDependencies> = {},
+) {
+  const resolved = { ...defaultProjectListDependencies, ...dependencies };
+  const authentication = await resolved.loadAuthentication();
+  const userToken =
+    resolved.environmentToken()?.trim() || authentication.userToken?.trim();
+  if (!userToken) {
+    throw new Error(
+      "Briar에 로그인되어 있지 않습니다. `briar login`을 실행하세요.",
+    );
+  }
+
+  let response: unknown;
+  try {
+    response = await resolved.fetchProjects(authentication.apiUrl, userToken);
+  } catch (error) {
+    if (error instanceof HttpRequestError && error.status === 401) {
+      throw new Error(
+        "Briar 로그인이 만료되었거나 유효하지 않습니다. `briar login`을 다시 실행하세요.",
+      );
+    }
+    throw error;
+  }
+
+  const projects = decodeProjectListResponse(response).projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    organizationId: project.organizationId,
+    organizationName: project.organizationName,
+    role: project.role,
+  }));
+  if (resolved.jsonOutput()) {
+    resolved.writeOutput(JSON.stringify({ projects }, null, 2));
+    return;
+  }
+  if (projects.length === 0) {
+    resolved.writeOutput("접근 가능한 Briar 프로젝트가 없습니다.");
+    return;
+  }
+  resolved.writeOutput(
+    projects.map((project) =>
+      [
+        project.name,
+        `  Project ID: ${project.id}`,
+        `  Organization: ${project.organizationName} (${project.organizationId})`,
+        `  Role: ${project.role}`,
+      ].join("\n")
+    ).join("\n\n"),
+  );
+}
 
 async function createProject() {
   const config = await loadConfig();
@@ -259,44 +360,195 @@ async function configureProject() {
   );
 }
 
-async function projectDoctor() {
-  const config = await loadConfig();
-  const project = await currentProject(config);
+export type ProjectDoctorDependencies = {
+  loadConfiguration: () => Promise<Config>;
+  selectProject: (config: Config) => Promise<ProjectConfig>;
+  environmentToken: () => string | undefined;
+  fetchProjectSettings: FetchRemoteProjectSettings;
+  persistConfig: (config: Config) => Promise<void>;
+  inspectVelen: typeof ensureConfiguredVelen;
+  resolveProjectBaseRef: (project: ProjectConfig) => string | null;
+  writeOutput: (output: string) => void;
+};
+
+const defaultProjectDoctorDependencies: ProjectDoctorDependencies = {
+  loadConfiguration: loadConfig,
+  selectProject: currentProject,
+  environmentToken: () => process.env.BRIAR_USER_TOKEN,
+  fetchProjectSettings: fetchRemoteProjectSettings,
+  persistConfig: saveConfig,
+  inspectVelen: ensureConfiguredVelen,
+  resolveProjectBaseRef: (project) =>
+    resolveBaseRef(runGit, project.repositoryPath),
+  writeOutput: console.log,
+};
+
+type ProjectDoctorWorkflowSync = {
+  status:
+    | "local_ready"
+    | "refreshed"
+    | "server_generation_pending"
+    | "local_persistence_failed"
+    | "session_unavailable"
+    | "api_unavailable"
+    | "network_unavailable";
+  source: "local" | "server";
+  persisted: boolean;
+  serverWorkflowState: "ready" | "generation_pending" | null;
+  message: string;
+};
+
+const unavailableWorkflowSync = (
+  error: unknown,
+): ProjectDoctorWorkflowSync => {
+  if (error instanceof HttpRequestError && error.status === 401) {
+    return {
+      status: "session_unavailable",
+      source: "server",
+      persisted: false,
+      serverWorkflowState: null,
+      message: "Briar login session is invalid or expired",
+    };
+  }
+  if (error instanceof TypeError) {
+    return {
+      status: "network_unavailable",
+      source: "server",
+      persisted: false,
+      serverWorkflowState: null,
+      message: "Project settings could not be reached over the network",
+    };
+  }
+  return {
+    status: "api_unavailable",
+    source: "server",
+    persisted: false,
+    serverWorkflowState: null,
+    message: "Project settings API did not return usable settings",
+  };
+};
+
+async function projectDoctor(
+  dependencies: Partial<ProjectDoctorDependencies> = {},
+) {
+  const resolved = { ...defaultProjectDoctorDependencies, ...dependencies };
+  const config = await resolved.loadConfiguration();
+  const project = await resolved.selectProject(config);
+  let effectiveProject = project;
+  let workflow = project.autoHunt?.workflow;
+  let workflowSync: ProjectDoctorWorkflowSync = {
+    status: "local_ready",
+    source: "local",
+    persisted: true,
+    serverWorkflowState: null,
+    message: "Local repository workflow is ready",
+  };
+
+  if (!workflow || isRepositoryWorkflowPending(workflow)) {
+    const userToken = resolved.environmentToken()?.trim() ||
+      config.userToken?.trim();
+    if (!userToken) {
+      workflow = undefined;
+      workflowSync = {
+        status: "session_unavailable",
+        source: "server",
+        persisted: false,
+        serverWorkflowState: null,
+        message: "Briar login session is unavailable",
+      };
+    } else {
+      try {
+        const settings = await resolved.fetchProjectSettings(
+          config.apiUrl,
+          project.id,
+          userToken,
+        );
+        const serverWorkflowState = remoteWorkflowState(settings);
+        effectiveProject = projectWithRemoteSettings(project, settings);
+        workflow = serverWorkflowState === "ready"
+          ? settings.workflow
+          : undefined;
+        try {
+          await resolved.persistConfig(configWithRemoteProjectSettings(
+            config,
+            project.id,
+            settings,
+          ));
+          workflowSync = serverWorkflowState === "ready"
+            ? {
+                status: "refreshed",
+                source: "server",
+                persisted: true,
+                serverWorkflowState,
+                message: "Repository workflow was refreshed from Briar",
+              }
+            : {
+                status: "server_generation_pending",
+                source: "server",
+                persisted: true,
+                serverWorkflowState,
+                message: "Briar is still generating the repository workflow",
+              };
+        } catch {
+          workflowSync = {
+            status: "local_persistence_failed",
+            source: "server",
+            persisted: false,
+            serverWorkflowState,
+            message: "Remote project settings exist but local config could not be updated",
+          };
+        }
+      } catch (error) {
+        workflow = undefined;
+        workflowSync = unavailableWorkflowSync(error);
+      }
+    }
+  }
+
   let velen: ReturnType<typeof ensureConfiguredVelen> = null;
   let velenError: string | null = null;
   try {
-    velen = ensureConfiguredVelen(project);
+    velen = resolved.inspectVelen(effectiveProject);
   } catch (error) {
     velenError = error instanceof Error ? error.message : String(error);
   }
-  console.log(
-    JSON.stringify({
-      ok: true,
-      projectId: project.id,
-      repositoryPath: project.repositoryPath,
-      velenOrg: project.autoHunt?.velenOrg ?? null,
-      linearEnabled: project.autoHunt?.linear?.enabled ?? false,
-      linearSource: project.autoHunt?.linear?.source ?? null,
-      dataSource: project.autoHunt?.dataSource ?? null,
-      workflow: configuredWorkflow(project),
-      worktrees: {
-        enabled: worktreesEnabled(project),
-        root: projectWorktreeRoot(worktreeSettings(project).root, project.id),
-        branchPrefix: worktreeSettings(project).branchPrefix,
-        // null means no origin/HEAD and no main/master: allocation would fail.
-        baseRef: resolveBaseRef(runGit, project.repositoryPath),
-      },
-      sandbox: {
-        // true is the default; false opts into checkout/worktree-confined writes.
-        fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
-      },
-      velenHealthy: velenError === null,
-      velenError,
-      requestIds: [velen?.auth.requestId, velen?.org.requestId, velen?.linear?.requestId].filter(
-        Boolean,
+  const result = {
+    ok: Boolean(workflow) && workflowSync.status !== "local_persistence_failed",
+    projectId: project.id,
+    repositoryPath: project.repositoryPath,
+    velenOrg: effectiveProject.autoHunt?.velenOrg ?? null,
+    linearEnabled: effectiveProject.autoHunt?.linear?.enabled ?? false,
+    linearSource: effectiveProject.autoHunt?.linear?.source ?? null,
+    dataSource: effectiveProject.autoHunt?.dataSource ?? null,
+    githubRepository: effectiveProject.autoHunt?.githubRepository ?? null,
+    workflow: workflow ?? null,
+    workflowSync,
+    worktrees: {
+      enabled: worktreesEnabled(effectiveProject),
+      root: projectWorktreeRoot(
+        worktreeSettings(effectiveProject).root,
+        effectiveProject.id,
       ),
-    }),
-  );
+      branchPrefix: worktreeSettings(effectiveProject).branchPrefix,
+      // null means no origin/HEAD and no main/master: allocation would fail.
+      baseRef: resolved.resolveProjectBaseRef(effectiveProject),
+    },
+    sandbox: {
+      // true is the default; false opts into checkout/worktree-confined writes.
+      fullAccess: effectiveProject.autoHunt?.sandbox?.fullAccess ?? true,
+    },
+    velenHealthy: velenError === null,
+    velenError,
+    requestIds: [velen?.auth.requestId, velen?.org.requestId, velen?.linear?.requestId].filter(
+      Boolean,
+    ),
+  };
+  resolved.writeOutput(JSON.stringify(result));
+  if (!result.ok) {
+    throw new Error(
+      `Project doctor could not use the repository workflow: ${workflowSync.status}`,
+    );
+  }
 }
 
 async function showWorkflow() {
@@ -311,6 +563,7 @@ async function showWorkflow() {
 }
 
 export {
+  listProjectsCommand,
   createProject,
   connectProject,
   velenExecutable,

@@ -43,6 +43,26 @@ struct CompanionShellView: View {
         CompanionLocale(rawValue: localeRaw) ?? .ko
     }
 
+    private func openRelatedMessage(_ reference: RelatedMessageReference) {
+        navigation.open(
+            .channel(
+                organizationID: reference.organizationId,
+                channelID: reference.channelId,
+                messageID: reference.messageId,
+                rootMessageID: reference.rootMessageId
+            )
+        )
+        if navigation.pendingProjectID == nil,
+           let targetProject = projects.first(where: {
+               $0.organizationId == reference.organizationId
+           }) {
+            navigation.pendingProjectID = targetProject.id
+        }
+        if let pendingProjectID = navigation.pendingProjectID {
+            selectProject(pendingProjectID)
+        }
+    }
+
     var body: some View {
         TabView(selection: $navigation.selectedTab) {
             NavigationStack(path: $homePath) {
@@ -91,6 +111,7 @@ struct CompanionShellView: View {
                     currentUserID: user?.id,
                     issueConversationView: issueConversationView,
                     refresh: refresh,
+                    onRelatedMessageOpen: openRelatedMessage,
                     onSkillSessionMaterialized: { agents.materialize($0) },
                     onSkillSessionOpen: { projectID, sessionID in
                         navigation.open(.session(projectID: projectID, sessionID: sessionID))
@@ -154,6 +175,7 @@ struct CompanionShellView: View {
                                 snapshot: snapshot,
                                 issueConversationView: issueConversationView,
                                 refreshDashboard: refresh,
+                                onRelatedMessageOpen: openRelatedMessage,
                                 onSkillSessionMaterialized: { agents.materialize($0) },
                                 onSkillSessionOpen: { projectID, sessionID in
                                     navigation.open(
@@ -275,6 +297,7 @@ struct CompanionShellView: View {
                 initialTab: initialTab,
                 issueConversationView: issueConversationView,
                 refresh: refresh,
+                onRelatedMessageOpen: openRelatedMessage,
                 onSkillSessionMaterialized: { agents.materialize($0) },
                 onSkillSessionOpen: { projectID, sessionID in
                     navigation.open(
@@ -436,6 +459,7 @@ struct TaskListView: View {
     let currentUserID: String?
     let issueConversationView: IssueConversationViewTracker?
     let refresh: () async -> Void
+    let onRelatedMessageOpen: (RelatedMessageReference) -> Void
     let onSkillSessionMaterialized: SkillSessionMaterializedHandler
     let onSkillSessionOpen: SkillSessionOpenHandler
 
@@ -451,6 +475,7 @@ struct TaskListView: View {
         currentUserID: String? = nil,
         issueConversationView: IssueConversationViewTracker? = nil,
         refresh: @escaping () async -> Void,
+        onRelatedMessageOpen: @escaping (RelatedMessageReference) -> Void = { _ in },
         onSkillSessionMaterialized: @escaping SkillSessionMaterializedHandler = { _ in },
         onSkillSessionOpen: @escaping SkillSessionOpenHandler = { _, _ in }
     ) {
@@ -464,6 +489,7 @@ struct TaskListView: View {
         self.currentUserID = currentUserID
         self.issueConversationView = issueConversationView
         self.refresh = refresh
+        self.onRelatedMessageOpen = onRelatedMessageOpen
         self.onSkillSessionMaterialized = onSkillSessionMaterialized
         self.onSkillSessionOpen = onSkillSessionOpen
         _mutations = StateObject(wrappedValue: IssueMutationStore(
@@ -530,6 +556,7 @@ struct TaskListView: View {
                                     currentUserID: currentUserID,
                                     issueConversationView: issueConversationView,
                                     refresh: refresh,
+                                    onRelatedMessageOpen: onRelatedMessageOpen,
                                     onSkillSessionMaterialized: onSkillSessionMaterialized,
                                     onSkillSessionOpen: onSkillSessionOpen
                                 )
@@ -682,7 +709,9 @@ struct RunRow: View {
                 Text(verbatim: "\(issueKeyPrefix)-\(runNumber)")
                     .fixedSize(horizontal: true, vertical: false)
             }
-            IssueDifficultyBadge(difficulty: run.difficulty ?? .normal)
+            if let difficulty = run.difficulty {
+                IssueDifficultyBadge(difficulty: difficulty)
+            }
             if let assignee {
                 ProfileImageView(
                     image: assignee.image,
@@ -917,6 +946,7 @@ struct RunDetailView: View {
     private let currentUserID: String?
     private let issueConversationView: IssueConversationViewTracker?
     private let refresh: () async -> Void
+    private let onRelatedMessageOpen: (RelatedMessageReference) -> Void
     private let onSkillSessionMaterialized: SkillSessionMaterializedHandler
     private let onSkillSessionOpen: SkillSessionOpenHandler
     private let token: String
@@ -979,6 +1009,7 @@ struct RunDetailView: View {
         initialTab: RunDetailTab? = nil,
         issueConversationView: IssueConversationViewTracker? = nil,
         refresh: @escaping () async -> Void = {},
+        onRelatedMessageOpen: @escaping (RelatedMessageReference) -> Void = { _ in },
         onSkillSessionMaterialized: @escaping SkillSessionMaterializedHandler = { _ in },
         onSkillSessionOpen: @escaping SkillSessionOpenHandler = { _, _ in }
     ) {
@@ -994,6 +1025,7 @@ struct RunDetailView: View {
         self.currentUserID = currentUserID
         self.issueConversationView = issueConversationView
         self.refresh = refresh
+        self.onRelatedMessageOpen = onRelatedMessageOpen
         self.onSkillSessionMaterialized = onSkillSessionMaterialized
         self.onSkillSessionOpen = onSkillSessionOpen
         self.token = token
@@ -1287,6 +1319,26 @@ struct RunDetailView: View {
         let embeddedReferences = IssueAttachmentMedia.embeddedReferences(in: run.issueDescription)
         let remainingAttachments = attachments.filter {
             !embeddedReferences.contains($0.id.uuidString.lowercased())
+        }
+
+        if let relatedMessage = run.relatedMessage {
+            Section(L10n.text("속성", locale: locale)) {
+                Button {
+                    onRelatedMessageOpen(relatedMessage)
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(L10n.text("관련 메시지", locale: locale))
+                            Text(L10n.text("관련 메시지로 돌아가기", locale: locale))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "message")
+                    }
+                }
+                .accessibilityIdentifier("run-related-message")
+            }
         }
 
         if let description = run.issueDescription, !description.isEmpty {
@@ -2104,7 +2156,11 @@ struct RunDetailView: View {
                 .font(.subheadline.weight(.semibold))
             Text(
                 proposal.status == .accepted
-                    ? L10n.text("승인되어 Agent 세션을 시작했습니다.", locale: locale)
+                    ? L10n.text(proposal.executionStatus == .completed
+                        ? "Skill 실행을 완료했습니다."
+                        : proposal.executionStatus == .failed
+                        ? "Skill 실행이 실패했습니다."
+                        : "Skill을 실행 중입니다.", locale: locale)
                     : L10n.text(
                         "정확한 Worker를 선택하고 명시적으로 승인해야 실행됩니다.",
                         locale: locale
@@ -2144,12 +2200,13 @@ struct RunDetailView: View {
                 )
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.tint)
-                if let workerLabel {
+                if proposal.executionMode == .task, let workerLabel {
                     Label(workerLabel, systemImage: "desktopcomputer")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                if let sessionID = proposal.resultSessionId {
+                if proposal.executionMode == .task,
+                   let sessionID = proposal.resultSessionId {
                     Button {
                         onSkillSessionOpen(proposal.projectId, sessionID)
                     } label: {
@@ -2162,6 +2219,11 @@ struct RunDetailView: View {
                     .accessibilityIdentifier(
                         "open-issue-skill-session-\(proposal.id.uuidString.lowercased())"
                     )
+                }
+                if let error = proposal.error {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
             } else {
                 Label(
@@ -2418,7 +2480,9 @@ struct RunDetailView: View {
             ) else { throw MobileAPIError.invalidResponse }
 
             detail.updateSkillExecutionProposal(response.proposal)
-            onSkillSessionMaterialized(response.session)
+            if let session = response.session {
+                onSkillSessionMaterialized(session)
+            }
             actionError = nil
             await refresh()
             return true

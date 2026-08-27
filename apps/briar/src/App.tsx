@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { useAtomSet } from "@effect/atom-react";
 import {
   Activity,
   ArrowLeft,
@@ -11,6 +12,7 @@ import {
   Hash,
   House,
   Inbox as InboxIcon,
+  Keyboard as KeyboardIcon,
   MessageCircle,
   MessagesSquare,
   PanelLeft,
@@ -32,11 +34,17 @@ import { HuntDashboard, RunPage } from "./components/HuntDashboard";
 import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
+import {
+  InboxDetailTargetBoundary,
+  InboxWithSelection,
+} from "./components/InboxSelectionBoundary";
 import { Channels } from "./components/Channels";
 import {
   CommandPalette,
   type CommandPaletteItem,
 } from "./components/CommandPalette";
+import { KeyboardShortcutModeHint } from "./components/KeyboardShortcutModeHint";
+import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
 import { DirectMessages } from "./components/DirectMessages";
 import {
   CompanionChannels,
@@ -59,13 +67,19 @@ import { ProjectSchedule } from "./components/ProjectSchedule";
 import { ProjectRepositorySetupDialog } from "./components/ProjectRepositorySetupDialog";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
+import { EmptyState, MainContent, PageHeader } from "./components/layout";
+import { Button } from "./components/ui/button";
 import { LoadingState } from "./components/ui/loading-state";
 import { Sidebar } from "./components/Sidebar";
 import {
   UnifiedSettingsSidebar,
   type UnifiedSettingsTarget,
 } from "./components/UnifiedSettingsSidebar";
-import { WindowNavigationControls } from "./components/WindowNavigationControls";
+import {
+  WindowNavigationControls,
+  type WindowNavigationHistoryItem,
+} from "./components/WindowNavigationControls";
+import { appSettingsNavigationGroups } from "./components/app-settings-navigation";
 import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import {
   collapseLinkedAutoHuntSessions,
@@ -83,6 +97,10 @@ import {
   useMobileNavigationGestures,
 } from "./hooks/useMobileNavigation";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
+import {
+  useAppKeyboardCommandScope,
+  useAppKeyboardCommandState,
+} from "./hooks/appKeyboardCommands";
 import { isProjectScheduleTabEnabled } from "./lib/project-tabs";
 import {
   clearLaunchIntroPreview,
@@ -121,6 +139,7 @@ import {
   isInboxRunDetailTarget,
   type InboxNotificationTarget,
 } from "./lib/inbox-notifications";
+import { inboxDetailTargetAtom } from "./lib/inbox-selection";
 import {
   clearFirstRunTutorialPending,
   hasPendingFirstRunTutorial,
@@ -142,6 +161,11 @@ import {
   type BriarLinkTarget,
 } from "./lib/issue-links";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
+import {
+  localProjectConnectionState,
+  localProjectReadiness,
+  projectRepositoryDestination,
+} from "./lib/local-project-connection";
 import type { IssueDetailTab } from "./lib/issue-detail-tab";
 import { settingsAccountSelection } from "./lib/settings-account-selection";
 import { LITELLM_MAIN_PRICING_SOURCE } from "./lib/agent-usage-pricing";
@@ -178,7 +202,12 @@ import {
 } from "./lib/channel-realtime";
 import { startDesktopChannelTransition } from "./lib/channel-performance";
 import { directMessageDisplayName } from "./lib/direct-messages";
+import { cn } from "./lib/utils";
 import { dispatchAutoHuntToWorkers } from "./lib/auto-hunt-worker-dispatch";
+import {
+  projectSupportsExecutionSelection,
+  projectWorkerCapabilityCatalog,
+} from "./lib/project-worker-capabilities";
 import { demoProjectAgents } from "./lib/demo-project-agents";
 import { executeProjectAgentTask } from "./lib/project-agent-execution";
 import { runProjectAgent } from "./lib/project-llm";
@@ -193,11 +222,20 @@ import {
 } from "./lib/planned-update-recovery";
 import {
   formatShortcut,
-  installKeybindingShortcuts,
+  isMacPlatform,
   loadKeybindings,
+  loadKeyboardNavigationPreferences,
+  subscribeKeyboardNavigationPreferences,
 } from "./lib/keybindings";
+import {
+  appKeyboardShortcutSpecs,
+  createKeyboardShortcutHelpSections,
+  type AppKeyboardShortcutCommandId,
+} from "./lib/app-keyboard-shortcuts";
+import { hasOpenKeyboardShortcutOverlay } from "./lib/keyboard-shortcuts";
 import { formatIssueKey } from "./lib/issue-key";
 import { listenForAppMenuSettings } from "./lib/app-menu";
+import type { AppZoomCommands } from "./lib/app-zoom";
 import {
   channelIdFromNavigationLocation,
   channelNavigationLocation,
@@ -229,7 +267,11 @@ type AgentAutoHuntOptions = {
 
 const CHANNEL_CATALOG_RETRY_MS = 3_000;
 
-export function App() {
+export function App({
+  appZoomCommands = null,
+}: {
+  readonly appZoomCommands?: AppZoomCommands | null;
+}) {
   const { locale, t } = useI18n();
   const [projectWindowProjectId] = useState(readProjectWindowProjectId);
   const autoHunt = useAutoHuntSessions();
@@ -496,9 +538,9 @@ export function App() {
     );
   }, [briar.activeOrganizationId, briar.token]);
   const loadProjectHomeUsage = useMemo(
-    () => createCachedProjectUsageSummaryLoader(async (projectId, period) => {
+    () => createCachedProjectUsageSummaryLoader(async (projectId, period, range) => {
       if (!briar.token) return null;
-      return loadProjectUsageSummary(briar.token, projectId, period);
+      return loadProjectUsageSummary(briar.token, projectId, period, range);
     }),
     [briar.token],
   );
@@ -710,6 +752,14 @@ export function App() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isNavigationHistoryOpen, setIsNavigationHistoryOpen] = useState(false);
+  const [commandPaletteInitialQuery, setCommandPaletteInitialQuery] =
+    useState("");
+  const [isKeyboardShortcutsOpen, setIsKeyboardShortcutsOpen] =
+    useState(false);
+  const [sequenceShortcutsEnabled, setSequenceShortcutsEnabled] = useState(
+    () => loadKeyboardNavigationPreferences().sequenceShortcutsEnabled,
+  );
   const {
     containerRef: inboxLayoutRef,
     effectiveWidth: inboxDetailPaneWidth,
@@ -737,10 +787,14 @@ export function App() {
     useState(false);
   const {
     current: activeNavigationLocation,
+    entries: navigationHistoryEntries,
+    index: navigationHistoryIndex,
     canGoBack,
     canGoForward,
     goBack,
+    goBackTo,
     goForward,
+    goTo: goToNavigationHistory,
     navigate: navigateToLocation,
     replace: replaceNavigationLocation,
     reset: resetNavigationLocation,
@@ -788,6 +842,30 @@ export function App() {
       ),
     [briar.activeOrganizationId, navigateToLocation],
   );
+  const closeSettings = useCallback(() => {
+    const projectId = navigationActiveProjectIdRef.current;
+    goBackTo(
+      (location) => pageFromNavigationLocation(location) !== "settings",
+      projectId ? projectNavigationLocation("issues", projectId) : "issues",
+    );
+  }, [goBackTo]);
+  useAppKeyboardCommandScope({
+    fallthrough: true,
+    handlers: {
+      closeSettings: {
+        isAvailable: () =>
+          activePage === "settings" &&
+          !briar.companionMode &&
+          !hasOpenKeyboardShortcutOverlay(document),
+        run: () => {
+          closeSettings();
+          return "handled";
+        },
+      },
+    },
+    id: "settings-page",
+    priority: 100,
+  });
   const navigateToIssue = useCallback(
     (runId: string, projectId = navigationActiveProjectIdRef.current) => {
       if (!projectId) return;
@@ -1241,8 +1319,7 @@ export function App() {
     useState<BriarLinkTarget | null>(null);
   const [pendingInboxNotificationTarget, setPendingInboxNotificationTarget] =
     useState<InboxNotificationTarget | null>(null);
-  const [inboxDetailTarget, setInboxDetailTarget] =
-    useState<InboxNotificationTarget | null>(null);
+  const setInboxDetailTarget = useAtomSet(inboxDetailTargetAtom);
   const handleInboxNotificationClick = useCallback(
     (target: InboxNotificationTarget) => {
       if (!projectWindowProjectId) setPendingInboxNotificationTarget(target);
@@ -1251,6 +1328,7 @@ export function App() {
   );
   useInboxNotificationClicks(handleInboxNotificationClick);
   const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
+  const [requestedRunMessageId, setRequestedRunMessageId] = useState<string | null>(null);
   const [requestedRunInitialTab, setRequestedRunInitialTab] =
     useState<IssueDetailTab | null>(null);
   const clearRequestedChannelMessage = useCallback(
@@ -1258,6 +1336,7 @@ export function App() {
     [],
   );
   const [issueListRequestKey, setIssueListRequestKey] = useState(0);
+  const [agentListRequestKey, setAgentListRequestKey] = useState(0);
   const [requestedSessionId, setRequestedSessionId] = useState<string | null>(
     null,
   );
@@ -1300,6 +1379,7 @@ export function App() {
   useEffect(() => {
     if (!pendingBriarLink || !briar.user || briar.loading) return;
     if (pendingBriarLink.kind === "channel") {
+      setRequestedRunMessageId(null);
       if (
         !briar.organizations.some(
           (organization) => organization.id === pendingBriarLink.organizationId,
@@ -1373,12 +1453,14 @@ export function App() {
     }
     if (pendingBriarLink.kind === "issue") {
       setRequestedSessionId(null);
+      setRequestedRunMessageId(null);
       setRequestedRunInitialTab(null);
       setRequestedRunId(pendingBriarLink.runId);
       setCompanionPage("issues");
       setCompanionStatus("all");
       navigateToIssue(pendingBriarLink.runId, pendingBriarLink.projectId);
     } else {
+      setRequestedRunMessageId(null);
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(pendingBriarLink.sessionId);
@@ -1429,6 +1511,11 @@ export function App() {
       pendingInboxNotificationTarget.kind === "conversation"
     ) {
       setRequestedSessionId(null);
+      setRequestedRunMessageId(
+        pendingInboxNotificationTarget.kind === "conversation"
+          ? pendingInboxNotificationTarget.conversationMessageId ?? null
+          : null,
+      );
       setRequestedRunInitialTab(
         pendingInboxNotificationTarget.kind === "conversation"
           ? "conversation"
@@ -1447,6 +1534,7 @@ export function App() {
     } else if (pendingInboxNotificationTarget.kind === "channel") {
       const { channelMessageId, rootMessageId } = pendingInboxNotificationTarget;
       if (!channelMessageId || !rootMessageId) return;
+      setRequestedRunMessageId(null);
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(null);
@@ -1478,6 +1566,7 @@ export function App() {
         );
       }
     } else {
+      setRequestedRunMessageId(null);
       setRequestedRunInitialTab(null);
       setRequestedRunId(null);
       setRequestedSessionId(pendingInboxNotificationTarget.targetId);
@@ -1522,10 +1611,98 @@ export function App() {
   );
   const [repositorySetupProjectId, setRepositorySetupProjectId] =
     useState<string | null>(null);
+  const repositorySetupTriggerRef = useRef<HTMLElement | null>(null);
+  const repositoryReconnectRequestRef = useRef(0);
+  const rememberRepositorySetupTrigger = useCallback(() => {
+    const activeElement = document.activeElement;
+    repositorySetupTriggerRef.current =
+      activeElement instanceof HTMLElement && activeElement !== document.body
+        ? activeElement
+        : null;
+  }, []);
+  const restoreRepositorySetupTrigger = useCallback(() => {
+    const trigger = repositorySetupTriggerRef.current;
+    repositorySetupTriggerRef.current = null;
+    window.requestAnimationFrame(() => {
+      if (trigger?.isConnected) trigger.focus();
+    });
+  }, []);
+  const beginProjectReconnect = useCallback(
+    (projectId: string, rememberTrigger = true) => {
+      const request = ++repositoryReconnectRequestRef.current;
+      if (rememberTrigger) rememberRepositorySetupTrigger();
+      const trigger = repositorySetupTriggerRef.current;
+      void briar.reconnectProject(projectId).then((outcome) => {
+        if (
+          request !== repositoryReconnectRequestRef.current ||
+          repositorySetupTriggerRef.current !== trigger
+        ) {
+          return;
+        }
+        if (outcome === "opened") return;
+        repositorySetupTriggerRef.current = null;
+        if (outcome !== "failed") return;
+        const activeElement = document.activeElement;
+        if (
+          trigger?.isConnected &&
+          (activeElement === trigger || activeElement === document.body)
+        ) {
+          trigger.focus();
+        }
+      });
+    },
+    [briar.reconnectProject, rememberRepositorySetupTrigger],
+  );
   const hasCompactedWindowForOnboarding = useRef(false);
   const activeProject = briar.projects.find(
     (project) => project.id === briar.activeProjectId,
   );
+  const openProjectRepository = useCallback((projectId: string) => {
+    if (!briar.projects.some((project) => project.id === projectId)) return;
+
+    const connectionState = localProjectConnectionState(
+      briar.connectedProjectIds,
+      projectId,
+    );
+    const readiness = briar.projectReadiness[projectId] ?? null;
+    const destination = projectRepositoryDestination({
+      connectionState,
+      readiness,
+      requiresLocalReadiness: !briar.remoteMode,
+    });
+
+    setRepositorySetupProjectId(null);
+    if (destination === "reconnect") {
+      beginProjectReconnect(projectId);
+      return;
+    }
+
+    briar.setActiveProjectId(projectId);
+    if (destination === "settings") {
+      repositorySetupTriggerRef.current = null;
+      setSettingsTarget({
+        scope: "project",
+        projectId,
+        section: "general",
+      });
+      navigateToPage("settings", projectId);
+      return;
+    }
+
+    rememberRepositorySetupTrigger();
+    setRepositorySetupProjectId(projectId);
+    void briar.refreshProjectReadiness(projectId);
+  }, [
+    briar.connectedProjectIds,
+    briar.projectReadiness,
+    briar.projects,
+    briar.remoteMode,
+    briar.refreshProjectReadiness,
+    briar.setActiveProjectId,
+    beginProjectReconnect,
+    rememberRepositorySetupTrigger,
+    navigateToPage,
+  ]);
   const projectWindowProject = projectWindowProjectId
     ? briar.projects.find((project) => project.id === projectWindowProjectId) ?? null
     : null;
@@ -1565,6 +1742,195 @@ export function App() {
         )
       : []
     : briar.organizations;
+  const navigationHistoryItems = useMemo<WindowNavigationHistoryItem[]>(() => {
+    const pageLabels = {
+      agents: t("sidebar.agents"),
+      channels: t("sidebar.channels"),
+      dms: t("sidebar.dms"),
+      inbox: t("sidebar.inbox"),
+      "organization-create": t("sidebar.addOrganization"),
+      issues: t("sidebar.issues"),
+      lobby: t("lobby.eyebrow"),
+      schedule: t("sidebar.schedule"),
+      settings: t("account.settings"),
+    } satisfies Record<ActivePage, string>;
+    const applicationSettingLabels = new Map(
+      appSettingsNavigationGroups.flatMap((group) =>
+        group.items.map((item) => [item.id, t(item.labelKey)] as const)
+      ),
+    );
+    const organizationSettingLabels = {
+      agents: t("organization.agents"),
+      general: t("organization.general"),
+      integrations: t("organization.integrations"),
+      members: t("organization.membersAndInvites"),
+      workers: t("organization.workers"),
+    };
+    const projectSettingLabels = {
+      "agent-configuration": t("settings.navAgent"),
+      execution: t("settings.navExecution"),
+      general: t("settings.navGeneral"),
+      integrations: t("settings.navIntegrations"),
+      "issue-import": t("settings.navIssueImport"),
+      tabs: t("settings.navTabs"),
+      workflow: t("settings.navWorkflow"),
+    };
+    const pageIcon = (page: ActivePage) => {
+      if (page === "lobby") return <House aria-hidden="true" size={16} />;
+      if (page === "issues") return <Activity aria-hidden="true" size={16} />;
+      if (page === "agents") return <Bot aria-hidden="true" size={16} />;
+      if (page === "schedule") return <CalendarDays aria-hidden="true" size={16} />;
+      if (page === "inbox") return <InboxIcon aria-hidden="true" size={16} />;
+      if (page === "channels") return <Hash aria-hidden="true" size={16} />;
+      if (page === "dms") return <MessageCircle aria-hidden="true" size={16} />;
+      if (page === "organization-create") {
+        return <Building2 aria-hidden="true" size={16} />;
+      }
+      return <Settings aria-hidden="true" size={16} />;
+    };
+    const createItem = (
+      index: number,
+      location: AppNavigationLocation,
+      item: Omit<WindowNavigationHistoryItem, "index" | "location">,
+    ): WindowNavigationHistoryItem => ({ index, location, ...item });
+
+    return navigationHistoryEntries.map((location, index) => {
+      const page = pageFromNavigationLocation(location);
+      const projectId = projectIdFromNavigationLocation(location);
+      const project = projectId
+        ? briar.projects.find((candidate) => candidate.id === projectId)
+        : undefined;
+      const organizationId = organizationIdFromNavigationLocation(location);
+      const organization = organizationId
+        ? briar.organizations.find(
+            (candidate) => candidate.id === organizationId,
+          )
+        : undefined;
+      const runId = runIdFromNavigationLocation(location);
+      if (runId) {
+        const run = projectId && briar.dashboard?.project.id === projectId
+          ? briar.dashboard.runs.find((candidate) => candidate.id === runId)
+          : undefined;
+        return createItem(index, location, {
+          context: project?.name ?? null,
+          eyebrow: run
+            ? formatIssueKey(project?.issueKeyPrefix, run.runNumber)
+            : t("sidebar.issues"),
+          icon: <Activity aria-hidden="true" size={16} />,
+          label: run?.title ?? t("sidebar.issues"),
+        });
+      }
+
+      const channelId = channelIdFromNavigationLocation(location);
+      if (channelId) {
+        const channel = organizationChannels.find(
+          (candidate) => candidate.id === channelId,
+        );
+        const isDirectMessage = page === "dms" || channel?.kind === "dm";
+        const channelName = channel
+          ? isDirectMessage
+            ? directMessageDisplayName(channel, briar.user?.id ?? null)
+            : channel.name
+          : isDirectMessage
+            ? t("sidebar.dms")
+            : t("sidebar.channels");
+        return createItem(index, location, {
+          context: organization?.name ?? null,
+          eyebrow: isDirectMessage
+            ? t("sidebar.dms")
+            : channel
+              ? `#${channel.slug}`
+              : t("sidebar.channels"),
+          icon: isDirectMessage
+            ? <MessageCircle aria-hidden="true" size={16} />
+            : <Hash aria-hidden="true" size={16} />,
+          label: channelName,
+        });
+      }
+
+      const settingsTarget = settingsTargetFromNavigationLocation(location);
+      if (settingsTarget) {
+        const sectionLabel = settingsTarget.scope === "application"
+          ? applicationSettingLabels.get(settingsTarget.section) ??
+            t("account.settings")
+          : settingsTarget.scope === "organization"
+            ? organizationSettingLabels[settingsTarget.section]
+            : projectSettingLabels[settingsTarget.section];
+        const settingsOwner = settingsTarget.scope === "organization"
+          ? briar.organizations.find(
+              (candidate) => candidate.id === settingsTarget.organizationId,
+            )?.name
+          : settingsTarget.scope === "project"
+            ? briar.projects.find(
+                (candidate) => candidate.id === settingsTarget.projectId,
+              )?.name
+            : null;
+        return createItem(index, location, {
+          context: settingsTarget.scope === "application"
+            ? null
+            : settingsTarget.scope === "organization"
+              ? t("organization.settingsLabel")
+              : t("sidebar.projectSettings"),
+          eyebrow: settingsOwner ?? t("account.settings"),
+          icon: settingsTarget.scope === "organization"
+            ? <Building2 aria-hidden="true" size={16} />
+            : <Settings aria-hidden="true" size={16} />,
+          label: sectionLabel,
+        });
+      }
+
+      if (page === "inbox") {
+        return createItem(index, location, {
+          context: null,
+          eyebrow: organization?.name ?? t("sidebar.inbox"),
+          icon: <InboxIcon aria-hidden="true" size={16} />,
+          label: t("sidebar.inbox"),
+        });
+      }
+
+      if (page === "organization-create") {
+        return createItem(index, location, {
+          context: null,
+          eyebrow: t("sidebar.organizationSettings"),
+          icon: pageIcon(page),
+          label: pageLabels[page],
+        });
+      }
+
+      if (projectId && isProjectNavigationPage(page)) {
+        return createItem(index, location, {
+          context: null,
+          eyebrow: project?.name ?? t("sidebar.projects"),
+          icon: pageIcon(page),
+          label: pageLabels[page],
+        });
+      }
+
+      if (page === "channels" || page === "dms") {
+        return createItem(index, location, {
+          context: project?.name ?? null,
+          eyebrow: organization?.name ?? t("navigation.history"),
+          icon: pageIcon(page),
+          label: pageLabels[page],
+        });
+      }
+
+      return createItem(index, location, {
+        context: null,
+        eyebrow: "Briar",
+        icon: pageIcon(page),
+        label: pageLabels[page],
+      });
+    });
+  }, [
+    briar.dashboard,
+    briar.organizations,
+    briar.projects,
+    briar.user?.id,
+    navigationHistoryEntries,
+    organizationChannels,
+    t,
+  ]);
   const openProjectInNewWindow = useCallback(
     async (projectId: string) => {
       const project = briar.projects.find((candidate) => candidate.id === projectId);
@@ -1578,34 +1944,6 @@ export function App() {
         (session) => session.id === requestedSessionId,
       ) ?? null
     : null;
-  const inboxDetailChannelId =
-    inboxDetailTarget?.kind === "channel"
-      ? inboxDetailTarget.targetId
-      : null;
-  const inboxDetailRun =
-    inboxDetailTarget && isInboxRunDetailTarget(inboxDetailTarget)
-      ? briar.dashboard?.runs.find(
-          (run) => run.id === inboxDetailTarget.targetId,
-        ) ?? null
-      : null;
-  const inboxDetailSession =
-    inboxDetailTarget?.kind === "session"
-      ? autoHunt.sessions.find(
-          (session) => session.id === inboxDetailTarget.targetId,
-        ) ?? null
-      : null;
-  const inboxDetailLabel =
-    inboxDetailRun?.title ??
-    (inboxDetailTarget
-      ? inbox.messages.find(
-          (message) => message.id === inboxDetailTarget.messageId,
-        )?.title ?? t("inbox.messages")
-      : t("inbox.messages"));
-  const isInboxDetailLoading = Boolean(
-    inboxDetailTarget &&
-      isInboxRunDetailTarget(inboxDetailTarget) &&
-      briar.dashboard?.project.id !== inboxDetailTarget.projectId,
-  );
   const [issueAgents, setIssueAgents] = useState<ProjectAgent[]>([]);
   const activeProjectAgents = useMemo(
     () => issueAgents.filter((agent) => agent.projectId === activeProject?.id),
@@ -1766,6 +2104,10 @@ export function App() {
   ) => {
     const token = briar.token;
     if (!token) throw new Error("로그인이 필요합니다.");
+    const executionDashboard =
+      briar.dashboard?.project.id === projectId
+        ? briar.dashboard
+        : await loadDashboard(token, projectId);
     const result = await dispatchAutoHuntToWorkers(
       {
         dispatch: (run, input) =>
@@ -1776,6 +2118,18 @@ export function App() {
       {
         agent,
         runs,
+        providerModels: projectWorkerCapabilityCatalog(
+          executionDashboard.workers ?? [],
+          executionDashboard.executionPolicy,
+        ),
+        selectionAvailable: (selection) =>
+          projectSupportsExecutionSelection(
+            executionDashboard.workers ?? [],
+            executionDashboard.executionPolicy,
+            selection.provider,
+            selection.model,
+            selection.effort,
+          ),
         maxIssues: options?.maxIssues,
         targetRunIds: options?.targetRunIds,
         retryReason: options?.retryReason,
@@ -1792,6 +2146,7 @@ export function App() {
   }, [
     activeProject?.id,
     autoHunt.startWorkerDispatchSession,
+    briar.dashboard,
     briar.refresh,
     briar.token,
   ]);
@@ -2024,29 +2379,268 @@ export function App() {
       !shouldShowFirstRunTutorial &&
       !isLaunchIntroVisible
   );
-  useEffect(
-    () =>
-      installKeybindingShortcuts((id) => {
-        if (id === "commandPalette") {
-          const anotherDialogOpen = !isCommandPaletteOpen && Boolean(
-            document.querySelector(
-              '[data-briar-dialog-overlay][data-state="open"], [aria-modal="true"], dialog[open]',
-            ),
-          );
-          if (commandPaletteAvailable && !anotherDialogOpen) {
-            setIsCommandPaletteOpen((open) => !open);
-          }
-          return;
-        }
-        if (id === "sidebarToggle") {
-          setIsSidebarOpen((open) => !open);
-        }
-      }),
-    [commandPaletteAvailable, isCommandPaletteOpen],
-  );
+
   useEffect(() => {
-    if (!commandPaletteAvailable) setIsCommandPaletteOpen(false);
-  }, [commandPaletteAvailable]);
+    if (!commandPaletteAvailable || isCommandPaletteOpen || isKeyboardShortcutsOpen) {
+      setIsNavigationHistoryOpen(false);
+    }
+  }, [
+    commandPaletteAvailable,
+    isCommandPaletteOpen,
+    isKeyboardShortcutsOpen,
+  ]);
+
+  const configuredKeybindings = loadKeybindings();
+  const openCommandPalette = useCallback((initialQuery = "") => {
+    setCommandPaletteInitialQuery(initialQuery);
+    setIsCommandPaletteOpen(true);
+  }, []);
+  const handleCommandPaletteOpenChange = useCallback((open: boolean) => {
+    setIsCommandPaletteOpen(open);
+    if (!open) setCommandPaletteInitialQuery("");
+  }, []);
+
+  useEffect(
+    () => subscribeKeyboardNavigationPreferences((preferences) => {
+      setSequenceShortcutsEnabled(preferences.sequenceShortcutsEnabled);
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    if (commandPaletteAvailable) return;
+    handleCommandPaletteOpenChange(false);
+    setIsKeyboardShortcutsOpen(false);
+  }, [commandPaletteAvailable, handleCommandPaletteOpenChange]);
+
+  const keyboardShortcutTriggers = {
+    createIssue: () => {
+      if (!activeProject) return;
+      setCreateIssueProjectId(activeProject.id);
+      navigateToPage("issues");
+      setIsIssueDialogOpen(true);
+    },
+    goAgents: () => {
+      setRequestedSessionId(null);
+      setAgentListRequestKey((key) => key + 1);
+      navigateToPage("agents");
+    },
+    goChannels: () => navigateToPage("channels"),
+    goDms: () => navigateToPage("dms"),
+    goInbox: () => navigateToPage("inbox"),
+    goIssues: () => {
+      setRequestedRunId(null);
+      setIssueListRequestKey((key) => key + 1);
+      navigateToPage("issues");
+    },
+    goProjectHome: () => navigateToPage("lobby"),
+    goSchedule: () => navigateToPage("schedule"),
+    goSettings: openAppSettings,
+    openChannel: () => openCommandPalette("c:"),
+    openCommandPalette: () => openCommandPalette(),
+    openDm: () => openCommandPalette("d:"),
+    openIssue: () => openCommandPalette("i:"),
+    openProject: () => openCommandPalette("p:"),
+    openSession: () => openCommandPalette("s:"),
+    showKeyboardShortcuts: () => setIsKeyboardShortcutsOpen(true),
+    toggleSidebar: () => setIsSidebarOpen((open) => !open),
+  } satisfies Record<AppKeyboardShortcutCommandId, () => void>;
+  const keyboardShortcutDisabled = {
+    createIssue: !activeProject,
+    goAgents: !activeProject,
+    goChannels: !briar.activeOrganizationId,
+    goDms: !briar.activeOrganizationId || Boolean(projectWindowProjectId),
+    goInbox: !briar.activeOrganizationId,
+    goIssues: !activeProject,
+    goProjectHome: !activeProject,
+    goSchedule: !activeProject || !isProjectScheduleTabEnabled(activeProject),
+    goSettings: false,
+    openChannel: !briar.activeOrganizationId,
+    openCommandPalette: false,
+    openDm: !briar.activeOrganizationId || Boolean(projectWindowProjectId),
+    openIssue: !activeProject,
+    openProject: activeOrganizationProjects.length === 0,
+    openSession: !activeProject,
+    showKeyboardShortcuts: false,
+    toggleSidebar: false,
+  } satisfies Record<AppKeyboardShortcutCommandId, boolean>;
+  const sequenceShortcutShellAvailable =
+    commandPaletteAvailable &&
+    sequenceShortcutsEnabled &&
+    !isCommandPaletteOpen &&
+    !isKeyboardShortcutsOpen;
+  const sequenceCommandAvailable = (id: AppKeyboardShortcutCommandId) =>
+    sequenceShortcutShellAvailable &&
+    !keyboardShortcutDisabled[id] &&
+    !hasOpenKeyboardShortcutOverlay(document);
+  const sequenceHandler = (id: AppKeyboardShortcutCommandId) => ({
+    isAvailable: () => sequenceCommandAvailable(id),
+    run: () => {
+      keyboardShortcutTriggers[id]();
+      return "handled" as const;
+    },
+  });
+  useAppKeyboardCommandScope({
+    fallthrough: true,
+    handlers: {
+      createIssue: sequenceHandler("createIssue"),
+      goAgents: sequenceHandler("goAgents"),
+      goChannels: sequenceHandler("goChannels"),
+      goDms: sequenceHandler("goDms"),
+      goInbox: sequenceHandler("goInbox"),
+      goIssues: sequenceHandler("goIssues"),
+      goProjectHome: sequenceHandler("goProjectHome"),
+      goSchedule: sequenceHandler("goSchedule"),
+      goSettings: sequenceHandler("goSettings"),
+      historyBack: {
+        isAvailable: () => commandPaletteAvailable,
+        run: () => {
+          if (canGoBack) goBack();
+          return "consume";
+        },
+      },
+      historyForward: {
+        isAvailable: () => commandPaletteAvailable,
+        run: () => {
+          if (canGoForward) goForward();
+          return "consume";
+        },
+      },
+      openNavigationHistory: {
+        isAvailable: () =>
+          commandPaletteAvailable &&
+          (isNavigationHistoryOpen || !hasOpenKeyboardShortcutOverlay(document)),
+        run: () => {
+          setIsNavigationHistoryOpen((open) => !open);
+          return "handled";
+        },
+      },
+      openChannel: sequenceHandler("openChannel"),
+      openCommandPalette: {
+        run: ({ input }) => {
+          const configured = Boolean(
+            input.altKey ||
+              input.controlKey ||
+              input.ctrlKey ||
+              input.metaKey,
+          );
+          if (!configured && !sequenceCommandAvailable("openCommandPalette")) {
+            return "pass";
+          }
+          const anotherDialogOpen = !isCommandPaletteOpen &&
+            hasOpenKeyboardShortcutOverlay(document);
+          if (!commandPaletteAvailable || anotherDialogOpen) {
+            return configured ? "consume" : "pass";
+          }
+          if (isCommandPaletteOpen) handleCommandPaletteOpenChange(false);
+          else openCommandPalette();
+          return "handled";
+        },
+      },
+      openDm: sequenceHandler("openDm"),
+      openIssue: sequenceHandler("openIssue"),
+      openProject: sequenceHandler("openProject"),
+      openSession: sequenceHandler("openSession"),
+      openSettings: {
+        isAvailable: () => commandPaletteAvailable,
+        run: () => {
+          openAppSettings();
+          return "handled";
+        },
+      },
+      showKeyboardShortcuts: {
+        run: ({ input }) => {
+          const primaryModifier =
+            Boolean(input.metaKey) !==
+              Boolean(input.controlKey || input.ctrlKey) &&
+            Boolean(input.metaKey || input.controlKey || input.ctrlKey) &&
+            !input.altKey &&
+            !input.shiftKey;
+          if (!primaryModifier) {
+            if (!sequenceCommandAvailable("showKeyboardShortcuts")) {
+              return "pass";
+            }
+            setIsKeyboardShortcutsOpen(true);
+            return "handled";
+          }
+          const anotherDialogOpen = !isKeyboardShortcutsOpen &&
+            hasOpenKeyboardShortcutOverlay(document);
+          if (!commandPaletteAvailable || anotherDialogOpen) return "pass";
+          setIsKeyboardShortcutsOpen((open) => !open);
+          return "handled";
+        },
+      },
+      toggleSidebar: {
+        run: ({ input }) => {
+          const configured = Boolean(
+            input.altKey ||
+              input.controlKey ||
+              input.ctrlKey ||
+              input.metaKey,
+          );
+          if (!configured && !sequenceCommandAvailable("toggleSidebar")) {
+            return "pass";
+          }
+          if (hasOpenKeyboardShortcutOverlay(document)) {
+            return configured ? "consume" : "pass";
+          }
+          setIsSidebarOpen((open) => !open);
+          return "handled";
+        },
+      },
+      ...(appZoomCommands
+        ? {
+            zoomIn: {
+              run: () => {
+                appZoomCommands.zoomIn();
+                return "handled" as const;
+              },
+            },
+            zoomOut: {
+              run: () => {
+                appZoomCommands.zoomOut();
+                return "handled" as const;
+              },
+            },
+          }
+        : {}),
+    },
+    id: "app-global",
+    priority: 0,
+  });
+
+  const keyboardCommandState = useAppKeyboardCommandState();
+  const pendingShortcut = keyboardCommandState.pending;
+  const pendingShortcutSpec = pendingShortcut
+    ? appKeyboardShortcutSpecs.find(
+        ({ id }) => id === pendingShortcut.candidateIds[0],
+      )
+    : undefined;
+  const pendingShortcutPrefix = pendingShortcut
+    ? pendingShortcutSpec?.sequence.slice(0, pendingShortcut.sequence.length) ??
+      pendingShortcut.sequence
+    : [];
+  const pendingShortcutChoices = pendingShortcut
+    ? pendingShortcut.candidateIds.flatMap((id) => {
+        const shortcut = appKeyboardShortcutSpecs.find(
+          (candidate) => candidate.id === id,
+        );
+        const key = shortcut?.sequence[pendingShortcut.sequence.length];
+        return shortcut && key
+          ? [{ id, key: key.toUpperCase(), label: t(shortcut.labelKey) }]
+          : [];
+      })
+    : [];
+  const keyboardShortcutsModifierLabel = isMacPlatform() ? "⌘/" : "Ctrl+/";
+  const keyboardShortcutHelpSections = createKeyboardShortcutHelpSections({
+    commandPaletteShortcut: formatShortcut(
+      configuredKeybindings.commandPalette,
+    ),
+    keyboardShortcutsShortcut: keyboardShortcutsModifierLabel,
+    sequenceShortcutsEnabled,
+    sidebarShortcut: formatShortcut(configuredKeybindings.sidebarToggle),
+    t,
+  });
 
   const paletteSections = {
     actions: {
@@ -2082,7 +2676,6 @@ export function App() {
       label: t("commandPalette.groupProjects"),
     },
   } as const;
-  const configuredKeybindings = loadKeybindings();
   const commandPaletteItems: CommandPaletteItem[] = [];
   const addPaletteItem = (
     item: Omit<CommandPaletteItem, "section" | "sectionLabel">,
@@ -2243,6 +2836,28 @@ export function App() {
   }
 
   addPaletteItem({
+    description: t("commandPalette.keyboardShortcutsDescription"),
+    icon: <KeyboardIcon />,
+    id: "action:keyboard-shortcuts",
+    keywords: [
+      "keyboard shortcuts",
+      "hotkeys",
+      "vim",
+      "keyboard mode",
+      "단축키",
+      "키보드",
+      "快捷键",
+    ],
+    label: t("keyboardShortcuts.title"),
+    onSelect: () => setIsKeyboardShortcutsOpen(true),
+    priority: 90,
+    remember: false,
+    restoreFocusOnSelect: false,
+    scope: "actions",
+    shortcut: keyboardShortcutsModifierLabel,
+  }, paletteSections.actions);
+
+  addPaletteItem({
     description: t(
       isSidebarOpen
         ? "commandPalette.hideSidebarDescription"
@@ -2364,7 +2979,11 @@ export function App() {
       id: `navigation:agents:${activeProject.id}`,
       keywords: ["agents", "sessions", "에이전트", "세션", "智能体", activeProject.name],
       label: t("sidebar.agents"),
-      onSelect: () => navigateToPage("agents"),
+      onSelect: () => {
+        setRequestedSessionId(null);
+        setAgentListRequestKey((key) => key + 1);
+        navigateToPage("agents");
+      },
       priority: activePage === "agents" ? 120 : 60,
       scope: "navigation",
     }, paletteSections.navigation);
@@ -2472,7 +3091,7 @@ export function App() {
         }
         setRequestedRunId(null);
         setRequestedSessionId(null);
-        navigateToPage("lobby", project.id);
+        navigateToPage("issues", project.id);
       },
       priority: project.id === briar.activeProjectId ? 100 : 20,
       scope: "projects",
@@ -2622,7 +3241,7 @@ export function App() {
     <UnifiedSettingsSidebar
       activeTarget={settingsTarget}
       isOpen={isSidebarOpen}
-      onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
+      onBack={closeSettings}
       onNavigate={(target) => {
         setSettingsTarget(target);
         navigateToLocation(settingsNavigationLocation(target));
@@ -2642,8 +3261,29 @@ export function App() {
     />
   );
 
-  const inboxDetailContent = inboxDetailTarget ? (
-    inboxDetailRun ? (
+  const renderInboxDetailContent = (
+    inboxDetailTarget: InboxNotificationTarget,
+  ) => {
+    const inboxDetailChannelId =
+      inboxDetailTarget.kind === "channel"
+        ? inboxDetailTarget.targetId
+        : null;
+    const inboxDetailRun = isInboxRunDetailTarget(inboxDetailTarget)
+      ? briar.dashboard?.runs.find(
+          (run) => run.id === inboxDetailTarget.targetId,
+        ) ?? null
+      : null;
+    const inboxDetailSession = inboxDetailTarget.kind === "session"
+      ? autoHunt.sessions.find(
+          (session) => session.id === inboxDetailTarget.targetId,
+        ) ?? null
+      : null;
+    const isInboxDetailLoading = Boolean(
+      isInboxRunDetailTarget(inboxDetailTarget) &&
+        briar.dashboard?.project.id !== inboxDetailTarget.projectId,
+    );
+
+    return inboxDetailRun ? (
       <RunPage
         availableProviders={
           briar.dashboard?.organizationProviders?.length
@@ -2659,6 +3299,11 @@ export function App() {
         availableRuns={briar.dashboard?.runs ?? []}
         conversationInboxSyncSignal={conversationInboxSyncSignal}
         error={briar.recoveryError}
+        highlightedMessageId={
+          inboxDetailTarget.kind === "conversation"
+            ? inboxDetailTarget.conversationMessageId ?? null
+            : null
+        }
         initialDetailTab={
           inboxDetailTarget.kind === "conversation"
             ? "conversation"
@@ -2695,8 +3340,19 @@ export function App() {
         }}
         onDependencyOpen={(runId) =>
           setInboxDetailTarget((current) =>
-            current ? { ...current, kind: "issue", targetId: runId } : current,
+            current
+              ? {
+                  ...current,
+                  kind: "issue",
+                  targetId: runId,
+                  conversationMessageId: undefined,
+                }
+              : current,
           )}
+        onRelatedMessageOpen={(relatedMessage) => {
+          setInboxDetailTarget(null);
+          setPendingBriarLink({ kind: "channel", ...relatedMessage });
+        }}
         onLoadAttachment={briar.readIssueAttachment}
         onLoadIssueMessages={() => briar.readIssueMessages(inboxDetailRun.id)}
         onLoadRunEvents={() => briar.readRunEvents(inboxDetailRun.id)}
@@ -2709,6 +3365,11 @@ export function App() {
           setInboxDetailTarget(null);
           setRequestedSessionId(null);
           setRequestedRunId(inboxDetailRun.id);
+          setRequestedRunMessageId(
+            inboxDetailTarget.kind === "conversation"
+              ? inboxDetailTarget.conversationMessageId ?? null
+              : null,
+          );
           setRequestedRunInitialTab(
             inboxDetailTarget.kind === "conversation"
               ? "conversation"
@@ -2817,18 +3478,43 @@ export function App() {
         token={briar.token}
       />
     ) : isInboxDetailLoading ? (
-      <div className="inbox-detail-loading" role="status">
+      <div
+        className="inbox-detail-loading grid h-full w-full place-items-center bg-card text-xs text-muted-foreground"
+        role="status"
+      >
         <LoadingState label={t("inbox.detailLoading")} />
       </div>
     ) : (
-      <div className="inbox-detail-unavailable" role="alert">
-        <strong>{t("run.loadFailed")}</strong>
-        <button onClick={() => setInboxDetailTarget(null)} type="button">
+      <div
+        className="inbox-detail-unavailable flex h-full w-full flex-col items-center justify-center gap-3.5 bg-card px-8 py-8 text-center text-muted-foreground"
+        role="alert"
+      >
+        <strong className="text-sm font-semibold text-foreground">
+          {t("run.loadFailed")}
+        </strong>
+        <Button
+          className="min-h-[34px] rounded-[9px] px-3 text-xs font-semibold"
+          onClick={() => setInboxDetailTarget(null)}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
           {t("common.close")}
-        </button>
+        </Button>
       </div>
-    )
-  ) : null;
+    );
+  };
+
+  const inboxDetailLabel = (inboxDetailTarget: InboxNotificationTarget) =>
+    (isInboxRunDetailTarget(inboxDetailTarget)
+      ? briar.dashboard?.runs.find(
+          (run) => run.id === inboxDetailTarget.targetId,
+        )?.title
+      : null) ??
+    inbox.messages.find(
+      (message) => message.id === inboxDetailTarget.messageId,
+    )?.title ??
+    t("inbox.messages");
 
   let content: React.ReactNode;
 
@@ -2899,10 +3585,14 @@ export function App() {
           <WindowNavigationControls
             canGoBack={canGoBack}
             canGoForward={canGoForward}
+            historyIndex={navigationHistoryIndex}
+            historyItems={navigationHistoryItems}
+            isHistoryOpen={isNavigationHistoryOpen}
             isSidebarOpen={isSidebarOpen}
             onBack={goBack}
             onForward={goForward}
-            onSettings={openAppSettings}
+            onHistoryOpenChange={setIsNavigationHistoryOpen}
+            onHistorySelect={goToNavigationHistory}
             onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
           />
         {activePage !== "settings" ? (
@@ -2922,7 +3612,11 @@ export function App() {
               setRequestedSessionId(sessionId);
               navigateToPage("agents");
             }}
-            onAgentsOpen={() => navigateToPage("agents")}
+            onAgentsOpen={() => {
+              setRequestedSessionId(null);
+              setAgentListRequestKey((key) => key + 1);
+              navigateToPage("agents");
+            }}
             onLobbyOpen={() => navigateToPage("lobby")}
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
@@ -2981,7 +3675,7 @@ export function App() {
                 ? openProjectInNewWindow
                 : undefined
             }
-            onProjectReadinessOpen={setRepositorySetupProjectId}
+            onProjectRepositoryOpen={openProjectRepository}
             onProjectSettings={(projectId) => {
               briar.setActiveProjectId(projectId);
               setSettingsTarget({
@@ -2996,6 +3690,7 @@ export function App() {
             organizations={briar.organizations}
             projects={visibleProjects}
             projectReadiness={briar.projectReadiness}
+            projectReadinessError={briar.projectReadinessError}
             projectWindowProjectId={projectWindowProjectId}
             sessions={autoHunt.sessions}
             token={briar.token}
@@ -3007,20 +3702,19 @@ export function App() {
         <div className="app-content-surface">
         {repositorySetupProjectId ? (
           <ProjectRepositorySetupDialog
+            connectionState={localProjectConnectionState(
+              briar.connectedProjectIds,
+              repositorySetupProjectId,
+            )}
             error={briar.projectReadinessError[repositorySetupProjectId] ?? null}
             loading={
-              briar.projectReadinessLoadingId === repositorySetupProjectId
+              briar.projectReadinessLoadingProjects.has(
+                repositorySetupProjectId,
+              )
             }
             onClose={() => {
-              const projectId = repositorySetupProjectId;
               setRepositorySetupProjectId(null);
-              window.requestAnimationFrame(() => {
-                document
-                  .querySelector<HTMLButtonElement>(
-                    `[data-project-readiness="${projectId}"]`,
-                  )
-                  ?.focus();
-              });
+              restoreRepositorySetupTrigger();
             }}
             onInstallGithub={() =>
               briar.installGithubForProject(repositorySetupProjectId)
@@ -3028,6 +3722,11 @@ export function App() {
             onLoginGithub={() =>
               briar.loginGithubForProject(repositorySetupProjectId)
             }
+            onReconnect={() => {
+              const projectId = repositorySetupProjectId;
+              setRepositorySetupProjectId(null);
+              beginProjectReconnect(projectId, false);
+            }}
             onRefresh={() =>
               briar.refreshProjectReadiness(repositorySetupProjectId)
             }
@@ -3056,6 +3755,7 @@ export function App() {
           settingsTarget.scope === "application" &&
           briar.user ? (
           <AppSettings
+            connectionState={briar.activeProjectConnectionState}
             error={
               activeProject
                 ? briar.projectReadinessError[activeProject.id] ?? null
@@ -3065,11 +3765,11 @@ export function App() {
             isSidebarOpen={isSidebarOpen}
             loading={
               activeProject
-                ? briar.projectReadinessLoadingId === activeProject.id
+                ? briar.projectReadinessLoadingProjects.has(activeProject.id)
                 : false
             }
             navigationSidebar={unifiedSettingsSidebar}
-            onBack={() => (canGoBack ? goBack() : navigateToPage("issues"))}
+            onBack={closeSettings}
             onAccountDelete={
               briar.demoMode ? undefined : briar.deleteAccount
             }
@@ -3092,6 +3792,7 @@ export function App() {
                 ? briar.projectReadiness[activeProject.id] ?? null
                 : null
             }
+            requiresLocalReadiness={!briar.remoteMode}
             usageScopeKey={briar.activeOrganizationId ?? "none"}
             user={briar.user}
           />
@@ -3103,9 +3804,7 @@ export function App() {
             isSidebarOpen={isSidebarOpen}
             key={settingsOrganization.id}
             navigationSidebar={unifiedSettingsSidebar}
-            onBack={() =>
-              canGoBack ? goBack() : navigateToPage("issues")
-            }
+            onBack={closeSettings}
             organization={settingsOrganization}
             onLogoChange={briar.changeOrganizationLogo}
             onRename={briar.renameOrganization}
@@ -3161,9 +3860,24 @@ export function App() {
             projects={activeOrganizationProjects}
             token={briar.token}
           />
+        ) : activePage === "dms" &&
+          !projectWindowProjectId &&
+          briar.activeOrganizationId ? (
+          <MainContent id="dms">
+            <PageHeader title={t("sidebar.dms")} />
+            <EmptyState
+              description={t("dm.composeDescription")}
+              icon={<MessageCircle aria-hidden="true" size={20} />}
+              title={t("dm.empty")}
+            />
+          </MainContent>
         ) : activePage === "inbox" ? (
-          <div
-            className={`inbox-layout${isResizingInbox ? " is-resizing-inbox" : ""}`}
+          <main
+            aria-label={`${t("inbox.title")} · ${t("inbox.messages")}`}
+            className={cn(
+              "inbox-layout grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(280px,1fr)_var(--inbox-resizer-width,6px)_minmax(320px,var(--inbox-detail-pane-width,50%))] grid-rows-[minmax(0,1fr)] bg-card",
+              isResizingInbox && "is-resizing-inbox cursor-col-resize select-none",
+            )}
             ref={inboxLayoutRef}
             style={
               {
@@ -3171,7 +3885,8 @@ export function App() {
               } as CSSProperties
             }
           >
-            <Inbox
+            <InboxWithSelection
+              desktopEmbedded
               isSidebarOpen={isSidebarOpen}
               messages={visibleInboxMessages}
               onMarkAllRead={
@@ -3184,6 +3899,7 @@ export function App() {
                   : inbox.markAllRead
               }
               onMarkRead={inbox.markRead}
+              onMarkUnread={inbox.markUnread}
               onOpen={(message) => {
                 const target = inboxNotificationTarget(message);
                 inbox.markRead(message.id);
@@ -3214,24 +3930,37 @@ export function App() {
               aria-valuemax={inboxPaneWidthMax}
               aria-valuemin={inboxPaneWidthMin}
               aria-valuenow={inboxDetailPaneWidth}
-              className="inbox-pane-resizer"
+              className={cn(
+                "inbox-pane-resizer relative z-[1] h-full min-h-0 min-w-0 cursor-col-resize touch-none bg-transparent outline-none before:absolute before:bottom-0 before:left-1/2 before:top-0 before:w-px before:-translate-x-1/2 before:bg-border before:opacity-0 before:shadow-none before:transition-[opacity,background-color,box-shadow] before:duration-150 after:absolute after:left-1/2 after:top-1/2 after:h-[34px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:border after:border-border after:bg-card after:opacity-0 after:transition-[opacity,border-color,background-color] after:duration-150 motion-reduce:before:transition-none motion-reduce:after:transition-none hover:before:bg-primary/60 hover:before:opacity-100 hover:before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] hover:after:border-primary/60 hover:after:bg-accent hover:after:opacity-100 focus-visible:before:bg-primary/60 focus-visible:before:opacity-100 focus-visible:before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] focus-visible:after:border-primary/60 focus-visible:after:bg-accent focus-visible:after:opacity-100",
+                isResizingInbox &&
+                  "before:bg-primary/60 before:opacity-100 before:shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_8%,transparent)] after:border-primary/60 after:bg-accent after:opacity-100",
+              )}
               role="separator"
               tabIndex={0}
               {...inboxResizeProps}
             />
-            <InboxDetailPanel
-              label={
-                inboxDetailTarget ? inboxDetailLabel : t("inbox.messages")
-              }
-            >
-              {inboxDetailContent ?? (
-                <div className="inbox-detail-empty" role="status">
-                  <InboxIcon aria-hidden="true" size={56} strokeWidth={1.2} />
-                  <p>{t("inbox.noNotificationSelected")}</p>
-                </div>
+            <InboxDetailTargetBoundary>
+              {(target) => (
+                <InboxDetailPanel
+                  label={
+                    target
+                      ? inboxDetailLabel(target)
+                      : t("inbox.noNotificationSelected")
+                  }
+                >
+                  {target ? renderInboxDetailContent(target) : (
+                    <div
+                      className="inbox-detail-empty flex h-full w-full flex-col items-center justify-center gap-[18px] bg-card text-center text-muted-foreground [&>svg]:text-muted-foreground/60 [&>p]:m-0 [&>p]:text-sm"
+                      role="status"
+                    >
+                      <InboxIcon aria-hidden="true" size={56} strokeWidth={1.2} />
+                      <p>{t("inbox.noNotificationSelected")}</p>
+                    </div>
+                  )}
+                </InboxDetailPanel>
               )}
-            </InboxDetailPanel>
-          </div>
+            </InboxDetailTargetBoundary>
+          </main>
         ) : activePage === "settings" &&
           settingsTarget.scope === "project" &&
           activeProject ? (
@@ -3239,7 +3968,10 @@ export function App() {
             dashboard={briar.dashboard}
             githubRepository={
               briar.dashboard?.settings.githubRepository ??
-              briar.projectReadiness[activeProject.id]?.githubRepository ??
+              localProjectReadiness(
+                briar.activeProjectConnectionState,
+                briar.projectReadiness[activeProject.id] ?? null,
+              )?.githubRepository ??
               null
             }
             health={briar.health}
@@ -3248,9 +3980,7 @@ export function App() {
             initialSection={settingsTarget.section}
             key={activeProject.id}
             navigationSidebar={unifiedSettingsSidebar}
-            onBack={() =>
-              canGoBack ? goBack() : navigateToPage("issues")
-            }
+            onBack={closeSettings}
             onDelete={async () => {
               const fallbackProject = briar.projects.find(
                 (project) => project.id !== activeProject.id,
@@ -3307,10 +4037,15 @@ export function App() {
           />
         ) : activePage === "lobby" && activeProject ? (
           <ProjectLobby
+            connectionState={briar.activeProjectConnectionState}
             dashboard={briar.dashboard}
             isSidebarOpen={isSidebarOpen}
             onLoadUsageSummary={loadProjectHomeUsage}
-            onOpenAgents={() => navigateToPage("agents")}
+            onOpenAgents={() => {
+              setRequestedSessionId(null);
+              setAgentListRequestKey((key) => key + 1);
+              navigateToPage("agents");
+            }}
             onOpenIssue={(runId) => {
               setRequestedSessionId(null);
               setRequestedRunId(runId);
@@ -3320,21 +4055,7 @@ export function App() {
               setRequestedRunId(null);
               navigateToPage("issues");
             }}
-            onOpenRepository={() => {
-              if (
-                briar.projectReadiness[activeProject.id]?.githubRepository ||
-                briar.dashboard?.settings.githubRepository
-              ) {
-                setSettingsTarget({
-                  scope: "project",
-                  projectId: activeProject.id,
-                  section: "general",
-                });
-                navigateToPage("settings");
-                return;
-              }
-              setRepositorySetupProjectId(activeProject.id);
-            }}
+            onOpenRepository={() => openProjectRepository(activeProject.id)}
             onOpenSettings={() => {
               setSettingsTarget({
                 scope: "project",
@@ -3345,9 +4066,11 @@ export function App() {
             }}
             project={activeProject}
             readiness={briar.projectReadiness[activeProject.id] ?? null}
+            requiresLocalReadiness={!briar.remoteMode}
           />
         ) : activePage === "agents" && activeProject ? (
           <ProjectAgents
+            agentListRequestKey={agentListRequestKey}
             dashboard={briar.dashboard}
             error={briar.error}
             isSidebarOpen={isSidebarOpen}
@@ -3449,6 +4172,8 @@ export function App() {
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
+            requestedRunMessageId={requestedRunMessageId}
+            requestedRunInitialTab={requestedRunInitialTab}
             selectedRunId={selectedRunId}
             issueListRequestKey={issueListRequestKey}
             isSidebarOpen={isSidebarOpen}
@@ -3485,6 +4210,9 @@ export function App() {
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}
             onAcceptSkillExecution={briar.acceptConversationSkillExecution}
             onRemoveIssueDependency={briar.removeIssueDependency}
+            onRelatedMessageOpen={(relatedMessage) => {
+              setPendingBriarLink({ kind: "channel", ...relatedMessage });
+            }}
             onUpdateIssue={briar.editIssue}
             onUpdateIssueSubscription={briar.editIssueSubscription}
             onUpdateIssueCheckpoints={briar.editIssueCheckpoints}
@@ -3504,6 +4232,7 @@ export function App() {
             onResumeRun={briar.resumeRun}
             onRequestedRunOpen={() => {
               setRequestedRunId(null);
+              setRequestedRunMessageId(null);
               setRequestedRunInitialTab(null);
             }}
             onSendIssueMessage={sendIssueMessage}
@@ -3556,7 +4285,11 @@ export function App() {
             error={briar.healthError}
             health={briar.health}
             loading={briar.healthLoading}
-            onReconnect={briar.reconnectProject}
+            onReconnect={() => {
+              if (briar.activeProjectId) {
+                beginProjectReconnect(briar.activeProjectId);
+              }
+            }}
             onRefresh={() => void briar.refreshHealth()}
             onRepair={() => void briar.repairHealth()}
           />
@@ -3685,6 +4418,7 @@ export function App() {
               messages={inbox.messages}
               onMarkAllRead={inbox.markAllRead}
               onMarkRead={inbox.markRead}
+              onMarkUnread={inbox.markUnread}
               onOpen={(message) =>
                 setPendingInboxNotificationTarget(
                   inboxNotificationTarget(message),
@@ -3763,6 +4497,7 @@ export function App() {
             recoveringRunId={briar.recoveringRunId}
             recoveryError={briar.recoveryError}
             requestedRunId={requestedRunId}
+            requestedRunMessageId={requestedRunMessageId}
             requestedRunInitialTab={requestedRunInitialTab}
             isSidebarOpen
             onCompanionDmsOpen={() => setCompanionPage("dms")}
@@ -3786,6 +4521,9 @@ export function App() {
             onAcceptIssueExecution={briar.acceptConversationIssueExecution}
             onAcceptSkillExecution={briar.acceptConversationSkillExecution}
             onRemoveIssueDependency={briar.removeIssueDependency}
+            onRelatedMessageOpen={(relatedMessage) => {
+              setPendingBriarLink({ kind: "channel", ...relatedMessage });
+            }}
             onUpdateIssue={briar.editIssue}
             onUpdateIssueSubscription={briar.editIssueSubscription}
             onUpdateIssueCheckpoints={briar.editIssueCheckpoints}
@@ -3800,6 +4538,7 @@ export function App() {
             onProcessIssueNow={processIssueNow}
             onRequestedRunOpen={() => {
               setRequestedRunId(null);
+              setRequestedRunMessageId(null);
               setRequestedRunInitialTab(null);
             }}
             onRetryRun={briar.retryRun}
@@ -3841,11 +4580,30 @@ export function App() {
       {commandPaletteAvailable && isCommandPaletteOpen ? (
         <CommandPalette
           contextLabel={commandPaletteContextLabel}
+          initialQuery={commandPaletteInitialQuery}
           items={commandPaletteItems}
           loading={briar.loading || channelsLoading}
-          onOpenChange={setIsCommandPaletteOpen}
+          onOpenChange={handleCommandPaletteOpenChange}
           open={isCommandPaletteOpen}
           shortcutLabel={formatShortcut(configuredKeybindings.commandPalette)}
+        />
+      ) : null}
+      {commandPaletteAvailable ? (
+        <KeyboardShortcutsDialog
+          onOpenChange={setIsKeyboardShortcutsOpen}
+          open={isKeyboardShortcutsOpen}
+          sections={keyboardShortcutHelpSections}
+        />
+      ) : null}
+      {pendingShortcut ? (
+        <KeyboardShortcutModeHint
+          choices={pendingShortcutChoices}
+          label={t(
+            pendingShortcutPrefix[0] === "g"
+              ? "keyboardShortcuts.section.go"
+              : "keyboardShortcuts.section.open",
+          )}
+          prefix={pendingShortcutPrefix.join(" ").toUpperCase()}
         />
       ) : null}
       {!briar.remoteMode &&
@@ -3860,6 +4618,7 @@ export function App() {
           onCancel={() => {
             setDeveloperToolsProjectSetupRequested(false);
             briar.cancelProjectCreation();
+            restoreRepositorySetupTrigger();
           }}
           onAnalyzeRequirements={async (projectId, onProgress) => {
             const workflow = await briar.analyzeWorkflowRequirements(
@@ -3876,6 +4635,7 @@ export function App() {
           onConnect={briar.connectProject}
           onCreate={briar.addProject}
           onFinish={() => {
+            repositorySetupTriggerRef.current = null;
             setDeveloperToolsProjectSetupRequested(false);
             briar.finishProjectCreation();
             setRequestedRunId(null);
@@ -3883,6 +4643,7 @@ export function App() {
             resetNavigation("lobby");
           }}
           onInspectLovableRepository={briar.inspectLovableProject}
+          onPreflight={briar.preflightProjectConnection}
           onReviseWorkflow={briar.reviseWorkflow}
           onRepositorySelect={briar.selectProjectRepository}
           onRepositoryInspect={briar.inspectProjectRepository}

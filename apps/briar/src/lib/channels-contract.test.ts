@@ -94,6 +94,16 @@ describe("Agent input limits", () => {
       name: "Release",
       description: "Publish and verify the release.",
       body: "Publish and verify the release.",
+      executionMode: "task",
+      approvalPolicy: "explicit",
+    });
+    expect(decode(channelAgentSkillInputSchema, {
+      ...skill(0),
+      executionMode: "conversation",
+      approvalPolicy: "invoke_is_consent",
+    })).toMatchObject({
+      executionMode: "conversation",
+      approvalPolicy: "invoke_is_consent",
     });
   });
 });

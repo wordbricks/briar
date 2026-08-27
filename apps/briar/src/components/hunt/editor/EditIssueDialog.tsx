@@ -1,4 +1,5 @@
 import { CircleAlert, Image as ImageIcon, Paperclip, X } from "lucide-react";
+import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { useEffect, useState } from "react";
 import { NativeSelect } from "@/components/NativeSelect";
@@ -34,7 +35,7 @@ export function EditIssueDialog({
   const [title, setTitle] = useState(run.title);
   const [description, setDescription] = useState(run.issueDescription ?? "");
   const [priority, setPriority] = useState(run.priority === null ? "" : String(run.priority));
-  const [difficulty, setDifficulty] = useState<IssueDifficulty>(run.difficulty);
+  const [difficulty, setDifficulty] = useState<IssueDifficulty | null>(run.difficulty);
   const [assigneeUserId, setAssigneeUserId] = useState(run.assigneeUserId ?? "");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [keptAttachmentIds, setKeptAttachmentIds] = useState<string[]>(() => (run.attachments ?? []).map(attachment => attachment.id));
@@ -186,7 +187,10 @@ export function EditIssueDialog({
             label: t("issue.priority4"),
             value: "4"
           }]} value={priority} />
-            <NativeSelect className="issue-priority-select issue-difficulty-select" label={t("issue.difficulty")} onValueChange={value => setDifficulty(value as IssueDifficulty)} options={[{
+            <NativeSelect className="issue-priority-select issue-difficulty-select" label={t("issue.difficulty")} onValueChange={value => setDifficulty(value ? value as IssueDifficulty : null)} options={[{
+            label: t("run.notSet"),
+            value: ""
+          }, {
             label: t("issue.difficulty.easy"),
             value: "easy"
           }, {
@@ -195,7 +199,7 @@ export function EditIssueDialog({
           }, {
             label: t("issue.difficulty.hard"),
             value: "hard"
-          }]} value={difficulty} />
+          }]} value={difficulty ?? ""} />
             <label className="issue-attachment-trigger">
               <Paperclip size={13} />
               <span>
@@ -213,7 +217,7 @@ export function EditIssueDialog({
         </div>
         <footer>
           <span className="issue-submit-hint">
-            <kbd>⌘</kbd>
+            <Kbd>⌘</Kbd>
             {t("issue.submitHint")}
           </span>
           <div>

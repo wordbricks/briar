@@ -9,6 +9,7 @@ import {
   decodeAccountDeletionInput,
   decodeAccountProfileInput,
   decodeInboxReadStatesInput,
+  decodeInboxUnreadStateInput,
 } from "./account-organization-request-contract";
 import {
   deleteAccountData,
@@ -19,6 +20,7 @@ import {
   decodeMobileCurrentUserResponse,
 } from "./mobile-contract";
 import {
+  deleteInboxReadState,
   listInboxReadStates,
   upsertInboxReadStates,
 } from "./inbox-read-state-repository";
@@ -29,6 +31,9 @@ import { requireSession } from "./session-auth";
 import { processSlackRevocationQueue } from "./slack-revocations";
 
 const accountDeletionFreshAgeMs = 24 * 60 * 60 * 1_000;
+
+const isUniqueConstraintError = (error: unknown) =>
+  error instanceof Error && /unique constraint failed/iu.test(error.message);
 
 export type AccountRouteInput = {
   request: Request;
@@ -93,6 +98,20 @@ export async function handleAccountRoute(
       ),
     });
   }
+  if (pathname === "/inbox/read-states" && request.method === "DELETE") {
+    const session = await requireSession(auth, request);
+    const input = decodeInboxUnreadStateInput(await readJson(request));
+    const rows = await deleteInboxReadState(
+      db,
+      session.user.id,
+      input.messageId,
+    );
+    return json({
+      readVersions: Object.fromEntries(
+        rows.map((row) => [row.message_id, row.version]),
+      ),
+    });
+  }
 
   if (pathname === "/me" && request.method === "PATCH") {
     const session = await requireSession(auth, request);
@@ -100,29 +119,30 @@ export async function handleAccountRoute(
       await readJson(request, 450_000),
     );
     const updatedAt = new Date().toISOString();
-    const result = await db
-      .prepare(
-        `update "user"
-         set "username" = ?, "name" = ?, "image" = ?, "updatedAt" = ?
-         where "id" = ?
-           and not exists (
-             select 1 from "user" as existing
-             where lower(existing."username") = lower(?)
-               and existing."id" <> ?
-           )`,
-      )
-      .bind(
-        input.username,
-        input.name,
-        input.image,
-        updatedAt,
-        session.user.id,
-        input.username,
-        session.user.id,
-      )
-      .run();
+    let result: D1Result;
+    try {
+      result = await db
+        .prepare(
+          `update "user"
+           set "username" = ?, "name" = ?, "image" = ?, "updatedAt" = ?
+           where "id" = ?`,
+        )
+        .bind(
+          input.username,
+          input.name,
+          input.image,
+          updatedAt,
+          session.user.id,
+        )
+        .run();
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new HttpError(409, "Username is already taken");
+      }
+      throw error;
+    }
     if (result.meta.changes !== 1) {
-      throw new HttpError(409, "Username is already taken");
+      throw new HttpError(404, "Account not found");
     }
     return json({
       user: {
@@ -230,4 +250,3 @@ export async function handleAccountRoute(
     );
   }
 }
-

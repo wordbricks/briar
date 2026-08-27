@@ -51,7 +51,7 @@ export type CreateIssueInput = {
   title: string;
   description: string | null;
   priority: number | null;
-  difficulty: IssueDifficulty;
+  difficulty: IssueDifficulty | null;
   assigneeUserId?: string | null;
   status: "backlog" | "queued";
   attachments: File[];
@@ -67,7 +67,7 @@ export type UpdateIssueInput = {
   title: string;
   description: string | null;
   priority: number | null;
-  difficulty: IssueDifficulty;
+  difficulty: IssueDifficulty | null;
   assigneeUserId?: string | null;
   attachments: File[];
   attachmentReferences?: string[];
@@ -79,7 +79,7 @@ export type UpdateIssueResult = {
   title: string;
   description: string | null;
   priority: number | null;
-  difficulty: IssueDifficulty;
+  difficulty: IssueDifficulty | null;
   assigneeUserId: string | null;
   attachments: IssueAttachment[];
 };
@@ -100,7 +100,7 @@ export type IssueExecutionApprovalInput = {
 
 /** The only mutable choice a member makes when approving a saved Skill run. */
 export type AgentSkillExecutionApprovalInput = {
-  workerId: string;
+  workerId?: string;
 };
 
 export type IssueDependencyReference = {
@@ -337,7 +337,7 @@ export type HuntRun = {
   fullAuto?: boolean;
   detail: string | null;
   priority: number | null;
-  difficulty: IssueDifficulty;
+  difficulty: IssueDifficulty | null;
   assigneeUserId?: string | null;
   createdByUserId?: string | null;
   subscribers?: IssueSubscriber[];
@@ -346,6 +346,7 @@ export type HuntRun = {
   commitSha: string | null;
   tracker: TrackerReference | null;
   issueDescription: string | null;
+  relatedMessage?: RelatedMessageReference | null;
   attachments: IssueAttachment[];
   prerequisites?: IssueDependencyReference[];
   dependents?: IssueDependencyReference[];
@@ -384,6 +385,13 @@ export type HuntRun = {
   completedAt: string | null;
   lastEventAt: string;
   eventCount: number;
+};
+
+export type RelatedMessageReference = {
+  organizationId: string;
+  channelId: string;
+  messageId: string;
+  rootMessageId: string;
 };
 
 export type StatusTrayRun = {
@@ -691,6 +699,8 @@ export type ProjectAgent = {
   provider: AgentProvider;
   model: string | null;
   effort: ModelEffort | null;
+  designatedWorkerId?: string | null;
+  designatedWorkerLabel?: string | null;
   description?: string;
   responsibility: string;
   skill: string;
@@ -701,6 +711,10 @@ export type ProjectAgent = {
 };
 
 export type ProjectAgentSkillKind = "issue_processing" | "custom";
+export type ProjectAgentSkillExecutionMode = "conversation" | "task";
+export type ProjectAgentSkillApprovalPolicy =
+  | "invoke_is_consent"
+  | "explicit";
 
 export type ProjectAgentSkill = {
   id: string;
@@ -712,6 +726,8 @@ export type ProjectAgentSkill = {
   model: string | null;
   effort: ModelEffort | null;
   kind: ProjectAgentSkillKind;
+  executionMode: ProjectAgentSkillExecutionMode;
+  approvalPolicy: ProjectAgentSkillApprovalPolicy;
   position: number;
   createdAt: string;
   updatedAt: string;
@@ -729,6 +745,8 @@ export type ProjectAgentSkillInput = Pick<
   | "position"
 > & {
   id?: string;
+  executionMode?: ProjectAgentSkillExecutionMode;
+  approvalPolicy?: ProjectAgentSkillApprovalPolicy;
 };
 
 export type CreateProjectAgentInput = {
@@ -738,6 +756,7 @@ export type CreateProjectAgentInput = {
   provider: AgentProvider;
   model: string | null;
   effort?: ModelEffort | null;
+  designatedWorkerId?: string | null;
   description?: string;
   responsibility: string;
   skills?: ProjectAgentSkillInput[];
@@ -834,6 +853,7 @@ export type OrganizationMember = {
   email: string;
   image: string | null;
   role: "owner" | "admin" | "member";
+  projectIds?: string[];
   createdAt: string;
 };
 
@@ -882,6 +902,66 @@ export type ProjectSettings = {
     projectRevision: number;
     userRevision: number;
   };
+};
+
+export type MergeQueueProfile = {
+  projectId: string;
+  repositoryId: number;
+  repository: string;
+  baseBranch: "main";
+  enabled: boolean;
+  readinessStageId: string;
+  quietWindowMs: number;
+  maxBatchSize: number;
+  updatedAt: string;
+};
+
+export type MergeQueueBatchState =
+  | "collecting"
+  | "frozen"
+  | "enqueueing"
+  | "waiting_tail"
+  | "validating"
+  | "publishing"
+  | "awaiting_merge"
+  | "blocked"
+  | "draining"
+  | "completed"
+  | "failed";
+
+export type MergeQueueCandidateState =
+  | "ready"
+  | "frozen"
+  | "enqueued"
+  | "merged"
+  | "dequeued"
+  | "failed";
+
+export type MergeQueueStatus = {
+  batches: Array<{
+    id: string;
+    state: MergeQueueBatchState;
+    candidateCount: number;
+    quietUntil: string;
+    frozenAt: string | null;
+    mergeGroupSha: string | null;
+    failureCode: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  candidates: Array<{
+    id: string;
+    batchId: string | null;
+    runId: string;
+    pullRequestNumber: number;
+    pullRequestUrl: string;
+    state: MergeQueueCandidateState;
+    ordinal: number | null;
+    readyAt: string;
+    failureCode: string | null;
+    updatedAt: string;
+  }>;
 };
 
 export type DashboardPayload = {

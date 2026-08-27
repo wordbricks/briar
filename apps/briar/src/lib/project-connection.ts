@@ -1,9 +1,11 @@
 import { briarApiUrl } from "./api";
 import {
+  canonicalizeProjectWorkflow,
   isRepositoryWorkflowPending,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
 import type { ProjectSettings } from "../types";
+import type { AgentProvider } from "./agent-provider";
 
 export type VelenOrganization = { name: string; slug: string };
 export type VelenSource = {
@@ -107,6 +109,24 @@ export type ConnectedLocalProject = {
   workflow: AutoHuntWorkflow;
 };
 
+export type LocalProjectConnectionPreflight = {
+  repositoryPath: string;
+  repositoryRemote: string | null;
+  provider: AgentProvider;
+};
+
+export async function preflightThenCreateProject<T>(
+  preflight: () => Promise<T>,
+  create?: () => Promise<unknown>,
+  assertCurrent: () => void = () => undefined,
+) {
+  const prepared = await preflight();
+  assertCurrent();
+  await create?.();
+  assertCurrent();
+  return prepared;
+}
+
 export async function resolveProjectConnectionWorkflow(
   role: "owner" | "admin" | "member" | undefined,
   existingWorkflow: AutoHuntWorkflow | undefined,
@@ -118,7 +138,7 @@ export async function resolveProjectConnectionWorkflow(
     !isRepositoryWorkflowPending(existingWorkflow)
   ) {
     return {
-      workflow: existingWorkflow,
+      workflow: canonicalizeProjectWorkflow(existingWorkflow),
       shouldPersistProjectSettings: false,
     };
   }
@@ -132,12 +152,12 @@ export async function resolveProjectConnectionWorkflow(
     !isRepositoryWorkflowPending(compatiblePreset)
   ) {
     return {
-      workflow: compatiblePreset,
+      workflow: canonicalizeProjectWorkflow(compatiblePreset),
       shouldPersistProjectSettings: true,
     };
   }
   return {
-    workflow: await generateWorkflow(),
+    workflow: canonicalizeProjectWorkflow(await generateWorkflow()),
     shouldPersistProjectSettings: true,
   };
 }
@@ -254,6 +274,23 @@ export async function loginProjectGithub(projectId: string) {
   });
 }
 
+export async function preflightLocalProjectConnection(input: {
+  repositoryPath: string;
+  autoHunt: LocalAutoHuntConfig;
+}) {
+  if (!isTauri()) {
+    throw new Error("프로젝트 연결 검사는 Briar 데스크톱 앱에서 사용할 수 있습니다.");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<LocalProjectConnectionPreflight>(
+    "preflight_local_project_connection",
+    {
+      repositoryPath: input.repositoryPath,
+      autoHunt: input.autoHunt,
+    },
+  );
+}
+
 export async function connectLocalProject(input: {
   projectId: string;
   agentToken: string;
@@ -282,11 +319,20 @@ export async function configureLocalExecutionWorker(
     throw new Error("Worker 설정은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
   const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("configure_execution_worker", {
-    projectId,
-    userToken,
-    enabled,
-  });
+  try {
+    return await invoke("configure_execution_worker", {
+      projectId,
+      userToken,
+      enabled,
+    });
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : String(caught);
+    const cleanupIncompletePrefix = "BRIAR_WORKER_CLEANUP_INCOMPLETE: ";
+    if (message.startsWith(cleanupIncompletePrefix)) {
+      throw new Error(message.slice(cleanupIncompletePrefix.length));
+    }
+    throw caught;
+  }
 }
 
 export async function disconnectLocalProject(projectId: string) {

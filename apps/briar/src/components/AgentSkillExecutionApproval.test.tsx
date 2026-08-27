@@ -2,9 +2,10 @@
 
 import { readFileSync } from "node:fs";
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  AgentSkillExecutionApprovalInput,
   AgentSkillExecutionProposal,
   ExecutionWorker,
 } from "../types";
@@ -26,11 +27,16 @@ const proposal = (
   provider: "codex",
   model: "gpt-5.6-sol",
   effort: "high",
+  executionMode: "task",
+  approvalPolicy: "explicit",
+  executionStatus: status === "accepted" ? "running" : "waiting",
   createdAt: "2026-08-11T00:00:00.000Z",
   acceptedAt: status === "accepted" ? "2026-08-11T00:01:00.000Z" : null,
   requestedWorkerId: status === "accepted" ? "worker-1" : null,
   requestedWorkerLabel: status === "accepted" ? "Build Mac" : null,
   resultSessionId: status === "accepted" ? "session-1" : null,
+  resultMessageId: null,
+  error: null,
   delegatedByAgentId: null,
   delegatedByAgentName: null,
 });
@@ -70,18 +76,19 @@ async function chooseWorker(label = "Build Mac") {
 }
 
 describe("AgentSkillExecutionApproval", () => {
+  let cleanup: () => Promise<void>;
   let container: HTMLDivElement;
-  let root: ReturnType<typeof createRoot>;
+  let root: ReturnType<typeof createReactTestRoot>["root"];
 
   beforeEach(() => {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    ({ cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    }));
   });
 
   afterEach(async () => {
-    await act(async () => root.unmount());
+    await cleanup();
     document.body.innerHTML = "";
   });
 
@@ -91,26 +98,27 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       workers: [worker("worker-1")],
     }));
     const onAccepted = vi.fn();
-    const onAccept = vi.fn(async ({ workerId }: { workerId: string }) => ({
+    const onAccept = vi.fn(async (
+      { workerId }: AgentSkillExecutionApprovalInput,
+    ) => ({
       ...pending,
       status: "accepted" as const,
       acceptedAt: "2026-08-11T00:01:00.000Z",
-      requestedWorkerId: workerId,
+      requestedWorkerId: workerId!,
       requestedWorkerLabel: "Build Mac",
       resultSessionId: "session-1",
     }));
 
-    await act(async () => {
-      root.render(
-        <AgentSkillExecutionApproval
-          loadExecutionContext={loadExecutionContext}
-          onAccept={onAccept}
-          onAccepted={onAccepted}
-          proposal={pending}
-          surfaceKey="channel:root:message"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <AgentSkillExecutionApproval
+        loadExecutionContext={loadExecutionContext}
+        onAccept={onAccept}
+        onAccepted={onAccepted}
+        proposal={pending}
+        surfaceKey="channel:root:message"
+      />,
+    );
     expect(loadExecutionContext).not.toHaveBeenCalled();
     expect(onAccept).not.toHaveBeenCalled();
 
@@ -149,19 +157,18 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       ...worker("worker-2"),
       acceptingWork: false,
     };
-    await act(async () => {
-      root.render(
-        <AgentSkillExecutionApproval
-          loadExecutionContext={async () => ({
-            workers: [worker("worker-1", "offline"), notAccepting],
-          })}
-          onAccept={onAccept}
-          onAccepted={vi.fn()}
-          proposal={proposal()}
-          surfaceKey="channel:no-selectable-worker"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <AgentSkillExecutionApproval
+        loadExecutionContext={async () => ({
+          workers: [worker("worker-1", "offline"), notAccepting],
+        })}
+        onAccept={onAccept}
+        onAccepted={vi.fn()}
+        proposal={proposal()}
+        surfaceKey="channel:no-selectable-worker"
+      />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".skill-execution-proposal-card footer button",
@@ -188,21 +195,100 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(onAccept).not.toHaveBeenCalled();
   });
 
+  it("approves conversation execution without exposing a Worker choice", async () => {
+    const pending = {
+      ...proposal(),
+      executionMode: "conversation" as const,
+    };
+    const loadExecutionContext = vi.fn(async () => ({
+      workers: [worker("worker-1")],
+    }));
+    const onAccept = vi.fn(async () => ({
+      ...pending,
+      status: "accepted" as const,
+      executionStatus: "running" as const,
+      acceptedAt: "2026-08-11T00:01:00.000Z",
+      requestedWorkerId: "worker-1",
+      requestedWorkerLabel: "Build Mac",
+      resultSessionId: "channel-session-1",
+      resultMessageId: "result-message-1",
+    }));
+    await renderReactTestRoot(
+      root,
+      <AgentSkillExecutionApproval
+        loadExecutionContext={loadExecutionContext}
+        onAccept={onAccept}
+        onAccepted={vi.fn()}
+        proposal={pending}
+        surfaceKey="channel:conversation:message"
+      />,
+    );
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(
+        ".skill-execution-proposal-card footer button",
+      )?.click();
+    });
+    expect(loadExecutionContext).not.toHaveBeenCalled();
+    expect(document.body.querySelector('[role="combobox"]')).toBeNull();
+    expect(document.body.textContent).toContain("원래 스레드 세션");
+    const approve = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("승인하고 Skill 실행"));
+    expect(approve?.disabled).toBe(false);
+    await act(async () => approve?.click());
+    expect(onAccept).toHaveBeenCalledWith({});
+  });
+
+  it("shows a completed conversation result in the original thread", async () => {
+    const result = document.createElement("div");
+    result.dataset.channelMessageId = "result-message-1";
+    result.tabIndex = -1;
+    result.scrollIntoView = vi.fn();
+    document.body.append(result);
+    await renderReactTestRoot(
+      root,
+      <AgentSkillExecutionApproval
+        loadExecutionContext={vi.fn()}
+        onAccept={vi.fn()}
+        onAccepted={vi.fn()}
+        proposal={{
+          ...proposal("proposal-completed", "accepted"),
+          executionMode: "conversation",
+          executionStatus: "completed",
+          resultSessionId: "channel-session-1",
+          resultMessageId: "result-message-1",
+        }}
+        surfaceKey="channel:conversation:completed"
+      />,
+    );
+
+    expect(document.body.textContent).toContain("완료");
+    expect(document.body.textContent).not.toContain("channel-session-1");
+    const viewResult = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("결과 보기"));
+    await act(async () => viewResult?.click());
+    expect(result.scrollIntoView).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "center",
+    });
+    expect(document.activeElement).toBe(result);
+  });
+
 
   it("fails closed when the selected Worker changes before final approval", async () => {
     let latestWorkers = [worker("worker-1")];
     const onAccept = vi.fn();
-    await act(async () => {
-      root.render(
-        <AgentSkillExecutionApproval
-          loadExecutionContext={async () => ({ workers: latestWorkers })}
-          onAccept={onAccept}
-          onAccepted={vi.fn()}
-          proposal={proposal()}
-          surfaceKey="issue:message"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <AgentSkillExecutionApproval
+        loadExecutionContext={async () => ({ workers: latestWorkers })}
+        onAccept={onAccept}
+        onAccepted={vi.fn()}
+        proposal={proposal()}
+        surfaceKey="issue:message"
+      />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".skill-execution-proposal-card footer button",
@@ -226,17 +312,16 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         resolveContext = resolve;
       }));
     const onAccept = vi.fn();
-    await act(async () => {
-      root.render(
-        <AgentSkillExecutionApproval
-          loadExecutionContext={loadExecutionContext}
-          onAccept={onAccept}
-          onAccepted={vi.fn()}
-          proposal={proposal("proposal-old")}
-          surfaceKey="channel:old"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <AgentSkillExecutionApproval
+        loadExecutionContext={loadExecutionContext}
+        onAccept={onAccept}
+        onAccepted={vi.fn()}
+        proposal={proposal("proposal-old")}
+        surfaceKey="channel:old"
+      />,
+    );
     await act(async () => {
       container.querySelector<HTMLButtonElement>(
         ".skill-execution-proposal-card footer button",
@@ -261,17 +346,16 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
   it("renders immutable Worker and session history without loading current state", async () => {
     const loadExecutionContext = vi.fn();
-    await act(async () => {
-      root.render(
-        <AgentSkillExecutionApproval
-          loadExecutionContext={loadExecutionContext}
-          onAccept={vi.fn()}
-          onAccepted={vi.fn()}
-          proposal={proposal("proposal-accepted", "accepted")}
-          surfaceKey="history"
-        />,
-      );
-    });
+    await renderReactTestRoot(
+      root,
+      <AgentSkillExecutionApproval
+        loadExecutionContext={loadExecutionContext}
+        onAccept={vi.fn()}
+        onAccepted={vi.fn()}
+        proposal={proposal("proposal-accepted", "accepted")}
+        surfaceKey="history"
+      />,
+    );
     expect(document.body.textContent).toContain("Build Mac");
     expect(document.body.textContent).toContain("session-1");
     expect(loadExecutionContext).not.toHaveBeenCalled();

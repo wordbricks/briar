@@ -1,13 +1,14 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { I18nProvider } from "../i18n";
 import {
   defaultKeybindings,
   formatShortcut,
   loadKeybindings,
+  loadKeyboardNavigationPreferences,
 } from "../lib/keybindings";
 import { KeybindingsSettings } from "./KeybindingsSettings";
 
@@ -18,16 +19,15 @@ describe("KeybindingsSettings", () => {
   });
 
   it("records a new shortcut and persists it", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <KeybindingsSettings />
-        </I18nProvider>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <KeybindingsSettings />
+      </I18nProvider>,
+    );
 
     const changeButton = container.querySelector<HTMLButtonElement>(
       '[data-keybinding-id="sidebarToggle"] [aria-label="Change"]',
@@ -66,21 +66,45 @@ describe("KeybindingsSettings", () => {
       }),
     );
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
+  });
+
+  it("toggles Linear-style single-key and sequence shortcuts", async () => {
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <KeybindingsSettings />
+      </I18nProvider>,
+    );
+
+    const toggle = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Single-key and sequence shortcuts"]',
+    );
+    expect(toggle?.getAttribute("data-state")).toBe("checked");
+
+    await act(async () => toggle?.click());
+
+    expect(loadKeyboardNavigationPreferences()).toEqual({
+      sequenceShortcutsEnabled: false,
+    });
+    expect(toggle?.getAttribute("data-state")).toBe("unchecked");
+
+    await cleanup();
   });
 
   it("cancels recording with Escape", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <KeybindingsSettings />
-        </I18nProvider>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <KeybindingsSettings />
+      </I18nProvider>,
+    );
 
     const changeButton = container.querySelector<HTMLButtonElement>(
       '[data-keybinding-id="sidebarToggle"] [aria-label="Change"]',
@@ -99,21 +123,19 @@ describe("KeybindingsSettings", () => {
     );
     expect(container.textContent).not.toContain("Press a new shortcut…");
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("resets a customized binding back to its default", async () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <KeybindingsSettings />
-        </I18nProvider>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <KeybindingsSettings />
+      </I18nProvider>,
+    );
 
     const changeButton = container.querySelector<HTMLButtonElement>(
       '[data-keybinding-id="sidebarToggle"] [aria-label="Change"]',
@@ -140,7 +162,6 @@ describe("KeybindingsSettings", () => {
       defaultKeybindings.sidebarToggle,
     );
 
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });

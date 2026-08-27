@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import {
   restartInstalledServices,
+  removeServiceDefinition,
   serviceDefinition,
   writeServiceDefinition,
 } from "./worker";
@@ -184,6 +185,9 @@ async function workerService(action: "install" | "uninstall") {
     throw new Error(
       `서비스 ${action === "install" ? "설치" : "제거"}에 실패했습니다: ${new TextDecoder().decode(spawned.stderr).trim()}`,
     );
+  }
+  if (action === "uninstall") {
+    await removeServiceDefinition(definition);
   }
   console.log(
     JSON.stringify({

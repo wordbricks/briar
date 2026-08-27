@@ -1,11 +1,11 @@
-import { Activity, ArrowLeft, ArrowUp, BadgeCheck, Bot, BrainCircuit, Check, ChevronRight, CircleAlert, Clock3, Columns3, FolderGit2, FolderInput, GitCommitHorizontal, GitFork, GitPullRequest, Image as ImageIcon, ListChecks, Maximize2, Play, RefreshCw, RotateCcw, Signal, Trash2, UserRound, Waypoints, X } from "lucide-react";
+import { Activity, ArrowLeft, ArrowUp, BadgeCheck, Bot, BrainCircuit, Check, ChevronRight, CircleAlert, Clock3, Columns3, FolderGit2, FolderInput, GitCommitHorizontal, GitFork, GitPullRequest, Image as ImageIcon, ListChecks, Maximize2, MessageSquare, Play, RefreshCw, RotateCcw, Signal, Trash2, UserRound, Waypoints, X } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { MainContent } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { NativeSelect } from "@/components/NativeSelect";
 import { ProviderSelect } from "@/components/ProviderSelect";
 import { SelectMenu } from "@/components/SelectMenu";
@@ -21,13 +21,14 @@ import { eventMeta, runMeta } from "@/lib/stages";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { formatExecutionDuration, formatExecutionTokens } from "@/lib/agent-execution-metrics";
 import { issueTitleInputMaxLength, isIssueTitleWithinLimit } from "@/lib/issue-title";
+import { isKeyboardShortcutEditableTarget, keyboardShortcutEventIsComposing } from "@/lib/keyboard-shortcuts";
 import { defaultIssueDetailTab, type IssueDetailTab } from "@/lib/issue-detail-tab";
 import { issueAttachmentReference, issueAttachmentReferences, removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
 import { clampConversationPaneWidth, conversationPaneWidthDefault, conversationPaneWidthMax, conversationPaneWidthMin, loadConversationPaneWidth, saveConversationPaneWidth } from "@/lib/conversation-pane-width";
 import { loadRunCostEstimate } from "@/lib/api";
 import { copyIssueId, copyIssueShareLink, shareIssueLink } from "@/lib/issue-links";
 import { formatIssueKey } from "@/lib/issue-key";
-import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, AgentExecutionCostEstimate, ExecutionWorker, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, OrganizationMember, Project, ProjectAgent, ProjectExecutionWorkerPolicy, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
+import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, AgentExecutionCostEstimate, ExecutionWorker, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, OrganizationMember, Project, ProjectAgent, ProjectExecutionWorkerPolicy, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
 import { agentEffortOptions, agentModelDisplayName, agentModelOptions, agentProviderLabels, type AgentProvider, type ModelEffort } from "@/lib/project-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
 import { useI18n } from "@/i18n";
@@ -49,7 +50,6 @@ import { formatDate, formatExecutionUsdTicks, formatRatePerMillion, localizeEven
 import { placementForId, placementIdForRun, placementMatchesRun } from "../model/kanban";
 import { IssueResultReviewers } from "../results/IssueResultReviewers";
 import { RunEvidencePanel } from "../results/RunEvidencePanel";
-import { RunResultArtifacts } from "../results/RunResultArtifacts";
 import { RunResultScreenshots } from "../results/RunResultScreenshots";
 import { hasResultReviews } from "../results/model";
 export function RunPage({
@@ -63,6 +63,7 @@ export function RunPage({
   executionPolicy,
   executionWorkers = [],
   executionCostEstimate: providedExecutionCostEstimate = null,
+  highlightedMessageId = null,
   initialDetailTab,
   isDeletingIssue = false,
   isProcessing = false,
@@ -81,6 +82,7 @@ export function RunPage({
   onTransfer,
   transferProjects = [],
   onDependencyOpen,
+  onRelatedMessageOpen,
   onLoadAttachment,
   onLoadIssueMessages,
   onLoadRunEvents = async () => [],
@@ -125,6 +127,7 @@ export function RunPage({
   executionPolicy?: ProjectExecutionWorkerPolicy;
   executionWorkers?: ExecutionWorker[];
   executionCostEstimate?: AgentExecutionCostEstimate | null;
+  highlightedMessageId?: string | null;
   initialDetailTab?: IssueDetailTab;
   isDeletingIssue?: boolean;
   isProcessing?: boolean;
@@ -143,6 +146,7 @@ export function RunPage({
   onTransfer?: (targetProjectId: string) => Promise<unknown>;
   transferProjects?: Project[];
   onDependencyOpen?: (runId: string) => void;
+  onRelatedMessageOpen?: (relatedMessage: RelatedMessageReference) => void;
   onLoadAttachment: (attachment: IssueAttachment) => Promise<Blob>;
   onLoadIssueMessages: () => Promise<IssueMessage[]>;
   onLoadRunEvents?: () => Promise<HuntEvent[]>;
@@ -278,6 +282,7 @@ export function RunPage({
   const [inlineKeptAttachmentIds, setInlineKeptAttachmentIds] = useState<string[]>(() => (run.attachments ?? []).map(attachment => attachment.id));
   const [inlineSaveStatus, setInlineSaveStatus] = useState<"saved" | "saving" | "failed">("saved");
   const inlineSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inlineSaveTaskRef = useRef<(() => void) | null>(null);
   const inlineSaveSequenceRef = useRef(0);
   const inlineSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const inlineSavePendingRef = useRef({
@@ -287,6 +292,34 @@ export function RunPage({
   const inlineUpdateIssueRef = useRef(onUpdateIssue);
   const inlineDescriptionEditorRef = useRef<HTMLDivElement>(null);
   const canEditIssueInline = Boolean(onUpdateIssue);
+  const flushInlineSave = useCallback(() => {
+    const save = inlineSaveTaskRef.current;
+    if (!save) return;
+    if (inlineSaveTimerRef.current) {
+      clearTimeout(inlineSaveTimerRef.current);
+      inlineSaveTimerRef.current = null;
+    }
+    inlineSaveTaskRef.current = null;
+    save();
+  }, []);
+  const leaveInlineEditing = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
+    if (
+      event.defaultPrevented ||
+      event.key !== "Escape" ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      keyboardShortcutEventIsComposing(event.nativeEvent) ||
+      !isKeyboardShortcutEditableTarget(event.target) ||
+      !(event.target instanceof HTMLElement)
+    ) {
+      return;
+    }
+    event.preventDefault();
+    flushInlineSave();
+    event.target.blur();
+  }, [flushInlineSave]);
   const lastSavedInlineIssueRef = useRef({
     runId: run.id,
     title: run.title.trim(),
@@ -382,6 +415,7 @@ export function RunPage({
       clearTimeout(inlineSaveTimerRef.current);
       inlineSaveTimerRef.current = null;
     }
+    inlineSaveTaskRef.current = null;
     setInlineTitle(run.title);
     setInlineDescription(run.issueDescription ?? "");
     setInlineKeptAttachmentIds((run.attachments ?? []).map(attachment => attachment.id));
@@ -427,6 +461,7 @@ export function RunPage({
       clearTimeout(inlineSaveTimerRef.current);
       inlineSaveTimerRef.current = null;
     }
+    inlineSaveTaskRef.current = null;
     if (!canEditIssueInline) return;
     const title = inlineTitle.trim();
     const description = inlineDescription.trim() || null;
@@ -442,8 +477,11 @@ export function RunPage({
     }
     setInlineSaveStatus("saving");
     const sequence = ++inlineSaveSequenceRef.current;
-    inlineSaveTimerRef.current = setTimeout(() => {
+    const saveInlineIssue = () => {
       inlineSaveTimerRef.current = null;
+      if (inlineSaveTaskRef.current === saveInlineIssue) {
+        inlineSaveTaskRef.current = null;
+      }
       const update = inlineUpdateIssueRef.current;
       if (!update) return;
       const runAttachmentIds = (run.attachments ?? []).map(attachment => attachment.id);
@@ -485,14 +523,19 @@ export function RunPage({
           setInlineSaveStatus("failed");
         }
       });
-    }, 600);
+    };
+    inlineSaveTaskRef.current = saveInlineIssue;
+    inlineSaveTimerRef.current = setTimeout(saveInlineIssue, 600);
     return () => {
       if (inlineSaveTimerRef.current) {
         clearTimeout(inlineSaveTimerRef.current);
         inlineSaveTimerRef.current = null;
       }
+      if (inlineSaveTaskRef.current === saveInlineIssue) {
+        inlineSaveTaskRef.current = null;
+      }
     };
-  }, [canEditIssueInline, inlineDescription, inlineKeptAttachmentIds, inlineTitle, run.id, run.priority]);
+  }, [canEditIssueInline, inlineDescription, inlineKeptAttachmentIds, inlineTitle, run.difficulty, run.id, run.priority]);
   useEffect(() => {
     void loadRunEvents();
   }, [loadRunEvents, run.eventCount, run.id]);
@@ -837,7 +880,7 @@ export function RunPage({
   };
   const reviewed = hasResultReviews(run);
   const statusBadgeTitle = reviewed ? `${t("dashboard.status")}: ${t("run.resultReviewed")}` : t("dashboard.status");
-  const compactProperties = <div className="run-page-property-badges" aria-label={t("run.properties")}>
+  const compactProperties = <div aria-label={t("run.properties")} className="run-page-property-badges" role="group">
       <SelectMenu align="start" className={`run-page-property-select status ${meta.tone}${reviewed ? " reviewed" : ""}`} disabled={isRecovering} hideChevron label={t("dashboard.status")} leadingIcon={reviewed ? <BadgeCheck aria-hidden="true" className="status-pill-review-icon" size={13} /> : <Activity aria-hidden="true" size={13} />} onValueChange={value => {
       const placement = placementForId(value);
       if (!placement || placementMatchesRun(run, placement)) return;
@@ -883,7 +926,7 @@ export function RunPage({
           <small className="run-page-window-number">
             {formatIssueKey(issueKeyPrefix, run.runNumber)}
           </small>
-          <input aria-label={t("issue.title")} className="run-page-window-title run-page-inline-title" id="run-page-title" maxLength={issueTitleInputMaxLength(inlineTitle, locale)} onChange={event => setInlineTitle(event.currentTarget.value)} readOnly={!onUpdateIssue} title={inlineTitle} value={inlineTitle} />
+          <input aria-label={t("issue.title")} className="run-page-window-title run-page-inline-title" id="run-page-title" maxLength={issueTitleInputMaxLength(inlineTitle, locale)} onChange={event => setInlineTitle(event.currentTarget.value)} onKeyDown={leaveInlineEditing} readOnly={!onUpdateIssue} title={inlineTitle} value={inlineTitle} />
           {inlineSaveIndicator}
           <div className="run-page-titlebar-actions">
             {compactProperties}
@@ -915,7 +958,7 @@ export function RunPage({
                 <div className="run-page-overview">
                   <div className="run-page-title-row">
                     <small>{formatIssueKey(issueKeyPrefix, run.runNumber)}</small>
-                    <input aria-label={t("issue.title")} className="run-page-inline-title" id="run-page-title" maxLength={issueTitleInputMaxLength(inlineTitle, locale)} onChange={event => setInlineTitle(event.currentTarget.value)} readOnly={!onUpdateIssue} value={inlineTitle} />
+                    <input aria-label={t("issue.title")} className="run-page-inline-title" id="run-page-title" maxLength={issueTitleInputMaxLength(inlineTitle, locale)} onChange={event => setInlineTitle(event.currentTarget.value)} onKeyDown={leaveInlineEditing} readOnly={!onUpdateIssue} value={inlineTitle} />
                     {inlineSaveIndicator}
                     <IssueActionsMenu disabled={isDeletingIssue || isRecovering} mutatingDisabled={isUpdatingIssue} onCancel={canCancelRemoteExecution ? () => void runAction(onCancel) : undefined} onUnassign={canUnassign ? () => void runAction(() => onUnassignRun!(run.id)) : undefined} onDelete={onDelete ? () => setIsDeleteDialogOpen(true) : undefined} onTransfer={onTransfer ? () => {
                   setTransferError(null);
@@ -1012,7 +1055,7 @@ export function RunPage({
                               </button>}
                           </div>
                         </section> : null}
-                      {onUpdateIssue ? <DraftIssueDescriptionEditor attachments={editableIssueAttachments} autoSizeTextFields className="issue-description-inline-editor" description={inlineDescription} editorRef={inlineDescriptionEditorRef} label={t("issue.description")} onChange={setInlineDescription} onLoadAttachment={onLoadAttachment} onRemoveAttachment={reference => {
+                      {onUpdateIssue ? <DraftIssueDescriptionEditor attachments={editableIssueAttachments} autoSizeTextFields className="issue-description-inline-editor" description={inlineDescription} editorRef={inlineDescriptionEditorRef} label={t("issue.description")} onChange={setInlineDescription} onKeyDown={leaveInlineEditing} onLoadAttachment={onLoadAttachment} onRemoveAttachment={reference => {
                       setInlineKeptAttachmentIds(current => current.filter(attachmentId => attachmentId !== reference));
                       setInlineDescription(current => removeIssueAttachmentMarkdown(current, reference));
                     }} placeholder={t("issue.descriptionPlaceholder")} removeLabel={name => t("issue.remove", {
@@ -1100,7 +1143,7 @@ export function RunPage({
                                   <strong>{t("run.resultNextAction")}</strong>
                                   <span>{run.structuredResult.nextAction}</span>
                                 </div> : null}
-                              <RunResultArtifacts onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} run={run} />
+                              <RunResultScreenshots onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} runId={run.id} />
                             </section>
                           </div>
                           {run.pullRequestUrls.length > 0 ? <div className="run-result-links">
@@ -1220,7 +1263,7 @@ export function RunPage({
                               <strong>{t("run.resultNextAction")}</strong>
                               <span>{run.structuredResult.nextAction}</span>
                             </div> : null}
-                          <RunResultArtifacts onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} run={run} />
+                          <RunResultScreenshots onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} runId={run.id} />
                           {run.pullRequestUrls.length > 0 ? <div className="run-result-links">
                               {run.pullRequestUrls.map((url, index) => {
                           const pullRequestLabel = pullRequestDisplayName(url, index);
@@ -1262,18 +1305,18 @@ export function RunPage({
                           <p>{run.detail?.trim() || t("run.resultEmpty")}</p>
                           {executionMetricsPanel}
                         </div>}
-                      {run.status === "completed" && !completionSummary ? <RunResultArtifacts onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} run={run} /> : run.status !== "paused" && !completionSummary ? <RunResultScreenshots onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} runId={run.id} /> : null}
+                      {run.status !== "paused" && !completionSummary ? <RunResultScreenshots onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} runId={run.id} /> : null}
                     </div> : activeDetailTab === "agentActivity" ? <IssueAgentActivityPanel activity={agentActivity} error={workerEvents.error} id={`${detailTabsId}-agent-activity-panel`} isLive={workerExecutionIsLive && hasWorkerExecution} labelledBy={`${detailTabsId}-agent-activity-tab`} loading={workerEvents.isLoading} provider={activityProvider} /> : activeDetailTab === "statusHistory" ? <IssueStatusHistoryPanel events={runEvents} id={`${detailTabsId}-status-history-panel`} labelledBy={`${detailTabsId}-status-history-tab`} loadError={runEventsLoadError} loading={runEventsLoading} onRetry={() => void loadRunEvents()} workflow={run.workflow} /> : <RunEvidencePanel id={`${detailTabsId}-evidence-panel`} labelledBy={`${detailTabsId}-evidence-tab`} onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} run={run} />}
                 </section>
                 {usesConversationTab ? <div aria-labelledby={`${detailTabsId}-conversation-tab`} className="issue-conversation-tab-panel" hidden={activeDetailTab !== "conversation"} id={`${detailTabsId}-conversation-panel`} role="tabpanel">
-                    <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} organizationId={organizationId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
+                    <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} highlightedMessageId={highlightedMessageId} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} organizationId={organizationId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
                   </div> : null}
                 </div>
                 <IssueWorkflowProgress onCheckpointsChange={onUpdateIssueCheckpoints} run={run} />
               </div>
               {!usesConversationTab ? <>
                   <div aria-label={t("run.resizeContentPanels")} aria-orientation="vertical" aria-valuemax={conversationPaneWidthMax} aria-valuemin={conversationPaneWidthMin} aria-valuenow={effectiveConversationPaneWidth} className="run-page-conversation-resizer" role="separator" tabIndex={0} {...conversationResizeProps} />
-                  <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} organizationId={organizationId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
+                  <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} highlightedMessageId={highlightedMessageId} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} organizationId={organizationId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
                 </> : null}
               {isPropertiesOpen ? <div className="run-properties-layer" onClick={event => {
               if (event.target === event.currentTarget) {
@@ -1373,6 +1416,13 @@ export function RunPage({
                     <span className="run-property-icon assignee"><UserRound size={15} /></span>
                     <span className="run-property-copy"><strong>{creator?.name ?? t("run.creatorUnknown")}</strong></span>
                   </div>
+                  {run.relatedMessage && onRelatedMessageOpen ? <button aria-label={t("run.openRelatedMessage")} className="run-property run-property-button run-related-message-property" onClick={() => onRelatedMessageOpen(run.relatedMessage!)} title={t("run.openRelatedMessage")} type="button">
+                      <span className="run-property-icon related-message"><MessageSquare size={15} /></span>
+                      <span className="run-property-copy">
+                        <strong>{t("run.relatedMessage")}</strong>
+                        <small>{t("run.openRelatedMessage")}</small>
+                      </span>
+                    </button> : null}
                   <div aria-label={`${t("run.agent")}: ${performedAgentName ?? t("run.unassigned")}`} className="run-property" title={t("run.agent")}>
                     <span className="run-property-icon agent"><Bot size={15} /></span>
                     <span className="run-property-copy"><strong>{performedAgentName ?? t("run.unassigned")}</strong></span>

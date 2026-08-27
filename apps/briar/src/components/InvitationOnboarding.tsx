@@ -10,6 +10,7 @@ import { Spinner } from "./ui/spinner";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
@@ -83,11 +84,11 @@ export function InvitationOnboarding({
   return (
     <main
       aria-label={t("invitation.label")}
-      className="login-shell"
+      className="scrollbar-subtle relative grid h-full min-h-0 w-full place-items-center overflow-auto bg-[radial-gradient(circle_at_50%_30%,rgba(108,82,199,0.1),transparent_34%),var(--background)]"
       data-tauri-drag-region
     >
-      <div className="login-glow" />
-      <section className="login-card w-full max-w-[520px] rounded-3xl border border-border bg-card shadow-lg">
+      <div className="pointer-events-none absolute top-[8%] size-80 rounded-full bg-primary/10 blur-[90px]" />
+      <Card className="relative block w-full max-w-[520px] rounded-3xl p-9 shadow-[0_26px_80px_rgba(38,42,32,0.1)]">
         <Logo />
         {loadingInvitation ? (
           <div className="grid min-h-56 place-items-center" role="status">
@@ -95,10 +96,10 @@ export function InvitationOnboarding({
           </div>
         ) : invitation ? (
           <>
-            <div className="login-copy">
+            <div className="mt-[34px] mb-[26px]">
               <Typography
                 as="p"
-                className="eyebrow"
+                className="m-0 mb-[7px]"
                 tone="primary"
                 variant="micro"
               >
@@ -201,13 +202,13 @@ export function InvitationOnboarding({
                 </Button>
               </div>
             ) : loginCode ? (
-              <div className="device-code-card mt-5 rounded-xl border border-primary/20 bg-accent p-4 text-center">
+              <div className="mt-5 flex flex-col items-center rounded-[13px] border border-primary/20 bg-accent p-4 text-center">
                 <Typography as="span" tone="muted" variant="caption">
                   {t("login.approveCode")}
                 </Typography>
                 <Typography
                   as="strong"
-                  className="mt-2.5 mb-2 block tracking-[0.25em] text-primary"
+                  className="mt-[11px] mb-2 block max-w-full font-mono text-3xl font-semibold tracking-[0.25em] text-primary"
                   variant="heading"
                 >
                   {loginCode}
@@ -224,7 +225,7 @@ export function InvitationOnboarding({
             ) : (
               <div className="mt-5 grid gap-3">
                 <Button
-                  className="email-button h-11 w-full justify-between rounded-xl"
+                  className="grid h-11 w-full grid-cols-[20px_minmax(0,1fr)_16px] place-items-center rounded-[13px] px-3.5 text-xs font-semibold shadow-[0_5px_16px_rgba(38,42,32,0.05)] [&>svg:first-child]:size-[18px] [&>svg:last-child]:size-4"
                   disabled={loginLoading}
                   onClick={() => onLogin("email")}
                   type="button"
@@ -234,23 +235,26 @@ export function InvitationOnboarding({
                   ) : (
                     <Mail size={18} />
                   )}
-                  <span className="flex-1 text-center">
+                  <span className="col-start-2 text-center">
                     {t("invitation.signIn")}
                   </span>
                   <ArrowUpRight size={16} />
                 </Button>
-                <div className="login-provider-divider" role="separator">
+                <div
+                  className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2.5 text-[var(--text-2xs)] text-muted-foreground before:h-px before:bg-border before:content-[''] after:h-px after:bg-border after:content-['']"
+                  role="separator"
+                >
                   <span>{t("login.or")}</span>
                 </div>
                 <Button
-                  className="google-button h-11 w-full justify-between rounded-xl"
+                  className="grid h-[46px] w-full grid-cols-[20px_minmax(0,1fr)_16px] place-items-center rounded-[13px] border border-border bg-card px-3.5 text-xs font-semibold text-foreground shadow-[0_5px_16px_rgba(38,42,32,0.05)] hover:bg-secondary [&>svg:first-child]:size-[18px] [&>svg:last-child]:size-4"
                   disabled={loginLoading}
                   onClick={() => onLogin("google")}
                   type="button"
                   variant="outline"
                 >
                   <GoogleIcon />
-                  <span className="flex-1 text-center">
+                  <span className="col-start-2 text-center">
                     {t("invitation.signInGoogle")}
                   </span>
                   <ArrowUpRight size={16} />
@@ -274,14 +278,14 @@ export function InvitationOnboarding({
         )}
         {error && invitation ? (
           <Typography
-            className="login-error mt-3 text-destructive"
+            className="mt-3 rounded-[10px] border border-[var(--status-destructive-border)] bg-[var(--status-destructive-surface)] px-3 py-2.5 text-[color:var(--status-destructive-foreground)]"
             role="alert"
             variant="caption"
           >
             {error}
           </Typography>
         ) : null}
-      </section>
+      </Card>
     </main>
   );
 }

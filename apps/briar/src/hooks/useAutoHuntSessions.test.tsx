@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { HuntRun } from "../types";
 import {
@@ -29,9 +29,8 @@ beforeEach(() => {
 
 describe("useAutoHuntSessions", () => {
   it("links dispatched Worker runs and completes the session from run outcomes", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    await act(async () => root.render(<Harness />));
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(root, <Harness />);
 
     await act(async () => {
       sessionsHook.startTaskSession("project-1", "agent-1", {
@@ -85,7 +84,7 @@ describe("useAutoHuntSessions", () => {
     });
     expect(completed.events.at(-1)?.type).toBe("completed");
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("keeps a remotely owned running session active after app restart", async () => {
@@ -114,9 +113,8 @@ describe("useAutoHuntSessions", () => {
         localOwner: false,
       }]),
     );
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    await act(async () => root.render(<Harness />));
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(root, <Harness />);
 
     expect(sessionsHook.sessions[0]).toMatchObject({
       id: "remote-session-1",
@@ -124,7 +122,7 @@ describe("useAutoHuntSessions", () => {
       localOwner: false,
     });
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("merges a newer remote status without losing local-only details", () => {
@@ -271,9 +269,8 @@ describe("useAutoHuntSessions", () => {
   });
 
   it("starts and settles a scheduled task session with schedule identity", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    await act(async () => root.render(<Harness />));
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(root, <Harness />);
 
     let sessionId = "";
     await act(async () => {
@@ -357,13 +354,12 @@ describe("useAutoHuntSessions", () => {
       }],
     });
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("records a no-work scheduled task as skipped", async () => {
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    await act(async () => root.render(<Harness />));
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(root, <Harness />);
 
     await act(async () => {
       sessionsHook.startTaskSession("project-1", "agent-1", {
@@ -388,14 +384,13 @@ describe("useAutoHuntSessions", () => {
     });
     expect(sessionsHook.sessions[0]?.events.at(-1)?.type).toBe("skipped");
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 
   it("stops a running session and ignores late settlement", async () => {
     stopper = async () => true;
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    await act(async () => root.render(<Harness />));
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(root, <Harness />);
 
     await act(async () => {
       sessionsHook.startTaskSession("project-1", "agent-1", {
@@ -424,6 +419,6 @@ describe("useAutoHuntSessions", () => {
     });
     expect(sessionsHook.sessions[0]?.events.at(-1)?.type).toBe("stopped");
 
-    await act(async () => root.unmount());
+    await cleanup();
   });
 });

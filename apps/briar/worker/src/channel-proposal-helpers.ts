@@ -72,34 +72,20 @@ export function approvedIssueCreation<T extends Record<string, unknown>>(
   };
 }
 
-export function channelMessageShareUrl(input: {
-  origin: string;
+export function channelRelatedMessageReference(input: {
   organizationId: string;
   channelId: string;
   messageId: string;
-  rootMessageId?: string | null;
+  rootMessageId: string | null;
 }) {
-  const url = new URL(input.origin);
-  url.pathname =
-    `/open/channels/${encodeURIComponent(input.organizationId)}` +
-    `/${encodeURIComponent(input.channelId)}` +
-    `/${encodeURIComponent(input.messageId)}`;
-  url.search = "";
-  url.hash = "";
-  const rootMessageId = input.rootMessageId?.trim();
-  if (rootMessageId && rootMessageId !== input.messageId) {
-    url.searchParams.set("root", rootMessageId);
-  }
-  return url.toString();
-}
-
-export function appendChannelMessageBacklink(
-  description: string | null,
-  channelMessageUrl: string,
-) {
-  const backlink = `[채널 메시지로 돌아가기](${channelMessageUrl})`;
-  const body = description?.trimEnd() ?? "";
-  return body ? `${body}\n\n${backlink}` : backlink;
+  return {
+    organizationId: input.organizationId,
+    channelId: input.channelId,
+    messageId: input.messageId,
+    // A root message is required by the in-app deep-link handler. A proposal
+    // reply without a parent is still a valid message target, so use itself.
+    rootMessageId: input.rootMessageId?.trim() || input.messageId,
+  };
 }
 
 /**
@@ -116,4 +102,3 @@ export async function loadChannelCatalogSnapshot<T>(
   const channels = await readChannels();
   return { channels, cursor };
 }
-

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
@@ -15,19 +15,18 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
   it("requires the signed-in email before permanently deleting", async () => {
     const onDelete = vi.fn(async () => undefined);
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <AccountDeletionSettings
-            onDelete={onDelete}
-            user={{ id: "user-1", name: "Jay", email: "jay@example.com" }}
-          />
-        </I18nProvider>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <AccountDeletionSettings
+          onDelete={onDelete}
+          user={{ id: "user-1", name: "Jay", email: "jay@example.com" }}
+        />
+      </I18nProvider>,
+    );
 
     await act(async () => findButton("Delete account")?.click());
     const confirmButton = findButton("Delete permanently");
@@ -41,8 +40,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await act(async () => confirmButton?.click());
 
     expect(onDelete).toHaveBeenCalledWith("JAY@example.com");
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 
   it("explains when shared organization resources block deletion", async () => {
@@ -51,19 +49,18 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         "Account deletion is blocked by shared organization resources",
       );
     });
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <I18nProvider>
-          <AccountDeletionSettings
-            onDelete={onDelete}
-            user={{ id: "user-1", name: "Jay", email: "jay@example.com" }}
-          />
-        </I18nProvider>,
-      );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
     });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <AccountDeletionSettings
+          onDelete={onDelete}
+          user={{ id: "user-1", name: "Jay", email: "jay@example.com" }}
+        />
+      </I18nProvider>,
+    );
 
     await act(async () => findButton("Delete account")?.click());
     const confirmation = document.body.querySelector<HTMLInputElement>(
@@ -75,8 +72,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(document.body.textContent).toContain(
       "You still own an organization, project, Worker, or Slack connection",
     );
-    await act(async () => root.unmount());
-    container.remove();
+    await cleanup();
   });
 });
 

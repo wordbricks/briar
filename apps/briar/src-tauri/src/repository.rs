@@ -1,15 +1,49 @@
 use super::*;
 
+pub(super) const WORKFLOW_CHECKPOINT_KEY_MAX_LENGTH: usize = 64;
+
+fn checkpoint_key_for_boundary(owner: &str, checkpoint: &WorkflowCheckpointConfig) -> String {
+    let position = match checkpoint.position {
+        WorkflowCheckpointPosition::Before => "before",
+        WorkflowCheckpointPosition::After => "after",
+    };
+    let key = format!("{owner}-{position}-{}", checkpoint.stage);
+    if key.len() <= WORKFLOW_CHECKPOINT_KEY_MAX_LENGTH {
+        return key;
+    }
+
+    let hash = key
+        .as_bytes()
+        .iter()
+        .fold(14_695_981_039_346_656_037_u64, |hash, byte| {
+            (hash ^ u64::from(*byte)).wrapping_mul(1_099_511_628_211)
+        });
+    let suffix = format!("-{hash:016x}");
+    let prefix_budget = WORKFLOW_CHECKPOINT_KEY_MAX_LENGTH - suffix.len();
+    let prefix_end = key
+        .char_indices()
+        .map(|(index, character)| index + character.len_utf8())
+        .take_while(|end| *end <= prefix_budget)
+        .last()
+        .unwrap_or(0);
+    format!("{}{suffix}", &key[..prefix_end])
+}
+
 pub(super) fn canonicalize_workflow(mut workflow: WorkflowConfig) -> WorkflowConfig {
+    for requirement in &mut workflow.requirements {
+        let canonical_tool = match requirement.kind {
+            WorkflowRequirementKind::Executable => None,
+            WorkflowRequirementKind::Xcode => Some("xcodebuild"),
+            WorkflowRequirementKind::IosSimulator => Some("xcrun"),
+            WorkflowRequirementKind::AndroidSdk => Some("adb"),
+            WorkflowRequirementKind::AndroidEmulator => Some("emulator"),
+        };
+        if let Some(tool) = canonical_tool {
+            requirement.tool = tool.to_string();
+        }
+    }
     for checkpoint in &mut workflow.execution.checkpoints {
-        checkpoint.key = format!(
-            "project-{}-{}",
-            match checkpoint.position {
-                WorkflowCheckpointPosition::Before => "before",
-                WorkflowCheckpointPosition::After => "after",
-            },
-            checkpoint.stage
-        );
+        checkpoint.key = checkpoint_key_for_boundary("project", checkpoint);
     }
     workflow.execution.checkpoints.sort_by_key(|checkpoint| {
         (
@@ -216,10 +250,13 @@ pub(super) fn repository_icon_data_url(root: &Path) -> Result<Option<String>, St
 
 #[tauri::command]
 pub(super) async fn discover_repository_icon(
+    app: tauri::AppHandle,
     repository_path: String,
 ) -> Result<Option<String>, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let root = git_repository_root(Path::new(&repository_path))?;
+        let runner = LocalExecutionEnvironment::discover(&home)?.runner();
+        let root = git_repository_root(&runner, Path::new(&repository_path))?;
         repository_icon_data_url(&root)
     })
     .await
@@ -476,10 +513,13 @@ pub(super) fn inspect_lovable_repository_compatibility_in(
 
 #[tauri::command]
 pub(super) async fn inspect_lovable_repository_compatibility(
+    app: tauri::AppHandle,
     repository_path: String,
 ) -> Result<LovableRepositoryCompatibility, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let root = git_repository_root(Path::new(&repository_path))?;
+        let runner = LocalExecutionEnvironment::discover(&home)?.runner();
+        let root = git_repository_root(&runner, Path::new(&repository_path))?;
         Ok(inspect_lovable_repository_compatibility_in(&root))
     })
     .await
@@ -530,9 +570,9 @@ pub(super) fn inspect_repository_readiness_on(
     }
     let resolved_path = root.as_deref().unwrap_or(repository_path);
     let remote = repository_healthy
-        .then(|| repository_remote(resolved_path))
+        .then(|| repository_remote(runner, resolved_path))
         .flatten();
-    if remote.is_none() {
+    if requires_github && remote.is_none() {
         issues.push("origin 원격 저장소가 설정되지 않았습니다.".to_string());
     }
 
@@ -545,7 +585,7 @@ pub(super) fn inspect_repository_readiness_on(
     let remote_reachable = git
         .as_ref()
         .ok()
-        .filter(|_| repository_healthy && safe_remote)
+        .filter(|_| requires_github && repository_healthy && safe_remote)
         .and_then(|binary| {
             runner
                 .run(
@@ -564,7 +604,7 @@ pub(super) fn inspect_repository_readiness_on(
                 .ok()
         })
         .is_some_and(|output| output.success());
-    if remote.is_some() && !remote_reachable {
+    if requires_github && remote.is_some() && !remote_reachable {
         issues.push("origin에 인증된 상태로 접근할 수 없습니다.".to_string());
     }
 
@@ -574,7 +614,7 @@ pub(super) fn inspect_repository_readiness_on(
     let push_access = git
         .as_ref()
         .ok()
-        .filter(|_| repository_healthy && remote_reachable)
+        .filter(|_| requires_github && repository_healthy && remote_reachable)
         .and_then(|binary| {
             let sha = runner
                 .run(
@@ -605,7 +645,7 @@ pub(super) fn inspect_repository_readiness_on(
                 .ok()
         })
         .is_some_and(|output| output.success());
-    if remote_reachable && !push_access {
+    if requires_github && remote_reachable && !push_access {
         issues.push("origin에 브랜치를 push할 권한을 확인하지 못했습니다.".to_string());
     }
 
@@ -749,7 +789,7 @@ pub(super) async fn inspect_repository_readiness(
 ) -> Result<RepositoryReadiness, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let runner = host::LocalRunner::new(cli_execution_path(&home)?, home);
+        let runner = LocalExecutionEnvironment::discover(&home)?.runner();
         Ok(inspect_repository_readiness_on(
             &runner,
             Path::new(&repository_path),
@@ -926,7 +966,7 @@ pub(super) fn run_velen_json_on(
 
 pub(super) fn inspect_velen_sync(org: Option<String>) -> Result<VelenInspection, String> {
     let home = dirs::home_dir().ok_or_else(|| "홈 폴더를 찾을 수 없습니다.".to_string())?;
-    let runner = host::LocalRunner::new(cli_execution_path(&home)?, home);
+    let runner = LocalExecutionEnvironment::discover(&home)?.runner();
     inspect_velen_on(&runner, org)
 }
 
@@ -999,7 +1039,7 @@ pub(super) async fn inspect_velen(
 ) -> Result<VelenInspection, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let runner = host::LocalRunner::new(cli_execution_path(&home)?, home);
+        let runner = LocalExecutionEnvironment::discover(&home)?.runner();
         inspect_velen_on(&runner, org)
     })
     .await
@@ -1007,9 +1047,14 @@ pub(super) async fn inspect_velen(
 }
 
 #[tauri::command]
-pub(super) async fn validate_repository_path(path: String) -> Result<String, String> {
+pub(super) async fn validate_repository_path(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<String, String> {
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let root = git_repository_root(Path::new(&path))?;
+        let runner = LocalExecutionEnvironment::discover(&home)?.runner();
+        let root = git_repository_root(&runner, Path::new(&path))?;
         root.into_os_string()
             .into_string()
             .map_err(|_| "Git 저장소 경로를 표시할 수 없습니다.".to_string())

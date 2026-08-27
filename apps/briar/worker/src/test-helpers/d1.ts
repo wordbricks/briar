@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import {
   chmod,
@@ -32,14 +33,31 @@ type TemplateFile = {
 type TemplateManifest = {
   formatVersion: number;
   fingerprint: string;
+  builder: typeof TEMPLATE_BUILDER;
   migrations: string[];
   runtimes: {
     miniflare: string;
     wrangler: string;
+    platform: NodeJS.Platform;
+    architecture: string;
   };
   bindingConfig: typeof TEMPLATE_BINDING_CONFIG;
   files: TemplateFile[];
   schemaObjects: number;
+};
+
+type NativeCheckpointResult = {
+  checkpoint: {
+    busy: number;
+    log: number;
+    checkpointed: number;
+  } | null;
+};
+
+type NativeTemplateVerification = NativeCheckpointResult & {
+  quickCheck: string | null;
+  schemaObjects: number | null;
+  migrations: string[];
 };
 
 export type D1TestTemplate = {
@@ -65,8 +83,15 @@ type CreateIsolatedTestDatabaseOptions = {
   miniflareOptions?: MiniflareOptions;
 };
 
-const TEMPLATE_FORMAT_VERSION = 2;
-const TEMPLATE_DATABASE_ID = "briar-d1-test-template";
+interface WranglerLocalEnvironment {
+  [name: string]: string | undefined;
+}
+
+const TEMPLATE_FORMAT_VERSION = 4;
+const TEMPLATE_BUILDER = "wrangler-local";
+const TEMPLATE_DATABASE_ID = "00000000-0000-4000-8000-000000000001";
+const TEMPLATE_DATABASE_NAME = "briar-d1-test-template";
+const TEMPLATE_COMPATIBILITY_DATE = "2026-07-21";
 const TEMPLATE_BINDING_CONFIG = {
   binding: "DB",
   databaseId: TEMPLATE_DATABASE_ID,
@@ -74,7 +99,26 @@ const TEMPLATE_BINDING_CONFIG = {
   script: "export default { fetch() { return new Response('ok') } }",
 } as const;
 const MANIFEST_FILE = "manifest.json";
-const PERSISTENCE_DIRECTORY = "persistence";
+const PERSISTENCE_PARENT_DIRECTORY = "persistence";
+const PERSISTENCE_DIRECTORY = join(PERSISTENCE_PARENT_DIRECTORY, "v3");
+const WRANGLER_CONFIG_FILE = "wrangler.d1-test.json";
+const WRANGLER_TIMEOUT_MS = 5 * 60_000;
+const WRANGLER_MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
+const WRANGLER_FAILURE_LOG_LINES = 40;
+const NATIVE_VERIFIER_TIMEOUT_MS = 60_000;
+const NATIVE_VERIFIER_FILE = fileURLToPath(
+  new URL("../../../../../scripts/verify-d1-test-template.ts", import.meta.url),
+);
+const WRANGLER_LOCAL_ENVIRONMENT_VARIABLES = [
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "PATH",
+  "SHELL",
+  "TMPDIR",
+  "TZ",
+  "USER",
+] as const;
 const LOCK_OWNER_FILE = "owner.json";
 const LOCK_STALE_MS = 10 * 60_000;
 const LOCK_WAIT_MS = 5 * 60_000;
@@ -153,9 +197,11 @@ async function templateFingerprint() {
   ]);
   const hash = createHash("sha256");
   hash.update(`d1-test-template-format:${TEMPLATE_FORMAT_VERSION}\0`);
+  hash.update(`builder:${TEMPLATE_BUILDER}\0`);
   hash.update(JSON.stringify(TEMPLATE_BINDING_CONFIG));
   hash.update("\0");
   hash.update(`miniflare:${miniflareVersion}\0wrangler:${wranglerVersion}\0`);
+  hash.update(`platform:${process.platform}\0architecture:${process.arch}\0`);
   for (const file of files) {
     hash.update(file);
     hash.update("\0");
@@ -229,9 +275,12 @@ async function readValidTemplate(
     if (
       manifest.formatVersion !== TEMPLATE_FORMAT_VERSION ||
       manifest.fingerprint !== expected.fingerprint ||
+      manifest.builder !== TEMPLATE_BUILDER ||
       JSON.stringify(manifest.migrations) !== JSON.stringify(expected.files) ||
       manifest.runtimes?.miniflare !== expected.miniflareVersion ||
       manifest.runtimes?.wrangler !== expected.wranglerVersion ||
+      manifest.runtimes?.platform !== process.platform ||
+      manifest.runtimes?.architecture !== process.arch ||
       JSON.stringify(manifest.bindingConfig) !== JSON.stringify(TEMPLATE_BINDING_CONFIG) ||
       !Number.isInteger(manifest.schemaObjects) ||
       manifest.schemaObjects < 1 ||
@@ -239,7 +288,7 @@ async function readValidTemplate(
       manifest.files.length === 0
     ) return null;
     const observedFiles = await listTemplateFiles(
-      join(directory, PERSISTENCE_DIRECTORY),
+      join(directory, PERSISTENCE_PARENT_DIRECTORY),
     );
     if (JSON.stringify(observedFiles) !== JSON.stringify(manifest.files)) return null;
     return manifest;
@@ -336,19 +385,270 @@ async function releaseTemplateLock(
   await rm(lockPath, { recursive: true, force: true });
 }
 
-async function verifyPreparedDatabase(db: D1Database) {
-  const integrity = await db.prepare("PRAGMA quick_check").first<Record<string, unknown>>();
-  if (!integrity || !Object.values(integrity).includes("ok")) {
-    throw new Error("D1 template failed SQLite quick_check");
-  }
-  const schemaObjects = await db.prepare(
-    `select count(*) as count from sqlite_master
-     where type in ('table', 'index', 'trigger') and name not like 'sqlite_%'`,
+async function verifyMiniflareDatabase(
+  db: D1Database,
+  expectedMigrationCount: number,
+) {
+  const ready = await db.prepare("select 1 as ready").first<number>("ready");
+  if (ready !== 1) throw new Error("D1 template failed Miniflare connection check");
+  const observedMigrationCount = await db.prepare(
+    "select count(*) as count from d1_migrations",
   ).first<number>("count");
-  if (!schemaObjects || schemaObjects < 1) {
-    throw new Error("D1 template contains no application schema objects");
+  if (observedMigrationCount !== expectedMigrationCount) {
+    throw new Error(
+      `D1 template migration count mismatch in Miniflare: ` +
+        `expected ${expectedMigrationCount}, observed ${observedMigrationCount ?? "none"}`,
+    );
   }
-  return schemaObjects;
+}
+
+async function findD1SqliteDatabase(persistencePath: string) {
+  const d1Root = join(persistencePath, "d1");
+  const candidates: string[] = [];
+  const visit = async (directory: string): Promise<void> => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`D1 persistence contains an unexpected symbolic link: ${path}`);
+      }
+      if (entry.isDirectory()) {
+        await visit(path);
+      } else if (
+        entry.isFile() &&
+        entry.name.endsWith(".sqlite") &&
+        entry.name !== "metadata.sqlite"
+      ) {
+        candidates.push(path);
+      }
+    }
+  };
+  await visit(d1Root);
+  if (candidates.length !== 1) {
+    throw new Error(
+      `Expected one local D1 SQLite database, found ${candidates.length}`,
+    );
+  }
+  return candidates[0]!;
+}
+
+function bunExecutable() {
+  const versions = process.versions as NodeJS.ProcessVersions & { bun?: string };
+  return versions.bun ? process.execPath : "bun";
+}
+
+async function runNativeTemplateVerifier<T extends NativeCheckpointResult>(
+  databasePath: string,
+  checkpointOnly = false,
+) {
+  const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>(
+    (resolvePromise, rejectPromise) => {
+      execFile(
+        bunExecutable(),
+        [
+          "run",
+          NATIVE_VERIFIER_FILE,
+          databasePath,
+          ...(checkpointOnly ? ["--checkpoint-only"] : []),
+        ],
+        {
+          cwd: process.cwd(),
+          encoding: "utf8",
+          env: localWranglerEnvironment(),
+          maxBuffer: WRANGLER_MAX_OUTPUT_BYTES,
+          timeout: NATIVE_VERIFIER_TIMEOUT_MS,
+        },
+        (error, stdout, stderr) => {
+          if (!error) {
+            resolvePromise({ stdout, stderr });
+            return;
+          }
+          const diagnostic = wranglerFailureOutput(stdout, stderr);
+          rejectPromise(new Error(
+            error.killed
+              ? `Native D1 template verification timed out after ` +
+                `${NATIVE_VERIFIER_TIMEOUT_MS / 1_000}s`
+              : `Native D1 template verification failed with exit code ` +
+                `${error.code ?? "unknown"}` +
+                (diagnostic ? `:\n${diagnostic}` : ""),
+            { cause: error },
+          ));
+        },
+      );
+    },
+  );
+  if (stderr.trim()) {
+    console.warn(`[d1-test] native verifier warning:\n${stderr.trim()}`);
+  }
+  try {
+    return JSON.parse(stdout.trim()) as T;
+  } catch (error) {
+    throw new Error("Native D1 template verifier returned invalid JSON", {
+      cause: error,
+    });
+  }
+}
+
+async function assertCompactedWal(databasePath: string) {
+  try {
+    const wal = await stat(`${databasePath}-wal`);
+    if (wal.size !== 0) {
+      throw new Error(`D1 template WAL remains ${wal.size} bytes after checkpoint`);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+}
+
+async function checkpointAndVerifyPreparedDatabase(
+  persistencePath: string,
+  expectedMigrations: readonly string[],
+) {
+  const startedAt = performance.now();
+  const databasePath = await findD1SqliteDatabase(persistencePath);
+  const verification = await runNativeTemplateVerifier<NativeTemplateVerification>(
+    databasePath,
+  );
+  if (
+    !verification.checkpoint ||
+    verification.checkpoint.busy !== 0 ||
+    verification.quickCheck !== "ok" ||
+    !Number.isInteger(verification.schemaObjects) ||
+    (verification.schemaObjects ?? 0) < 1 ||
+    JSON.stringify(verification.migrations) !== JSON.stringify(expectedMigrations)
+  ) {
+    throw new Error(
+      `Native D1 template verification failed: ` +
+        `checkpoint busy=${verification.checkpoint?.busy ?? "unknown"}; ` +
+        `quick_check=${verification.quickCheck ?? "missing"}; ` +
+        `schema objects=${verification.schemaObjects ?? "missing"}; ` +
+        `migrations=${verification.migrations?.length ?? "missing"}/${expectedMigrations.length}`,
+    );
+  }
+  await assertCompactedWal(databasePath);
+  console.info(
+    `[d1-test] native SQLite checkpoint and verification: ` +
+      `${verification.schemaObjects} schema objects; ` +
+      `${expectedMigrations.length} migrations; ` +
+      `elapsed: ${((performance.now() - startedAt) / 1_000).toFixed(3)}s`,
+  );
+  return { databasePath, schemaObjects: verification.schemaObjects! };
+}
+
+async function checkpointPreparedDatabase(databasePath: string) {
+  const checkpoint = await runNativeTemplateVerifier<NativeCheckpointResult>(
+    databasePath,
+    true,
+  );
+  if (!checkpoint.checkpoint || checkpoint.checkpoint.busy !== 0) {
+    throw new Error(
+      `Final D1 template checkpoint failed: ` +
+        `busy=${checkpoint.checkpoint?.busy ?? "unknown"}`,
+    );
+  }
+  await assertCompactedWal(databasePath);
+}
+
+function localWranglerEnvironment() {
+  const environment: WranglerLocalEnvironment = {
+    CI: "true",
+    NO_COLOR: "1",
+    NO_D1_WARNING: "true",
+    WRANGLER_SEND_METRICS: "false",
+  };
+  for (const variable of WRANGLER_LOCAL_ENVIRONMENT_VARIABLES) {
+    const value = process.env[variable];
+    if (value !== undefined) environment[variable] = value;
+  }
+  return environment as NodeJS.ProcessEnv;
+}
+
+function wranglerFailureOutput(stdout: string, stderr: string) {
+  const lines = `${stdout}\n${stderr}`
+    .split(/\r?\n/u)
+    .map((line) => line.trimEnd())
+    .filter(Boolean);
+  return lines.slice(-WRANGLER_FAILURE_LOG_LINES).join("\n");
+}
+
+async function applyWranglerLocalMigrations(
+  temporaryDirectory: string,
+  migrationCount: number,
+) {
+  const persistenceParent = join(
+    temporaryDirectory,
+    PERSISTENCE_PARENT_DIRECTORY,
+  );
+  const configPath = join(temporaryDirectory, WRANGLER_CONFIG_FILE);
+  await mkdir(persistenceParent, { recursive: true });
+  await writeFile(
+    configPath,
+    `${JSON.stringify({
+      name: TEMPLATE_DATABASE_NAME,
+      compatibility_date: TEMPLATE_COMPATIBILITY_DATE,
+      d1_databases: [
+        {
+          binding: "DB",
+          database_name: TEMPLATE_DATABASE_NAME,
+          database_id: TEMPLATE_DATABASE_ID,
+          migrations_dir: resolve("migrations"),
+        },
+      ],
+    }, null, 2)}\n`,
+    { flag: "wx", mode: 0o600 },
+  );
+
+  const startedAt = performance.now();
+  try {
+    await new Promise<void>((resolvePromise, rejectPromise) => {
+      execFile(
+        resolve("node_modules/.bin/wrangler"),
+        [
+          "d1",
+          "migrations",
+          "apply",
+          "DB",
+          "--local",
+          "--persist-to",
+          persistenceParent,
+          "--config",
+          configPath,
+          "--experimental-auto-create=false",
+        ],
+        {
+          cwd: process.cwd(),
+          encoding: "utf8",
+          env: localWranglerEnvironment(),
+          maxBuffer: WRANGLER_MAX_OUTPUT_BYTES,
+          timeout: WRANGLER_TIMEOUT_MS,
+        },
+        (error, stdout, stderr) => {
+          if (!error) {
+            resolvePromise();
+            return;
+          }
+          const diagnostic = wranglerFailureOutput(stdout, stderr);
+          const timedOut = error.killed && error.signal !== null;
+          rejectPromise(new Error(
+            timedOut
+              ? `Wrangler local D1 migrations timed out after ${WRANGLER_TIMEOUT_MS / 1_000}s ` +
+                `on ${process.platform}-${process.arch}`
+              : `Wrangler local D1 migrations failed with exit code ${error.code ?? "unknown"} ` +
+                `on ${process.platform}-${process.arch}` +
+                (diagnostic ? `:\n${diagnostic}` : ""),
+            { cause: error },
+          ));
+        },
+      );
+    });
+  } finally {
+    await rm(configPath, { force: true });
+  }
+  const elapsedMs = performance.now() - startedAt;
+  console.info(
+    `[d1-test] Wrangler local migrations: ${migrationCount}; ` +
+      `platform: ${process.platform}-${process.arch}; ` +
+      `elapsed: ${(elapsedMs / 1_000).toFixed(3)}s`,
+  );
 }
 
 async function buildTemplate(
@@ -356,30 +656,41 @@ async function buildTemplate(
   fingerprint: Awaited<ReturnType<typeof templateFingerprint>>,
 ) {
   const persistencePath = join(temporaryDirectory, PERSISTENCE_DIRECTORY);
-  await mkdir(persistencePath, { recursive: true });
+  await applyWranglerLocalMigrations(
+    temporaryDirectory,
+    fingerprint.files.length,
+  );
+  const { databasePath, schemaObjects } = await checkpointAndVerifyPreparedDatabase(
+    persistencePath,
+    fingerprint.files,
+  );
   const miniflare = new Miniflare({
     modules: TEMPLATE_BINDING_CONFIG.modules,
     script: TEMPLATE_BINDING_CONFIG.script,
     d1Databases: { DB: TEMPLATE_DATABASE_ID },
     resourcePersistencePath: persistencePath,
   });
-  let schemaObjects: number;
   try {
     const db = await miniflare.getD1Database("DB") as unknown as D1Database;
-    await applyD1Migrations(db);
-    schemaObjects = await verifyPreparedDatabase(db);
+    await verifyMiniflareDatabase(db, fingerprint.files.length);
   } finally {
     await miniflare.dispose();
   }
-  const files = await listTemplateFiles(persistencePath);
+  await checkpointPreparedDatabase(databasePath);
+  const files = await listTemplateFiles(
+    join(temporaryDirectory, PERSISTENCE_PARENT_DIRECTORY),
+  );
   if (files.length === 0) throw new Error("Miniflare did not persist the D1 template");
   const manifest: TemplateManifest = {
     formatVersion: TEMPLATE_FORMAT_VERSION,
     fingerprint: fingerprint.fingerprint,
+    builder: TEMPLATE_BUILDER,
     migrations: fingerprint.files,
     runtimes: {
       miniflare: fingerprint.miniflareVersion,
       wrangler: fingerprint.wranglerVersion,
+      platform: process.platform,
+      architecture: process.arch,
     },
     bindingConfig: TEMPLATE_BINDING_CONFIG,
     files,
@@ -565,7 +876,7 @@ export async function createIsolatedTestDatabase(
     });
     clonedMiniflare = miniflare;
     const db = await miniflare.getD1Database("DB") as unknown as D1Database;
-    await verifyPreparedDatabase(db);
+    await verifyMiniflareDatabase(db, template.manifest.migrations.length);
     const disposeMiniflare = miniflare.dispose.bind(miniflare);
     let disposed = false;
     const dispose = async () => {
@@ -609,10 +920,13 @@ export async function createIsolatedTestDatabase(
         );
       }
     }
-    return createFallbackDatabase(
-      options.suite,
-      options.miniflareOptions,
-      fallbackReason,
+    const reason = fallbackReason instanceof Error
+      ? fallbackReason.message
+      : String(fallbackReason);
+    throw new Error(
+      `[d1-test] template setup failed for ${options.suite}; ` +
+        `automatic full-migration fallback is disabled: ${reason}`,
+      { cause: fallbackReason },
     );
   }
 }

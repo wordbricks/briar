@@ -24,6 +24,31 @@ const parseJsonArray = (value: string) => {
   return Array.isArray(parsed) ? parsed : [];
 };
 
+const parseRelatedMessageReference = (value: unknown) => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const reference = value as Record<string, unknown>;
+  const organizationId = reference.organizationId;
+  const channelId = reference.channelId;
+  const messageId = reference.messageId;
+  const rootMessageId = reference.rootMessageId;
+  if (
+    typeof organizationId !== "string" || !organizationId.trim() ||
+    typeof channelId !== "string" || !channelId.trim() ||
+    typeof messageId !== "string" || !messageId.trim() ||
+    typeof rootMessageId !== "string" || !rootMessageId.trim()
+  ) {
+    return null;
+  }
+  return {
+    organizationId: organizationId.trim(),
+    channelId: channelId.trim(),
+    messageId: messageId.trim(),
+    rootMessageId: rootMessageId.trim(),
+  };
+};
+
 export const dashboardEventJson = (
   event: HuntEventRow,
   actorNames: ReadonlyMap<string, string> = new Map(),
@@ -54,6 +79,9 @@ export function dashboardRunJson(
   const status = run.paused_at ? ("paused" as const) : run.status;
   const workflow = normalizeAutoHuntWorkflow(JSON.parse(run.workflow_snapshot_json));
   const context = parseJsonObject(run.context_json);
+  const relatedMessage = parseRelatedMessageReference(
+    context ? (context as Record<string, unknown>).relatedMessage : undefined,
+  );
   const dependencyStatus = (
     rawStatus: AutoHuntRunStatus,
     pausedAt: string | null,
@@ -139,6 +167,7 @@ export function dashboardRunJson(
         }
       : null,
     issueDescription: run.issue_description,
+    relatedMessage,
     attachments: attachments.map(issueAttachmentJson),
     prerequisites: prerequisites.map((dependency) => ({
       id: dependency.prerequisite_run_id,

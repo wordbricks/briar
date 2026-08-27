@@ -46,6 +46,8 @@ export async function createProject(
     provider: "codex",
     model: null,
     effort: null,
+    designated_worker_id: null,
+    designated_worker_label: null,
     description: defaultAgentCopy.description,
     responsibility: defaultAgentCopy.responsibility,
     skill_markdown: projectAgentSkill({
@@ -119,8 +121,7 @@ export async function getProject(
   projectId: string,
   userId: string,
 ) {
-  return await db
-    .prepare(
+  const accessibleProject = () => db.prepare(
       `select project.id, project.name,
               project.issue_key_prefix,
               project.schedule_tab_enabled,
@@ -133,10 +134,44 @@ export async function getProject(
        join briar_organization_members membership
          on membership.organization_id = project.organization_id
         and membership.user_id = ?
-       where project.id = ?`,
+       left join briar_project_members project_membership
+         on project_membership.project_id = project.id
+        and project_membership.organization_id = project.organization_id
+        and project_membership.user_id = membership.user_id
+       where project.id = ?
+         and (
+           membership.role in ('owner', 'admin')
+           or project_membership.user_id is not null
+         )`,
     )
     .bind(userId, projectId)
     .first<ProjectRow>();
+  try {
+    return await accessibleProject();
+  } catch (error) {
+    if (!String(error).includes("no such table: briar_project_members")) {
+      throw error;
+    }
+    return await db
+      .prepare(
+        `select project.id, project.name,
+                project.issue_key_prefix,
+                project.schedule_tab_enabled,
+                coalesce(project.icon_data_url_browser, project.icon_data_url) as icon,
+                project.organization_id,
+                organization.name as organization_name,
+                membership.role as member_role, project.created_at
+         from briar_projects project
+         join briar_organizations organization
+           on organization.id = project.organization_id
+         join briar_organization_members membership
+           on membership.organization_id = project.organization_id
+          and membership.user_id = ?
+         where project.id = ?`,
+      )
+      .bind(userId, projectId)
+      .first<ProjectRow>();
+  }
 }
 
 export async function updateProjectIcon(

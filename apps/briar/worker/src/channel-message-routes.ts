@@ -3,7 +3,10 @@ import {
 } from "../../src/lib/issue-markdown";
 import { agentReplyParentMessageId } from "../../src/lib/issue-reply-decision";
 import {
+  channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
+  channelReplyProviderUsageExhaustedError,
+  type ChannelReplyUnavailableReason,
 } from "../../src/lib/channels-contract";
 import { hydrateAgentSkills } from "./agent-skills";
 import { processArchiveCleanupQueue } from "./archive";
@@ -24,6 +27,7 @@ import {
   getChannelMessage,
   getChannelMessageAttachment,
   getChannelMessageDocument,
+  getChannelReplySessionForThread,
   getProjectAgentChannel,
   getProjectOrganizationChannel,
   isChannelReactionEmoji,
@@ -46,6 +50,7 @@ import {
   json,
   privateNoStoreJson,
 } from "./http-response";
+import { fetchChannelLinkPreview } from "./link-preview";
 import { getOrganizationRole } from "./organization-repository";
 import {
   decodeChannelMessageQuery,
@@ -57,7 +62,7 @@ import {
 } from "./request-readers";
 import { requireSession } from "./session-auth";
 import {
-  hasAvailableChannelReplyWorker,
+  channelReplyWorkerAvailability,
   userOwnsExecutionWorkerDevice,
 } from "./workers";
 import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
@@ -162,6 +167,23 @@ export async function handleChannelMessageRoute(
   const channelDocumentMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/document$/u,
   );
+  const channelLinkPreviewMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/link-preview$/u,
+  );
+  if (channelLinkPreviewMatch && request.method === "GET") {
+    const session = await requireSession(auth, request);
+    await requireChannelAccess(
+      db,
+      channelLinkPreviewMatch[1],
+      channelLinkPreviewMatch[2],
+      session.user.id,
+    );
+    const targetUrl = url.searchParams.get("url");
+    if (!targetUrl) throw new HttpError(400, "Link preview URL is required");
+    return privateNoStoreJson({
+      preview: await fetchChannelLinkPreview(targetUrl),
+    });
+  }
   if (channelDocumentMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     await requireChannelAccess(
@@ -349,18 +371,40 @@ export async function handleChannelMessageRoute(
           ? selectedSkillTarget.skill
           : null;
         const replyRuntime = selectedSkill ?? agent;
-        const hasAvailableWorker = await hasAvailableChannelReplyWorker(db, {
+        const retainedSession = await getChannelReplySessionForThread(db, {
+          channelId: channel.id,
+          threadRootMessageId: input.parentMessageId ?? messageId,
+          agentId: agent.id,
+        });
+        const liveSession = retainedSession &&
+            retainedSession.retained_until > createdAt
+          ? retainedSession
+          : null;
+        const assignedWorkerId = liveSession
+          ? liveSession.owner_worker_id
+          : agent.designated_worker_id;
+        const assignedWorkerLabel = liveSession
+          ? liveSession.owner_worker_label
+          : agent.designated_worker_label;
+        const workerAvailability = await channelReplyWorkerAvailability(db, {
           organizationId,
           projectId: agent.project_id,
+          preferredDeviceId: liveSession?.owner_device_id ?? null,
+          preferredWorkerId: assignedWorkerId,
           provider: replyRuntime.provider,
           model: replyRuntime.model,
           effort: replyRuntime.effort,
           observedAt: createdAt,
         });
-        const unavailableReason:
-          | typeof channelReplyNoAvailableWorkerError
-          | null = hasAvailableWorker
+        const unavailableReason: ChannelReplyUnavailableReason | null =
+          workerAvailability === "available"
             ? null
+            : assignedWorkerId
+            ? channelReplyAssignedWorkerUnavailableError(
+                assignedWorkerLabel ?? assignedWorkerId,
+              )
+            : workerAvailability === "usage_exhausted"
+            ? channelReplyProviderUsageExhaustedError
             : channelReplyNoAvailableWorkerError;
         return { agent, selectedSkill, replyRuntime, unavailableReason };
       }),

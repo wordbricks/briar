@@ -1,5 +1,9 @@
 import { contentDisposition } from "./attachment-storage";
 import { corsHeaders } from "./http-response";
+import {
+  htmlArtifactContentSecurityPolicy,
+  isHtmlArtifactAttachment,
+} from "../../src/lib/agent-reply-attachments";
 
 export type ChannelAttachmentMetadata = {
   filename: string;
@@ -21,6 +25,13 @@ export function channelAttachmentResponse(
   headers.set("X-Content-Type-Options", "nosniff");
   if (attachment.content_type.toLowerCase() === "image/svg+xml") {
     headers.set("Content-Security-Policy", "sandbox");
+  } else if (
+    isHtmlArtifactAttachment(attachment.content_type, attachment.filename)
+  ) {
+    headers.set(
+      "Content-Security-Policy",
+      `sandbox allow-scripts; ${htmlArtifactContentSecurityPolicy}`,
+    );
   }
   return new Response(body, { headers });
 }

@@ -3,7 +3,10 @@ import {
   repositoryWorkflowBootstrap,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import { resolveProjectConnectionWorkflow } from "./project-connection";
+import {
+  preflightThenCreateProject,
+  resolveProjectConnectionWorkflow,
+} from "./project-connection";
 
 const configuredWorkflow: AutoHuntWorkflow = {
   version: 2,
@@ -12,6 +15,7 @@ const configuredWorkflow: AutoHuntWorkflow = {
     id: "implementing",
     label: "Implement",
     required: true,
+    evidence: ["diff"],
   }],
   execution: { checkpoints: [] },
   completion: { requiredStages: ["implementing"] },
@@ -56,5 +60,53 @@ describe("project connection workflow authorization", () => {
       shouldPersistProjectSettings: true,
     });
     expect(generateWorkflow).not.toHaveBeenCalled();
+  });
+});
+
+describe("project creation preflight", () => {
+  it("does not create a remote project when native preflight fails", async () => {
+    const create = vi.fn<() => Promise<void>>();
+
+    await expect(preflightThenCreateProject(
+      () => Promise.reject(new Error("provider unavailable")),
+      create,
+    )).rejects.toThrow("provider unavailable");
+
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("creates only after preflight and skips creation for reconnects", async () => {
+    const order: string[] = [];
+    const create = vi.fn(async () => {
+      order.push("create");
+    });
+    const preflight = async () => {
+      order.push("preflight");
+      return { repositoryPath: "/repo" };
+    };
+
+    await expect(preflightThenCreateProject(preflight, create)).resolves.toEqual({
+      repositoryPath: "/repo",
+    });
+    expect(order).toEqual(["preflight", "create"]);
+
+    order.length = 0;
+    await preflightThenCreateProject(preflight);
+    expect(order).toEqual(["preflight"]);
+    expect(create).toHaveBeenCalledOnce();
+  });
+
+  it("does not create after the preflight request is cancelled", async () => {
+    const create = vi.fn<() => Promise<void>>();
+
+    await expect(preflightThenCreateProject(
+      () => Promise.resolve({ repositoryPath: "/repo" }),
+      create,
+      () => {
+        throw new Error("cancelled");
+      },
+    )).rejects.toThrow("cancelled");
+
+    expect(create).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,6 @@
 //! Local command execution shared by Briar's desktop integrations.
 
+mod environment;
 mod local;
 
 use std::{
@@ -7,6 +8,9 @@ use std::{
     process::Child,
 };
 
+pub(crate) use environment::{bundled_bun_binary, cli_execution_path, LocalExecutionEnvironment};
+#[cfg(test)]
+pub(crate) use environment::{bundled_runtime_directories, cli_execution_path_with_runtime};
 pub(crate) use local::LocalRunner;
 
 /// One command to run on the local machine.

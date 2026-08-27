@@ -2,6 +2,7 @@ import {
   ArrowRight,
   BarChart3,
   Bot,
+  CalendarDays,
   CheckCircle2,
   CircleAlert,
   Clock3,
@@ -23,9 +24,17 @@ import type { MessageKey } from "../i18n/messages";
 import { formatUsageDuration } from "../lib/agent-usage";
 import type { RepositoryReadiness } from "../lib/project-connection";
 import {
+  isLocalProjectRepositoryReady,
+  localProjectReadiness,
+  type LocalProjectConnectionState,
+} from "../lib/local-project-connection";
+import {
+  defaultProjectUsageDateRange,
+  isProjectUsageDateRange,
   projectTrackedDuration as trackedDurationForRange,
   summarizeProjectUsage,
   type ProjectUsageBreakdownItem,
+  type ProjectUsageDateRange,
   type ProjectUsagePeriod,
   type ProjectUsageSummaryRun,
   type ProjectUsageSummaryLoadOptions,
@@ -36,10 +45,23 @@ import type {
   Project,
   ProjectUsageSummary,
 } from "../types";
+import { cn } from "../lib/utils";
 
 const defaultPeriod: ProjectUsagePeriod = "day";
 const activeStatuses = new Set(["queued", "running", "paused"]);
 const attentionStatuses = new Set(["blocked", "failed"]);
+
+const displayDateRange = (range: ProjectUsageDateRange, locale: string) => {
+  const formatter = new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  });
+  const from = Date.parse(`${range.from}T00:00:00.000Z`);
+  const to = Date.parse(`${range.to}T00:00:00.000Z`);
+  return `${formatter.format(from)} – ${formatter.format(to)}`;
+};
 
 function formatCompact(value: number, locale: string) {
   return new Intl.NumberFormat(locale, {
@@ -92,10 +114,7 @@ export function projectTrackedDuration(
   return trackedDurationForRange(runs, defaultPeriod, now);
 }
 
-function breakdownLabel(
-  item: ProjectUsageBreakdownItem,
-  fallback: string,
-) {
+function breakdownLabel(item: ProjectUsageBreakdownItem, fallback: string) {
   return item.name?.trim() || item.id?.trim() || fallback;
 }
 
@@ -105,6 +124,7 @@ function statusLabel(run: HuntRun, t: ReturnType<typeof useI18n>["t"]) {
 }
 
 export function ProjectLobby({
+  connectionState,
   dashboard,
   isSidebarOpen,
   onLoadUsageSummary,
@@ -115,7 +135,9 @@ export function ProjectLobby({
   onOpenSettings,
   project,
   readiness,
+  requiresLocalReadiness,
 }: {
+  connectionState: LocalProjectConnectionState;
   dashboard: DashboardPayload | null;
   isSidebarOpen: boolean;
   onLoadUsageSummary: (
@@ -130,34 +152,44 @@ export function ProjectLobby({
   onOpenSettings: () => void;
   project: Project;
   readiness: RepositoryReadiness | null;
+  requiresLocalReadiness: boolean;
 }) {
   const { localeTag, t } = useI18n();
-  const [usageSummary, setUsageSummary] =
-    useState<ProjectUsageSummary | null>(null);
+  const [usageSummary, setUsageSummary] = useState<ProjectUsageSummary | null>(
+    null,
+  );
   const [usageError, setUsageError] = useState<string | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [period, setPeriod] = useState<ProjectUsagePeriod>(defaultPeriod);
+  const [dateRange, setDateRange] = useState(defaultProjectUsageDateRange);
+  const [draftDateRange, setDraftDateRange] = useState(dateRange);
   const [now, setNow] = useState(Date.now);
   const usageRequest = useRef(0);
 
-  const refreshUsage = useCallback(async (force = false) => {
-    const request = ++usageRequest.current;
-    setUsageLoading(true);
-    setUsageError(null);
-    try {
-      const summary = await onLoadUsageSummary(project.id, period, { force });
-      if (request === usageRequest.current) {
-        setUsageSummary(summary);
-        setNow(Date.now());
+  const refreshUsage = useCallback(
+    async (force = false) => {
+      const request = ++usageRequest.current;
+      setUsageLoading(true);
+      setUsageError(null);
+      try {
+        const summary = await onLoadUsageSummary(project.id, period, {
+          force,
+          range: dateRange,
+        });
+        if (request === usageRequest.current) {
+          setUsageSummary(summary);
+          setNow(Date.now());
+        }
+      } catch (cause) {
+        if (request === usageRequest.current) {
+          setUsageError(cause instanceof Error ? cause.message : String(cause));
+        }
+      } finally {
+        if (request === usageRequest.current) setUsageLoading(false);
       }
-    } catch (cause) {
-      if (request === usageRequest.current) {
-        setUsageError(cause instanceof Error ? cause.message : String(cause));
-      }
-    } finally {
-      if (request === usageRequest.current) setUsageLoading(false);
-    }
-  }, [onLoadUsageSummary, period, project.id]);
+    },
+    [dateRange, onLoadUsageSummary, period, project.id],
+  );
 
   useEffect(() => {
     setUsageSummary(null);
@@ -165,27 +197,31 @@ export function ProjectLobby({
     void refreshUsage();
   }, [period, project.id, refreshUsage]);
 
-  const dashboardRuns = dashboard?.project.id === project.id
-    ? dashboard.runs
-    : [];
+  const dashboardRuns =
+    dashboard?.project.id === project.id ? dashboard.runs : [];
   const dashboardUsage = useMemo(
-    () => summarizeProjectUsage(dashboardRuns, period, now),
-    [dashboardRuns, now, period],
+    () => summarizeProjectUsage(dashboardRuns, period, now, dateRange),
+    [dashboardRuns, dateRange, now, period],
   );
-  const totalTokens = usageSummary?.totalTokens ??
-    dashboardUsage.totalTokens;
-  const observedRuns = usageSummary?.observedRuns ?? dashboardUsage.observedRuns;
-  const reportedRuns = usageSummary?.reportedRuns ?? dashboardUsage.reportedRuns;
-  const trackedDuration = usageSummary?.trackedDurationMs ??
-    trackedDurationForRange(dashboardRuns, period, now);
-  const completedIssues = usageSummary?.completedIssues ??
-    dashboardUsage.completedIssues;
+  const totalTokens = usageSummary?.totalTokens ?? dashboardUsage.totalTokens;
+  const observedRuns =
+    usageSummary?.observedRuns ?? dashboardUsage.observedRuns;
+  const reportedRuns =
+    usageSummary?.reportedRuns ?? dashboardUsage.reportedRuns;
+  const trackedDuration =
+    usageSummary?.trackedDurationMs ??
+    trackedDurationForRange(dashboardRuns, period, now, dateRange);
+  const completedIssues =
+    usageSummary?.completedIssues ?? dashboardUsage.completedIssues;
   const timeline = usageSummary?.timeline ?? dashboardUsage.timeline;
-  const issueCreators = usageSummary?.issueCreators ?? dashboardUsage.issueCreators;
+  const issueCreators =
+    usageSummary?.issueCreators ?? dashboardUsage.issueCreators;
   const agents = usageSummary?.agents ?? dashboardUsage.agents;
-  const activeRuns = dashboardRuns.filter((run) => activeStatuses.has(run.status));
+  const activeRuns = dashboardRuns.filter((run) =>
+    activeStatuses.has(run.status),
+  );
   const attentionRuns = dashboardRuns.filter((run) =>
-    attentionStatuses.has(run.status)
+    attentionStatuses.has(run.status),
   );
   const recentRuns = [...dashboardRuns]
     .sort(
@@ -194,11 +230,42 @@ export function ProjectLobby({
         Date.parse(left.lastEventAt || left.updatedAt),
     )
     .slice(0, 5);
+  const inspectedReadiness = requiresLocalReadiness
+    ? localProjectReadiness(connectionState, readiness)
+    : readiness;
   const githubRepository =
-    dashboard?.settings.githubRepository ?? readiness?.githubRepository ?? null;
-  const githubReady = Boolean(
-    githubRepository && (readiness ? readiness.prReady : true),
+    inspectedReadiness?.githubRepository ??
+    (dashboard?.project.id === project.id
+      ? dashboard.settings.githubRepository
+      : null);
+  const localSetupReady = Boolean(
+    (!requiresLocalReadiness || connectionState === "connected") &&
+    (requiresLocalReadiness
+      ? isLocalProjectRepositoryReady(inspectedReadiness)
+      : true),
   );
+  const repositoryReady = Boolean(localSetupReady && githubRepository);
+  const connectsOnDesktop = !requiresLocalReadiness && !githubRepository;
+  const githubOptional = Boolean(
+    requiresLocalReadiness &&
+    connectionState === "connected" &&
+    inspectedReadiness &&
+    !inspectedReadiness.requiresGithub &&
+    !githubRepository,
+  );
+  const repositoryState = !requiresLocalReadiness
+    ? repositoryReady
+      ? "ready"
+      : "attention"
+    : connectionState === "disconnected"
+      ? "disconnected"
+      : connectionState === "unknown" || !inspectedReadiness
+        ? "unknown"
+        : githubOptional
+          ? "optional"
+          : repositoryReady
+            ? "ready"
+            : "attention";
   const dateFormatter = new Intl.DateTimeFormat(localeTag, {
     day: "numeric",
     month: "short",
@@ -225,7 +292,20 @@ export function ProjectLobby({
   const maxTokens = niceScaleMaximum(maxTokensRaw);
   const issueTicks = chartTickValues(maxIssues, true);
   const tokenTicks = chartTickValues(maxTokens, false);
-  const periodLabel = t(`lobby.period.${period}` as MessageKey);
+  const periodLabel = displayDateRange(dateRange, localeTag);
+  const today = defaultProjectUsageDateRange(now).to;
+  const dateRangeValid =
+    isProjectUsageDateRange(draftDateRange, period) &&
+    draftDateRange.to <= today;
+  const dateRangeChanged =
+    draftDateRange.from !== dateRange.from ||
+    draftDateRange.to !== dateRange.to;
+  const applyDateRange = () => {
+    if (!dateRangeValid || !dateRangeChanged) return;
+    usageRequest.current += 1;
+    setUsageSummary(null);
+    setDateRange(draftDateRange);
+  };
   const bucketLabel = (startAt: string) => {
     const timestamp = Date.parse(startAt);
     return period === "month"
@@ -238,15 +318,30 @@ export function ProjectLobby({
   ) => {
     const max = Math.max(1, ...items.map((item) => item.issues));
     if (items.length === 0) {
-      return <p className="project-lobby-analytics-empty">{t("lobby.analyticsEmpty")}</p>;
+      return (
+        <p className="flex min-h-[72px] items-center text-micro text-muted-foreground">
+          {t("lobby.analyticsEmpty")}
+        </p>
+      );
     }
     return (
-      <ol className="project-lobby-breakdown-list">
+      <ol className="mt-4 grid list-none gap-3 p-0">
         {items.map((item, index) => (
-          <li key={`${item.id ?? item.name ?? "unknown"}-${index}`}>
-            <span>{breakdownLabel(item, fallback)}</span>
-            <strong>{t("lobby.issueCount", { count: item.issues })}</strong>
-            <i aria-hidden style={{ width: `${(item.issues / max) * 100}%` }} />
+          <li
+            className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1"
+            key={`${item.id ?? item.name ?? "unknown"}-${index}`}
+          >
+            <span className="truncate text-xs font-semibold text-foreground">
+              {breakdownLabel(item, fallback)}
+            </span>
+            <strong className="font-mono text-micro font-medium text-muted-foreground">
+              {t("lobby.issueCount", { count: item.issues })}
+            </strong>
+            <i
+              aria-hidden
+              className="col-span-full h-1.25 min-w-0 rounded-full bg-gradient-to-r from-accent-foreground to-[#9d8bdd]"
+              style={{ width: `${(item.issues / max) * 100}%` }}
+            />
           </li>
         ))}
       </ol>
@@ -256,31 +351,36 @@ export function ProjectLobby({
   return (
     <MainContent id="project-lobby">
       <PageHeader
-        className={`app-page-header project-lobby-header${
-          isSidebarOpen ? "" : " sidebar-closed"
-        }`}
+        className={cn(
+          "app-page-header [&_.page-header-title]:min-w-0",
+          !isSidebarOpen && "sidebar-closed",
+        )}
         data-tauri-drag-region="deep"
         title={
-          <span className="project-lobby-title">
+          <span className="flex min-w-0 items-center gap-2">
             <ProjectIcon className="size-5" project={project} />
-            <span>{project.name}</span>
+            <span className="truncate">{project.name}</span>
           </span>
         }
       />
-      <div className="project-lobby-scroll">
-        <div className="project-lobby-content">
-          <section className="project-lobby-intro">
-            <div>
-              <span className="project-lobby-kicker">
+      <div className="scrollbar-subtle min-h-0 flex-1 overflow-auto bg-background">
+        <div className="mx-auto w-[min(1180px,calc(100%_-_64px))] py-11 pb-[72px] max-[980px]:w-[min(calc(100%_-_40px),900px)] max-[980px]:pt-8 max-[620px]:w-[calc(100%_-_28px)] max-[620px]:py-6 max-[620px]:pb-12">
+          <section className="flex min-h-[122px] items-start justify-between gap-8 max-[620px]:mb-6 max-[620px]:min-h-0 max-[620px]:flex-col max-[620px]:gap-4">
+            <div className="min-w-0">
+              <span className="flex items-center gap-1.5 text-micro font-bold tracking-wide text-primary uppercase">
                 <Sparkles aria-hidden size={14} />
                 {periodLabel}
               </span>
-              <h1>{t("lobby.title")}</h1>
-              <p>{t("lobby.description", { project: project.name })}</p>
+              <h1 className="mt-3 mb-0 text-[clamp(28px,3vw,38px)] leading-[1.1] font-[680] tracking-[-.045em] text-foreground">
+                {t("lobby.title")}
+              </h1>
+              <p className="mt-2.5 mb-0 text-sm leading-relaxed text-muted-foreground">
+                {t("lobby.description", { project: project.name })}
+              </p>
             </div>
             <button
               aria-label={t("lobby.refresh")}
-              className="project-lobby-refresh"
+              className="flex h-9 min-w-max cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-0 text-xs font-semibold text-muted-foreground shadow-xs hover:border-input hover:bg-muted hover:text-foreground disabled:cursor-wait disabled:opacity-60 max-[620px]:w-full max-[620px]:justify-center"
               disabled={usageLoading}
               onClick={() => void refreshUsage(true)}
               type="button"
@@ -295,9 +395,15 @@ export function ProjectLobby({
             </button>
           </section>
 
-          <section aria-label={t("lobby.metrics")} className="project-lobby-metrics">
-            <article className="project-lobby-metric primary">
-              <span><Sparkles aria-hidden size={16} />{t("lobby.tokens")}</span>
+          <section
+            aria-label={t("lobby.metrics")}
+            className="grid grid-cols-4 overflow-hidden rounded-[18px] border border-border bg-card shadow-sm max-[980px]:grid-cols-2 max-[620px]:grid-cols-1 [&>article]:flex [&>article]:min-h-[156px] [&>article]:min-w-0 [&>article]:flex-col [&>article]:justify-center [&>article]:border-l [&>article]:border-border [&>article]:px-6 [&>article]:py-5 [&>article:first-child]:border-l-0 [&>article>span]:flex [&>article>span]:items-center [&>article>span]:gap-2 [&>article>span]:text-xs [&>article>span]:font-semibold [&>article>span]:text-muted-foreground [&>article>span_svg]:text-accent-foreground [&>article>strong]:mt-3.5 [&>article>strong]:truncate [&>article>strong]:font-mono [&>article>strong]:text-[clamp(26px,3vw,34px)] [&>article>strong]:leading-none [&>article>strong]:font-semibold [&>article>strong]:tracking-tighter [&>article>strong]:text-foreground [&>article>small]:mt-2.5 [&>article>small]:truncate [&>article>small]:text-micro [&>article>small]:leading-snug [&>article>small]:text-muted-foreground max-[980px]:[&>article]:min-h-[132px] max-[980px]:[&>article]:border-t max-[980px]:[&>article:nth-child(odd)]:border-l-0 max-[980px]:[&>article:nth-child(-n+2)]:border-t-0 max-[620px]:[&>article]:min-h-[120px] max-[620px]:[&>article]:border-t max-[620px]:[&>article]:border-l-0 max-[620px]:[&>article:first-child]:border-t-0"
+          >
+            <article className="bg-[linear-gradient(145deg,color-mix(in_srgb,var(--primary)_9%,var(--card)),var(--card)_74%)]">
+              <span>
+                <Sparkles aria-hidden size={16} />
+                {t("lobby.tokens")}
+              </span>
               <strong>{formatCompact(totalTokens, localeTag)}</strong>
               <small>
                 {usageLoading && !usageSummary
@@ -308,18 +414,27 @@ export function ProjectLobby({
                     })}
               </small>
             </article>
-            <article className="project-lobby-metric">
-              <span><Clock3 aria-hidden size={16} />{t("lobby.workTime")}</span>
+            <article>
+              <span>
+                <Clock3 aria-hidden size={16} />
+                {t("lobby.workTime")}
+              </span>
               <strong>{formatUsageDuration(trackedDuration)}</strong>
               <small>{t("lobby.trackedTimeHint")}</small>
             </article>
-            <article className="project-lobby-metric">
-              <span><CheckCircle2 aria-hidden size={16} />{t("lobby.completed")}</span>
+            <article>
+              <span>
+                <CheckCircle2 aria-hidden size={16} />
+                {t("lobby.completed")}
+              </span>
               <strong>{formatCompact(completedIssues, localeTag)}</strong>
               <small>{t("lobby.completedHint", { period: periodLabel })}</small>
             </article>
-            <article className="project-lobby-metric">
-              <span><CircleAlert aria-hidden size={16} />{t("lobby.active")}</span>
+            <article>
+              <span>
+                <CircleAlert aria-hidden size={16} />
+                {t("lobby.active")}
+              </span>
               <strong>{formatCompact(activeRuns.length, localeTag)}</strong>
               <small>
                 {attentionRuns.length > 0
@@ -330,48 +445,159 @@ export function ProjectLobby({
           </section>
 
           {usageError ? (
-            <p className="project-lobby-usage-error" role="status">
+            <p
+              className="mt-3 mb-0 flex items-center gap-2 rounded-lg border border-[var(--status-destructive-border)] bg-[var(--status-destructive-surface)] px-2.5 py-2 text-micro text-[var(--status-destructive-foreground)]"
+              role="status"
+            >
               {t("lobby.usageUnavailable")}
-              <span title={usageError}>{usageError}</span>
+              <span
+                className="min-w-0 truncate text-muted-foreground"
+                title={usageError}
+              >
+                {usageError}
+              </span>
             </p>
           ) : null}
 
-          <section className="project-lobby-analytics" aria-labelledby="project-analytics-title">
-            <header>
-              <div>
-                <span className="project-lobby-panel-icon"><BarChart3 aria-hidden size={18} /></span>
-                <div>
-                  <h2 id="project-analytics-title">{t("lobby.analyticsTitle")}</h2>
-                  <p>{t("lobby.analyticsDescription")}</p>
+          <section
+            className="mt-5 min-w-0 overflow-hidden rounded-[18px] border border-border bg-card shadow-sm [&_h2]:m-0 [&_h2]:text-md [&_h2]:font-semibold [&_h2]:tracking-tight [&_h3]:m-0 [&_h3]:text-md [&_h3]:font-semibold [&_h3]:tracking-tight"
+            aria-labelledby="project-analytics-title"
+          >
+            <header className="flex min-h-[86px] items-center justify-between gap-4 border-b border-border px-5 py-4 max-[620px]:items-stretch max-[620px]:flex-col">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid size-[38px] shrink-0 place-items-center rounded-xl border border-border bg-muted text-primary">
+                  <BarChart3 aria-hidden size={18} />
+                </span>
+                <div className="min-w-0">
+                  <h2 id="project-analytics-title">
+                    {t("lobby.analyticsTitle")}
+                  </h2>
+                  <p className="mt-1 mb-0 text-micro leading-snug text-muted-foreground">
+                    {t("lobby.analyticsDescription")}
+                  </p>
                 </div>
               </div>
-              <div className="project-lobby-period-picker" aria-label={t("lobby.analyticsPeriod")}>
-                {(["day", "week", "month"] as const).map((value) => (
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 max-[620px]:w-full max-[620px]:justify-stretch">
+                <div
+                  aria-label={t("lobby.analyticsGranularity")}
+                  className="flex shrink-0 items-center rounded-lg border border-border bg-muted p-0.5 max-[620px]:w-full [&>button]:h-[29px] [&>button]:cursor-pointer [&>button]:rounded-md [&>button]:border-0 [&>button]:bg-transparent [&>button]:px-2.5 [&>button]:py-0 [&>button]:text-micro [&>button]:font-semibold [&>button]:text-muted-foreground [&>button]:hover:text-foreground [&>button]:disabled:cursor-not-allowed [&>button]:disabled:opacity-40 max-[620px]:[&>button]:flex-1"
+                  role="group"
+                >
+                  {(["day", "week", "month"] as const).map((value) => {
+                    const available = isProjectUsageDateRange(dateRange, value);
+                    return (
+                      <button
+                        aria-pressed={period === value}
+                        className={
+                          period === value
+                            ? "bg-card! text-foreground! shadow-xs"
+                            : ""
+                        }
+                        disabled={!available}
+                        key={value}
+                        onClick={() => {
+                          if (period === value) return;
+                          usageRequest.current += 1;
+                          setUsageSummary(null);
+                          setPeriod(value);
+                        }}
+                        title={
+                          !available
+                            ? t("lobby.analyticsInvalidRange")
+                            : undefined
+                        }
+                        type="button"
+                      >
+                        {t(`lobby.periodOption.${value}` as MessageKey)}
+                      </button>
+                    );
+                  })}
+                </div>
+                <form
+                  className="project-lobby-date-range flex min-h-[37px] min-w-0 items-center gap-1.5 rounded-lg border border-border bg-card py-0 pr-0.5 pl-2 shadow-xs max-[620px]:grid max-[620px]:w-full max-[620px]:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto] [&>svg:first-child]:shrink-0 [&>svg:first-child]:text-primary [&_label]:flex [&_label]:min-w-0 [&_label]:items-center [&_label]:gap-1 [&_label>span]:whitespace-nowrap [&_label>span]:text-micro [&_label>span]:font-semibold max-[620px]:[&_label>span]:sr-only [&_input]:h-[27px] [&_input]:w-28 [&_input]:min-w-0 [&_input]:rounded-md [&_input]:border-0 [&_input]:bg-transparent [&_input]:px-1 [&_input]:py-0 [&_input]:font-mono [&_input]:text-micro [&_input]:font-medium [&_input]:text-foreground [&_input]:hover:bg-muted [&_input[aria-invalid=true]]:bg-[var(--status-destructive-surface)] [&_input[aria-invalid=true]]:text-[var(--status-destructive-foreground)] max-[620px]:[&_input]:w-full [&>button]:h-[29px] [&>button]:cursor-pointer [&>button]:rounded-md [&>button]:border-0 [&>button]:bg-primary [&>button]:px-2.5 [&>button]:py-0 [&>button]:text-micro [&>button]:font-semibold [&>button]:text-primary-foreground [&>button]:hover:brightness-95 [&>button]:disabled:cursor-not-allowed [&>button]:disabled:opacity-40"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    applyDateRange();
+                  }}
+                >
+                  <CalendarDays aria-hidden size={15} />
+                  <label>
+                    <span>{t("lobby.analyticsFrom")}</span>
+                    <input
+                      aria-invalid={draftDateRange.from > draftDateRange.to}
+                      max={
+                        draftDateRange.to < today ? draftDateRange.to : today
+                      }
+                      name="from"
+                      onChange={(event) =>
+                        setDraftDateRange((current) => ({
+                          ...current,
+                          from: event.target.value,
+                        }))
+                      }
+                      required
+                      type="date"
+                      value={draftDateRange.from}
+                    />
+                  </label>
+                  <ArrowRight
+                    aria-hidden
+                    className="shrink-0 opacity-65"
+                    size={13}
+                  />
+                  <label>
+                    <span>{t("lobby.analyticsTo")}</span>
+                    <input
+                      aria-invalid={
+                        draftDateRange.from > draftDateRange.to ||
+                        draftDateRange.to > today
+                      }
+                      max={today}
+                      min={draftDateRange.from}
+                      name="to"
+                      onChange={(event) =>
+                        setDraftDateRange((current) => ({
+                          ...current,
+                          to: event.target.value,
+                        }))
+                      }
+                      required
+                      type="date"
+                      value={draftDateRange.to}
+                    />
+                  </label>
                   <button
-                    aria-pressed={period === value}
-                    className={period === value ? "active" : ""}
-                    key={value}
-                    onClick={() => {
-                      usageRequest.current += 1;
-                      setUsageSummary(null);
-                      setPeriod(value);
-                    }}
-                    type="button"
+                    aria-label={
+                      dateRangeValid
+                        ? t("lobby.analyticsApply")
+                        : t("lobby.analyticsInvalidRange")
+                    }
+                    disabled={
+                      !dateRangeValid || !dateRangeChanged || usageLoading
+                    }
+                    title={
+                      !dateRangeValid
+                        ? t("lobby.analyticsInvalidRange")
+                        : undefined
+                    }
+                    type="submit"
                   >
-                    {t(`lobby.periodOption.${value}` as MessageKey)}
+                    {t("lobby.analyticsApply")}
                   </button>
-                ))}
+                </form>
               </div>
             </header>
-            <div className="project-lobby-chart-wrap">
-              <div className="project-lobby-chart-legend" aria-hidden>
-                <span className="issues">{t("lobby.completedIssuesLegend")}</span>
-                <span className="tokens">{t("lobby.tokensLegend")}</span>
+            <div className="overflow-x-auto px-5 pt-5 pb-3 max-[620px]:px-3.5">
+              <div className="flex min-w-[768px] justify-end gap-4 px-12 pl-10 text-micro text-muted-foreground [&>span]:flex [&>span]:items-center [&>span]:gap-1.5 [&>span]:before:size-2 [&>span]:before:rounded-sm [&>span]:before:bg-accent-foreground [&>span]:before:content-['']">
+                <span>{t("lobby.completedIssuesLegend")}</span>
+                <span className="before:bg-success!">
+                  {t("lobby.tokensLegend")}
+                </span>
               </div>
-              <div className="project-lobby-chart-body">
+              <div className="mt-3 grid min-w-[768px] grid-cols-[40px_minmax(0,1fr)_48px] items-start gap-x-1.5">
                 <div
                   aria-hidden
-                  className="project-lobby-chart-y-axis issues"
+                  className="relative mt-2 h-[168px] font-mono text-micro leading-none text-accent-foreground select-none [&>span]:absolute [&>span]:right-0 [&>span]:translate-y-1/2 [&>span]:whitespace-nowrap"
                 >
                   {issueTicks.map((value) => (
                     <span
@@ -385,8 +611,10 @@ export function ProjectLobby({
                   ))}
                 </div>
                 <div
-                  aria-label={t("lobby.analyticsChartLabel", { period: periodLabel })}
-                  className="project-lobby-chart"
+                  aria-label={t("lobby.analyticsChartLabel", {
+                    period: periodLabel,
+                  })}
+                  className="grid h-[210px] min-w-0 items-stretch gap-1.5 border-b border-border bg-[repeating-linear-gradient(to_bottom,transparent_0,transparent_41px,color-mix(in_srgb,var(--border)_65%,transparent)_42px)] bg-[length:100%_168px] bg-[position:0_8px] bg-no-repeat"
                   role="list"
                   style={{
                     gridTemplateColumns: `repeat(${Math.max(timeline.length, 1)}, minmax(34px, 1fr))`,
@@ -401,7 +629,7 @@ export function ProjectLobby({
                           issues: point.completedIssues,
                           tokens: formatCompact(point.totalTokens, localeTag),
                         })}
-                        className="project-lobby-chart-column"
+                        className="grid min-w-0 grid-rows-[176px_33px] items-end"
                         key={point.startAt}
                         role="listitem"
                         title={t("lobby.analyticsPoint", {
@@ -410,28 +638,33 @@ export function ProjectLobby({
                           tokens: formatCompact(point.totalTokens, localeTag),
                         })}
                       >
-                        <div className="project-lobby-chart-bars" aria-hidden>
+                        <div
+                          className="flex h-[168px] items-end justify-center gap-0.5"
+                          aria-hidden
+                        >
                           <i
-                            className="issues"
+                            className="w-[min(12px,42%)] rounded-t bg-accent-foreground"
                             style={{
                               height: `${(point.completedIssues / maxIssues) * 100}%`,
                             }}
                           />
                           <i
-                            className="tokens"
+                            className="w-[min(12px,42%)] rounded-t bg-success"
                             style={{
                               height: `${(point.totalTokens / maxTokens) * 100}%`,
                             }}
                           />
                         </div>
-                        <span>{label}</span>
+                        <span className="truncate text-center font-mono text-micro leading-[33px] text-muted-foreground">
+                          {label}
+                        </span>
                       </div>
                     );
                   })}
                 </div>
                 <div
                   aria-hidden
-                  className="project-lobby-chart-y-axis tokens"
+                  className="relative mt-2 h-[168px] font-mono text-micro leading-none text-[var(--status-success-foreground)] select-none [&>span]:absolute [&>span]:left-0 [&>span]:translate-y-1/2 [&>span]:whitespace-nowrap"
                 >
                   {tokenTicks.map((value) => (
                     <span
@@ -446,7 +679,7 @@ export function ProjectLobby({
                 </div>
               </div>
             </div>
-            <div className="project-lobby-breakdowns">
+            <div className="grid grid-cols-2 border-t border-border max-[980px]:grid-cols-1 [&>section]:min-w-0 [&>section]:p-5 [&>section+section]:border-l [&>section+section]:border-border [&>section+section_i]:from-[var(--status-success-foreground)] [&>section+section_i]:to-success max-[980px]:[&>section+section]:border-t max-[980px]:[&>section+section]:border-l-0 [&_p]:mt-1 [&_p]:mb-0 [&_p]:text-micro [&_p]:leading-snug [&_p]:text-muted-foreground">
               <section>
                 <h3>{t("lobby.issueCreatorsTitle")}</h3>
                 <p>{t("lobby.issueCreatorsDescription")}</p>
@@ -460,83 +693,181 @@ export function ProjectLobby({
             </div>
           </section>
 
-          <div className="project-lobby-grid">
-            <section className="project-lobby-panel repository-panel">
-              <header>
-                <span className="project-lobby-panel-icon"><Github aria-hidden size={18} /></span>
-                <div>
-                  <h2>{t("lobby.githubTitle")}</h2>
-                  <p>{t("lobby.githubDescription")}</p>
+          <div className="mt-5 grid grid-cols-[minmax(0,1.35fr)_minmax(290px,.65fr)] items-start gap-5 max-[980px]:grid-cols-1">
+            <section className="repository-panel min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+              <header className="flex min-h-[76px] items-center gap-3 border-b border-border px-5 py-4">
+                <span className="grid size-[38px] shrink-0 place-items-center rounded-xl border border-border bg-muted text-primary">
+                  <Github aria-hidden size={18} />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="m-0 text-md font-semibold tracking-tight">
+                    {t("lobby.githubTitle")}
+                  </h2>
+                  <p className="mt-1 mb-0 text-micro leading-snug text-muted-foreground">
+                    {t("lobby.githubDescription")}
+                  </p>
                 </div>
-                <span className={`project-lobby-state ${githubReady ? "ready" : "attention"}`}>
-                  {githubReady ? t("lobby.connected") : t("lobby.needsConnection")}
+                <span
+                  className={cn(
+                    "ml-auto min-w-max rounded-full px-2 py-1 text-micro font-semibold max-[620px]:hidden",
+                    repositoryState === "ready" &&
+                      "bg-[var(--status-success-surface)] text-[var(--status-success-foreground)]",
+                    repositoryState === "attention" &&
+                      "bg-[var(--status-warning-surface)] text-[var(--status-warning-foreground)]",
+                    (repositoryState === "optional" ||
+                      repositoryState === "unknown") &&
+                      "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {repositoryState === "ready"
+                    ? t("lobby.connected")
+                    : repositoryState === "optional"
+                      ? t("common.optional")
+                      : repositoryState === "unknown"
+                        ? t("common.checkNeeded")
+                        : t("lobby.needsConnection")}
                 </span>
               </header>
-              <div className="project-lobby-repository">
-                <div>
-                  <small>{t("lobby.repository")}</small>
-                  <strong>{githubRepository ?? t("lobby.noRepository")}</strong>
-                  <span>
-                    {readiness?.ghAccount
-                      ? t("lobby.githubAccount", { account: readiness.ghAccount })
-                      : githubReady
-                        ? t("lobby.githubReady")
-                        : t("lobby.githubSetupHint")}
+              <div className="flex min-h-[126px] items-center justify-between gap-6 p-5 max-[620px]:items-stretch max-[620px]:flex-col max-[620px]:gap-4">
+                <div className="grid min-w-0 gap-1.5">
+                  <small className="text-micro font-semibold text-muted-foreground">
+                    {t("lobby.repository")}
+                  </small>
+                  <strong className="truncate font-mono text-md font-semibold text-foreground">
+                    {githubRepository ?? t("lobby.noRepository")}
+                  </strong>
+                  <span className="text-micro leading-snug text-muted-foreground">
+                    {repositoryState === "unknown"
+                      ? t("common.checkNeeded")
+                      : repositoryState === "optional"
+                        ? t("lobby.githubOptional")
+                        : connectsOnDesktop
+                          ? t("health.desktopOnly")
+                          : inspectedReadiness?.ghAccount
+                            ? t("lobby.githubAccount", {
+                                account: inspectedReadiness.ghAccount,
+                              })
+                            : repositoryReady
+                              ? t("lobby.githubReady")
+                              : t("lobby.githubSetupHint")}
                   </span>
                 </div>
-                <button onClick={onOpenRepository} type="button">
-                  {githubReady ? t("lobby.manageConnection") : t("lobby.connectRepository")}
-                  <ArrowRight aria-hidden size={14} />
-                </button>
+                {!githubOptional ? (
+                  <button
+                    className="flex h-8 min-w-max cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-muted px-2.5 py-0 text-micro font-semibold text-foreground hover:border-input hover:bg-accent max-[620px]:justify-center"
+                    disabled={connectsOnDesktop}
+                    onClick={onOpenRepository}
+                    type="button"
+                  >
+                    {connectsOnDesktop
+                      ? t("lobby.connectOnDesktop")
+                      : repositoryState === "unknown"
+                        ? t("repositorySetup.recheck")
+                        : repositoryReady
+                          ? t("lobby.manageConnection")
+                          : t("lobby.connectRepository")}
+                    <ArrowRight aria-hidden size={14} />
+                  </button>
+                ) : null}
               </div>
             </section>
 
-            <section className="project-lobby-panel quick-panel">
-              <header>
-                <span className="project-lobby-panel-icon"><Home aria-hidden size={18} /></span>
-                <div>
-                  <h2>{t("lobby.quickActions")}</h2>
-                  <p>{t("lobby.quickActionsDescription")}</p>
+            <section className="min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+              <header className="flex min-h-[76px] items-center gap-3 border-b border-border px-5 py-4">
+                <span className="grid size-[38px] shrink-0 place-items-center rounded-xl border border-border bg-muted text-primary">
+                  <Home aria-hidden size={18} />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="m-0 text-md font-semibold tracking-tight">
+                    {t("lobby.quickActions")}
+                  </h2>
+                  <p className="mt-1 mb-0 text-micro leading-snug text-muted-foreground">
+                    {t("lobby.quickActionsDescription")}
+                  </p>
                 </div>
               </header>
-              <div className="project-lobby-actions">
+              <div className="grid p-1.5 [&>button]:grid [&>button]:min-h-[59px] [&>button]:min-w-0 [&>button]:cursor-pointer [&>button]:grid-cols-[32px_minmax(0,1fr)_16px] [&>button]:items-center [&>button]:gap-2 [&>button]:rounded-lg [&>button]:border-0 [&>button]:bg-transparent [&>button]:px-2.5 [&>button]:py-2 [&>button]:text-left [&>button]:text-muted-foreground [&>button]:hover:bg-muted [&>button]:hover:text-foreground [&>button>svg:first-child]:size-8 [&>button>svg:first-child]:rounded-lg [&>button>svg:first-child]:border [&>button>svg:first-child]:border-border [&>button>svg:first-child]:bg-card [&>button>svg:first-child]:p-1.5 [&>button>svg:first-child]:text-primary [&>button>span]:grid [&>button>span]:min-w-0 [&>button>span]:gap-0.5 [&_strong]:truncate [&_strong]:text-xs [&_strong]:text-foreground [&_small]:truncate [&_small]:text-micro [&_small]:text-muted-foreground">
                 <button onClick={onOpenIssues} type="button">
                   <ListTodo aria-hidden size={17} />
-                  <span><strong>{t("sidebar.issues")}</strong><small>{t("lobby.openIssues")}</small></span>
+                  <span>
+                    <strong>{t("sidebar.issues")}</strong>
+                    <small>{t("lobby.openIssues")}</small>
+                  </span>
                   <ArrowRight aria-hidden size={14} />
                 </button>
                 <button onClick={onOpenAgents} type="button">
                   <Bot aria-hidden size={17} />
-                  <span><strong>{t("sidebar.agents")}</strong><small>{t("lobby.openAgents")}</small></span>
+                  <span>
+                    <strong>{t("sidebar.agents")}</strong>
+                    <small>{t("lobby.openAgents")}</small>
+                  </span>
                   <ArrowRight aria-hidden size={14} />
                 </button>
                 <button onClick={onOpenSettings} type="button">
                   <Settings aria-hidden size={17} />
-                  <span><strong>{t("sidebar.projectSettings")}</strong><small>{t("lobby.openSettings")}</small></span>
+                  <span>
+                    <strong>{t("sidebar.projectSettings")}</strong>
+                    <small>{t("lobby.openSettings")}</small>
+                  </span>
                   <ArrowRight aria-hidden size={14} />
                 </button>
               </div>
             </section>
 
-            <section className="project-lobby-panel activity-panel">
-              <header>
-                <div>
-                  <h2>{t("lobby.recentActivity")}</h2>
-                  <p>{t("lobby.recentActivityDescription")}</p>
+            <section className="col-span-full min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-xs max-[980px]:col-auto">
+              <header className="flex min-h-[76px] items-center gap-3 border-b border-border px-5 py-4">
+                <div className="min-w-0 flex-1">
+                  <h2 className="m-0 text-md font-semibold tracking-tight">
+                    {t("lobby.recentActivity")}
+                  </h2>
+                  <p className="mt-1 mb-0 text-micro leading-snug text-muted-foreground">
+                    {t("lobby.recentActivityDescription")}
+                  </p>
                 </div>
-                <button onClick={onOpenIssues} type="button">
-                  {t("lobby.viewAll")}<ArrowRight aria-hidden size={14} />
+                <button
+                  className="flex h-8 min-w-max cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-muted px-2.5 py-0 text-micro font-semibold text-foreground hover:border-input hover:bg-accent"
+                  onClick={onOpenIssues}
+                  type="button"
+                >
+                  {t("lobby.viewAll")}
+                  <ArrowRight aria-hidden size={14} />
                 </button>
               </header>
               {recentRuns.length > 0 ? (
-                <div className="project-lobby-activity-list">
+                <div className="project-lobby-activity-list grid">
                   {recentRuns.map((run) => (
-                    <button key={run.id} onClick={() => onOpenIssue(run.id)} type="button">
-                      <span className={`project-lobby-status-dot ${run.status}`} aria-hidden />
-                      <IssueDifficultyIcon difficulty={run.difficulty} size={12} />
-                      <span>
-                        <strong>{run.title}</strong>
-                        <small>
+                    <button
+                      className="grid min-h-[66px] min-w-0 cursor-pointer grid-cols-[9px_minmax(0,1fr)_auto_16px] items-center gap-3 border-0 border-t border-border bg-transparent px-5 py-2.5 text-left text-muted-foreground first:border-t-0 hover:bg-muted max-[620px]:grid-cols-[9px_minmax(0,1fr)_14px]"
+                      key={run.id}
+                      onClick={() => onOpenIssue(run.id)}
+                      type="button"
+                    >
+                      <span
+                        className={cn(
+                          "size-2 rounded-full bg-muted-foreground shadow-[0_0_0_3px_color-mix(in_srgb,var(--muted-foreground)_15%,transparent)]",
+                          (run.status === "running" ||
+                            run.status === "queued") &&
+                            "bg-accent-foreground shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent-foreground)_13%,transparent)]",
+                          run.status === "completed" &&
+                            "bg-success shadow-[0_0_0_3px_color-mix(in_srgb,var(--success)_13%,transparent)]",
+                          (run.status === "blocked" ||
+                            run.status === "failed") &&
+                            "bg-destructive shadow-[0_0_0_3px_color-mix(in_srgb,var(--destructive)_13%,transparent)]",
+                          run.status === "paused" &&
+                            "bg-warning shadow-[0_0_0_3px_color-mix(in_srgb,var(--warning)_13%,transparent)]",
+                        )}
+                        aria-hidden
+                      />
+                      <IssueDifficultyIcon
+                        className="grid size-5 shrink-0 place-items-center rounded-md border border-current/25 bg-current/10"
+                        difficulty={run.difficulty}
+                        size={12}
+                      />
+                      <span className="grid min-w-0 gap-1">
+                        <strong className="truncate text-xs font-semibold text-foreground">
+                          {run.title}
+                        </strong>
+                        <small className="flex items-center gap-1 text-micro text-muted-foreground">
                           {project.issueKeyPrefix
                             ? `${project.issueKeyPrefix}-${run.runNumber}`
                             : `#${run.runNumber}`}
@@ -544,18 +875,27 @@ export function ProjectLobby({
                           {statusLabel(run, t)}
                         </small>
                       </span>
-                      <time dateTime={run.lastEventAt}>
-                        {dateFormatter.format(Date.parse(run.lastEventAt || run.updatedAt))}
+                      <time
+                        className="font-mono text-micro font-medium text-muted-foreground max-[620px]:hidden"
+                        dateTime={run.lastEventAt}
+                      >
+                        {dateFormatter.format(
+                          Date.parse(run.lastEventAt || run.updatedAt),
+                        )}
                       </time>
                       <ArrowRight aria-hidden size={14} />
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="project-lobby-empty">
+                <div className="flex min-h-[180px] flex-col items-center justify-center p-7 text-center text-muted-foreground">
                   <ListTodo aria-hidden size={22} />
-                  <strong>{t("lobby.noActivity")}</strong>
-                  <p>{t("lobby.noActivityDescription")}</p>
+                  <strong className="mt-2.5 text-xs text-foreground">
+                    {t("lobby.noActivity")}
+                  </strong>
+                  <p className="mt-1.5 mb-0 text-micro">
+                    {t("lobby.noActivityDescription")}
+                  </p>
                 </div>
               )}
             </section>

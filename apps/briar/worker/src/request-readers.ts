@@ -14,6 +14,10 @@ import {
   validateIssueAttachments,
 } from "../../src/lib/issue-attachments";
 import {
+  normalizeAgentReplyAttachmentFile,
+  validateAgentReplyAttachments,
+} from "../../src/lib/agent-reply-attachments";
+import {
   isIssueAttachmentReference,
   issueAttachmentReferences,
 } from "../../src/lib/issue-markdown";
@@ -69,12 +73,13 @@ function readMultipartFiles(
   fieldName: string,
   invalidFilesMessage: string,
   validate: (files: readonly File[]) => string | null,
+  normalize: (file: File) => File = normalizeIssueAttachmentFile,
 ) {
   const values = form.getAll(fieldName);
   if (values.some((value) => !(value instanceof File))) {
     throw new HttpError(400, invalidFilesMessage);
   }
-  const files = (values as File[]).map(normalizeIssueAttachmentFile);
+  const files = (values as File[]).map(normalize);
   const validationError = validate(files);
   if (validationError) throw new HttpError(400, validationError);
   return files;
@@ -166,7 +171,7 @@ async function readReplyCompleteRequest<Input>(
   const form = await readBoundedMultipartForm(
     request,
     maxIssueMultipartBytes,
-    `${input.replyLabel} images exceed the 25MB total limit`,
+    `${input.replyLabel} attachments exceed the 25MB total limit`,
   );
   if (!form) {
     return {
@@ -188,17 +193,15 @@ async function readReplyCompleteRequest<Input>(
     form,
     "attachments",
     `${input.replyLabel} attachments must be files`,
-    validateIssueAttachments,
+    validateAgentReplyAttachments,
+    normalizeAgentReplyAttachmentFile,
   );
-  if (attachments.some((attachment) => !attachment.type.startsWith("image/"))) {
-    throw new HttpError(400, `${input.replyLabel} attachments must be images`);
-  }
   const decoded = input.decode(parsed);
   if (
     typeof decoded === "object" && decoded !== null &&
     "error" in decoded && decoded.error && attachments.length > 0
   ) {
-    throw new HttpError(400, "A failed reply cannot include images");
+    throw new HttpError(400, "A failed reply cannot include attachments");
   }
   return { input: decoded, attachments };
 }
@@ -532,7 +535,8 @@ export async function readIssueUpdateRequest(request: Request) {
           : null,
       priority:
         typeof priority === "string" && priority ? Number(priority) : null,
-      difficulty,
+      difficulty:
+        typeof difficulty === "string" && difficulty ? difficulty : null,
       assigneeUserId:
         typeof assigneeUserId === "string" && assigneeUserId.trim()
           ? assigneeUserId

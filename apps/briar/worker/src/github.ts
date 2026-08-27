@@ -126,6 +126,7 @@ export async function exchangeGithubOAuthCode(input: {
 const githubApiHeaders = (accessToken: string) => ({
   accept: "application/vnd.github+json",
   authorization: `Bearer ${accessToken}`,
+  "user-agent": "Briar-Workflow-GitHub-App",
   "x-github-api-version": "2026-03-10",
 });
 
@@ -135,7 +136,7 @@ async function fetchGithubApi(path: string, accessToken: string) {
   });
   if (!response.ok) {
     throw new GithubOAuthError(
-      `GitHub API request failed with status ${response.status}`,
+      `GitHub API request to ${path} failed with status ${response.status}`,
     );
   }
   return readGithubJson(response);

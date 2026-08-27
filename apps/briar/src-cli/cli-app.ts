@@ -14,6 +14,7 @@ import {
   configureProject,
   connectProject,
   createProject,
+  listProjectsCommand,
   projectDoctor,
   showWorkflow,
 } from "./project-commands";
@@ -56,6 +57,7 @@ import {
 import {
   managedComputerSetupCommand,
   managedComputerStatusCommand,
+  managedComputerSyncCommand,
   managedComputerWorkerSupervisor,
 } from "./managed-computer-commands";
 
@@ -145,6 +147,12 @@ const skillsCommand = Command.make("skills").pipe(
 const projectCommand = Command.make("project").pipe(
   Command.withDescription("Create and configure Briar projects"),
   Command.withSubcommands([
+    leaf(
+      "list",
+      switches("json"),
+      listProjectsCommand,
+      "List projects available to the signed-in user",
+    ),
     leaf(
       "create",
       optionalStrings("name"),
@@ -508,6 +516,12 @@ const managedComputerCommand = Command.make("managed-computer").pipe(
       "Bind this enrolled computer to a Briar project",
     ),
     leaf(
+      "sync",
+      optionalStrings("project", "credential-file"),
+      managedComputerSyncCommand,
+      "Synchronize repository workflow settings from Briar",
+    ),
+    leaf(
       "status",
       optionalStrings("credential-file"),
       managedComputerStatusCommand,
@@ -528,7 +542,7 @@ const mergeQueueCommand = Command.make("merge-queue").pipe(
     leaf(
       "configure",
       {
-        ...optionalStrings("project"),
+        ...optionalStrings("project", "readiness-stage"),
         ...optionalIntegers("quiet-window-ms", "max-batch-size"),
         ...switches("enable", "disable"),
       },

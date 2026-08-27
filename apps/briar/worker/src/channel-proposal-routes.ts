@@ -4,10 +4,9 @@ import type {
 import { approveAgentSkillExecutionProposal } from "./agent-skill-execution-approval";
 import type { BriarAuth } from "./auth";
 import {
-  appendChannelMessageBacklink,
   approvedIssueCreation,
   assertChannelProposalAuthorScope,
-  channelMessageShareUrl,
+  channelRelatedMessageReference,
   resolveChannelProposalTargetProjectId,
 } from "./channel-proposal-helpers";
 import { requireChannelAccess } from "./channel-route-access";
@@ -92,7 +91,6 @@ async function createApprovedChannelProposalIssue(input: {
   channelId: string;
   messageId: string;
   rootMessageId: string | null;
-  shareOrigin: string;
   sourceKey: string;
   title: string;
   description: string | null;
@@ -101,21 +99,14 @@ async function createApprovedChannelProposalIssue(input: {
   occurredAt: string;
 }) {
   const settings = await getProjectSettings(input.db, input.project.id);
-  const channelMessageUrl = channelMessageShareUrl({
-    origin: input.shareOrigin,
+  const relatedMessage = channelRelatedMessageReference({
     organizationId: input.organizationId,
     channelId: input.channelId,
     messageId: input.messageId,
     rootMessageId: input.rootMessageId,
   });
-  const issueDescription = appendChannelMessageBacklink(
-    input.description,
-    channelMessageUrl,
-  );
-  // The approval reservation trigger intentionally requires the insert to
-  // match the immutable proposal payload exactly. recordHuntEvent inserts
-  // that protected row first and applies this derived link in the same D1
-  // batch, so a successful creation cannot expose an intermediate description.
+  // Keep the source message structured so the issue description remains the
+  // exact proposal payload while the dashboard can offer an in-app jump back.
   return recordHuntEvent(input.db, input.project.id, {
     source: "issue",
     sourceKey: input.sourceKey,
@@ -129,6 +120,7 @@ async function createApprovedChannelProposalIssue(input: {
     repository: settings?.github_repository ?? input.project.name,
     detail: "채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.",
     priority: input.priority,
+    difficulty: null,
     assigneeUserId: null,
     issueCheckpoints: [],
     fullAuto: false,
@@ -149,10 +141,10 @@ async function createApprovedChannelProposalIssue(input: {
       proposalId: input.proposalId,
       channelId: input.channelId,
       issueId: input.proposalId,
+      relatedMessage,
       attachmentCount: 0,
       fullAuto: false,
     },
-    postInsertIssueDescription: issueDescription,
     createdByUserId: input.createdByUserId,
     preferredAgentProvider: null,
     preferredAgentModel: null,
@@ -489,7 +481,6 @@ export async function handleChannelProposalRoute(
           proposalId: proposal.id,
           messageId: proposal.reply_message_id,
           rootMessageId: proposal.reply_parent_message_id,
-          shareOrigin: new URL(request.url).origin,
           proposalPayloadJson: proposal.payload_json,
           proposalCreatedAt: proposal.created_at,
           approvedAt: reservation.accepted_at,
@@ -675,7 +666,6 @@ export async function handleChannelProposalRoute(
       channelId: channel.id,
       messageId: proposal.reply_message_id,
       rootMessageId: proposal.reply_parent_message_id,
-      shareOrigin: new URL(request.url).origin,
       title: approvedIssue.title,
       description: approvedIssue.description,
       priority: approvedIssue.priority,

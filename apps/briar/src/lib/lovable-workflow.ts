@@ -1,5 +1,5 @@
 import {
-  normalizeAutoHuntWorkflow,
+  canonicalizeProjectWorkflow,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
 import type { LovableRepositoryCompatibility } from "./project-connection";
@@ -32,7 +32,7 @@ export function lovableWorkflowPreset(
     ? "TanStack Start"
     : "React + Vite";
 
-  return normalizeAutoHuntWorkflow({
+  return canonicalizeProjectWorkflow({
     version: 2,
     requirements: [{
       id: packageManager,

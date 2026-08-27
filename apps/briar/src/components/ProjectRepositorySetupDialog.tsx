@@ -13,39 +13,63 @@ import { Spinner } from "./ui/spinner";
 import { useEffect, useRef } from "react";
 import { useI18n } from "../i18n";
 import type { RepositoryReadiness } from "../lib/project-connection";
+import {
+  isLocalProjectRepositoryReady,
+  localProjectReadiness,
+  type LocalProjectConnectionState,
+} from "../lib/local-project-connection";
 import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 
 export function ProjectRepositorySetupDialog({
+  connectionState,
   error,
   loading,
   onClose,
   onInstallGithub,
   onLoginGithub,
+  onReconnect,
   onRefresh,
   projectName,
   readiness,
 }: {
+  connectionState: LocalProjectConnectionState;
   error: string | null;
   loading: boolean;
   onClose: () => void;
   onInstallGithub: () => Promise<unknown>;
   onLoginGithub: () => Promise<unknown>;
+  onReconnect: () => void;
   onRefresh: () => Promise<unknown>;
   projectName: string;
   readiness: RepositoryReadiness | null;
 }) {
   const { t } = useI18n();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const loadingRef = useRef(loading);
+  const onCloseRef = useRef(onClose);
+  loadingRef.current = loading;
+  onCloseRef.current = onClose;
+  const inspectedReadiness = localProjectReadiness(connectionState, readiness);
+  const requiresGithub = inspectedReadiness?.requiresGithub === true;
+  const repositoryReady = isLocalProjectRepositoryReady(inspectedReadiness);
+  const unresolvedDetail = connectionState === "disconnected"
+    ? t("common.notConnected")
+    : t("common.checkNeeded");
 
   useEffect(() => {
     closeRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !loading) onClose();
+      if (event.key === "Escape" && !loadingRef.current) {
+        onCloseRef.current();
+      }
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [loading, onClose]);
+  }, []);
 
   return (
     <div
@@ -62,19 +86,35 @@ export function ProjectRepositorySetupDialog({
       >
         <header>
           <span className="repository-setup-dialog-icon">
-            <Github size={20} />
+            {requiresGithub ? <Github size={20} /> : <FolderGit2 size={20} />}
           </span>
           <div>
-            <p className="eyebrow">{t("repositorySetup.eyebrow")}</p>
+            <p className="eyebrow">
+              {t(
+                requiresGithub
+                  ? "repositorySetup.eyebrow"
+                  : "repositorySetup.inspectEyebrow",
+              )}
+            </p>
             <h2 id="repository-setup-title">
-              {t("repositorySetup.title", { name: projectName })}
+              {t(
+                requiresGithub
+                  ? "repositorySetup.title"
+                  : "repositorySetup.inspectTitle",
+                { name: projectName },
+              )}
             </h2>
-            <p>{t("repositorySetup.description")}</p>
+            <p>
+              {t(
+                requiresGithub
+                  ? "repositorySetup.description"
+                  : "repositorySetup.inspectDescription",
+              )}
+            </p>
           </div>
           <button
             aria-label={t("common.close")}
             className="repository-setup-close"
-            disabled={loading}
             onClick={onClose}
             ref={closeRef}
             type="button"
@@ -85,46 +125,66 @@ export function ProjectRepositorySetupDialog({
 
         <div className="repository-setup-checks">
           <ReadinessRow
-            detail={readiness?.gitVersion ?? t("common.notInstalled")}
-            healthy={readiness?.gitReady ?? false}
+            detail={
+              inspectedReadiness
+                ? inspectedReadiness.gitVersion ?? t("common.notInstalled")
+                : unresolvedDetail
+            }
+            healthy={inspectedReadiness?.gitReady ?? false}
             icon={<FolderGit2 size={16} />}
             label="Git"
           />
-          <ReadinessRow
-            detail={
-              readiness?.pushAccess
-                ? readiness.remote ?? t("repositorySetup.origin")
-                : t("repositorySetup.pushUnavailable")
-            }
-            healthy={Boolean(readiness?.remoteReachable && readiness.pushAccess)}
-            icon={<UploadCloud size={16} />}
-            label={t("repositorySetup.pushAccess")}
-          />
-          <ReadinessRow
-            detail={readiness?.ghVersion ?? t("common.notInstalled")}
-            healthy={readiness?.ghInstalled ?? false}
-            icon={<Github size={16} />}
-            label="GitHub CLI"
-          />
-          <ReadinessRow
-            detail={
-              readiness?.ghAccount
-                ? `@${readiness.ghAccount}`
-                : t("repositorySetup.loginRequired")
-            }
-            healthy={
-              Boolean(
-                readiness?.ghAuthenticated && readiness.githubWriteAccess,
-              )
-            }
-            icon={<LogIn size={16} />}
-            label={t("repositorySetup.githubLogin")}
-          />
+          {!inspectedReadiness || requiresGithub ? (
+            <ReadinessRow
+              detail={
+                inspectedReadiness
+                  ? inspectedReadiness.pushAccess
+                    ? inspectedReadiness.remote ?? t("repositorySetup.origin")
+                    : t("repositorySetup.pushUnavailable")
+                  : unresolvedDetail
+              }
+              healthy={Boolean(
+                inspectedReadiness?.remoteReachable &&
+                  inspectedReadiness.pushAccess,
+              )}
+              icon={<UploadCloud size={16} />}
+              label={t("repositorySetup.pushAccess")}
+            />
+          ) : null}
+          {!inspectedReadiness || requiresGithub ? (
+            <>
+              <ReadinessRow
+                detail={
+                  inspectedReadiness
+                    ? inspectedReadiness.ghVersion ?? t("common.notInstalled")
+                    : unresolvedDetail
+                }
+                healthy={inspectedReadiness?.ghInstalled ?? false}
+                icon={<Github size={16} />}
+                label="GitHub CLI"
+              />
+              <ReadinessRow
+                detail={
+                  inspectedReadiness
+                    ? inspectedReadiness.ghAccount
+                      ? `@${inspectedReadiness.ghAccount}`
+                      : t("repositorySetup.loginRequired")
+                    : unresolvedDetail
+                }
+                healthy={Boolean(
+                  inspectedReadiness?.ghAuthenticated &&
+                    inspectedReadiness.githubWriteAccess,
+                )}
+                icon={<LogIn size={16} />}
+                label={t("repositorySetup.githubLogin")}
+              />
+            </>
+          ) : null}
         </div>
 
-        {readiness?.issues.length ? (
+        {inspectedReadiness?.issues.length ? (
           <div className="repository-setup-issues">
-            {readiness.issues.map((issue) => (
+            {inspectedReadiness.issues.map((issue) => (
               <span key={issue}>
                 <CircleAlert size={13} />
                 {issue}
@@ -149,7 +209,18 @@ export function ProjectRepositorySetupDialog({
             <Spinner icon={RefreshCw} size={15} spinning={loading} />
             {t("repositorySetup.recheck")}
           </button>
-          {!readiness?.ghInstalled ? (
+          {connectionState === "disconnected" ? (
+            <button
+              className="repository-setup-primary"
+              disabled={loading}
+              onClick={onReconnect}
+              type="button"
+            >
+              <FolderGit2 size={15} />
+              {t("dashboard.connectRepository")}
+            </button>
+          ) : requiresGithub &&
+            !inspectedReadiness.ghInstalled ? (
             <button
               className="repository-setup-primary"
               disabled={loading}
@@ -159,7 +230,8 @@ export function ProjectRepositorySetupDialog({
               {loading ? <Spinner size={15} /> : <Download size={15} />}
               {t("repositorySetup.installGh")}
             </button>
-          ) : !readiness.prReady ? (
+          ) : requiresGithub &&
+            !inspectedReadiness.prReady ? (
             <button
               className="repository-setup-primary"
               disabled={loading}
@@ -168,19 +240,19 @@ export function ProjectRepositorySetupDialog({
             >
               {loading ? <Spinner size={15} /> : <LogIn size={15} />}
               {t(
-                loading && !readiness.ghAuthenticated
+                loading && !inspectedReadiness.ghAuthenticated
                   ? "repositorySetup.completeLoginGithub"
-                  : readiness.ghAuthenticated
+                  : inspectedReadiness.ghAuthenticated
                     ? "repositorySetup.configureGit"
                     : "repositorySetup.loginGithub",
               )}
             </button>
-          ) : (
+          ) : repositoryReady ? (
             <span className="repository-setup-ready">
               <Check size={15} />
               {t("repositorySetup.ready")}
             </span>
-          )}
+          ) : null}
         </footer>
       </section>
     </div>

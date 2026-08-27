@@ -193,12 +193,6 @@ const currentReadyCandidate = (
   exists (
     select 1
     from briar_hunt_runs run
-    join briar_run_stage_progress progress
-      on progress.run_id = run.id
-     and progress.attempt = run.current_attempt
-     and progress.revision = run.current_revision
-     and progress.stage_id = 'ci_qa'
-     and progress.state = 'completed'
     join briar_run_pull_requests link
       on link.project_id = run.project_id and link.run_id = run.id
      and link.attempt = run.current_attempt
@@ -211,6 +205,12 @@ const currentReadyCandidate = (
      and profile.repository = link.repository
      and profile.base_branch = coalesce(link.base_branch, 'main')
      and profile.enabled = 1
+    join briar_run_stage_progress progress
+      on progress.run_id = run.id
+     and progress.attempt = run.current_attempt
+     and progress.revision = run.current_revision
+     and progress.stage_id = profile.readiness_stage_id
+     and progress.state = 'completed'
     where run.id = ${candidate}.run_id
       and run.project_id = ${candidate}.project_id
       and run.current_attempt = ${candidate}.attempt
@@ -595,7 +595,7 @@ export async function reconcileReadyMergeCandidates(
     db.prepare(
       `update briar_merge_batch_candidates as candidate
        set state = 'failed', failure_code = 'readiness_changed',
-           failure_detail = 'Current ci_qa, revision, or exact pull request head changed',
+           failure_detail = 'Current readiness stage, revision, or exact pull request head changed',
            updated_at = ?
        where candidate.project_id = ? ${runScope}
          and candidate.batch_id is null and candidate.state = 'ready'
@@ -704,11 +704,6 @@ export async function registerReadyMergeCandidates(
             link.head_sha, link.base_sha, run.priority, ?, null,
             'ready', ?, ?
      from briar_hunt_runs run
-     join briar_run_stage_progress progress
-       on progress.run_id = run.id
-      and progress.attempt = run.current_attempt
-      and progress.revision = run.current_revision
-      and progress.stage_id = 'ci_qa' and progress.state = 'completed'
      join briar_run_pull_requests link
        on link.project_id = run.project_id and link.run_id = run.id
       and link.attempt = run.current_attempt
@@ -719,6 +714,12 @@ export async function registerReadyMergeCandidates(
       and profile.repository = link.repository
       and profile.base_branch = coalesce(link.base_branch, 'main')
       and profile.enabled = 1
+     join briar_run_stage_progress progress
+       on progress.run_id = run.id
+      and progress.attempt = run.current_attempt
+      and progress.revision = run.current_revision
+      and progress.stage_id = profile.readiness_stage_id
+      and progress.state = 'completed'
      where run.project_id = ? and run.id = ?
        and run.current_attempt = ? and run.current_revision = ?
        and run.status = 'running'
@@ -1302,7 +1303,8 @@ export async function recordMergeBatchCandidateEnqueued(
  * Keeps signed PR identity changes append-only once a merge-queue profile is
  * configured, including its disabled rollout phase. Mutable provider
  * snapshots intentionally ignore delayed events;
- * this security fence must not, because A -> B -> A cannot reuse A's ci_qa.
+ * this security fence must not, because A -> B -> A cannot reuse an earlier
+ * readiness-stage proof.
  */
 export async function recordSignedMergeQueuePullRequestObservation(
   db: D1Database,

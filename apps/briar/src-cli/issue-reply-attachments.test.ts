@@ -26,7 +26,7 @@ afterEach(async () => {
 });
 
 describe("issue reply agent attachments", () => {
-  it("extracts image paths without changing the existing issue reply result", () => {
+  it("extracts attachment paths without changing the issue reply result", () => {
     expect(parseIssueReplyAgentResult(JSON.stringify({
       reply: "Here is the mockup.",
       attachments: [" mockup.png "],
@@ -56,15 +56,16 @@ describe("issue reply agent attachments", () => {
     });
   });
 
-  it("reads workspace images and emits the shared multipart contract", async () => {
+  it("reads workspace images and HTML artifacts into the multipart contract", async () => {
     const workspacePath = await temporaryWorkspace();
     await writeFile(
       join(workspacePath, "mockup.png"),
       new Uint8Array([137, 80, 78, 71]),
     );
+    await writeFile(join(workspacePath, "lesson.html"), "<h1>Lesson</h1>");
     const attachments = await collectIssueReplyAttachments({
       workspacePath,
-      paths: ["mockup.png"],
+      paths: ["mockup.png", "lesson.html"],
     });
     const body = issueReplyCompleteRequestBody({
       projectId: "11111111-1111-4111-8111-111111111111",
@@ -84,15 +85,20 @@ describe("issue reply agent attachments", () => {
     expect(JSON.parse(String(form.get("complete")))).toMatchObject({
       body: "Here is the mockup.",
     });
-    expect(form.getAll("attachments")).toHaveLength(1);
+    expect(form.getAll("attachments")).toHaveLength(2);
     expect(form.get("attachments")).toMatchObject({
       name: "mockup.png",
       type: "image/png",
       size: 4,
     });
+    expect(form.getAll("attachments")[1]).toMatchObject({
+      name: "lesson.html",
+      type: "text/html",
+      size: 15,
+    });
   });
 
-  it("keeps JSON completion when there are no images", () => {
+  it("keeps JSON completion when there are no attachments", () => {
     const body = issueReplyCompleteRequestBody({
       projectId: "11111111-1111-4111-8111-111111111111",
       workerId: "worker-1",

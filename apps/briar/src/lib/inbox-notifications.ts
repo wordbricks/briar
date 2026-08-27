@@ -14,6 +14,12 @@ export const inboxNotificationCategories = [
 
 export type InboxNotificationPreferences = Record<InboxCategory, boolean>;
 
+export type InboxNotificationPermissionStatus =
+  | "authorized"
+  | "denied"
+  | "not_determined"
+  | "unsupported";
+
 const storageKey = "briar.settings.inbox-notifications.v1";
 const soundStorageKey = "briar.settings.inbox-notification-sound.v1";
 const targetStorageKey = "briar.inbox.notification-targets.v1";
@@ -26,6 +32,8 @@ export type InboxNotificationTarget = {
   projectId: string;
   targetId: string;
   kind: InboxMessage["kind"];
+  /** Actual IssueMessage.id; messageId remains the Inbox row id for read state. */
+  conversationMessageId?: string;
   channelMessageId?: string;
   rootMessageId?: string;
 };
@@ -49,6 +57,20 @@ export const defaultInboxNotificationPreferences = () =>
     important: false,
     activity: false,
   }) satisfies InboxNotificationPreferences;
+
+export const recommendedInboxNotificationPreferences = () =>
+  ({
+    urgent: true,
+    action_required: true,
+    important: true,
+    activity: false,
+  }) satisfies InboxNotificationPreferences;
+
+export function inboxNotificationsEnabled(
+  preferences: InboxNotificationPreferences,
+) {
+  return inboxNotificationCategories.some((category) => preferences[category]);
+}
 
 export function readInboxNotificationPreferences(): InboxNotificationPreferences {
   const defaults = defaultInboxNotificationPreferences();
@@ -111,7 +133,9 @@ export function inboxNotificationTarget(
     projectId: message.projectId,
     targetId: message.targetId,
     kind: message.kind,
-    ...(message.kind === "channel"
+    ...(message.kind === "conversation"
+      ? { conversationMessageId: message.messageId }
+      : message.kind === "channel"
       ? {
           channelMessageId: message.messageId,
           rootMessageId: message.rootMessageId,
@@ -273,6 +297,9 @@ export function targetFromNotificationAction(payload: unknown) {
         projectId: stored.projectId,
         targetId: stored.targetId,
         kind: stored.kind,
+        ...(stored.conversationMessageId
+          ? { conversationMessageId: stored.conversationMessageId }
+          : {}),
         ...(stored.channelMessageId
           ? { channelMessageId: stored.channelMessageId }
           : {}),
@@ -341,6 +368,41 @@ export async function requestInboxNotificationPermission() {
   if (Notification.permission === "granted") return true;
   if (Notification.permission === "denied") return false;
   return (await Notification.requestPermission()) === "granted";
+}
+
+export async function readInboxNotificationPermissionStatus(): Promise<
+  InboxNotificationPermissionStatus
+> {
+  if (isMacDesktopTauri()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const status = await invoke<unknown>(
+      "inbox_notification_permission_status",
+    );
+    return status === "authorized" ||
+        status === "denied" ||
+        status === "not_determined"
+      ? status
+      : "unsupported";
+  }
+
+  if (isTauriRuntime()) {
+    const { isPermissionGranted } = await import(
+      "@tauri-apps/plugin-notification"
+    );
+    return (await isPermissionGranted()) ? "authorized" : "not_determined";
+  }
+
+  if (typeof Notification === "undefined") return "unsupported";
+  if (Notification.permission === "granted") return "authorized";
+  if (Notification.permission === "denied") return "denied";
+  return "not_determined";
+}
+
+export async function openInboxNotificationSystemSettings() {
+  if (!isMacDesktopTauri()) return false;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("open_inbox_notification_settings");
+  return true;
 }
 
 export type InboxNotificationContent = {
@@ -441,6 +503,12 @@ export async function sendInboxNotification(
 
   if (isTauriRuntime()) {
     if (isDesktopTauri()) {
+      if (
+        isMacDesktopTauri() &&
+        (await readInboxNotificationPermissionStatus()) !== "authorized"
+      ) {
+        return false;
+      }
       const { invoke } = await import("@tauri-apps/api/core");
       await invoke("show_inbox_notification", {
         title,

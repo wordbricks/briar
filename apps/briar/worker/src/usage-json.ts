@@ -1,5 +1,6 @@
 import {
   summarizeProjectUsage,
+  type ProjectUsageDateRange,
   type ProjectUsagePeriod,
 } from "../../src/lib/project-usage-summary";
 import type {
@@ -129,6 +130,7 @@ export function projectUsageSummaryJson(
   totals: readonly ProjectUsageTotalRow[],
   period: ProjectUsagePeriod,
   generatedAt: number,
+  range?: ProjectUsageDateRange,
 ) {
   const totalsByRun = new Map<string, ProjectUsageTotalRow[]>();
   for (const total of totals) {
@@ -159,6 +161,6 @@ export function projectUsageSummaryJson(
     }),
     period,
     generatedAt,
+    range,
   );
 }
-

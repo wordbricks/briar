@@ -393,13 +393,13 @@ export async function handleChannelReplyResultRoute(
       };
     });
     const uploadedKeys: string[] = [];
-    const discardUploadedReplyImages = async () => {
+    const discardUploadedReplyAttachments = async () => {
       if (uploadedKeys.length === 0) return;
       try {
         await attachmentsBucket.delete(uploadedKeys);
       } catch (cleanupError) {
         console.error(JSON.stringify({
-          message: "Failed channel reply image cleanup",
+          message: "Failed channel reply attachment cleanup",
           organizationId: job.organization_id,
           channelId: job.channel_id,
           messageId: job.reply_message_id,
@@ -444,11 +444,11 @@ export async function handleChannelReplyResultRoute(
         ),
       });
     } catch (error) {
-      await discardUploadedReplyImages();
+      await discardUploadedReplyAttachments();
       throw error;
     }
     if (!completed) {
-      await discardUploadedReplyImages();
+      await discardUploadedReplyAttachments();
       throw new HttpError(409, "Reply claim is no longer active");
     }
     scheduleChannelRealtimePublish(env, db, input.organizationId, context);

@@ -404,7 +404,7 @@ async function runClaimedIssueReply(
   const cleanupContext = () =>
     cleanupChannelReplyResources([
       {
-        label: "issue reply images",
+        label: "issue reply attachments",
         run: async () => {
           if (imagesCleaned) return;
           await rm(imageDirectory, { recursive: true, force: true });
@@ -451,6 +451,10 @@ async function runClaimedIssueReply(
         issue.skillExecutionTarget.agentId !== agent.id ||
         issue.skillExecutionTarget.skillId !== agent.activeSkill?.id ||
         issue.skillExecutionTarget.skillName !== agent.activeSkill?.name ||
+        issue.skillExecutionTarget.executionMode !==
+          (agent.activeSkill?.executionMode ?? "task") ||
+        issue.skillExecutionTarget.approvalPolicy !==
+          (agent.activeSkill?.approvalPolicy ?? "explicit") ||
         issue.skillExecutionTarget.request !== trigger.body)
     ) {
       throw new Error(
@@ -555,11 +559,12 @@ async function runClaimedIssueReply(
     assertDetachedProviderTurnSucceeded(turn);
     if (!turn.resultText) throw new Error("Agent returned an empty issue reply");
     const parsedResult = parseIssueReplyAgentResult(turn.resultText, {
-      allowSkillExecutionProposal: issue.skillExecutionTarget !== null,
+      allowSkillExecutionProposal:
+        issue.skillExecutionTarget?.executionMode === "task",
     });
     const result = parsedResult.result;
     if (!result.reply) throw new Error("Agent returned an empty issue reply");
-    const replyImages = validateReplyAttachments([
+    const replyAttachments = validateReplyAttachments([
       ...await collectIssueReplyAttachments({
         workspacePath,
         paths: parsedResult.attachmentPaths,
@@ -580,7 +585,7 @@ async function runClaimedIssueReply(
           workerId: registered.workerId,
           claimToken: issue.claimToken,
           result,
-          attachments: replyImages,
+          attachments: replyAttachments,
         }),
       },
     );
@@ -975,14 +980,19 @@ async function runClaimedChannelReply(
       turnPrompt = conversationId ? continuation : `${prompt}\n\n${continuation}`;
     }
     if (!result) throw new Error("Agent returned no channel reply");
-    if (result.skillExecutionProposal && !reply.skillExecutionTarget) {
+    const skillExecutionProposalAllowed =
+      reply.skillExecutionTarget?.executionMode === "task" ||
+      (reply.skillExecutionTarget?.executionMode === "conversation" &&
+        reply.skillExecutionTarget.approvalPolicy === "explicit" &&
+        !reply.skillExecutionTarget.approved);
+    if (result.skillExecutionProposal && !skillExecutionProposalAllowed) {
       throw new Error(
         "Channel reply Agent Skill execution target is not authorized",
       );
     }
-    // Read reply images before the disposable workspace disappears. Private
+    // Read reply attachments before the disposable workspace disappears. Private
     // inbound context must still be gone before the durable reply completes.
-    const replyImages = validateReplyAttachments([
+    const replyAttachments = validateReplyAttachments([
       ...await collectChannelReplyAttachments({
         workspacePath,
         paths: attachmentPaths,
@@ -1004,7 +1014,7 @@ async function runClaimedChannelReply(
           claimToken: reply.claimToken,
           conversationId,
           result,
-          attachments: replyImages,
+          attachments: replyAttachments,
         }),
       },
     );
