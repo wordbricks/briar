@@ -6,6 +6,7 @@
 if [ "${HOME:-}" = "/home/briar" ]; then
   export CARGO_HOME=/home/briar/.cargo
   export RUSTUP_HOME=/home/briar/.rustup
+  export GH_BROWSER=/opt/briar/bin/briar-open-browser-style
 else
   export CARGO_HOME=/opt/briar/cargo
   export RUSTUP_HOME=/opt/briar/rustup
