@@ -3437,7 +3437,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         proposal,
         input,
       );
-      adoptRemoteAgentSession?.(result.session);
+      if (result.session) adoptRemoteAgentSession?.(result.session);
       issueMessagesByRun.current = {
         ...issueMessagesByRun.current,
         [runId]: (issueMessagesByRun.current[runId] ?? []).map((message) =>

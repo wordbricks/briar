@@ -1047,6 +1047,19 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       db,
       await readFile(resolve("migrations/0138_project_members.sql"), "utf8"),
     );
+    // The compact lifecycle schema intentionally skips the approval tables
+    // required by production migration 0140. Keep the shared Agent Skill
+    // helpers on their current schema without pulling those unrelated tables
+    // into this suite.
+    await executeSql(
+      db,
+      `alter table briar_agent_skills add column execution_mode text not null
+         default 'task'
+         check (execution_mode in ('conversation', 'task'));
+       alter table briar_agent_skills add column approval_policy text not null
+         default 'explicit'
+         check (approval_policy in ('invoke_is_consent', 'explicit'));`,
+    );
     await executeSql(
       db,
       await readFile(

@@ -1,5 +1,9 @@
 import type { ModelEffort } from "../../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../../src/lib/agent-provider";
+import type {
+  AgentSkillApprovalPolicy,
+  AgentSkillExecutionMode,
+} from "../../src/lib/channels-contract";
 import {
   agentSkillBodyMaxLength,
   agentSkillDescriptionMaxLength,
@@ -19,6 +23,8 @@ export type AgentSkillInput = {
   model: string | null;
   effort: AgentSkillEffort | null;
   kind: AgentSkillKind;
+  executionMode?: AgentSkillExecutionMode;
+  approvalPolicy?: AgentSkillApprovalPolicy;
   position: number;
 };
 
@@ -32,6 +38,8 @@ export type AgentSkillRow = {
   model: string | null;
   effort: AgentSkillEffort | null;
   kind: AgentSkillKind;
+  execution_mode: AgentSkillExecutionMode;
+  approval_policy: AgentSkillApprovalPolicy;
   is_default: number;
   position: number;
   created_at: string;
@@ -46,6 +54,8 @@ export type AgentSkillFallback = {
   model: string | null;
   effort: AgentSkillEffort | null;
   kind?: AgentSkillKind;
+  executionMode?: AgentSkillExecutionMode;
+  approvalPolicy?: AgentSkillApprovalPolicy;
 };
 
 export class AgentSkillConflictError extends Error {
@@ -72,7 +82,7 @@ export function normalizedAgentSkillRows(
   fallback: AgentSkillFallback,
   observedAt: string,
 ): AgentSkillRow[] {
-  const requested = input ?? [{
+  const requested: readonly AgentSkillInput[] = input ?? [{
     ...fallback,
     kind: fallback.kind ?? "custom",
     position: 0,
@@ -123,6 +133,8 @@ export function normalizedAgentSkillRows(
       model: normalizedModel,
       effort: skill.effort,
       kind: skill.kind,
+      execution_mode: skill.executionMode ?? "task",
+      approval_policy: skill.approvalPolicy ?? "explicit",
       is_default: 0,
       position: skill.position ?? index,
       created_at: observedAt,
@@ -136,8 +148,8 @@ function upsertAgentSkillStatement(db: D1Database, skill: AgentSkillRow) {
     .prepare(
       `insert into briar_agent_skills (
          id, agent_id, name, description, body, provider, model, effort, kind,
-         is_default, position, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         execution_mode, approval_policy, is_default, position, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        on conflict (id) do update set
          name = excluded.name,
          description = excluded.description,
@@ -146,6 +158,8 @@ function upsertAgentSkillStatement(db: D1Database, skill: AgentSkillRow) {
          model = excluded.model,
          effort = excluded.effort,
          kind = excluded.kind,
+         execution_mode = excluded.execution_mode,
+         approval_policy = excluded.approval_policy,
          is_default = excluded.is_default,
          position = excluded.position,
          updated_at = excluded.updated_at
@@ -161,6 +175,8 @@ function upsertAgentSkillStatement(db: D1Database, skill: AgentSkillRow) {
       skill.model,
       skill.effort,
       skill.kind,
+      skill.execution_mode,
+      skill.approval_policy,
       skill.is_default,
       skill.position,
       skill.created_at,
@@ -190,17 +206,19 @@ const activeDirectAgentSkillJobPredicate = (skillAlias: string) => `
 const agentSkillRuntimeChanged = (
   current: Pick<
     AgentSkillRow,
-    "body" | "provider" | "model" | "effort"
+    "body" | "provider" | "model" | "effort" | "execution_mode" | "approval_policy"
   >,
   requested: Pick<
     AgentSkillRow,
-    "body" | "provider" | "model" | "effort"
+    "body" | "provider" | "model" | "effort" | "execution_mode" | "approval_policy"
   >,
 ) =>
   current.body !== requested.body ||
   current.provider !== requested.provider ||
   current.model !== requested.model ||
-  current.effort !== requested.effort;
+  current.effort !== requested.effort ||
+  current.execution_mode !== requested.execution_mode ||
+  current.approval_policy !== requested.approval_policy;
 
 export async function assertAgentSkillReplacementAllowed(
   db: D1Database,
@@ -248,7 +266,8 @@ export async function assertAgentSkillReplacementAllowed(
   const active = await db
     .prepare(
       `select skill.id, skill.name, skill.body, skill.provider,
-              skill.model, skill.effort
+              skill.model, skill.effort, skill.execution_mode,
+              skill.approval_policy
        from briar_agent_skills skill
        where skill.agent_id = ? and skill.id in (${placeholders})
          and (${activeDirectAgentSkillJobPredicate("skill")})
@@ -258,7 +277,8 @@ export async function assertAgentSkillReplacementAllowed(
     .all<
       Pick<
         AgentSkillRow,
-        "id" | "name" | "body" | "provider" | "model" | "effort"
+        "id" | "name" | "body" | "provider" | "model" | "effort" |
+          "execution_mode" | "approval_policy"
       >
     >();
   const requestedById = new Map(skills.map((skill) => [skill.id, skill]));
@@ -285,6 +305,8 @@ function guardActiveDirectAgentSkillRuntimeStatement(
       provider: skill.provider,
       model: skill.model,
       effort: skill.effort,
+      executionMode: skill.execution_mode,
+      approvalPolicy: skill.approval_policy,
     })),
   );
   return db
@@ -294,15 +316,18 @@ function guardActiveDirectAgentSkillRuntimeStatement(
                 json_extract(value, '$.body') as body,
                 json_extract(value, '$.provider') as provider,
                 json_extract(value, '$.model') as model,
-                json_extract(value, '$.effort') as effort
+                json_extract(value, '$.effort') as effort,
+                json_extract(value, '$.executionMode') as execution_mode,
+                json_extract(value, '$.approvalPolicy') as approval_policy
          from json_each(?)
        )
        insert into briar_agent_skills (
          id, agent_id, name, description, body, provider, model, effort, kind,
-         is_default, position, created_at, updated_at
+         execution_mode, approval_policy, is_default, position, created_at, updated_at
        )
        select skill.id, skill.agent_id, skill.name, skill.description,
               skill.body, skill.provider, skill.model, skill.effort, skill.kind,
+              skill.execution_mode, skill.approval_policy,
               skill.is_default, skill.position, skill.created_at,
               skill.updated_at
        from briar_agent_skills skill
@@ -314,6 +339,8 @@ function guardActiveDirectAgentSkillRuntimeStatement(
            or skill.provider is not requested.provider
            or skill.model is not requested.model
            or skill.effort is not requested.effort
+           or skill.execution_mode is not requested.execution_mode
+           or skill.approval_policy is not requested.approval_policy
          )
        limit 1`,
     )
@@ -350,10 +377,11 @@ export function replaceAgentSkillStatements(
         .prepare(
           `insert into briar_agent_skills (
              id, agent_id, name, description, body, provider, model, effort, kind,
-             is_default, position, created_at, updated_at
+             execution_mode, approval_policy, is_default, position, created_at, updated_at
            )
            select skill.id, skill.agent_id, skill.name, skill.description,
                   skill.body, skill.provider, skill.model, skill.effort, skill.kind,
+                  skill.execution_mode, skill.approval_policy,
                   skill.is_default, skill.position, skill.created_at,
                   skill.updated_at
            from briar_agent_skills skill
@@ -373,10 +401,10 @@ export function replaceAgentSkillStatements(
       .prepare(
         `insert into briar_agent_skills (
            id, agent_id, name, description, body, provider, model, effort, kind,
-           is_default, position, created_at, updated_at
+           execution_mode, approval_policy, is_default, position, created_at, updated_at
          )
          select id, agent_id, name, description, body, provider, model, effort, kind,
-                is_default, position, created_at, updated_at
+                execution_mode, approval_policy, is_default, position, created_at, updated_at
          from briar_agent_skills
          where id in (${placeholders}) and agent_id != ?
          limit 1`,
@@ -395,10 +423,11 @@ export function replaceAgentSkillStatements(
       .prepare(
         `insert into briar_agent_skills (
            id, agent_id, name, description, body, provider, model, effort, kind,
-           is_default, position, created_at, updated_at
+           execution_mode, approval_policy, is_default, position, created_at, updated_at
          )
          select skill.id, skill.agent_id, skill.name, skill.description,
                 skill.body, skill.provider, skill.model, skill.effort, skill.kind,
+                skill.execution_mode, skill.approval_policy,
                 skill.is_default, skill.position, skill.created_at,
                 skill.updated_at
          from briar_agent_skills skill
@@ -433,8 +462,8 @@ export function insertAgentSkillStatement(
     .prepare(
       `insert into briar_agent_skills (
          id, agent_id, name, description, body, provider, model, effort, kind,
-         is_default, position, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         execution_mode, approval_policy, is_default, position, created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       skill.id,
@@ -446,6 +475,8 @@ export function insertAgentSkillStatement(
       skill.model,
       skill.effort,
       skill.kind,
+      skill.execution_mode,
+      skill.approval_policy,
       skill.is_default,
       skill.position,
       skill.created_at,
@@ -496,7 +527,7 @@ export async function listAgentSkills(
     const result = await db
       .prepare(
         `select id, agent_id, name, description, body, provider, model, effort, kind,
-                is_default, position, created_at, updated_at
+                execution_mode, approval_policy, is_default, position, created_at, updated_at
          from briar_agent_skills
          where agent_id in (${placeholders})
          order by agent_id, position, created_at, id`,
@@ -525,7 +556,7 @@ export async function getAgentSkill(
     return db
       .prepare(
         `select id, agent_id, name, description, body, provider, model, effort, kind,
-                is_default, position, created_at, updated_at
+                execution_mode, approval_policy, is_default, position, created_at, updated_at
          from briar_agent_skills
          where agent_id = ? and id = ?
          limit 1`,
@@ -536,7 +567,7 @@ export async function getAgentSkill(
   const result = await db
     .prepare(
       `select id, agent_id, name, description, body, provider, model, effort, kind,
-              is_default, position, created_at, updated_at
+              execution_mode, approval_policy, is_default, position, created_at, updated_at
        from briar_agent_skills
        where agent_id = ?
        order by position, created_at, id
@@ -576,6 +607,8 @@ export const agentSkillJson = (skill: AgentSkillRow) => ({
   model: skill.model,
   effort: skill.effort,
   kind: skill.kind,
+  executionMode: skill.execution_mode,
+  approvalPolicy: skill.approval_policy,
   // Workers from before explicit Skill selection require this wire field.
   // It is always false and has no selection or persistence semantics.
   isDefault: false,

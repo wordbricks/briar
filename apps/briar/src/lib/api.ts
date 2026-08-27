@@ -1889,8 +1889,9 @@ function assertPendingAgentSkillExecutionApproval(
     proposal.requestedWorkerId !== null ||
     proposal.requestedWorkerLabel !== null ||
     proposal.resultSessionId !== null ||
-    !input.workerId ||
-    input.workerId !== input.workerId.trim()
+    (proposal.executionMode === "task" &&
+      (!input.workerId || input.workerId !== input.workerId.trim())) ||
+    (proposal.executionMode === "conversation" && input.workerId !== undefined)
   ) {
     throw new Error(
       "Skill execution approval requires one exact Worker and a pending proposal.",
@@ -1910,6 +1911,8 @@ const skillExecutionSnapshotKeys = [
   "provider",
   "model",
   "effort",
+  "executionMode",
+  "approvalPolicy",
   "createdAt",
   "delegatedByAgentId",
   "delegatedByAgentName",
@@ -1920,10 +1923,12 @@ function validateAgentSkillExecutionAcceptance(
   expected: AgentSkillExecutionProposal,
   input: AgentSkillExecutionApprovalInput,
 ) {
-  const session = {
-    ...decodeProjectAgentSessionResponse(result.session),
-    localOwner: false,
-  } as AutoHuntSession;
+  const session = result.session === null
+    ? null
+    : {
+      ...decodeProjectAgentSessionResponse(result.session),
+      localOwner: false,
+    } as AutoHuntSession;
   const snapshotChanged = skillExecutionSnapshotKeys.some(
     (key) => result.proposal[key] !== expected[key],
   );
@@ -1933,18 +1938,23 @@ function validateAgentSkillExecutionAcceptance(
     result.projectId !== expected.projectId ||
     result.proposal.status !== "accepted" ||
     !result.proposal.acceptedAt ||
-    result.proposal.requestedWorkerId !== input.workerId ||
     !result.proposal.requestedWorkerLabel?.trim() ||
-    result.proposal.resultSessionId !== session.id ||
-    session.projectId !== expected.projectId ||
-    session.agentId !== expected.agentId ||
-    session.agentName !== expected.agentName ||
-    session.skillId !== expected.skillId ||
-    session.sessionType !== "task" ||
-    session.trigger !== "manual" ||
-    session.request !== expected.request ||
-    session.requestedWorkerId !== input.workerId ||
-    session.workerId !== input.workerId
+    (expected.executionMode === "conversation"
+      ? session !== null ||
+        !result.proposal.requestedWorkerId ||
+        !result.proposal.resultMessageId
+      : session === null ||
+        result.proposal.requestedWorkerId !== input.workerId ||
+        result.proposal.resultSessionId !== session.id ||
+        session.projectId !== expected.projectId ||
+        session.agentId !== expected.agentId ||
+        session.agentName !== expected.agentName ||
+        session.skillId !== expected.skillId ||
+        session.sessionType !== "task" ||
+        session.trigger !== "manual" ||
+        session.request !== expected.request ||
+        session.requestedWorkerId !== input.workerId ||
+        session.workerId !== input.workerId)
   ) {
     throw new Error(
       "Skill execution approval returned inconsistent immutable evidence.",

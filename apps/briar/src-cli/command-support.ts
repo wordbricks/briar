@@ -217,19 +217,94 @@ const serializeTranscriptRequest = (
 const isTranscriptPayloadTooLarge = (error: unknown) =>
   error instanceof HttpRequestError && error.status === 413;
 
-async function openBrowser(url: string) {
+type BrowserLaunchHandle = {
+  exited: Promise<number | null>;
+  unref: () => void;
+};
+
+type BrowserLauncher = (
+  command: string,
+  arguments_: string[],
+  options: {
+    detached: true;
+    stdio: "ignore";
+    windowsHide: true;
+  },
+) => BrowserLaunchHandle;
+
+type OpenBrowserDependencies = {
+  launch?: BrowserLauncher;
+  platform?: NodeJS.Platform;
+  writeLine?: (message: string) => void;
+};
+
+const launchBrowser: BrowserLauncher = (command, arguments_, options) => {
+  const child = spawn(command, arguments_, options);
+  return {
+    exited: new Promise((resolveExit, rejectExit) => {
+      child.once("error", rejectExit);
+      child.once("exit", resolveExit);
+    }),
+    unref: () => child.unref(),
+  };
+};
+
+function openBrowser(url: string, dependencies: OpenBrowserDependencies = {}) {
+  const operatingSystem = dependencies.platform ?? platform();
   const command =
-    platform() === "darwin"
+    operatingSystem === "darwin"
       ? ["open", url]
-      : platform() === "win32"
+      : operatingSystem === "win32"
         ? ["cmd", "/c", "start", "", url]
         : ["xdg-open", url];
-  const process = Bun.spawn(command, { stdout: "ignore", stderr: "ignore" });
-  await process.exited;
+  const writeLine = dependencies.writeLine ?? console.error;
+  let reportedFailure = false;
+  const reportFailure = () => {
+    if (reportedFailure) return;
+    reportedFailure = true;
+    writeLine(
+      `브라우저를 자동으로 열지 못했습니다. 다음 주소를 직접 여세요: ${url}`,
+    );
+  };
+
+  try {
+    const child = (dependencies.launch ?? launchBrowser)(
+      command[0],
+      command.slice(1),
+      { detached: true, stdio: "ignore", windowsHide: true },
+    );
+    void child.exited.then((exitCode) => {
+      if (exitCode !== 0) reportFailure();
+    }, reportFailure);
+    child.unref();
+  } catch {
+    reportFailure();
+  }
 }
 
-async function login(apiUrlOverride?: string) {
-  const loaded = await loadConfig();
+type LoginDependencies = {
+  loadConfig: typeof loadConfig;
+  openBrowser: (url: string) => void;
+  request: typeof request;
+  saveConfig: typeof saveConfig;
+  sleep: (milliseconds: number) => Promise<void>;
+  writeLine: (message: string) => void;
+};
+
+async function login(
+  apiUrlOverride?: string,
+  dependencyOverrides: Partial<LoginDependencies> = {},
+) {
+  const dependencies: LoginDependencies = {
+    loadConfig,
+    openBrowser,
+    request,
+    saveConfig,
+    sleep: (milliseconds) => Bun.sleep(milliseconds),
+    writeLine: console.log,
+    ...dependencyOverrides,
+  };
+  const loaded = await dependencies.loadConfig();
   const config = apiUrlOverride
     ? {
       ...loaded,
@@ -239,7 +314,7 @@ async function login(apiUrlOverride?: string) {
         : undefined,
     }
     : loaded;
-  const code = await request<{
+  const code = await dependencies.request<{
     device_code: string;
     user_code: string;
     verification_uri: string;
@@ -249,15 +324,17 @@ async function login(apiUrlOverride?: string) {
     method: "POST",
     body: JSON.stringify({ client_id: "briar-cli", scope: "openid profile email" }),
   });
-  console.log(`Briar 로그인 코드: ${code.user_code}`);
-  console.log("시스템 브라우저에서 로그인하고 기기 승인을 완료하세요.");
-  await openBrowser(code.verification_uri_complete ?? code.verification_uri);
+  dependencies.writeLine(`Briar 로그인 코드: ${code.user_code}`);
+  dependencies.writeLine("시스템 브라우저에서 로그인하고 기기 승인을 완료하세요.");
+  dependencies.openBrowser(
+    code.verification_uri_complete ?? code.verification_uri,
+  );
 
   let interval = (code.interval ?? 5) * 1_000;
   for (;;) {
-    await Bun.sleep(interval);
+    await dependencies.sleep(interval);
     try {
-      const token = await request<{ access_token?: string }>(
+      const token = await dependencies.request<{ access_token?: string }>(
         config.apiUrl,
         "/api/auth/device/token",
         null,
@@ -272,13 +349,17 @@ async function login(apiUrlOverride?: string) {
       );
       if (!token.access_token) continue;
       config.userToken = token.access_token;
-      await saveConfig(config);
-      const me = await request<{ user: { name: string; email: string } }>(
+      await dependencies.saveConfig(config);
+      const me = await dependencies.request<{
+        user: { name: string; email: string };
+      }>(
         config.apiUrl,
         "/me",
         token.access_token,
       );
-      console.log(`${me.user.name} (${me.user.email}) 계정으로 로그인했습니다.`);
+      dependencies.writeLine(
+        `${me.user.name} (${me.user.email}) 계정으로 로그인했습니다.`,
+      );
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message.toLowerCase() : String(error);
@@ -415,6 +496,7 @@ export {
   serializeTranscriptRequest,
   isTranscriptPayloadTooLarge,
   openBrowser,
+  type LoginDependencies,
   login,
   gitValueAt,
   gitValue,

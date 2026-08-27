@@ -3,6 +3,7 @@ import {
   Bot,
   CircleAlert,
   Cpu,
+  Eye,
   Play,
   ShieldCheck,
   Sparkles,
@@ -99,6 +100,7 @@ export function AgentSkillExecutionApproval<
     acceptedProposal?.id === proposal.id && acceptedProposal.status === "accepted"
       ? acceptedProposal
       : proposal;
+  const conversationExecution = displayProposal.executionMode === "conversation";
   const proposalSnapshotKey = JSON.stringify([
     proposal.id,
     proposal.type,
@@ -211,7 +213,9 @@ export function AgentSkillExecutionApproval<
     setOpening(true);
     setError(null);
     try {
-      const context = await getContext();
+      const context = conversationExecution
+        ? { workers: [] }
+        : await getContext();
       if (
         !mounted.current ||
         generation.current !== requestGeneration ||
@@ -233,12 +237,12 @@ export function AgentSkillExecutionApproval<
         setOpening(false);
       }
     }
-  }, [displayProposal.status, getContext]);
+  }, [conversationExecution, displayProposal.status, getContext]);
 
   const accept = useCallback(async () => {
     if (
       !activeRef.current ||
-      !workerId ||
+      (!conversationExecution && !workerId) ||
       acceptingRef.current ||
       displayProposal.status !== "pending"
     ) return;
@@ -247,28 +251,35 @@ export function AgentSkillExecutionApproval<
     setAccepting(true);
     setError(null);
     try {
-      // Refresh immediately before the mutation. The UI does not treat the
-      // Worker selected when opening the dialog as an authorization snapshot.
-      const context = await getContext();
+      // Task execution refreshes the mutable Worker eligibility immediately
+      // before approval. Conversation execution is server-bound to the
+      // retained thread owner and deliberately exposes no Worker choice.
+      const context = conversationExecution
+        ? { workers: [] }
+        : await getContext();
       if (
         !mounted.current ||
         generation.current !== requestGeneration ||
         !activeRef.current
       ) return;
       setDialogContext(context);
-      const selected = context.workers.find(
-        (worker) => worker.id === workerId,
-      );
-      if (!selected || !selectableWorker(
-        selected,
-        displayProposal.provider,
-        context.policy,
-      )) {
-        setWorkerId("");
-        setError(t("skillExecution.workerChanged"));
-        return;
+      if (!conversationExecution) {
+        const selected = context.workers.find(
+          (worker) => worker.id === workerId,
+        );
+        if (!selected || !selectableWorker(
+          selected,
+          displayProposal.provider,
+          context.policy,
+        )) {
+          setWorkerId("");
+          setError(t("skillExecution.workerChanged"));
+          return;
+        }
       }
-      const accepted = await onAccept({ workerId });
+      const accepted = await onAccept(
+        conversationExecution ? {} : { workerId },
+      );
       if (
         !mounted.current ||
         generation.current !== requestGeneration ||
@@ -290,7 +301,7 @@ export function AgentSkillExecutionApproval<
         setAccepting(false);
       }
     }
-  }, [displayProposal.provider, displayProposal.status, getContext, onAccept, onAccepted, t, workerId]);
+  }, [conversationExecution, displayProposal.provider, displayProposal.status, getContext, onAccept, onAccepted, t, workerId]);
 
   const compatibleWorkers = useMemo(
     () => (dialogContext?.workers ?? executionContext?.workers ?? []).filter(
@@ -324,13 +335,35 @@ export function AgentSkillExecutionApproval<
     ],
   );
   const hasSelectableWorker = selectableWorkers.length > 0;
-  const canAccept = selectableWorkers.some((worker) => worker.id === workerId);
+  const canAccept = conversationExecution ||
+    selectableWorkers.some((worker) => worker.id === workerId);
   const workerLabel =
     displayProposal.requestedWorkerLabel ??
     compatibleWorkers.find(
       (worker) => worker.id === displayProposal.requestedWorkerId,
     )?.label ??
     displayProposal.requestedWorkerId;
+  const executionStateLabel = t(
+    `skillExecution.status.${displayProposal.executionStatus}` as MessageKey,
+  );
+  const viewResult = useCallback(() => {
+    if (!displayProposal.resultMessageId) return;
+    const target = Array.from(document.querySelectorAll<HTMLElement>([
+      "[data-channel-message-id]",
+      "[data-channel-virtual-message-id]",
+      "[data-companion-channel-message-id]",
+      "[data-issue-message-id]",
+    ].join(","))).find((element) =>
+      element.dataset.channelMessageId === displayProposal.resultMessageId ||
+      element.dataset.channelVirtualMessageId ===
+        displayProposal.resultMessageId ||
+      element.dataset.companionChannelMessageId ===
+        displayProposal.resultMessageId ||
+      element.dataset.issueMessageId === displayProposal.resultMessageId
+    );
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    target?.focus({ preventScroll: true });
+  }, [displayProposal.resultMessageId]);
 
   return (
     <>
@@ -342,9 +375,7 @@ export function AgentSkillExecutionApproval<
           <span>
             <strong>{t("skillExecution.cardTitle")}</strong>
             <small>
-              {displayProposal.status === "accepted"
-                ? t("skillExecution.accepted")
-                : t("skillExecution.pending")}
+              {executionStateLabel}
             </small>
           </span>
         </header>
@@ -353,23 +384,44 @@ export function AgentSkillExecutionApproval<
           <div><dt><Sparkles size={13} />{t("skillExecution.skill")}</dt><dd>{displayProposal.skillName}</dd></div>
           <div className="skill-execution-proposal-request"><dt>{t("skillExecution.request")}</dt><dd>{displayProposal.request}</dd></div>
           <div><dt>{t("skillExecution.runtime")}</dt><dd>{displayProposal.provider} · {displayProposal.model ?? t("settings.providerDefaultModel")} · {displayProposal.effort ?? t("settings.providerDefaultEffort")}</dd></div>
+          <div><dt>{t("skillExecution.executionMode")}</dt><dd>{t(`skillExecution.mode.${displayProposal.executionMode}` as MessageKey)}</dd></div>
         </dl>
         {displayProposal.delegatedByAgentName ? (
           <p>{t("skillExecution.delegatedBy", { agent: displayProposal.delegatedByAgentName })}</p>
         ) : null}
         {displayProposal.status === "accepted" ? (
-          <div className="skill-execution-proposal-accepted">
-            <BadgeCheck aria-hidden="true" size={15} />
+          <div className={`skill-execution-proposal-accepted${
+            displayProposal.executionStatus === "failed" ? " is-failed" : ""
+          }`}>
+            {displayProposal.executionStatus === "failed"
+              ? <CircleAlert aria-hidden="true" size={15} />
+              : displayProposal.executionStatus === "completed"
+              ? <BadgeCheck aria-hidden="true" size={15} />
+              : <Play aria-hidden="true" size={15} />}
             <span>
-              <strong>{t("skillExecution.acceptedWorker", { worker: workerLabel ?? "—" })}</strong>
-              {displayProposal.resultSessionId ? (
+              <strong>{conversationExecution
+                ? t("skillExecution.continuedConversation")
+                : t("skillExecution.acceptedWorker", { worker: workerLabel ?? "—" })}</strong>
+              {!conversationExecution && displayProposal.resultSessionId ? (
                 <small>{t("skillExecution.sessionHistory", { id: displayProposal.resultSessionId })}</small>
               ) : null}
+              {displayProposal.error ? <small>{displayProposal.error}</small> : null}
             </span>
+            {displayProposal.resultMessageId &&
+                ["completed", "failed"].includes(
+                  displayProposal.executionStatus,
+                ) ? (
+              <button onClick={viewResult} type="button">
+                <Eye aria-hidden="true" size={14} />
+                {t("skillExecution.viewResult")}
+              </button>
+            ) : null}
           </div>
         ) : (
           <>
-            <p>{t("skillExecution.separateBoundary")}</p>
+            <p>{t(conversationExecution
+              ? "skillExecution.conversationBoundary"
+              : "skillExecution.separateBoundary")}</p>
             {disabledReason ? (
               <p className="skill-execution-proposal-error" role="alert">
                 <CircleAlert aria-hidden="true" size={14} />
@@ -406,7 +458,9 @@ export function AgentSkillExecutionApproval<
           <div className="skill-execution-approval-scroll">
             <DialogHeader>
               <DialogTitle>{t("skillExecution.dialogTitle")}</DialogTitle>
-              <DialogDescription>{t("skillExecution.dialogDescription")}</DialogDescription>
+              <DialogDescription>{t(conversationExecution
+                ? "skillExecution.conversationDialogDescription"
+                : "skillExecution.dialogDescription")}</DialogDescription>
             </DialogHeader>
             <dl className="skill-execution-approval-runtime">
               <div><dt>{t("skillExecution.agent")}</dt><dd>{displayProposal.agentName}</dd></div>
@@ -416,7 +470,7 @@ export function AgentSkillExecutionApproval<
               <div><dt>{t("issue.preferredModel")}</dt><dd>{displayProposal.model ?? t("settings.providerDefaultModel")}</dd></div>
               <div><dt>{t("settings.effort")}</dt><dd>{displayProposal.effort ?? t("settings.providerDefaultEffort")}</dd></div>
             </dl>
-            <label className="skill-execution-worker-select">
+            {!conversationExecution ? <label className="skill-execution-worker-select">
               <span><Cpu size={15} />{t("skillExecution.exactWorker")}</span>
               <NativeSelect
                 disabled={accepting || !hasSelectableWorker}
@@ -434,8 +488,8 @@ export function AgentSkillExecutionApproval<
                 placeholder={t("skillExecution.selectWorker")}
                 value={workerId}
               />
-            </label>
-            {!hasSelectableWorker ? (
+            </label> : null}
+            {!conversationExecution && !hasSelectableWorker ? (
               <p className="skill-execution-proposal-error" role="alert">
                 <CircleAlert aria-hidden="true" size={14} />
                 {t("skillExecution.noWorker")}

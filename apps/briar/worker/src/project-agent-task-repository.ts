@@ -277,6 +277,8 @@ export async function claimNextProjectAgentTask(
         provider: ProjectAgentProvider;
         model: string | null;
         effort: AgentSkillEffort | null;
+        execution_mode: "conversation" | "task";
+        approval_policy: "invoke_is_consent" | "explicit";
         approved_at: string;
       }>();
     if (!approval) {
@@ -294,6 +296,8 @@ export async function claimNextProjectAgentTask(
       model: approval.model,
       effort: approval.effort,
       kind: approval.skill_kind,
+      execution_mode: approval.execution_mode,
+      approval_policy: approval.approval_policy,
       is_default: 0,
       position: 0,
       created_at: approval.approved_at,

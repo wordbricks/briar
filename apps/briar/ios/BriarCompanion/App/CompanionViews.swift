@@ -58,7 +58,9 @@ struct CompanionShellView: View {
            }) {
             navigation.pendingProjectID = targetProject.id
         }
-        applyPendingProjectIfNeeded()
+        if let pendingProjectID = navigation.pendingProjectID {
+            selectProject(pendingProjectID)
+        }
     }
 
     var body: some View {
@@ -2154,7 +2156,11 @@ struct RunDetailView: View {
                 .font(.subheadline.weight(.semibold))
             Text(
                 proposal.status == .accepted
-                    ? L10n.text("승인되어 Agent 세션을 시작했습니다.", locale: locale)
+                    ? L10n.text(proposal.executionStatus == .completed
+                        ? "Skill 실행을 완료했습니다."
+                        : proposal.executionStatus == .failed
+                        ? "Skill 실행이 실패했습니다."
+                        : "Skill을 실행 중입니다.", locale: locale)
                     : L10n.text(
                         "정확한 Worker를 선택하고 명시적으로 승인해야 실행됩니다.",
                         locale: locale
@@ -2194,12 +2200,13 @@ struct RunDetailView: View {
                 )
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.tint)
-                if let workerLabel {
+                if proposal.executionMode == .task, let workerLabel {
                     Label(workerLabel, systemImage: "desktopcomputer")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                if let sessionID = proposal.resultSessionId {
+                if proposal.executionMode == .task,
+                   let sessionID = proposal.resultSessionId {
                     Button {
                         onSkillSessionOpen(proposal.projectId, sessionID)
                     } label: {
@@ -2212,6 +2219,11 @@ struct RunDetailView: View {
                     .accessibilityIdentifier(
                         "open-issue-skill-session-\(proposal.id.uuidString.lowercased())"
                     )
+                }
+                if let error = proposal.error {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
             } else {
                 Label(
@@ -2468,7 +2480,9 @@ struct RunDetailView: View {
             ) else { throw MobileAPIError.invalidResponse }
 
             detail.updateSkillExecutionProposal(response.proposal)
-            onSkillSessionMaterialized(response.session)
+            if let session = response.session {
+                onSkillSessionMaterialized(session)
+            }
             actionError = nil
             await refresh()
             return true

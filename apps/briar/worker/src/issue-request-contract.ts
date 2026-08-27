@@ -255,14 +255,14 @@ export const IssueAgentReplyCompletion = strictSchema(Schema.Struct({
 
 export const AgentSkillExecutionProposalAcceptInput = strictSchema(
   Schema.Struct({
-    workerId: Schema.String.check(
+    workerId: Schema.optional(Schema.String.check(
       Schema.isLengthBetween(1, 128),
       Schema.makeFilter((workerId) =>
         workerId === workerId.trim()
           ? undefined
           : "workerId cannot contain leading or trailing whitespace"
       ),
-    ),
+    )),
   }),
 );
 

@@ -1,6 +1,7 @@
 import type { AgentSkillExecutionProposalRow } from "./agent-skill-execution-proposal-repository";
 import {
   acceptAgentSkillExecutionProposal,
+  acceptConversationAgentSkillExecutionProposal,
   getAgentSkillExecutionApprovalAudit,
 } from "./agent-skill-execution-proposal-repository";
 import { getArchivedProjectAgentSession } from "./archive";
@@ -12,6 +13,7 @@ import {
 } from "./project-agent-session-repository";
 import {
   availableExecutionWorkerForAgentSkill,
+  listExecutionWorkers,
   WorkerConflictError,
 } from "./workers";
 
@@ -35,12 +37,18 @@ export const agentSkillExecutionProposalJson = (
     provider: proposal.provider,
     model: proposal.model,
     effort: proposal.effort,
+    executionMode: proposal.execution_mode,
+    approvalPolicy: proposal.approval_policy,
+    executionStatus: proposal.execution_status ??
+      (proposal.status === "pending" ? "waiting" : "running"),
     request: proposal.request,
     delegatedByAgentId: proposal.delegated_by_agent_id,
     delegatedByAgentName: proposal.delegated_by_agent_name,
     requestedWorkerId: proposal.requested_worker_id,
     requestedWorkerLabel: proposal.requested_worker_label,
     resultSessionId: proposal.result_session_id,
+    resultMessageId: proposal.result_message_id,
+    error: proposal.execution_error ?? null,
     createdAt: proposal.created_at,
     acceptedAt: proposal.accepted_at,
   };
@@ -53,7 +61,7 @@ export async function approveAgentSkillExecutionProposal(
   input: {
     sourceKind: "channel" | "issue";
     userId: string;
-    workerId: string;
+    workerId?: string;
     staleCode:
       | "CHANNEL_SKILL_EXECUTION_PROPOSAL_STALE"
       | "ISSUE_SKILL_EXECUTION_PROPOSAL_STALE";
@@ -75,7 +83,7 @@ export async function approveAgentSkillExecutionProposal(
     if (
       current.status !== "accepted" ||
       current.accepted_by_user_id !== input.userId ||
-      current.requested_worker_id !== input.workerId
+      (input.workerId && current.requested_worker_id !== input.workerId)
     ) {
       throw conflict();
     }
@@ -107,16 +115,54 @@ export async function approveAgentSkillExecutionProposal(
       approval.provider !== current.provider ||
       approval.model !== current.model ||
       approval.effort !== current.effort ||
+      approval.execution_mode !== current.execution_mode ||
+      approval.approval_policy !== current.approval_policy ||
+      approval.thread_root_message_id !== current.thread_root_message_id ||
       approval.request !== current.request ||
       approval.worker_id !== current.requested_worker_id ||
       approval.worker_label !== current.requested_worker_label ||
       approval.result_session_id !== current.result_session_id ||
+      approval.result_reply_job_id !== current.result_reply_job_id ||
+      (current.execution_mode === "conversation" &&
+        approval.result_message_id !== current.result_message_id) ||
       approval.approved_by_user_id !== current.accepted_by_user_id ||
       approval.approved_at !== current.accepted_at ||
       approval.delegated_by_agent_id !== current.delegated_by_agent_id ||
       approval.delegated_by_agent_name !== current.delegated_by_agent_name
     ) {
       throw stale("The approved Agent Skill execution audit is invalid");
+    }
+    if (current.execution_mode === "conversation") {
+      const conversation = await db.prepare(
+        `select session.id, reply.status as reply_status
+         from briar_channel_reply_sessions session
+         join briar_channel_agent_reply_jobs reply
+           on reply.id = ? and reply.session_id = session.id
+         where session.id = ? and session.channel_id = ?
+           and session.thread_root_message_id = ? and session.agent_id = ?`,
+      ).bind(
+        current.result_reply_job_id,
+        current.result_session_id,
+        current.channel_id,
+        current.thread_root_message_id,
+        current.agent_id,
+      ).first<{ id: string; reply_status: string }>();
+      if (!conversation) {
+        throw stale("The approved conversation Skill execution was not found");
+      }
+      return {
+        outcome,
+        proposal: agentSkillExecutionProposalJson({
+          ...current,
+          execution_status: conversation.reply_status === "completed"
+            ? "completed"
+            : conversation.reply_status === "failed"
+              ? "failed"
+              : "running",
+        }),
+        projectId: current.project_id,
+        session: null,
+      };
     }
     const session = await getProjectAgentSession(
       db,
@@ -176,37 +222,104 @@ export async function approveAgentSkillExecutionProposal(
   if (proposal.status !== "pending") throw stale();
 
   const acceptedAt = new Date().toISOString();
-  let worker: Awaited<ReturnType<typeof availableExecutionWorkerForAgentSkill>>;
-  try {
-    worker = await availableExecutionWorkerForAgentSkill(db, {
-      organizationId: proposal.organization_id,
-      projectId: proposal.project_id,
-      workerId: input.workerId,
-      provider: proposal.provider,
-      observedAt: acceptedAt,
-    });
-  } catch (error) {
-    if (error instanceof WorkerConflictError) {
-      throw conflict(error.message);
+  if (
+    proposal.execution_mode === "conversation" &&
+    (proposal.source_kind !== "channel" || !proposal.channel_id ||
+      !proposal.thread_root_message_id)
+  ) {
+    throw stale(
+      "Conversation Skill execution requires its original channel thread context",
+    );
+  }
+  const conversationBinding = proposal.execution_mode === "conversation"
+    ? await db.prepare(
+      `select session.id as session_id,
+              session.owner_worker_id as owner_worker_id,
+              source.claimed_worker_id as source_worker_id
+       from briar_channel_agent_reply_jobs source
+       join briar_channel_reply_sessions session on session.id = source.session_id
+       where source.id = ? and source.status = 'completed'
+         and session.channel_id = ? and session.thread_root_message_id = ?
+         and session.agent_id = ?`,
+    ).bind(
+      proposal.source_reply_job_id,
+      proposal.channel_id,
+      proposal.thread_root_message_id,
+      proposal.agent_id,
+    ).first<{
+      session_id: string;
+      owner_worker_id: string | null;
+      source_worker_id: string | null;
+    }>()
+    : null;
+  if (proposal.execution_mode === "conversation" && !conversationBinding) {
+    throw stale(
+      "The original conversation session is no longer available",
+    );
+  }
+  if (proposal.execution_mode === "task" && !input.workerId) {
+    throw stale("Choose a Worker before approving this Agent Skill");
+  }
+  const candidateWorkerIds = proposal.execution_mode === "conversation"
+    ? [...new Set([
+      conversationBinding!.owner_worker_id,
+      conversationBinding!.source_worker_id,
+      ...(await listExecutionWorkers(db, proposal.project_id, acceptedAt))
+        .map((candidate) => candidate.id),
+    ].filter((candidate): candidate is string => Boolean(candidate)))]
+    : [input.workerId!];
+  let worker: Awaited<
+    ReturnType<typeof availableExecutionWorkerForAgentSkill>
+  > | null = null;
+  let workerConflict: WorkerConflictError | null = null;
+  for (const workerId of candidateWorkerIds) {
+    try {
+      worker = await availableExecutionWorkerForAgentSkill(db, {
+        organizationId: proposal.organization_id,
+        projectId: proposal.project_id,
+        workerId,
+        provider: proposal.provider,
+        observedAt: acceptedAt,
+      });
+      break;
+    } catch (error) {
+      if (!(error instanceof WorkerConflictError)) throw error;
+      workerConflict = error;
     }
-    throw error;
+  }
+  if (!worker) {
+    throw conflict(
+      workerConflict?.message ??
+        "No available Worker can restore this conversation Skill",
+    );
   }
 
   let accepted: AgentSkillExecutionProposalRow | null = null;
   try {
-    accepted = await acceptAgentSkillExecutionProposal(db, {
-      proposalId: proposal.id,
-      sourceKind: input.sourceKind,
-      organizationId: proposal.organization_id,
-      projectId: proposal.project_id,
-      channelId: proposal.channel_id,
-      conversationRunId: proposal.conversation_run_id,
-      userId: input.userId,
-      workerId: worker.id,
-      workerLabel: worker.label,
-      resultSessionId: crypto.randomUUID(),
-      acceptedAt,
-    });
+    accepted = proposal.execution_mode === "conversation"
+      ? await acceptConversationAgentSkillExecutionProposal(db, {
+        proposal,
+        userId: input.userId,
+        workerId: worker.id,
+        workerLabel: worker.label,
+        resultSessionId: conversationBinding!.session_id,
+        resultReplyJobId: crypto.randomUUID(),
+        resultMessageId: crypto.randomUUID(),
+        acceptedAt,
+      })
+      : await acceptAgentSkillExecutionProposal(db, {
+        proposalId: proposal.id,
+        sourceKind: input.sourceKind,
+        organizationId: proposal.organization_id,
+        projectId: proposal.project_id,
+        channelId: proposal.channel_id,
+        conversationRunId: proposal.conversation_run_id,
+        userId: input.userId,
+        workerId: worker.id,
+        workerLabel: worker.label,
+        resultSessionId: crypto.randomUUID(),
+        acceptedAt,
+      });
   } catch (error) {
     const current = await input.reload();
     if (current?.status === "accepted") {

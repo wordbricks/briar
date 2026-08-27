@@ -835,6 +835,7 @@ private struct ChannelConversationView: View {
     let onOpenThread: ((ChannelMessage) -> Void)?
     let showsThreadSummary: Bool
     var focusedMessageID: UUID? = nil
+    @State private var skillResultMessageID: UUID?
 
     private var mentionCandidates: [ChannelMentionTarget] {
         ChannelMentions.candidates(
@@ -881,7 +882,7 @@ private struct ChannelConversationView: View {
                 hasEarlierMessages: parentMessageID == nil && channels.hasEarlierMessages,
                 loadingEarlierMessages:
                     parentMessageID == nil && channels.loadingEarlierMessages,
-                focusedMessageID: focusedMessageID,
+                focusedMessageID: skillResultMessageID ?? focusedMessageID,
                 onLoadEarlier: parentMessageID == nil
                     ? { await channels.loadEarlierMessages(channelID: channel.id) }
                     : nil
@@ -950,7 +951,9 @@ private struct ChannelConversationView: View {
                                         )
                                     )
                                 }
-                                onSkillSessionMaterialized(response.session)
+                                if let session = response.session {
+                                    onSkillSessionMaterialized(session)
+                                }
                                 return response
                             },
                             onPrepareSkillExecution: { proposalID in
@@ -960,6 +963,13 @@ private struct ChannelConversationView: View {
                                 )
                             },
                             onSkillSessionOpen: onSkillSessionOpen,
+                            onSkillResultOpen: { messageID in
+                                skillResultMessageID = nil
+                                Task { @MainActor in
+                                    await Task.yield()
+                                    skillResultMessageID = messageID
+                                }
+                            },
                             onIssueOpen: { projectID, runID in
                                 guard let context = channels.captureFocus(
                                     channelID: channel.id,
@@ -1086,6 +1096,7 @@ private struct ChannelMessageRow: View {
         UUID
     ) async -> ChannelsStore.SkillExecutionApprovalContext?
     let onSkillSessionOpen: SkillSessionOpenHandler
+    let onSkillResultOpen: (UUID) -> Void
     let onIssueOpen: (UUID, UUID) async -> Void
     let onLoadAttachment: @MainActor (ChannelMessageAttachment) async throws -> URL
     let onOpenAttachment: @MainActor (URL) -> Void
@@ -1247,6 +1258,7 @@ private struct ChannelMessageRow: View {
                         onPrepare: {
                             await onPrepareSkillExecution(proposal.id)
                         },
+                        onResultOpen: onSkillResultOpen,
                         onSessionOpen: onSkillSessionOpen,
                         proposal: proposal,
                         workers: workers
@@ -2378,6 +2390,7 @@ private struct ChannelSkillExecutionProposalCard: View {
         AcceptAgentSkillExecutionProposalRequest
     ) async throws -> AcceptAgentSkillExecutionProposalResponse
     let onPrepare: () async -> ChannelsStore.SkillExecutionApprovalContext?
+    let onResultOpen: (UUID) -> Void
     let onSessionOpen: SkillSessionOpenHandler
     let proposal: AgentSkillExecutionProposal
     let workers: [DashboardWorker]
@@ -2403,11 +2416,15 @@ private struct ChannelSkillExecutionProposalCard: View {
                     .font(.caption.weight(.bold))
                 Text(
                     proposal.status == .accepted
-                        ? L10n.text("승인되어 Agent 세션을 시작했습니다.", locale: locale)
-                        : L10n.text(
-                            "정확한 Worker를 선택하고 명시적으로 승인해야 실행됩니다.",
-                            locale: locale
-                        )
+                        ? L10n.text(proposal.executionStatus == .completed
+                            ? "Skill 실행을 완료했습니다."
+                            : proposal.executionStatus == .failed
+                            ? "Skill 실행이 실패했습니다."
+                            : "Skill을 실행 중입니다.", locale: locale)
+                        : L10n.text(proposal.executionMode == .conversation
+                            ? "승인하면 이 대화에서 바로 이어서 실행합니다."
+                            : "정확한 Worker를 선택하고 명시적으로 승인해야 실행됩니다.",
+                            locale: locale)
                 )
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -2455,8 +2472,13 @@ private struct ChannelSkillExecutionProposalCard: View {
                         ProgressView().controlSize(.small)
                     } else {
                         Label(
-                            L10n.text("Worker 선택", locale: locale),
-                            systemImage: "desktopcomputer"
+                            L10n.text(
+                                proposal.executionMode == .conversation
+                                    ? "검토 및 승인" : "Worker 선택",
+                                locale: locale
+                            ),
+                            systemImage: proposal.executionMode == .conversation
+                                ? "checkmark.shield" : "desktopcomputer"
                         )
                     }
                 }
@@ -2473,12 +2495,13 @@ private struct ChannelSkillExecutionProposalCard: View {
                     "configure-channel-skill-execution-proposal-\(proposal.id.uuidString.lowercased())"
                 )
             } else {
-                if let workerLabel {
+                if proposal.executionMode == .task, let workerLabel {
                     Label(workerLabel, systemImage: "desktopcomputer")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                if let sessionID = proposal.resultSessionId {
+                if proposal.executionMode == .task,
+                   let sessionID = proposal.resultSessionId {
                     Button(L10n.text("Agent 세션 보기", locale: locale)) {
                         onSessionOpen(proposal.projectId, sessionID)
                     }
@@ -2487,6 +2510,23 @@ private struct ChannelSkillExecutionProposalCard: View {
                     .accessibilityIdentifier(
                         "open-channel-skill-session-\(proposal.id.uuidString.lowercased())"
                     )
+                }
+                if let resultMessageID = proposal.resultMessageId,
+                   proposal.executionStatus == .completed ||
+                    proposal.executionStatus == .failed {
+                    Button(L10n.text("결과 보기", locale: locale)) {
+                        onResultOpen(resultMessageID)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityIdentifier(
+                        "open-channel-skill-result-\(proposal.id.uuidString.lowercased())"
+                    )
+                }
+                if let error = proposal.error {
+                    Text(error)
+                        .font(.caption2)
+                        .foregroundStyle(.red)
                 }
             }
         }

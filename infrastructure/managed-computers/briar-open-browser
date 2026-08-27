@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+if [ "$#" -ne 1 ]; then
+  echo "Usage: briar-open-browser <url>" >&2
+  exit 2
+fi
+
+url="$1"
+case "$url" in
+  http://*|https://*) ;;
+  *)
+    echo "briar-open-browser requires an HTTP(S) URL" >&2
+    exit 2
+    ;;
+esac
+
+/usr/bin/nohup /usr/bin/setsid --fork \
+  /usr/bin/google-chrome-stable --new-window "$url" \
+  </dev/null >/dev/null 2>&1 &

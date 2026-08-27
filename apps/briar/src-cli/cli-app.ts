@@ -57,6 +57,7 @@ import {
 import {
   managedComputerSetupCommand,
   managedComputerStatusCommand,
+  managedComputerSyncCommand,
   managedComputerWorkerSupervisor,
 } from "./managed-computer-commands";
 
@@ -513,6 +514,12 @@ const managedComputerCommand = Command.make("managed-computer").pipe(
       },
       managedComputerSetupCommand,
       "Bind this enrolled computer to a Briar project",
+    ),
+    leaf(
+      "sync",
+      optionalStrings("project", "credential-file"),
+      managedComputerSyncCommand,
+      "Synchronize repository workflow settings from Briar",
     ),
     leaf(
       "status",
