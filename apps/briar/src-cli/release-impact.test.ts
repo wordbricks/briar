@@ -43,6 +43,7 @@ describe("release candidate impact gate", () => {
     expect(
       releaseImpactReasons([
         change("scripts/release-macos-production.sh"),
+        change("scripts/package-managed-runtime-release.sh"),
         change("apps/briar/package.json"),
         change("apps/briar/turbo.json"),
         change("apps/briar/src-tauri/icons/icon.icns"),
@@ -64,6 +65,7 @@ describe("release candidate impact gate", () => {
       "apps/briar/turbo.json",
       "config/release.env",
       "package.json",
+      "scripts/package-managed-runtime-release.sh",
       "scripts/release-macos-production.sh",
       "turbo.json",
     ]);

@@ -6,15 +6,51 @@ if [[ "$(id -u)" != "0" ]]; then
   exit 1
 fi
 
+verify_skill_only_provider_root() {
+  local provider_root="$1"
+  local skill_subdirectory="$2"
+  local entry relative target
+
+  if [[ ! -d "$provider_root/$skill_subdirectory" ]]; then
+    echo "Managed provider skill directory is missing: $provider_root/$skill_subdirectory" >&2
+    return 1
+  fi
+  while IFS= read -r -d '' entry; do
+    relative="${entry#"$provider_root/"}"
+    if [[ -d "$entry" && ! -L "$entry" &&
+      ( "$skill_subdirectory" == "$relative" ||
+        "$skill_subdirectory" == "$relative/"* ) ]]; then
+      continue
+    fi
+    case "$relative" in
+      "$skill_subdirectory/briar-workflow")
+        target=/opt/briar/current/skills/briar-workflow
+        ;;
+      "$skill_subdirectory/browser")
+        target=/opt/briar/current/skills/browser
+        ;;
+      *)
+        echo "Refusing to capture image with provider runtime state: $entry" >&2
+        return 1
+        ;;
+    esac
+    if [[ ! -L "$entry" || "$(readlink "$entry")" != "$target" ]]; then
+      echo "Refusing to capture image with an unexpected provider skill link: $entry" >&2
+      return 1
+    fi
+  done < <(find "$provider_root" -mindepth 1 -print0)
+}
+
+verify_skill_only_provider_root /home/briar/.cursor skills
+verify_skill_only_provider_root /home/briar/.grok skills
+verify_skill_only_provider_root /home/briar/.gemini config/skills
+
 for forbidden in \
   /var/lib/briar/worker-credential.json \
   /var/lib/briar/managed-enrollment.json \
   /home/briar/.config/briar/config.json \
   /home/briar/.codex/auth.json \
   /home/briar/.claude/.credentials.json \
-  /home/briar/.cursor \
-  /home/briar/.grok \
-  /home/briar/.gemini \
   /home/briar/.local/share/opencode/auth.json \
   /root/.aws \
   /home/admin/.aws \

@@ -24,6 +24,7 @@ if (( ${#updater_archives[@]} != 1 || ${#updater_signatures[@]} != 1 )); then
   exit 1
 fi
 cp "${updater_archives[0]}" "${updater_signatures[0]}" "$artifact_root/"
+"$workspace_root/scripts/package-managed-runtime-release.sh" "$artifact_root"
 
 codesign --verify --deep --strict "$app_path"
 xcrun stapler validate "$app_path"

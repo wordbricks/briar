@@ -90,7 +90,11 @@ user-installed Bun.
 The build command verifies the pinned toolchain, clean worktree, signed tag,
 remote tag, and membership in `origin/main`. It then imports an ephemeral
 keychain, signs with Developer ID, notarizes and staples, generates updater
-artifacts, SPDX, provenance, checksums, and lifecycle evidence. The keychain and
+artifacts, a minisign-authenticated
+`briar-managed-runtime-<version>-linux-x86_64.tar.gz`, SPDX, provenance,
+checksums, and lifecycle evidence. The managed runtime contains the Briar CLI,
+provider runners, remote-session agent, and version-matched built-in Skills;
+base AMI toolchains are not part of this archive. The keychain and
 temporary Apple API key are removed on every exit, and the user's original
 keychain search list is restored.
 

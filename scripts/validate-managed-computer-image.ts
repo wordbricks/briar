@@ -101,6 +101,7 @@ for (const required of [
   "librsvg2-dev",
   "libssl-dev",
   "libwebkit2gtk-4.1-dev",
+  "minisign",
   "patchelf",
   "pkg-config",
   "sudo",
@@ -171,6 +172,9 @@ for (const required of [
   "/home/briar/.rustup/tmp",
   "/home/briar/.rustup/toolchains",
   'chown -h briar:briar "$user_toolchain"',
+  'initial_release="/opt/briar/releases/$briar_version"',
+  "ln -s /opt/briar/current/bin/briar /opt/briar/bin/briar",
+  "/home/briar/.codex/skills",
 ]) {
   if (!installer.includes(required)) {
     fail(`image installer omits writable managed-user Rust state: ${required}`);
@@ -264,13 +268,20 @@ for (const forbidden of [
   "/home/briar/.ssh",
   "/home/briar/.git-credentials",
   "/home/briar/.config/gh",
-  "/home/briar/.cursor",
-  "/home/briar/.grok",
-  "/home/briar/.gemini",
   "/home/briar/.local/share/opencode/auth.json",
 ]) {
   if (!cleanup.includes(forbidden) || !verifier.includes(forbidden)) {
     fail(`capture credential boundary omits ${forbidden}`);
+  }
+}
+for (const [providerRoot, skillSubdirectory] of [
+  ["/home/briar/.cursor", "skills"],
+  ["/home/briar/.grok", "skills"],
+  ["/home/briar/.gemini", "config/skills"],
+]) {
+  const invocation = `verify_skill_only_provider_root ${providerRoot} ${skillSubdirectory}`;
+  if (!cleanup.includes(invocation) || !verifier.includes(invocation)) {
+    fail(`capture provider-state boundary omits ${providerRoot}`);
   }
 }
 
@@ -279,6 +290,7 @@ for (const required of [
   "User=briar",
   "Group=briar",
   "BRIAR_MANAGED_CREDENTIAL_FILE=/var/lib/briar/worker-credential.json",
+  "BRIAR_MANAGED_RUNTIME_UPDATER=/opt/briar/bin/briar-managed-runtime-update-request",
   "CARGO_HOME=/home/briar/.cargo",
   "RUSTUP_HOME=/home/briar/.rustup",
   "BRIAR_CI_SERIAL_CONTEXTS=true",
@@ -288,6 +300,52 @@ for (const required of [
   if (!service.includes(required)) fail(`managed worker unit omits ${required}`);
 }
 if (service.includes("briar_worker_")) fail("managed worker unit embeds a token");
+
+const updater = await text(join(image, "briar-managed-runtime-updater"));
+for (const required of [
+  "minisign_binary",
+  "wait_for_handoff",
+  "safe_archive",
+  "mv -Tf -- \"$temporary_link\" \"$current_link\"",
+  "wait_for_health",
+  "rollback_release",
+  "Refusing to downgrade the managed runtime",
+  "update-handoff/fail",
+]) {
+  if (!updater.includes(required)) fail(`runtime updater omits ${required}`);
+}
+if (updater.includes("curl | sh") || updater.includes("eval ")) {
+  fail("runtime updater must not execute an unverified download");
+}
+const updaterService = await text(
+  join(image, "briar-managed-runtime-updater.service"),
+);
+for (const required of [
+  "User=root",
+  "Group=briar",
+  "RuntimeDirectory=briar-runtime-updater",
+  "ProtectSystem=strict",
+  "ReadOnlyPaths=/var/lib/briar",
+  "ExecStart=/opt/briar/bin/briar-managed-runtime-updater",
+]) {
+  if (!updaterService.includes(required)) {
+    fail(`runtime updater unit omits ${required}`);
+  }
+}
+
+const releaseConfig = Object.fromEntries(
+  (await text(join(root, "config", "release.env")))
+    .split(/\r?\n/u)
+    .filter((line) => line && !line.startsWith("#"))
+    .map((line) => line.split("=", 2) as [string, string]),
+);
+const updaterPublicKey = Buffer.from(
+  releaseConfig.BRIAR_UPDATER_PUBLIC_KEY ?? "",
+  "base64",
+).toString("utf8");
+if (updaterPublicKey !== await text(join(image, "runtime-updater.pub"))) {
+  fail("managed runtime updater public key differs from Production releases");
+}
 
 const localCi = await text(join(root, "scripts", "ci-local.sh"));
 if (!localCi.includes('"${BRIAR_CI_SERIAL_CONTEXTS:-false}" == "true"')) {
@@ -307,6 +365,8 @@ if (!turboConfig.globalPassThroughEnv?.includes("VITEST_MAX_WORKERS")) {
 
 for (const executable of [
   "briar",
+  "briar-managed-runtime-update-request",
+  "briar-managed-runtime-updater",
   "build-managed-computer-image",
   "configure-debian-snapshot",
   "install-image-runtime",

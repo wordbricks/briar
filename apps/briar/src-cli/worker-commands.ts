@@ -27,7 +27,7 @@ import {
 import { resolveMergeGroupContainerRuntime } from "./merge-group-validation";
 import {
   supportsRemoteWorkerUpdates,
-  workerUpdateDeepLink,
+  workerUpdateLaunch,
   type WorkerUpdateDirective,
 } from "./worker-update";
 import {
@@ -375,6 +375,15 @@ async function workerCommand() {
   }
   const label = registered.label;
   const workerId = registered.workerId;
+  const triggerWorkerUpdate = (directive: WorkerUpdateDirective) => {
+    if (directive.handoffState === "failed") return;
+    const launch = workerUpdateLaunch(directive, workerId);
+    const child = spawn(launch.command, launch.args, {
+      detached: true,
+      stdio: "ignore",
+    });
+    child.unref();
+  };
   let sharedWorkflowRequirements:
     | Array<{
         id: string;
@@ -431,12 +440,7 @@ async function workerCommand() {
       heartbeat.updateDirective &&
       supportsRemoteWorkerUpdates(platform())
     ) {
-      const child = spawn(
-        "/usr/bin/open",
-        [workerUpdateDeepLink(heartbeat.updateDirective)],
-        { detached: true, stdio: "ignore" },
-      );
-      child.unref();
+      triggerWorkerUpdate(heartbeat.updateDirective);
     }
     throw new Error(readinessProblem);
   }
@@ -742,17 +746,16 @@ async function workerCommand() {
         let effectiveAcceptingWork = acceptingWork;
         if (heartbeat.updateDirective) {
           effectiveAcceptingWork = false;
-          if (
+          if (heartbeat.updateDirective.handoffState === "failed") {
+            // A failed request is retried with the same server request ID.
+            // Re-arm the local launcher once the server moves it back to draining.
+            lastTriggeredUpdateId = null;
+          } else if (
             supportsRemoteWorkerUpdates(platform()) &&
             lastTriggeredUpdateId !== heartbeat.updateDirective.id
           ) {
             lastTriggeredUpdateId = heartbeat.updateDirective.id;
-            const child = spawn(
-              "/usr/bin/open",
-              [workerUpdateDeepLink(heartbeat.updateDirective)],
-              { detached: true, stdio: "ignore" },
-            );
-            child.unref();
+            triggerWorkerUpdate(heartbeat.updateDirective);
             console.log(
               `worker update requested: ${heartbeat.updateDirective.targetVersion}`,
             );

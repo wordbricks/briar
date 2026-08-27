@@ -17,6 +17,7 @@ import {
   decodeWorkerRegister,
 } from "./worker-request-contract";
 import {
+  decodeWorkerUpdateFailure,
   decodeWorkerUpdateHandoff,
   decodeWorkerUpdatePrepare,
   decodeWorkerUpdateRequestId,
@@ -39,6 +40,7 @@ import {
   executionWorkerBindingById,
   executionWorkerDeviceForBinding,
   executionWorkerUpdateStatus,
+  failExecutionWorkerUpdate,
   failExecutionWorkerUpdateHandoff,
   handoffExecutionWorkerClaim,
   hasExecutionWorkerReadinessChanged,
@@ -413,6 +415,30 @@ export async function handleExecutionWorkerRoute(
     });
   }
 
+  const workerUpdateFailureMatch = pathname.match(
+    /^\/workers\/([0-9a-zA-Z-]+)\/update-handoff\/fail$/u,
+  );
+  if (workerUpdateFailureMatch && request.method === "POST") {
+    const principal = await requireWorkerCredential(db, request);
+    const binding = await executionWorkerBindingById(
+      db,
+      principal.deviceId,
+      workerUpdateFailureMatch[1],
+    );
+    if (!binding || binding.state === "disabled") {
+      throw new HttpError(403, "Worker is not enabled for this project");
+    }
+    const input = decodeWorkerUpdateFailure(await readJson(request));
+    await failExecutionWorkerUpdate(db, {
+      requestId: input.requestId,
+      organizationId: principal.organizationId,
+      deviceId: principal.deviceId,
+      error: input.error,
+      observedAt: new Date().toISOString(),
+    });
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   const workerHeartbeatMatch = pathname.match(
     /^\/workers\/([0-9a-zA-Z-]+)\/heartbeat$/u,
   );
@@ -440,15 +466,22 @@ export async function handleExecutionWorkerRoute(
       pendingBeforeHeartbeat,
     );
     const updateIsPending = updateDirective !== null;
+    const updateFailed = updateDirective?.handoffState === "failed";
     const worker = await recordWorkerHeartbeat(db, binding.project_id, {
       workerId: workerHeartbeatMatch[1],
       knownBinding: binding,
       versions: input.versions,
       acceptingWork: updateIsPending ? false : input.acceptingWork,
-      readinessState: updateIsPending ? "busy" : input.readinessState,
-      readinessDetail: updateIsPending
-        ? "계획된 업데이트 handoff를 진행 중입니다."
-        : input.readinessDetail,
+      readinessState: updateFailed
+        ? "needs_attention"
+        : updateIsPending
+          ? "busy"
+          : input.readinessState,
+      readinessDetail: updateFailed
+        ? "원격 런타임 업데이트에 실패했습니다."
+        : updateIsPending
+          ? "계획된 업데이트 handoff를 진행 중입니다."
+          : input.readinessDetail,
       capabilities: input.capabilities,
       observedAt,
     });
