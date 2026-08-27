@@ -15,6 +15,7 @@ import { MessageAvatar } from "./MessageAvatar";
 import { formatDate, relativeTime } from "../model/formatters";
 export function IssueMessageItem({
   currentUserId = null,
+  highlighted = false,
   isEditing = false,
   isReplying = false,
   localeTag,
@@ -45,6 +46,7 @@ export function IssueMessageItem({
   reworkStageLabel
 }: {
   currentUserId?: string | null;
+  highlighted?: boolean;
   isEditing?: boolean;
   isReplying?: boolean;
   localeTag: string;
@@ -94,7 +96,7 @@ export function IssueMessageItem({
   const proposal = message.proposedAction;
   const proposalTitle = proposal?.type === "request_issue_update" ? t("run.issueUpdateProposalTitle") : proposal?.type === "request_issue_create" ? t("run.issueCreateProposalTitle") : t("run.reworkProposalTitle");
   const proposalAcceptLabel = proposal?.type === "request_issue_update" ? t("run.issueUpdateProposalAccept") : proposal?.type === "request_issue_create" ? t("run.issueCreateProposalAccept") : t("run.reworkProposalAccept");
-  return <article className={`issue-message${message.optimistic ? " is-optimistic" : ""}`}>
+  return <article aria-current={highlighted ? "true" : undefined} className={`issue-message${highlighted ? " is-inbox-target" : ""}${message.optimistic ? " is-optimistic" : ""}`} data-issue-message-id={message.id} data-inbox-highlighted={highlighted ? "true" : undefined} tabIndex={highlighted ? -1 : undefined}>
       <MessageAvatar message={message} />
       <div>
         <header>

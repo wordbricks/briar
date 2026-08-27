@@ -181,6 +181,7 @@ describe("inbox notification navigation", () => {
     expect(isInboxRunDetailTarget(issueTarget)).toBe(true);
     expect(isInboxChannelTarget(conversationTarget)).toBe(false);
     expect(isInboxRunDetailTarget(conversationTarget)).toBe(true);
+    expect(conversationTarget.conversationMessageId).toBe("message-2");
     expect(isInboxChannelTarget(sessionTarget)).toBe(false);
     expect(isInboxRunDetailTarget(sessionTarget)).toBe(false);
   });

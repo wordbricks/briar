@@ -5248,6 +5248,23 @@ button.issue-message-state { width:100%; cursor:pointer; }
   line-height: 1.55;
 }
 .channel-message:hover { background: color-mix(in srgb, var(--muted, #f7f4ef) 70%, transparent); }
+.issue-message.is-inbox-target,
+.channel-message.is-inbox-target,
+.companion-channel-message.is-inbox-target {
+  background: color-mix(in srgb, var(--primary, #5943a4) 10%, var(--card, #fff));
+  box-shadow: inset 3px 0 0 var(--primary, #5943a4);
+}
+.issue-message.is-inbox-target:hover,
+.channel-message.is-inbox-target:hover,
+.companion-channel-message.is-inbox-target:hover {
+  background: color-mix(in srgb, var(--primary, #5943a4) 13%, var(--card, #fff));
+}
+.issue-message.is-inbox-target:focus-visible,
+.channel-message.is-inbox-target:focus-visible,
+.companion-channel-message.is-inbox-target:focus-visible {
+  outline: 2px solid var(--ring, var(--primary, #5943a4));
+  outline-offset: -2px;
+}
 .channel-message-deleted { margin:3px 0 0; color:var(--muted-foreground,#777168); font-style:italic; }
 .channel-message.is-optimistic,
 .companion-channel-message.is-optimistic { background:color-mix(in srgb,var(--muted,#f7f4ef) 58%,transparent); }
