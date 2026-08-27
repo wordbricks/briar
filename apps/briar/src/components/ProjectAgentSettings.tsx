@@ -27,9 +27,16 @@ import {
   projectAgentAvatarFromFile,
 } from "../lib/project-agent-avatar";
 import { projectAgentAvatarFromCodexPet } from "../lib/codex-pets";
-import type { Project, ProjectAgent, UpdateProjectAgentInput } from "../types";
+import type {
+  ExecutionWorker,
+  Project,
+  ProjectAgent,
+  ProjectExecutionWorkerPolicy,
+  UpdateProjectAgentInput,
+} from "../types";
 import { CodexPetAttribution, CodexPetPicker } from "./CodexPetPicker";
 import { NativeSelect } from "./NativeSelect";
+import { ProjectAgentDesignatedWorkerSelect } from "./ProjectAgentDesignatedWorkerSelect";
 import { ProviderSelect } from "./ProviderSelect";
 import {
   ProjectAgentSkillsEditor,
@@ -62,7 +69,9 @@ export function ProjectAgentSettings({
   onBack,
   onDelete,
   onSave,
+  policy,
   project,
+  workers,
 }: {
   agent: ProjectAgent;
   isDeleteDisabled: boolean;
@@ -70,7 +79,9 @@ export function ProjectAgentSettings({
   onBack: () => void;
   onDelete: () => Promise<void>;
   onSave: (input: UpdateProjectAgentInput) => Promise<ProjectAgent>;
+  policy?: ProjectExecutionWorkerPolicy;
   project: Project;
+  workers: readonly ExecutionWorker[];
 }) {
   const { t } = useI18n();
   const { toast } = useToast();
@@ -81,6 +92,9 @@ export function ProjectAgentSettings({
   const [provider, setProvider] = useState<AgentProvider>(agent.provider);
   const [model, setModel] = useState(agent.model ?? "");
   const [effort, setEffort] = useState<ModelEffort | null>(agent.effort);
+  const [designatedWorkerId, setDesignatedWorkerId] = useState<string | null>(
+    agent.designatedWorkerId ?? null,
+  );
   const [description, setDescription] = useState(agent.description ?? "");
   const [responsibility, setResponsibility] = useState(agent.responsibility);
   const [calendarColor, setCalendarColor] = useState(agent.calendarColor);
@@ -94,6 +108,8 @@ export function ProjectAgentSettings({
     provider: agent.provider,
     model: agent.model ?? "",
     effort: agent.effort,
+    designatedWorkerId: agent.designatedWorkerId ?? null,
+    designatedWorkerLabel: agent.designatedWorkerLabel ?? null,
     description: agent.description ?? "",
     responsibility: agent.responsibility,
     skills: projectAgentSkillInputs(agent.skills),
@@ -112,6 +128,7 @@ export function ProjectAgentSettings({
     provider !== savedProfile.provider ||
     model !== savedProfile.model ||
     effort !== savedProfile.effort ||
+    designatedWorkerId !== savedProfile.designatedWorkerId ||
     description !== savedProfile.description ||
     responsibility !== savedProfile.responsibility ||
     JSON.stringify(skills) !== JSON.stringify(savedProfile.skills) ||
@@ -137,6 +154,7 @@ export function ProjectAgentSettings({
         provider,
         model: model || null,
         effort,
+        designatedWorkerId,
         description: description.trim(),
         responsibility: responsibility.trim(),
         skills: projectAgentSkillInputs(skills),
@@ -149,6 +167,8 @@ export function ProjectAgentSettings({
         provider: saved.provider,
         model: saved.model ?? "",
         effort: saved.effort,
+        designatedWorkerId: saved.designatedWorkerId ?? null,
+        designatedWorkerLabel: saved.designatedWorkerLabel ?? null,
         description: saved.description ?? "",
         responsibility: saved.responsibility,
         skills: projectAgentSkillInputs(saved.skills),
@@ -160,6 +180,7 @@ export function ProjectAgentSettings({
       setProvider(nextProfile.provider);
       setModel(nextProfile.model);
       setEffort(nextProfile.effort);
+      setDesignatedWorkerId(nextProfile.designatedWorkerId);
       setDescription(nextProfile.description);
       setResponsibility(nextProfile.responsibility);
       setSkills(nextProfile.skills);
@@ -369,6 +390,17 @@ export function ProjectAgentSettings({
                     {codexPet ? <CodexPetAttribution pet={codexPet} /> : null}
                   </div>
                 </div>
+                <ProjectAgentDesignatedWorkerSelect
+                  disabled={profileSaving}
+                  effort={effort}
+                  model={model || null}
+                  onChange={setDesignatedWorkerId}
+                  policy={policy}
+                  provider={provider}
+                  selectedWorkerId={designatedWorkerId}
+                  selectedWorkerLabel={savedProfile.designatedWorkerLabel}
+                  workers={workers}
+                />
                 <div className="grid min-w-0 gap-2">
                   <Label htmlFor="project-agent-settings-name">
                     {t("agents.name")}

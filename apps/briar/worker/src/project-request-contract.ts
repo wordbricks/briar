@@ -116,6 +116,7 @@ export const ProjectAgentInput = strictSchema(Schema.Struct({
   provider: Schema.Literals(agentProviders),
   model: Schema.optional(Schema.NullOr(trimmedText(1, 100))),
   effort: Schema.optional(Schema.NullOr(ModelEffort)),
+  designatedWorkerId: Schema.optional(Schema.NullOr(trimmedText(1, 128))),
   responsibility: trimmedText(1, agentResponsibilityMaxLength),
   skills: Schema.optional(
     mutableArray(channelAgentSkillInputSchema).check(

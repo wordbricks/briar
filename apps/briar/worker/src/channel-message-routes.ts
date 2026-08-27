@@ -3,6 +3,7 @@ import {
 } from "../../src/lib/issue-markdown";
 import { agentReplyParentMessageId } from "../../src/lib/issue-reply-decision";
 import {
+  channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
   channelReplyProviderUsageExhaustedError,
   type ChannelReplyUnavailableReason,
@@ -26,6 +27,7 @@ import {
   getChannelMessage,
   getChannelMessageAttachment,
   getChannelMessageDocument,
+  getChannelReplySessionForThread,
   getProjectAgentChannel,
   getProjectOrganizationChannel,
   isChannelReactionEmoji,
@@ -351,9 +353,26 @@ export async function handleChannelMessageRoute(
           ? selectedSkillTarget.skill
           : null;
         const replyRuntime = selectedSkill ?? agent;
+        const retainedSession = await getChannelReplySessionForThread(db, {
+          channelId: channel.id,
+          threadRootMessageId: input.parentMessageId ?? messageId,
+          agentId: agent.id,
+        });
+        const liveSession = retainedSession &&
+            retainedSession.retained_until > createdAt
+          ? retainedSession
+          : null;
+        const assignedWorkerId = liveSession
+          ? liveSession.owner_worker_id
+          : agent.designated_worker_id;
+        const assignedWorkerLabel = liveSession
+          ? liveSession.owner_worker_label
+          : agent.designated_worker_label;
         const workerAvailability = await channelReplyWorkerAvailability(db, {
           organizationId,
           projectId: agent.project_id,
+          preferredDeviceId: liveSession?.owner_device_id ?? null,
+          preferredWorkerId: assignedWorkerId,
           provider: replyRuntime.provider,
           model: replyRuntime.model,
           effort: replyRuntime.effort,
@@ -362,6 +381,10 @@ export async function handleChannelMessageRoute(
         const unavailableReason: ChannelReplyUnavailableReason | null =
           workerAvailability === "available"
             ? null
+            : assignedWorkerId
+            ? channelReplyAssignedWorkerUnavailableError(
+                assignedWorkerLabel ?? assignedWorkerId,
+              )
             : workerAvailability === "usage_exhausted"
             ? channelReplyProviderUsageExhaustedError
             : channelReplyNoAvailableWorkerError;

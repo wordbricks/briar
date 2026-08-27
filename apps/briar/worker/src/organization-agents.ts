@@ -28,6 +28,8 @@ export type OrganizationAgentRow = {
   responsibility: string;
   skill_markdown?: string;
   effort: AgentSkillEffort | null;
+  designated_worker_id?: string | null;
+  designated_worker_label?: string | null;
   created_at: string;
   updated_at: string;
   skills?: AgentSkillRow[];
@@ -54,7 +56,8 @@ const agentSelect = `
   select agent.id, agent.organization_id, agent.project_id,
          project.name as project_name, agent.name, agent.avatar,
          agent.provider, agent.model, agent.description, agent.responsibility,
-         agent.skill_markdown, agent.effort, agent.created_at, agent.updated_at
+         agent.skill_markdown, agent.effort, agent.designated_worker_id,
+         agent.designated_worker_label, agent.created_at, agent.updated_at
   from briar_project_agents agent
   left join briar_projects project on project.id = agent.project_id`;
 

@@ -248,8 +248,10 @@ describe("detached execution workers", () => {
         "0123_native_merge_queue_coordinator.sql",
         "0125_managed_computers.sql",
         "0128_agent_skill_documents.sql",
+        "0133_channel_reply_sessions.sql",
         "0136_issue_difficulty.sql",
         "0137_execution_worker_lifecycle_telemetry.sql",
+        "0140_agent_designated_workers.sql",
       ],
     });
     await executeD1Sql(
@@ -357,6 +359,8 @@ describe("detached execution workers", () => {
        delete from briar_hunt_events;
        delete from briar_hunt_runs;
        delete from briar_channel_agent_reply_jobs;
+       delete from briar_channel_reply_session_events;
+       delete from briar_channel_reply_sessions;
        delete from briar_project_execution_worker_allowlist;
        delete from briar_project_execution_worker_policies;
        delete from briar_execution_worker_update_requests;
@@ -2307,6 +2311,72 @@ describe("detached execution workers", () => {
       hard_delete_rows_written: expect.any(Number),
       detail_json: expect.stringContaining('"bindingCount":2'),
     });
+  });
+
+  it("does not delete or clear a Worker that is designated by an Agent", async () => {
+    const registered = await register("designated-delete");
+    const agentId = crypto.randomUUID();
+    await db.prepare(
+      `insert into briar_project_agents (
+         id, organization_id, project_id, name, provider, model, effort,
+         designated_worker_id, designated_worker_label, responsibility,
+         created_at, updated_at
+       ) values (?, ?, ?, 'Pinned Agent', 'codex', null, null, ?, ?,
+                 'Stay on one Worker', ?, ?)`,
+    ).bind(
+      agentId,
+      projectId,
+      projectId,
+      registered.worker.id,
+      registered.worker.label,
+      atMinute(3),
+      atMinute(3),
+    ).run();
+
+    await expect(updateExecutionWorkerLabel(
+      db,
+      registered.device.id,
+      "renamed designated Worker",
+      atMinute(4),
+    )).resolves.toMatchObject({ label: "renamed designated Worker" });
+    await expect(db.prepare(
+      `select designated_worker_label from briar_project_agents where id = ?`,
+    ).bind(agentId).first()).resolves.toMatchObject({
+      designated_worker_label: "renamed designated Worker",
+    });
+
+    await expect(
+      deleteExecutionWorker(db, registered.device.id, atMinute(5), {
+        requestId: "worker-deprovision:designated-delete",
+        organizationId: projectId,
+        projectId: null,
+        workerId: null,
+        reason: "explicit_user_deprovision",
+      }),
+    ).rejects.toThrow("Designated Worker");
+    await expect(db.prepare(
+      `select designated_worker_id from briar_project_agents where id = ?`,
+    ).bind(agentId).first()).resolves.toMatchObject({
+      designated_worker_id: registered.worker.id,
+    });
+    await expect(
+      executionWorkerBindingForProject(db, registered.device.id, projectId),
+    ).resolves.not.toBeNull();
+
+    await db.prepare(
+      `update briar_project_agents
+       set designated_worker_id = null, designated_worker_label = null
+       where id = ?`,
+    ).bind(agentId).run();
+    await expect(
+      deleteExecutionWorker(db, registered.device.id, atMinute(10), {
+        requestId: "worker-deprovision:designated-delete",
+        organizationId: projectId,
+        projectId: null,
+        workerId: null,
+        reason: "explicit_user_deprovision",
+      }),
+    ).resolves.toBe(true);
   });
 
   it("disables but does not delete a Worker with an active session", async () => {

@@ -1,4 +1,5 @@
 import {
+  channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
   type ChannelReplyUnavailableReason,
   type ChannelActionType,
@@ -28,6 +29,7 @@ import type {
   IssueExecutionProposalRow,
 } from "./db";
 import {
+  channelReplyWorkerAvailability,
   executionWorkerSupportsSelection,
   hasAvailableChannelReplyWorker,
 } from "./workers";
@@ -229,6 +231,7 @@ export type ChannelReplySessionRow = {
   effort: AgentSkillEffort | null;
   owner_device_id: string | null;
   owner_worker_id: string | null;
+  owner_worker_label: string | null;
   conversation_id: string | null;
   last_activity_at: string;
   retained_until: string;
@@ -1247,7 +1250,8 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
               project.name as project_name, agent.name, agent.avatar,
               agent.provider, agent.model, agent.description,
               agent.responsibility,
-              agent.effort, agent.created_at, agent.updated_at
+              agent.effort, agent.designated_worker_id,
+              agent.designated_worker_label, agent.created_at, agent.updated_at
        from briar_channel_agents roster
        join briar_project_agents agent on agent.id = roster.agent_id
        join briar_channels channel
@@ -1272,6 +1276,8 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
       description: string;
       responsibility: string;
       effort: AgentSkillEffort | null;
+      designated_worker_id: string | null;
+      designated_worker_label: string | null;
       created_at: string;
       updated_at: string;
     }>();
@@ -2560,6 +2566,7 @@ export async function enqueueChannelAgentReplies(
           `insert into briar_channel_reply_sessions (
              id, organization_id, channel_id, thread_root_message_id,
              project_id, agent_id, provider, model, effort,
+             owner_device_id, owner_worker_id, owner_worker_label,
              last_activity_at, retained_until, created_at, updated_at
            )
            select ?, ?, ?, ?, ?, ?,
@@ -2569,12 +2576,17 @@ export async function enqueueChannelAgentReplies(
                     then current_agent.model else current_skill.model end,
                   case when current_skill.id is null
                     then current_agent.effort else current_skill.effort end,
+                  designated_worker.device_id, designated_worker.id,
+                  current_agent.designated_worker_label,
                   ?, ?, ?, ?
            from briar_channel_agents roster
            join briar_project_agents current_agent
              on current_agent.id = roster.agent_id
            left join briar_agent_skills current_skill
              on current_skill.id = ? and current_skill.agent_id = current_agent.id
+           left join briar_execution_workers designated_worker
+             on designated_worker.id = current_agent.designated_worker_id
+            and designated_worker.project_id = current_agent.project_id
            where roster.channel_id = ? and roster.agent_id = ?
              and current_agent.organization_id = ?
              and current_agent.project_id is ?
@@ -2595,11 +2607,18 @@ export async function enqueueChannelAgentReplies(
              owner_device_id = case
                when briar_channel_reply_sessions.retained_until <=
                       excluded.last_activity_at
-               then null else briar_channel_reply_sessions.owner_device_id end,
+               then excluded.owner_device_id
+               else briar_channel_reply_sessions.owner_device_id end,
              owner_worker_id = case
                when briar_channel_reply_sessions.retained_until <=
                       excluded.last_activity_at
-               then null else briar_channel_reply_sessions.owner_worker_id end,
+               then excluded.owner_worker_id
+               else briar_channel_reply_sessions.owner_worker_id end,
+             owner_worker_label = case
+               when briar_channel_reply_sessions.retained_until <=
+                      excluded.last_activity_at
+               then excluded.owner_worker_label
+               else briar_channel_reply_sessions.owner_worker_label end,
              provider = excluded.provider, model = excluded.model,
              effort = excluded.effort,
              last_activity_at = excluded.last_activity_at,
@@ -2778,6 +2797,20 @@ export async function getChannelReplySession(
   ).bind(sessionId).first<ChannelReplySessionRow>();
 }
 
+export async function getChannelReplySessionForThread(
+  db: D1Database,
+  input: { channelId: string; threadRootMessageId: string; agentId: string },
+) {
+  return db.prepare(
+    `select * from briar_channel_reply_sessions
+     where channel_id = ? and thread_root_message_id = ? and agent_id = ?`,
+  ).bind(
+    input.channelId,
+    input.threadRootMessageId,
+    input.agentId,
+  ).first<ChannelReplySessionRow>();
+}
+
 export async function checkpointChannelReplySession(
   db: D1Database,
   input: {
@@ -2875,7 +2908,7 @@ export async function cleanupExpiredChannelReplySessions(
       db.prepare(
         `update briar_channel_reply_sessions
          set owner_device_id = null, owner_worker_id = null,
-             conversation_id = null, updated_at = ?
+             owner_worker_label = null, conversation_id = null, updated_at = ?
          where id = ? and retained_until <= ?
            and not exists (
              select 1 from briar_channel_agent_reply_jobs job
@@ -3001,12 +3034,81 @@ export async function claimNextChannelAgentReply(
     )
     .bind(input.claimedAt, organizationId, MAX_REPLY_ATTEMPTS, input.claimedAt)
     .run();
+  const assignedJobs = await db.prepare(
+    `select job.id, job.project_id, job.agent_provider,
+            case when job.selected_skill_id_snapshot is null
+              then agent.model else job.selected_skill_model_snapshot end as runtime_model,
+            case when job.selected_skill_id_snapshot is null
+              then agent.effort else job.selected_skill_effort_snapshot end as runtime_effort,
+            session.owner_device_id, session.owner_worker_id,
+            session.owner_worker_label
+     from briar_channel_agent_reply_jobs job
+     join briar_project_agents agent on agent.id = job.agent_id
+     join briar_channel_reply_sessions session on session.id = job.session_id
+     where job.organization_id = ? and session.owner_worker_id is not null
+       and (job.status = 'queued'
+         or (job.status = 'running' and job.lease_expires_at <= ?))`,
+  ).bind(organizationId, input.claimedAt).all<{
+    id: string;
+    project_id: string | null;
+    agent_provider: AgentProvider | null;
+    runtime_model: string | null;
+    runtime_effort: AgentSkillEffort | null;
+    owner_device_id: string | null;
+    owner_worker_id: string;
+    owner_worker_label: string | null;
+  }>();
+  for (const assigned of assignedJobs.results) {
+    if (!assigned.agent_provider) continue;
+    const availability = await channelReplyWorkerAvailability(db, {
+      organizationId,
+      projectId: assigned.project_id,
+      preferredDeviceId: assigned.owner_device_id,
+      preferredWorkerId: assigned.owner_worker_id,
+      provider: assigned.agent_provider,
+      model: assigned.runtime_model,
+      effort: assigned.runtime_effort,
+      observedAt: input.claimedAt,
+    });
+    if (availability === "available") continue;
+    const error = channelReplyAssignedWorkerUnavailableError(
+      assigned.owner_worker_label ?? assigned.owner_worker_id,
+    );
+    await db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set status = 'failed', error = ?, completed_at = ?, updated_at = ?,
+           claimed_device_id = null, claimed_worker_id = null,
+           claim_token_hash = null, lease_expires_at = null
+       where id = ? and organization_id = ?
+         and (status = 'queued'
+           or (status = 'running' and lease_expires_at <= ?))
+         and exists (
+           select 1 from briar_channel_reply_sessions session
+           where session.id = briar_channel_agent_reply_jobs.session_id
+             and session.owner_worker_id = ?
+         )`,
+    ).bind(
+      error,
+      input.claimedAt,
+      input.claimedAt,
+      assigned.id,
+      organizationId,
+      input.claimedAt,
+      assigned.owner_worker_id,
+    ).run();
+  }
+  const claimingWorker = await db.prepare(
+    `select label from briar_execution_workers
+     where id = ? and device_id = ?`,
+  ).bind(input.workerId, input.deviceId).first<{ label: string }>();
+  if (!claimingWorker) return null;
   const candidates = await db.prepare(
     `select job.*,
             session.owner_device_id as session_owner_device_id,
             session.owner_worker_id as session_owner_worker_id,
             session.conversation_id as session_conversation_id,
             session.retained_until as session_retained_until,
+            session.created_at as session_created_at,
             session.updated_at as session_updated_at,
             session.provider as session_provider,
             session.model as session_model,
@@ -3104,6 +3206,7 @@ export async function claimNextChannelAgentReply(
     session_owner_worker_id: string | null;
     session_conversation_id: string | null;
     session_retained_until: string;
+    session_created_at: string;
     session_updated_at: string;
     session_provider: AgentProvider;
     session_model: string | null;
@@ -3111,7 +3214,6 @@ export async function claimNextChannelAgentReply(
   }>();
 
   const preferredAvailability = new Map<string, boolean>();
-  const sessionOwnerAvailability = new Map<string, boolean>();
   for (const candidate of candidates.results) {
     if (!candidate.agent_provider) continue;
     const supportsSelection = input.workerCapabilitiesJson &&
@@ -3132,47 +3234,18 @@ export async function claimNextChannelAgentReply(
     if (!supportsSelection) continue;
 
     const sessionExpired = candidate.session_retained_until <= input.claimedAt;
-    const replyLeaseExpired = candidate.status === "running" &&
-      candidate.lease_expires_at !== null &&
-      candidate.lease_expires_at <= input.claimedAt;
-    const claimingWorkerOwnsLiveSession =
-      !sessionExpired && !replyLeaseExpired &&
-      candidate.session_owner_worker_id === input.workerId;
     if (
-      !sessionExpired && !replyLeaseExpired &&
       candidate.session_owner_worker_id &&
       candidate.session_owner_worker_id !== input.workerId
-    ) {
-      const ownerKey = JSON.stringify([
-        candidate.session_owner_device_id,
-        candidate.session_owner_worker_id,
-        candidate.project_id,
-        candidate.agent_provider,
-        candidate.runtime_model,
-        candidate.runtime_effort,
-      ]);
-      let ownerAvailable = sessionOwnerAvailability.get(ownerKey);
-      if (ownerAvailable === undefined) {
-        ownerAvailable = await hasAvailableChannelReplyWorker(db, {
-          organizationId,
-          projectId: candidate.project_id,
-          preferredDeviceId: candidate.session_owner_device_id,
-          preferredWorkerId: candidate.session_owner_worker_id,
-          provider: candidate.agent_provider,
-          model: candidate.runtime_model,
-          effort: candidate.runtime_effort,
-          observedAt: input.claimedAt,
-        });
-        sessionOwnerAvailability.set(ownerKey, ownerAvailable);
-      }
-      if (ownerAvailable) continue;
-    }
+    ) continue;
+    const claimingWorkerOwnsSession =
+      candidate.session_owner_worker_id === input.workerId;
 
     // A healthy live session owner is the elected claimant. Reapplying a
     // conflicting message-level device preference here would make the owner
     // and preferred device yield to each other indefinitely.
     if (
-      !claimingWorkerOwnsLiveSession &&
+      !claimingWorkerOwnsSession &&
       candidate.preferred_device_id &&
       candidate.preferred_device_id !== input.deviceId
     ) {
@@ -3205,11 +3278,10 @@ export async function claimNextChannelAgentReply(
     const claimReason = sessionExpired
       ? "ttl_expired_reactivated"
       : candidate.session_owner_worker_id === input.workerId
-      ? runtimeChanged ? "worker_reused_runtime_changed" : "worker_reused"
-      : candidate.session_owner_worker_id && replyLeaseExpired
-      ? "worker_failover_lease_expired"
-      : candidate.session_owner_worker_id
-      ? "worker_failover_unavailable_or_incompatible"
+      ? candidate.attempts === 0 &&
+          candidate.session_created_at === candidate.session_updated_at
+        ? "designated_worker_claimed"
+        : runtimeChanged ? "worker_reused_runtime_changed" : "worker_reused"
       : "session_created";
     const retainedUntil = channelReplySessionRetentionUntil(input.claimedAt);
     const [claimResult, sessionResult] = await db.batch([
@@ -3286,7 +3358,8 @@ export async function claimNextChannelAgentReply(
       ),
       db.prepare(
         `update briar_channel_reply_sessions
-         set owner_device_id = ?, owner_worker_id = ?, provider = ?,
+         set owner_device_id = ?, owner_worker_id = ?, owner_worker_label = ?,
+             provider = ?,
              model = ?, effort = ?,
              conversation_id = case
                when retained_until > ? and provider = ? and model is ?
@@ -3305,6 +3378,7 @@ export async function claimNextChannelAgentReply(
       ).bind(
         input.deviceId,
         input.workerId,
+        claimingWorker.label,
         candidate.agent_provider,
         candidate.runtime_model,
         candidate.runtime_effort,
@@ -4442,6 +4516,7 @@ export async function completeChannelReply(
         `insert into briar_channel_reply_sessions (
            id, organization_id, channel_id, thread_root_message_id,
            project_id, agent_id, provider, model, effort,
+           owner_device_id, owner_worker_id, owner_worker_label,
            last_activity_at, retained_until, created_at, updated_at
          )
          select ?, parent.organization_id, parent.channel_id,
@@ -4452,11 +4527,16 @@ export async function completeChannelReply(
                   then target.model else target_skill.model end,
                 case when target_skill.id is null
                   then target.effort else target_skill.effort end,
+                designated_worker.device_id, designated_worker.id,
+                target.designated_worker_label,
                 ?, ?, ?, ?
          from briar_channel_agent_reply_jobs parent
          join briar_project_agents target on target.id = ?
          left join briar_agent_skills target_skill
            on target_skill.id = ? and target_skill.agent_id = target.id
+         left join briar_execution_workers designated_worker
+           on designated_worker.id = target.designated_worker_id
+          and designated_worker.project_id = target.project_id
          join briar_channel_agents roster
            on roster.agent_id = target.id and roster.channel_id = parent.channel_id
          where parent.id = ? and parent.claimed_device_id = ?
@@ -4483,11 +4563,18 @@ export async function completeChannelReply(
            owner_device_id = case
              when briar_channel_reply_sessions.retained_until <=
                     excluded.last_activity_at
-             then null else briar_channel_reply_sessions.owner_device_id end,
+             then excluded.owner_device_id
+             else briar_channel_reply_sessions.owner_device_id end,
            owner_worker_id = case
              when briar_channel_reply_sessions.retained_until <=
                     excluded.last_activity_at
-             then null else briar_channel_reply_sessions.owner_worker_id end,
+             then excluded.owner_worker_id
+             else briar_channel_reply_sessions.owner_worker_id end,
+           owner_worker_label = case
+             when briar_channel_reply_sessions.retained_until <=
+                    excluded.last_activity_at
+             then excluded.owner_worker_label
+             else briar_channel_reply_sessions.owner_worker_label end,
            provider = excluded.provider, model = excluded.model,
            effort = excluded.effort,
            last_activity_at = excluded.last_activity_at,
