@@ -26,12 +26,16 @@ fi
 mise exec -- bun run --cwd "$repo_root/apps/briar" cli:build
 mise exec -- bun run --cwd "$repo_root/apps/briar" agent:build
 
-install -d -m 0755 "$output" "$output/agent" "$output/provider-runtime"
+install -d -m 0755 \
+  "$output" "$output/agent" "$output/provider-runtime" "$output/skills"
 for file in \
   assert-debian-13-x86_64 \
   briar \
   briar-managed-enroll \
   briar-managed-enroll.service \
+  briar-managed-runtime-update-request \
+  briar-managed-runtime-updater \
+  briar-managed-runtime-updater.service \
   briar-managed-worker.service \
   briar-runtime-profile.sh \
   briar-remote-desktop \
@@ -45,6 +49,7 @@ for file in \
   prepare-image-for-capture \
   remote-desktop-packages.txt \
   resolve-remote-desktop-packages \
+  runtime-updater.pub \
   verify-managed-image \
   verify-remote-desktop \
   xfce4-helpers.rc \
@@ -52,7 +57,9 @@ for file in \
   install -m 0644 "$script_dir/$file" "$output/$file"
 done
 for executable in \
-  assert-debian-13-x86_64 briar briar-managed-enroll briar-remote-desktop \
+  assert-debian-13-x86_64 briar briar-managed-enroll \
+  briar-managed-runtime-update-request briar-managed-runtime-updater \
+  briar-remote-desktop \
   configure-debian-snapshot install-image-runtime install-remote-desktop \
   prepare-image-for-capture resolve-remote-desktop-packages \
   verify-managed-image verify-remote-desktop; do
@@ -70,6 +77,9 @@ install -m 0644 \
   "$script_dir/provider-runtime/package.json" \
   "$script_dir/provider-runtime/bun.lock" \
   "$output/provider-runtime/"
+cp -R "$repo_root/skills/briar-workflow" "$output/skills/"
+cp -R "$repo_root/skills/browser" "$output/skills/"
+chmod 0755 "$output/skills/briar-workflow/scripts/briar"
 printf '%s\n' "$source_commit" > "$output/source-commit"
 printf '%s\n' "$briar_version" > "$output/briar-version"
 

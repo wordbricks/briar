@@ -1,0 +1,388 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+runtime_root="${BRIAR_RUNTIME_ROOT:-/opt/briar}"
+request_directory="${BRIAR_RUNTIME_UPDATE_REQUEST_DIR:-/run/briar-runtime-updater}"
+state_directory="${BRIAR_RUNTIME_UPDATE_STATE_DIR:-/var/lib/briar-runtime-updater}"
+credential_file="${BRIAR_RUNTIME_CREDENTIAL_FILE:-/var/lib/briar/worker-credential.json}"
+public_key="${BRIAR_RUNTIME_UPDATE_PUBLIC_KEY:-$runtime_root/etc/runtime-updater.pub}"
+curl_binary="${BRIAR_RUNTIME_CURL:-/usr/bin/curl}"
+minisign_binary="${BRIAR_RUNTIME_MINISIGN:-/usr/bin/minisign}"
+systemctl_binary="${BRIAR_RUNTIME_SYSTEMCTL:-/usr/bin/systemctl}"
+poll_seconds="${BRIAR_RUNTIME_UPDATE_POLL_SECONDS:-5}"
+handoff_timeout_seconds="${BRIAR_RUNTIME_UPDATE_HANDOFF_TIMEOUT_SECONDS:-900}"
+health_timeout_seconds="${BRIAR_RUNTIME_UPDATE_HEALTH_TIMEOUT_SECONDS:-180}"
+run_once=false
+if [[ "${1:-}" == "--once" ]]; then
+  run_once=true
+elif [[ $# -gt 0 ]]; then
+  echo "Usage: briar-managed-runtime-updater [--once]" >&2
+  exit 2
+fi
+
+if [[ "$(id -u)" != "0" ]]; then
+  if [[ "${BRIAR_RUNTIME_UPDATER_TEST_MODE:-}" != "1" ||
+    "$runtime_root" != /tmp/briar-runtime-updater-test.* ]]; then
+    echo "briar-managed-runtime-updater must run as root" >&2
+    exit 1
+  fi
+fi
+
+for directory in "$runtime_root" "$request_directory" "$state_directory"; do
+  if [[ "$directory" != /* || ! -d "$directory" ]]; then
+    echo "runtime updater directory is unavailable: $directory" >&2
+    exit 1
+  fi
+done
+for binary in "$curl_binary" "$minisign_binary" "$systemctl_binary"; do
+  if [[ "$binary" != /* || ! -x "$binary" ]]; then
+    echo "runtime updater dependency is unavailable: $binary" >&2
+    exit 1
+  fi
+done
+if [[ ! -s "$credential_file" || ! -s "$public_key" ]]; then
+  echo "runtime updater credential or public key is unavailable" >&2
+  exit 1
+fi
+if [[ ! "$poll_seconds" =~ ^[1-9][0-9]*$ ||
+  ! "$handoff_timeout_seconds" =~ ^[1-9][0-9]*$ ||
+  ! "$health_timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
+  echo "runtime updater timeout configuration is invalid" >&2
+  exit 1
+fi
+
+release_root="$runtime_root/releases"
+current_link="$runtime_root/current"
+mkdir -p -- "$release_root"
+chmod 0755 "$release_root"
+
+last_error=""
+activated=false
+previous_release=""
+api_origin=""
+credential=""
+request_id=""
+target_version=""
+worker_id=""
+installed_release=""
+
+fail_update() {
+  last_error="$1"
+  return 1
+}
+
+write_result() {
+  local outcome="$1"
+  local detail="$2"
+  local temporary
+  temporary="$(mktemp "$state_directory/.result.XXXXXX")" || return 1
+  jq -n \
+    --arg outcome "$outcome" \
+    --arg requestId "$request_id" \
+    --arg targetVersion "$target_version" \
+    --arg detail "$detail" \
+    '{outcome: $outcome, requestId: $requestId, targetVersion: $targetVersion, detail: $detail}' \
+    > "$temporary" || return 1
+  chmod 0640 "$temporary"
+  mv -f -- "$temporary" "$state_directory/last-result.json"
+}
+
+api_json() {
+  local method="$1"
+  local path="$2"
+  local output="$3"
+  local body_file="${4:-}"
+  local args=(
+    --fail --silent --show-error --location
+    --retry 3 --retry-all-errors --connect-timeout 20
+    --request "$method"
+    --header "Accept: application/json"
+    --header "Authorization: Bearer $credential"
+    --output "$output"
+  )
+  if [[ -n "$body_file" ]]; then
+    args+=(--header "Content-Type: application/json" --data-binary "@$body_file")
+  fi
+  "$curl_binary" "${args[@]}" "$api_origin$path"
+}
+
+update_status() {
+  local output="$1"
+  api_json GET \
+    "/workers/$worker_id/update-handoff/status?requestId=$request_id" \
+    "$output"
+}
+
+wait_for_handoff() {
+  local deadline=$((SECONDS + handoff_timeout_seconds))
+  local response
+  response="$(mktemp "$state_directory/.handoff.XXXXXX")" || return 1
+  while (( SECONDS < deadline )); do
+    if update_status "$response" && jq -e \
+      --arg requestId "$request_id" \
+      --arg targetVersion "$target_version" \
+      '.requestId == $requestId and .targetVersion == $targetVersion and
+       .status == "requested" and .ready == true and .activeWorkCount == 0' \
+      "$response" >/dev/null; then
+      rm -f -- "$response"
+      return 0
+    fi
+    if jq -e '.handoffState == "failed" or .status == "cancelled"' \
+      "$response" >/dev/null 2>&1; then
+      rm -f -- "$response"
+      fail_update "Worker handoff did not reach a safe update boundary"
+      return 1
+    fi
+    sleep "$poll_seconds"
+  done
+  rm -f -- "$response"
+  fail_update "Timed out waiting for active Worker sessions to hand off"
+}
+
+safe_archive() {
+  local archive="$1"
+  local entry
+  while IFS= read -r entry; do
+    entry="${entry#./}"
+    if [[ -z "$entry" ]]; then
+      continue
+    fi
+    case "$entry" in
+      /*|../*|*/../*|*/..)
+        return 1
+        ;;
+    esac
+  done < <(tar -tzf "$archive")
+}
+
+install_release() {
+  local work_directory="$1"
+  local archive_name="briar-managed-runtime-${target_version}-linux-x86_64.tar.gz"
+  local archive="$work_directory/$archive_name"
+  local signature="$archive.sig"
+  local artifact_url="$api_origin/releases/v${target_version}/$archive_name"
+  local staging="$release_root/.staging-${target_version}-${request_id}"
+  local release="$release_root/$target_version"
+  installed_release=""
+
+  "$curl_binary" --fail --silent --show-error --location \
+    --retry 5 --retry-all-errors --connect-timeout 20 \
+    "$artifact_url" --output "$archive" || {
+      fail_update "Could not download the requested runtime release"
+      return 1
+    }
+  "$curl_binary" --fail --silent --show-error --location \
+    --retry 5 --retry-all-errors --connect-timeout 20 \
+    "$artifact_url.sig" --output "$signature" || {
+      fail_update "Could not download the runtime release signature"
+      return 1
+    }
+  "$minisign_binary" -Vm "$archive" -x "$signature" -p "$public_key" \
+    >/dev/null || {
+      fail_update "Runtime release signature verification failed"
+      return 1
+    }
+  safe_archive "$archive" || {
+    fail_update "Runtime release archive contains an unsafe path"
+    return 1
+  }
+
+  rm -rf -- "$staging"
+  mkdir -m 0755 -- "$staging" || {
+    fail_update "Could not create the runtime release staging directory"
+    return 1
+  }
+  tar -xzf "$archive" -C "$staging" --no-same-owner --no-same-permissions || {
+    rm -rf -- "$staging"
+    fail_update "Runtime release extraction failed"
+    return 1
+  }
+  if ! jq -e \
+    --arg version "$target_version" \
+    '.schemaVersion == 1 and .version == $version and
+     .platform == "linux-x86_64" and
+     (.sourceCommit | test("^[0-9a-f]{40}$"))' \
+    "$staging/manifest.json" >/dev/null 2>&1; then
+    rm -rf -- "$staging"
+    fail_update "Runtime release manifest is invalid"
+    return 1
+  fi
+  for required in \
+    bin/briar lib/briar.js bin/briar-remote-session-agent.js \
+    briar-version source-commit \
+    skills/briar-workflow/SKILL.md skills/briar-workflow/VERSION \
+    skills/browser/SKILL.md skills/browser/VERSION; do
+    if [[ ! -s "$staging/$required" ]]; then
+      rm -rf -- "$staging"
+      fail_update "Runtime release is missing $required"
+      return 1
+    fi
+  done
+  chmod 0755 "$staging/bin/briar" \
+    "$staging/skills/briar-workflow/scripts/briar"
+  chmod -R go-w "$staging"
+  chown -R root:root "$staging"
+  local runtime_cli_version
+  runtime_cli_version="$(HOME=/root "$staging/bin/briar" version 2>/dev/null)"
+  if [[ "$runtime_cli_version" != "briar $target_version" ]]; then
+    rm -rf -- "$staging"
+    fail_update "Runtime release CLI self-check failed"
+    return 1
+  fi
+
+  if [[ -e "$release" ]]; then
+    if ! cmp -s "$release/manifest.json" "$staging/manifest.json"; then
+      rm -rf -- "$staging"
+      fail_update "A different runtime release already uses the target version"
+      return 1
+    fi
+    rm -rf -- "$staging"
+  else
+    mv -- "$staging" "$release" || {
+      rm -rf -- "$staging"
+      fail_update "Could not install the verified runtime release"
+      return 1
+    }
+  fi
+  installed_release="$release"
+}
+
+activate_release() {
+  local release="$1"
+  local temporary_link="$runtime_root/.current-${request_id}"
+  previous_release="$(readlink -f "$current_link" 2>/dev/null || true)"
+  ln -s -- "$release" "$temporary_link" || return 1
+  mv -Tf -- "$temporary_link" "$current_link" || return 1
+  activated=true
+  "$systemctl_binary" restart briar-remote-session-agent.service || return 1
+  "$systemctl_binary" restart briar-managed-worker.service || return 1
+}
+
+wait_for_health() {
+  local deadline=$((SECONDS + health_timeout_seconds))
+  local response
+  response="$(mktemp "$state_directory/.health.XXXXXX")" || return 1
+  while (( SECONDS < deadline )); do
+    if update_status "$response" && jq -e \
+      --arg requestId "$request_id" \
+      '.requestId == $requestId and .status == "completed"' \
+      "$response" >/dev/null; then
+      rm -f -- "$response"
+      return 0
+    fi
+    sleep "$poll_seconds"
+  done
+  rm -f -- "$response"
+  fail_update "Updated Worker did not report the target version in time"
+}
+
+rollback_release() {
+  if [[ "$activated" != true || -z "$previous_release" ||
+    ! -d "$previous_release" ]]; then
+    return 0
+  fi
+  local temporary_link="$runtime_root/.rollback-${request_id}"
+  rm -f -- "$temporary_link"
+  ln -s -- "$previous_release" "$temporary_link" || return 1
+  mv -Tf -- "$temporary_link" "$current_link" || return 1
+  "$systemctl_binary" restart briar-remote-session-agent.service || true
+  "$systemctl_binary" restart briar-managed-worker.service || true
+}
+
+report_failure() {
+  local error="$1"
+  local body response
+  body="$(mktemp "$state_directory/.failure-body.XXXXXX")" || return 1
+  response="$(mktemp "$state_directory/.failure-response.XXXXXX")" || {
+    rm -f -- "$body"
+    return 1
+  }
+  jq -n --arg requestId "$request_id" --arg error "$error" \
+    '{requestId: $requestId, error: $error}' > "$body"
+  api_json POST "/workers/$worker_id/update-handoff/fail" "$response" "$body" \
+    >/dev/null 2>&1 || true
+  rm -f -- "$body" "$response"
+}
+
+process_request() {
+  local request_file="$1"
+  local current_version work_directory release
+  activated=false
+  previous_release=""
+  last_error=""
+  request_id="$(jq -r '.requestId // ""' "$request_file")"
+  target_version="$(jq -r '.targetVersion // ""' "$request_file")"
+  worker_id="$(jq -r '.workerId // ""' "$request_file")"
+  if [[ ! "$request_id" =~ ^[0-9a-fA-F-]{36}$ ||
+    ! "$target_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ||
+    ! "$worker_id" =~ ^[0-9a-zA-Z-]{1,128}$ ]]; then
+    fail_update "Runtime update request is invalid"
+    return 1
+  fi
+
+  api_origin="$(jq -r '.apiOrigin // ""' "$credential_file")"
+  credential="$(jq -r '.credential // ""' "$credential_file")"
+  if [[ ! "$api_origin" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ||
+    ! "$credential" =~ ^briar_worker_[A-Za-z0-9_-]{43}$ ]]; then
+    fail_update "Managed computer credential is invalid"
+    return 1
+  fi
+  current_version=""
+  if [[ -s "$current_link/briar-version" ]]; then
+    current_version="$(tr -d '\r\n' < "$current_link/briar-version")"
+  fi
+  if [[ "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ &&
+    "$current_version" != "$target_version" &&
+    "$(printf '%s\n%s\n' "$current_version" "$target_version" |
+      LC_ALL=C sort -V | head -n 1)" == "$target_version" ]]; then
+    fail_update "Refusing to downgrade the managed runtime from $current_version to $target_version"
+    return 1
+  fi
+
+  wait_for_handoff || return 1
+  work_directory="$(mktemp -d "/tmp/briar-runtime-update.${request_id}.XXXXXX")" || {
+    fail_update "Could not create a runtime update workspace"
+    return 1
+  }
+  if ! install_release "$work_directory"; then
+    rm -rf -- "$work_directory"
+    return 1
+  fi
+  release="$installed_release"
+  rm -rf -- "$work_directory"
+  activate_release "$release" || {
+    fail_update "Could not activate the verified runtime release"
+    return 1
+  }
+  wait_for_health
+}
+
+while true; do
+  shopt -s nullglob
+  requests=("$request_directory"/request-*.json)
+  shopt -u nullglob
+  if (( ${#requests[@]} == 0 )); then
+    if [[ "$run_once" == true ]]; then
+      exit 0
+    fi
+    sleep "$poll_seconds"
+    continue
+  fi
+
+  request_file="${requests[0]}"
+  if process_request "$request_file"; then
+    write_result completed "Runtime activated and confirmed by Worker heartbeat" || true
+    echo "managed runtime update completed: request=$request_id version=$target_version"
+    rm -f -- "$request_file"
+  else
+    error="${last_error:-Runtime update failed}"
+    rollback_release || error="$error; rollback also failed"
+    report_failure "$error"
+    write_result failed "$error" || true
+    echo "managed runtime update failed: request=$request_id version=$target_version error=$error" >&2
+    rm -f -- "$request_file"
+  fi
+  if [[ "$run_once" == true ]]; then
+    exit 0
+  fi
+done

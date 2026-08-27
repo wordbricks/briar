@@ -193,6 +193,13 @@ const mobileRunDependencySchema = mutableStruct({
   status: mobileRunStatusSchema,
 });
 
+const mobileRelatedMessageSchema = mutableStruct({
+  organizationId: uuidString,
+  channelId: uuidString,
+  messageId: uuidString,
+  rootMessageId: uuidString,
+});
+
 const mobileStructuredResultSchema = mutableStruct({
   summary: Schema.String,
   outcome: Schema.Literals(["completed", "partial", "blocked", "failed"]),
@@ -232,6 +239,7 @@ export const mobileDashboardRunSchema = mutableStruct({
   createdByUserId: optionalNullable(Schema.String),
   subscribers: optional(mutableArray(mobileIssueSubscriberSchema)),
   issueDescription: optionalNullable(Schema.String),
+  relatedMessage: optionalNullable(mobileRelatedMessageSchema),
   attachments: optional(mutableArray(mobileIssueAttachmentSchema)),
   prerequisites: optional(mutableArray(mobileRunDependencySchema)),
   dependents: optional(mutableArray(mobileRunDependencySchema)),
@@ -680,6 +688,12 @@ const mobileChannelMessageAuthorSchema = Schema.Union([
   }),
 ]);
 
+const mobileChannelMessageReactionPersonSchema = mutableStruct({
+  userId: Schema.String,
+  name: Schema.String,
+  image: nullable(Schema.String),
+});
+
 const mobileChannelProposalSchema = Schema.Union([
   mutableStruct({
     ...mobileChannelProposalBaseFields,
@@ -714,6 +728,10 @@ export const mobileChannelMessageSchema = mutableStruct({
       emoji: Schema.String.check(Schema.isLengthBetween(1, 32)),
       count: positiveInteger,
       userIds: mutableArray(Schema.String).check(Schema.isMinLength(1)),
+      people: defaultedWith(
+        mutableArray(mobileChannelMessageReactionPersonSchema),
+        () => [],
+      ),
     })),
     () => [],
   ),

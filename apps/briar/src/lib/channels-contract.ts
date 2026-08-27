@@ -733,10 +733,18 @@ export type ChannelMessageAttachment = {
 };
 
 /** Aggregated emoji reaction on a channel message. */
+export type ChannelMessageReactionPerson = {
+  userId: string;
+  name: string;
+  image: string | null;
+};
+
 export type ChannelMessageReaction = {
   emoji: string;
   count: number;
   userIds: string[];
+  /** Profiles for reaction authors who are visible in the message's organization. */
+  people?: ChannelMessageReactionPerson[];
 };
 
 export type ChannelThreadSubscriber = {

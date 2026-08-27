@@ -49,6 +49,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let createdByUserId: String?
     let subscribers: [IssueSubscriber]?
     let issueDescription: String?
+    let relatedMessage: RelatedMessageReference?
     let attachments: [IssueAttachment]?
     let prerequisites: [IssueDependencyReference]?
     let dependents: [IssueDependencyReference]?
@@ -102,6 +103,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         createdByUserId: String? = nil,
         subscribers: [IssueSubscriber]? = nil,
         issueDescription: String? = nil,
+        relatedMessage: RelatedMessageReference? = nil,
         attachments: [IssueAttachment]? = nil,
         prerequisites: [IssueDependencyReference]? = nil,
         dependents: [IssueDependencyReference]? = nil,
@@ -154,6 +156,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.createdByUserId = createdByUserId
         self.subscribers = subscribers
         self.issueDescription = issueDescription
+        self.relatedMessage = relatedMessage
         self.attachments = attachments
         self.prerequisites = prerequisites
         self.dependents = dependents
@@ -254,6 +257,13 @@ struct IssueAttachment: Codable, Equatable, Identifiable, Sendable {
     let contentType: String
     let byteSize: Int
     let url: String
+}
+
+struct RelatedMessageReference: Codable, Equatable, Sendable {
+    let organizationId: UUID
+    let channelId: UUID
+    let messageId: UUID
+    let rootMessageId: UUID
 }
 
 struct StructuredRunResult: Codable, Equatable, Sendable {

@@ -189,6 +189,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // 0118 backfills trusted requesters from the Agent Skill approval
         // audit that this historical workflow fixture deliberately excludes.
         "0118_agent_session_inbox_requesters.sql",
+        // 0139 installs channel approval triggers that depend on the
+        // approval columns deliberately excluded from this historical schema.
+        "0139_channel_related_message.sql",
       ],
     });
 

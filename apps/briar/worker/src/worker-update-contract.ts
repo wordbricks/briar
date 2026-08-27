@@ -38,10 +38,18 @@ const WorkerUpdateHandoff = strictSchema(Schema.Struct({
   checkpoint: defaulted(WorkerUpdateCheckpoint, {}),
 }));
 
+const WorkerUpdateFailure = strictSchema(Schema.Struct({
+  requestId: UuidString,
+  error: trimmedText(1, 4_000),
+}));
+
 export const decodeWorkerUpdatePrepare = decodeRequestSync(
   WorkerUpdatePrepare,
 );
 export const decodeWorkerUpdateHandoff = decodeRequestSync(
   WorkerUpdateHandoff,
+);
+export const decodeWorkerUpdateFailure = decodeRequestSync(
+  WorkerUpdateFailure,
 );
 export const decodeWorkerUpdateRequestId = decodeRequestSync(UuidString);

@@ -106,6 +106,20 @@ describe("Companion mobile API contract", () => {
     }
   });
 
+  it("carries related channel messages on dashboard runs", () => {
+    const dashboard = decodeMobileSchema(
+      mobileOperationSchemas.getDashboardSnapshot.response,
+      fixture.operations.getDashboardSnapshot.response,
+    );
+
+    expect(dashboard.runs[0]?.relatedMessage).toEqual({
+      organizationId: "22222222-2222-4222-8222-222222222222",
+      channelId: "66666666-6666-4666-8666-666666666666",
+      messageId: "77777777-7777-4777-8777-777777777777",
+      rootMessageId: "88888888-8888-4888-8888-888888888888",
+    });
+  });
+
   it("requires callers to choose an Agent Skill before running a task", () => {
     const request = fixture.operations.runProjectAgentTask.request as Record<
       string,
