@@ -1,0 +1,36 @@
+[Unit]
+Description=Install signed Briar managed-computer runtime updates
+After=network-online.target briar-managed-enroll.service
+Wants=network-online.target
+Requires=briar-managed-enroll.service
+Before=briar-managed-worker.service
+
+[Service]
+Type=simple
+User=root
+Group=briar
+RuntimeDirectory=briar-runtime-updater
+RuntimeDirectoryMode=0770
+StateDirectory=briar-runtime-updater
+StateDirectoryMode=0750
+ExecStart=/opt/briar/bin/briar-managed-runtime-updater
+Restart=always
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadOnlyPaths=/var/lib/briar
+ReadWritePaths=/opt/briar /run/briar-runtime-updater /var/lib/briar-runtime-updater
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
+

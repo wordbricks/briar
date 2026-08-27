@@ -1,8 +1,8 @@
 [Unit]
 Description=Run Briar managed-computer project workers
-After=network-online.target briar-managed-enroll.service
+After=network-online.target briar-managed-enroll.service briar-managed-runtime-updater.service
 Wants=network-online.target
-Requires=briar-managed-enroll.service
+Requires=briar-managed-enroll.service briar-managed-runtime-updater.service
 
 [Service]
 Type=simple
@@ -11,6 +11,7 @@ Group=briar
 Environment=HOME=/home/briar
 Environment=BRIAR_CONFIG_HOME=/home/briar/.config/briar
 Environment=BRIAR_MANAGED_CREDENTIAL_FILE=/var/lib/briar/worker-credential.json
+Environment=BRIAR_MANAGED_RUNTIME_UPDATER=/opt/briar/bin/briar-managed-runtime-update-request
 Environment=BRIAR_CLI=/opt/briar/bin/briar
 Environment=CARGO_HOME=/home/briar/.cargo
 Environment=RUSTUP_HOME=/home/briar/.rustup

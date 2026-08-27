@@ -277,9 +277,14 @@ for shell_profile in /home/briar/.profile /home/briar/.bashrc; do
 done
 
 install -o root -g root -m 0755 \
+  "$source_dir/briar-managed-runtime-update-request" \
+  "$source_dir/briar-managed-runtime-updater" \
   "$source_dir/verify-managed-image" \
   "$source_dir/prepare-image-for-capture" \
   /opt/briar/bin/
+install -d -o root -g root -m 0755 /opt/briar/etc
+install -o root -g root -m 0644 "$source_dir/runtime-updater.pub" \
+  /opt/briar/etc/runtime-updater.pub
 install -o root -g root -m 0644 "$source_dir/image-lock.env" \
   /opt/briar/image-lock.env
 install -o root -g root -m 0644 "$source_dir/source-commit" \
@@ -288,14 +293,69 @@ install -o root -g root -m 0644 "$source_dir/briar-version" \
   /opt/briar/briar-version
 install -o root -g root -m 0644 "$source_dir/artifact-manifest.sha256" \
   /opt/briar/artifact-manifest.sha256
+
+source_commit="$(tr -d '\r\n' < "$source_dir/source-commit")"
+briar_version="$(tr -d '\r\n' < "$source_dir/briar-version")"
+initial_release="/opt/briar/releases/$briar_version"
+install -d -o root -g root -m 0755 \
+  "$initial_release/bin" "$initial_release/lib/agent" \
+  "$initial_release/skills"
+install -o root -g root -m 0755 "$source_dir/briar" \
+  "$initial_release/bin/briar"
+install -o root -g root -m 0644 \
+  "$source_dir/briar.js" "$initial_release/lib/briar.js"
+install -o root -g root -m 0644 \
+  "$source_dir/briar-remote-session-agent.js" \
+  "$initial_release/bin/briar-remote-session-agent.js"
+for runner in "$source_dir"/agent/*-runner.js; do
+  install -o root -g root -m 0644 "$runner" \
+    "$initial_release/lib/agent/$(basename -- "$runner")"
+done
+cp -a "$source_dir/skills/." "$initial_release/skills/"
+chown -R root:root "$initial_release/skills"
+chmod 0755 "$initial_release/skills/briar-workflow/scripts/briar"
+install -o root -g root -m 0644 "$source_dir/source-commit" \
+  "$initial_release/source-commit"
+install -o root -g root -m 0644 "$source_dir/briar-version" \
+  "$initial_release/briar-version"
+jq -n \
+  --arg version "$briar_version" \
+  --arg sourceCommit "$source_commit" \
+  '{schemaVersion: 1, version: $version, sourceCommit: $sourceCommit, platform: "linux-x86_64"}' \
+  > "$initial_release/manifest.json"
+chmod -R go-w "$initial_release"
+
+ln -s "$initial_release" /opt/briar/current
+rm -f -- /opt/briar/bin/briar /opt/briar/bin/briar-remote-session-agent.js
+rm -rf -- /opt/briar/lib
+rm -f -- /opt/briar/briar-version /opt/briar/source-commit
+ln -s /opt/briar/current/bin/briar /opt/briar/bin/briar
+ln -s /opt/briar/current/bin/briar-remote-session-agent.js \
+  /opt/briar/bin/briar-remote-session-agent.js
+ln -s /opt/briar/current/lib /opt/briar/lib
+ln -s /opt/briar/current/briar-version /opt/briar/briar-version
+ln -s /opt/briar/current/source-commit /opt/briar/source-commit
+
+for skill_root in \
+  /home/briar/.codex/skills \
+  /home/briar/.claude/skills \
+  /home/briar/.cursor/skills \
+  /home/briar/.grok/skills \
+  /home/briar/.gemini/config/skills \
+  /home/briar/.config/opencode/skills; do
+  install -d -o briar -g briar -m 0755 "$skill_root"
+  for skill_name in briar-workflow browser; do
+    ln -s "/opt/briar/current/skills/$skill_name" "$skill_root/$skill_name"
+    chown -h briar:briar "$skill_root/$skill_name"
+  done
+done
+
 sha256sum /opt/briar/provider/bun.lock > /opt/briar/provider/bun.lock.sha256
 dpkg-query --show --showformat='${binary:Package}=${Version}\n' \
   | LC_ALL=C sort > /opt/briar/debian-packages.lock
 sha256sum /opt/briar/debian-packages.lock \
   > /opt/briar/debian-packages.lock.sha256
 
-source_commit="$(tr -d '\r\n' < /opt/briar/source-commit)"
-briar_version="$(tr -d '\r\n' < /opt/briar/briar-version)"
 jq -n \
   --arg schemaVersion "2" \
   --arg sourceCommit "$source_commit" \

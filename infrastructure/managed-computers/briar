@@ -1,3 +1,6 @@
 #!/bin/sh
 set -eu
-exec /opt/briar/bin/bun /opt/briar/lib/briar.js "$@"
+self="$(readlink -f "$0")"
+runtime_bin="$(dirname -- "$self")"
+exec "${BRIAR_BUN_BINARY:-/opt/briar/bin/bun}" \
+  "$runtime_bin/../lib/briar.js" "$@"

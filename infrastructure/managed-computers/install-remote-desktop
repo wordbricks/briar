@@ -46,6 +46,7 @@ install -o root -g root -m 0755 \
   /opt/briar/bin/
 install -o root -g root -m 0644 \
   "$source_dir/briar-managed-enroll.service" \
+  "$source_dir/briar-managed-runtime-updater.service" \
   "$source_dir/briar-managed-worker.service" \
   "$source_dir/briar-remote-desktop.service" \
   "$source_dir/briar-remote-session-agent.service" \
@@ -61,6 +62,7 @@ install -o root -g root -m 0644 "$agent_bundle" \
 systemctl daemon-reload
 systemctl enable \
   briar-managed-enroll.service \
+  briar-managed-runtime-updater.service \
   briar-managed-worker.service \
   briar-remote-desktop.service \
   briar-remote-session-agent.service

@@ -630,6 +630,49 @@ export async function failExecutionWorkerUpdateHandoff(
   ]);
 }
 
+export async function failExecutionWorkerUpdate(
+  db: D1Database,
+  input: {
+    requestId: string;
+    organizationId: string;
+    deviceId: string;
+    error: string;
+    observedAt: string;
+  },
+) {
+  const error = input.error.trim().slice(0, 4_000) || "Unknown update failure";
+  const [updated] = await db.batch([
+    db
+      .prepare(
+        `update briar_execution_worker_update_requests
+         set handoff_state = 'failed', handoff_error = ?, updated_at = ?
+         where id = ? and device_id = ? and organization_id = ?
+           and status = 'requested'
+           and handoff_state in ('draining', 'ready', 'failed')`,
+      )
+      .bind(
+        error,
+        input.observedAt,
+        input.requestId,
+        input.deviceId,
+        input.organizationId,
+      ),
+    db
+      .prepare(
+        `update briar_execution_workers
+         set accepting_work = 0,
+             readiness_state = 'needs_attention',
+             readiness_detail = '원격 런타임 업데이트에 실패했습니다.',
+             updated_at = ?
+         where device_id = ? and state <> 'disabled'`,
+      )
+      .bind(input.observedAt, input.deviceId),
+  ]);
+  if ((updated.meta?.changes ?? 0) < 1) {
+    throw new WorkerConflictError("Worker update request is no longer active");
+  }
+}
+
 export type ExecutionWorkerCredentialPrincipal = {
   deviceId: string;
   organizationId: string;

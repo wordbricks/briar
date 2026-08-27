@@ -928,6 +928,91 @@ describe("detached execution workers", () => {
     });
   });
 
+  it("records a managed runtime installation failure for an explicit retry", async () => {
+    const credential = "briar_worker_runtime-update-failed-test";
+    const worker = await register(
+      "runtime-update-failed",
+      1,
+      createHash("sha256").update(credential).digest("hex"),
+    );
+    const request = await requestExecutionWorkerUpdate(db, {
+      id: "77777777-7777-4777-8777-777777777775",
+      organizationId: projectId,
+      deviceId: worker.device.id,
+      requestedByUserId: "owner",
+      targetVersion: "2.0.0",
+      requestedAt: atMinute(2),
+    });
+    const env = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "runtime-update-failed-secret-runtime-update-failed-secret",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const headers = {
+      authorization: `Bearer ${credential}`,
+      "content-type": "application/json",
+    };
+    const failure = await apiWorker.fetch(
+      new Request(
+        `https://briar-api.example/workers/${worker.worker.id}/update-handoff/fail`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            requestId: request.id,
+            error: "signed runtime failed its health check",
+          }),
+        },
+      ),
+      env,
+    );
+    expect(failure.status).toBe(204);
+
+    expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toMatchObject({
+      id: request.id,
+      handoffState: "failed",
+      handoffError: "signed runtime failed its health check",
+    });
+    const heartbeat = await apiWorker.fetch(
+      new Request(
+        `https://briar-api.example/workers/${worker.worker.id}/heartbeat`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            versions: { briar: "1.0.0" },
+            acceptingWork: true,
+            readinessState: "ready",
+          }),
+        },
+      ),
+      env,
+    );
+    expect(heartbeat.status).toBe(200);
+    expect(await heartbeat.json()).toMatchObject({
+      updateDirective: {
+        id: request.id,
+        handoffState: "failed",
+      },
+      worker: {
+        acceptingWork: false,
+        readiness: "needs_attention",
+      },
+    });
+    expect((await listOrganizationExecutionWorkers(
+      db,
+      projectId,
+      atMinute(3),
+    ))[0]).toMatchObject({
+      bindings: [{
+        acceptingWork: false,
+        readiness: "needs_attention",
+      }],
+    });
+  });
+
   it("dispatches a queued issue to a selected Worker without an Agent", async () => {
     const selected = await register("agentless");
     const requestId = "99999999-aaaa-4999-8999-999999999999";

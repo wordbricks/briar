@@ -26,7 +26,7 @@ import { type IssueDetailTab } from "@/lib/issue-detail-tab";
 import { readKanbanCollapsedColumnIds, toggleKanbanCollapsedColumnId, writeKanbanCollapsedColumnIds } from "@/lib/kanban-column-collapse";
 import { readKanbanHiddenColumnIds, toggleKanbanHiddenColumnId, writeKanbanHiddenColumnIds } from "@/lib/kanban-column-hide";
 import { formatIssueKey } from "@/lib/issue-key";
-import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, CreateIssueInput, DashboardPayload, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, Project, ProjectAgent, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
+import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, CreateIssueInput, DashboardPayload, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, Project, ProjectAgent, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
 import { sortAgentProviders, type AgentProvider } from "@/lib/project-llm";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
@@ -121,6 +121,7 @@ export function HuntDashboard({
   onAcceptIssueExecution,
   onAcceptSkillExecution,
   onRemoveIssueDependency,
+  onRelatedMessageOpen,
   onUpdateIssue,
   onUpdateIssueCheckpoints = async () => undefined,
   onUpdateIssuePreferences = async () => undefined,
@@ -188,6 +189,7 @@ export function HuntDashboard({
   onAcceptIssueExecution?: (runId: string, proposal: IssueExecutionProposal, input: IssueExecutionApprovalInput) => Promise<IssueExecutionProposal>;
   onAcceptSkillExecution?: (runId: string, proposal: AgentSkillExecutionProposal, input: AgentSkillExecutionApprovalInput) => Promise<AgentSkillExecutionProposal>;
   onRemoveIssueDependency?: (dependentRunId: string, prerequisiteRunId: string) => Promise<unknown>;
+  onRelatedMessageOpen?: (relatedMessage: RelatedMessageReference) => void;
   onUpdateIssue: (runId: string, input: UpdateIssueInput) => Promise<unknown>;
   onUpdateIssueCheckpoints?: (runId: string, checkpoints: AutoHuntWorkflowCheckpoint[]) => Promise<unknown>;
   onUpdateIssuePreferences?: (runId: string, input: IssueExecutionPreferences) => Promise<unknown>;
@@ -748,7 +750,7 @@ export function HuntDashboard({
   }
   if (selected) {
     return <>
-        <RunPage assignedWorker={workerById.get(selected.workerId ?? "") ?? workerById.get(selected.requestedWorkerId ?? "") ?? null} companionMode={companionMode} conversationInboxSyncSignal={conversationInboxSyncSignal} initialDetailTab={selectedRunInitialTab ?? undefined} issueKeyPrefix={dashboard?.project.issueKeyPrefix} currentUserId={currentUserId} error={displayedError} showErrorToast={false} isDeletingIssue={deletingIssueId === selected.id} isRecovering={recoveringRunId === selected.id} isUpdatingIssue={updatingIssueId === selected.id} isSidebarOpen={isSidebarOpen} onBack={() => {
+      <RunPage assignedWorker={workerById.get(selected.workerId ?? "") ?? workerById.get(selected.requestedWorkerId ?? "") ?? null} companionMode={companionMode} conversationInboxSyncSignal={conversationInboxSyncSignal} initialDetailTab={selectedRunInitialTab ?? undefined} issueKeyPrefix={dashboard?.project.issueKeyPrefix} currentUserId={currentUserId} error={displayedError} showErrorToast={false} isDeletingIssue={deletingIssueId === selected.id} isRecovering={recoveringRunId === selected.id} isUpdatingIssue={updatingIssueId === selected.id} isSidebarOpen={isSidebarOpen} onBack={() => {
         setSelectedRunInitialTab(null);
         setSelectedRunId(null);
       }} onCancel={() => onCancelRun(selected.id)} onDelete={async () => {
@@ -759,7 +761,7 @@ export function HuntDashboard({
         await onTransferIssue(selected.id, targetProjectId);
         setSelectedRunInitialTab(null);
         setSelectedRunId(null);
-      } : undefined} transferProjects={transferDestinationProjects} onAddDependency={onAddIssueDependency ? prerequisiteRunId => onAddIssueDependency(selected.id, prerequisiteRunId) : undefined} onAcceptIssueAction={onAcceptIssueAction ? proposal => onAcceptIssueAction(selected.id, proposal) : undefined} onAcceptIssueExecution={onAcceptIssueExecution ? (proposal, input) => onAcceptIssueExecution(selected.id, proposal, input) : undefined} onAcceptSkillExecution={onAcceptSkillExecution ? (proposal, input) => onAcceptSkillExecution(selected.id, proposal, input) : undefined} onRemoveDependency={onRemoveIssueDependency ? prerequisiteRunId => onRemoveIssueDependency(selected.id, prerequisiteRunId) : undefined} onDependencyOpen={runId => {
+      } : undefined} transferProjects={transferDestinationProjects} onAddDependency={onAddIssueDependency ? prerequisiteRunId => onAddIssueDependency(selected.id, prerequisiteRunId) : undefined} onAcceptIssueAction={onAcceptIssueAction ? proposal => onAcceptIssueAction(selected.id, proposal) : undefined} onAcceptIssueExecution={onAcceptIssueExecution ? (proposal, input) => onAcceptIssueExecution(selected.id, proposal, input) : undefined} onAcceptSkillExecution={onAcceptSkillExecution ? (proposal, input) => onAcceptSkillExecution(selected.id, proposal, input) : undefined} onRemoveDependency={onRemoveIssueDependency ? prerequisiteRunId => onRemoveIssueDependency(selected.id, prerequisiteRunId) : undefined} onRelatedMessageOpen={onRelatedMessageOpen} onDependencyOpen={runId => {
         setSelectedRunInitialTab(null);
         setSelectedRunId(runId);
       }} onLoadAttachment={onLoadAttachment} onLoadIssueMessages={() => onLoadIssueMessages(selected.id)} onLoadRunEvents={() => onLoadRunEvents(selected.id)} onLoadRunEvidence={() => onLoadRunEvidence(selected.id)} onLoadRunEvidenceImage={onLoadRunEvidenceImage} onViewingIssueConversationChange={onViewingIssueConversationChange} onCompleteResultReview={onCompleteResultReview ? () => onCompleteResultReview(selected.id) : undefined} mentionMembers={dashboard?.members ?? []} mentionAgents={agents.filter(agent => agent.projectId === dashboard?.project.id)} onMove={placement => onMoveRun(selected.id, placement)} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(selected) : undefined} onRetry={() => onRetryRun(selected.id)} onRework={onReworkRun ? input => onReworkRun(selected.id, input) : undefined} onResume={() => onResumeRun(selected.id)} onSendIssueMessage={input => onSendIssueMessage(selected.id, input)} onEditIssueMessage={(messageId, input) => onEditIssueMessage(selected.id, messageId, input)} onDeleteIssueMessage={messageId => onDeleteIssueMessage(selected.id, messageId)} onUpdateIssue={input => onUpdateIssue(selected.id, input)} onUpdateIssueCheckpoints={checkpoints => onUpdateIssueCheckpoints(selected.id, checkpoints)} onUpdateIssuePreferences={input => onUpdateIssuePreferences(selected.id, input)} onUpdateIssueSubscription={onUpdateIssueSubscription ? subscribed => onUpdateIssueSubscription(selected.id, subscribed) : undefined} availableProviders={availableProviders} executionPolicy={dashboard?.executionPolicy} executionWorkers={dashboard?.workers ?? []} performedAgentName={agentAssociationsByRunId.performedAgents.get(selected.id)?.name ?? null} performedAgentProvider={agentAssociationsByRunId.performedAgents.get(selected.id)?.provider ?? null} performedAgentModel={agentAssociationsByRunId.performedAgents.get(selected.id)?.model ?? null} organizationId={dashboard!.project.organizationId} projectId={dashboard!.project.id} run={selected} isProcessing={processingIssueIds.has(selected.id)} availableRuns={dashboard!.runs} token={token} />
