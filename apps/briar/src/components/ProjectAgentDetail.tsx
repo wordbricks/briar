@@ -311,6 +311,7 @@ export function ProjectAgentDetail({
         <ProjectAgentSessions
           agent={agent}
           onSessionOpen={setSelectedSessionId}
+          onStopSession={onStopSession}
           projectId={dashboard?.project.id ?? agent.projectId}
           sessions={sessions}
         />
