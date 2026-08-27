@@ -5088,7 +5088,19 @@ describe("D1 migrations", () => {
     try {
       const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
       await applyD1Migrations(db, {
-        through: "0142_restore_cvs_slack_history.sql",
+        through: "0141_agent_designated_workers.sql",
+      });
+      await executeD1Sql(
+        db,
+        `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+         values
+           ('existing-cvs-sophia', 'Existing Sophia', 'sophia@wordbricks.ai', 1, '2026-08-27T00:00:00.000Z', '2026-08-27T00:00:00.000Z'),
+           ('existing-cvs-ian', 'Existing Ian', 'ian@wordbricks.ai', 1, '2026-08-27T00:00:00.000Z', '2026-08-27T00:00:00.000Z'),
+           ('existing-cvs-jay', 'Existing Jay', 'jay@wordbricks.ai', 1, '2026-08-27T00:00:00.000Z', '2026-08-27T00:00:00.000Z'),
+           ('existing-cvs-jayce', 'Existing Jayce', 'jayce@wordbricks.ai', 1, '2026-08-27T00:00:00.000Z', '2026-08-27T00:00:00.000Z');`,
+      );
+      await applyD1Migrations(db, {
+        files: ["0142_restore_cvs_slack_history.sql"],
       });
 
       const org = await db
@@ -5165,9 +5177,67 @@ describe("D1 migrations", () => {
         )
         .all<{ name: string; email: string }>();
       expect(users.results.length).toBe(6);
+
+      const importedAliases = await db
+        .prepare(
+          `select count(*) as count from "user"
+           where email like 'cvs-slack-alias-%@invalid.local'`,
+        )
+        .first<number>("count");
+      expect(importedAliases).toBe(0);
+
+      const existingUserMessageRefs = await db
+        .prepare(
+          `select count(*) as count from briar_channel_messages
+           where author_user_id in (
+             'usr-slack-sophia', 'usr-slack-ian',
+             'usr-slack-jay', 'usr-slack-jayce'
+           )`,
+        )
+        .first<number>("count");
+      expect(existingUserMessageRefs).toBe(0);
+
+      const knownMessageAuthor = await db
+        .prepare(
+          `select author_user_id from briar_channel_messages
+           where id = '5e84a592-2f28-525e-9a86-f367558e52e6'`,
+        )
+        .first<{ author_user_id: string }>();
+      expect(knownMessageAuthor).toEqual({ author_user_id: "existing-cvs-sophia" });
+    } finally {
+      await miniflare.dispose();
+    }
+  }, 60_000);
+
+  it("applies CVS Slack history to an empty database", async () => {
+    const miniflare = new Miniflare({
+      modules: true,
+      script: "export default { fetch() { return new Response('ok') } }",
+      d1Databases: { DB: "cvs-slack-empty-migration" },
+    });
+    try {
+      const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+      await applyD1Migrations(db, {
+        through: "0142_restore_cvs_slack_history.sql",
+      });
+
+      const userCount = await db.prepare(`select count(*) as count from "user"`).first<number>("count");
+      expect(userCount).toBe(10);
+
+      const importedAliases = await db
+        .prepare(
+          `select count(*) as count from "user"
+           where email like 'cvs-slack-alias-%@invalid.local'`,
+        )
+        .first<number>("count");
+      expect(importedAliases).toBe(0);
+
+      const messageCount = await db
+        .prepare(`select count(*) as count from briar_channel_messages`)
+        .first<number>("count");
+      expect(messageCount).toBe(4105);
     } finally {
       await miniflare.dispose();
     }
   }, 60_000);
 });
-
