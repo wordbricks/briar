@@ -6,19 +6,47 @@ insert into briar_organizations (id, name, handle, created_at, updated_at)
 values ('ef46a0ee-b3d8-5658-ba2c-a685e7b30022', 'cvs', 'cvs', '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z')
 on conflict (handle) do nothing;
 
--- 2. Users (matching existing or creating NPC users)
-insert into "user" (id, name, email, emailVerified, image, createdAt, updatedAt)
+-- 2. Users (reuse existing Briar accounts by email, or create NPC users)
+create table cvs_slack_user_map (
+  slack_user_id text primary key,
+  name text not null,
+  email text not null,
+  image text,
+  actual_user_id text
+);
+
+insert into cvs_slack_user_map (slack_user_id, name, email, image)
 values
-  ('usr-slack-sophia', 'Sophia Kim', 'sophia@wordbricks.ai', 1, 'https://avatars.slack-edge.com/2026-06-11/11336043132179_908f654b73255152a5c5_512.png', '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z'),
-  ('usr-slack-ian', 'Ian Jeon', 'ian@wordbricks.ai', 1, 'https://avatars.slack-edge.com/2026-06-11/11342618032514_49c3360d84ee53ae95ae_512.png', '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z'),
-  ('usr-slack-jay', 'Jay Nam', 'jay@wordbricks.ai', 1, 'https://avatars.slack-edge.com/2026-06-11/11336246496563_dcad7ef995f61340cdf1_512.png', '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z'),
-  ('usr-slack-jayce', 'Jayce Byun', 'jayce@wordbricks.ai', 1, 'https://secure.gravatar.com/avatar/91e35ce2a94d05db51a5fb62200e16d2.jpg?s=512', '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z'),
-  ('usr-slack-velen', 'Velen', 'velen@cvs.internal', 1, 'https://avatars.slack-edge.com/2026-06-11/11342805950242_d72ccb30942cbd133a3d_512.png', '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z'),
-  ('usr-slack-google-drive', 'Google Drive', 'googledrive@cvs.internal', 1, 'https://avatars.slack-edge.com/2026-06-22/11420209263797_3e3712ca352ede9d2062_512.png', '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z'),
-  ('usr-slack-gs25-ofc', 'GS25 OFC', 'gs25-ofc@cvs.internal', 1, null, '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z'),
-  ('usr-slack-noh-hee-young', 'Noh Hee-young', 'noh-hee-young@cvs.internal', 1, null, '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z'),
-  ('usr-slack-startup-pm', 'Startup PM', 'startup-pm@cvs.internal', 1, null, '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z'),
-  ('usr-slack-incoming-webhook', 'incoming-webhook', 'incoming-webhook@cvs.internal', 1, null, '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z')
+  ('usr-slack-sophia', 'Sophia Kim', 'sophia@wordbricks.ai', 'https://avatars.slack-edge.com/2026-06-11/11336043132179_908f654b73255152a5c5_512.png'),
+  ('usr-slack-ian', 'Ian Jeon', 'ian@wordbricks.ai', 'https://avatars.slack-edge.com/2026-06-11/11342618032514_49c3360d84ee53ae95ae_512.png'),
+  ('usr-slack-jay', 'Jay Nam', 'jay@wordbricks.ai', 'https://avatars.slack-edge.com/2026-06-11/11336246496563_dcad7ef995f61340cdf1_512.png'),
+  ('usr-slack-jayce', 'Jayce Byun', 'jayce@wordbricks.ai', 'https://secure.gravatar.com/avatar/91e35ce2a94d05db51a5fb62200e16d2.jpg?s=512'),
+  ('usr-slack-velen', 'Velen', 'velen@cvs.internal', 'https://avatars.slack-edge.com/2026-06-11/11342805950242_d72ccb30942cbd133a3d_512.png'),
+  ('usr-slack-google-drive', 'Google Drive', 'googledrive@cvs.internal', 'https://avatars.slack-edge.com/2026-06-22/11420209263797_3e3712ca352ede9d2062_512.png'),
+  ('usr-slack-gs25-ofc', 'GS25 OFC', 'gs25-ofc@cvs.internal', null),
+  ('usr-slack-noh-hee-young', 'Noh Hee-young', 'noh-hee-young@cvs.internal', null),
+  ('usr-slack-startup-pm', 'Startup PM', 'startup-pm@cvs.internal', null),
+  ('usr-slack-incoming-webhook', 'incoming-webhook', 'incoming-webhook@cvs.internal', null);
+
+update cvs_slack_user_map
+set actual_user_id = coalesce(
+  (select id from "user" where id = cvs_slack_user_map.slack_user_id),
+  (select id from "user" where lower(email) = lower(cvs_slack_user_map.email)),
+  slack_user_id
+);
+
+insert into "user" (id, name, email, emailVerified, image, createdAt, updatedAt)
+select slack_user_id, name, email, 1, image, '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z'
+from cvs_slack_user_map
+where actual_user_id = slack_user_id
+on conflict (id) do nothing;
+
+-- Temporary aliases keep the bulk imports valid until existing accounts are remapped below.
+insert into "user" (id, name, email, emailVerified, image, createdAt, updatedAt)
+select slack_user_id, name, 'cvs-slack-alias-' || slack_user_id || '@invalid.local', 1, image,
+  '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z'
+from cvs_slack_user_map
+where actual_user_id <> slack_user_id
 on conflict (id) do nothing;
 
 -- 3. Organization members
@@ -18653,5 +18681,70 @@ values
   ('6af8aeff-73fa-546b-ae05-b3593fa5286c', 'usr-slack-jay', 'raised_hands', '2026-08-20T00:14:32.312Z'),
   ('819741ab-258c-5862-8d6a-77dc7285e09a', 'usr-slack-sophia', 'eyes', '2026-08-25T07:54:58.632Z')
 on conflict (message_id, user_id, emoji) do nothing;
+
+-- 8. Reconcile imported aliases with existing Briar accounts.
+insert into briar_organization_members (
+  organization_id, user_id, role, created_at, updated_at
+)
+select member.organization_id, imported.actual_user_id, member.role,
+  member.created_at, member.updated_at
+from briar_organization_members as member
+join cvs_slack_user_map as imported
+  on imported.slack_user_id = member.user_id
+where imported.actual_user_id <> imported.slack_user_id
+on conflict (organization_id, user_id) do nothing;
+
+delete from briar_organization_members
+where user_id in (
+  select slack_user_id from cvs_slack_user_map
+  where actual_user_id <> slack_user_id
+);
+
+insert into briar_channel_members (channel_id, user_id, role, created_at)
+select member.channel_id, imported.actual_user_id, member.role, member.created_at
+from briar_channel_members as member
+join cvs_slack_user_map as imported
+  on imported.slack_user_id = member.user_id
+where imported.actual_user_id <> imported.slack_user_id
+on conflict (channel_id, user_id) do nothing;
+
+delete from briar_channel_members
+where user_id in (
+  select slack_user_id from cvs_slack_user_map
+  where actual_user_id <> slack_user_id
+);
+
+update briar_channel_messages
+set author_user_id = (
+  select actual_user_id
+  from cvs_slack_user_map
+  where slack_user_id = briar_channel_messages.author_user_id
+)
+where author_user_id in (
+  select slack_user_id from cvs_slack_user_map
+  where actual_user_id <> slack_user_id
+);
+
+insert into briar_channel_message_reactions (message_id, user_id, emoji, created_at)
+select reaction.message_id, imported.actual_user_id, reaction.emoji, reaction.created_at
+from briar_channel_message_reactions as reaction
+join cvs_slack_user_map as imported
+  on imported.slack_user_id = reaction.user_id
+where imported.actual_user_id <> imported.slack_user_id
+on conflict (message_id, user_id, emoji) do nothing;
+
+delete from briar_channel_message_reactions
+where user_id in (
+  select slack_user_id from cvs_slack_user_map
+  where actual_user_id <> slack_user_id
+);
+
+delete from "user"
+where id in (
+  select slack_user_id from cvs_slack_user_map
+  where actual_user_id <> slack_user_id
+);
+
+drop table cvs_slack_user_map;
 
 pragma defer_foreign_keys = off;
