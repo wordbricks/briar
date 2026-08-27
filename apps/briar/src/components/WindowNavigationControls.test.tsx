@@ -32,9 +32,23 @@ describe("WindowNavigationControls", () => {
         <WindowNavigationControls
           canGoBack
           canGoForward={false}
+          historyIndex={0}
+          historyItems={[
+            {
+              context: null,
+              eyebrow: "Issues",
+              icon: null,
+              index: 0,
+              label: "Issues",
+              location: "issues",
+            },
+          ]}
+          isHistoryOpen={false}
           isSidebarOpen
           onBack={onBack}
           onForward={onForward}
+          onHistoryOpenChange={() => undefined}
+          onHistorySelect={() => undefined}
           onSidebarToggle={() => undefined}
         />
       </I18nProvider>,
@@ -71,9 +85,14 @@ describe("WindowNavigationControls", () => {
         <WindowNavigationControls
           canGoBack={false}
           canGoForward={false}
+          historyIndex={0}
+          historyItems={[]}
+          isHistoryOpen={false}
           isSidebarOpen={false}
           onBack={() => undefined}
           onForward={() => undefined}
+          onHistoryOpenChange={() => undefined}
+          onHistorySelect={() => undefined}
           onSidebarToggle={onSidebarToggle}
         />
       </I18nProvider>,
@@ -85,5 +104,56 @@ describe("WindowNavigationControls", () => {
     expect(sidebar?.getAttribute("aria-expanded")).toBe("false");
     await act(async () => sidebar?.click());
     expect(onSidebarToggle).toHaveBeenCalledOnce();
+  });
+
+  it("renders recent destinations and selects an existing history index", async () => {
+    const onHistorySelect = vi.fn();
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <WindowNavigationControls
+          canGoBack
+          canGoForward
+          historyIndex={1}
+          historyItems={[
+            {
+              context: "Project",
+              eyebrow: "Issues",
+              icon: null,
+              index: 0,
+              label: "Issue list",
+              location: "issues",
+            },
+            {
+              context: "Project",
+              eyebrow: "AH-42",
+              icon: null,
+              index: 1,
+              label: "Fix navigation",
+              location: "issues/project/run",
+            },
+          ]}
+          isHistoryOpen
+          isSidebarOpen
+          onBack={() => undefined}
+          onForward={() => undefined}
+          onHistoryOpenChange={() => undefined}
+          onHistorySelect={onHistorySelect}
+          onSidebarToggle={() => undefined}
+        />
+      </I18nProvider>,
+    );
+
+    const menu = document.querySelector('[role="menu"]');
+    expect(menu?.textContent).toContain("Recently viewed");
+    expect(menu?.querySelector('[data-current="true"]')?.textContent).toContain(
+      "Fix navigation",
+    );
+
+    const previous = menu?.querySelector<HTMLButtonElement>(
+      '[data-history-index="0"]',
+    );
+    await act(async () => previous?.click());
+    expect(onHistorySelect).toHaveBeenCalledWith(0);
   });
 });

@@ -190,6 +190,11 @@ describe("app keyboard shortcuts", () => {
         label: "navigation.forward",
       },
       {
+        id: "navigationHistory",
+        keys: ["⌘Y"],
+        label: "keyboardShortcuts.openNavigationHistory",
+      },
+      {
         id: "keyboardShortcutsModifier",
         join: undefined,
         keys: ["Ctrl+/"],

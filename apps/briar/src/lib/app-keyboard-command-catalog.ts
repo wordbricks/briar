@@ -24,6 +24,7 @@ export type AppKeyboardCommandId =
   | AppKeyboardShortcutCommandId
   | "historyBack"
   | "historyForward"
+  | "openNavigationHistory"
   | "openSettings"
   | "moveListDown"
   | "moveListUp"
@@ -186,6 +187,11 @@ function createCommandDefinitions(
     {
       bindings: [modifiedBinding("BracketRight", { meta: true })],
       id: "historyForward",
+      phase: "capture",
+    },
+    {
+      bindings: [modifiedBinding("KeyY", { meta: true })],
+      id: "openNavigationHistory",
       phase: "capture",
     },
     {

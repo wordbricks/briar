@@ -75,7 +75,11 @@ import {
   UnifiedSettingsSidebar,
   type UnifiedSettingsTarget,
 } from "./components/UnifiedSettingsSidebar";
-import { WindowNavigationControls } from "./components/WindowNavigationControls";
+import {
+  WindowNavigationControls,
+  type WindowNavigationHistoryItem,
+} from "./components/WindowNavigationControls";
+import { appSettingsNavigationGroups } from "./components/app-settings-navigation";
 import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
 import {
   collapseLinkedAutoHuntSessions,
@@ -748,6 +752,7 @@ export function App({
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isNavigationHistoryOpen, setIsNavigationHistoryOpen] = useState(false);
   const [commandPaletteInitialQuery, setCommandPaletteInitialQuery] =
     useState("");
   const [isKeyboardShortcutsOpen, setIsKeyboardShortcutsOpen] =
@@ -782,11 +787,14 @@ export function App({
     useState(false);
   const {
     current: activeNavigationLocation,
+    entries: navigationHistoryEntries,
+    index: navigationHistoryIndex,
     canGoBack,
     canGoForward,
     goBack,
     goBackTo,
     goForward,
+    goTo: goToNavigationHistory,
     navigate: navigateToLocation,
     replace: replaceNavigationLocation,
     reset: resetNavigationLocation,
@@ -1733,6 +1741,195 @@ export function App({
         )
       : []
     : briar.organizations;
+  const navigationHistoryItems = useMemo<WindowNavigationHistoryItem[]>(() => {
+    const pageLabels = {
+      agents: t("sidebar.agents"),
+      channels: t("sidebar.channels"),
+      dms: t("sidebar.dms"),
+      inbox: t("sidebar.inbox"),
+      "organization-create": t("sidebar.addOrganization"),
+      issues: t("sidebar.issues"),
+      lobby: t("lobby.eyebrow"),
+      schedule: t("sidebar.schedule"),
+      settings: t("account.settings"),
+    } satisfies Record<ActivePage, string>;
+    const applicationSettingLabels = new Map(
+      appSettingsNavigationGroups.flatMap((group) =>
+        group.items.map((item) => [item.id, t(item.labelKey)] as const)
+      ),
+    );
+    const organizationSettingLabels = {
+      agents: t("organization.agents"),
+      general: t("organization.general"),
+      integrations: t("organization.integrations"),
+      members: t("organization.membersAndInvites"),
+      workers: t("organization.workers"),
+    };
+    const projectSettingLabels = {
+      "agent-configuration": t("settings.navAgent"),
+      execution: t("settings.navExecution"),
+      general: t("settings.navGeneral"),
+      integrations: t("settings.navIntegrations"),
+      "issue-import": t("settings.navIssueImport"),
+      tabs: t("settings.navTabs"),
+      workflow: t("settings.navWorkflow"),
+    };
+    const pageIcon = (page: ActivePage) => {
+      if (page === "lobby") return <House aria-hidden="true" size={16} />;
+      if (page === "issues") return <Activity aria-hidden="true" size={16} />;
+      if (page === "agents") return <Bot aria-hidden="true" size={16} />;
+      if (page === "schedule") return <CalendarDays aria-hidden="true" size={16} />;
+      if (page === "inbox") return <InboxIcon aria-hidden="true" size={16} />;
+      if (page === "channels") return <Hash aria-hidden="true" size={16} />;
+      if (page === "dms") return <MessageCircle aria-hidden="true" size={16} />;
+      if (page === "organization-create") {
+        return <Building2 aria-hidden="true" size={16} />;
+      }
+      return <Settings aria-hidden="true" size={16} />;
+    };
+    const createItem = (
+      index: number,
+      location: AppNavigationLocation,
+      item: Omit<WindowNavigationHistoryItem, "index" | "location">,
+    ): WindowNavigationHistoryItem => ({ index, location, ...item });
+
+    return navigationHistoryEntries.map((location, index) => {
+      const page = pageFromNavigationLocation(location);
+      const projectId = projectIdFromNavigationLocation(location);
+      const project = projectId
+        ? briar.projects.find((candidate) => candidate.id === projectId)
+        : undefined;
+      const organizationId = organizationIdFromNavigationLocation(location);
+      const organization = organizationId
+        ? briar.organizations.find(
+            (candidate) => candidate.id === organizationId,
+          )
+        : undefined;
+      const runId = runIdFromNavigationLocation(location);
+      if (runId) {
+        const run = projectId && briar.dashboard?.project.id === projectId
+          ? briar.dashboard.runs.find((candidate) => candidate.id === runId)
+          : undefined;
+        return createItem(index, location, {
+          context: project?.name ?? null,
+          eyebrow: run
+            ? formatIssueKey(project?.issueKeyPrefix, run.runNumber)
+            : t("sidebar.issues"),
+          icon: <Activity aria-hidden="true" size={16} />,
+          label: run?.title ?? t("sidebar.issues"),
+        });
+      }
+
+      const channelId = channelIdFromNavigationLocation(location);
+      if (channelId) {
+        const channel = organizationChannels.find(
+          (candidate) => candidate.id === channelId,
+        );
+        const isDirectMessage = page === "dms" || channel?.kind === "dm";
+        const channelName = channel
+          ? isDirectMessage
+            ? directMessageDisplayName(channel, briar.user?.id ?? null)
+            : channel.name
+          : isDirectMessage
+            ? t("sidebar.dms")
+            : t("sidebar.channels");
+        return createItem(index, location, {
+          context: organization?.name ?? null,
+          eyebrow: isDirectMessage
+            ? t("sidebar.dms")
+            : channel
+              ? `#${channel.slug}`
+              : t("sidebar.channels"),
+          icon: isDirectMessage
+            ? <MessageCircle aria-hidden="true" size={16} />
+            : <Hash aria-hidden="true" size={16} />,
+          label: channelName,
+        });
+      }
+
+      const settingsTarget = settingsTargetFromNavigationLocation(location);
+      if (settingsTarget) {
+        const sectionLabel = settingsTarget.scope === "application"
+          ? applicationSettingLabels.get(settingsTarget.section) ??
+            t("account.settings")
+          : settingsTarget.scope === "organization"
+            ? organizationSettingLabels[settingsTarget.section]
+            : projectSettingLabels[settingsTarget.section];
+        const settingsOwner = settingsTarget.scope === "organization"
+          ? briar.organizations.find(
+              (candidate) => candidate.id === settingsTarget.organizationId,
+            )?.name
+          : settingsTarget.scope === "project"
+            ? briar.projects.find(
+                (candidate) => candidate.id === settingsTarget.projectId,
+              )?.name
+            : null;
+        return createItem(index, location, {
+          context: settingsTarget.scope === "application"
+            ? null
+            : settingsTarget.scope === "organization"
+              ? t("organization.settingsLabel")
+              : t("sidebar.projectSettings"),
+          eyebrow: settingsOwner ?? t("account.settings"),
+          icon: settingsTarget.scope === "organization"
+            ? <Building2 aria-hidden="true" size={16} />
+            : <Settings aria-hidden="true" size={16} />,
+          label: sectionLabel,
+        });
+      }
+
+      if (page === "inbox") {
+        return createItem(index, location, {
+          context: null,
+          eyebrow: organization?.name ?? t("sidebar.inbox"),
+          icon: <InboxIcon aria-hidden="true" size={16} />,
+          label: t("sidebar.inbox"),
+        });
+      }
+
+      if (page === "organization-create") {
+        return createItem(index, location, {
+          context: null,
+          eyebrow: t("sidebar.organizationSettings"),
+          icon: pageIcon(page),
+          label: pageLabels[page],
+        });
+      }
+
+      if (projectId && isProjectNavigationPage(page)) {
+        return createItem(index, location, {
+          context: null,
+          eyebrow: project?.name ?? t("sidebar.projects"),
+          icon: pageIcon(page),
+          label: pageLabels[page],
+        });
+      }
+
+      if (page === "channels" || page === "dms") {
+        return createItem(index, location, {
+          context: project?.name ?? null,
+          eyebrow: organization?.name ?? t("navigation.history"),
+          icon: pageIcon(page),
+          label: pageLabels[page],
+        });
+      }
+
+      return createItem(index, location, {
+        context: null,
+        eyebrow: "Briar",
+        icon: pageIcon(page),
+        label: pageLabels[page],
+      });
+    });
+  }, [
+    briar.dashboard,
+    briar.organizations,
+    briar.projects,
+    briar.user?.id,
+    navigationHistoryEntries,
+    organizationChannels,
+    t,
+  ]);
   const openProjectInNewWindow = useCallback(
     async (projectId: string) => {
       const project = briar.projects.find((candidate) => candidate.id === projectId);
@@ -2182,6 +2379,16 @@ export function App({
       !isLaunchIntroVisible
   );
 
+  useEffect(() => {
+    if (!commandPaletteAvailable || isCommandPaletteOpen || isKeyboardShortcutsOpen) {
+      setIsNavigationHistoryOpen(false);
+    }
+  }, [
+    commandPaletteAvailable,
+    isCommandPaletteOpen,
+    isKeyboardShortcutsOpen,
+  ]);
+
   const configuredKeybindings = loadKeybindings();
   const openCommandPalette = useCallback((initialQuery = "") => {
     setCommandPaletteInitialQuery(initialQuery);
@@ -2292,6 +2499,15 @@ export function App({
         run: () => {
           if (canGoForward) goForward();
           return "consume";
+        },
+      },
+      openNavigationHistory: {
+        isAvailable: () =>
+          commandPaletteAvailable &&
+          (isNavigationHistoryOpen || !hasOpenKeyboardShortcutOverlay(document)),
+        run: () => {
+          setIsNavigationHistoryOpen((open) => !open);
+          return "handled";
         },
       },
       openChannel: sequenceHandler("openChannel"),
@@ -3360,9 +3576,14 @@ export function App({
           <WindowNavigationControls
             canGoBack={canGoBack}
             canGoForward={canGoForward}
+            historyIndex={navigationHistoryIndex}
+            historyItems={navigationHistoryItems}
+            isHistoryOpen={isNavigationHistoryOpen}
             isSidebarOpen={isSidebarOpen}
             onBack={goBack}
             onForward={goForward}
+            onHistoryOpenChange={setIsNavigationHistoryOpen}
+            onHistorySelect={goToNavigationHistory}
             onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
           />
         {activePage !== "settings" ? (
