@@ -532,7 +532,8 @@ export async function readIssueUpdateRequest(request: Request) {
           : null,
       priority:
         typeof priority === "string" && priority ? Number(priority) : null,
-      difficulty,
+      difficulty:
+        typeof difficulty === "string" && difficulty ? difficulty : null,
       assigneeUserId:
         typeof assigneeUserId === "string" && assigneeUserId.trim()
           ? assigneeUserId

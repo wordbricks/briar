@@ -193,6 +193,7 @@ async function processSlackAppMention(env: Env, payload: SlackEventCallback) {
             ? "Slack 멘션으로 생성된 이슈가 백로그에 추가되었습니다."
             : "Slack 멘션으로 생성된 이슈가 처리를 기다리고 있습니다.",
         priority: instruction.priority,
+        difficulty: null,
         branch: null,
         commitSha: null,
         tracker: null,

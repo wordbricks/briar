@@ -104,6 +104,7 @@ import { ChannelSkillMenu } from "./ChannelSkillMenu";
 import { ChannelTypingState } from "./ChannelTypingState";
 import { MentionComposerField } from "./MentionComposerField";
 import { AgentProviderIcon } from "./AgentIcons";
+import { ChannelLinkPreview } from "./ChannelLinkPreview";
 import {
   ProfileDialog,
   profileTargetForChannelAgent,
@@ -2942,6 +2943,12 @@ const MessageRow = memo(function MessageRow({
           </time>
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
+        <ChannelLinkPreview
+          channelId={message.channelId}
+          message={message}
+          organizationId={channel.organizationId}
+          token={token}
+        />
         <ChannelMessageImages attachments={message.attachments} token={token} />
         {message.document ? (
           <ChannelDocumentPreview

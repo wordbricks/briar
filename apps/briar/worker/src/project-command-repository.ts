@@ -46,6 +46,8 @@ export async function createProject(
     provider: "codex",
     model: null,
     effort: null,
+    designated_worker_id: null,
+    designated_worker_label: null,
     description: defaultAgentCopy.description,
     responsibility: defaultAgentCopy.responsibility,
     skill_markdown: projectAgentSkill({

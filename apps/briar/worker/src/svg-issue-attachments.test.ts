@@ -30,7 +30,9 @@ describe("SVG issue attachment lifecycle", () => {
     await applyD1Migrations(db, {
       through: "0119_execution_worker_update_handoffs.sql",
     });
-    await applyD1Migrations(db, { files: ["0136_issue_difficulty.sql"] });
+    await applyD1Migrations(db, {
+      files: ["0136_issue_difficulty.sql", "0140_issue_difficulty_optional.sql"],
+    });
     await db.batch([
       db
         .prepare(
@@ -149,8 +151,10 @@ describe("SVG issue attachment lifecycle", () => {
       );
       expect(legacyPngResponse.status).toBe(201);
       const legacyPng = await legacyPngResponse.json<{
+        difficulty: string | null;
         attachments: Array<{ url: string; contentType: string }>;
       }>();
+      expect(legacyPng.difficulty).toBeNull();
 
       const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
       const legacyResponse = await worker.fetch(

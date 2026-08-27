@@ -62,10 +62,12 @@ import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
 import type {
   CreateProjectAgentInput,
   DashboardPayload,
+  ExecutionWorker,
   HuntRun,
   Project,
   ProjectAgent,
   ProjectAgentSkillInput,
+  ProjectExecutionWorkerPolicy,
   UpdateProjectAgentInput,
 } from "../types";
 import { AgentProviderIcon } from "./AgentIcons";
@@ -74,6 +76,7 @@ import { ProviderSelect } from "./ProviderSelect";
 import { ProjectAgentAvatar } from "./ProjectAgentAvatar";
 import { ProjectAgentDetail } from "./ProjectAgentDetail";
 import { ProjectAgentSettings } from "./ProjectAgentSettings";
+import { ProjectAgentDesignatedWorkerSelect } from "./ProjectAgentDesignatedWorkerSelect";
 import {
   ProjectAgentTaskDialog,
   type ProjectAgentTaskDialogSubmit,
@@ -242,7 +245,12 @@ export function ProjectAgents({
       const createdAt = new Date().toISOString();
       const agent = token
         ? await createProjectAgent(token, project.id, input)
-        : localProjectAgent(input, project.id, createdAt);
+        : localProjectAgent(
+            input,
+            project.id,
+            createdAt,
+            dashboard?.workers ?? [],
+          );
       setAgents((current) => [...current, agent]);
       setIsDialogOpen(false);
     } finally {
@@ -267,6 +275,14 @@ export function ProjectAgents({
           provider: input.provider,
           model: input.model,
           effort: input.effort === undefined ? agent.effort : input.effort,
+          designatedWorkerId: input.designatedWorkerId === undefined
+            ? agent.designatedWorkerId
+            : input.designatedWorkerId,
+          designatedWorkerLabel: input.designatedWorkerId === undefined
+            ? agent.designatedWorkerLabel
+            : dashboard?.workers?.find(
+                (worker) => worker.id === input.designatedWorkerId,
+              )?.label ?? null,
           description: input.description?.trim() ?? "",
           responsibility: input.responsibility,
           skills: localProjectAgentSkills(
@@ -378,7 +394,9 @@ export function ProjectAgents({
         onBack={() => setSettingsAgent(null)}
         onDelete={() => removeAgent(settingsAgent)}
         onSave={(input) => editAgent(settingsAgent, input)}
+        policy={dashboard?.executionPolicy}
         project={project}
+        workers={dashboard?.workers ?? []}
       />
     );
   }
@@ -705,6 +723,8 @@ export function ProjectAgents({
           key="create"
           onClose={closeDialog}
           onSubmit={addAgent}
+          policy={dashboard?.executionPolicy}
+          workers={dashboard?.workers ?? []}
         />
       )}
       <ProjectAgentTaskDialog
@@ -744,11 +764,15 @@ export function ProjectAgentDialog({
   isSubmitting,
   onClose,
   onSubmit,
+  policy,
+  workers,
 }: {
   agent: ProjectAgent | null;
   isSubmitting: boolean;
   onClose: () => void;
   onSubmit: (input: CreateProjectAgentInput) => Promise<void>;
+  policy?: ProjectExecutionWorkerPolicy;
+  workers: readonly ExecutionWorker[];
 }) {
   const { t } = useI18n();
   const providerModels = useAgentProviderModels();
@@ -759,6 +783,9 @@ export function ProjectAgentDialog({
   const [model, setModel] = useState(agent?.model ?? "");
   const [effort, setEffort] = useState<ModelEffort | null>(
     agent?.effort ?? null,
+  );
+  const [designatedWorkerId, setDesignatedWorkerId] = useState<string | null>(
+    agent?.designatedWorkerId ?? null,
   );
   const [description, setDescription] = useState(agent?.description ?? "");
   const [responsibility, setResponsibility] = useState(
@@ -795,6 +822,7 @@ export function ProjectAgentDialog({
     setProvider("codex");
     setModel("");
     setEffort(null);
+    setDesignatedWorkerId(null);
     setDescription("");
     setResponsibility("");
     setCalendarColor(defaultProjectAgentCalendarColor);
@@ -838,6 +866,7 @@ export function ProjectAgentDialog({
             provider,
             model: model || null,
             effort,
+            designatedWorkerId,
             description: description.trim(),
             responsibility: responsibility.trim(),
             ...(selectedTemplate
@@ -1180,6 +1209,16 @@ export function ProjectAgentDialog({
               <small className="-mt-2 text-micro leading-relaxed text-muted-foreground">
                 {t("agents.skillDefaultsHint")}
               </small>
+              <ProjectAgentDesignatedWorkerSelect
+                effort={effort}
+                model={model || null}
+                onChange={setDesignatedWorkerId}
+                policy={policy}
+                provider={provider}
+                selectedWorkerId={designatedWorkerId}
+                selectedWorkerLabel={agent?.designatedWorkerLabel ?? null}
+                workers={workers}
+              />
               <label>
                 <span>
                   {t("agents.responsibility")} <em>{t("common.required")}</em>
@@ -1254,6 +1293,7 @@ function localProjectAgent(
   input: CreateProjectAgentInput,
   projectId: string,
   createdAt: string,
+  workers: readonly ExecutionWorker[],
 ): ProjectAgent {
   const id = crypto.randomUUID();
   const name = input.name ?? `${agentProviderLabels[input.provider]} Agent`;
@@ -1266,6 +1306,10 @@ function localProjectAgent(
     provider: input.provider,
     model: input.model,
     effort: input.effort ?? null,
+    designatedWorkerId: input.designatedWorkerId ?? null,
+    designatedWorkerLabel: workers.find(
+      (worker) => worker.id === input.designatedWorkerId,
+    )?.label ?? null,
     description: input.description?.trim() ?? "",
     responsibility: input.responsibility,
     skill: projectAgentSkill({ name, responsibility: input.responsibility }),

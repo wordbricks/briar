@@ -221,6 +221,11 @@ export function createKeyboardShortcutHelpSections({
           label: t("navigation.forward"),
         },
         {
+          id: "navigationHistory",
+          keys: ["⌘Y"],
+          label: t("keyboardShortcuts.openNavigationHistory"),
+        },
+        {
           id: "keyboardShortcutsModifier",
           join: sequenceShortcutsEnabled ? "or" : undefined,
           keys: sequenceShortcutsEnabled

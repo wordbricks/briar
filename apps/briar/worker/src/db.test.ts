@@ -1030,7 +1030,18 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
+      await readFile(
+        resolve("migrations/0133_channel_reply_sessions.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
       await readFile(resolve("migrations/0136_issue_difficulty.sql"), "utf8"),
+    );
+    await executeSql(
+      db,
+      await readFile(resolve("migrations/0140_issue_difficulty_optional.sql"), "utf8"),
     );
     await executeSql(
       db,
@@ -1048,6 +1059,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
        alter table briar_agent_skills add column approval_policy text not null
          default 'explicit'
          check (approval_policy in ('invoke_is_consent', 'explicit'));`,
+    );
+    await executeSql(
+      db,
+      await readFile(
+        resolve("migrations/0141_agent_designated_workers.sql"),
+        "utf8",
+      ),
     );
     // The lifecycle suite intentionally uses a compact migration history, so
     // add the issue-reply job columns that production migration 0116 supplies
@@ -4561,8 +4579,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(
       await db.prepare("select difficulty from briar_hunt_runs where id = ?")
         .bind(runId)
-        .first<{ difficulty: string }>(),
-    ).toEqual({ difficulty: "normal" });
+        .first<{ difficulty: string | null }>(),
+    ).toEqual({ difficulty: null });
 
     const updated = await updateIssue(db, projectId, runId, {
       title: "Updated title",
@@ -4594,6 +4612,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       updatedAt: atMinute(20),
     });
     expect(unassigned?.assignee_user_id).toBeNull();
+    const cleared = await updateIssue(db, projectId, runId, {
+      title: "Updated title",
+      description: null,
+      priority: 1,
+      difficulty: null,
+      updatedAt: atMinute(21),
+    });
+    expect(cleared?.difficulty).toBeNull();
     await expect(
       db.prepare("update briar_hunt_runs set difficulty = ? where id = ?")
         .bind("extreme", runId)

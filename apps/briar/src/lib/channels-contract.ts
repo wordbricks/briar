@@ -69,9 +69,16 @@ export const channelReplyNoAvailableWorkerError =
 export const channelReplyProviderUsageExhaustedError =
   "The assigned Agent model has reached its usage limit.";
 
+/** Stable, actionable error for a pinned Agent or retained thread owner. */
+export const channelReplyAssignedWorkerUnavailableError = (
+  workerLabel: string,
+) =>
+  `Worker "${workerLabel}" is assigned to this Agent thread but is unavailable. Check that it is online, enabled, signed in, accepting work, allowed for this project, and supports the Agent provider, model, and effort.` as const;
+
 export type ChannelReplyUnavailableReason =
   | typeof channelReplyNoAvailableWorkerError
-  | typeof channelReplyProviderUsageExhaustedError;
+  | typeof channelReplyProviderUsageExhaustedError
+  | ReturnType<typeof channelReplyAssignedWorkerUnavailableError>;
 
 const strictSchemaOptions = {
   errors: "all",
@@ -754,6 +761,16 @@ export type ChannelMessageAttachment = {
   contentType: string;
   byteSize: number;
   url: string;
+};
+
+/** Public metadata used to render a channel message link preview. */
+export type ChannelLinkPreview = {
+  url: string;
+  title: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  faviconUrl: string | null;
+  siteName: string | null;
 };
 
 /** Aggregated emoji reaction on a channel message. */

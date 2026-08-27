@@ -51,7 +51,7 @@ export type CreateIssueInput = {
   title: string;
   description: string | null;
   priority: number | null;
-  difficulty: IssueDifficulty;
+  difficulty: IssueDifficulty | null;
   assigneeUserId?: string | null;
   status: "backlog" | "queued";
   attachments: File[];
@@ -67,7 +67,7 @@ export type UpdateIssueInput = {
   title: string;
   description: string | null;
   priority: number | null;
-  difficulty: IssueDifficulty;
+  difficulty: IssueDifficulty | null;
   assigneeUserId?: string | null;
   attachments: File[];
   attachmentReferences?: string[];
@@ -79,7 +79,7 @@ export type UpdateIssueResult = {
   title: string;
   description: string | null;
   priority: number | null;
-  difficulty: IssueDifficulty;
+  difficulty: IssueDifficulty | null;
   assigneeUserId: string | null;
   attachments: IssueAttachment[];
 };
@@ -337,7 +337,7 @@ export type HuntRun = {
   fullAuto?: boolean;
   detail: string | null;
   priority: number | null;
-  difficulty: IssueDifficulty;
+  difficulty: IssueDifficulty | null;
   assigneeUserId?: string | null;
   createdByUserId?: string | null;
   subscribers?: IssueSubscriber[];
@@ -699,6 +699,8 @@ export type ProjectAgent = {
   provider: AgentProvider;
   model: string | null;
   effort: ModelEffort | null;
+  designatedWorkerId?: string | null;
+  designatedWorkerLabel?: string | null;
   description?: string;
   responsibility: string;
   skill: string;
@@ -754,6 +756,7 @@ export type CreateProjectAgentInput = {
   provider: AgentProvider;
   model: string | null;
   effort?: ModelEffort | null;
+  designatedWorkerId?: string | null;
   description?: string;
   responsibility: string;
   skills?: ProjectAgentSkillInput[];
