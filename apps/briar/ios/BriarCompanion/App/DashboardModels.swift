@@ -98,7 +98,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         progress: Double? = nil,
         detail: String? = nil,
         priority: Int? = nil,
-        difficulty: IssueDifficulty? = .normal,
+        difficulty: IssueDifficulty? = nil,
         assigneeUserId: String? = nil,
         createdByUserId: String? = nil,
         subscribers: [IssueSubscriber]? = nil,

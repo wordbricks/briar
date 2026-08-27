@@ -164,7 +164,7 @@ describe("Effect mobile contract behavior", () => {
     ))).toBe(true);
   });
 
-  it("defaults omitted issue difficulty and rejects unsupported values", () => {
+  it("defaults omitted issue difficulty to unset and rejects unsupported values", () => {
     const request = fixture.operations.createIssue.request as Record<
       string,
       unknown
@@ -174,7 +174,13 @@ describe("Effect mobile contract behavior", () => {
     expect(
       decodeMobileSchema(mobileCreateIssueRequestSchema, withoutDifficulty)
         .difficulty,
-    ).toBe("normal");
+    ).toBeNull();
+    expect(
+      decodeMobileSchema(mobileCreateIssueRequestSchema, {
+        ...request,
+        difficulty: null,
+      }).difficulty,
+    ).toBeNull();
     expect(Option.isNone(decodeMobileSchemaOption(
       mobileCreateIssueRequestSchema,
       { ...request, difficulty: "extreme" },
@@ -189,5 +195,17 @@ describe("Effect mobile contract behavior", () => {
         assigneeUserId: null,
       },
     ))).toBe(true);
+    const updateWithoutDifficulty = {
+      title: "Updated issue",
+      description: null,
+      priority: null,
+      assigneeUserId: null,
+    };
+    expect(
+      decodeMobileSchema(
+        mobileUpdateIssueRequestSchema,
+        updateWithoutDifficulty,
+      ).difficulty,
+    ).toBeNull();
   });
 });

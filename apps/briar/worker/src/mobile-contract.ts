@@ -12,10 +12,7 @@ import {
   issueTitleOverLimitMessage,
 } from "../../src/lib/issue-title";
 import { channelMessageBlockSchema } from "../../src/lib/channels-contract";
-import {
-  defaultIssueDifficulty,
-  issueDifficulties,
-} from "../../src/lib/issue-difficulty";
+import { issueDifficulties } from "../../src/lib/issue-difficulty";
 import {
   defaulted,
   defaultedWith,
@@ -234,7 +231,10 @@ export const mobileDashboardRunSchema = mutableStruct({
   progress: optional(numberBetween(0, 100)),
   detail: optionalNullable(Schema.String),
   priority: optionalNullable(integerBetween(1, 4)),
-  difficulty: defaulted(mobileIssueDifficultySchema, defaultIssueDifficulty),
+  difficulty: defaulted(
+    nullable(mobileIssueDifficultySchema),
+    null,
+  ),
   assigneeUserId: optionalNullable(Schema.String),
   createdByUserId: optionalNullable(Schema.String),
   subscribers: optional(mutableArray(mobileIssueSubscriberSchema)),
@@ -929,7 +929,10 @@ const mobileIssueWriteFields = {
     Schema.String.check(Schema.isMaxLength(100_000)),
   ),
   priority: nullable(integerBetween(1, 4)),
-  difficulty: defaulted(mobileIssueDifficultySchema, defaultIssueDifficulty),
+  difficulty: defaulted(
+    nullable(mobileIssueDifficultySchema),
+    null,
+  ),
   assigneeUserId: nullable(Schema.String),
   status: Schema.Literals(["backlog", "queued"]),
   preferredProvider: optionalNullable(mobileProviderSchema),
@@ -961,7 +964,7 @@ export const mobileCreateIssueResponseSchema = mutableStruct({
   status: Schema.Literals(["backlog", "queued"]),
   assigneeUserId: nullable(Schema.String),
   createdByUserId: Schema.String,
-  difficulty: mobileIssueDifficultySchema,
+  difficulty: nullable(mobileIssueDifficultySchema),
   attachments: mutableArray(mobileIssueAttachmentSchema),
 });
 
@@ -971,7 +974,10 @@ export const mobileUpdateIssueRequestSchema = strict(mutableStruct({
     Schema.String.check(Schema.isMaxLength(100_000)),
   ),
   priority: nullable(integerBetween(1, 4)),
-  difficulty: mobileIssueDifficultySchema,
+  difficulty: defaulted(
+    nullable(mobileIssueDifficultySchema),
+    null,
+  ),
   assigneeUserId: nullable(Schema.String),
 }));
 
@@ -980,7 +986,7 @@ export const mobileUpdateIssueResponseSchema = mutableStruct({
   title: Schema.String,
   description: nullable(Schema.String),
   priority: nullable(integerBetween(1, 4)),
-  difficulty: mobileIssueDifficultySchema,
+  difficulty: nullable(mobileIssueDifficultySchema),
   assigneeUserId: nullable(Schema.String),
 });
 
