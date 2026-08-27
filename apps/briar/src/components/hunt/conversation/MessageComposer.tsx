@@ -9,6 +9,7 @@ import { MentionComposerField } from "@/components/MentionComposerField";
 import type { OrganizationMember, ProjectAgent } from "@/types";
 import { useI18n } from "@/i18n";
 import { MessageAttachmentPreview } from "./MessageAttachmentPreview";
+import { cn } from "@/lib/utils";
 export function MessageComposer({
   autoFocus = false,
   compact = false,
@@ -187,7 +188,7 @@ export function MessageComposer({
       textarea.setSelectionRange(nextCaret, nextCaret);
     });
   };
-  return <form className={`issue-message-composer${compact ? " compact" : ""}`} onBlur={event => {
+  return <form className={cn("issue-message-composer relative z-[1] grid min-w-0 shrink-0 grid-rows-[minmax(0,1fr)_auto] overflow-visible rounded-2xl border border-border bg-card shadow-md focus-within:border-input focus-within:ring-4 focus-within:ring-ring/15", compact && "compact shadow-sm")} onBlur={event => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
       setComposerFocused(false);
     }
@@ -202,23 +203,23 @@ export function MessageComposer({
     event.preventDefault();
     addImages(filesFromDataTransfer(event.dataTransfer));
   }} onSubmit={event => void submit(event)}>
-      {showsMentionSuggestion && <div aria-label={t("run.mention")} className="issue-composer-mention-menu" id={mentionListId} role="listbox">
-          {mentionSuggestions.map((suggestion, index) => <button aria-selected={index === 0} key={suggestion.userId ?? suggestion.agentId} onClick={() => completeMention(suggestion)} onMouseDown={event => event.preventDefault()} role="option" type="button">
-              <span aria-hidden="true">
+      {showsMentionSuggestion && <div aria-label={t("run.mention")} className="issue-composer-mention-menu absolute inset-x-3 bottom-[51px] z-[3] max-h-56 overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-xl" id={mentionListId} role="listbox">
+          {mentionSuggestions.map((suggestion, index) => <button aria-selected={index === 0} className="flex min-h-8 w-full items-center gap-2 rounded-md border-0 bg-accent px-2 py-1 text-left text-foreground outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring" key={suggestion.userId ?? suggestion.agentId} onClick={() => completeMention(suggestion)} onMouseDown={event => event.preventDefault()} role="option" type="button">
+              <span aria-hidden="true" className="grid size-[22px] shrink-0 place-items-center overflow-hidden rounded-md bg-secondary text-accent-foreground [&>img]:size-full [&>img]:object-cover">
                 {suggestion.userId ? suggestion.image ? <img alt="" src={suggestion.image} /> : suggestion.name.trim().charAt(0).toUpperCase() || "?" : suggestion.image ? <img alt="" src={suggestion.image} /> : <Bot size={14} />}
               </span>
-              <strong>@{suggestion.handle}</strong>
-              <small>{suggestion.name}</small>
+              <strong className="text-xs">@{suggestion.handle}</strong>
+              <small className="ml-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-2xs text-muted-foreground">{suggestion.name}</small>
             </button>)}
         </div>}
-      {attachments.length > 0 && <div className="issue-composer-attachments">
+      {attachments.length > 0 && <div className="issue-composer-attachments flex flex-wrap gap-1.5 px-3 pt-2.5">
           {attachments.map(({
         file,
         reference
       }) => <MessageAttachmentPreview file={file} key={reference} onRemove={() => setAttachments(current => current.filter(attachment => attachment.reference !== reference))} />)}
         </div>}
-      <MentionComposerField body={body} className="issue-composer-field" controlRef={textareaRef} mentions={connectedMentions} onMentionClick={mention => onMentionOpen(mention.handle)}>
-        <textarea autoFocus={autoFocus} aria-autocomplete="list" aria-controls={showsMentionSuggestion ? mentionListId : undefined} aria-expanded={showsMentionSuggestion} aria-label={placeholder} disabled={sending} maxLength={10_000} onChange={event => {
+      <MentionComposerField body={body} className="issue-composer-field min-w-0 [&>textarea]:min-h-[68px] [&>textarea]:w-full [&>textarea]:resize-none [&>textarea]:border-0 [&>textarea]:bg-transparent [&>textarea]:px-[18px] [&>textarea]:pb-1.5 [&>textarea]:pt-[18px] [&>textarea]:text-sm [&>textarea]:leading-relaxed [&>textarea]:outline-none [&>textarea]:placeholder:text-muted-foreground [&>textarea]:focus-visible:ring-0" controlRef={textareaRef} mentions={connectedMentions} onMentionClick={mention => onMentionOpen(mention.handle)}>
+        <textarea autoFocus={autoFocus} aria-autocomplete="list" aria-controls={showsMentionSuggestion ? mentionListId : undefined} aria-expanded={showsMentionSuggestion} aria-label={placeholder} className="text-foreground" disabled={sending} maxLength={10_000} onChange={event => {
         setBody(event.currentTarget.value);
         setCaret(event.currentTarget.selectionStart);
         setMentionDismissed(false);
@@ -250,12 +251,12 @@ export function MessageComposer({
         addImages(images);
       }} onSelect={event => setCaret(event.currentTarget.selectionStart)} placeholder={placeholder} ref={textareaRef} rows={2} value={body} />
       </MentionComposerField>
-      <footer>
-        {onCancel ? <button aria-label={t("run.cancelReply")} className="issue-reply-cancel" disabled={sending} onClick={onCancel} title={t("run.cancelReply")} type="button">
+      <footer className="flex min-h-12 items-center justify-end gap-1 px-3 pb-2.5 pt-1">
+        {onCancel ? <button aria-label={t("run.cancelReply")} className="issue-reply-cancel mr-auto grid size-8 place-items-center rounded-lg border-0 bg-transparent text-muted-foreground outline-none hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" disabled={sending} onClick={onCancel} title={t("run.cancelReply")} type="button">
             <X size={17} />
           </button> : null}
         {!disableAttachments ? <>
-            <button aria-label={t("issue.attachmentLabel")} className="issue-composer-link" disabled={sending || attachments.length >= maxIssueAttachmentCount} onClick={() => attachmentInputRef.current?.click()} type="button">
+            <button aria-label={t("issue.attachmentLabel")} className="issue-composer-link grid size-8 place-items-center rounded-lg border-0 bg-transparent text-muted-foreground outline-none hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" disabled={sending || attachments.length >= maxIssueAttachmentCount} onClick={() => attachmentInputRef.current?.click()} type="button">
               <Paperclip size={18} />
             </button>
             <input accept="image/*" className="issue-composer-file-input" disabled={sending || attachments.length >= maxIssueAttachmentCount} multiple onChange={event => {
@@ -263,11 +264,11 @@ export function MessageComposer({
           event.currentTarget.value = "";
         }} ref={attachmentInputRef} type="file" />
           </> : null}
-        <button aria-label={sending ? t("run.sendingMessage") : t("run.sendMessage")} className="issue-message-send" disabled={!body.trim() && attachments.length === 0 || sending} type="submit">
+        <button aria-label={sending ? t("run.sendingMessage") : t("run.sendMessage")} className="issue-message-send grid size-8 place-items-center rounded-lg border-0 bg-transparent text-foreground outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:text-muted-foreground" disabled={!body.trim() && attachments.length === 0 || sending} type="submit">
           {sending ? <Spinner size={16} /> : <Send aria-hidden="true" size={19} strokeWidth={2.2} />}
         </button>
       </footer>
-      {error && <p className="issue-composer-error">
+      {error && <p className="issue-composer-error m-0 flex items-center gap-1.5 px-2.5 pb-2 text-2xs text-destructive">
           <CircleAlert size={13} />
           {error}
         </p>}
