@@ -233,7 +233,7 @@ final class IssueMutationTests: XCTestCase {
         XCTAssertEqual(body["preferredModel"] as? String, "sonnet")
         XCTAssertEqual(body["preferredEffort"] as? String, "high")
         XCTAssertEqual(body["fullAuto"] as? Bool, true)
-        XCTAssertEqual(body["difficulty"] as? String, "normal")
+        XCTAssertNil(body["difficulty"])
     }
 
     func testIssueSubscriptionUsesDedicatedPutAndDeleteEndpoint() async throws {

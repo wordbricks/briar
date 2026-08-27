@@ -250,6 +250,7 @@ describe("detached execution workers", () => {
         "0128_agent_skill_documents.sql",
         "0136_issue_difficulty.sql",
         "0137_execution_worker_lifecycle_telemetry.sql",
+        "0140_issue_difficulty_optional.sql",
       ],
     });
     await executeD1Sql(

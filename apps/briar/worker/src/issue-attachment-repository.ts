@@ -114,7 +114,7 @@ export async function updateIssueWithAttachmentMetadata(
     title: string;
     description: string | null;
     priority: number | null;
-    difficulty: IssueDifficulty;
+    difficulty: IssueDifficulty | null;
     assigneeUserId?: string | null;
     updatedAt: string;
     attachments: IssueAttachmentInput[];

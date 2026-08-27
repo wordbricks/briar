@@ -905,6 +905,7 @@ describe("Worker HTTP contract", () => {
     expect(input.preferredModel).toBe("sonnet");
     expect(input.preferredEffort).toBe("high");
     expect(input.fullAuto).toBe(true);
+    expect(input.difficulty).toBeNull();
   });
 
   it("rejects an effort preference without a provider on issue creation", async () => {
@@ -1732,7 +1733,15 @@ describe("Worker HTTP contract", () => {
         assigneeUserId: null,
         status: "backlog",
       }).difficulty,
-    ).toBe("normal");
+    ).toBeNull();
+    expect(
+      decodeIssueUpdateInput({
+        title: "Clear difficulty",
+        description: null,
+        priority: null,
+        difficulty: null,
+      }),
+    ).toMatchObject({ difficulty: null });
     expect(() =>
       decodeIssueUpdateInput({
         title: "",

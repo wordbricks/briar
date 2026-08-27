@@ -412,6 +412,25 @@ describe("D1 migrations", () => {
           .bind(migrationFixture.runId)
           .run(),
       ).resolves.toBeDefined();
+      await executeD1Sql(
+        db,
+        await readFile(resolve("migrations/0140_issue_difficulty_optional.sql"), "utf8"),
+      );
+      await expect(
+        db.prepare("select difficulty from briar_hunt_runs where id = ?")
+          .bind(migrationFixture.runId)
+          .first<{ difficulty: string | null }>(),
+      ).resolves.toEqual({ difficulty: "easy" });
+      await expect(
+        db.prepare("update briar_hunt_runs set difficulty = null where id = ?")
+          .bind(migrationFixture.runId)
+          .run(),
+      ).resolves.toBeDefined();
+      await expect(
+        db.prepare("select difficulty from briar_hunt_runs where id = ?")
+          .bind(migrationFixture.runId)
+          .first<{ difficulty: string | null }>(),
+      ).resolves.toEqual({ difficulty: null });
       await expect(
         db.prepare("update briar_hunt_runs set difficulty = 'extreme' where id = ?")
           .bind(migrationFixture.runId)
@@ -1282,6 +1301,7 @@ describe("D1 migrations", () => {
           "0099_project_usage_analytics.sql",
           "0102_channel_read_states.sql",
           "0136_issue_difficulty.sql",
+          "0140_issue_difficulty_optional.sql",
         ],
       });
       const ownerId = "channel-canonical-owner";
@@ -1597,6 +1617,7 @@ describe("D1 migrations", () => {
           "0099_project_usage_analytics.sql",
           "0102_channel_read_states.sql",
           "0136_issue_difficulty.sql",
+          "0140_issue_difficulty_optional.sql",
         ],
       });
       const userId = "channel-upgrade-owner";

@@ -63,7 +63,7 @@ export type HuntEventInput = {
   repository: string;
   detail: string | null;
   priority: number | null;
-  difficulty?: IssueDifficulty;
+  difficulty?: IssueDifficulty | null;
   branch: string | null;
   commitSha: string | null;
   tracker: TrackerInput;

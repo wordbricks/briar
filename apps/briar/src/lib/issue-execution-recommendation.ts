@@ -130,13 +130,14 @@ function matchesRecommendedModel(
  * so harmless prefix and display-name variations never become guessed IDs.
  */
 export function recommendIssueExecution(
-  difficulty: IssueDifficulty,
+  difficulty: IssueDifficulty | null,
   catalog: AgentProviderCapabilityCatalog,
   providerConstraint?: AgentProvider | null,
   selectionAvailable: (
     selection: IssueExecutionRecommendation,
   ) => boolean = () => true,
 ): IssueExecutionRecommendation | null {
+  if (!difficulty) return null;
   const recommendations = recommendedModelsByDifficulty[difficulty];
   if (!recommendations) return null;
   for (const recommendation of recommendations) {
