@@ -889,6 +889,7 @@ private struct ChannelConversationView: View {
             ) { message in
                 ChannelMessageRow(
                             acceptingProposalID: channels.acceptingProposalID,
+                            decliningProposalID: channels.decliningProposalID,
                             approvingExecutionProposalID: channels.approvingExecutionProposalID,
                             preparingExecutionProposalID: channels.preparingExecutionProposalID,
                             approvingSkillExecutionProposalID:
@@ -908,6 +909,12 @@ private struct ChannelConversationView: View {
                                     proposalID: proposalID,
                                     projectID: projectID,
                                     execution: execution
+                                )
+                            },
+                            onDeclineProposal: { proposalID in
+                                await channels.declineProposal(
+                                    channelID: channel.id,
+                                    proposalID: proposalID
                                 )
                             },
                             onPrepareCreateExecution: { proposalID, projectID in
@@ -1061,6 +1068,7 @@ private struct ChannelMessageRow: View {
     private static let quickReactionEmojis = ["👍", "❤️", "😂", "🎉"]
 
     let acceptingProposalID: UUID?
+    let decliningProposalID: UUID?
     let approvingExecutionProposalID: UUID?
     let preparingExecutionProposalID: UUID?
     let approvingSkillExecutionProposalID: UUID?
@@ -1077,6 +1085,7 @@ private struct ChannelMessageRow: View {
         UUID,
         AcceptIssueExecutionProposalRequest?
     ) async -> AcceptChannelProposalResponse?
+    let onDeclineProposal: (UUID) async -> Bool
     let onPrepareCreateExecution: (
         UUID,
         UUID
@@ -1194,7 +1203,9 @@ private struct ChannelMessageRow: View {
                    proposal.actionType == .createIssue {
                     ChannelProposalCard(
                         accepting: acceptingProposalID == proposal.id,
+                        declining: decliningProposalID == proposal.id,
                         acceptanceInFlight: acceptingProposalID != nil ||
+                            decliningProposalID != nil ||
                             approvingExecutionProposalID != nil ||
                             preparingExecutionProposalID != nil ||
                             approvingSkillExecutionProposalID != nil ||
@@ -1204,6 +1215,9 @@ private struct ChannelMessageRow: View {
                         locale: locale,
                         onAccept: { projectID, execution in
                             await onAcceptProposal(proposal.id, projectID, execution)
+                        },
+                        onDecline: {
+                            await onDeclineProposal(proposal.id)
                         },
                         onIssueOpen: onIssueOpen,
                         onPrepareExecution: { projectID in
@@ -1810,6 +1824,7 @@ private struct ChannelProposalCard: View {
     @State private var approvalContext: ChannelsStore.ExecutionApprovalContext?
 
     let accepting: Bool
+    let declining: Bool
     let acceptanceInFlight: Bool
     let channel: ChannelSummary
     let executionProposal: IssueExecutionProposal?
@@ -1818,6 +1833,7 @@ private struct ChannelProposalCard: View {
         UUID,
         AcceptIssueExecutionProposalRequest?
     ) async -> AcceptChannelProposalResponse?
+    let onDecline: () async -> Bool
     let onIssueOpen: (UUID, UUID) async -> Void
     let onPrepareExecution: (
         UUID
@@ -1876,18 +1892,35 @@ private struct ChannelProposalCard: View {
         )
     }
 
+    private var createApprovalEnabled: Bool {
+        channelProposalApprovalIsEnabled(
+            acceptanceInFlight: acceptanceInFlight,
+            channelArchived: channel.archivedAt != nil,
+            targetProjectID: targetProjectID,
+            issue: proposal.payload?.issue,
+            batch: proposal.payload?.batch
+        )
+    }
+
+    private var declineEnabled: Bool {
+        !acceptanceInFlight && channel.archivedAt == nil
+    }
+
+    private var proposalStatusKey: L10n.Key {
+        switch proposal.status {
+        case .accepted: .channelIssueProposalAccepted
+        case .declined: .channelIssueProposalDeclined
+        case .pending: .channelIssueProposalPending
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L10n.text(.channelIssueProposal, locale: locale))
                     .font(.caption.weight(.bold))
                 Text(
-                    L10n.text(
-                        proposal.status == .accepted
-                            ? .channelIssueProposalAccepted
-                            : .channelIssueProposalPending,
-                        locale: locale
-                    )
+                    L10n.text(proposalStatusKey, locale: locale)
                 )
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -2038,10 +2071,10 @@ private struct ChannelProposalCard: View {
                     )
             }
 
-            if requestsExecution {
+            if requestsExecution, proposal.status != .declined {
                 if executionProposal?.status == .accepted {
                     combinedExecutionSummary
-                } else {
+                } else if proposal.status == .accepted {
                     Button {
                         guard let targetProjectID else { return }
                         Task {
@@ -2052,12 +2085,7 @@ private struct ChannelProposalCard: View {
                             ProgressView().controlSize(.small)
                         } else {
                             Label(
-                                L10n.text(
-                                    proposal.status == .accepted
-                                        ? .channelRetryExecution
-                                        : .channelCreateAndExecute,
-                                    locale: locale
-                                ),
+                                L10n.text(.channelRetryExecution, locale: locale),
                                 systemImage: "slider.horizontal.3"
                             )
                         }
@@ -2076,22 +2104,70 @@ private struct ChannelProposalCard: View {
                     .accessibilityIdentifier(
                         "accept-channel-create-execution-\(proposal.id.uuidString.lowercased())"
                     )
+                } else {
+                    HStack(spacing: 7) {
+                        Button(L10n.text(.channelCreateIssue, locale: locale)) {
+                            guard let targetProjectID else { return }
+                            Task { _ = await onAccept(targetProjectID, nil) }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier(
+                            "accept-channel-proposal-\(proposal.id.uuidString.lowercased())"
+                        )
+                        .disabled(!createApprovalEnabled)
+
+                        Button {
+                            guard let targetProjectID else { return }
+                            Task {
+                                approvalContext = await onPrepareExecution(targetProjectID)
+                            }
+                        } label: {
+                            if accepting || openingExecution {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Text(L10n.text(.channelCreateAndExecute, locale: locale))
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier(
+                            "accept-channel-create-execution-\(proposal.id.uuidString.lowercased())"
+                        )
+                        .disabled(!createApprovalEnabled)
+
+                        Button(
+                            L10n.text(
+                                declining
+                                    ? .channelDecliningProposal
+                                    : .channelDeclineProposal,
+                                locale: locale
+                            ),
+                            role: .destructive
+                        ) {
+                            Task { _ = await onDecline() }
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier(
+                            "decline-channel-proposal-\(proposal.id.uuidString.lowercased())"
+                        )
+                        .disabled(!declineEnabled)
+                    }
+                    .controlSize(.small)
                 }
             } else if proposal.status == .pending {
-                Button {
-                    guard let targetProjectID else { return }
-                    Task {
-                        if let result = await onAccept(targetProjectID, nil),
-                           result.executionProposal == nil,
-                           proposal.payload?.batch == nil {
-                            await onIssueOpen(result.projectId, result.resultRunId)
+                HStack(spacing: 7) {
+                    Button {
+                        guard let targetProjectID else { return }
+                        Task {
+                            if let result = await onAccept(targetProjectID, nil),
+                               result.executionProposal == nil,
+                               proposal.payload?.batch == nil {
+                                await onIssueOpen(result.projectId, result.resultRunId)
+                            }
                         }
-                    }
-                } label: {
-                    if accepting {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        if let batch = proposal.payload?.batch {
+                    } label: {
+                        if accepting {
+                            ProgressView().controlSize(.small)
+                        } else if let batch = proposal.payload?.batch {
                             Text(
                                 String(
                                     format: L10n.text(
@@ -2105,21 +2181,30 @@ private struct ChannelProposalCard: View {
                             Text(L10n.text(.channelCreateIssue, locale: locale))
                         }
                     }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .disabled(
-                    !channelProposalApprovalIsEnabled(
-                        acceptanceInFlight: acceptanceInFlight,
-                        channelArchived: channel.archivedAt != nil,
-                        targetProjectID: targetProjectID,
-                        issue: proposal.payload?.issue,
-                        batch: proposal.payload?.batch
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier(
+                        "accept-channel-proposal-\(proposal.id.uuidString.lowercased())"
                     )
-                )
-                .accessibilityIdentifier(
-                    "accept-channel-proposal-\(proposal.id.uuidString.lowercased())"
-                )
+                    .disabled(!createApprovalEnabled)
+
+                    Button(
+                        L10n.text(
+                            declining
+                                ? .channelDecliningProposal
+                                : .channelDeclineProposal,
+                            locale: locale
+                        ),
+                        role: .destructive
+                    ) {
+                        Task { _ = await onDecline() }
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier(
+                        "decline-channel-proposal-\(proposal.id.uuidString.lowercased())"
+                    )
+                    .disabled(!declineEnabled)
+                }
+                .controlSize(.small)
             }
             if proposal.status == .accepted,
                proposal.payload?.batch == nil,

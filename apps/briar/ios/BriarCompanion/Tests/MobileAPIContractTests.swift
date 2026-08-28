@@ -918,6 +918,14 @@ final class MobileAPIContractTests: XCTestCase {
             "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept"
         )
         XCTAssertEqual(
+            MobileAPIContract.Endpoint.declineChannelProposal(
+                organizationID: organizationID,
+                channelID: channelID,
+                proposalID: proposalID
+            ),
+            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/decline"
+        )
+        XCTAssertEqual(
             MobileAPIContract.Endpoint.acceptChannelExecutionProposal(
                 organizationID: organizationID,
                 channelID: channelID,

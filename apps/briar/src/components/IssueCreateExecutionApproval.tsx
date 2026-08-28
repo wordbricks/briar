@@ -8,6 +8,8 @@ import type { ExecutionApprovalContext } from "./IssueExecutionApproval";
 import { WorkerDispatchDialog } from "./WorkerDispatchDialog";
 
 type Props = {
+  creating: boolean;
+  declining: boolean;
   disabledReason?: string | null;
   executionProposal?: ChannelExecutionProposal | null;
   issueAccepted: boolean;
@@ -15,6 +17,8 @@ type Props = {
   onAccept: (
     input: IssueExecutionApprovalInput,
   ) => Promise<string | null | undefined>;
+  onCreate: () => Promise<string | null | undefined>;
+  onDecline: () => void | Promise<void>;
   projectName?: string | null;
   proposalId: string;
   targetTitle: string;
@@ -26,11 +30,15 @@ type Props = {
  * in the authenticated create-proposal acceptance request after the final click.
  */
 export function IssueCreateExecutionApproval({
+  creating,
+  declining,
   disabledReason = null,
   executionProposal = null,
   issueAccepted,
   loadExecutionContext,
   onAccept,
+  onCreate,
+  onDecline,
   projectName = null,
   proposalId,
   targetTitle,
@@ -134,26 +142,54 @@ export function IssueCreateExecutionApproval({
           </span>
         </div>
       ) : (
-        <button
-          aria-busy={opening || accepting}
-          className="channel-proposal-approve-button"
-          disabled={Boolean(disabledReason) || opening || accepting}
-          onClick={() => void openApproval()}
-          type="button"
-        >
-          {opening || accepting ? (
-            <Spinner aria-hidden="true" size={15} />
-          ) : (
-            <Play aria-hidden="true" size={15} />
-          )}
-          {opening
-            ? t("executionApproval.loading")
-            : accepting
-              ? t("channel.creatingIssue")
-              : issueAccepted
-                ? t("channel.retryCreateExecution")
-                : t("channel.approveCreateAndExecute")}
-        </button>
+        <div className="channel-proposal-actions">
+          {!issueAccepted ? (
+            <button
+              aria-busy={creating}
+              className="channel-proposal-create-button"
+              disabled={Boolean(disabledReason) || creating || declining || opening || accepting}
+              onClick={() => void onCreate()}
+              type="button"
+            >
+              {creating ? <Spinner aria-hidden="true" size={15} /> : null}
+              {creating ? t("channel.creatingIssue") : t("channel.createIssue")}
+            </button>
+          ) : null}
+          <button
+            aria-busy={opening || accepting}
+            className="channel-proposal-approve-button"
+            disabled={Boolean(disabledReason) || creating || declining || opening || accepting}
+            onClick={() => void openApproval()}
+            type="button"
+          >
+            {opening || accepting ? (
+              <Spinner aria-hidden="true" size={15} />
+            ) : (
+              <Play aria-hidden="true" size={15} />
+            )}
+            {opening
+              ? t("executionApproval.loading")
+              : accepting
+                ? t("channel.creatingIssue")
+                : issueAccepted
+                  ? t("channel.retryCreateExecution")
+                  : t("channel.approveCreateAndExecute")}
+          </button>
+          {!issueAccepted ? (
+            <button
+              aria-busy={declining}
+              className="channel-proposal-decline-button"
+              disabled={Boolean(disabledReason) || creating || declining || opening || accepting}
+              onClick={() => void onDecline()}
+              type="button"
+            >
+              {declining ? <Spinner aria-hidden="true" size={15} /> : null}
+              {declining
+                ? t("channel.decliningIssueProposal")
+                : t("channel.declineIssueProposal")}
+            </button>
+          ) : null}
+        </div>
       )}
       {error || (pending ? disabledReason : null) ? (
         <p className="execution-proposal-error" role="alert">

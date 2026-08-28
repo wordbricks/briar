@@ -797,6 +797,7 @@ enum L10n {
         case channelHome
         case channelIssueProposal
         case channelIssueProposalAccepted
+        case channelIssueProposalDeclined
         case channelIssueProposalPending
         case channelIssuePriority
         case channelIssueProject
@@ -810,6 +811,8 @@ enum L10n {
         case channelIssueBatchDependencies
         case channelIssueBatchSafety
         case channelCreateAndExecute
+        case channelDeclineProposal
+        case channelDecliningProposal
         case channelRetryExecution
         case channelSelectProposalProject
         case channelViewIssue
@@ -862,6 +865,7 @@ enum L10n {
             case .channelHome: "홈"
             case .channelIssueProposal: "이슈 생성 제안"
             case .channelIssueProposalAccepted: "승인되어 이슈가 생성되었습니다."
+            case .channelIssueProposalDeclined: "제안을 거절했습니다."
             case .channelIssueProposalPending: "승인하면 이슈가 생성됩니다."
             case .channelIssuePriority: "우선순위 P%d"
             case .channelIssueProject: "대상 프로젝트: %@"
@@ -869,12 +873,14 @@ enum L10n {
             case .channelIssueCreationAndExecutionSafety: "이슈 내용과 실행 설정을 함께 확인합니다. 한 번 승인하면 이슈 생성과 실행 예약이 이어집니다."
             case .channelIssueShowDescription: "설명 전체 보기"
             case .channelIssueHideDescription: "설명 접기"
-            case .channelCreateIssue: "승인하고 이슈 만들기"
+            case .channelCreateIssue: "이슈 만들기"
             case .channelCreateIssueBatch: "승인하고 이슈 %d개 만들기"
             case .channelIssueBatchCount: "한 번에 생성할 백로그 이슈 %d개"
             case .channelIssueBatchDependencies: "이슈 의존성"
             case .channelIssueBatchSafety: "모든 이슈와 의존성을 백로그에 원자적으로 생성하며 자동 실행하지 않습니다."
-            case .channelCreateAndExecute: "승인하고 이슈 생성·실행"
+            case .channelCreateAndExecute: "생성 및 실행"
+            case .channelDeclineProposal: "거절"
+            case .channelDecliningProposal: "거절하는 중…"
             case .channelRetryExecution: "실행 예약 다시 시도"
             case .channelSelectProposalProject: "프로젝트 선택"
             case .channelViewIssue: "이슈 보기"
@@ -930,6 +936,7 @@ enum L10n {
             case .channelHome: "Home"
             case .channelIssueProposal: "Issue proposal"
             case .channelIssueProposalAccepted: "Accepted — the issue was created."
+            case .channelIssueProposalDeclined: "Declined."
             case .channelIssueProposalPending: "Accept to create an issue."
             case .channelIssuePriority: "Priority P%d"
             case .channelIssueProject: "Target project: %@"
@@ -937,12 +944,14 @@ enum L10n {
             case .channelIssueCreationAndExecutionSafety: "Review the issue and execution settings together. One approval creates the issue and schedules its execution."
             case .channelIssueShowDescription: "Show full description"
             case .channelIssueHideDescription: "Collapse description"
-            case .channelCreateIssue: "Approve and create issue"
+            case .channelCreateIssue: "Create issue"
             case .channelCreateIssueBatch: "Approve and create %d issues"
             case .channelIssueBatchCount: "%d backlog issues will be created together"
             case .channelIssueBatchDependencies: "Issue dependencies"
             case .channelIssueBatchSafety: "Create every issue and dependency atomically in backlog without execution."
-            case .channelCreateAndExecute: "Approve, create, and run"
+            case .channelCreateAndExecute: "Create & Run"
+            case .channelDeclineProposal: "Decline"
+            case .channelDecliningProposal: "Declining…"
             case .channelRetryExecution: "Retry execution scheduling"
             case .channelSelectProposalProject: "Select project"
             case .channelViewIssue: "View issue"
@@ -998,6 +1007,7 @@ enum L10n {
             case .channelHome: "主页"
             case .channelIssueProposal: "创建问题建议"
             case .channelIssueProposalAccepted: "已批准并创建问题。"
+            case .channelIssueProposalDeclined: "已拒绝。"
             case .channelIssueProposalPending: "批准后将创建问题。"
             case .channelIssuePriority: "优先级 P%d"
             case .channelIssueProject: "目标项目：%@"
@@ -1005,12 +1015,14 @@ enum L10n {
             case .channelIssueCreationAndExecutionSafety: "同时检查问题和执行设置。一次批准将创建问题并调度执行。"
             case .channelIssueShowDescription: "查看完整说明"
             case .channelIssueHideDescription: "收起说明"
-            case .channelCreateIssue: "批准并创建问题"
+            case .channelCreateIssue: "创建问题"
             case .channelCreateIssueBatch: "批准并创建 %d 个问题"
             case .channelIssueBatchCount: "将一次创建 %d 个待办问题"
             case .channelIssueBatchDependencies: "问题依赖关系"
             case .channelIssueBatchSafety: "以原子方式将所有问题和依赖关系创建到待办列表，不自动执行。"
-            case .channelCreateAndExecute: "批准、创建并执行"
+            case .channelCreateAndExecute: "创建并执行"
+            case .channelDeclineProposal: "拒绝"
+            case .channelDecliningProposal: "正在拒绝…"
             case .channelRetryExecution: "重试执行调度"
             case .channelSelectProposalProject: "选择项目"
             case .channelViewIssue: "查看问题"

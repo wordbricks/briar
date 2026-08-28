@@ -12,6 +12,7 @@ import {
   acceptChannelExecutionProposal,
   acceptChannelProposal,
   acceptChannelSkillExecutionProposal,
+  declineChannelProposal,
   deleteChannelMessage,
   listChannelMessages,
   loadChannel,
@@ -129,6 +130,7 @@ export type ChannelConversationDependencies = {
   acceptChannelExecutionProposal: typeof acceptChannelExecutionProposal;
   acceptChannelProposal: typeof acceptChannelProposal;
   acceptChannelSkillExecutionProposal: typeof acceptChannelSkillExecutionProposal;
+  declineChannelProposal: typeof declineChannelProposal;
   createChannelRealtimeTransport: typeof createChannelRealtimeTransport;
   currentExecutionWorkerDeviceId: typeof currentExecutionWorkerDeviceId;
   deleteChannelMessage: typeof deleteChannelMessage;
@@ -145,6 +147,7 @@ export const defaultChannelConversationDependencies: ChannelConversationDependen
   acceptChannelExecutionProposal,
   acceptChannelProposal,
   acceptChannelSkillExecutionProposal,
+  declineChannelProposal,
   createChannelRealtimeTransport,
   currentExecutionWorkerDeviceId,
   deleteChannelMessage,
@@ -322,6 +325,9 @@ export function useChannelConversation({
   const [acceptingProposalId, setAcceptingProposalId] = useState<string | null>(
     null,
   );
+  const [decliningProposalId, setDecliningProposalId] = useState<string | null>(
+    null,
+  );
   const [threadSubscriptionPending, setThreadSubscriptionPending] = useState(false);
   const [loadingEarlierMessages, setLoadingEarlierMessages] = useState(false);
   const [threadLoading, setThreadLoading] = useState(false);
@@ -408,6 +414,7 @@ export function useChannelConversation({
       };
       setBusy(false);
       setAcceptingProposalId(null);
+      setDecliningProposalId(null);
       setThreadLoading(false);
       earlierMessagesPending.current = false;
       setLoadingEarlierMessages(false);
@@ -418,6 +425,7 @@ export function useChannelConversation({
   useEffect(() => {
     setBusy(false);
     setAcceptingProposalId(null);
+    setDecliningProposalId(null);
   }, [channelId, threadParentId]);
 
   useEffect(() => {
@@ -1505,6 +1513,61 @@ export function useChannelConversation({
     ],
   );
 
+  const declineProposal = useCallback(
+    async (item: ChannelMessage) => {
+      const activeId = channelIdRef.current;
+      const proposal = item.proposal;
+      if (
+        !activeId ||
+        item.channelId !== activeId ||
+        proposal?.actionType !== "request_issue_create" ||
+        proposal.status !== "pending"
+      ) return;
+      const declineContext = captureChannelSurface();
+      setBusy(true);
+      setDecliningProposalId(proposal.id);
+      setError(null);
+      try {
+        await dependenciesRef.current.declineChannelProposal(
+          token,
+          organizationId,
+          activeId,
+          proposal.id,
+        );
+        if (!channelSurfaceIsCurrent(declineContext)) return;
+        const applyDecline = (candidate: ChannelMessage): ChannelMessage =>
+          candidate.proposal?.id === proposal.id &&
+            candidate.proposal.status === "pending"
+            ? {
+                ...candidate,
+                proposal: { ...candidate.proposal, status: "declined" },
+              }
+            : candidate;
+        updateRootMessages((current) => current.map(applyDecline));
+        updateThreadMessages((current) => current.map(applyDecline));
+        recordProposalMessages([applyDecline(item)]);
+      } catch (cause) {
+        if (channelSurfaceIsCurrent(declineContext)) {
+          setError(channelConversationError(cause));
+        }
+      } finally {
+        if (channelSurfaceIsCurrent(declineContext)) {
+          setBusy(false);
+          setDecliningProposalId(null);
+        }
+      }
+    },
+    [
+      captureChannelSurface,
+      channelSurfaceIsCurrent,
+      organizationId,
+      recordProposalMessages,
+      token,
+      updateRootMessages,
+      updateThreadMessages,
+    ],
+  );
+
   const toggleReaction = useCallback(
     async (item: ChannelMessage, emoji: string) => {
       const activeId = channelIdRef.current;
@@ -1727,6 +1790,8 @@ export function useChannelConversation({
     channelSurfaceIsCurrent,
     clearProposalHistory,
     closeThread,
+    declineProposal,
+    decliningProposalId,
     error,
     invalidateChannelSurface,
     loadCreateExecutionProposalContext,

@@ -734,6 +734,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         enum Status: String, Codable, Hashable, Sendable {
             case pending
             case accepted
+            case declined
         }
     }
 }
@@ -1057,6 +1058,15 @@ struct AcceptChannelProposalResponse: Codable, Equatable, Sendable {
     enum Outcome: String, Codable, Equatable, Sendable {
         case accepted
         case alreadyAccepted = "already_accepted"
+    }
+}
+
+struct DeclineChannelProposalResponse: Codable, Equatable, Sendable {
+    let outcome: Outcome
+
+    enum Outcome: String, Codable, Equatable, Sendable {
+        case declined
+        case alreadyDeclined = "already_declined"
     }
 }
 
