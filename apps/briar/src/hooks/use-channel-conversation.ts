@@ -191,11 +191,39 @@ export function channelConversationError(cause: unknown) {
 export function mergeChannelReplies(
   current: ChannelAgentReply[],
   incoming: ChannelAgentReply[],
+  tombstones: ReadonlySet<string> = new Set(),
 ) {
   const byId = new Map(current.map((item) => [item.id, item]));
-  for (const item of incoming) byId.set(item.id, item);
+  for (const item of incoming) {
+    if (tombstones.has(item.id) && !channelReplyIsTerminal(item)) continue;
+    const previous = byId.get(item.id);
+    if (!previous || channelReplyShouldReplace(previous, item)) {
+      byId.set(item.id, item);
+    }
+  }
   return [...byId.values()];
 }
+
+const channelReplyIsTerminal = (reply: ChannelAgentReply) =>
+  reply.status === "completed" || reply.status === "failed";
+
+const channelReplyStatusRank = (reply: ChannelAgentReply) => {
+  if (channelReplyIsTerminal(reply)) return 2;
+  return reply.status === "running" ? 1 : 0;
+};
+
+const channelReplyShouldReplace = (
+  current: ChannelAgentReply,
+  incoming: ChannelAgentReply,
+) => {
+  const currentTerminal = channelReplyIsTerminal(current);
+  const incomingTerminal = channelReplyIsTerminal(incoming);
+  if (currentTerminal !== incomingTerminal) return incomingTerminal;
+  if (incoming.updatedAt !== current.updatedAt) {
+    return incoming.updatedAt > current.updatedAt;
+  }
+  return channelReplyStatusRank(incoming) > channelReplyStatusRank(current);
+};
 
 const channelAuthorId = (author: ChannelMessage["author"]) =>
   author.type === "user"
@@ -317,6 +345,10 @@ export function useChannelConversation({
   const earlierMessagesPending = useRef(false);
   const requestVersion = useRef(0);
   const messagesRef = useRef(messages);
+  const repliesRef = useRef(replies);
+  const replyTombstones = useRef(new Set<string>());
+  const replyVersions = useRef(new Map<string, number>());
+  const replyVersion = useRef(0);
   const messageNextCursorRef = useRef(messageNextCursor);
   const realtimeRef = useRef(realtime);
   const dependenciesRef = useRef(dependencies);
@@ -331,6 +363,12 @@ export function useChannelConversation({
   channelIdRef.current = channelId;
   threadParentIdRef.current = threadParentId;
   messagesRef.current = messages;
+  repliesRef.current = replies;
+  for (const reply of replies) {
+    if (!replyVersions.current.has(reply.id)) {
+      replyVersions.current.set(reply.id, replyVersion.current);
+    }
+  }
   messageNextCursorRef.current = messageNextCursor;
   realtimeRef.current = realtime;
   dependenciesRef.current = dependencies;
@@ -435,7 +473,20 @@ export function useChannelConversation({
   const applyAgentReplies = useCallback(
     (incoming: ChannelAgentReply[]) => {
       if (incoming.length === 0) return;
-      setReplies((current) => mergeChannelReplies(current, incoming));
+      for (const reply of incoming) {
+        replyVersion.current += 1;
+        replyVersions.current.set(reply.id, replyVersion.current);
+        if (channelReplyIsTerminal(reply)) replyTombstones.current.add(reply.id);
+      }
+      setReplies((current) => {
+        const next = mergeChannelReplies(
+          current,
+          incoming,
+          replyTombstones.current,
+        );
+        repliesRef.current = next;
+        return next;
+      });
       const failed = incoming.find(
         (reply) =>
           reply.channelId === channelIdRef.current && reply.status === "failed",
@@ -443,6 +494,57 @@ export function useChannelConversation({
       if (failed) setError(replyFailureMessage(failed));
     },
     [replyFailureMessage, setReplies],
+  );
+
+  const applyAuthoritativeAgentReplies = useCallback(
+    (
+      incoming: ChannelAgentReply[],
+      selectedChannelId: string,
+      observedReplyVersion: number,
+    ) => {
+      const authoritative = incoming.filter(
+        (reply) => reply.channelId === selectedChannelId,
+      );
+      const incomingIds = new Set(authoritative.map((reply) => reply.id));
+      const recordTombstones = (current: ChannelAgentReply[]) => {
+        for (const reply of current) {
+          if (
+            reply.channelId === selectedChannelId &&
+            (replyVersions.current.get(reply.id) ?? 0) <= observedReplyVersion &&
+            !incomingIds.has(reply.id)
+          ) {
+            replyTombstones.current.add(reply.id);
+          }
+        }
+        for (const reply of authoritative) {
+          if (channelReplyIsTerminal(reply)) replyTombstones.current.add(reply.id);
+        }
+      };
+      recordTombstones(repliesRef.current);
+      setReplies((current) => {
+        recordTombstones(current);
+        const concurrent = current.filter(
+          (reply) =>
+            reply.channelId === selectedChannelId &&
+            (replyVersions.current.get(reply.id) ?? 0) > observedReplyVersion,
+        );
+        const next = [
+          ...current.filter((reply) => reply.channelId !== selectedChannelId),
+          ...mergeChannelReplies(
+            mergeChannelReplies(
+              [],
+              authoritative,
+              replyTombstones.current,
+            ),
+            concurrent,
+            replyTombstones.current,
+          ),
+        ];
+        repliesRef.current = next;
+        return next;
+      });
+    },
+    [setReplies],
   );
 
   const applyIncomingMessages = useCallback(
@@ -646,6 +748,7 @@ export function useChannelConversation({
     }: LoadChannelConversationOptions) => {
       const context = captureChannelSurface();
       const version = ++requestVersion.current;
+      const observedReplyVersion = replyVersion.current;
       try {
         const result = await dependenciesRef.current.loadChannel(
           token,
@@ -662,7 +765,11 @@ export function useChannelConversation({
         onChannelLoaded?.(result.channel);
         setMembers(result.members);
         setAgents(result.agents);
-        applyAgentReplies(result.agentReplies ?? []);
+        applyAuthoritativeAgentReplies(
+          result.agentReplies ?? [],
+          requestedChannelId,
+          observedReplyVersion,
+        );
         recordProposalMessages(result.messages);
         const currentMessages = messagesRef.current;
         let appliedMessages = mergeWithCurrentMessages
@@ -750,7 +857,7 @@ export function useChannelConversation({
       }
     },
     [
-      applyAgentReplies,
+      applyAuthoritativeAgentReplies,
       captureChannelSurface,
       channelSurfaceIsCurrent,
       invalidateChannelSurface,

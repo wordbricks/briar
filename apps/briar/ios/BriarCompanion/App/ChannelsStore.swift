@@ -187,6 +187,7 @@ final class ChannelsStore: ObservableObject {
     private var skillExecutionProposalRevisions: [UUID: Int] = [:]
     private var latestSkillExecutionProposals: [UUID: AgentSkillExecutionProposal] = [:]
     private var skillExecutionProposalIDsByMessage: [UUID: UUID] = [:]
+    private var agentReplyTombstones: Set<UUID> = []
     private var isForeground = true
     private var changesRefreshRequested = false
     private var pollingTask: Task<Void, Never>?
@@ -236,6 +237,7 @@ final class ChannelsStore: ObservableObject {
         skillExecutionProposalRevisions = [:]
         latestSkillExecutionProposals = [:]
         skillExecutionProposalIDsByMessage = [:]
+        agentReplyTombstones = []
         focusedChannelID = nil
         focusedThreadParentID = nil
         nextMessageCursor = nil
@@ -380,6 +382,9 @@ final class ChannelsStore: ObservableObject {
         // Reply jobs are live execution state. A cached running job can finish
         // while another screen is open, so restoring it would replay a stale
         // typing indicator until the authoritative channel load completes.
+        let repliesBeforeAuthoritativeLoad = agentReplies.filter {
+            $0.channelId == channelID
+        }
         agentReplies = []
         if let cachedConversation {
             recordProposalMessages(cachedConversation.messages)
@@ -425,7 +430,11 @@ final class ChannelsStore: ObservableObject {
             hasEarlierMessages = nextMessageCursor != nil
             members = response.members
             agents = response.agents
-            agentReplies = response.agentReplies ?? []
+            replaceAgentReplies(
+                with: response.agentReplies ?? [],
+                channelID: channelID,
+                previous: repliesBeforeAuthoritativeLoad
+            )
             cacheFocusedConversation()
             errorMessage = nil
         } catch {
@@ -902,6 +911,7 @@ final class ChannelsStore: ObservableObject {
                 thread = Self.mergeMessages(thread, updates: [response.message], removing: [])
                 cacheFocusedThread()
             }
+            mergeAgentReplies(response.agentReplies)
             optimisticMessageIDs.remove(clientMessageID)
             errorMessage = nil
         } catch {
@@ -1959,9 +1969,7 @@ final class ChannelsStore: ObservableObject {
 
     private func apply(_ delta: ChannelDeltaResponse) {
         if let incomingReplies = delta.agentReplies {
-            var byID = Dictionary(uniqueKeysWithValues: agentReplies.map { ($0.id, $0) })
-            for reply in incomingReplies { byID[reply.id] = reply }
-            agentReplies = Array(byID.values)
+            mergeAgentReplies(incomingReplies)
         }
         let removedChannelIDs = Set(delta.removedChannelIds)
         var nextChannels = channels.filter { !removedChannelIDs.contains($0.id) }
@@ -2240,6 +2248,70 @@ final class ChannelsStore: ObservableObject {
             }
             return left.id.uuidString < right.id.uuidString
         }
+    }
+
+    private static func agentReplyIsTerminal(_ reply: ChannelAgentReply) -> Bool {
+        reply.status == .completed || reply.status == .failed
+    }
+
+    private static func agentReplyStatusRank(_ reply: ChannelAgentReply) -> Int {
+        if agentReplyIsTerminal(reply) { return 2 }
+        return reply.status == .running ? 1 : 0
+    }
+
+    private static func agentReplyShouldReplace(
+        current: ChannelAgentReply,
+        incoming: ChannelAgentReply
+    ) -> Bool {
+        let currentTerminal = agentReplyIsTerminal(current)
+        let incomingTerminal = agentReplyIsTerminal(incoming)
+        if currentTerminal != incomingTerminal { return incomingTerminal }
+        if incoming.updatedAt != current.updatedAt {
+            return incoming.updatedAt > current.updatedAt
+        }
+        return agentReplyStatusRank(incoming) > agentReplyStatusRank(current)
+    }
+
+    private func mergeAgentReplies(_ incoming: [ChannelAgentReply]) {
+        for reply in incoming where Self.agentReplyIsTerminal(reply) {
+            agentReplyTombstones.insert(reply.id)
+        }
+        var byID = Dictionary(uniqueKeysWithValues: agentReplies.map { ($0.id, $0) })
+        for reply in incoming {
+            if agentReplyTombstones.contains(reply.id),
+               !Self.agentReplyIsTerminal(reply) {
+                continue
+            }
+            if let current = byID[reply.id],
+               !Self.agentReplyShouldReplace(current: current, incoming: reply) {
+                continue
+            }
+            byID[reply.id] = reply
+        }
+        agentReplies = byID.values.sorted { $0.id.uuidString < $1.id.uuidString }
+    }
+
+    private func replaceAgentReplies(
+        with incoming: [ChannelAgentReply],
+        channelID: UUID,
+        previous: [ChannelAgentReply]
+    ) {
+        let authoritative = incoming.filter { $0.channelId == channelID }
+        let concurrent = agentReplies.filter { $0.channelId == channelID }
+        let incomingIDs = Set(authoritative.map(\.id))
+        for reply in previous where !incomingIDs.contains(reply.id) {
+            agentReplyTombstones.insert(reply.id)
+        }
+        for reply in authoritative where Self.agentReplyIsTerminal(reply) {
+            agentReplyTombstones.insert(reply.id)
+        }
+        agentReplies = authoritative
+            .filter {
+                !agentReplyTombstones.contains($0.id) ||
+                    Self.agentReplyIsTerminal($0)
+            }
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+        mergeAgentReplies(concurrent)
     }
 
     func typingStatuses(messageIDs: Set<UUID>) -> [AgentTypingStatus] {
