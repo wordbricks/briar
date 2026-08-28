@@ -125,7 +125,7 @@ export function IssuePropertyFilterMenu({
                         <DropdownMenu.ItemIndicator className="issue-property-filter-check">
                           <Check aria-hidden="true" size={13} />
                         </DropdownMenu.ItemIndicator>
-                        <span>{option.label}</span>
+                        <span className="issue-property-filter-choice-label">{option.label}</span>
                       </DropdownMenu.CheckboxItem>;
               })}
                 </DropdownMenu.SubContent>

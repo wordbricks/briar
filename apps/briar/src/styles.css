@@ -547,11 +547,12 @@ body { overflow: hidden; font-synthesis: none; }
 .issue-property-filter-heading { padding:7px 9px 6px; color:var(--muted-foreground); font-size:var(--text-2xs); font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
 .issue-property-filter-item { min-height:39px; padding:7px 8px; display:grid; grid-template-columns:20px minmax(0,1fr) auto 14px; align-items:center; gap:9px; border-radius:9px; outline:none; color:var(--popover-foreground); font-size:var(--text-sm); line-height:1.2; cursor:default; user-select:none; }
 .issue-property-filter-item > svg:first-child { color:var(--muted-foreground); }
-.issue-property-filter-item > span,.issue-property-filter-choice > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.issue-property-filter-item > span,.issue-property-filter-choice-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .issue-property-filter-item > small { min-width:18px; height:18px; padding:0 5px; display:grid; place-items:center; border-radius:999px; color:#654bb8; background:#eee9ff; font-size:var(--text-2xs); }
 .issue-property-filter-item[data-highlighted],.issue-property-filter-item[data-state="open"] { color:var(--accent-foreground); background:var(--accent); }
 .issue-property-filter-item[data-highlighted] > svg:first-child,.issue-property-filter-item[data-state="open"] > svg:first-child { color:var(--accent-foreground); }
 .issue-property-filter-choice { min-height:38px; padding:7px 9px; display:grid; grid-template-columns:18px minmax(0,1fr); align-items:center; gap:9px; border-radius:9px; outline:none; color:var(--popover-foreground); font-size:var(--text-sm); line-height:1.2; cursor:default; user-select:none; }
+.issue-property-filter-choice-label { grid-column:2; }
 .issue-property-filter-choice[data-highlighted],.issue-property-filter-clear[data-highlighted] { color:var(--accent-foreground); background:var(--accent); }
 .issue-property-filter-check { width:18px; height:18px; display:grid; place-items:center; color:#654bb8; }
 .issue-property-filter-separator { height:1px; margin:6px -6px; background:var(--border); }
