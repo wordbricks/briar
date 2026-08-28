@@ -962,6 +962,26 @@ struct CreateChannelMessageRequest: Codable, Sendable {
 
 struct CreateChannelMessageResponse: Codable, Sendable {
     let message: ChannelMessage
+    let agentReplies: [ChannelAgentReply]
+
+    init(message: ChannelMessage, agentReplies: [ChannelAgentReply] = []) {
+        self.message = message
+        self.agentReplies = agentReplies
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case message
+        case agentReplies
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        message = try container.decode(ChannelMessage.self, forKey: .message)
+        agentReplies = try container.decodeIfPresent(
+            [ChannelAgentReply].self,
+            forKey: .agentReplies
+        ) ?? []
+    }
 }
 
 struct ToggleChannelMessageReactionRequest: Codable, Sendable {

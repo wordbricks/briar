@@ -105,6 +105,24 @@ const message = (
   ...input,
 });
 
+const agentReply = (
+  id: string,
+  input: Partial<ChannelAgentReply> = {},
+): ChannelAgentReply => ({
+  id,
+  agentId: `agent-${id}`,
+  channelId: "channel-a",
+  triggerMessageId: "root",
+  parentMessageId: "root",
+  replyMessageId: `message-${id}`,
+  status: "queued",
+  attempts: 0,
+  error: null,
+  createdAt: "2026-08-01T01:00:00.000Z",
+  updatedAt: "2026-08-01T01:00:00.000Z",
+  ...input,
+});
+
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
   let reject!: (cause: unknown) => void;
@@ -128,18 +146,22 @@ let latest: Conversation | null = null;
 function Harness({
   activeChannel,
   initialMessages = [],
+  initialReplies = [],
   initialNextCursor = null,
   realtimeEnabled = false,
 }: {
   activeChannel: ChannelSummary;
   initialMessages?: ChannelMessage[];
+  initialReplies?: ChannelAgentReply[];
   initialNextCursor?: string | null;
   realtimeEnabled?: boolean;
 }) {
   const [members, setMembers] = React.useState<ChannelMember[]>([member]);
   const [agents, setAgents] = React.useState<ChannelAgentSummary[]>([]);
   const [messages, setMessages] = React.useState(initialMessages);
-  const [replies, setReplies] = React.useState<ChannelAgentReply[]>([]);
+  const [replies, setReplies] = React.useState<ChannelAgentReply[]>(
+    initialReplies,
+  );
   const [threadParentId, setThreadParentId] = React.useState<string | null>(null);
   const [threadMessages, setThreadMessages] = React.useState<ChannelMessage[]>([]);
   const [messageNextCursor, setMessageNextCursor] = React.useState<string | null>(
@@ -318,6 +340,139 @@ describe("useChannelConversation", () => {
       expect.any(AbortSignal),
     );
     expect(current().messages.map((item) => item.id)).toEqual(["realtime"]);
+  });
+
+  it("replaces active replies from an authoritative detail and tombstones absences", async () => {
+    const stale = agentReply("reply-a", { status: "running" });
+    api.loadChannel.mockResolvedValueOnce({
+      channel: channel("channel-a"),
+      members: [member],
+      agents: [],
+      messages: [message("root")],
+      agentReplies: [],
+      nextCursor: null,
+    });
+    ({ cleanup, root } = await renderHarness({
+      activeChannel: channel("channel-a"),
+      initialReplies: [stale],
+    }));
+
+    await act(async () => {
+      await current().loadChannelConversation({
+        channelId: "channel-a",
+        messageLimit: 20,
+        mergeWithCurrentMessages: false,
+      });
+    });
+    expect(current().replies).toEqual([]);
+
+    act(() => current().applyAgentReplies([
+      { ...stale, updatedAt: "2026-08-01T03:00:00.000Z" },
+    ]));
+    expect(current().replies).toEqual([]);
+  });
+
+  it("preserves a reply first observed while an older detail request is loading", async () => {
+    const pending = deferred<Awaited<ReturnType<typeof import("../lib/api").loadChannel>>>();
+    const concurrent = agentReply("reply-new", { status: "queued" });
+    api.loadChannel.mockReturnValueOnce(pending.promise);
+    ({ cleanup, root } = await renderHarness({
+      activeChannel: channel("channel-a"),
+    }));
+
+    let request!: ReturnType<Conversation["loadChannelConversation"]>;
+    await act(async () => {
+      request = current().loadChannelConversation({
+        channelId: "channel-a",
+        messageLimit: 20,
+        mergeWithCurrentMessages: false,
+      });
+      await Promise.resolve();
+    });
+    act(() => current().applyAgentReplies([concurrent]));
+    await act(async () => pending.resolve({
+      channel: channel("channel-a"),
+      members: [member],
+      agents: [],
+      messages: [message("root")],
+      agentReplies: [],
+      nextCursor: null,
+    }));
+    await act(async () => request);
+
+    expect(current().replies).toEqual([concurrent]);
+  });
+
+  it("keeps a terminal delta when an older send response arrives later", async () => {
+    const pending = deferred<Awaited<ReturnType<typeof import("../lib/api").sendChannelMessage>>>();
+    const completed = agentReply("reply-a", {
+      status: "completed",
+      updatedAt: "2026-08-01T02:00:00.000Z",
+    });
+    api.sendChannelMessage.mockReturnValueOnce(pending.promise);
+    api.loadChannelDelta.mockResolvedValueOnce({
+      cursor: 1,
+      hasMore: false,
+      channels: [],
+      removedChannelIds: [],
+      messages: [],
+      removedMessageIds: [],
+      agentReplies: [completed],
+    });
+    ({ cleanup, root } = await renderHarness({
+      activeChannel: channel("channel-a"),
+      realtimeEnabled: true,
+    }));
+
+    let request!: ReturnType<Conversation["send"]>;
+    await act(async () => {
+      request = current().send("hello", [], null, [], []);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      realtimeTransport.emit({ topic: "channels", cursor: 1 });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(current().replies).toEqual([completed]);
+
+    const optimisticId = current().messages[0]!.id;
+    await act(async () => pending.resolve({
+      message: message(optimisticId, { body: "hello" }),
+      agentReplies: [agentReply("reply-a", {
+        status: "queued",
+        updatedAt: "2026-08-01T03:00:00.000Z",
+      })],
+    }));
+    await act(async () => request);
+    expect(current().replies).toEqual([completed]);
+  });
+
+  it("keeps only the other Agent active after one of concurrent replies completes", async () => {
+    const first = agentReply("reply-a", {
+      agentId: "agent-a",
+      status: "running",
+    });
+    const second = agentReply("reply-b", {
+      agentId: "agent-b",
+      status: "running",
+      updatedAt: "2026-08-01T02:00:00.000Z",
+    });
+    ({ cleanup, root } = await renderHarness({
+      activeChannel: channel("channel-a"),
+      initialReplies: [first, second],
+    }));
+
+    act(() => current().applyAgentReplies([
+      { ...first, status: "completed", updatedAt: "2026-08-01T02:00:00.000Z" },
+      { ...second, status: "queued", updatedAt: "2026-08-01T01:00:00.000Z" },
+    ]));
+
+    expect(current().replies.filter(
+      (reply) => reply.status === "queued" || reply.status === "running",
+    ).map((reply) => reply.id)).toEqual(["reply-b"]);
+    expect(current().replies.find((reply) => reply.id === "reply-b")?.status)
+      .toBe("running");
   });
 
   it("loads a thread snapshot and keeps its root/replies together", async () => {
