@@ -5572,6 +5572,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
   font-size: 12px;
 }
 .channel-proposal-card button:disabled { opacity: .4; }
+.channel-proposal-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.channel-proposal-card .channel-proposal-create-button,
+.companion-channel-proposal .channel-proposal-create-button { color:var(--primary-foreground,#fff); background:var(--primary,#5b43aa); }
+.channel-proposal-card .channel-proposal-decline-button,
+.companion-channel-proposal .channel-proposal-decline-button { border:1px solid color-mix(in srgb,var(--destructive,#c33) 35%,var(--border,#ddd8cf)); color:var(--destructive,#c33); background:transparent; }
 
 .channel-typing {
   display: flex;

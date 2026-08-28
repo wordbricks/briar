@@ -82,7 +82,7 @@ export type ChannelMessageRow = {
   document_project_id: string | null;
   proposal_id: string | null;
   proposal_action_type: ChannelActionType | null;
-  proposal_status: "pending" | "accepted" | null;
+  proposal_status: "pending" | "accepted" | "declined" | null;
   proposal_project_id: string | null;
   proposal_payload_json: string | null;
   proposal_execute_after_create: number | null;
@@ -401,7 +401,10 @@ const messageSelect = (
          document.project_id as document_project_id,
          proposal.id as proposal_id,
          proposal.action_type as proposal_action_type,
-         proposal.status as proposal_status,
+         case
+           when proposal.declined_at is not null then 'declined'
+           else proposal.status
+         end as proposal_status,
          proposal.project_id as proposal_project_id,
          proposal.payload_json as proposal_payload_json,
          proposal.result_run_id as proposal_result_run_id,
@@ -5044,7 +5047,7 @@ export async function getChannelActionProposal(
   channelId: string,
   proposalId: string,
 ) {
-  return db
+  const proposal = await db
     .prepare(
       `select proposal.*,
               reply.parent_message_id as reply_parent_message_id,
@@ -5081,6 +5084,50 @@ export async function getChannelActionProposal(
       reply_author_agent_project_id: string | null;
       created_at: string;
       updated_at: string;
+      declined_by_user_id: string | null;
+      declined_at: string | null;
+    }>();
+  return proposal
+    ? {
+        ...proposal,
+        status: proposal.declined_at
+          ? "declined" as const
+          : proposal.status,
+      }
+    : null;
+}
+
+export async function declineChannelActionProposal(
+  db: D1Database,
+  input: {
+    channelId: string;
+    proposalId: string;
+    userId: string;
+    declinedAt: string;
+  },
+) {
+  return db
+    .prepare(
+      `update briar_channel_action_proposals
+       set declined_by_user_id = ?, declined_at = ?, updated_at = ?
+       where id = ? and channel_id = ? and status = 'pending'
+         and action_type = 'request_issue_create'
+         and declined_by_user_id is null and declined_at is null
+         and accepted_by_user_id is null and accepted_at is null
+         and issue_source_key is null
+       returning id, declined_by_user_id, declined_at`,
+    )
+    .bind(
+      input.userId,
+      input.declinedAt,
+      input.declinedAt,
+      input.proposalId,
+      input.channelId,
+    )
+    .first<{
+      id: string;
+      declined_by_user_id: string;
+      declined_at: string;
     }>();
 }
 

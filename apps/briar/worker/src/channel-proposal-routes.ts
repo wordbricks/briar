@@ -21,6 +21,7 @@ import {
   channelIssueBatchProposalTablesAvailable,
   channelSkillExecutionProposalTablesAvailable,
   getChannelActionProposal,
+  declineChannelActionProposal,
   getChannelAgentSkillExecutionProposal,
   getChannelExecutionProposal,
   getOrganizationProject,
@@ -323,6 +324,52 @@ export async function handleChannelProposalRoute(
   const { request, url, auth, db, env } = routeInput;
   const { pathname } = url;
 
+  const channelProposalDeclineMatch = pathname.match(
+    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/proposals\/([0-9a-f-]+)\/decline$/u,
+  );
+  if (channelProposalDeclineMatch && request.method === "POST") {
+    const session = await requireSession(auth, request);
+    const channel = await requireChannelAccess(
+      db,
+      channelProposalDeclineMatch[1],
+      channelProposalDeclineMatch[2],
+      session.user.id,
+    );
+    const proposal = await getChannelActionProposal(
+      db,
+      channel.id,
+      channelProposalDeclineMatch[3],
+    );
+    if (!proposal) throw new HttpError(404, "Proposal not found");
+    if (proposal.action_type !== "request_issue_create") {
+      throw new HttpError(409, "This proposal cannot be declined");
+    }
+    if (proposal.status === "accepted") {
+      throw new HttpError(409, "Accepted proposals cannot be declined");
+    }
+    if (proposal.status === "declined") {
+      return json({ outcome: "already_declined" as const });
+    }
+    const declined = await declineChannelActionProposal(db, {
+      channelId: channel.id,
+      proposalId: proposal.id,
+      userId: session.user.id,
+      declinedAt: new Date().toISOString(),
+    });
+    if (!declined) {
+      const current = await getChannelActionProposal(
+        db,
+        channel.id,
+        proposal.id,
+      );
+      if (current?.status === "declined") {
+        return json({ outcome: "already_declined" as const });
+      }
+      throw new HttpError(409, "Proposal changed");
+    }
+    return json({ outcome: "declined" as const });
+  }
+
   const channelProposalAcceptMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/proposals\/([0-9a-f-]+)\/accept$/u,
   );
@@ -342,6 +389,9 @@ export async function handleChannelProposalRoute(
     if (!proposal) throw new HttpError(404, "Proposal not found");
     if (proposal.action_type !== "request_issue_create") {
       throw new HttpError(409, "This proposal cannot create an issue");
+    }
+    if (proposal.status === "declined") {
+      throw new HttpError(409, "Declined proposals cannot create an issue");
     }
     assertChannelProposalAuthorScope({
       channelOrganizationId: channel.organization_id,

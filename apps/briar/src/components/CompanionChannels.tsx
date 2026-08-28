@@ -441,6 +441,8 @@ export function CompanionChannels({
     channelSurfaceIsCurrent,
     clearProposalHistory,
     closeThread: closeConversationThread,
+    declineProposal,
+    decliningProposalId,
     error,
     invalidateChannelSurface,
     loadCreateExecutionProposalContext,
@@ -898,6 +900,7 @@ export function CompanionChannels({
             {(thread ?? []).map((item) => (
             <MessageRow
               acceptingProposal={acceptingProposalId === item.proposal?.id}
+              decliningProposal={decliningProposalId === item.proposal?.id}
               agents={agents}
               busy={busy}
               channel={channel}
@@ -908,6 +911,7 @@ export function CompanionChannels({
               message={item}
               onAcceptProposal={(input) =>
                 acceptProposal(item, input ?? null)}
+              onDeclineProposal={() => declineProposal(item)}
               loadCreateExecutionProposalContext={
                 loadCreateExecutionProposalContext
               }
@@ -1005,6 +1009,7 @@ export function CompanionChannels({
             {messages.map((item) => (
             <MessageRow
               acceptingProposal={acceptingProposalId === item.proposal?.id}
+              decliningProposal={decliningProposalId === item.proposal?.id}
               agents={agents}
               busy={busy}
               channel={channel}
@@ -1015,6 +1020,7 @@ export function CompanionChannels({
               message={item}
               onAcceptProposal={(input) =>
                 acceptProposal(item, input ?? null)}
+              onDeclineProposal={() => declineProposal(item)}
               loadCreateExecutionProposalContext={
                 loadCreateExecutionProposalContext
               }
@@ -1222,6 +1228,7 @@ const companionReplyRelativeTime = (
 
 function MessageRow({
   acceptingProposal,
+  decliningProposal,
   agents,
   busy,
   channel,
@@ -1233,6 +1240,7 @@ function MessageRow({
   members,
   message,
   onAcceptProposal,
+  onDeclineProposal,
   onAcceptExecutionProposal,
   onAcceptSkillExecutionProposal,
   onExecutionProposalAccepted,
@@ -1251,6 +1259,7 @@ function MessageRow({
   showTypingState = true,
 }: {
   acceptingProposal: boolean;
+  decliningProposal: boolean;
   agents: ChannelAgentSummary[];
   busy: boolean;
   channel: ChannelSummary;
@@ -1275,6 +1284,7 @@ function MessageRow({
   onAcceptProposal: (
     input?: IssueExecutionApprovalInput,
   ) => Promise<string | null | undefined>;
+  onDeclineProposal: () => void | Promise<void>;
   onAcceptExecutionProposal: (
     input: IssueExecutionApprovalInput,
   ) => Promise<ChannelExecutionProposal>;
@@ -1389,7 +1399,9 @@ function MessageRow({
               <span>
                 {issueProposal.status === "accepted"
                   ? t("channel.issueProposalAccepted")
-                  : t("channel.issueProposalPending")}
+                  : issueProposal.status === "declined"
+                    ? t("channel.issueProposalDeclined")
+                    : t("channel.issueProposalPending")}
               </span>
               <ChannelIssueProposalDetails
                 projectName={proposalProjectName}
@@ -1416,6 +1428,8 @@ function MessageRow({
             {requestsExecution && proposalProjectId && proposalIssue ? (
               <>
                 <IssueCreateExecutionApproval
+                  creating={acceptingProposal}
+                  declining={decliningProposal}
                   disabledReason={channel.archivedAt
                     ? t("executionApproval.archived")
                     : busy && !acceptingProposal
@@ -1426,6 +1440,8 @@ function MessageRow({
                   loadExecutionContext={() =>
                     loadCreateExecutionProposalContext(proposalProjectId)}
                   onAccept={(input) => onAcceptProposal(input)}
+                  onCreate={() => onAcceptProposal()}
+                  onDecline={onDeclineProposal}
                   projectName={proposalProjectName}
                   proposalId={issueProposal.id}
                   targetTitle={proposalIssue.title}
@@ -1444,29 +1460,42 @@ function MessageRow({
                 ) : null}
               </>
             ) : issueProposal.status === "pending" ? (
-              <button
-                aria-busy={acceptingProposal}
-                className="channel-proposal-approve-button"
-                disabled={
-                  busy || Boolean(channel.archivedAt) ||
-                  !proposalProjectId || !proposalValid
-                }
-                onClick={() => void onAcceptProposal()}
-                type="button"
-              >
-                {acceptingProposal ? (
-                  <>
-                    <Spinner aria-hidden="true" size={15} />
-                    {t("channel.creatingIssue")}
-                  </>
-                ) : (
-                  proposalBatch
-                    ? t("channel.approveCreateIssueBatch", {
-                        count: proposalBatch.items.length,
-                      })
-                    : t("channel.approveCreateIssue")
-                )}
-              </button>
+              <div className="channel-proposal-actions">
+                <button
+                  aria-busy={acceptingProposal}
+                  className="channel-proposal-approve-button"
+                  disabled={
+                    busy || Boolean(channel.archivedAt) ||
+                    !proposalProjectId || !proposalValid
+                  }
+                  onClick={() => void onAcceptProposal()}
+                  type="button"
+                >
+                  {acceptingProposal ? (
+                    <>
+                      <Spinner aria-hidden="true" size={15} />
+                      {t("channel.creatingIssue")}
+                    </>
+                  ) : (
+                    proposalBatch
+                      ? t("channel.approveCreateIssueBatch", {
+                          count: proposalBatch.items.length,
+                        })
+                      : t("channel.approveCreateIssue")
+                  )}
+                </button>
+                <button
+                  aria-busy={decliningProposal}
+                  className="channel-proposal-decline-button"
+                  disabled={busy || Boolean(channel.archivedAt)}
+                  onClick={() => void onDeclineProposal()}
+                  type="button"
+                >
+                  {decliningProposal
+                    ? t("channel.decliningIssueProposal")
+                    : t("channel.declineIssueProposal")}
+                </button>
+              </div>
             ) : acceptedProjectId && acceptedRunId && !proposalBatch &&
               onIssueOpen ? (
               <button

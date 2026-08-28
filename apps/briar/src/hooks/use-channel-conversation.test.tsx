@@ -23,6 +23,7 @@ import {
 
 const api = {
   acceptChannelProposal: vi.fn(),
+  declineChannelProposal: vi.fn(),
   listChannelMessages: vi.fn(),
   loadChannel: vi.fn(),
   loadChannelDelta: vi.fn(),
@@ -46,6 +47,7 @@ const realtimeTransport = new FakeRealtimeTransport();
 const dependencies = {
   ...defaultChannelConversationDependencies,
   acceptChannelProposal: api.acceptChannelProposal,
+  declineChannelProposal: api.declineChannelProposal,
   listChannelMessages: api.listChannelMessages,
   loadChannel: api.loadChannel,
   loadChannelDelta: api.loadChannelDelta,
@@ -615,6 +617,44 @@ describe("useChannelConversation", () => {
       status: "accepted",
       resultRunId: "run-1",
     });
+  });
+
+  it("marks a declined proposal terminal on the unchanged surface", async () => {
+    const proposalMessage = message("proposal", {
+      proposal: {
+        id: "proposal-1",
+        actionType: "request_issue_create",
+        status: "pending",
+        projectId: "project-1",
+        payload: {
+          issue: {
+            title: "Follow-up",
+            description: null,
+            priority: 2,
+            status: "backlog",
+          },
+          executeAfterCreate: true,
+        },
+        resultRunId: null,
+      },
+    });
+    api.declineChannelProposal.mockResolvedValueOnce({ outcome: "declined" });
+    ({ cleanup, root } = await renderHarness({
+      activeChannel: channel("channel-a"),
+      initialMessages: [proposalMessage],
+    }));
+    act(() => current().recordProposalMessages([proposalMessage]));
+
+    await act(async () => current().declineProposal(proposalMessage));
+
+    expect(api.declineChannelProposal).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-a",
+      "proposal-1",
+    );
+    expect(current().messages[0]?.proposal?.status).toBe("declined");
+    expect(current().decliningProposalId).toBeNull();
   });
 
   it("ignores a late proposal success after switching channels", async () => {

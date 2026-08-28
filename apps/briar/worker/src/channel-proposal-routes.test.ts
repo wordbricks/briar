@@ -328,6 +328,17 @@ describe("channel issue proposal approval route", () => {
       },
     );
 
+  const declineRequest = (
+    proposalId: string,
+    token: string | null = ownerToken,
+  ) => new Request(
+    `https://briar.example/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/decline`,
+    {
+      method: "POST",
+      headers: token ? { authorization: `Bearer ${token}` } : undefined,
+    },
+  );
+
   const seedProposal = async (
     sequence: number,
     options: {
@@ -403,6 +414,51 @@ describe("channel issue proposal approval route", () => {
     `source = 'issue'
      and json_extract(context_json, '$.origin') = 'briar-channel'
      and json_extract(context_json, '$.proposalId') = ?`;
+
+  it("persists a decline and prevents later issue creation", async () => {
+    const proposalId = await seedProposal(200, { executeAfterCreate: true });
+    const beforeDecline = await getChannelSyncCursor(db, organizationId);
+
+    const declined = await worker.fetch(declineRequest(proposalId), env());
+    expect(declined.status).toBe(200);
+    await expect(declined.json()).resolves.toEqual({ outcome: "declined" });
+
+    const retried = await worker.fetch(declineRequest(proposalId), env());
+    expect(retried.status).toBe(200);
+    await expect(retried.json()).resolves.toEqual({
+      outcome: "already_declined",
+    });
+
+    await expect(db.prepare(
+      `select status, declined_by_user_id, declined_at, result_run_id
+       from briar_channel_action_proposals where id = ?`,
+    ).bind(proposalId).first()).resolves.toMatchObject({
+      status: "pending",
+      declined_by_user_id: ownerId,
+      declined_at: expect.any(String),
+      result_run_id: null,
+    });
+
+    const delta = await loadChannelDelta(
+      db,
+      organizationId,
+      ownerId,
+      beforeDecline,
+    );
+    expect(
+      delta.messages.find((message) => message.proposal?.id === proposalId)
+        ?.proposal?.status,
+    ).toBe("declined");
+
+    const acceptDeclined = await worker.fetch(
+      request(proposalId, projectAId),
+      env(),
+    );
+    expect(acceptDeclined.status).toBe(409);
+    await expect(db.prepare(
+      `select count(*) as count from briar_hunt_runs where ${proposalRunWhere}`,
+    ).bind(proposalId).first()).resolves.toEqual({ count: 0 });
+  });
 
   const seedConversationProposal = async (sequence: number) => {
     const suffix = sequence.toString(16).padStart(12, "0");

@@ -1454,6 +1454,14 @@
         }
       }
     },
+    "declineChannelProposal": {
+      "method": "POST",
+      "path": "/organizations/{organizationId}/channels/{channelId}/proposals/{proposalId}/decline",
+      "status": 200,
+      "response": {
+        "outcome": "declined"
+      }
+    },
     "acceptChannelSkillExecutionProposal": {
       "method": "POST",
       "path": "/organizations/{organizationId}/channels/{channelId}/skill-execution-proposals/{proposalId}/accept",
