@@ -100,6 +100,41 @@ describe("ProjectAgentSkillsEditor", () => {
     expect(onChange).toHaveBeenCalledWith([]);
   });
 
+  it("does not expose provider, model, or effort controls for conversation Skills", async () => {
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    mounted.push({ cleanup });
+
+    await renderReactTestRoot(
+      root,
+      <ProjectAgentSkillsEditor
+        defaultEffort="high"
+        defaultModel="gpt-5.6-sol"
+        defaultProvider="codex"
+        onChange={vi.fn()}
+        skills={[{
+          id: "conversation-skill-1",
+          name: "대화 스킬",
+          description: "현재 대화에서 실행합니다.",
+          body: "현재 대화의 설정을 사용합니다.",
+          provider: "codex",
+          model: "gpt-5.6-sol",
+          effort: "high",
+          kind: "custom",
+          executionMode: "conversation",
+          approvalPolicy: "explicit",
+          position: 0,
+        }]}
+      />,
+    );
+
+    expect(container.querySelector('button[aria-label*="프로바이더"]')).toBeNull();
+    expect(container.querySelector('button[aria-label*="모델"]')).toBeNull();
+    expect(container.querySelector('button[aria-label*="Effort"]')).toBeNull();
+    expect(container.querySelector('button[aria-label*="실행 위치"]')).not.toBeNull();
+  });
+
   it("enforces description/body limits and rejects a sixth Skill", async () => {
     const skills = Array.from({ length: agentSkillsMaxCount }, (_, index) => ({
       id: `skill-${index}`,
