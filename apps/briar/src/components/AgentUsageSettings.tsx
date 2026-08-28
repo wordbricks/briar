@@ -26,9 +26,11 @@ import {
   tightestUsageWindow,
   quotaUsageProviderLabel,
   quotaUsageProviders,
-  type AgentUsageProvider,
-  type AgentUsageSnapshot,
 } from "../lib/agent-usage";
+import type {
+  AgentUsageSnapshot,
+  ProviderUsage,
+} from "../generated/tauri";
 import {
   aggregateAgentUsageOverview,
   type UsageAttribution,
@@ -436,7 +438,7 @@ function DailyUsageChart({
   );
 }
 
-function ProviderLimitRow({ provider }: { provider: AgentUsageProvider }) {
+function ProviderLimitRow({ provider }: { provider: ProviderUsage }) {
   const { t } = useI18n();
   const window = tightestUsageWindow(provider);
   const percentage = window ? Math.round(window.usedPercent) : null;

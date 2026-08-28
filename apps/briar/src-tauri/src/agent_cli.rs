@@ -870,18 +870,31 @@ pub(super) fn connected_agent_provider(
     })
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub(super) enum AgentLoginProvider {
+    Codex,
+    Claude,
+    Cursor,
+    Grok,
+    Agy,
+    Opencode,
+}
+
 pub(super) fn provider_login_binary_and_args(
     home: &Path,
-    provider: &str,
+    provider: AgentLoginProvider,
 ) -> Result<(PathBuf, Vec<&'static str>), String> {
     let execution_path = cli_execution_path(home)?;
     match provider {
-        "codex" => Ok((agent::codex_binary(home, &execution_path)?, vec!["login"])),
-        "claude" => Ok((
+        AgentLoginProvider::Codex => {
+            Ok((agent::codex_binary(home, &execution_path)?, vec!["login"]))
+        }
+        AgentLoginProvider::Claude => Ok((
             agent::claude_binary(home, &execution_path)?,
             vec!["auth", "login", "--claudeai"],
         )),
-        "cursor" => {
+        AgentLoginProvider::Cursor => {
             let cursor_binary = agent::cursor_binary(home, &execution_path)?;
             let sibling = cursor_binary.with_file_name(if cfg!(target_os = "windows") {
                 "agent.exe"
@@ -896,13 +909,12 @@ pub(super) fn provider_login_binary_and_args(
             })?;
             Ok((login_binary, vec!["login"]))
         }
-        "grok" => Ok((agent::grok_binary(home, &execution_path)?, vec!["login"])),
-        "agy" => Ok((agent::agy_binary(home, &execution_path)?, vec![])),
-        "opencode" => Ok((
+        AgentLoginProvider::Grok => Ok((agent::grok_binary(home, &execution_path)?, vec!["login"])),
+        AgentLoginProvider::Agy => Ok((agent::agy_binary(home, &execution_path)?, vec![])),
+        AgentLoginProvider::Opencode => Ok((
             agent::opencode_binary(home, &execution_path)?,
             vec!["auth", "login"],
         )),
-        _ => Err("지원하지 않는 Agent 프로바이더입니다.".to_string()),
     }
 }
 
@@ -983,15 +995,28 @@ pub(super) fn open_provider_login_terminal(_binary: &Path, _args: &[&str]) -> Re
 #[specta::specta]
 pub(super) async fn open_agent_provider_login(
     app: tauri::AppHandle,
-    provider: String,
+    provider: AgentLoginProvider,
 ) -> Result<(), String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let (binary, args) = provider_login_binary_and_args(&home, &provider)?;
+        let (binary, args) = provider_login_binary_and_args(&home, provider)?;
         open_provider_login_terminal(&binary, &args)
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub(super) enum OnboardingPrerequisite {
+    Git,
+    Codex,
+    Claude,
+    Cursor,
+    Grok,
+    Agy,
+    Opencode,
+    Openrouter,
 }
 
 #[tauri::command]
@@ -1347,34 +1372,35 @@ pub(super) fn install_agy_cli(home: &Path) -> Result<(), String> {
 #[specta::specta]
 pub(super) async fn install_onboarding_prerequisite(
     app: tauri::AppHandle,
-    prerequisite: String,
+    prerequisite: OnboardingPrerequisite,
 ) -> Result<OnboardingPrerequisites, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        match prerequisite.as_str() {
-            "git" => install_brew_package(&home, "git")?,
-            "codex" => install_cli_package(&home, "@openai/codex")?,
-            "claude" => install_cli_package(&home, "@anthropic-ai/claude-code")?,
-            "cursor" => install_cursor_cli(&home)?,
-            "grok" => install_grok_cli(&home)?,
-            "agy" => install_agy_cli(&home)?,
-            "opencode" => install_cli_package(&home, "opencode-ai")?,
-            "openrouter" => install_cli_package(&home, "opencode-ai")?,
-            _ => return Err("지원하지 않는 필수 도구입니다.".to_string()),
+        match prerequisite {
+            OnboardingPrerequisite::Git => install_brew_package(&home, "git")?,
+            OnboardingPrerequisite::Codex => install_cli_package(&home, "@openai/codex")?,
+            OnboardingPrerequisite::Claude => {
+                install_cli_package(&home, "@anthropic-ai/claude-code")?
+            }
+            OnboardingPrerequisite::Cursor => install_cursor_cli(&home)?,
+            OnboardingPrerequisite::Grok => install_grok_cli(&home)?,
+            OnboardingPrerequisite::Agy => install_agy_cli(&home)?,
+            OnboardingPrerequisite::Opencode | OnboardingPrerequisite::Openrouter => {
+                install_cli_package(&home, "opencode-ai")?
+            }
         }
         let configured = openrouter_api_key_from(&config_path)?.is_some();
         let prerequisites = inspect_onboarding_prerequisites_sync(&home, configured);
-        let installed = match prerequisite.as_str() {
-            "git" => prerequisites.git.installed,
-            "codex" => prerequisites.codex.installed,
-            "claude" => prerequisites.claude.installed,
-            "cursor" => prerequisites.cursor.installed,
-            "grok" => prerequisites.grok.installed,
-            "agy" => prerequisites.agy.installed,
-            "opencode" => prerequisites.opencode.installed,
-            "openrouter" => prerequisites.openrouter.installed,
-            _ => false,
+        let installed = match prerequisite {
+            OnboardingPrerequisite::Git => prerequisites.git.installed,
+            OnboardingPrerequisite::Codex => prerequisites.codex.installed,
+            OnboardingPrerequisite::Claude => prerequisites.claude.installed,
+            OnboardingPrerequisite::Cursor => prerequisites.cursor.installed,
+            OnboardingPrerequisite::Grok => prerequisites.grok.installed,
+            OnboardingPrerequisite::Agy => prerequisites.agy.installed,
+            OnboardingPrerequisite::Opencode => prerequisites.opencode.installed,
+            OnboardingPrerequisite::Openrouter => prerequisites.openrouter.installed,
         };
         if !installed {
             return Err(

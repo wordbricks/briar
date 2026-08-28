@@ -67,15 +67,16 @@ import {
 import {
   loadAgentUsage,
   openAgentProviderLogin,
-  type AgentUsageProvider,
-  type AgentUsageSnapshot,
 } from "../lib/agent-usage";
 import type {
+  AgentLoginProvider,
+  AgentUsageSnapshot,
   AppProviderSettings,
   AppRuntimeSettings,
   OnboardingPrerequisites,
   OpenCodeTerminalPathStatus,
   OpenRouterCredentialStatus,
+  ProviderUsage,
   RepositoryReadiness,
 } from "../generated/tauri";
 import {
@@ -371,7 +372,7 @@ export function AppSettings({
       })),
   });
 
-  const openProviderLogin = async (provider: AgentProvider) => {
+  const openProviderLogin = async (provider: AgentLoginProvider) => {
     if (providerLoginOpening) return;
     setProviderLoginOpening(provider);
     setProviderError(null);
@@ -1739,7 +1740,7 @@ function ProviderDetails({
   onLogin: () => void;
   onToggleFavorite: (model: string) => void;
   providerName: string;
-  usage?: AgentUsageProvider;
+  usage?: ProviderUsage;
 }) {
   const { t } = useI18n();
   const connected = Boolean(installed && authenticated);

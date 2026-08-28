@@ -17,15 +17,15 @@ export const commands = {
 	inspectAgentBrowser: () => __TAURI_INVOKE<AgentBrowserStatus>("inspect_agent_browser"),
 	inspectAsideBrowser: () => __TAURI_INVOKE<AsideBrowserStatus>("inspect_aside_browser"),
 	inspectEgoBrowser: () => __TAURI_INVOKE<EgoBrowserStatus>("inspect_ego_browser"),
-	openAgentProviderLogin: (provider: string) => __TAURI_INVOKE<null>("open_agent_provider_login", { provider }),
-	installOnboardingPrerequisite: (prerequisite: string) => __TAURI_INVOKE<OnboardingPrerequisites>("install_onboarding_prerequisite", { prerequisite }),
+	openAgentProviderLogin: (provider: AgentLoginProvider) => __TAURI_INVOKE<null>("open_agent_provider_login", { provider }),
+	installOnboardingPrerequisite: (prerequisite: OnboardingPrerequisite) => __TAURI_INVOKE<OnboardingPrerequisites>("install_onboarding_prerequisite", { prerequisite }),
 	installAgentBrowser: () => __TAURI_INVOKE<AgentBrowserStatus>("install_agent_browser"),
 	setupAsideBrowser: () => __TAURI_INVOKE<AsideBrowserStatus>("setup_aside_browser"),
 	readSessionToken: () => __TAURI_INVOKE<string | null>("read_session_token"),
 	writeSessionToken: (token: string) => __TAURI_INVOKE<null>("write_session_token", { token }),
 	clearSessionToken: () => __TAURI_INVOKE<null>("clear_session_token"),
-	currentAppIcon: () => __TAURI_INVOKE<string>("current_app_icon"),
-	setAppIcon: (icon: string) => __TAURI_INVOKE<null>("set_app_icon", { icon }),
+	currentAppIcon: () => __TAURI_INVOKE<AppIconName>("current_app_icon"),
+	setAppIcon: (icon: AppIconName) => __TAURI_INVOKE<null>("set_app_icon", { icon }),
 	setAppBadgeCount: (count: number) => __TAURI_INVOKE<null>("set_app_badge_count", { count }),
 	validateRepositoryPath: (path: string) => __TAURI_INVOKE<string>("validate_repository_path", { path }),
 	cloneGithubSshRepository: (repositoryUrl: string) => __TAURI_INVOKE<ClonedProjectRepository>("clone_github_ssh_repository", { repositoryUrl }),
@@ -126,6 +126,8 @@ export type AgentEvent = { type: "conversationStarted"; conversationId: string }
 
 export type AgentEventDirection = "client" | "server";
 
+export type AgentLoginProvider = "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode";
+
 export type AgentProviderEffort = {
 	id: string,
 	label: string,
@@ -184,6 +186,8 @@ export type AgentUsageWindow = {
 	windowMinutes: number,
 	resetsAt: number | null,
 };
+
+export type AppIconName = "purple" | "gray" | "pink" | "green";
 
 export type AppMenuSettingsEvent = null;
 
@@ -468,6 +472,8 @@ export type LovableRepositoryCompatibility = {
 export type LovableStack = "tanstack-start" | "vite-react";
 
 export type ModelEffort = string;
+
+export type OnboardingPrerequisite = "git" | "codex" | "claude" | "cursor" | "grok" | "agy" | "opencode" | "openrouter";
 
 export type OnboardingPrerequisiteStatus = {
 	installed: boolean,

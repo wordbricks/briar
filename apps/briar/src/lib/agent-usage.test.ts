@@ -7,10 +7,10 @@ import {
   readAgentUsageHistory,
   recordAgentUsageSnapshot,
   tightestUsageWindow,
-  type AgentUsageProvider,
 } from "./agent-usage";
+import type { ProviderUsage } from "../generated/tauri";
 
-const provider: AgentUsageProvider = {
+const provider: ProviderUsage = {
   provider: "codex",
   status: "ok",
   session: {

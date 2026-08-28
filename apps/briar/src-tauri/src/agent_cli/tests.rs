@@ -283,8 +283,9 @@ fn uses_the_cursor_agent_companion_binary_for_login() {
             .expect("Cursor CLI fixture should be executable");
     }
 
-    let (binary, arguments) = provider_login_binary_and_args(home.path(), "cursor")
-        .expect("Cursor login command should resolve");
+    let (binary, arguments) =
+        provider_login_binary_and_args(home.path(), AgentLoginProvider::Cursor)
+            .expect("Cursor login command should resolve");
 
     assert_eq!(binary, binary_directory.join("agent"));
     assert_eq!(arguments, vec!["login"]);

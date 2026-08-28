@@ -7,11 +7,11 @@ import {
   agentProviderBinaryName,
   type AgentProvider,
 } from "../src/lib/agent-provider";
-import {
-  isProviderUsageExhausted,
-  type AgentUsageProvider,
-} from "../src/lib/agent-usage";
-import type { AgentUsageWindow } from "../src/generated/tauri";
+import { isProviderUsageExhausted } from "../src/lib/agent-usage";
+import type {
+  AgentUsageWindow,
+  ProviderUsage,
+} from "../src/generated/tauri";
 
 const CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
 const AGY_LOAD_ASSIST_URL =
@@ -81,7 +81,7 @@ const unknownUsage = (error: string | null = null): ProviderUsageProbe => ({
 });
 
 const exhaustedFromWindows = (
-  status: AgentUsageProvider["status"],
+  status: ProviderUsage["status"],
   session: AgentUsageWindow | null,
   weekly: AgentUsageWindow | null,
   monthly: AgentUsageWindow | null,

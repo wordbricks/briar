@@ -4,7 +4,7 @@ import { act } from "react";
 import { createReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
-import type { AgentUsageSnapshot } from "../lib/agent-usage";
+import type { AgentUsageSnapshot } from "../generated/tauri";
 import { defaultAppProviderSettings } from "../lib/project-llm";
 import { AgentUsageStatusBar } from "./AgentUsageStatusBar";
 

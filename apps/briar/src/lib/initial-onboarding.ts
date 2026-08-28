@@ -1,7 +1,7 @@
-import type { AgentProvider } from "./agent-provider";
-import { commands } from "../generated/tauri";
-
-export type PrerequisiteId = "git" | AgentProvider;
+import {
+  commands,
+  type OnboardingPrerequisite,
+} from "../generated/tauri";
 
 export const initialOnboardingStorageKey = "briar.initial-onboarding.seen.v1";
 
@@ -35,7 +35,7 @@ export async function inspectOnboardingPrerequisites() {
 }
 
 export async function installOnboardingPrerequisite(
-  prerequisite: PrerequisiteId,
+  prerequisite: OnboardingPrerequisite,
 ) {
   if (!isTauri()) {
     throw new Error(

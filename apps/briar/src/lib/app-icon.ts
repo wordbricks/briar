@@ -1,8 +1,12 @@
 import { getMobilePlatform } from "./platform";
-import { commands } from "../generated/tauri";
+import { commands, type AppIconName } from "../generated/tauri";
 
-export const appIconNames = ["purple", "gray", "pink", "green"] as const;
-export type AppIconName = (typeof appIconNames)[number];
+export const appIconNames = [
+  "purple",
+  "gray",
+  "pink",
+  "green",
+] as const satisfies readonly AppIconName[];
 
 const storageKey = "briar.app-icon.v1";
 
@@ -54,10 +58,8 @@ export async function getCurrentAppIcon(): Promise<AppIconName> {
 
   if (platform === "ios" && window.__TAURI_INTERNALS__) {
     const icon = await commands.currentAppIcon();
-    if (isAppIconName(icon)) {
-      storeAppIcon(icon);
-      return icon;
-    }
+    storeAppIcon(icon);
+    return icon;
   }
 
   return storedAppIcon();

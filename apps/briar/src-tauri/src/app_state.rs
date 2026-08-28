@@ -979,8 +979,36 @@ pub(super) fn clear_session_token(app: tauri::AppHandle) -> Result<(), String> {
     clear_session_token_at(&session_file_path(&app)?)
 }
 
-pub(super) fn valid_app_icon(icon: &str) -> bool {
-    matches!(icon, "purple" | "gray" | "pink" | "green")
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub(super) enum AppIconName {
+    Purple,
+    Gray,
+    Pink,
+    Green,
+}
+
+impl AppIconName {
+    #[cfg(target_os = "ios")]
+    fn from_native(value: &str) -> Option<Self> {
+        match value {
+            "purple" => Some(Self::Purple),
+            "gray" => Some(Self::Gray),
+            "pink" => Some(Self::Pink),
+            "green" => Some(Self::Green),
+            _ => None,
+        }
+    }
+
+    #[cfg(target_os = "ios")]
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Purple => "purple",
+            Self::Gray => "gray",
+            Self::Pink => "pink",
+            Self::Green => "green",
+        }
+    }
 }
 
 #[cfg(target_os = "ios")]
@@ -1032,23 +1060,19 @@ unsafe fn briar_ios_set_app_badge_count(count: u32) -> bool {
 
 #[tauri::command]
 #[specta::specta]
-pub(super) fn current_app_icon() -> Result<String, String> {
+pub(super) fn current_app_icon() -> Result<AppIconName, String> {
     #[cfg(target_os = "ios")]
     {
         let mut buffer = [0 as std::ffi::c_char; 32];
         let has_alternate_icon =
             unsafe { briar_ios_current_app_icon(buffer.as_mut_ptr(), buffer.len()) } == 1;
         if !has_alternate_icon {
-            return Ok("purple".to_string());
+            return Ok(AppIconName::Purple);
         }
         let icon = unsafe { std::ffi::CStr::from_ptr(buffer.as_ptr()) }
             .to_str()
             .map_err(|_| "The selected iOS app icon is invalid.".to_string())?;
-        return Ok(if valid_app_icon(icon) {
-            icon.to_string()
-        } else {
-            "purple".to_string()
-        });
+        return Ok(AppIconName::from_native(icon).unwrap_or(AppIconName::Purple));
     }
     #[cfg(not(target_os = "ios"))]
     Err("Native app icon selection is only handled by this command on iOS.".to_string())
@@ -1056,14 +1080,12 @@ pub(super) fn current_app_icon() -> Result<String, String> {
 
 #[tauri::command]
 #[specta::specta]
-pub(super) fn set_app_icon(icon: String) -> Result<(), String> {
-    if !valid_app_icon(&icon) {
-        return Err("Unsupported app icon.".to_string());
-    }
+pub(super) fn set_app_icon(icon: AppIconName) -> Result<(), String> {
     #[cfg(target_os = "ios")]
     {
-        let icon_name = (icon != "purple")
-            .then(|| std::ffi::CString::new(icon).expect("validated icon names contain no nulls"));
+        let icon_name = (icon != AppIconName::Purple).then(|| {
+            std::ffi::CString::new(icon.as_str()).expect("app icon names contain no nulls")
+        });
         let pointer = icon_name
             .as_ref()
             .map_or(std::ptr::null(), |name| name.as_ptr());
@@ -1073,7 +1095,10 @@ pub(super) fn set_app_icon(icon: String) -> Result<(), String> {
         return Err("This device does not support alternate app icons.".to_string());
     }
     #[cfg(not(target_os = "ios"))]
-    Err("Native app icon selection is only handled by this command on iOS.".to_string())
+    {
+        let _ = icon;
+        Err("Native app icon selection is only handled by this command on iOS.".to_string())
+    }
 }
 
 #[tauri::command]

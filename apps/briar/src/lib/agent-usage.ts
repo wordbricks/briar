@@ -1,11 +1,9 @@
-import {
-  agentProviderLabels,
-  type AgentProvider,
-} from "./agent-provider";
+import { agentProviderLabels } from "./agent-provider";
 import {
   commands,
+  type AgentLoginProvider,
   type AgentProviderKind,
-  type AgentUsageSnapshot as NativeAgentUsageSnapshot,
+  type AgentUsageSnapshot,
   type AgentUsageWindow,
   type ProviderUsage,
 } from "../generated/tauri";
@@ -20,12 +18,9 @@ export const quotaUsageProviders = [
   "cursor",
 ] as const satisfies readonly AgentProviderKind[];
 
-export type AgentUsageProvider = ProviderUsage;
-export type AgentUsageSnapshot = NativeAgentUsageSnapshot;
-
 export function emptyUsageProvider(
   provider: AgentProviderKind,
-): AgentUsageProvider {
+): ProviderUsage {
   return {
     provider,
     status: "unavailable",
@@ -58,7 +53,7 @@ export async function loadAgentUsage(): Promise<AgentUsageSnapshot> {
 }
 
 export async function openAgentProviderLogin(
-  provider: AgentProvider,
+  provider: AgentLoginProvider,
 ) {
   if (!isTauri()) {
     throw new Error("Provider sign-in is available in the Briar desktop app.");
@@ -66,45 +61,69 @@ export async function openAgentProviderLogin(
   return commands.openAgentProviderLogin(provider);
 }
 
-function isQuotaUsageProvider(value: unknown): value is AgentProviderKind {
-  return (
-    value === "claude" ||
-    value === "codex" ||
-    value === "grok" ||
-    value === "agy" ||
-    value === "opencode" ||
-    value === "openrouter" ||
-    value === "cursor"
-  );
+function usageWindowFrom(
+  value: unknown,
+): AgentUsageWindow | null | undefined {
+  if (value === null) return null;
+  if (!value || typeof value !== "object") return undefined;
+  const window = value as Partial<AgentUsageWindow>;
+  if (
+    typeof window.usedPercent !== "number" ||
+    typeof window.windowMinutes !== "number" ||
+    (window.resetsAt !== null && typeof window.resetsAt !== "number")
+  ) {
+    return undefined;
+  }
+  return {
+    usedPercent: window.usedPercent,
+    windowMinutes: window.windowMinutes,
+    resetsAt: window.resetsAt,
+  };
 }
 
-function usageProviderFrom(value: unknown): AgentUsageProvider | null {
+function usageProviderFrom(
+  value: unknown,
+  expectedProvider: AgentProviderKind,
+): ProviderUsage | null {
   if (!value || typeof value !== "object") return null;
-  const provider = value as Partial<AgentUsageProvider>;
+  const provider = value as Partial<ProviderUsage>;
+  const session = usageWindowFrom(provider.session);
+  const weekly = usageWindowFrom(provider.weekly);
+  const monthly = usageWindowFrom(provider.monthly);
   if (
-    !isQuotaUsageProvider(provider.provider) ||
+    provider.provider !== expectedProvider ||
     (provider.status !== "ok" &&
       provider.status !== "error" &&
       provider.status !== "unavailable") ||
-    typeof provider.updatedAt !== "number"
+    typeof provider.updatedAt !== "number" ||
+    session === undefined ||
+    weekly === undefined ||
+    monthly === undefined
   ) {
     return null;
   }
   return {
-    ...provider,
+    provider: expectedProvider,
+    status: provider.status,
+    session,
+    weekly,
+    monthly,
+    planType: typeof provider.planType === "string" ? provider.planType : null,
     accountLabel: typeof provider.accountLabel === "string"
       ? provider.accountLabel
       : null,
     authenticated: provider.authenticated === true,
-  } as AgentUsageProvider;
+    updatedAt: provider.updatedAt,
+    error: typeof provider.error === "string" ? provider.error : null,
+  };
 }
 
 function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
   if (!value || typeof value !== "object") return null;
   const snapshot = value as Partial<AgentUsageSnapshot>;
-  const claude = usageProviderFrom(snapshot.claude);
-  const codex = usageProviderFrom(snapshot.codex);
-  const grok = usageProviderFrom(snapshot.grok);
+  const claude = usageProviderFrom(snapshot.claude, "claude");
+  const codex = usageProviderFrom(snapshot.codex, "codex");
+  const grok = usageProviderFrom(snapshot.grok, "grok");
   if (
     typeof snapshot.updatedAt !== "number" ||
     !claude ||
@@ -117,12 +136,13 @@ function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
     claude,
     codex,
     grok,
-    agy: usageProviderFrom(snapshot.agy) ?? emptyUsageProvider("agy"),
-    opencode: usageProviderFrom(snapshot.opencode) ??
+    agy: usageProviderFrom(snapshot.agy, "agy") ?? emptyUsageProvider("agy"),
+    opencode: usageProviderFrom(snapshot.opencode, "opencode") ??
       emptyUsageProvider("opencode"),
-    openrouter: usageProviderFrom(snapshot.openrouter) ??
+    openrouter: usageProviderFrom(snapshot.openrouter, "openrouter") ??
       emptyUsageProvider("openrouter"),
-    cursor: usageProviderFrom(snapshot.cursor) ?? emptyUsageProvider("cursor"),
+    cursor: usageProviderFrom(snapshot.cursor, "cursor") ??
+      emptyUsageProvider("cursor"),
     updatedAt: snapshot.updatedAt,
   };
 }
@@ -170,7 +190,7 @@ export function clearAgentUsageHistory() {
   }
 }
 
-export function tightestUsageWindow(provider: AgentUsageProvider) {
+export function tightestUsageWindow(provider: ProviderUsage) {
   const windows = [provider.session, provider.weekly, provider.monthly].filter(
     (window): window is AgentUsageWindow => window !== null,
   );
@@ -187,7 +207,7 @@ export function tightestUsageWindow(provider: AgentUsageProvider) {
  */
 export function isProviderUsageExhausted(
   provider: Pick<
-    AgentUsageProvider,
+    ProviderUsage,
     "status" | "session" | "weekly" | "monthly"
   >,
   thresholdPercent = 100,
