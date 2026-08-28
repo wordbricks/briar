@@ -8,6 +8,7 @@ import {
 } from "../../src/lib/channels-contract";
 import apiWorker from "./index";
 import {
+  CHANNEL_REPLY_FAILURE_MESSAGE,
   addChannelAgent,
   addChannelMember,
   claimNextChannelAgentReply,
@@ -3830,6 +3831,214 @@ describe("organization channels", () => {
       }),
     }), apiEnv);
     expect(rejected.status).toBe(403);
+  });
+
+  it("stores one ordinary reply and Inbox notification on final AI failure", async () => {
+    const channelId = "e0000000-0000-4000-8000-000000000701";
+    const triggerId = "f0000000-0000-4000-8000-000000000701";
+    const successTriggerId = "f0000000-0000-4000-8000-000000000702";
+    const agent = await createOrganizationAgent(db, {
+      id: "aa000000-0000-4000-8000-000000000701",
+      organizationId,
+      name: "Retry Agent",
+      provider: "claude",
+      model: null,
+      responsibility: "Verify final reply failures",
+      effort: null,
+      createdAt: at(80),
+    });
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      slug: "final-reply-failure",
+      name: "Final reply failure",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(80),
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId: agent!.id,
+      addedByUserId: ownerId,
+      createdAt: at(80),
+    });
+    await createChannelMessage(db, {
+      id: triggerId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "@Retry-Agent answer this",
+      mentionedUserIds: [],
+      mentionedAgentIds: [agent!.id],
+      createdAt: at(81),
+    });
+    const [job] = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: triggerId,
+      parentMessageId: triggerId,
+      agents: [{ id: agent!.id, projectId: null, provider: "claude" }],
+      createdAt: at(81),
+    });
+
+    await db.prepare(
+      `update briar_execution_workers set state = 'online' where id = ?`,
+    ).bind(otherWorkerId).run();
+    const armAttempt = async (
+      targetJob: typeof job,
+      attempt: number,
+      claimTokenHash: string,
+      claimedAt: string,
+      leaseExpiresAt: string,
+    ) => {
+      await db.batch([
+        db.prepare(
+          `update briar_channel_agent_reply_jobs
+           set status = 'running', attempts = ?, claimed_device_id = ?,
+               claimed_worker_id = ?, claim_token_hash = ?, claimed_at = ?,
+               lease_expires_at = ?, error = null, updated_at = ?
+           where id = ?`,
+        ).bind(
+          attempt,
+          deviceId,
+          otherWorkerId,
+          claimTokenHash,
+          claimedAt,
+          leaseExpiresAt,
+          claimedAt,
+          targetJob.id,
+        ),
+        db.prepare(
+          `update briar_channel_reply_sessions
+           set owner_device_id = ?, owner_worker_id = ?, updated_at = ?
+           where id = ?`,
+        ).bind(deviceId, otherWorkerId, claimedAt, targetJob.session_id),
+      ]);
+    };
+    const failAttempt = async (attempt: number, failureMinute: number) => {
+      const claimTokenHash = String(attempt).repeat(64);
+      await armAttempt(
+        job,
+        attempt,
+        claimTokenHash,
+        at(failureMinute - 1),
+        at(failureMinute + 1),
+      );
+      return await failChannelReply(db, {
+        jobId: job.id,
+        deviceId,
+        workerId: otherWorkerId,
+        claimTokenHash,
+        error: "sensitive provider trace must stay internal",
+        updatedAt: at(failureMinute),
+      });
+    };
+
+    await expect(failAttempt(1, 82)).resolves.toMatchObject({
+      status: "queued",
+      completed_at: null,
+    });
+    await expect(getChannelMessage(db, channelId, job.reply_message_id))
+      .resolves.toBeNull();
+    await expect(failAttempt(2, 84)).resolves.toMatchObject({
+      status: "queued",
+      completed_at: null,
+    });
+    await expect(getChannelMessage(db, channelId, job.reply_message_id))
+      .resolves.toBeNull();
+
+    const failed = await failAttempt(3, 86);
+    expect(failed).toMatchObject({ status: "failed", completed_at: at(86) });
+    await expect(
+      getChannelMessage(db, channelId, job.reply_message_id),
+    ).resolves.toMatchObject({
+      id: job.reply_message_id,
+      parentMessageId: triggerId,
+      body: CHANNEL_REPLY_FAILURE_MESSAGE,
+      author: { type: "agent", id: agent!.id, name: "Retry Agent" },
+    });
+    await expect(
+      listChannelConversationNotifications(db, organizationId, ownerId),
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: job.reply_message_id,
+        body: CHANNEL_REPLY_FAILURE_MESSAGE,
+        notification_reason: "thread_reply",
+      }),
+    ]));
+
+    await expect(failChannelReply(db, {
+      jobId: job.id,
+      deviceId,
+      workerId: otherWorkerId,
+      claimTokenHash: "3".repeat(64),
+      error: "duplicate final failure",
+      updatedAt: at(87),
+    })).resolves.toBeNull();
+    await expect(db.prepare(
+      `select count(*) as count from briar_channel_messages
+       where id = ? and body = ?`,
+    ).bind(job.reply_message_id, CHANNEL_REPLY_FAILURE_MESSAGE).first<{
+      count: number;
+    }>()).resolves.toEqual({ count: 1 });
+
+    await createChannelMessage(db, {
+      id: successTriggerId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "@Retry-Agent succeed this time",
+      mentionedUserIds: [],
+      mentionedAgentIds: [agent!.id],
+      createdAt: at(88),
+    });
+    const [successfulJob] = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: successTriggerId,
+      parentMessageId: successTriggerId,
+      agents: [{ id: agent!.id, projectId: null, provider: "claude" }],
+      createdAt: at(88),
+    });
+    await armAttempt(
+      successfulJob,
+      1,
+      "4".repeat(64),
+      at(89),
+      at(91),
+    );
+    await expect(completeChannelReply(db, successfulJob, {
+      jobId: successfulJob.id,
+      deviceId,
+      workerId: otherWorkerId,
+      claimTokenHash: "4".repeat(64),
+      body: "The normal answer succeeded.",
+      document: null,
+      issueProposal: null,
+      executionProposal: null,
+      agentName: agent!.name,
+      agentProvider: "claude",
+      completedAt: at(90),
+    })).resolves.toMatchObject({ status: "completed" });
+    await expect(
+      getChannelMessage(db, channelId, successfulJob.reply_message_id),
+    ).resolves.toMatchObject({
+      body: "The normal answer succeeded.",
+      parentMessageId: successTriggerId,
+    });
+    await expect(db.prepare(
+      `select count(*) as count from briar_channel_messages
+       where channel_id = ? and body = ?`,
+    ).bind(channelId, CHANNEL_REPLY_FAILURE_MESSAGE).first<{ count: number }>())
+      .resolves.toEqual({ count: 1 });
   });
 
   it("persists an unavailable Worker as an immediate failed reply", async () => {
