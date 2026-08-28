@@ -911,6 +911,7 @@ export type MergeQueueProfile = {
   baseBranch: "main";
   enabled: boolean;
   readinessStageId: string;
+  validationCommands: string[];
   quietWindowMs: number;
   maxBatchSize: number;
   updatedAt: string;

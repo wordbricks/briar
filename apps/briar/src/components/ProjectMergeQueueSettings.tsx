@@ -182,10 +182,18 @@ export function ProjectMergeQueueSettings({
   const boundaryValid = stages.some((stage) =>
     stage.id === readinessStageId
   );
+  const validationCommands = stages.find((stage) =>
+    stage.id === readinessStageId
+  )?.checks?.map((command) => command.trim()).filter(Boolean) ?? [];
+  const validationCommandsValid = validationCommands.length > 0;
   const dirty = enabled !== (profile?.enabled ?? false) ||
-    readinessStageId !== (profile?.readinessStageId ?? "");
+    readinessStageId !== (profile?.readinessStageId ?? "") ||
+    JSON.stringify(validationCommands) !==
+      JSON.stringify(profile?.validationCommands ?? []);
   const saveDisabled = !canManage || !token || saving || !dirty ||
-    (enabled && (!boundaryValid || !githubRepositoryConnected));
+    (enabled && (
+      !boundaryValid || !validationCommandsValid || !githubRepositoryConnected
+    ));
 
   const save = async () => {
     if (saveDisabled || !token) return;
@@ -270,6 +278,29 @@ export function ProjectMergeQueueSettings({
               <SettingsAlert>
                 {t("settings.mergeQueueInvalidBoundary")}
               </SettingsAlert>
+            ) : null}
+            {readinessStageId && boundaryValid ? (
+              <div className="grid gap-2">
+                <Typography as="strong" tone="muted" variant="caption">
+                  {t("settings.mergeQueueValidationCommands")}
+                </Typography>
+                {validationCommandsValid ? (
+                  <div className="grid gap-1">
+                    {validationCommands.map((command) => (
+                      <code
+                        className="rounded-md border border-border bg-muted/35 px-2.5 py-2 text-xs"
+                        key={command}
+                      >
+                        {command}
+                      </code>
+                    ))}
+                  </div>
+                ) : (
+                  <SettingsAlert>
+                    {t("settings.mergeQueueNeedsValidationCommands")}
+                  </SettingsAlert>
+                )}
+              </div>
             ) : null}
             {!canManage ? (
               <Typography tone="muted" variant="caption">

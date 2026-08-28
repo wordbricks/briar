@@ -1,22 +1,17 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import * as Schema from "effect/Schema";
 import {
-  MERGE_GROUP_CI_CONTEXTS,
-  MERGE_GROUP_CI_PROTECTED_BASE_REF_PREFIX,
-  MERGE_GROUP_CI_SOURCE_REF_PREFIX,
-  type MergeGroupCiContext,
-} from "../src/lib/merge-group-validation-contract";
-import {
-  disposeExactShaValidation,
-  ExactShaValidationInputError,
-  MergeGroupCiDefinitionChangedError,
-  prepareExactShaValidation,
-  runFixedMergeGroupValidation,
-  type CommandResult as ValidationCommandResult,
-  type GitRunner as ValidationGitRunner,
-  type MergeGroupContainerRuntime,
-} from "./merge-group-validation";
+  MERGE_QUEUE_GITHUB_STATUS_CONTEXT,
+  MERGE_QUEUE_VALIDATION_BASE_REF_PREFIX,
+  MERGE_QUEUE_VALIDATION_COMMAND_TIMEOUT_MS,
+  MERGE_QUEUE_VALIDATION_CONTEXT,
+  MERGE_QUEUE_VALIDATION_MAX_COMMANDS,
+  MERGE_QUEUE_VALIDATION_SOURCE_REF_PREFIX,
+} from "../src/lib/merge-queue-validation-contract";
 import {
   decodeClaimedMergeBatch,
   type ClaimedMergeBatch,
@@ -326,9 +321,8 @@ export async function claimMergeBatchIfReady(input: {
   workerId: string;
   claimedBy: string;
   repliesOnly: boolean;
-  runtime: MergeGroupContainerRuntime | null;
 }): Promise<ClaimedMergeBatch | null> {
-  if (input.repliesOnly || input.runtime === null) return null;
+  if (input.repliesOnly) return null;
   const raw = await input.api<unknown>("/merge-batch-claims", {
     method: "POST",
     body: JSON.stringify({
@@ -454,9 +448,9 @@ async function establishTailAuthority(input: NormalizedMergeBatchExecutionInput)
   }
   const integrationRef =
     `refs/heads/briar/merge-queue/${input.claim.workId}`;
-  const baseRef = `${MERGE_GROUP_CI_PROTECTED_BASE_REF_PREFIX}/${input.claim.workId}`;
+  const baseRef = `${MERGE_QUEUE_VALIDATION_BASE_REF_PREFIX}/${input.claim.workId}`;
   const memberRefs = input.claim.members.map((member) =>
-    `${MERGE_GROUP_CI_SOURCE_REF_PREFIX}/${input.claim.workId}/${member.ordinal}`
+    `${MERGE_QUEUE_VALIDATION_SOURCE_REF_PREFIX}/${input.claim.workId}/${member.ordinal}`
   );
   runGitCommand(
     input.runCommand,
@@ -583,9 +577,9 @@ export function fetchExactValidationRefs(
   repositoryPath: string,
   run: MergeQueueCommandRunner = runLocalCommand,
 ) {
-  const sourceRef = `${MERGE_GROUP_CI_SOURCE_REF_PREFIX}/${claim.workId}`;
+  const sourceRef = `${MERGE_QUEUE_VALIDATION_SOURCE_REF_PREFIX}/${claim.workId}`;
   const protectedBaseRef =
-    `${MERGE_GROUP_CI_PROTECTED_BASE_REF_PREFIX}/${claim.workId}`;
+    `${MERGE_QUEUE_VALIDATION_BASE_REF_PREFIX}/${claim.workId}`;
   const headRef = claim.batch.mergeGroupRef;
   const headSha = claim.batch.mergeGroupSha;
   const baseSha = claim.batch.mergeGroupBaseSha;
@@ -634,15 +628,6 @@ export function fetchExactValidationRefs(
   return { sourceRef, protectedBaseRef, headSha, baseSha };
 }
 
-function validationGitRunner(run: MergeQueueCommandRunner): ValidationGitRunner {
-  return (args, options): ValidationCommandResult =>
-    run(["git", ...args], {
-      cwd: options.cwd,
-      timeoutMs: options.timeoutMs,
-      env: options.env,
-    });
-}
-
 const MAX_VALIDATION_LOG_LENGTH = 64 * 1_024;
 
 function boundedValidationLog(log: string) {
@@ -654,20 +639,28 @@ function boundedValidationLog(log: string) {
       };
 }
 
-function deterministicValidationFailure(
-  error: MergeGroupCiDefinitionChangedError | ExactShaValidationInputError,
-) {
-  const bounded = boundedValidationLog(error.message);
-  const logSha256 = createHash("sha256").update(error.message).digest("hex");
-  return MERGE_GROUP_CI_CONTEXTS.map((context) => ({
-    context,
-    passed: false,
-    exitCode: 1,
-    failureCode: "ci_failed" as const,
-    log: bounded.log,
-    logSha256,
-    logTruncated: bounded.truncated,
-  }));
+function validationEnvironment(root: string): NodeJS.ProcessEnv {
+  const inherited = [
+    "PATH",
+    "TMPDIR",
+    "TEMP",
+    "SystemRoot",
+    "ComSpec",
+    "PATHEXT",
+  ];
+  return Object.fromEntries([
+    ["CI", "1"],
+    ["HOME", root],
+    ...inherited.flatMap((key) =>
+      process.env[key] ? [[key, process.env[key]!]] : []
+    ),
+  ]);
+}
+
+function validationShellCommand(command: string) {
+  return process.platform === "win32"
+    ? [process.env.ComSpec ?? "cmd.exe", "/d", "/s", "/c", command]
+    : ["/bin/sh", "-lc", command];
 }
 
 async function validateMergeBatch(input: NormalizedMergeBatchExecutionInput) {
@@ -676,46 +669,49 @@ async function validateMergeBatch(input: NormalizedMergeBatchExecutionInput) {
     input.repositoryPath,
     input.runCommand,
   );
-  let prepared: Awaited<ReturnType<typeof prepareExactShaValidation>> | null = null;
-  let validationResults;
+  const root = await mkdtemp(join(tmpdir(), "briar-merge-queue-validation."));
+  const workspace = join(root, "workspace");
+  let combinedLog = "";
+  let exitCode = 0;
   try {
-    prepared = await prepareExactShaValidation(
-      validationGitRunner(input.runCommand),
-      input.repositoryPath,
-      {
-        executionId: input.claim.workId,
-        sourceRef: exact.sourceRef,
-        protectedBaseRef: exact.protectedBaseRef,
-        baseSha: exact.baseSha,
-        headSha: exact.headSha,
-      },
+    runGitCommand(input.runCommand, root, ["init", "--quiet", workspace]);
+    runGitCommand(
+      input.runCommand,
+      workspace,
+      ["fetch", "--no-tags", input.repositoryPath, exact.sourceRef],
+      120_000,
     );
-    const results = await runFixedMergeGroupValidation({
-      prepared,
-      runtime: input.runtime,
-      signal: input.signal,
-    });
-    validationResults = results.map((result) => {
-      const bounded = boundedValidationLog(result.log);
-      return {
-        context: result.context,
-        passed: result.passed,
-        exitCode: result.exitCode,
-        failureCode: result.failureCode,
-        log: bounded.log,
-        logSha256: result.logSha256,
-        logTruncated: result.logTruncated || bounded.truncated,
-      };
-    });
-  } catch (error) {
-    if (
-      !(error instanceof MergeGroupCiDefinitionChangedError) &&
-      !(error instanceof ExactShaValidationInputError)
-    ) throw error;
-    validationResults = deterministicValidationFailure(error);
+    runGitCommand(
+      input.runCommand,
+      workspace,
+      ["checkout", "--detach", exact.headSha],
+    );
+    for (const command of input.claim.validationCommands) {
+      if (input.signal.aborted) throw input.signal.reason;
+      const result = input.runCommand(validationShellCommand(command), {
+        cwd: workspace,
+        timeoutMs: MERGE_QUEUE_VALIDATION_COMMAND_TIMEOUT_MS,
+        env: validationEnvironment(root),
+      });
+      combinedLog += `$ ${command}\n${result.stdout}${result.stderr}`;
+      if (result.exitCode !== 0) {
+        exitCode = result.exitCode;
+        break;
+      }
+    }
   } finally {
-    if (prepared) await disposeExactShaValidation(prepared);
+    await rm(root, { recursive: true, force: true });
   }
+  const bounded = boundedValidationLog(combinedLog);
+  const validationResults = [{
+    context: MERGE_QUEUE_VALIDATION_CONTEXT,
+    passed: exitCode === 0,
+    exitCode,
+    failureCode: exitCode === 0 ? null : "ci_failed" as const,
+    log: bounded.log,
+    logSha256: createHash("sha256").update(combinedLog).digest("hex"),
+    logTruncated: bounded.truncated,
+  }];
   await postClaimAction(
     input.api,
     input.claim,
@@ -811,7 +807,7 @@ function publishStatus(
   >[number],
 ) {
   const state = result.passed ? "success" : "failure";
-  const context = `signoff/${result.context}`;
+  const context = MERGE_QUEUE_GITHUB_STATUS_CONTEXT;
   const description = result.passed
     ? `Briar exact integration validation passed: ${result.context}`
     : `Briar exact integration validation failed: ${result.context}`;
@@ -844,12 +840,12 @@ async function publishMergeBatch(input: NormalizedMergeBatchExecutionInput) {
       "Publication claim is missing its durable validation proof",
     );
   }
-  const byContext = new Map<MergeGroupCiContext, typeof proof[number]>();
+  const byContext = new Map<string, typeof proof[number]>();
   for (const result of proof) byContext.set(result.context, result);
   const failed = proof.some((result) => !result.passed);
   let publicationAuthority: ReturnType<typeof assertPublishAuthorityValues> | null = null;
   let alreadyPublished = false;
-  for (const context of MERGE_GROUP_CI_CONTEXTS) {
+  for (const context of [MERGE_QUEUE_VALIDATION_CONTEXT]) {
     if (input.signal.aborted) throw input.signal.reason;
     const result = byContext.get(context);
     if (!result) {
@@ -921,7 +917,6 @@ export type MergeBatchExecutionInput = {
   claim: ClaimedMergeBatch;
   workerId: string;
   repositoryPath: string;
-  runtime: MergeGroupContainerRuntime;
   signal: AbortSignal;
   api: MergeBatchApi;
   runCommand?: MergeQueueCommandRunner;
@@ -987,6 +982,9 @@ const MergeQueueProfileSchema = Schema.Struct({
   readinessStageId: Schema.String.check(
     Schema.isPattern(/^[a-z][a-z0-9_-]{0,63}$/u),
   ),
+  validationCommands: Schema.mutable(Schema.Array(
+    Schema.String.check(Schema.isLengthBetween(1, 500)),
+  )).check(Schema.isLengthBetween(1, MERGE_QUEUE_VALIDATION_MAX_COMMANDS)),
   quietWindowMs: Schema.Int.check(
     Schema.isGreaterThanOrEqualTo(1_000),
     Schema.isLessThanOrEqualTo(300_000),
@@ -1142,21 +1140,10 @@ function ruleParameters<T>(
 export function inspectMergeQueueDoctor(input: {
   profile: MergeQueueProfile | null;
   repositoryPath: string;
-  runtime:
-    | ({ ready: true } & MergeGroupContainerRuntime)
-    | { ready: false; detail: string };
   runCommand?: MergeQueueCommandRunner;
 }): MergeQueueDoctorResult {
   const checks: MergeQueueDoctorCheck[] = [];
   const run = input.runCommand ?? runLocalCommand;
-  doctorCheck(
-    checks,
-    "audited-runtime",
-    input.runtime.ready,
-    input.runtime.ready
-      ? `${input.runtime.executable} ${input.runtime.image}`
-      : input.runtime.detail,
-  );
   if (!input.profile) {
     doctorCheck(
       checks,
@@ -1173,6 +1160,14 @@ export function inspectMergeQueueDoctor(input: {
     input.profile.enabled
       ? `enabled for ${input.profile.repository}/main`
       : `disabled for ${input.profile.repository}/main`,
+  );
+  doctorCheck(
+    checks,
+    "validation-commands",
+    input.profile.validationCommands.length > 0,
+    input.profile.validationCommands.length > 0
+      ? `${input.profile.validationCommands.length} repository workflow command(s)`
+      : "The readiness stage has no repository validation commands",
   );
 
   const auth = run(
@@ -1312,9 +1307,7 @@ export function inspectMergeQueueDoctor(input: {
     const contexts = statusParameters.flatMap((parameters) =>
       parameters.required_status_checks.map((check) => check.context)
     );
-    const expectedContexts = MERGE_GROUP_CI_CONTEXTS.map((context) =>
-      `signoff/${context}`
-    );
+    const expectedContexts = [MERGE_QUEUE_GITHUB_STATUS_CONTEXT];
     const statusReady = statusParameters.length > 0 &&
       statusParameters.every((parameters) =>
         !parameters.strict_required_status_checks_policy &&
@@ -1327,12 +1320,12 @@ export function inspectMergeQueueDoctor(input: {
       expectedContexts.every((context) => contexts.includes(context));
     doctorCheck(
       checks,
-      "signoff-contexts",
+      "validation-status-context",
       statusReady,
       statusReady
-        ? "exact four signoff contexts are required with strict=false"
-        : "required_status_checks must contain only the four signoff " +
-          "contexts, strict=false, without integration pinning",
+        ? `${MERGE_QUEUE_GITHUB_STATUS_CONTEXT} is required with strict=false`
+        : `required_status_checks must contain only ${MERGE_QUEUE_GITHUB_STATUS_CONTEXT}, ` +
+          "strict=false, without integration pinning",
     );
 
     const rulesetIds = [...new Set(

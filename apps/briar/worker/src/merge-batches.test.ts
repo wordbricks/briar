@@ -39,34 +39,23 @@ const workflow = JSON.stringify({
   execution: { checkpoints: [] },
   completion: { requiredStages: ["ci_qa", "merged"] },
 });
-const validationContexts = [
-  "app-worker",
-  "d1-migrations",
-  "rust",
-  "security",
-] as const;
-const successfulValidationResults: MergeBatchValidationResult[] =
-  validationContexts.map((context) => ({
-    context,
+const successfulValidationResults: MergeBatchValidationResult[] = [{
+    context: "merge-queue",
     passed: true,
     exitCode: 0,
     failureCode: null,
-    log: `${context} passed`,
-    logSha256: tokenHash(context === "rust" ? "b" : "a"),
+    log: "merge queue validation passed",
+    logSha256: tokenHash("a"),
     logTruncated: false,
-  }));
+  }];
 const failedValidationResults: MergeBatchValidationResult[] =
-  successfulValidationResults.map((result) =>
-    result.context === "rust"
-      ? {
-        ...result,
-        passed: false,
-        exitCode: 1,
-        failureCode: "ci_failed",
-        log: "rust failed",
-      }
-      : result
-  );
+  successfulValidationResults.map((result) => ({
+    ...result,
+    passed: false,
+    exitCode: 1,
+    failureCode: "ci_failed",
+    log: "merge queue validation failed",
+  }));
 
 type Lane = {
   scenario: number;
@@ -164,9 +153,9 @@ describe("repository merge queue coordinator", () => {
       db.prepare(
         `insert into briar_merge_queue_profiles (
            project_id, repository_id, repository, base_branch, enabled,
-           readiness_stage_id, quiet_window_ms, max_batch_size, created_at,
-           updated_at
-         ) values (?, ?, ?, 'main', ?, ?, ?, ?, ?, ?)`,
+           readiness_stage_id, validation_commands_json, quiet_window_ms,
+           max_batch_size, created_at, updated_at
+         ) values (?, ?, ?, 'main', ?, ?, '["bun run ci:local"]', ?, ?, ?, ?)`,
       ).bind(
         projectId,
         repositoryId,
@@ -644,7 +633,10 @@ describe("repository merge queue coordinator", () => {
     expect(preparedClaim).toMatchObject({
       phase: "tail_authority",
       pendingHeads: [],
-      batch: { state: "waiting_tail" },
+      batch: {
+        state: "waiting_tail",
+        validation_commands_json: '["bun run ci:local"]',
+      },
     });
     const integrationSha = sha("f");
     await expect(recordPreparedMergeBatch(db, {
