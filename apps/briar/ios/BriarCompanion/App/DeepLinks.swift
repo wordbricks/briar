@@ -20,25 +20,31 @@ enum BriarLinkTarget: Equatable, Sendable {
 }
 
 enum BriarLinkParser {
-    static func parse(_ value: String) -> BriarLinkTarget? {
+    static func parse(
+        _ value: String,
+        trustedOrigin: URL = BriarShareLinks.defaultOrigin
+    ) -> BriarLinkTarget? {
         guard let url = URL(string: value) else { return nil }
-        return parse(url)
+        return parse(url, trustedOrigin: trustedOrigin)
     }
 
-    static func parse(_ url: URL) -> BriarLinkTarget? {
+    static func parse(
+        _ url: URL,
+        trustedOrigin: URL = BriarShareLinks.defaultOrigin
+    ) -> BriarLinkTarget? {
         if url.scheme == "briar-companion" {
             let host = url.host?.lowercased() ?? ""
             let parts = url.path.split(separator: "/").map(String.init)
-            if host == "issues", parts.count >= 2,
+            if host == "issues", parts.count == 2,
                let projectID = UUID(uuidString: parts[0]),
                let runID = UUID(uuidString: parts[1]) {
                 return .issue(projectID: projectID, runID: runID)
             }
-            if host == "sessions", parts.count >= 2,
+            if host == "sessions", parts.count == 2,
                let projectID = UUID(uuidString: parts[0]) {
                 return .session(projectID: projectID, sessionID: parts[1])
             }
-            if host == "channels", parts.count >= 3,
+            if host == "channels", parts.count == 3,
                let organizationID = UUID(uuidString: parts[0]),
                let channelID = UUID(uuidString: parts[1]),
                let messageID = UUID(uuidString: parts[2]) {
@@ -53,21 +59,24 @@ enum BriarLinkParser {
             return nil
         }
 
-        guard url.scheme == "https" || url.scheme == "http" else { return nil }
+        guard
+            url.scheme == "https" || url.scheme == "http",
+            hasSameOrigin(url, trustedOrigin)
+        else { return nil }
         let segments = url.path.split(separator: "/").map(String.init)
         // /open/issues/{projectId}/{runId}
-        if segments.count >= 4, segments[0] == "open", segments[1] == "issues",
+        if segments.count == 4, segments[0] == "open", segments[1] == "issues",
            let projectID = UUID(uuidString: segments[2]),
            let runID = UUID(uuidString: segments[3]) {
             return .issue(projectID: projectID, runID: runID)
         }
         // /open/sessions/{projectId}/{sessionId}
-        if segments.count >= 4, segments[0] == "open", segments[1] == "sessions",
+        if segments.count == 4, segments[0] == "open", segments[1] == "sessions",
            let projectID = UUID(uuidString: segments[2]) {
             return .session(projectID: projectID, sessionID: segments[3])
         }
         // /open/channels/{organizationId}/{channelId}/{messageId}
-        if segments.count >= 5, segments[0] == "open", segments[1] == "channels",
+        if segments.count == 5, segments[0] == "open", segments[1] == "channels",
            let organizationID = UUID(uuidString: segments[2]),
            let channelID = UUID(uuidString: segments[3]),
            let messageID = UUID(uuidString: segments[4]) {
@@ -79,6 +88,27 @@ enum BriarLinkParser {
             )
         }
         return nil
+    }
+
+    private static func hasSameOrigin(_ candidate: URL, _ trusted: URL) -> Bool {
+        guard
+            let candidateScheme = candidate.scheme?.lowercased(),
+            let trustedScheme = trusted.scheme?.lowercased(),
+            let candidateHost = candidate.host?.lowercased(),
+            let trustedHost = trusted.host?.lowercased()
+        else { return false }
+        return candidateScheme == trustedScheme &&
+            candidateHost == trustedHost &&
+            effectivePort(candidate) == effectivePort(trusted)
+    }
+
+    private static func effectivePort(_ url: URL) -> Int? {
+        if let port = url.port { return port }
+        switch url.scheme?.lowercased() {
+        case "http": return 80
+        case "https": return 443
+        default: return nil
+        }
     }
 
     private static func channelRootMessageID(from url: URL) -> UUID? {
@@ -201,12 +231,41 @@ final class CompanionNavigationModel: ObservableObject {
     @Published var pendingChannelThread: ChannelThreadRoute?
     @Published var pathChannelToken = 0
     @Published private(set) var preparingIssue = false
+    @Published var linkErrorMessage: String?
     private var issuePreparationRevision = 0
 
     func open(_ target: BriarLinkTarget) {
         issuePreparationRevision &+= 1
         preparingIssue = false
+        linkErrorMessage = nil
         stage(target)
+    }
+
+    @discardableResult
+    func open(
+        _ url: URL,
+        trustedOrigin: URL = BriarShareLinks.defaultOrigin
+    ) -> BriarLinkTarget? {
+        guard let target = BriarLinkParser.parse(
+            url,
+            trustedOrigin: trustedOrigin
+        ) else { return nil }
+        open(target)
+        return target
+    }
+
+    func failPendingNavigation(_ message: String) {
+        issuePreparationRevision &+= 1
+        preparingIssue = false
+        pendingIssueID = nil
+        pendingIssueDetailTab = nil
+        pendingSessionID = nil
+        pendingProjectID = nil
+        pendingChannelID = nil
+        pendingChannelMessageID = nil
+        pendingChannelRootMessageID = nil
+        pendingChannelThread = nil
+        linkErrorMessage = message
     }
 
     private func stage(

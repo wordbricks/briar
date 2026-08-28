@@ -1,3 +1,4 @@
+import { briarApiUrl } from "./api-config";
 import { formatIssueKey } from "./issue-key";
 
 const issueLinkPathPattern =
@@ -32,11 +33,25 @@ export type BriarLinkTarget =
 
 export type IssueShareResult = "cancelled" | "copied" | "shared";
 
-function configuredShareOrigin(): string {
-  const configured = import.meta.env.VITE_BRIAR_API_URL?.trim();
-  if (configured) return configured;
+function configuredBriarOrigin(): string | null {
+  if (briarApiUrl) return briarApiUrl;
   if (typeof window !== "undefined") return window.location.origin;
+  return null;
+}
+
+function configuredShareOrigin(): string {
+  const configured = configuredBriarOrigin();
+  if (configured) return configured;
   throw new Error("Briar share URL is not configured");
+}
+
+function hasTrustedHttpOrigin(url: URL, trustedOrigin: string | null): boolean {
+  if (!trustedOrigin) return false;
+  try {
+    return url.origin === new URL(trustedOrigin).origin;
+  } catch {
+    return false;
+  }
 }
 
 export function issueShareUrl(
@@ -92,7 +107,10 @@ export function channelShareUrl(
   return url.toString();
 }
 
-export function parseIssueLink(value: string): IssueLinkTarget | null {
+export function parseIssueLink(
+  value: string,
+  trustedOrigin = configuredBriarOrigin(),
+): IssueLinkTarget | null {
   let url: URL;
   try {
     url = new URL(value);
@@ -105,7 +123,10 @@ export function parseIssueLink(value: string): IssueLinkTarget | null {
     return match ? { projectId: match[1], runId: match[2] } : null;
   }
 
-  if (url.protocol === "https:" || url.protocol === "http:") {
+  if (
+    (url.protocol === "https:" || url.protocol === "http:") &&
+    hasTrustedHttpOrigin(url, trustedOrigin)
+  ) {
     const match = url.pathname.match(issueLinkPathPattern);
     return match ? { projectId: match[1], runId: match[2] } : null;
   }
@@ -113,7 +134,10 @@ export function parseIssueLink(value: string): IssueLinkTarget | null {
   return null;
 }
 
-export function parseSessionLink(value: string): SessionLinkTarget | null {
+export function parseSessionLink(
+  value: string,
+  trustedOrigin = configuredBriarOrigin(),
+): SessionLinkTarget | null {
   let url: URL;
   try {
     url = new URL(value);
@@ -126,7 +150,10 @@ export function parseSessionLink(value: string): SessionLinkTarget | null {
     return match ? { projectId: match[1], sessionId: match[2] } : null;
   }
 
-  if (url.protocol === "https:" || url.protocol === "http:") {
+  if (
+    (url.protocol === "https:" || url.protocol === "http:") &&
+    hasTrustedHttpOrigin(url, trustedOrigin)
+  ) {
     const match = url.pathname.match(sessionLinkPathPattern);
     return match ? { projectId: match[1], sessionId: match[2] } : null;
   }
@@ -150,7 +177,10 @@ function channelLinkFromParts(
   };
 }
 
-export function parseChannelLink(value: string): ChannelLinkTarget | null {
+export function parseChannelLink(
+  value: string,
+  trustedOrigin = configuredBriarOrigin(),
+): ChannelLinkTarget | null {
   let url: URL;
   try {
     url = new URL(value);
@@ -170,7 +200,10 @@ export function parseChannelLink(value: string): ChannelLinkTarget | null {
       : null;
   }
 
-  if (url.protocol === "https:" || url.protocol === "http:") {
+  if (
+    (url.protocol === "https:" || url.protocol === "http:") &&
+    hasTrustedHttpOrigin(url, trustedOrigin)
+  ) {
     const match = url.pathname.match(channelLinkPathPattern);
     return match
       ? channelLinkFromParts(
@@ -185,12 +218,15 @@ export function parseChannelLink(value: string): ChannelLinkTarget | null {
   return null;
 }
 
-export function parseBriarLink(value: string): BriarLinkTarget | null {
-  const issue = parseIssueLink(value);
+export function parseBriarLink(
+  value: string,
+  trustedOrigin = configuredBriarOrigin(),
+): BriarLinkTarget | null {
+  const issue = parseIssueLink(value, trustedOrigin);
   if (issue) return { kind: "issue", ...issue };
-  const session = parseSessionLink(value);
+  const session = parseSessionLink(value, trustedOrigin);
   if (session) return { kind: "session", ...session };
-  const channel = parseChannelLink(value);
+  const channel = parseChannelLink(value, trustedOrigin);
   return channel ? { kind: "channel", ...channel } : null;
 }
 

@@ -17,6 +17,7 @@ const organizationId = "44444444-4444-4444-8444-444444444444";
 const channelId = "55555555-5555-4555-8555-555555555555";
 const messageId = "66666666-6666-4666-8666-666666666666";
 const rootMessageId = "77777777-7777-4777-8777-777777777777";
+const apiOrigin = "https://briar-api.example";
 const mobileConfig = (platform: "android" | "ios") =>
   JSON.parse(
     readFileSync(
@@ -53,14 +54,21 @@ describe("issue links", () => {
     expect(
       parseIssueLink(
         `https://briar-api.example/open/issues/${projectId}/${runId}`,
+        apiOrigin,
       ),
     ).toEqual({ projectId, runId });
     expect(
       parseIssueLink(`briar-companion://issues/${projectId}/${runId}`),
     ).toEqual({ projectId, runId });
     expect(parseIssueLink("briar-companion://auth-complete")).toBeNull();
-    expect(parseIssueLink("https://briar-api.example/open/issues/nope/nope"))
+    expect(parseIssueLink("https://briar-api.example/open/issues/nope/nope", apiOrigin))
       .toBeNull();
+    expect(
+      parseIssueLink(
+        `https://attacker.example/open/issues/${projectId}/${runId}`,
+        apiOrigin,
+      ),
+    ).toBeNull();
   });
 
   it("builds and parses session share and app deep links", () => {
@@ -72,6 +80,7 @@ describe("issue links", () => {
     expect(
       parseSessionLink(
         `https://briar-api.example/open/sessions/${projectId}/${sessionId}`,
+        apiOrigin,
       ),
     ).toEqual({ projectId, sessionId });
     expect(
@@ -81,7 +90,10 @@ describe("issue links", () => {
     ).toEqual({ projectId, sessionId });
     expect(parseSessionLink("briar-companion://issues/nope/nope")).toBeNull();
     expect(
-      parseSessionLink("https://briar-api.example/open/sessions/nope/nope"),
+      parseSessionLink(
+        "https://briar-api.example/open/sessions/nope/nope",
+        apiOrigin,
+      ),
     ).toBeNull();
   });
 
@@ -121,6 +133,7 @@ describe("issue links", () => {
     expect(
       parseChannelLink(
         `https://briar-api.example/open/channels/${organizationId}/${channelId}`,
+        apiOrigin,
       ),
     ).toEqual({
       organizationId,
@@ -158,6 +171,7 @@ describe("issue links", () => {
     expect(
       parseChannelLink(
         `https://briar-api.example/open/channels/${organizationId}/${channelId}/${messageId}`,
+        apiOrigin,
       ),
     ).toEqual({
       organizationId,
@@ -175,7 +189,10 @@ describe("issue links", () => {
       messageId,
       rootMessageId,
     });
-    expect(parseChannelLink("https://briar-api.example/open/channels/nope/nope/nope"))
+    expect(parseChannelLink(
+      "https://briar-api.example/open/channels/nope/nope/nope",
+      apiOrigin,
+    ))
       .toBeNull();
   });
 

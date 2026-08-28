@@ -697,6 +697,11 @@ final class AgentsInboxSystemTests: XCTestCase {
             ),
             .issue(projectID: projectID, runID: runID)
         )
+        XCTAssertNil(
+            BriarLinkParser.parse(
+                "https://attacker.example/open/issues/\(projectID.uuidString)/\(runID.uuidString)"
+            )
+        )
         XCTAssertEqual(
             BriarLinkParser.parse("briar-companion://sessions/\(projectID.uuidString)/session-1"),
             .session(projectID: projectID, sessionID: "session-1")
@@ -734,6 +739,35 @@ final class AgentsInboxSystemTests: XCTestCase {
             )
         )
         XCTAssertNil(BriarLinkParser.parse("briar-companion://auth-complete"))
+    }
+
+    @MainActor
+    func testInAppIssueURLUsesTrustedParserAndNavigationModel() throws {
+        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+        let navigation = CompanionNavigationModel()
+        let trustedOrigin = try XCTUnwrap(URL(string: "https://briar-api.wbai.workers.dev"))
+        let trustedURL = try XCTUnwrap(URL(string:
+            "https://briar-api.wbai.workers.dev/open/issues/\(projectID.uuidString)/\(runID.uuidString)"
+        ))
+
+        XCTAssertEqual(
+            navigation.open(trustedURL, trustedOrigin: trustedOrigin),
+            .issue(projectID: projectID, runID: runID)
+        )
+        XCTAssertEqual(navigation.selectedTab, .tasks)
+        XCTAssertEqual(navigation.pendingProjectID, projectID)
+        XCTAssertEqual(navigation.pendingIssueID, runID)
+
+        let untrustedURL = try XCTUnwrap(URL(string:
+            "https://attacker.example/open/issues/\(projectID.uuidString)/\(runID.uuidString)"
+        ))
+        XCTAssertNil(navigation.open(untrustedURL, trustedOrigin: trustedOrigin))
+        navigation.failPendingNavigation("요청한 이슈가 없습니다.")
+        XCTAssertNil(navigation.pendingProjectID)
+        XCTAssertNil(navigation.pendingIssueID)
+        XCTAssertFalse(navigation.preparingIssue)
+        XCTAssertEqual(navigation.linkErrorMessage, "요청한 이슈가 없습니다.")
     }
 
     @MainActor

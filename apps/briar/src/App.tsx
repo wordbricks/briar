@@ -70,6 +70,7 @@ import { SessionLoadingScreen } from "./components/SessionLoadingScreen";
 import { EmptyState, MainContent, PageHeader } from "./components/layout";
 import { Button } from "./components/ui/button";
 import { LoadingState } from "./components/ui/loading-state";
+import { useToast } from "./components/ui/toast";
 import { Sidebar } from "./components/Sidebar";
 import {
   UnifiedSettingsSidebar,
@@ -160,6 +161,8 @@ import {
   listenForBriarLinks,
   type BriarLinkTarget,
 } from "./lib/issue-links";
+import { listenForClickedIssueLinks } from "./lib/external-links";
+import { navigateToIssueLink } from "./lib/issue-link-navigation";
 import { isRepositoryConnectedForImport } from "./lib/linear-import";
 import {
   localProjectConnectionState,
@@ -273,6 +276,7 @@ export function App({
   readonly appZoomCommands?: AppZoomCommands | null;
 }) {
   const { locale, t } = useI18n();
+  const { toast } = useToast();
   const [projectWindowProjectId] = useState(readProjectWindowProjectId);
   const autoHunt = useAutoHuntSessions();
   const [invitationToken, setInvitationToken] = useState(
@@ -1203,28 +1207,6 @@ export function App({
     navigationUserBoundaryChanged,
     replaceNavigationLocation,
   ]);
-  useEffect(() => {
-    if (
-      navigationUserBoundaryChanged ||
-      briar.companionMode ||
-      !selectedRunId ||
-      !navigationProjectId ||
-      briar.dashboard?.project.id !== navigationProjectId ||
-      briar.dashboard.runs.some((run) => run.id === selectedRunId)
-    ) {
-      return;
-    }
-    replaceNavigationLocation(
-      projectNavigationLocation("issues", navigationProjectId),
-    );
-  }, [
-    briar.companionMode,
-    briar.dashboard,
-    navigationProjectId,
-    navigationUserBoundaryChanged,
-    replaceNavigationLocation,
-    selectedRunId,
-  ]);
   const createOrganizationChannel = useCallback(
     async (
       name: string,
@@ -1366,6 +1348,13 @@ export function App({
         : listenForBriarLinks(setPendingBriarLink),
     [projectWindowProjectId],
   );
+  useEffect(
+    () =>
+      listenForClickedIssueLinks((target) =>
+        setPendingBriarLink({ kind: "issue", ...target }),
+      ),
+    [],
+  );
   useEffect(() => {
     if (!runsOnMacDesktop || projectWindowProjectId) return;
     return listenForStatusTrayOpenRun((payload) => {
@@ -1440,6 +1429,37 @@ export function App({
       setPendingBriarLink(null);
       return;
     }
+    if (pendingBriarLink.kind === "issue") {
+      const target = pendingBriarLink;
+      setPendingBriarLink(null);
+      void navigateToIssueLink({
+        target,
+        activeProjectId: briar.activeProjectId,
+        availableProjectIds: briar.projects.map((project) => project.id),
+        lockedProjectId: projectWindowProjectId,
+        ensureProjectSelected: briar.ensureProjectSelected,
+        openIssue: ({ projectId, runId }) => {
+          setRequestedSessionId(null);
+          setRequestedRunMessageId(null);
+          setRequestedRunInitialTab(null);
+          setRequestedRunId(runId);
+          setCompanionPage("issues");
+          setCompanionStatus("all");
+          navigateToIssue(runId, projectId);
+        },
+      }).then((outcome) => {
+        if (outcome.status !== "rejected") return;
+        toast(
+          t(
+            outcome.reason === "project-window-locked"
+              ? "navigation.issueLinkProjectWindow"
+              : "navigation.issueLinkProjectUnavailable",
+          ),
+          { tone: "error" },
+        );
+      });
+      return;
+    }
     if (
       !briar.projects.some(
         (project) => project.id === pendingBriarLink.projectId,
@@ -1451,22 +1471,12 @@ export function App({
     if (pendingBriarLink.projectId !== briar.activeProjectId) {
       briar.setActiveProjectId(pendingBriarLink.projectId);
     }
-    if (pendingBriarLink.kind === "issue") {
-      setRequestedSessionId(null);
-      setRequestedRunMessageId(null);
-      setRequestedRunInitialTab(null);
-      setRequestedRunId(pendingBriarLink.runId);
-      setCompanionPage("issues");
-      setCompanionStatus("all");
-      navigateToIssue(pendingBriarLink.runId, pendingBriarLink.projectId);
-    } else {
-      setRequestedRunMessageId(null);
-      setRequestedRunInitialTab(null);
-      setRequestedRunId(null);
-      setRequestedSessionId(pendingBriarLink.sessionId);
-      if (briar.companionMode) setCompanionPage("dms");
-      else navigateToPage("agents", pendingBriarLink.projectId);
-    }
+    setRequestedRunMessageId(null);
+    setRequestedRunInitialTab(null);
+    setRequestedRunId(null);
+    setRequestedSessionId(pendingBriarLink.sessionId);
+    if (briar.companionMode) setCompanionPage("dms");
+    else navigateToPage("agents", pendingBriarLink.projectId);
     setPendingBriarLink(null);
   }, [
     briar.activeOrganizationId,
@@ -1475,6 +1485,7 @@ export function App({
     briar.loading,
     briar.organizations,
     briar.projects,
+    briar.ensureProjectSelected,
     briar.setActiveOrganizationId,
     briar.setActiveProjectId,
     briar.user,
@@ -1486,6 +1497,38 @@ export function App({
     navigateToPage,
     organizationChannels,
     pendingBriarLink,
+    projectWindowProjectId,
+    t,
+    toast,
+  ]);
+  useEffect(() => {
+    if (
+      navigationUserBoundaryChanged ||
+      !selectedRunId ||
+      !navigationProjectId ||
+      briar.dashboard?.project.id !== navigationProjectId ||
+      briar.dashboard.runs.some((run) => run.id === selectedRunId)
+    ) {
+      return;
+    }
+    if (requestedRunId === selectedRunId) {
+      setRequestedRunId(null);
+      setRequestedRunMessageId(null);
+      setRequestedRunInitialTab(null);
+      toast(t("navigation.issueLinkIssueUnavailable"), { tone: "error" });
+    }
+    replaceNavigationLocation(
+      projectNavigationLocation("issues", navigationProjectId),
+    );
+  }, [
+    briar.dashboard,
+    navigationProjectId,
+    navigationUserBoundaryChanged,
+    replaceNavigationLocation,
+    requestedRunId,
+    selectedRunId,
+    t,
+    toast,
   ]);
   useEffect(() => {
     if (!pendingInboxNotificationTarget || !briar.user || briar.loading) return;
