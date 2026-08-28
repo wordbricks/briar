@@ -28,7 +28,9 @@ pub(crate) use codex::{
     MAX_AUTO_HUNT_ISSUES,
 };
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize, specta::Type,
+)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum AgentProviderKind {
     #[default]
@@ -105,14 +107,14 @@ impl AgentProviderKind {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum AgentEventDirection {
     Client,
     Server,
 }
 
-#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum AgentActivityKind {
     Command,
@@ -121,7 +123,7 @@ pub(crate) enum AgentActivityKind {
     Tool,
 }
 
-#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum AgentActivityStatus {
     Completed,
@@ -129,7 +131,7 @@ pub(crate) enum AgentActivityStatus {
     Cancelled,
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum AgentEvent {
     ConversationStarted {
@@ -182,7 +184,7 @@ pub(crate) struct AgentProviderEvent {
 pub(crate) type AgentEventSink =
     Arc<dyn Fn(AgentProviderEvent) -> Result<(), String> + Send + Sync>;
 
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum SandboxMode {
     ReadOnly,
@@ -200,7 +202,9 @@ impl SandboxMode {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize, specta::Type,
+)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum ApprovalPolicy {
     Untrusted,
@@ -219,7 +223,7 @@ impl ApprovalPolicy {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(transparent)]
 pub(crate) struct ModelEffort(String);
 
@@ -248,7 +252,7 @@ pub(crate) struct ChatExecution {
     pub(crate) workspace_write_roots: Vec<String>,
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectLlmSettings {
     #[serde(default)]
@@ -272,7 +276,7 @@ impl Default for ProjectLlmSettings {
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectLlmRequest {
     pub(crate) message: String,
@@ -283,6 +287,7 @@ pub(crate) struct ProjectLlmRequest {
     #[serde(default)]
     pub(crate) instructions: Option<String>,
     #[serde(default)]
+    #[specta(type = Option<crate::ipc::JsonValue>)]
     pub(crate) output_schema: Option<serde_json::Value>,
 }
 
@@ -301,7 +306,7 @@ impl ProjectLlmRequest {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectLlmResponse {
     pub(crate) conversation_id: String,
@@ -322,13 +327,14 @@ pub(crate) struct AutoHuntExecution {
     pub(crate) full_access: bool,
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AppServerEventRecord {
     pub(crate) session_id: String,
     pub(crate) sequence: u64,
     pub(crate) occurred_at_ms: u64,
     pub(crate) direction: String,
+    #[specta(type = crate::ipc::JsonValue)]
     pub(crate) message: serde_json::Value,
     #[serde(default)]
     pub(crate) provider: AgentProviderKind,

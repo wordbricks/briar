@@ -56,6 +56,7 @@ pub(super) fn main_window_state_flags() -> tauri_plugin_window_state::StateFlags
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn show_inbox_notification(
     app: tauri::AppHandle,
     title: String,
@@ -139,6 +140,7 @@ pub(super) fn show_inbox_notification(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn request_inbox_notification_permission() -> Result<bool, String> {
     #[cfg(target_os = "macos")]
     {
@@ -149,6 +151,7 @@ pub(super) async fn request_inbox_notification_permission() -> Result<bool, Stri
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn inbox_notification_permission_status() -> Result<String, String> {
     #[cfg(target_os = "macos")]
     {
@@ -159,6 +162,7 @@ pub(super) async fn inbox_notification_permission_status() -> Result<String, Str
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn open_inbox_notification_settings(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -177,6 +181,7 @@ pub(super) fn open_inbox_notification_settings(app: tauri::AppHandle) -> Result<
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn drain_pending_inbox_notification_opens(
     state: tauri::State<'_, PendingInboxNotificationOpens>,
 ) -> Vec<InboxNotificationTarget> {
@@ -184,6 +189,7 @@ pub(super) fn drain_pending_inbox_notification_opens(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn set_main_window_onboarding_mode(
     app: tauri::AppHandle,
     compact: bool,
@@ -225,6 +231,7 @@ pub(super) fn display_main_window(app: &AppHandle, focus: bool) -> Result<(), St
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -238,6 +245,7 @@ pub(super) fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn sync_status_tray(
     app: tauri::AppHandle,
     snapshot: StatusTraySnapshotCommand,
@@ -255,7 +263,7 @@ pub(super) fn sync_status_tray(
 
 /// Command payload shared with the frontend; converted to the tray module type
 /// only on macOS desktop where the tray is installed.
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct StatusTraySnapshotCommand {
     pub(super) running_label: String,
@@ -272,7 +280,7 @@ pub(super) fn default_status_tray_more_label() -> String {
     "+{count} more in Briar".to_string()
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct StatusTrayRunItemCommand {
     pub(super) project_id: String,
@@ -308,6 +316,7 @@ impl From<StatusTraySnapshotCommand> for status_tray::StatusTraySnapshot {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn reveal_main_window(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -321,6 +330,7 @@ pub(super) fn reveal_main_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn finish_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -337,6 +347,7 @@ pub(super) fn finish_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn prepare_launch_intro(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -446,6 +457,7 @@ pub(super) fn app_update_menu_label(update_available: bool) -> &'static str {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn sync_app_update_menu(
     app: tauri::AppHandle,
     update_available: bool,
@@ -690,6 +702,7 @@ pub(crate) fn request_exit_confirmation(app: &AppHandle) {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn arm_macos_password_editor(webview: tauri::Webview) {
     #[cfg(target_os = "macos")]
     if webview.window().label() == "main" {

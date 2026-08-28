@@ -28,15 +28,16 @@ const GROK_WEEKLY_MINUTES: u64 = 10_080;
 const GROK_MONTHLY_MINUTES: u64 = 43_200;
 const GROK_TOKEN_SKEW_MILLIS: u64 = 5 * 60 * 1_000;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AgentUsageWindow {
+    #[specta(type = specta_typescript::Number)]
     used_percent: f64,
     window_minutes: u64,
     resets_at: Option<u64>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProviderUsage {
     provider: &'static str,
@@ -51,7 +52,7 @@ pub(crate) struct ProviderUsage {
     error: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AgentUsageSnapshot {
     codex: ProviderUsage,
@@ -64,7 +65,7 @@ pub(crate) struct AgentUsageSnapshot {
     updated_at: u64,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct CodexRateLimitWindow {
     used_percent: Option<f64>,
@@ -73,13 +74,13 @@ struct CodexRateLimitWindow {
     resets_at: Option<u64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, specta::Type)]
 struct ClaudeCredentials {
     #[serde(rename = "claudeAiOauth")]
     oauth: Option<ClaudeOauthCredentials>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct ClaudeOauthCredentials {
     access_token: Option<String>,
@@ -96,16 +97,17 @@ struct ClaudeAccountCredentials {
     plan_type: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, specta::Type)]
 struct ClaudeUsageResponse {
     five_hour: Option<ClaudeUsageWindow>,
     seven_day: Option<ClaudeUsageWindow>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, specta::Type)]
 struct ClaudeUsageWindow {
     utilization: Option<f64>,
     used_percentage: Option<f64>,
+    #[specta(type = Option<crate::ipc::JsonValue>)]
     resets_at: Option<Value>,
 }
 
@@ -117,7 +119,7 @@ struct GrokAuthSession {
     account_label: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, specta::Type)]
 struct GrokAuthEntry {
     key: Option<String>,
     user_id: Option<String>,
@@ -127,7 +129,7 @@ struct GrokAuthEntry {
     team_id: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct GrokBillingConfig {
     credit_usage_percent: Option<f64>,
@@ -139,7 +141,7 @@ struct GrokBillingConfig {
     used: Option<GrokMoneyValue>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, specta::Type)]
 struct GrokUsagePeriod {
     #[serde(rename = "type")]
     kind: Option<String>,
@@ -147,8 +149,9 @@ struct GrokUsagePeriod {
     end: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, specta::Type)]
 struct GrokMoneyValue {
+    #[specta(type = Option<crate::ipc::JsonValue>)]
     val: Option<Value>,
 }
 
@@ -903,7 +906,11 @@ fn epoch_to_millis(value: u64) -> u64 {
 }
 
 fn clamp_percent(value: f64) -> f64 {
-    value.clamp(0.0, 100.0)
+    if value.is_finite() {
+        value.clamp(0.0, 100.0)
+    } else {
+        0.0
+    }
 }
 
 fn parse_cli_reset_time(value: &Value) -> Option<u64> {

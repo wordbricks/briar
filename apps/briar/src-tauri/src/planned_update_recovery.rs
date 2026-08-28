@@ -12,7 +12,7 @@ const RECOVERY_VERSION: u8 = 1;
 const RECOVERY_MAX_AGE_MINUTES: i64 = 10;
 static STORE_LOCK: Mutex<()> = Mutex::new(());
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PlannedUpdateAgentRecovery {
     version: u8,
@@ -21,7 +21,7 @@ pub(crate) struct PlannedUpdateAgentRecovery {
     pub(crate) request: ProjectAgentRunRequest,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct PlannedUpdateMarker {
     version: u8,

@@ -1,6 +1,7 @@
 use super::*;
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn connected_project_ids(app: tauri::AppHandle) -> Result<Vec<String>, String> {
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
@@ -22,6 +23,7 @@ pub(super) async fn connected_project_ids(app: tauri::AppHandle) -> Result<Vec<S
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn project_llm_chat(
     app: tauri::AppHandle,
     project_id: String,
@@ -231,6 +233,7 @@ pub(super) async fn project_llm_chat(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn run_project_agent(
     app: tauri::AppHandle,
     session_cancellations: tauri::State<'_, AgentSessionCancellationState>,
@@ -444,6 +447,7 @@ pub(super) async fn run_project_agent(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn prepare_for_app_update(
     app: tauri::AppHandle,
     session_cancellations: tauri::State<'_, AgentSessionCancellationState>,
@@ -458,6 +462,7 @@ pub(super) fn prepare_for_app_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn take_planned_update_agent_recoveries(
     app: tauri::AppHandle,
 ) -> Result<Vec<planned_update_recovery::PlannedUpdateAgentRecovery>, String> {
@@ -469,6 +474,7 @@ pub(super) fn take_planned_update_agent_recoveries(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn stop_project_agent_session(
     session_cancellations: tauri::State<'_, AgentSessionCancellationState>,
     session_id: String,

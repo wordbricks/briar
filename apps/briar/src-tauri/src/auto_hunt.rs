@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct CliClaimResponse {
     pub(super) work: Option<CliClaimedRun>,
@@ -8,7 +8,7 @@ pub(super) struct CliClaimResponse {
     pub(super) workspace_error: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct CliClaimedRun {
     pub(super) run_id: String,
@@ -20,17 +20,19 @@ pub(super) struct CliClaimedRun {
     #[serde(default)]
     pub(super) priority: Option<u8>,
     #[serde(default)]
+    #[specta(type = Option<crate::ipc::JsonValue>)]
     pub(super) context: Option<serde_json::Value>,
     #[serde(default)]
     pub(super) attachments: Vec<agent::ProjectAutoHuntIssueAttachment>,
     #[serde(default)]
     pub(super) messages: Vec<agent::ProjectAutoHuntIssueMessage>,
+    #[specta(type = crate::ipc::JsonValue)]
     pub(super) workflow: serde_json::Value,
     #[serde(default)]
     pub(super) workspace: Option<CliClaimedWorkspace>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct CliClaimedWorkspace {
     #[serde(rename = "type")]
@@ -38,9 +40,10 @@ pub(super) struct CliClaimedWorkspace {
     pub(super) path: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct CliRunEvidenceResponse {
+    #[specta(type = Vec<crate::ipc::JsonValue>)]
     pub(super) evidence: Vec<serde_json::Value>,
 }
 
@@ -63,13 +66,14 @@ pub(super) fn claim_auto_hunt_run(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn retry_project_auto_hunt_run(
     app: tauri::AppHandle,
     project_id: String,
     run_id: String,
     request_id: String,
     reason: String,
-) -> Result<serde_json::Value, String> {
+) -> Result<ipc::JsonValue, String> {
     if project_id.trim().is_empty()
         || project_id.len() > 128
         || run_id.trim().is_empty()
@@ -523,6 +527,7 @@ pub(super) fn create_auto_hunt_worker_event_sink(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn start_project_auto_hunt(
     app: tauri::AppHandle,
     session_cancellations: tauri::State<'_, AgentSessionCancellationState>,
@@ -1245,6 +1250,7 @@ pub(super) fn parse_auto_hunt_event_records(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn load_auto_hunt_app_server_events(
     app: tauri::AppHandle,
     session_id: String,
@@ -1265,6 +1271,7 @@ pub(super) async fn load_auto_hunt_app_server_events(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn load_auto_hunt_dispatch(
     app: tauri::AppHandle,
     dispatch_group_id: String,

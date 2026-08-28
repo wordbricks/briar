@@ -109,6 +109,7 @@ mod app_builder;
 mod app_state;
 mod auto_hunt;
 mod execution_worker;
+mod ipc;
 mod native_ui;
 mod project_config;
 mod project_execution;

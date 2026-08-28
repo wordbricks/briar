@@ -249,6 +249,7 @@ pub(super) fn repository_icon_data_url(root: &Path) -> Result<Option<String>, St
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn discover_repository_icon(
     app: tauri::AppHandle,
     repository_path: String,
@@ -512,6 +513,7 @@ pub(super) fn inspect_lovable_repository_compatibility_in(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn inspect_lovable_repository_compatibility(
     app: tauri::AppHandle,
     repository_path: String,
@@ -782,6 +784,7 @@ pub(super) fn project_repository_readiness_at(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn inspect_repository_readiness(
     app: tauri::AppHandle,
     repository_path: String,
@@ -801,6 +804,7 @@ pub(super) async fn inspect_repository_readiness(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn project_repository_readiness(
     app: tauri::AppHandle,
     project_id: String,
@@ -815,6 +819,7 @@ pub(super) async fn project_repository_readiness(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn install_project_github_cli(
     app: tauri::AppHandle,
     project_id: String,
@@ -839,6 +844,7 @@ pub(super) async fn install_project_github_cli(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn login_project_github(
     app: tauri::AppHandle,
     project_id: String,
@@ -1033,6 +1039,7 @@ pub(super) fn inspect_velen_on(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn inspect_velen(
     app: tauri::AppHandle,
     org: Option<String>,
@@ -1047,6 +1054,7 @@ pub(super) async fn inspect_velen(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn validate_repository_path(
     app: tauri::AppHandle,
     path: String,
@@ -1289,7 +1297,7 @@ pub(super) fn create_project_workspace_in(
     })
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct CreatedProjectWorkspace {
     pub(super) repository_path: String,
@@ -1297,7 +1305,7 @@ pub(super) struct CreatedProjectWorkspace {
     pub(super) created: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct ClonedProjectRepository {
     pub(super) repository_path: String,
@@ -1305,6 +1313,7 @@ pub(super) struct ClonedProjectRepository {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn create_project_workspace(
     app: tauri::AppHandle,
     name: String,
@@ -1319,6 +1328,7 @@ pub(super) async fn create_project_workspace(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn clone_github_ssh_repository(
     app: tauri::AppHandle,
     repository_url: String,

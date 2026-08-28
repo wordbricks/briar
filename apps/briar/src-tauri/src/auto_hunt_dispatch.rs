@@ -8,7 +8,7 @@ use std::{
 
 const DISPATCH_VERSION: u8 = 1;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AutoHuntDispatchGroup {
     pub(crate) version: u8,
@@ -29,7 +29,7 @@ pub(crate) struct AutoHuntDispatchGroup {
     pub(crate) events: Vec<AutoHuntDispatchEvent>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AutoHuntDispatchStatus {
     Running,
@@ -38,7 +38,7 @@ pub(crate) enum AutoHuntDispatchStatus {
     Interrupted,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AutoHuntDispatchWorker {
     pub(crate) session_id: String,
@@ -53,7 +53,7 @@ pub(crate) struct AutoHuntDispatchWorker {
     pub(crate) completed_at: Option<String>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AutoHuntWorkerStatus {
     Allocating,
@@ -76,7 +76,7 @@ impl AutoHuntWorkerStatus {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AutoHuntDispatchEvent {
     pub(crate) dispatch_group_id: String,
@@ -88,6 +88,7 @@ pub(crate) struct AutoHuntDispatchEvent {
     pub(crate) status: String,
     pub(crate) message: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<crate::ipc::JsonValue>)]
     pub(crate) data: Option<serde_json::Value>,
     pub(crate) occurred_at: String,
 }

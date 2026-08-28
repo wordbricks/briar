@@ -36,7 +36,7 @@ fn enable_execution_worker(
     project_id: &str,
     bun_path: &str,
     cli_path: &str,
-) -> Result<serde_json::Value, String> {
+) -> Result<ipc::JsonValue, String> {
     // A failed registration has not produced a local binding that can be
     // unregistered reliably. Cleanup begins only after the CLI confirms that
     // registration completed.
@@ -64,12 +64,13 @@ fn enable_execution_worker(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn configure_execution_worker(
     app: AppHandle,
     project_id: String,
     user_token: String,
     enabled: bool,
-) -> Result<serde_json::Value, String> {
+) -> Result<ipc::JsonValue, String> {
     if project_id.trim().is_empty() || user_token.trim().is_empty() {
         return Err("프로젝트와 로그인 정보가 필요합니다.".to_string());
     }
@@ -124,6 +125,7 @@ pub(super) fn configure_execution_worker(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn inspect_execution_workers(
     app: AppHandle,
     project_ids: Vec<String>,
@@ -132,6 +134,7 @@ pub(super) fn inspect_execution_workers(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn current_execution_worker_device_id(
     app: AppHandle,
     organization_id: String,
@@ -140,7 +143,8 @@ pub(super) fn current_execution_worker_device_id(
 }
 
 #[tauri::command]
-pub(super) fn sync_execution_worker_labels(app: AppHandle) -> Result<serde_json::Value, String> {
+#[specta::specta]
+pub(super) fn sync_execution_worker_labels(app: AppHandle) -> Result<ipc::JsonValue, String> {
     let resource_directory = app
         .path()
         .resource_dir()
@@ -170,6 +174,7 @@ pub(super) fn sync_execution_worker_labels(app: AppHandle) -> Result<serde_json:
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) fn refresh_execution_worker_runtime(app: AppHandle) -> Result<bool, String> {
     let resource_directory = app
         .path()
@@ -654,6 +659,7 @@ pub(super) fn auto_hunt_health_sync_with(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn auto_hunt_health(
     app: tauri::AppHandle,
     project_id: String,
@@ -672,6 +678,7 @@ pub(super) async fn auto_hunt_health(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn repair_auto_hunt(
     app: tauri::AppHandle,
     project_id: String,

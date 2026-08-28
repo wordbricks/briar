@@ -980,6 +980,7 @@ pub(super) fn open_provider_login_terminal(_binary: &Path, _args: &[&str]) -> Re
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn open_agent_provider_login(
     app: tauri::AppHandle,
     provider: String,
@@ -994,6 +995,7 @@ pub(super) async fn open_agent_provider_login(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn inspect_onboarding_prerequisites(
     app: tauri::AppHandle,
 ) -> Result<OnboardingPrerequisites, String> {
@@ -1008,6 +1010,7 @@ pub(super) async fn inspect_onboarding_prerequisites(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn load_agent_provider_models(
     app: tauri::AppHandle,
 ) -> Result<AgentProviderModelCatalog, String> {
@@ -1180,6 +1183,7 @@ pub(super) fn configure_open_code_terminal_path_for_binary(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn inspect_open_code_terminal_path(
     app: tauri::AppHandle,
 ) -> Result<OpenCodeTerminalPathStatus, String> {
@@ -1193,6 +1197,7 @@ pub(super) async fn inspect_open_code_terminal_path(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn configure_open_code_terminal_path(
     app: tauri::AppHandle,
 ) -> Result<OpenCodeTerminalPathStatus, String> {
@@ -1339,6 +1344,7 @@ pub(super) fn install_agy_cli(home: &Path) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn install_onboarding_prerequisite(
     app: tauri::AppHandle,
     prerequisite: String,
@@ -1415,6 +1421,7 @@ pub(super) fn inspect_agent_browser_sync(home: &Path) -> AgentBrowserStatus {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn inspect_agent_browser(
     app: tauri::AppHandle,
 ) -> Result<AgentBrowserStatus, String> {
@@ -1455,6 +1462,7 @@ pub(super) fn inspect_ego_browser_sync(home: &Path) -> EgoBrowserStatus {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn inspect_ego_browser(app: tauri::AppHandle) -> Result<EgoBrowserStatus, String> {
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || inspect_ego_browser_sync(&home))
@@ -1567,6 +1575,7 @@ pub(super) fn inspect_aside_browser_sync(home: &Path) -> AsideBrowserStatus {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn inspect_aside_browser(
     app: tauri::AppHandle,
 ) -> Result<AsideBrowserStatus, String> {
@@ -1604,6 +1613,7 @@ pub(super) fn install_aside_cli(home: &Path) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn setup_aside_browser(
     app: tauri::AppHandle,
 ) -> Result<AsideBrowserStatus, String> {
@@ -1643,6 +1653,7 @@ pub(super) async fn setup_aside_browser(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub(super) async fn install_agent_browser(
     app: tauri::AppHandle,
 ) -> Result<AgentBrowserStatus, String> {

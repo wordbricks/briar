@@ -200,7 +200,7 @@ fn serialize_request(
         .map_err(|error| format!("{} 요청을 만들지 못했습니다: {error}", config.request_name))
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct SidecarRunnerRequest<'a> {
     r#type: &'static str,
@@ -208,6 +208,7 @@ struct SidecarRunnerRequest<'a> {
     workspace_root: &'a str,
     conversation_id: Option<&'a str>,
     instructions: Option<&'a str>,
+    #[specta(type = Option<crate::ipc::JsonValue>)]
     output_schema: Option<&'a Value>,
     model: Option<&'a str>,
     effort: Option<ModelEffort>,
@@ -252,7 +253,7 @@ fn runner_request(
     Ok(raw_request)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, specta::Type)]
 #[serde(tag = "type", rename_all = "camelCase")]
 enum SidecarRunnerMessage {
     Session {
@@ -260,6 +261,7 @@ enum SidecarRunnerMessage {
         session_id: String,
     },
     Event {
+        #[specta(type = crate::ipc::JsonValue)]
         raw: Value,
         event: Option<AgentEvent>,
     },
@@ -267,6 +269,7 @@ enum SidecarRunnerMessage {
         id: String,
         #[serde(rename = "toolName")]
         tool_name: String,
+        #[specta(type = crate::ipc::JsonValue)]
         input: Value,
         title: Option<String>,
     },

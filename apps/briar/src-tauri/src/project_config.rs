@@ -241,7 +241,7 @@ pub(super) fn connected_project_runtime(
     Ok((runner, workspace))
 }
 
-#[derive(Clone, Copy, Default, Deserialize)]
+#[derive(Clone, Copy, Default, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) enum ProjectWorkspaceMode {
     #[default]
