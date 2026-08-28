@@ -128,6 +128,24 @@ const decodePullRequestQueryResponse = Schema.decodeUnknownSync(
   PullRequestQueryResponse,
 );
 
+const RepositoryMergeMethodsResponse = Schema.Struct({
+  allow_merge_commit: Schema.Boolean,
+  allow_squash_merge: Schema.Boolean,
+  allow_rebase_merge: Schema.Boolean,
+});
+const decodeRepositoryMergeMethodsResponse = Schema.decodeUnknownSync(
+  RepositoryMergeMethodsResponse,
+);
+
+const PullRequestMergeResponse = Schema.Struct({
+  sha: Schema.NullOr(GitObjectId),
+  merged: Schema.Boolean,
+  message: Schema.String,
+});
+const decodePullRequestMergeResponse = Schema.decodeUnknownSync(
+  PullRequestMergeResponse,
+);
+
 const MergeBatchClaimResponse = Schema.Struct({
   work: Schema.NullOr(Schema.Unknown),
   retryAfterMs: Schema.optional(Schema.Int.check(
@@ -737,9 +755,108 @@ function assertPublishAuthorityValues(claim: ClaimedMergeBatch) {
   return { mergeGroupRef, mergeGroupSha, mergeGroupBaseSha };
 }
 
+function mergedPrefixLength(claim: ClaimedMergeBatch) {
+  let merged = 0;
+  let foundOpen = false;
+  for (const member of claim.members) {
+    if (member.state === "merged") {
+      if (foundOpen) {
+        throw new MergeQueueAuthorityError(
+          "Merged batch members are not a contiguous prefix",
+        );
+      }
+      merged += 1;
+    } else {
+      foundOpen = true;
+    }
+  }
+  return merged;
+}
+
+function verifyPublishedPrefix(
+  input: NormalizedMergeBatchExecutionInput,
+  authority: ReturnType<typeof assertPublishAuthorityValues>,
+  mergedCount: number,
+) {
+  const integrationRef = `${MERGE_QUEUE_VALIDATION_SOURCE_REF_PREFIX}/${input.claim.workId}`;
+  const mainRef = `${MERGE_QUEUE_VALIDATION_BASE_REF_PREFIX}/${input.claim.workId}-publication`;
+  runGitCommand(
+    input.runCommand,
+    input.repositoryPath,
+    [
+      "fetch",
+      "--no-tags",
+      "--force",
+      "--no-write-fetch-head",
+      "origin",
+      `+${authority.mergeGroupRef}:${integrationRef}`,
+      `+refs/heads/main:${mainRef}`,
+    ],
+    120_000,
+  );
+  const integrationSha = runGitCommand(input.runCommand, input.repositoryPath, [
+    "rev-parse",
+    "--verify",
+    `${integrationRef}^{commit}`,
+  ]);
+  if (integrationSha !== authority.mergeGroupSha) {
+    throw new MergeQueueAuthorityError(
+      "The live integration ref no longer matches the validated SHA",
+    );
+  }
+  const liveMainSha = runGitCommand(input.runCommand, input.repositoryPath, [
+    "rev-parse",
+    "--verify",
+    `${mainRef}^{commit}`,
+  ]);
+  if (mergedCount === 0 && liveMainSha !== authority.mergeGroupBaseSha) {
+    throw new MergeQueueRetryError(
+      "Main advanced before the validated batch started merging",
+    );
+  }
+  const remaining = input.claim.members.length - mergedCount;
+  const expectedCommit = remaining === 0
+    ? integrationRef
+    : `${integrationRef}~${remaining}`;
+  const expectedTree = runGitCommand(input.runCommand, input.repositoryPath, [
+    "rev-parse",
+    "--verify",
+    `${expectedCommit}^{tree}`,
+  ]);
+  const liveMainTree = runGitCommand(input.runCommand, input.repositoryPath, [
+    "rev-parse",
+    "--verify",
+    `${mainRef}^{tree}`,
+  ]);
+  if (liveMainTree !== expectedTree) {
+    throw new MergeQueueAuthorityError(
+      "Main content does not match the validated merged prefix",
+    );
+  }
+  return liveMainSha;
+}
+
+function repositoryMergeMethod(input: NormalizedMergeBatchExecutionInput) {
+  const methods = decodeCommandJson(
+    input.runCommand(
+      ["gh", "api", `repos/${input.claim.repository}`],
+      localOptions(input.repositoryPath),
+    ),
+    decodeRepositoryMergeMethodsResponse,
+    "GitHub repository merge-method inspection",
+  );
+  if (methods.allow_squash_merge) return "squash";
+  if (methods.allow_rebase_merge) return "rebase";
+  if (methods.allow_merge_commit) return "merge";
+  throw new MergeQueueAuthorityError(
+    "The repository does not allow a pull-request merge method",
+  );
+}
+
 async function reFencePublication(input: NormalizedMergeBatchExecutionInput) {
   await renewMergeBatchClaim(input.api, input.claim, input.workerId);
   const authority = assertPublishAuthorityValues(input.claim);
+  const mergedCount = mergedPrefixLength(input.claim);
   for (const member of input.claim.members) {
     if (member.state === "merged") continue;
     inspectPullRequest(
@@ -749,53 +866,59 @@ async function reFencePublication(input: NormalizedMergeBatchExecutionInput) {
       input.runCommand,
     );
   }
-  const refs = readRemoteRefs(
-    input.repositoryPath,
-    [authority.mergeGroupRef, "refs/heads/main"],
-    input.runCommand,
-  );
-  const liveMain = refs.get("refs/heads/main");
-  if (
-    refs.get(authority.mergeGroupRef) !== authority.mergeGroupSha &&
-    liveMain !== authority.mergeGroupSha
-  ) {
-    throw new MergeQueueAuthorityError(
-      "The live integration ref no longer matches the claimed publication SHA",
-    );
-  }
-  if (
-    liveMain !== authority.mergeGroupBaseSha &&
-    liveMain !== authority.mergeGroupSha
-  ) {
-    throw new MergeQueueAuthorityError(
-      "Protected main advanced beyond the prepared publication base SHA",
-    );
-  }
-  return { ...authority, alreadyPublished: liveMain === authority.mergeGroupSha };
+  verifyPublishedPrefix(input, authority, mergedCount);
+  return { ...authority, mergedCount };
 }
 
-function publishIntegrationRef(
+async function mergeBatchPullRequests(
   input: NormalizedMergeBatchExecutionInput,
-  authority: ReturnType<typeof assertPublishAuthorityValues>,
+  authority: Awaited<ReturnType<typeof reFencePublication>>,
 ) {
-  const pushed = input.runCommand(
-    [
-      "git",
-      "push",
-      `--force-with-lease=refs/heads/main:${authority.mergeGroupBaseSha}`,
-      "origin",
-      `${authority.mergeGroupSha}:refs/heads/main`,
-    ],
-    localOptions(input.repositoryPath, 120_000),
-  );
-  if (pushed.exitCode === 0) return;
-  const main = readRemoteRefs(
-    input.repositoryPath,
-    ["refs/heads/main"],
-    input.runCommand,
-  ).get("refs/heads/main");
-  if (main !== authority.mergeGroupSha) {
-    commandFailure("Exact integration publish", pushed);
+  if (authority.mergedCount === input.claim.members.length) return;
+  const mergeMethod = repositoryMergeMethod(input);
+  for (
+    let index = authority.mergedCount;
+    index < input.claim.members.length;
+    index += 1
+  ) {
+    if (input.signal.aborted) throw input.signal.reason;
+    await renewMergeBatchClaim(input.api, input.claim, input.workerId);
+    const member = input.claim.members[index];
+    inspectPullRequest(
+      input.claim,
+      member,
+      input.repositoryPath,
+      input.runCommand,
+    );
+    const merged = decodeCommandJson(
+      input.runCommand(
+        [
+          "gh",
+          "api",
+          `repos/${input.claim.repository}/pulls/${member.pullRequestNumber}/merge`,
+          "--method",
+          "PUT",
+          "-f",
+          `sha=${member.headSha}`,
+          "-f",
+          `merge_method=${mergeMethod}`,
+        ],
+        localOptions(input.repositoryPath, 120_000),
+      ),
+      decodePullRequestMergeResponse,
+      `GitHub pull request #${member.pullRequestNumber} merge`,
+    );
+    if (!merged.merged || !merged.sha) {
+      throw new MergeQueueAuthorityError(
+        `GitHub did not merge pull request #${member.pullRequestNumber}: ${merged.message}`,
+      );
+    }
+    const liveMainSha = verifyPublishedPrefix(input, authority, index + 1);
+    if (liveMainSha !== merged.sha) {
+      throw new MergeQueueRetryError(
+        `Main advanced while pull request #${member.pullRequestNumber} was merging`,
+      );
+    }
   }
 }
 
@@ -843,36 +966,43 @@ async function publishMergeBatch(input: NormalizedMergeBatchExecutionInput) {
   const byContext = new Map<string, typeof proof[number]>();
   for (const result of proof) byContext.set(result.context, result);
   const failed = proof.some((result) => !result.passed);
-  let publicationAuthority: ReturnType<typeof assertPublishAuthorityValues> | null = null;
-  let alreadyPublished = false;
-  for (const context of [MERGE_QUEUE_VALIDATION_CONTEXT]) {
-    if (input.signal.aborted) throw input.signal.reason;
-    const result = byContext.get(context);
-    if (!result) {
-      throw new MergeQueueAuthorityError(
-        `Publication proof is missing ${context}`,
-      );
+  const publishProofStatuses = async (
+    authority: ReturnType<typeof assertPublishAuthorityValues>,
+    renewBeforeEach: boolean,
+  ) => {
+    for (const context of [MERGE_QUEUE_VALIDATION_CONTEXT]) {
+      if (input.signal.aborted) throw input.signal.reason;
+      const result = byContext.get(context);
+      if (!result) {
+        throw new MergeQueueAuthorityError(
+          `Publication proof is missing ${context}`,
+        );
+      }
+      if (renewBeforeEach) {
+        await renewMergeBatchClaim(input.api, input.claim, input.workerId);
+      }
+      publishStatus(input, authority.mergeGroupSha, result);
     }
+  };
+  if (failed) {
     // A failed durable proof is safe to replay against its immutable SHA: it
-    // can never publish the integration ref to main. Keep the lease live
-    // before every status, while retaining the stronger ref/main fence for an
-    // all-success proof.
-    let authority: ReturnType<typeof assertPublishAuthorityValues>;
-    if (failed) {
-      await renewMergeBatchClaim(input.api, input.claim, input.workerId);
-      authority = assertPublishAuthorityValues(input.claim);
-    } else {
-      const fenced = await reFencePublication(input);
-      authority = fenced;
-      publicationAuthority = fenced;
-      alreadyPublished = fenced.alreadyPublished;
-    }
-    publishStatus(input, authority.mergeGroupSha, result);
+    // can never merge a pull request. Keep the lease live before every status.
+    const authority = assertPublishAuthorityValues(input.claim);
+    await publishProofStatuses(authority, true);
+    await postClaimAction(
+      input.api,
+      input.claim,
+      "published",
+      {
+        ...commonClaimBody(input.claim, input.workerId),
+        mergeGroupSha: authority.mergeGroupSha,
+      },
+    );
+    return;
   }
-  const authority = assertPublishAuthorityValues(input.claim);
-  if (!failed && !alreadyPublished) {
-    publishIntegrationRef(input, publicationAuthority ?? authority);
-  }
+  const authority = await reFencePublication(input);
+  await publishProofStatuses(authority, false);
+  await mergeBatchPullRequests(input, authority);
   await postClaimAction(
     input.api,
     input.claim,
@@ -1018,46 +1148,6 @@ const decodeGithubRepositoryResponse = Schema.decodeUnknownSync(
   GithubRepositoryResponse,
 );
 
-const EffectiveRuleSchema = Schema.Struct({
-  type: Schema.NonEmptyString,
-  ruleset_id: PositiveInteger,
-  parameters: Schema.optional(Schema.Unknown),
-});
-type EffectiveRule = typeof EffectiveRuleSchema.Type;
-const EffectiveRulePages = Schema.mutable(Schema.Array(
-  Schema.mutable(Schema.Array(EffectiveRuleSchema)),
-));
-const decodeEffectiveRulePages = Schema.decodeUnknownSync(EffectiveRulePages);
-
-const DetailedRulesetSchema = Schema.Struct({
-  id: PositiveInteger,
-  target: Schema.String,
-  enforcement: Schema.String,
-  bypass_actors: Schema.mutable(Schema.Array(Schema.Struct({
-    actor_id: PositiveInteger,
-    actor_type: Schema.Literals(["Integration", "Team"]),
-    bypass_mode: Schema.Literal("always"),
-  }))),
-  conditions: Schema.Struct({
-    ref_name: Schema.Struct({
-      include: Schema.mutable(Schema.Array(Schema.String)),
-      exclude: Schema.mutable(Schema.Array(Schema.String)),
-    }),
-  }),
-});
-const decodeDetailedRuleset = Schema.decodeUnknownSync(DetailedRulesetSchema);
-
-const RequiredStatusChecksParameters = Schema.Struct({
-  required_status_checks: Schema.mutable(Schema.Array(Schema.Struct({
-    context: Schema.NonEmptyString,
-    integration_id: Schema.optional(Schema.NullOr(PositiveInteger)),
-  }))),
-  strict_required_status_checks_policy: Schema.Boolean,
-});
-const decodeRequiredStatusChecksParameters = Schema.decodeUnknownSync(
-  RequiredStatusChecksParameters,
-);
-
 export type MergeQueueDoctorCheck = {
   name: string;
   ok: boolean;
@@ -1120,21 +1210,6 @@ function doctorCheck(
   detail: string,
 ) {
   checks.push({ name, ok, detail });
-}
-
-function ruleParameters<T>(
-  rule: EffectiveRule,
-  decode: (input: unknown) => T,
-  name: string,
-) {
-  try {
-    return decode(rule.parameters);
-  } catch (cause) {
-    throw new MergeQueueInfrastructureError(
-      `${name} rule parameters were invalid`,
-      { cause },
-    );
-  }
 }
 
 export function inspectMergeQueueDoctor(input: {
@@ -1239,144 +1314,6 @@ export function inspectMergeQueueDoctor(input: {
       "github-repository",
       false,
       "GitHub CLI authentication is unavailable",
-    );
-  }
-
-  if (!githubRepositoryReady) {
-    doctorCheck(
-      checks,
-      "effective-main-rules",
-      false,
-      "GitHub repository identity must pass before rules are trusted",
-    );
-    return { ok: false, checks };
-  }
-
-  try {
-    const pages = decodeCommandJson(
-      run(
-        [
-          "gh",
-          "api",
-          "--paginate",
-          "--slurp",
-          `repos/${input.profile.repository}/rules/branches/main?per_page=100`,
-        ],
-        localOptions(input.repositoryPath),
-      ),
-      decodeEffectiveRulePages,
-      "GitHub effective main rules inspection",
-    );
-    const rules = pages.flat();
-    const relevantTypes = new Set([
-      "pull_request",
-      "deletion",
-      "non_fast_forward",
-      "required_status_checks",
-    ]);
-    const relevantRules = rules.filter((rule) => relevantTypes.has(rule.type));
-    const byType = new Map<string, EffectiveRule[]>();
-    for (const rule of relevantRules) {
-      const current = byType.get(rule.type) ?? [];
-      current.push(rule);
-      byType.set(rule.type, current);
-    }
-
-    const protectionsReady = [
-      "pull_request",
-      "deletion",
-      "non_fast_forward",
-    ].every((type) => (byType.get(type)?.length ?? 0) > 0);
-    doctorCheck(
-      checks,
-      "main-protections",
-      protectionsReady,
-      protectionsReady
-        ? "pull_request, deletion, and non_fast_forward are effective"
-        : "main requires pull_request, deletion, and non_fast_forward rules",
-    );
-
-    const statusRules = byType.get("required_status_checks") ?? [];
-    const statusParameters = statusRules.map((rule) =>
-      ruleParameters(
-        rule,
-        decodeRequiredStatusChecksParameters,
-        "GitHub required_status_checks",
-      )
-    );
-    const contexts = statusParameters.flatMap((parameters) =>
-      parameters.required_status_checks.map((check) => check.context)
-    );
-    const expectedContexts = [MERGE_QUEUE_GITHUB_STATUS_CONTEXT];
-    const statusReady = statusParameters.length > 0 &&
-      statusParameters.every((parameters) =>
-        !parameters.strict_required_status_checks_policy &&
-        parameters.required_status_checks.every((check) =>
-          check.integration_id === undefined || check.integration_id === null
-        )
-      ) &&
-      contexts.length === expectedContexts.length &&
-      new Set(contexts).size === expectedContexts.length &&
-      expectedContexts.every((context) => contexts.includes(context));
-    doctorCheck(
-      checks,
-      "validation-status-context",
-      statusReady,
-      statusReady
-        ? `${MERGE_QUEUE_GITHUB_STATUS_CONTEXT} is required with strict=false`
-        : `required_status_checks must contain only ${MERGE_QUEUE_GITHUB_STATUS_CONTEXT}, ` +
-          "strict=false, without integration pinning",
-    );
-
-    const rulesetIds = [...new Set(
-      relevantRules.map((rule) => rule.ruleset_id),
-    )];
-    const rulesets = rulesetIds.map((rulesetId) =>
-      decodeCommandJson(
-        run(
-          [
-            "gh",
-            "api",
-            `repos/${input.profile!.repository}/rulesets/${rulesetId}?includes_parents=true`,
-          ],
-          localOptions(input.repositoryPath),
-        ),
-        decodeDetailedRuleset,
-        `GitHub ruleset ${rulesetId} inspection`,
-      )
-    );
-    const publisherActors = new Set(
-      rulesets.flatMap((ruleset) =>
-        ruleset.bypass_actors.map((actor) =>
-          `${actor.actor_type}:${actor.actor_id}`
-        )
-      ),
-    );
-    const rulesetsReady = rulesets.length > 0 && publisherActors.size === 1 &&
-      rulesets.every((ruleset) =>
-        ruleset.target === "branch" &&
-        ruleset.enforcement === "active" &&
-        ruleset.bypass_actors.length === 1 &&
-        ruleset.conditions.ref_name.include.length === 1 &&
-        ruleset.conditions.ref_name.include[0] === "refs/heads/main" &&
-        ruleset.conditions.ref_name.exclude.length === 0
-      );
-    doctorCheck(
-      checks,
-      "active-publisher-bypass-rulesets",
-      rulesetsReady,
-      rulesetsReady
-        ? "all effective coordinator rules come from exact-main active " +
-          "rulesets with one publisher bypass actor"
-        : "effective coordinator rules must come from exact refs/heads/main " +
-          "active rulesets with exactly one publisher bypass actor",
-    );
-  } catch (error) {
-    doctorCheck(
-      checks,
-      "effective-main-rules",
-      false,
-      error instanceof Error ? error.message : String(error),
     );
   }
 

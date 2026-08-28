@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.170",
+        date: "2026년 8월 28일",
+        title: "Merge Queue가 기존 저장소 정책을 그대로 따릅니다",
+        summary:
+          "GitHub 설정을 강제하지 않는 Merge Queue와 더 단순한 모바일·에이전트 경험을 제공합니다.",
+        items: [
+          "Merge Queue가 ruleset이나 bypass 권한을 요구하지 않고 저장소의 기존 PR 병합 정책을 그대로 따릅니다.",
+          "검증된 통합 결과를 확인한 뒤 원본 PR을 GitHub의 일반 병합 API로 순서대로 병합합니다.",
+          "iOS는 네이티브 SwiftUI 앱 하나로 정리하고 중복된 Tauri iOS 빌드 경로를 제거했습니다.",
+          "프로젝트 Skill 실행이 대화 세션 런타임을 사용해 승인과 실행 상태를 더 일관되게 유지합니다.",
+          "저장소 재연결 화면의 밝은 테마와 어두운 테마 대비를 개선했습니다.",
+        ],
+      },
+      {
         version: "1.2.169",
         date: "2026년 8월 28일",
         title: "저장소에 맞는 Merge Queue 검증으로 안전하게 병합합니다",
@@ -1252,6 +1266,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.170",
+        date: "August 28, 2026",
+        title: "Let Merge Queue follow existing repository policy",
+        summary:
+          "Use Merge Queue without imposing GitHub configuration while simplifying mobile and Agent experiences.",
+        items: [
+          "Merge Queue no longer requires rulesets or bypass access and instead honors each repository's existing pull request merge policy.",
+          "After validating the integration result, merge the original pull requests in order through GitHub's standard merge API.",
+          "Keep iOS on one native SwiftUI app and remove the duplicate Tauri iOS build path.",
+          "Run project Skills through the conversation session runtime for more consistent approval and execution state.",
+          "Improve light- and dark-theme contrast throughout the repository reconnect screen.",
+        ],
+      },
       {
         version: "1.2.169",
         date: "August 28, 2026",
@@ -2566,7 +2594,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-169">
+          <a href="#v1-2-170">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2588,6 +2616,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
+                      entry.version === "1.2.170" ||
                       entry.version === "1.2.169"
                         ? "2026-08-28"
                         : entry.version === "1.2.168" ||
