@@ -230,7 +230,10 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     });
     expect(loadExecutionContext).not.toHaveBeenCalled();
     expect(document.body.querySelector('[role="combobox"]')).toBeNull();
-    expect(document.body.textContent).toContain("원래 스레드 세션");
+    expect(document.body.textContent).toContain("기존 Agent 대화");
+    expect(document.body.textContent).toContain("원래 대화에서 실행을 이어가는 중");
+    expect(document.body.textContent).not.toContain("gpt-5.6-sol");
+    expect(document.body.textContent).not.toContain("high");
     const approve = Array.from(
       document.body.querySelectorAll<HTMLButtonElement>("button"),
     ).find((button) => button.textContent?.includes("승인하고 Skill 실행"));

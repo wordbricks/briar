@@ -235,7 +235,10 @@ export async function approveAgentSkillExecutionProposal(
     ? await db.prepare(
       `select session.id as session_id,
               session.owner_worker_id as owner_worker_id,
-              source.claimed_worker_id as source_worker_id
+              source.claimed_worker_id as source_worker_id,
+              session.provider as provider,
+              session.model as model,
+              session.effort as effort
        from briar_channel_agent_reply_jobs source
        join briar_channel_reply_sessions session on session.id = source.session_id
        where source.id = ? and source.status = 'completed'
@@ -250,6 +253,9 @@ export async function approveAgentSkillExecutionProposal(
       session_id: string;
       owner_worker_id: string | null;
       source_worker_id: string | null;
+      provider: AgentSkillExecutionProposalRow["provider"];
+      model: string | null;
+      effort: AgentSkillExecutionProposalRow["effort"];
     }>()
     : null;
   if (proposal.execution_mode === "conversation" && !conversationBinding) {
@@ -272,13 +278,16 @@ export async function approveAgentSkillExecutionProposal(
     ReturnType<typeof availableExecutionWorkerForAgentSkill>
   > | null = null;
   let workerConflict: WorkerConflictError | null = null;
+  const runtimeProvider = proposal.execution_mode === "conversation"
+    ? conversationBinding!.provider
+    : proposal.provider;
   for (const workerId of candidateWorkerIds) {
     try {
       worker = await availableExecutionWorkerForAgentSkill(db, {
         organizationId: proposal.organization_id,
         projectId: proposal.project_id,
         workerId,
-        provider: proposal.provider,
+        provider: runtimeProvider,
         observedAt: acceptedAt,
       });
       break;
