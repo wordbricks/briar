@@ -19,6 +19,8 @@ const historicalBaseSha = "b".repeat(40);
 const liveBaseSha = "c".repeat(40);
 const integrationSha = "d".repeat(40);
 const treeSha = "e".repeat(40);
+const baseTreeSha = "1".repeat(40);
+const mergedMainSha = "2".repeat(40);
 const logSha256 = "f".repeat(64);
 const integrationRef = `refs/heads/briar/merge-queue/${batchId}`;
 const validationResults: NonNullable<
@@ -245,20 +247,45 @@ describe("local provider-independent merge-queue worker", () => {
       });
   });
 
-  it("re-fences every status and lease-publishes the tested SHA to main", async () => {
+  it("re-fences the validated tree and merges each original PR through GitHub", async () => {
     const commands: string[][] = [];
+    let mainSha = liveBaseSha;
     const run: MergeQueueCommandRunner = (command) => {
       commands.push([...command]);
       if (command[0] === "gh" && command.includes("graphql")) {
         return successful(pullRequestResponse());
       }
-      if (command[0] === "gh") return successful();
-      if (command[1] === "ls-remote") {
-        return successful(
-          `${integrationSha}\t${integrationRef}\n${liveBaseSha}\trefs/heads/main\n`,
-        );
+      if (command[0] === "gh" && command.at(-1) === "repos/wordbricks/briar") {
+        return successful(JSON.stringify({
+          allow_merge_commit: true,
+          allow_squash_merge: true,
+          allow_rebase_merge: true,
+        }));
       }
-      if (command[1] === "push") return successful();
+      if (command[0] === "gh" && command.includes("repos/wordbricks/briar/pulls/42/merge")) {
+        mainSha = mergedMainSha;
+        return successful(JSON.stringify({
+          sha: mergedMainSha,
+          merged: true,
+          message: "Pull Request successfully merged",
+        }));
+      }
+      if (command[0] === "gh") return successful();
+      if (command[1] === "fetch") return successful();
+      if (command[1] === "rev-parse") {
+        const ref = command.at(-1) ?? "";
+        if (ref.includes("merge-group-validation/") && ref.endsWith("^{commit}")) {
+          return successful(integrationSha);
+        }
+        if (ref.includes("publication") && ref.endsWith("^{commit}")) {
+          return successful(mainSha);
+        }
+        if (ref.includes("publication") && ref.endsWith("^{tree}")) {
+          return successful(mainSha === liveBaseSha ? baseTreeSha : treeSha);
+        }
+        if (ref.includes("~1^{tree}")) return successful(baseTreeSha);
+        if (ref.endsWith("^{tree}")) return successful(treeSha);
+      }
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
     const api = recordingApi();
@@ -275,12 +302,16 @@ describe("local provider-independent merge-queue worker", () => {
     );
     expect(statuses).toHaveLength(1);
     expect(statuses[0]).toContain("context=briar/merge-queue");
-    expect(api.calls.filter((call) => call.path.endsWith("/lease"))).toHaveLength(1);
+    expect(api.calls.filter((call) => call.path.endsWith("/lease"))).toHaveLength(2);
     expect(commands.some((command) =>
-      command[1] === "push" &&
-      command.includes(`--force-with-lease=refs/heads/main:${liveBaseSha}`) &&
-      command.includes(`${integrationSha}:refs/heads/main`)
+      command[0] === "gh" &&
+      command.includes("repos/wordbricks/briar/pulls/42/merge") &&
+      command.includes(`sha=${headSha}`) &&
+      command.includes("merge_method=squash")
     )).toBe(true);
+    expect(commands.some((command) =>
+      command[1] === "push" && command.includes("refs/heads/main")
+    )).toBe(false);
     expect(api.calls.at(-1)?.path).toBe(`/merge-batch-claims/${batchId}/published`);
   });
 
@@ -310,7 +341,7 @@ describe("local provider-independent merge-queue worker", () => {
     expect(api.calls.at(-1)?.path).toBe(`/merge-batch-claims/${batchId}/published`);
   });
 
-  it("accepts a retry only after main resolves to the tested integration SHA", async () => {
+  it("accepts a retry after signed member state and main tree match the batch", async () => {
     const initial = claimFixture("publish");
     const claim = decodeClaimedMergeBatch({
       ...initial,
@@ -324,8 +355,16 @@ describe("local provider-independent merge-queue worker", () => {
     const run: MergeQueueCommandRunner = (command) => {
       commands.push([...command]);
       if (command[0] === "gh") return successful();
-      if (command[1] === "ls-remote") {
-        return successful(`${integrationSha}\trefs/heads/main\n`);
+      if (command[1] === "fetch") return successful();
+      if (command[1] === "rev-parse") {
+        const ref = command.at(-1) ?? "";
+        if (ref.includes("merge-group-validation/") && ref.endsWith("^{commit}")) {
+          return successful(integrationSha);
+        }
+        if (ref.includes("publication") && ref.endsWith("^{commit}")) {
+          return successful(mergedMainSha);
+        }
+        return successful(treeSha);
       }
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
@@ -338,12 +377,13 @@ describe("local provider-independent merge-queue worker", () => {
       api: api.api,
       runCommand: run,
     });
-    expect(commands.filter((command) => command[1] === "ls-remote")).toHaveLength(1);
+    expect(commands.filter((command) => command[1] === "fetch")).toHaveLength(1);
     expect(commands.some((command) => command[1] === "push")).toBe(false);
+    expect(commands.some((command) => command.includes("pulls/42/merge"))).toBe(false);
     expect(api.calls.at(-1)?.path).toBe(`/merge-batch-claims/${batchId}/published`);
   });
 
-  it("requires exact-main rules with one publisher bypass and no native merge_queue rule", () => {
+  it("checks repository identity without inspecting or requiring rulesets", () => {
     const profile = {
       projectId,
       repositoryId: 701,
@@ -356,31 +396,9 @@ describe("local provider-independent merge-queue worker", () => {
       maxBatchSize: 5,
       updatedAt: "2026-08-21T01:00:00Z",
     };
-    const effectiveRules = [[
-      { type: "pull_request", ruleset_id: 99 },
-      { type: "deletion", ruleset_id: 99 },
-      { type: "non_fast_forward", ruleset_id: 99 },
-      {
-        type: "required_status_checks",
-        ruleset_id: 99,
-        parameters: {
-          strict_required_status_checks_policy: false,
-          required_status_checks: [{ context: "briar/merge-queue" }],
-        },
-      },
-    ]];
-    const ruleset = {
-      id: 99,
-      target: "branch",
-      enforcement: "active",
-      bypass_actors: [{
-        actor_id: 123,
-        actor_type: "Integration",
-        bypass_mode: "always",
-      }],
-      conditions: { ref_name: { include: ["refs/heads/main"], exclude: [] } },
-    };
+    const commands: string[][] = [];
     const run: MergeQueueCommandRunner = (command) => {
+      commands.push([...command]);
       if (command[0] === "git") return successful("git@github.com:wordbricks/briar.git\n");
       if (command[1] === "auth") return successful();
       const endpoint = command.at(-1) ?? "";
@@ -391,10 +409,6 @@ describe("local provider-independent merge-queue worker", () => {
           default_branch: "main",
         }));
       }
-      if (endpoint.includes("rules/branches/main")) {
-        return successful(JSON.stringify(effectiveRules));
-      }
-      if (endpoint.includes("rulesets/99")) return successful(JSON.stringify(ruleset));
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
     const result = inspectMergeQueueDoctor({
@@ -403,29 +417,7 @@ describe("local provider-independent merge-queue worker", () => {
       runCommand: run,
     });
     expect(result.ok).toBe(true);
-    expect(result.checks.map((check) => check.name)).not.toContain("merge-queue-rule");
-    expect(result.checks).toContainEqual(expect.objectContaining({
-      name: "active-publisher-bypass-rulesets",
-      ok: true,
-    }));
-
-    const broadBypass = inspectMergeQueueDoctor({
-      profile,
-      repositoryPath: "/repo",
-      runCommand: (command, options) => {
-        if ((command.at(-1) ?? "").includes("rulesets/99")) {
-          return successful(JSON.stringify({
-            ...ruleset,
-            bypass_actors: [{
-              actor_id: 1,
-              actor_type: "OrganizationAdmin",
-              bypass_mode: "always",
-            }],
-          }));
-        }
-        return run(command, options);
-      },
-    });
-    expect(broadBypass.ok).toBe(false);
+    expect(commands.join("\n")).not.toContain("rules/branches");
+    expect(commands.join("\n")).not.toContain("rulesets");
   });
 });
