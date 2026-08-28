@@ -4,7 +4,7 @@ import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AutoHuntHealth } from "../lib/project-connection";
+import type { AutoHuntHealth } from "../generated/tauri";
 import { I18nProvider } from "../i18n";
 import { ConnectionHealth } from "./ConnectionHealth";
 

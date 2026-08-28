@@ -2,15 +2,12 @@ import type {
   ClaimedProjectAgentScheduleRun,
   ProjectAgentScheduleRun,
 } from "../types";
-import type { ProjectLlmChatResponse } from "./project-llm";
+import { events, type ProjectLlmResponse } from "../generated/tauri";
 import type { StructuredAgentResult } from "./agent-result";
 import { isDesktopTauri } from "./platform";
 
 export const PROJECT_AGENT_SCHEDULE_POLL_INTERVAL_MS = 60_000;
 export const PROJECT_AGENT_SCHEDULE_RENEW_INTERVAL_MS = 5 * 60_000;
-export const PROJECT_AGENT_SCHEDULE_POLL_EVENT =
-  "project-agent-schedule-poll";
-
 export type ProjectAgentScheduleRunnerDependencies = {
   claim: (
     projectIds: readonly string[],
@@ -40,16 +37,14 @@ export type ProjectAgentScheduleRunnerDependencies = {
   execute: (
     run: ClaimedProjectAgentScheduleRun,
   ) => Promise<
-    ProjectLlmChatResponse & { structuredResult: StructuredAgentResult }
+    ProjectLlmResponse & { structuredResult: StructuredAgentResult }
   >;
   log: (message: string, error?: unknown) => void;
   listenForNativePoll?: (poll: () => void) => Promise<() => void>;
 };
 
-const listenForNativePoll = async (poll: () => void) => {
-  const { listen } = await import("@tauri-apps/api/event");
-  return listen(PROJECT_AGENT_SCHEDULE_POLL_EVENT, poll);
-};
+const listenForNativePoll = async (poll: () => void) =>
+  events.projectAgentSchedulePoll.listen(poll);
 
 const describe = (error: unknown) =>
   error instanceof Error ? error.message : String(error);

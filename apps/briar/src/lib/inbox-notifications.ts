@@ -4,6 +4,7 @@ import {
   isDesktopTauri,
   isMacDesktopTauri,
 } from "./platform";
+import { commands, events } from "../generated/tauri";
 
 export const inboxNotificationCategories = [
   "urgent",
@@ -24,8 +25,6 @@ const storageKey = "briar.settings.inbox-notifications.v1";
 const soundStorageKey = "briar.settings.inbox-notification-sound.v1";
 const targetStorageKey = "briar.inbox.notification-targets.v1";
 const browserOpenEvent = "briar:inbox-notification-open";
-const desktopOpenEvent = "inbox-notification-open";
-const desktopOpenAvailableEvent = "inbox-notification-open-available";
 
 export type InboxNotificationTarget = {
   messageId: string;
@@ -321,16 +320,14 @@ export async function listenForInboxNotificationClicks(
 ) {
   if (isTauriRuntime()) {
     if (isDesktopTauri()) {
-      const { listen } = await import("@tauri-apps/api/event");
       if (isMacDesktopTauri()) {
-        const { invoke } = await import("@tauri-apps/api/core");
         return listenForMacInboxNotificationClicks(onOpen, {
           listenAvailable: (callback) =>
-            listen(desktopOpenAvailableEvent, callback),
-          drain: () => invoke("drain_pending_inbox_notification_opens"),
+            events.inboxNotificationOpenAvailable.listen(callback),
+          drain: () => commands.drainPendingInboxNotificationOpens(),
         });
       }
-      return listen<InboxNotificationTarget>(desktopOpenEvent, ({ payload }) => {
+      return events.inboxNotificationOpen.listen(({ payload }) => {
         if (isInboxNotificationTarget(payload)) onOpen(payload);
       });
     }
@@ -354,8 +351,7 @@ export async function listenForInboxNotificationClicks(
 export async function requestInboxNotificationPermission() {
   if (isTauriRuntime()) {
     if (isMacDesktopTauri()) {
-      const { invoke } = await import("@tauri-apps/api/core");
-      return invoke<boolean>("request_inbox_notification_permission");
+      return commands.requestInboxNotificationPermission();
     }
     const { isPermissionGranted, requestPermission } = await import(
       "@tauri-apps/plugin-notification"
@@ -374,10 +370,7 @@ export async function readInboxNotificationPermissionStatus(): Promise<
   InboxNotificationPermissionStatus
 > {
   if (isMacDesktopTauri()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const status = await invoke<unknown>(
-      "inbox_notification_permission_status",
-    );
+    const status = await commands.inboxNotificationPermissionStatus();
     return status === "authorized" ||
         status === "denied" ||
         status === "not_determined"
@@ -400,8 +393,7 @@ export async function readInboxNotificationPermissionStatus(): Promise<
 
 export async function openInboxNotificationSystemSettings() {
   if (!isMacDesktopTauri()) return false;
-  const { invoke } = await import("@tauri-apps/api/core");
-  await invoke("open_inbox_notification_settings");
+  await commands.openInboxNotificationSettings();
   return true;
 }
 
@@ -509,13 +501,20 @@ export async function sendInboxNotification(
       ) {
         return false;
       }
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("show_inbox_notification", {
+      await commands.showInboxNotification(
         title,
         body,
-        target,
+        {
+          messageId: target.messageId,
+          projectId: target.projectId,
+          targetId: target.targetId,
+          kind: target.kind,
+          conversationMessageId: target.conversationMessageId ?? null,
+          channelMessageId: target.channelMessageId ?? null,
+          rootMessageId: target.rootMessageId ?? null,
+        },
         playSound,
-      });
+      );
       return true;
     }
 

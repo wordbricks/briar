@@ -1,9 +1,9 @@
 import { isDesktopTauri } from "./platform";
-
-export type AppRuntimeSettings = {
-  preventSleepWhileRunning: boolean;
-  preventSleepSupported: boolean;
-};
+import {
+  commands,
+  type AppRuntimeSettings,
+  type AppRuntimeSettingsUpdate,
+} from "../generated/tauri";
 
 const storageKey = "briar.settings.runtime.v1";
 
@@ -27,12 +27,11 @@ const browserFallback = (): AppRuntimeSettings => {
 
 export async function loadAppRuntimeSettings(): Promise<AppRuntimeSettings> {
   if (!isDesktopTauri()) return browserFallback();
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AppRuntimeSettings>("load_app_runtime_settings");
+  return commands.loadAppRuntimeSettings();
 }
 
 export async function updateAppRuntimeSettings(
-  settings: Pick<AppRuntimeSettings, "preventSleepWhileRunning">,
+  settings: AppRuntimeSettingsUpdate,
 ): Promise<AppRuntimeSettings> {
   if (!isDesktopTauri()) {
     const result = {
@@ -46,8 +45,5 @@ export async function updateAppRuntimeSettings(
     }
     return result;
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AppRuntimeSettings>("update_app_runtime_settings", {
-    settings,
-  });
+  return commands.updateAppRuntimeSettings(settings);
 }

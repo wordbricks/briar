@@ -5,21 +5,24 @@ pub(super) struct StoredSession {
     pub(super) token: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, specta::Type)]
+#[derive(
+    Clone, Debug, Deserialize, Eq, PartialEq, Serialize, specta::Type, tauri_specta::Event,
+)]
 #[serde(rename_all = "camelCase")]
+#[tauri_specta(event_name = "inbox-notification-open")]
 pub(super) struct InboxNotificationTarget {
     pub(super) message_id: String,
     pub(super) project_id: String,
     pub(super) target_id: String,
     pub(super) kind: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) conversation_message_id: Option<String>,
     pub(super) channel_message_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) root_message_id: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, specta::Type)]
+#[derive(Clone, Debug, Serialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
+#[tauri_specta(event_name = "project-llm-progress")]
 pub(super) struct ProjectLlmProgressPayload {
     pub(super) request_id: String,
     pub(super) project_id: String,

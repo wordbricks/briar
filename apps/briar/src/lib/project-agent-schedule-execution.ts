@@ -9,9 +9,11 @@ import {
 import { projectAgentRunSnapshots } from "./project-llm";
 import type {
   ProjectAgentRunInput,
-  ProjectAgentRunResponse,
-  ProjectLlmChatResponse,
 } from "./project-llm";
+import type {
+  ProjectAgentRunResponse,
+  ProjectLlmResponse,
+} from "../generated/tauri";
 import type {
   ClaimedProjectAgentScheduleRun,
   DashboardPayload,
@@ -85,7 +87,7 @@ export async function executeScheduledProjectAgent(
   token: string,
   run: ClaimedProjectAgentScheduleRun,
 ): Promise<
-  ProjectLlmChatResponse & { structuredResult: StructuredAgentResult }
+  ProjectLlmResponse & { structuredResult: StructuredAgentResult }
 > {
   const sessionId = dependencies.startSession?.(run) ?? null;
   const runtimeAgent = agentWithSkillsRuntime(run.agent);
@@ -168,7 +170,7 @@ export async function executeScheduledProjectAgent(
         runs: projectAgentRunSnapshots(initialDashboard.runs),
       },
     );
-    let result: ProjectLlmChatResponse & {
+    let result: ProjectLlmResponse & {
       structuredResult: StructuredAgentResult;
     };
     if (skippedNoQueuedDispatch) {

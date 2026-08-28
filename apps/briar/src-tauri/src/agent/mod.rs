@@ -327,8 +327,9 @@ pub(crate) struct AutoHuntExecution {
     pub(crate) full_access: bool,
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
+#[tauri_specta(event_name = "auto-hunt-app-server-event")]
 pub(crate) struct AppServerEventRecord {
     pub(crate) session_id: String,
     pub(crate) sequence: u64,

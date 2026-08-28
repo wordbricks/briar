@@ -10,8 +10,8 @@ import {
 import {
   isProviderUsageExhausted,
   type AgentUsageProvider,
-  type AgentUsageWindow,
 } from "../src/lib/agent-usage";
+import type { AgentUsageWindow } from "../src/generated/tauri";
 
 const CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
 const AGY_LOAD_ASSIST_URL =

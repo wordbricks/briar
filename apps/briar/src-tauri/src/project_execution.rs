@@ -1,4 +1,5 @@
 use super::*;
+use tauri_specta::Event as _;
 
 #[tauri::command]
 #[specta::specta]
@@ -79,15 +80,13 @@ pub(super) async fn project_llm_chat(
                 let Some(event) = provider_event.event else {
                     return Ok(());
                 };
-                let _ = progress_app.emit(
-                    PROJECT_LLM_PROGRESS_EVENT,
-                    ProjectLlmProgressPayload {
-                        request_id: request_id.clone(),
-                        project_id: progress_project_id.clone(),
-                        provider: provider_event.provider,
-                        event,
-                    },
-                );
+                let _ = ProjectLlmProgressPayload {
+                    request_id: request_id.clone(),
+                    project_id: progress_project_id.clone(),
+                    provider: provider_event.provider,
+                    event,
+                }
+                .emit(&progress_app);
                 Ok(())
             }) as agent::AgentEventSink
         });

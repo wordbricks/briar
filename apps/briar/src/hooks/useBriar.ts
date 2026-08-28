@@ -91,11 +91,13 @@ import {
   resolveProjectConnectionWorkflow,
   updateLocalProjectVelenOrg,
   updateLocalProjectWorkflow,
-  type AutoHuntHealth,
   type LocalAutoHuntConfig,
-  type RepositoryReadiness,
-  type VelenInspection,
 } from "../lib/project-connection";
+import type {
+  AutoHuntHealth,
+  RepositoryReadiness,
+  VelenInspection,
+} from "../generated/tauri";
 import { projectIconFromDataUrl } from "../lib/project-icon";
 import {
   createLocalProjectReadinessCoordinator,

@@ -10,7 +10,7 @@ import {
 import { Spinner } from "./ui/spinner";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
-import type { AutoHuntHealth } from "../lib/project-connection";
+import type { AutoHuntHealth } from "../generated/tauri";
 import { cn } from "../lib/utils";
 
 export function ConnectionHealth({

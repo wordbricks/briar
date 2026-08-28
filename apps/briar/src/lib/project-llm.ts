@@ -10,6 +10,19 @@ import {
   sortAgentProviders,
   type AgentProvider,
 } from "./agent-provider";
+import {
+  commands,
+  events,
+  type AppProviderSettings,
+  type ApprovalPolicy,
+  type JsonValue,
+  type OpenRouterCredentialStatus,
+  type ProjectAgentRunResponse,
+  type ProjectAgentRunSnapshot,
+  type ProjectLlmProgressPayload,
+  type ProjectLlmResponse,
+  type ProjectSandboxSettings,
+} from "../generated/tauri";
 
 export {
   agentProviderLabels,
@@ -22,9 +35,6 @@ export type { ModelEffort } from "./agent-provider-contract";
 export type JsonSchema = Record<string, unknown> | boolean;
 
 export const approvalPolicies = ["untrusted", "on-request", "never"] as const;
-export type ApprovalPolicy = (typeof approvalPolicies)[number];
-
-export type AppProviderSettings = Record<AgentProvider, boolean>;
 
 export const defaultAppProviderSettings = {
   codex: true,
@@ -35,10 +45,6 @@ export const defaultAppProviderSettings = {
   opencode: true,
   openrouter: true,
 } satisfies AppProviderSettings;
-
-export type OpenRouterCredentialStatus = {
-  configured: boolean;
-};
 
 export type AgentModelOption = {
   value: string;
@@ -185,10 +191,6 @@ export type ProjectLlmSettings = {
   approvalPolicy: ApprovalPolicy;
 };
 
-export type ProjectSandboxSettings = {
-  fullAccess: boolean;
-};
-
 export const defaultProjectLlmSettings: ProjectLlmSettings = {
   provider: "codex",
   model: null,
@@ -225,44 +227,6 @@ export type ProjectLlmProgress = {
   activityKind?: "command" | "fileChange" | "webSearch" | "tool";
 };
 
-type ProjectLlmProviderEvent =
-  | { type: "conversationStarted"; conversationId: string }
-  | { type: "messageStarted"; id: string; phase: string | null; text: string }
-  | { type: "messageDelta"; id: string; delta: string }
-  | { type: "messageCompleted"; id: string; phase: string | null; text: string }
-  | {
-      type: "activityStarted";
-      id: string;
-      kind: "command" | "fileChange" | "webSearch" | "tool";
-      title: string;
-      text: string;
-    }
-  | { type: "activityDelta"; id: string; delta: string }
-  | {
-      type: "activityCompleted";
-      id: string;
-      kind: "command" | "fileChange" | "webSearch" | "tool";
-      title: string;
-      text: string;
-      status: "completed" | "failed" | "cancelled";
-    }
-  | { type: "turnCompleted"; status: string };
-
-type ProjectLlmProgressPayload = {
-  requestId: string;
-  projectId: string;
-  provider: AgentProvider;
-  event: ProjectLlmProviderEvent;
-};
-
-export const projectLlmProgressEvent = "project-llm-progress";
-
-export type ProjectLlmChatResponse = {
-  conversationId: string;
-  message: string;
-  workspaceRoot: string;
-};
-
 export type ProjectAgentRunInput = {
   projectId: string;
   sessionId: string;
@@ -279,17 +243,6 @@ export type ProjectAgentRunInput = {
   conversationId?: string | null;
   runs?: ProjectAgentRunSnapshot[];
   resumeAfterUpdate?: boolean;
-};
-
-export type ProjectAgentRunSnapshot = {
-  runId: string;
-  sourceKey: string;
-  title: string;
-  status: string;
-  currentAttempt: number;
-  detail: string | null;
-  resultSummary: string | null;
-  updatedAt: string;
 };
 
 type ProjectAgentRunSnapshotSource = {
@@ -321,60 +274,36 @@ export function projectAgentRunSnapshots(
     }));
 }
 
-export type ProjectAgentRunResponse = {
-  conversationId: string;
-  workspaceRoot: string;
-  action: "respond" | "dispatch_auto_hunt";
-  message: string;
-  maxIssues: number | null;
-  structuredResult: StructuredAgentResult | null;
-  targetRunIds?: string[];
-  retryReason?: string | null;
-};
-
 const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
-export const projectLlmChatInvocation = (
+export const projectLlmChatRequest = (
   input: ProjectLlmChatInput,
   progressId: string | null,
 ) => ({
-  command: "project_llm_chat",
-  payload: {
-    projectId: input.projectId,
-    fullAccess: input.fullAccess ?? false,
-    workspaceMode: input.workspaceMode ?? "connected",
-    workspaceRunId: input.workspaceRunId ?? null,
-    workspaceBranch: input.workspaceBranch ?? null,
-    request: {
-      message: input.message,
-      progressId,
-      conversationId: input.conversationId ?? null,
-      instructions: input.instructions ?? null,
-      outputSchema: input.outputSchema ?? null,
-    },
-  },
+  message: input.message,
+  progressId,
+  conversationId: input.conversationId ?? null,
+  instructions: input.instructions ?? null,
+  outputSchema:
+    input.outputSchema === undefined || input.outputSchema === null
+      ? null
+      : JSON.parse(JSON.stringify(input.outputSchema)) as JsonValue,
 });
 
-export const projectAgentRunInvocation = (input: ProjectAgentRunInput) => ({
-  command: "run_project_agent",
-  payload: {
-    projectId: input.projectId,
-    request: {
-      sessionId: input.sessionId,
-      agentId: input.agent.id,
-      agentName: input.agent.name,
-      agentProvider: input.agent.provider,
-      agentModel: input.agent.model,
-      agentEffort: input.agent.effort,
-      responsibility: input.agent.responsibility,
-      skill: input.agent.skill,
-      message: input.message,
-      conversationId: input.conversationId ?? null,
-      runs: input.runs ?? [],
-      resumeAfterUpdate: input.resumeAfterUpdate ?? false,
-    },
-  },
+export const projectAgentRunRequest = (input: ProjectAgentRunInput) => ({
+  sessionId: input.sessionId,
+  agentId: input.agent.id,
+  agentName: input.agent.name,
+  agentProvider: input.agent.provider,
+  agentModel: input.agent.model,
+  agentEffort: input.agent.effort,
+  responsibility: input.agent.responsibility,
+  skill: input.agent.skill,
+  message: input.message,
+  conversationId: input.conversationId ?? null,
+  runs: input.runs ?? [],
+  resumeAfterUpdate: input.resumeAfterUpdate ?? false,
 });
 
 /**
@@ -385,11 +314,10 @@ export const projectAgentRunInvocation = (input: ProjectAgentRunInput) => ({
  */
 export async function chatWithProjectLlm(
   input: ProjectLlmChatInput,
-): Promise<ProjectLlmChatResponse> {
+): Promise<ProjectLlmResponse> {
   if (!isTauri()) {
     throw new Error("프로젝트 LLM은 Briar 데스크톱 앱에서 사용할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
   const progressId = input.onProgress
     ? globalThis.crypto?.randomUUID?.() ??
       `project-llm-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -397,11 +325,9 @@ export async function chatWithProjectLlm(
   let unlisten: (() => void) | undefined;
 
   if (progressId && input.onProgress) {
-    const { listen } = await import("@tauri-apps/api/event");
     const messages = new Map<string, string>();
     const phases = new Map<string, string | null>();
-    unlisten = await listen<ProjectLlmProgressPayload>(
-      projectLlmProgressEvent,
+    unlisten = await events.projectLlmProgress.listen(
       ({ payload }) => {
         if (
           payload.requestId !== progressId ||
@@ -448,10 +374,13 @@ export async function chatWithProjectLlm(
   }
 
   try {
-    const invocation = projectLlmChatInvocation(input, progressId);
-    return await invoke<ProjectLlmChatResponse>(
-      invocation.command,
-      invocation.payload,
+    return await commands.projectLlmChat(
+      input.projectId,
+      input.fullAccess ?? false,
+      input.workspaceMode ?? "connected",
+      input.workspaceRunId ?? null,
+      input.workspaceBranch ?? null,
+      projectLlmChatRequest(input, progressId),
     );
   } finally {
     unlisten?.();
@@ -470,11 +399,9 @@ export async function runProjectAgent(
   if (!isTauri()) {
     throw new Error("에이전트는 Briar 데스크톱 앱에서 실행할 수 있습니다.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  const invocation = projectAgentRunInvocation(input);
-  return invoke<ProjectAgentRunResponse>(
-    invocation.command,
-    invocation.payload,
+  return commands.runProjectAgent(
+    input.projectId,
+    projectAgentRunRequest(input),
   );
 }
 
@@ -482,18 +409,14 @@ export async function stopProjectAgentSession(
   sessionId: string,
 ): Promise<boolean> {
   if (!isTauri()) return false;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<boolean>("stop_project_agent_session", { sessionId });
+  return commands.stopProjectAgentSession(sessionId);
 }
 
 export async function loadProjectLlmSettings(
   projectId: string,
 ): Promise<ProjectLlmSettings> {
   if (!isTauri()) return defaultProjectLlmSettings;
-  const { invoke } = await import("@tauri-apps/api/core");
-  const settings = await invoke<ProjectLlmSettings>("load_project_llm_settings", {
-    projectId,
-  });
+  const settings = await commands.loadProjectLlmSettings(projectId);
   return {
     ...settings,
     model: settings.model ?? null,
@@ -503,8 +426,7 @@ export async function loadProjectLlmSettings(
 
 export async function loadAppProviderSettings(): Promise<AppProviderSettings> {
   if (!isTauri()) return defaultAppProviderSettings;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AppProviderSettings>("load_app_provider_settings");
+  return commands.loadAppProviderSettings();
 }
 
 export function loadAgentProviderModels({
@@ -515,10 +437,8 @@ export function loadAgentProviderModels({
   if (!isTauri()) return Promise.resolve(defaultAgentProviderModelCatalog);
   if (!refresh && agentProviderModelsRequest) return agentProviderModelsRequest;
 
-  const request = import("@tauri-apps/api/core")
-    .then(({ invoke }) =>
-      invoke<AgentProviderModelCatalog>("load_agent_provider_models")
-    )
+  const request: Promise<AgentProviderModelCatalog> = commands
+    .loadAgentProviderModels()
     .catch((error) => {
       if (agentProviderModelsRequest === request) {
         agentProviderModelsRequest = null;
@@ -533,26 +453,19 @@ export async function updateAppProviderSettings(
   settings: AppProviderSettings,
 ): Promise<AppProviderSettings> {
   if (!isTauri()) return settings;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AppProviderSettings>("update_app_provider_settings", {
-    settings,
-  });
+  return commands.updateAppProviderSettings(settings);
 }
 
 export async function loadOpenRouterCredentialStatus(): Promise<OpenRouterCredentialStatus> {
   if (!isTauri()) return { configured: false };
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<OpenRouterCredentialStatus>("load_openrouter_credential_status");
+  return commands.loadOpenrouterCredentialStatus();
 }
 
 export async function updateOpenRouterApiKey(
   apiKey: string | null,
 ): Promise<OpenRouterCredentialStatus> {
   if (!isTauri()) return { configured: Boolean(apiKey?.trim()) };
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<OpenRouterCredentialStatus>("update_openrouter_api_key", {
-    apiKey,
-  });
+  return commands.updateOpenrouterApiKey(apiKey);
 }
 
 export async function updateProjectLlmSettings(
@@ -560,11 +473,7 @@ export async function updateProjectLlmSettings(
   settings: ProjectLlmSettings,
 ): Promise<ProjectLlmSettings> {
   if (!isTauri()) return settings;
-  const { invoke } = await import("@tauri-apps/api/core");
-  const saved = await invoke<ProjectLlmSettings>("update_project_llm_settings", {
-    projectId,
-    settings,
-  });
+  const saved = await commands.updateProjectLlmSettings(projectId, settings);
   return {
     ...saved,
     model: saved.model ?? null,
@@ -576,10 +485,7 @@ export async function loadProjectSandboxSettings(
   projectId: string,
 ): Promise<ProjectSandboxSettings> {
   if (!isTauri()) return defaultProjectSandboxSettings;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<ProjectSandboxSettings>("load_project_sandbox_settings", {
-    projectId,
-  });
+  return commands.loadProjectSandboxSettings(projectId);
 }
 
 export async function updateProjectSandboxSettings(
@@ -587,9 +493,5 @@ export async function updateProjectSandboxSettings(
   settings: ProjectSandboxSettings,
 ): Promise<ProjectSandboxSettings> {
   if (!isTauri()) return settings;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<ProjectSandboxSettings>("update_project_sandbox_settings", {
-    projectId,
-    settings,
-  });
+  return commands.updateProjectSandboxSettings(projectId, settings);
 }

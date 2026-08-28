@@ -2,8 +2,12 @@ import {
   agentProviderLabels,
   type AgentProvider,
 } from "./agent-provider";
-
-export type AgentUsageStatus = "ok" | "error" | "unavailable";
+import {
+  commands,
+  type AgentProviderKind,
+  type AgentUsageWindow,
+  type ProviderUsage,
+} from "../generated/tauri";
 
 export const quotaUsageProviders = [
   "claude",
@@ -13,27 +17,15 @@ export const quotaUsageProviders = [
   "opencode",
   "openrouter",
   "cursor",
-] as const;
+] as const satisfies readonly AgentProviderKind[];
 
-export type QuotaUsageProvider = (typeof quotaUsageProviders)[number];
-
-export type AgentUsageWindow = {
-  usedPercent: number;
-  windowMinutes: number;
-  resetsAt: number | null;
-};
-
-export type AgentUsageProvider = {
-  provider: QuotaUsageProvider;
-  status: AgentUsageStatus;
-  session: AgentUsageWindow | null;
-  weekly: AgentUsageWindow | null;
-  monthly: AgentUsageWindow | null;
-  planType: string | null;
+/** Normalized app model shared by native reads, CLI probes, and local history. */
+export type AgentUsageProvider = Omit<
+  ProviderUsage,
+  "accountLabel" | "authenticated"
+> & {
   accountLabel?: string | null;
   authenticated?: boolean;
-  updatedAt: number;
-  error: string | null;
 };
 
 export type AgentUsageSnapshot = {
@@ -48,7 +40,7 @@ export type AgentUsageSnapshot = {
 };
 
 export function emptyUsageProvider(
-  provider: QuotaUsageProvider,
+  provider: AgentProviderKind,
 ): AgentUsageProvider {
   return {
     provider,
@@ -62,7 +54,7 @@ export function emptyUsageProvider(
   };
 }
 
-export function quotaUsageProviderLabel(provider: QuotaUsageProvider) {
+export function quotaUsageProviderLabel(provider: AgentProviderKind) {
   return agentProviderLabels[provider];
 }
 
@@ -76,8 +68,11 @@ export async function loadAgentUsage(): Promise<AgentUsageSnapshot> {
   if (!isTauri()) {
     throw new Error("Agent usage is available in the Briar desktop app.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AgentUsageSnapshot>("load_agent_usage");
+  const snapshot = parseUsageSnapshot(await commands.loadAgentUsage());
+  if (!snapshot) {
+    throw new Error("The native agent usage response is invalid.");
+  }
+  return snapshot;
 }
 
 export async function openAgentProviderLogin(
@@ -86,11 +81,10 @@ export async function openAgentProviderLogin(
   if (!isTauri()) {
     throw new Error("Provider sign-in is available in the Briar desktop app.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<void>("open_agent_provider_login", { provider });
+  return commands.openAgentProviderLogin(provider);
 }
 
-function isQuotaUsageProvider(value: unknown): value is QuotaUsageProvider {
+function isQuotaUsageProvider(value: unknown): value is AgentProviderKind {
   return (
     value === "claude" ||
     value === "codex" ||

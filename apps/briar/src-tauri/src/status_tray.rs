@@ -10,15 +10,14 @@ use tauri::{
     image::Image,
     menu::{Menu, MenuBuilder, MenuItemBuilder},
     tray::{TrayIcon, TrayIconBuilder},
-    AppHandle, Emitter, Manager,
+    AppHandle, Manager,
 };
+use tauri_specta::Event as _;
 
 pub const TRAY_ID: &str = "briar-status";
 pub const OPEN_BRIAR_MENU_ID: &str = "status-tray:open-briar";
 pub const QUIT_BRIAR_MENU_ID: &str = "status-tray:quit-briar";
 pub const RUN_MENU_ID_PREFIX: &str = "status-tray:run:";
-pub const STATUS_TRAY_OPEN_RUN_EVENT: &str = "status-tray-open-run";
-
 const MAX_TITLE_CHARS: usize = 42;
 const TRAY_ICON_SCALE: f64 = 1.8;
 // Keep the canonical line-art mark as the template source. The macOS tray-icon
@@ -68,13 +67,6 @@ impl Default for StatusTraySnapshot {
             items: Vec::new(),
         }
     }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct StatusTrayOpenRunPayload {
-    pub project_id: String,
-    pub run_id: String,
 }
 
 pub struct StatusTrayState {
@@ -384,10 +376,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
         other => {
             if let Some((project_id, run_id)) = parse_run_menu_id(other) {
                 show_main_window_from_tray(app);
-                let _ = app.emit(
-                    STATUS_TRAY_OPEN_RUN_EVENT,
-                    StatusTrayOpenRunPayload { project_id, run_id },
-                );
+                let _ = crate::ipc::StatusTrayOpenRunPayload { project_id, run_id }.emit(app);
             }
         }
     }

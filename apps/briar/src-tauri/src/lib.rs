@@ -29,7 +29,7 @@ use std::{
 };
 #[cfg(target_os = "macos")]
 use tauri::{webview::Color, WebviewUrl, WebviewWindowBuilder};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_opener::OpenerExt;
 
@@ -38,16 +38,8 @@ const AUTO_HUNT_EVENT_DIRECTORY: &str = "auto-hunt-sessions";
 const WORKTREE_INCLUDE_FILE: &str = ".worktreeinclude";
 const WORKTREE_INCLUDE_MAX_BYTES: u64 = 256 * 1024;
 const WORKTREE_INCLUDE_MAX_ENTRIES: usize = 200;
-const AUTO_HUNT_APP_SERVER_EVENT: &str = "auto-hunt-app-server-event";
-const AUTO_HUNT_DISPATCH_EVENT: &str = "auto-hunt-dispatch-event";
-const PROJECT_LLM_PROGRESS_EVENT: &str = "project-llm-progress";
-const PROJECT_AGENT_SCHEDULE_POLL_EVENT: &str = "project-agent-schedule-poll";
 #[cfg(all(desktop, not(dev)))]
 const WORKTREE_SWEEP_INTERVAL_SECS: u64 = 60 * 60;
-#[cfg(all(desktop, not(target_os = "macos")))]
-const INBOX_NOTIFICATION_OPEN_EVENT: &str = "inbox-notification-open";
-#[cfg(target_os = "macos")]
-const INBOX_NOTIFICATION_OPEN_AVAILABLE_EVENT: &str = "inbox-notification-open-available";
 const AGENT_SESSION_STOPPED_ERROR: &str = "사용자가 에이전트 세션을 중지했습니다.";
 const GITHUB_DEVICE_LOGIN_URL: &str = "https://github.com/login/device";
 #[cfg(not(target_os = "windows"))]

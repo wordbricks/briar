@@ -43,8 +43,6 @@ import {
   inspectOpenCodeTerminalPath,
   inspectOnboardingPrerequisites,
   installOnboardingPrerequisite,
-  type OpenCodeTerminalPathStatus,
-  type OnboardingPrerequisites,
 } from "../lib/initial-onboarding";
 import {
   loadAppProviderSettings,
@@ -54,8 +52,6 @@ import {
   updateOpenRouterApiKey,
   type AgentProvider,
   type AgentProviderModelCatalogEntry,
-  type AppProviderSettings,
-  type OpenRouterCredentialStatus,
   defaultAgentProviderModelCatalog,
   sortAgentModelsByPreference,
 } from "../lib/project-llm";
@@ -67,7 +63,6 @@ import {
 import {
   loadAppRuntimeSettings,
   updateAppRuntimeSettings,
-  type AppRuntimeSettings,
 } from "../lib/app-runtime-settings";
 import {
   loadAgentUsage,
@@ -75,6 +70,14 @@ import {
   type AgentUsageProvider,
   type AgentUsageSnapshot,
 } from "../lib/agent-usage";
+import type {
+  AppProviderSettings,
+  AppRuntimeSettings,
+  OnboardingPrerequisites,
+  OpenCodeTerminalPathStatus,
+  OpenRouterCredentialStatus,
+  RepositoryReadiness,
+} from "../generated/tauri";
 import {
   AntigravityIcon,
   ClaudeIcon,
@@ -88,7 +91,6 @@ import { MacSecurePasswordInput } from "./MacSecurePasswordInput";
 import { AgentUsageSettings } from "./AgentUsageSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";
-import type { RepositoryReadiness } from "../lib/project-connection";
 import {
   localProjectReadiness,
   type LocalProjectConnectionState,

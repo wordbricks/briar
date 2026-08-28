@@ -1,6 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
 import { isMacDesktopTauri } from "./platform";
 import type { StatusTrayRun } from "../types";
+import {
+  commands,
+  events,
+  type StatusTrayOpenRunPayload,
+} from "../generated/tauri";
 
 export type StatusTrayRunItem = {
   projectId: string;
@@ -18,13 +22,6 @@ export type StatusTraySnapshot = {
   moreLabel: string;
   items: StatusTrayRunItem[];
 };
-
-export type StatusTrayOpenRunPayload = {
-  projectId: string;
-  runId: string;
-};
-
-export const STATUS_TRAY_OPEN_RUN_EVENT = "status-tray-open-run";
 
 export function statusLabelForRun(
   run: StatusTrayRun,
@@ -81,7 +78,7 @@ export async function syncStatusTray(
   if (typeof window === "undefined") return;
   if (!isMacDesktopTauri()) return;
   if (!window.__TAURI_INTERNALS__) return;
-  await invoke("sync_status_tray", { snapshot });
+  await commands.syncStatusTray(snapshot);
 }
 
 export function listenForStatusTrayOpenRun(
@@ -94,10 +91,10 @@ export function listenForStatusTrayOpenRun(
   let cancelled = false;
   let unlisten: (() => void) | undefined;
 
-  void import("@tauri-apps/api/event")
-    .then(({ listen }) => {
+  void Promise.resolve()
+    .then(() => {
       if (cancelled) return;
-      return listen<StatusTrayOpenRunPayload>(STATUS_TRAY_OPEN_RUN_EVENT, (event) => {
+      return events.statusTrayOpenRun.listen((event) => {
         const payload = event.payload;
         if (
           !payload ||

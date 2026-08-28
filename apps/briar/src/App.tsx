@@ -82,6 +82,7 @@ import {
 } from "./components/WindowNavigationControls";
 import { appSettingsNavigationGroups } from "./components/app-settings-navigation";
 import { useBriar, type UseBriarOptions } from "./hooks/useBriar";
+import { commands } from "./generated/tauri";
 import {
   collapseLinkedAutoHuntSessions,
   useAutoHuntSessions,
@@ -738,9 +739,7 @@ export function App({
   ]);
   useEffect(() => {
     if (!runsOnDesktopTauri || projectWindowProjectId) return;
-    void import("@tauri-apps/api/core")
-      .then(({ invoke }) => invoke("sync_execution_worker_labels"))
-      .catch(() => {
+    void commands.syncExecutionWorkerLabels().catch(() => {
         // Offline startup must not block the rest of the desktop app.
       });
   }, [projectWindowProjectId, runsOnDesktopTauri]);
@@ -2345,21 +2344,22 @@ export function App({
     if (!runsOnDesktopTauri || projectWindowProjectId) return;
     let cancelled = false;
 
-    void import("@tauri-apps/api/core").then(async ({ invoke }) => {
+    void (async () => {
       if (cancelled) return;
       const shouldPrepareLaunchIntro =
         usesNativeLaunchIntro && shouldShowLaunchIntro();
-      const command = shouldPrepareLaunchIntro
-        ? "prepare_launch_intro"
-        : "show_main_window";
       try {
-        await invoke(command);
+        if (shouldPrepareLaunchIntro) {
+          await commands.prepareLaunchIntro();
+        } else {
+          await commands.showMainWindow();
+        }
         if (shouldPrepareLaunchIntro) markLaunchIntroSeen();
       } catch (error) {
         console.error("Failed to prepare the native launch experience", error);
-        await invoke("show_main_window").catch(() => undefined);
+        await commands.showMainWindow().catch(() => undefined);
       }
-    });
+    })();
 
     return () => {
       cancelled = true;
@@ -2377,10 +2377,8 @@ export function App({
     if (!compact && !hasCompactedWindowForOnboarding.current) return;
     hasCompactedWindowForOnboarding.current = compact;
 
-    void import("@tauri-apps/api/core")
-      .then(({ invoke }) =>
-        invoke("set_main_window_onboarding_mode", { compact }),
-      )
+    void commands
+      .setMainWindowOnboardingMode(compact)
       .catch((error) => {
         console.error("Failed to resize the Briar onboarding window", error);
       });

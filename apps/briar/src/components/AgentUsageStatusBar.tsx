@@ -19,13 +19,15 @@ import {
   tightestUsageWindow,
   type AgentUsageProvider,
   type AgentUsageSnapshot,
-  type AgentUsageWindow,
 } from "../lib/agent-usage";
 import {
   defaultAppProviderSettings,
   loadAppProviderSettings,
-  type AppProviderSettings,
 } from "../lib/project-llm";
+import type {
+  AgentUsageWindow,
+  AppProviderSettings,
+} from "../generated/tauri";
 import { AgentProviderIcon } from "./AgentIcons";
 import {
   StatusPanel,

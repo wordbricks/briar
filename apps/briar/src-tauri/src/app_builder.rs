@@ -1,4 +1,6 @@
 use super::*;
+#[cfg(desktop)]
+use tauri_specta::Event as _;
 
 pub(super) fn run() {
     let ipc_builder = ipc::builder();
@@ -26,11 +28,11 @@ pub(super) fn run() {
                     let _ = main.show();
                     let _ = main.set_focus();
                 }
-                let _ = app.emit(APP_SETTINGS_MENU_EVENT, ());
+                let _ = ipc::AppMenuSettingsEvent.emit(app);
             }
             #[cfg(target_os = "macos")]
             if event.id() == APP_UPDATE_MENU_ID {
-                let _ = app.emit(APP_UPDATE_MENU_EVENT, ());
+                let _ = ipc::AppMenuUpdateEvent.emit(app);
             }
         })
         .on_window_event(|window, event| {
@@ -91,7 +93,7 @@ pub(super) fn run() {
                 let schedule_poll_app = _app.handle().clone();
                 std::thread::spawn(move || loop {
                     std::thread::sleep(std::time::Duration::from_secs(60));
-                    let _ = schedule_poll_app.emit(PROJECT_AGENT_SCHEDULE_POLL_EVENT, ());
+                    let _ = ipc::ProjectAgentSchedulePollEvent.emit(&schedule_poll_app);
                 });
                 let resource_directory = _app.path().resource_dir()?;
                 let home = _app.path().home_dir()?;

@@ -1,4 +1,5 @@
 import { isDesktopTauri } from "./platform";
+import { commands } from "../generated/tauri";
 
 /**
  * Returns this desktop app's enrolled Worker device for one organization.
@@ -10,10 +11,7 @@ export async function currentExecutionWorkerDeviceId(
 ) {
   if (!isDesktopTauri()) return null;
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke<string | null>("current_execution_worker_device_id", {
-      organizationId,
-    });
+    return await commands.currentExecutionWorkerDeviceId(organizationId);
   } catch {
     return null;
   }

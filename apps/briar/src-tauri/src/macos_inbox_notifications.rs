@@ -16,11 +16,10 @@ use objc2_user_notifications::{
     UNNotificationRequest, UNNotificationResponse, UNNotificationSettings, UNNotificationSound,
     UNUserNotificationCenter, UNUserNotificationCenterDelegate,
 };
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
+use tauri_specta::Event as _;
 
-use crate::{
-    InboxNotificationTarget, PendingInboxNotificationOpens, INBOX_NOTIFICATION_OPEN_AVAILABLE_EVENT,
-};
+use crate::{InboxNotificationTarget, PendingInboxNotificationOpens};
 
 const NOTIFICATION_ID_PREFIX: &str = "briar-inbox:v1:";
 
@@ -73,7 +72,7 @@ fn handle_notification_open(target: InboxNotificationTarget) {
         let _ = main.unminimize();
         let _ = main.set_focus();
     }
-    let _ = app.emit(INBOX_NOTIFICATION_OPEN_AVAILABLE_EVENT, ());
+    let _ = crate::ipc::InboxNotificationOpenAvailableEvent.emit(app);
 }
 
 define_class!(
@@ -227,6 +226,7 @@ mod tests {
             project_id: "project-1".to_string(),
             target_id: "run-1".to_string(),
             kind: "issue".to_string(),
+            conversation_message_id: None,
             channel_message_id: None,
             root_message_id: None,
         }
@@ -238,6 +238,7 @@ mod tests {
             project_id: "project-1".to_string(),
             target_id: "channel-1".to_string(),
             kind: "channel".to_string(),
+            conversation_message_id: None,
             channel_message_id: Some("reply-1".to_string()),
             root_message_id: Some("root-1".to_string()),
         }

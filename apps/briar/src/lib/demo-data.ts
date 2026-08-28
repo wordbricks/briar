@@ -3,7 +3,7 @@ import {
   cloneAutoHuntWorkflow,
   normalizeAutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import type { RepositoryReadiness } from "./project-connection";
+import type { RepositoryReadiness } from "../generated/tauri";
 
 const now = Date.now();
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();

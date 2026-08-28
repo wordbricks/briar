@@ -82,12 +82,15 @@ import {
   updateProjectLlmSettings,
   updateProjectSandboxSettings,
   type AgentProvider,
-  type AppProviderSettings,
-  type ApprovalPolicy,
   type ModelEffort,
 } from "../lib/project-llm";
 import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
-import type { AutoHuntHealth, VelenInspection } from "../lib/project-connection";
+import type {
+  AppProviderSettings,
+  ApprovalPolicy,
+  AutoHuntHealth,
+  VelenInspection,
+} from "../generated/tauri";
 import type {
   LinearImportConnectResult,
   LinearImportResult,

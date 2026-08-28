@@ -1,34 +1,17 @@
-export type AgentBrowserStatus = {
-  supported: boolean;
-  installed: boolean;
-  browserReady: boolean;
-  version: string | null;
-};
-
-export type EgoBrowserStatus = AgentBrowserStatus;
-
-export type AsideBrowserStatus = {
-  supported: boolean;
-  installed: boolean;
-  cliReady: boolean;
-  mcpReady: boolean;
-  skillReady: boolean;
-  browserReady: boolean;
-  version: string | null;
-};
+import {
+  commands,
+  type AgentBrowserStatus,
+  type AsideBrowserStatus,
+  type BrowserAutomationProvider,
+  type BrowserAutomationSettings,
+  type EgoBrowserStatus,
+} from "../generated/tauri";
 
 export const browserAutomationProviders = [
   "ego-browser",
   "agent-browser",
   "aside",
 ] as const;
-
-export type BrowserAutomationProvider =
-  (typeof browserAutomationProviders)[number];
-
-export type BrowserAutomationSettings = {
-  provider: BrowserAutomationProvider;
-};
 
 const browserSettingsStorageKey = "briar.settings.browser.v1";
 
@@ -44,8 +27,7 @@ export async function inspectAgentBrowser(): Promise<AgentBrowserStatus> {
       version: null,
     };
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AgentBrowserStatus>("inspect_agent_browser");
+  return commands.inspectAgentBrowser();
 }
 
 export async function inspectEgoBrowser(): Promise<EgoBrowserStatus> {
@@ -57,8 +39,7 @@ export async function inspectEgoBrowser(): Promise<EgoBrowserStatus> {
       version: null,
     };
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<EgoBrowserStatus>("inspect_ego_browser");
+  return commands.inspectEgoBrowser();
 }
 
 export async function inspectAsideBrowser(): Promise<AsideBrowserStatus> {
@@ -73,8 +54,7 @@ export async function inspectAsideBrowser(): Promise<AsideBrowserStatus> {
       version: null,
     };
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AsideBrowserStatus>("inspect_aside_browser");
+  return commands.inspectAsideBrowser();
 }
 
 export async function loadBrowserAutomationSettings(): Promise<BrowserAutomationSettings> {
@@ -95,8 +75,7 @@ export async function loadBrowserAutomationSettings(): Promise<BrowserAutomation
     }
     return { provider: "ego-browser" };
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<BrowserAutomationSettings>("load_browser_automation_settings");
+  return commands.loadBrowserAutomationSettings();
 }
 
 export async function updateBrowserAutomationSettings(
@@ -113,11 +92,7 @@ export async function updateBrowserAutomationSettings(
     }
     return settings;
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<BrowserAutomationSettings>(
-    "update_browser_automation_settings",
-    { settings },
-  );
+  return commands.updateBrowserAutomationSettings(settings);
 }
 
 export async function installAgentBrowser(): Promise<AgentBrowserStatus> {
@@ -126,14 +101,12 @@ export async function installAgentBrowser(): Promise<AgentBrowserStatus> {
       "agent-browser installation is available in the Briar desktop app.",
     );
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AgentBrowserStatus>("install_agent_browser");
+  return commands.installAgentBrowser();
 }
 
 export async function setupAsideBrowser(): Promise<AsideBrowserStatus> {
   if (!isTauri()) {
     throw new Error("Aside setup is available in the Briar desktop app.");
   }
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AsideBrowserStatus>("setup_aside_browser");
+  return commands.setupAsideBrowser();
 }

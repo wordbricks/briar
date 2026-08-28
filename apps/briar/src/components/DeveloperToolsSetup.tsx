@@ -13,10 +13,12 @@ import {
   inspectOpenCodeTerminalPath,
   inspectOnboardingPrerequisites,
   installOnboardingPrerequisite,
-  type OpenCodeTerminalPathStatus,
-  type OnboardingPrerequisites,
   type PrerequisiteId,
 } from "../lib/initial-onboarding";
+import type {
+  OnboardingPrerequisites,
+  OpenCodeTerminalPathStatus,
+} from "../generated/tauri";
 import { agentProviders } from "../lib/agent-provider";
 import {
   AntigravityIcon,

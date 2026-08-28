@@ -27,7 +27,7 @@ import {
   localProjectConnectionState,
 } from "../lib/local-project-connection";
 import { isProjectScheduleTabEnabled } from "../lib/project-tabs";
-import type { RepositoryReadiness } from "../lib/project-connection";
+import type { RepositoryReadiness } from "../generated/tauri";
 import type {
   ChannelSummary,
   ChannelVisibility,

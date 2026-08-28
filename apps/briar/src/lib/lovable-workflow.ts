@@ -2,7 +2,7 @@ import {
   canonicalizeProjectWorkflow,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import type { LovableRepositoryCompatibility } from "./project-connection";
+import type { LovableRepositoryCompatibility } from "../generated/tauri";
 
 const packageManagerLabels = {
   bun: "Bun",
@@ -10,6 +10,12 @@ const packageManagerLabels = {
   pnpm: "pnpm",
   yarn: "Yarn",
 } as const;
+
+function isSupportedPackageManager(
+  value: string,
+): value is keyof typeof packageManagerLabels {
+  return value in packageManagerLabels;
+}
 
 const validationScriptOrder = ["lint", "typecheck", "test", "build"] as const;
 
@@ -19,7 +25,8 @@ export function lovableWorkflowPreset(
   if (
     !compatibility.compatible ||
     !compatibility.stack ||
-    !compatibility.packageManager
+    !compatibility.packageManager ||
+    !isSupportedPackageManager(compatibility.packageManager)
   ) {
     return null;
   }

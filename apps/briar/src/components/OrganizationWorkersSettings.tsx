@@ -25,6 +25,10 @@ import { Switch } from "@/components/ui/switch";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import {
+  commands,
+  type LocalExecutionWorkerStatus,
+} from "../generated/tauri";
+import {
   deleteOrganizationExecutionWorker,
   loadOrganizationExecutionWorkers,
   requestOrganizationExecutionWorkerUpdate,
@@ -54,15 +58,6 @@ import { SelectMenu } from "./SelectMenu";
 import { WorkerIcon } from "./WorkerIcon";
 import { WorkerProviderIcons } from "./WorkerProviderIcons";
 import { ManagedComputersCard } from "./ManagedComputersCard";
-
-type LocalWorkerStatus = {
-  projectId: string;
-  registered: boolean;
-  workerId: string | null;
-  deviceId: string | null;
-  label: string | null;
-  maxConcurrentSessions: number | null;
-};
 
 const readinessTone = (
   readiness: OrganizationExecutionWorker["bindings"][number]["readiness"],
@@ -106,7 +101,9 @@ export function OrganizationWorkersSettings({
     [connectedProjectIds, organizationProjects],
   );
   const [workers, setWorkers] = useState<OrganizationExecutionWorker[]>([]);
-  const [localStatuses, setLocalStatuses] = useState<LocalWorkerStatus[]>([]);
+  const [localStatuses, setLocalStatuses] = useState<
+    LocalExecutionWorkerStatus[]
+  >([]);
   const [canManage, setCanManage] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -127,18 +124,13 @@ export function OrganizationWorkersSettings({
     setError(null);
     try {
       if (desktop) {
-        const { invoke } = await import("@tauri-apps/api/core");
-        await invoke("sync_execution_worker_labels");
+        await commands.syncExecutionWorkerLabels();
       }
       const [remote, local] = await Promise.all([
         loadOrganizationExecutionWorkers(token, organization.id),
         desktop
-          ? import("@tauri-apps/api/core").then(({ invoke }) =>
-              invoke<LocalWorkerStatus[]>("inspect_execution_workers", {
-                projectIds: connectedOrganizationProjects.map(
-                  (project) => project.id,
-                ),
-              }),
+          ? commands.inspectExecutionWorkers(
+              connectedOrganizationProjects.map((project) => project.id),
             )
           : Promise.resolve([]),
       ]);

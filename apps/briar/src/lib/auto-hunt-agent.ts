@@ -1,7 +1,11 @@
 import type { AgentProvider } from "./agent-provider";
-
-export const autoHuntAppServerEventName = "auto-hunt-app-server-event";
-export const autoHuntDispatchEventName = "auto-hunt-dispatch-event";
+import {
+  commands,
+  events,
+  type AgentEvent,
+  type AppServerEventRecord_Deserialize,
+  type AutoHuntDispatchEvent_Deserialize,
+} from "../generated/tauri";
 
 export type AutoHuntAppServerEvent = {
   sessionId: string;
@@ -132,15 +136,59 @@ export type AutoHuntDispatchGroup = {
 const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+function nativeAutoHuntAgentEvent(
+  event: AgentEvent | null | undefined,
+): AutoHuntAgentEvent | undefined {
+  if (!event) return undefined;
+  if (event.type === "conversationStarted") {
+    return {
+      type: event.type,
+      conversationId: event.conversation_id,
+    };
+  }
+  return event;
+}
+
+function nativeAutoHuntAppServerEvent(
+  event: AppServerEventRecord_Deserialize,
+): AutoHuntAppServerEvent | null {
+  if (
+    (event.direction !== "client" && event.direction !== "server") ||
+    !event.message ||
+    typeof event.message !== "object" ||
+    Array.isArray(event.message)
+  ) {
+    return null;
+  }
+  return {
+    ...event,
+    direction: event.direction,
+    message: event.message,
+    event: nativeAutoHuntAgentEvent(event.event),
+  };
+}
+
+function nativeAutoHuntDispatchEvent(
+  event: AutoHuntDispatchEvent_Deserialize,
+): AutoHuntDispatchEvent {
+  return {
+    ...event,
+    data:
+      event.data && typeof event.data === "object" && !Array.isArray(event.data)
+        ? event.data
+        : undefined,
+  };
+}
+
 export async function loadAutoHuntAppServerEvents(
   sessionId: string,
 ): Promise<AutoHuntAppServerEvent[]> {
   if (!isTauri()) return [];
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AutoHuntAppServerEvent[]>(
-    "load_auto_hunt_app_server_events",
-    { sessionId },
-  );
+  const events = await commands.loadAutoHuntAppServerEvents(sessionId);
+  return events.flatMap((event) => {
+    const normalized = nativeAutoHuntAppServerEvent(event);
+    return normalized ? [normalized] : [];
+  });
 }
 
 export async function loadAutoHuntDispatch(
@@ -148,21 +196,23 @@ export async function loadAutoHuntDispatch(
   afterCursor = 0,
 ): Promise<AutoHuntDispatchGroup | null> {
   if (!isTauri()) return null;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<AutoHuntDispatchGroup | null>("load_auto_hunt_dispatch", {
+  const dispatch = await commands.loadAutoHuntDispatch(
     dispatchGroupId,
     afterCursor,
-  });
+  );
+  if (!dispatch) return null;
+  return {
+    ...dispatch,
+    events: dispatch.events.map(nativeAutoHuntDispatchEvent),
+  };
 }
 
 export async function listenToAutoHuntDispatchEvents(
   onEvent: (event: AutoHuntDispatchEvent) => void,
 ): Promise<() => void> {
   if (!isTauri()) return () => undefined;
-  const { listen } = await import("@tauri-apps/api/event");
-  return listen<AutoHuntDispatchEvent>(
-    autoHuntDispatchEventName,
-    (event) => onEvent(event.payload),
+  return events.autoHuntDispatchEvent.listen(
+    ({ payload }) => onEvent(nativeAutoHuntDispatchEvent(payload)),
   );
 }
 
@@ -170,11 +220,10 @@ export async function listenToAutoHuntAppServerEvents(
   onEvent: (event: AutoHuntAppServerEvent) => void,
 ): Promise<() => void> {
   if (!isTauri()) return () => undefined;
-  const { listen } = await import("@tauri-apps/api/event");
-  return listen<AutoHuntAppServerEvent>(
-    autoHuntAppServerEventName,
-    (event) => onEvent(event.payload),
-  );
+  return events.autoHuntAppServerEvent.listen(({ payload }) => {
+    const normalized = nativeAutoHuntAppServerEvent(payload);
+    if (normalized) onEvent(normalized);
+  });
 }
 
 export function mergeAutoHuntAppServerEvents(

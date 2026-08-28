@@ -1,4 +1,6 @@
 use super::*;
+#[cfg(all(desktop, not(target_os = "macos")))]
+use tauri_specta::Event as _;
 
 #[cfg(any(target_os = "macos", test))]
 pub(super) fn launch_intro_bounds(
@@ -124,7 +126,7 @@ pub(super) fn show_inbox_notification(
                         let _ = main.unminimize();
                         let _ = main.set_focus();
                     }
-                    let _ = app.emit(INBOX_NOTIFICATION_OPEN_EVENT, target);
+                    let _ = target.emit(&app);
                 })
             {
                 eprintln!("Inbox notification response failed: {error}");
@@ -442,11 +444,6 @@ pub(super) const APP_MENU_ID: &str = "app:menu";
 pub(super) const APP_SETTINGS_MENU_ID: &str = "app:settings";
 #[cfg(target_os = "macos")]
 pub(super) const APP_UPDATE_MENU_ID: &str = "app:update";
-#[cfg(target_os = "macos")]
-pub(super) const APP_SETTINGS_MENU_EVENT: &str = "app-menu-settings";
-#[cfg(target_os = "macos")]
-pub(super) const APP_UPDATE_MENU_EVENT: &str = "app-menu-update";
-
 #[cfg(target_os = "macos")]
 pub(super) fn app_update_menu_label(update_available: bool) -> &'static str {
     if update_available {

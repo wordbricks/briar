@@ -76,8 +76,9 @@ impl AutoHuntWorkerStatus {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
+#[tauri_specta(event_name = "auto-hunt-dispatch-event")]
 pub(crate) struct AutoHuntDispatchEvent {
     pub(crate) dispatch_group_id: String,
     pub(crate) cursor: u64,

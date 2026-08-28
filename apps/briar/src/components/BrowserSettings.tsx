@@ -23,19 +23,21 @@ import asideSymbolBlack from "../assets/aside-symbol-black.png";
 import asideSymbolWhite from "../assets/aside-symbol-white.png";
 import { useI18n } from "../i18n";
 import {
-  type AsideBrowserStatus,
-  type BrowserAutomationProvider,
-  type BrowserAutomationSettings,
   inspectAgentBrowser,
   inspectAsideBrowser,
   inspectEgoBrowser,
   installAgentBrowser,
   loadBrowserAutomationSettings,
-  type AgentBrowserStatus,
-  type EgoBrowserStatus,
   setupAsideBrowser,
   updateBrowserAutomationSettings,
 } from "../lib/agent-browser";
+import type {
+  AgentBrowserStatus,
+  AsideBrowserStatus,
+  BrowserAutomationProvider,
+  BrowserAutomationSettings,
+  EgoBrowserStatus,
+} from "../generated/tauri";
 
 const egoDownloadUrl = "https://lite.ego.app/download?auto=1";
 const egoDocsUrl = "https://lite.ego.app/document/en/docs/quick-start";

@@ -1,4 +1,5 @@
 use super::*;
+use tauri_specta::Event as _;
 
 #[derive(Debug, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
@@ -414,7 +415,7 @@ pub(super) fn emit_latest_auto_hunt_dispatch_event(
     group: &auto_hunt_dispatch::AutoHuntDispatchGroup,
 ) {
     if let Some(event) = group.events.last() {
-        let _ = app.emit(AUTO_HUNT_DISPATCH_EVENT, event);
+        let _ = event.emit(app);
     }
 }
 
@@ -1204,7 +1205,7 @@ pub(super) fn create_auto_hunt_event_sink(
                 .and_then(|_| file.flush())
                 .map_err(|error| format!("이슈 처리 이벤트를 저장하지 못했습니다: {error}"))?;
         }
-        let _ = event_app.emit(AUTO_HUNT_APP_SERVER_EVENT, &record);
+        let _ = record.emit(&event_app);
         Ok(())
     }))
 }
