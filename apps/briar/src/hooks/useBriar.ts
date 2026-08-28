@@ -223,11 +223,11 @@ const demoUser: SessionUser = {
   email: "demo@briar.local",
 };
 const demoOrganization: Organization = {
-  id: demoDashboard.project.organizationId!,
-  name: demoDashboard.project.organizationName!,
+  id: demoDashboard.project.organizationId,
+  name: demoDashboard.project.organizationName,
   handle: "briar",
   logo: null,
-  role: demoDashboard.project.role!,
+  role: demoDashboard.project.role,
   createdAt: demoDashboard.project.createdAt,
 };
 const demoMessageTime = new Date(Date.now() - 18 * 60_000).toISOString();
@@ -1280,7 +1280,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       if (!project) return;
       reconnectRequest.current += 1;
       setActiveProjectId(projectId);
-      setActiveOrganizationId((current) => project.organizationId ?? current);
+      setActiveOrganizationId(project.organizationId);
       if (!demoMode) {
         setDashboard(null);
         setError(null);
@@ -1313,7 +1313,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         throw new Error("요청한 프로젝트를 찾을 수 없습니다.");
       }
       setActiveProjectId(project.id);
-      setActiveOrganizationId((current) => project.organizationId ?? current);
+      setActiveOrganizationId(project.organizationId);
       if (!demoMode) {
         setDashboard(null);
         setError(null);
@@ -1618,9 +1618,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         const nextOrganizations = await loadOrganizations(token).catch(() => null);
         setProjects((current) => [...current, result.project]);
         if (nextOrganizations) setOrganizations(nextOrganizations);
-        setActiveOrganizationId(
-          result.project.organizationId ?? activeOrganizationId,
-        );
+        setActiveOrganizationId(result.project.organizationId);
         setActiveProjectId(result.project.id);
         setIsCreatingProject(false);
         setVelen(null);
@@ -2024,7 +2022,7 @@ export function useBriar(options: UseBriarOptions = {}) {
     if (request !== reconnectRequest.current) return "superseded" as const;
     setVelen(null);
     setActiveProjectId(project.id);
-    setActiveOrganizationId((current) => project.organizationId ?? current);
+    setActiveOrganizationId(project.organizationId);
     setIsCreatingProject(true);
     setProjectConnection({
       kind: "reconnect",
@@ -2535,7 +2533,7 @@ export function useBriar(options: UseBriarOptions = {}) {
           };
           runEventsByRun.current[run.id] = [initialEvent];
           setActiveProjectId(projectId);
-          setActiveOrganizationId((current) => project.organizationId ?? current);
+          setActiveOrganizationId(project.organizationId);
           setDashboard({
             ...targetDashboard,
             runs: [run, ...targetDashboard.runs],

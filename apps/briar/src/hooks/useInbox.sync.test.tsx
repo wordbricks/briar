@@ -75,7 +75,7 @@ function Harness({
   const projects = useMemo(() => [dashboard.project], [dashboard.project]);
   inbox = useInbox(
     userId,
-    dashboard.project.organizationId ?? null,
+    dashboard.project.organizationId,
     dashboard,
     sessions,
     projects,

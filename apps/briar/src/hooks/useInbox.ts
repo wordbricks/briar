@@ -214,7 +214,7 @@ export function buildCurrentInboxMessages(
   const messages: InboxMessage[] = [];
 
   if (dashboard) {
-    const issueKeyPrefix = dashboard.project.issueKeyPrefix?.trim() || "AH";
+    const issueKeyPrefix = dashboard.project.issueKeyPrefix;
     for (const run of dashboard.runs) {
       if (!inboxIssueNotifyingStatuses.has(run.status)) continue;
       if (currentUserId !== undefined && run.subscribers !== undefined) {

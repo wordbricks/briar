@@ -255,7 +255,7 @@ describe("Inbox messages", () => {
         messageId: "message-reply",
         rootMessageId: "message-root",
         authorImage: "https://example.com/member.png",
-        issueKey: `${demoDashboard.project.issueKeyPrefix ?? "AH"}-1321`,
+        issueKey: `${demoDashboard.project.issueKeyPrefix}-1321`,
         reason: "thread_reply",
       }),
     ]);
@@ -440,7 +440,7 @@ describe("Inbox messages", () => {
       filterInboxMessagesByOrganization(
         messages,
         [project, otherProject],
-        project.organizationId ?? null,
+        project.organizationId,
       ).map((message) => message.id),
     ).toEqual(["session:selected-session"]);
     expect(

@@ -3107,7 +3107,7 @@ export function App({
   for (const project of isCommandPaletteOpen ? activeOrganizationProjects : []) {
     const organizationName = briar.organizations.find(
       (organization) => organization.id === project.organizationId,
-    )?.name ?? project.organizationName ?? "";
+    )?.name ?? project.organizationName;
     addPaletteItem({
       active: project.id === briar.activeProjectId,
       description:
