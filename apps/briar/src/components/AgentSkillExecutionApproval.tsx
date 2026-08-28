@@ -68,8 +68,8 @@ const selectableWorker = (
 
 /**
  * Shared approval boundary for a natural-language request matched to a saved
- * Project Agent Skill. Runtime settings are immutable; approval only chooses
- * one exact, currently available Worker.
+ * Project Agent Skill. Task runtime settings are immutable; conversation
+ * execution follows the retained thread session and does not choose a Worker.
  */
 export function AgentSkillExecutionApproval<
   T extends AgentSkillExecutionProposal,
@@ -383,7 +383,9 @@ export function AgentSkillExecutionApproval<
           <div><dt><Bot size={13} />{t("skillExecution.agent")}</dt><dd>{displayProposal.agentName}</dd></div>
           <div><dt><Sparkles size={13} />{t("skillExecution.skill")}</dt><dd>{displayProposal.skillName}</dd></div>
           <div className="skill-execution-proposal-request"><dt>{t("skillExecution.request")}</dt><dd>{displayProposal.request}</dd></div>
-          <div><dt>{t("skillExecution.runtime")}</dt><dd>{displayProposal.provider} · {displayProposal.model ?? t("settings.providerDefaultModel")} · {displayProposal.effort ?? t("settings.providerDefaultEffort")}</dd></div>
+          <div><dt>{t("skillExecution.runtime")}</dt><dd>{conversationExecution
+            ? t("skillExecution.continuedConversation")
+            : `${displayProposal.provider} · ${displayProposal.model ?? t("settings.providerDefaultModel")} · ${displayProposal.effort ?? t("settings.providerDefaultEffort")}`}</dd></div>
           <div><dt>{t("skillExecution.executionMode")}</dt><dd>{t(`skillExecution.mode.${displayProposal.executionMode}` as MessageKey)}</dd></div>
         </dl>
         {displayProposal.delegatedByAgentName ? (
@@ -459,16 +461,22 @@ export function AgentSkillExecutionApproval<
             <DialogHeader>
               <DialogTitle>{t("skillExecution.dialogTitle")}</DialogTitle>
               <DialogDescription>{t(conversationExecution
-                ? "skillExecution.conversationDialogDescription"
+                ? "skillExecution.conversationBoundary"
                 : "skillExecution.dialogDescription")}</DialogDescription>
             </DialogHeader>
             <dl className="skill-execution-approval-runtime">
               <div><dt>{t("skillExecution.agent")}</dt><dd>{displayProposal.agentName}</dd></div>
               <div><dt>{t("skillExecution.skill")}</dt><dd>{displayProposal.skillName}</dd></div>
               <div><dt>{t("skillExecution.request")}</dt><dd>{displayProposal.request}</dd></div>
-              <div><dt>{t("worker.provider")}</dt><dd>{displayProposal.provider}</dd></div>
-              <div><dt>{t("issue.preferredModel")}</dt><dd>{displayProposal.model ?? t("settings.providerDefaultModel")}</dd></div>
-              <div><dt>{t("settings.effort")}</dt><dd>{displayProposal.effort ?? t("settings.providerDefaultEffort")}</dd></div>
+              {conversationExecution ? (
+                <div><dt>{t("skillExecution.runtime")}</dt><dd>{t("skillExecution.continuedConversation")}</dd></div>
+              ) : (
+                <>
+                  <div><dt>{t("worker.provider")}</dt><dd>{displayProposal.provider}</dd></div>
+                  <div><dt>{t("issue.preferredModel")}</dt><dd>{displayProposal.model ?? t("settings.providerDefaultModel")}</dd></div>
+                  <div><dt>{t("settings.effort")}</dt><dd>{displayProposal.effort ?? t("settings.providerDefaultEffort")}</dd></div>
+                </>
+              )}
             </dl>
             {!conversationExecution ? <label className="skill-execution-worker-select">
               <span><Cpu size={15} />{t("skillExecution.exactWorker")}</span>

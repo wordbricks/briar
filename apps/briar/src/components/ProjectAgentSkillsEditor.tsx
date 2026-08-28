@@ -165,6 +165,7 @@ export function ProjectAgentSkillsEditor({
       ) : (
         <div className="grid gap-3">
           {skills.map((skill, index) => {
+            const conversationSkill = skill.executionMode === "conversation";
             const modelOptions = agentModelOptions(
               providerModels,
               skill.provider,
@@ -264,66 +265,68 @@ export function ProjectAgentSkillsEditor({
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2.5 min-[761px]:grid-cols-[1fr_1.35fr_1fr]">
-                    <div className="grid min-w-0 gap-2">
-                      <Label>{t("agents.provider")}</Label>
-                      <ProviderSelect
-                        disabled={disabled}
-                        label={`${accessibleSkillName} · ${t("agents.provider")}`}
-                        onValueChange={(value) =>
-                          updateSkill(index, {
-                            provider: value as AgentProvider,
-                            model: null,
-                            effort: null,
-                          })
-                        }
-                        value={skill.provider}
-                      />
+                  {!conversationSkill ? (
+                    <div className="grid grid-cols-1 gap-2.5 min-[761px]:grid-cols-[1fr_1.35fr_1fr]">
+                      <div className="grid min-w-0 gap-2">
+                        <Label>{t("agents.provider")}</Label>
+                        <ProviderSelect
+                          disabled={disabled}
+                          label={`${accessibleSkillName} · ${t("agents.provider")}`}
+                          onValueChange={(value) =>
+                            updateSkill(index, {
+                              provider: value as AgentProvider,
+                              model: null,
+                              effort: null,
+                            })
+                          }
+                          value={skill.provider}
+                        />
+                      </div>
+                      <div className="grid min-w-0 gap-2">
+                        <Label>{t("agents.model")}</Label>
+                        <NativeSelect
+                          disabled={disabled}
+                          label={`${accessibleSkillName} · ${t("agents.model")}`}
+                          onValueChange={(value) =>
+                            updateSkill(index, {
+                              model: value || null,
+                              effort: null,
+                            })
+                          }
+                          options={modelOptions}
+                          searchEmptyMessage={t("issue.noModelsFound")}
+                          searchPlaceholder={t("issue.searchModels")}
+                          searchable={skill.provider === "opencode" || skill.provider === "agy"}
+                          value={skill.model ?? ""}
+                        />
+                      </div>
+                      <div className="grid min-w-0 gap-2">
+                        <Label>{t("agents.effort")}</Label>
+                        <NativeSelect
+                          disabled={disabled}
+                          label={`${accessibleSkillName} · ${t("agents.effort")}`}
+                          onValueChange={(value) =>
+                            updateSkill(index, {
+                              effort: (value || null) as ModelEffort | null,
+                            })
+                          }
+                          options={[
+                            {
+                              label: t("agents.providerDefaultEffort"),
+                              value: "",
+                            },
+                            ...agentEffortOptions(
+                              providerModels,
+                              skill.provider,
+                              skill.model,
+                              skill.effort,
+                            ),
+                          ]}
+                          value={skill.effort ?? ""}
+                        />
+                      </div>
                     </div>
-                    <div className="grid min-w-0 gap-2">
-                      <Label>{t("agents.model")}</Label>
-                      <NativeSelect
-                        disabled={disabled}
-                        label={`${accessibleSkillName} · ${t("agents.model")}`}
-                        onValueChange={(value) =>
-                          updateSkill(index, {
-                            model: value || null,
-                            effort: null,
-                          })
-                        }
-                        options={modelOptions}
-                        searchEmptyMessage={t("issue.noModelsFound")}
-                        searchPlaceholder={t("issue.searchModels")}
-                        searchable={skill.provider === "opencode" || skill.provider === "agy"}
-                        value={skill.model ?? ""}
-                      />
-                    </div>
-                    <div className="grid min-w-0 gap-2">
-                      <Label>{t("agents.effort")}</Label>
-                      <NativeSelect
-                        disabled={disabled}
-                        label={`${accessibleSkillName} · ${t("agents.effort")}`}
-                        onValueChange={(value) =>
-                          updateSkill(index, {
-                            effort: (value || null) as ModelEffort | null,
-                          })
-                        }
-                        options={[
-                          {
-                            label: t("agents.providerDefaultEffort"),
-                            value: "",
-                          },
-                          ...agentEffortOptions(
-                            providerModels,
-                            skill.provider,
-                            skill.model,
-                            skill.effort,
-                          ),
-                        ]}
-                        value={skill.effort ?? ""}
-                      />
-                    </div>
-                  </div>
+                  ) : null}
                   <div className="grid grid-cols-1 gap-2.5 min-[761px]:grid-cols-2">
                     <div className="grid min-w-0 gap-2">
                       <Label>{t("agents.skillExecutionMode")}</Label>
