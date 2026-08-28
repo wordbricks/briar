@@ -1,9 +1,8 @@
-export type MobilePlatform = "android" | "ios";
+export type MobilePlatform = "android";
 
 export function getMobilePlatform(): MobilePlatform | null {
   if (typeof navigator !== "undefined") {
     if (/\bAndroid\b/iu.test(navigator.userAgent)) return "android";
-    if (/\biPhone\b|\biPad\b|\biPod\b/iu.test(navigator.userAgent)) return "ios";
   }
   return import.meta.env.VITE_BRIAR_COMPANION === "true" ? "android" : null;
 }

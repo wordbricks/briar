@@ -1062,9 +1062,7 @@ export function useBriar(options: UseBriarOptions = {}) {
       );
       if (attempt !== loginAttempt.current) return;
       setLoginCode(authorization.userCode);
-      const authorizationPresentation = await openAuthorization(
-        authorization.verificationUrl,
-      );
+      await openAuthorization(authorization.verificationUrl);
       if (attempt !== loginAttempt.current) return;
       let delay = authorization.interval * 1_000;
       const poll = async () => {
@@ -1140,11 +1138,7 @@ export function useBriar(options: UseBriarOptions = {}) {
         }
       };
       pollLoginNow.current = () => void poll();
-      if (authorizationPresentation === "completed") {
-        void poll();
-      } else {
-        pollTimer.current = window.setTimeout(() => void poll(), delay);
-      }
+      pollTimer.current = window.setTimeout(() => void poll(), delay);
     } catch (caught) {
       if (attempt !== loginAttempt.current) return;
       if (isAuthorizationCancelled(caught)) {

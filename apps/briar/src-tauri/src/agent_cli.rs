@@ -974,7 +974,7 @@ pub(super) fn open_provider_login_terminal(binary: &Path, args: &[&str]) -> Resu
     Err("사용 가능한 터미널 앱을 찾지 못했습니다.".to_string())
 }
 
-#[cfg(any(target_os = "android", target_os = "ios"))]
+#[cfg(target_os = "android")]
 pub(super) fn open_provider_login_terminal(_binary: &Path, _args: &[&str]) -> Result<(), String> {
     Err("모바일에서는 Agent CLI 로그인을 열 수 없습니다.".to_string())
 }

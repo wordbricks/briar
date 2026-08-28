@@ -18,13 +18,12 @@ const channelId = "55555555-5555-4555-8555-555555555555";
 const messageId = "66666666-6666-4666-8666-666666666666";
 const rootMessageId = "77777777-7777-4777-8777-777777777777";
 const apiOrigin = "https://briar-api.example";
-const mobileConfig = (platform: "android" | "ios") =>
-  JSON.parse(
-    readFileSync(
-      new URL(`../../src-tauri/tauri.${platform}.conf.json`, import.meta.url),
-      "utf8",
-    ),
-  );
+const androidConfig = JSON.parse(
+  readFileSync(
+    new URL("../../src-tauri/tauri.android.conf.json", import.meta.url),
+    "utf8",
+  ),
+);
 const desktopConfig = JSON.parse(
   readFileSync(
     new URL("../../src-tauri/tauri.conf.json", import.meta.url),
@@ -196,25 +195,11 @@ describe("issue links", () => {
       .toBeNull();
   });
 
-  it("registers issue and session deep links on both mobile platforms", () => {
-    expect(mobileConfig("android").plugins["deep-link"].mobile).toContainEqual({
+  it("registers issue and session deep links on Tauri Android", () => {
+    expect(androidConfig.plugins["deep-link"].mobile).toContainEqual({
       scheme: ["briar-companion"],
       appLink: false,
     });
-    expect(mobileConfig("ios").plugins["deep-link"].mobile).toEqual(
-      expect.arrayContaining([
-        {
-          scheme: ["briar-companion"],
-          appLink: false,
-        },
-        {
-          scheme: ["https"],
-          host: "briar-api.wbai.workers.dev",
-          pathPrefix: ["/open/issues", "/open/sessions", "/open/channels"],
-          appLink: true,
-        },
-      ]),
-    );
   });
 
   it("registers and grants issue deep links on desktop", () => {
