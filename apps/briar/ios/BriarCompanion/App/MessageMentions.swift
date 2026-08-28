@@ -244,10 +244,5 @@ struct MentionText: View {
                 Text(attributed)
             }
         }
-        .environment(\.openURL, OpenURLAction { url in
-            // Keep mention taps in-app; do not hand briar-mention:// to Safari.
-            if url.scheme == "briar-mention" { return .handled }
-            return .systemAction
-        })
     }
 }

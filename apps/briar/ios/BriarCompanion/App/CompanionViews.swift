@@ -328,7 +328,14 @@ struct CompanionShellView: View {
         if !available, forceRefresh {
             available = await ensureIssueAvailable(project.id, runID)
         }
-        guard available else { return }
+        guard available else {
+            if forceRefresh {
+                navigation.failPendingNavigation(
+                    "요청한 이슈가 없거나 접근 권한이 없습니다."
+                )
+            }
+            return
+        }
         guard let route = navigation.consumePendingIssueNavigation(
             projectID: project.id,
             runID: runID,
@@ -1829,10 +1836,6 @@ struct RunDetailView: View {
                             handles: issueMentionHandles
                         )
                     )
-                    .environment(\.openURL, OpenURLAction { url in
-                        if url.scheme == "briar-mention" { return .handled }
-                        return .systemAction
-                    })
                 }
                 ForEach(message.attachments ?? []) { attachment in
                     AuthenticatedImagePreview(

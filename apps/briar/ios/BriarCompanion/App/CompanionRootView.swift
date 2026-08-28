@@ -88,6 +88,27 @@ struct CompanionRootView: View {
             }
         }
         .preferredColorScheme(CompanionAppearance(rawValue: appearance)?.colorScheme)
+        .environment(\.openURL, OpenURLAction { url in
+            if url.scheme == "briar-mention" { return .handled }
+            return handleIncomingURL(url) ? .handled : .systemAction
+        })
+        .alert(
+            L10n.text("링크를 열 수 없음", locale: locale),
+            isPresented: Binding(
+                get: { navigation.linkErrorMessage != nil },
+                set: { presented in
+                    if !presented { navigation.linkErrorMessage = nil }
+                }
+            )
+        ) {
+            Button(L10n.text("확인", locale: locale), role: .cancel) {
+                navigation.linkErrorMessage = nil
+            }
+        } message: {
+            if let message = navigation.linkErrorMessage {
+                Text(L10n.text(message, locale: locale))
+            }
+        }
         .task(id: session.token) {
             guard let token = session.token else {
                 companion.clear()
@@ -245,7 +266,7 @@ struct CompanionRootView: View {
             }
         }
         .onOpenURL { url in
-            handleIncomingURL(url)
+            _ = handleIncomingURL(url)
         }
     }
 
@@ -360,10 +381,10 @@ struct CompanionRootView: View {
             do {
                 try await companion.refreshProjects(token: token)
             } catch {
-                // Clear the routing key so another tap can trigger a fresh
-                // catalog lookup instead of leaving navigation stuck forever.
                 if navigation.pendingProjectID == pending {
-                    navigation.pendingProjectID = nil
+                    navigation.failPendingNavigation(
+                        "프로젝트 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요."
+                    )
                 }
                 return
             }
@@ -371,18 +392,17 @@ struct CompanionRootView: View {
         guard navigation.pendingProjectID == pending else { return }
         applyPendingProjectIfNeeded()
         if companion.selectedProjectID != pending {
-            // A successful refresh can still race eventual project creation.
-            // Clear only this unresolved request so tapping the link again
-            // performs a new catalog lookup.
-            navigation.pendingProjectID = nil
+            navigation.failPendingNavigation(
+                "요청한 프로젝트가 없거나 접근 권한이 없습니다."
+            )
         }
     }
 
-    private func handleIncomingURL(_ url: URL) {
+    @discardableResult
+    private func handleIncomingURL(_ url: URL) -> Bool {
         // Device auth callback is handled by ASWebAuthenticationSession.
-        if url.host == "auth-complete" { return }
-        guard let target = BriarLinkParser.parse(url) else { return }
-        navigation.open(target)
+        if url.host == "auth-complete" { return false }
+        guard let target = navigation.open(url) else { return false }
         if case let .channel(organizationID, _, _, _) = target,
            navigation.pendingProjectID == nil,
            let project = companion.projects.first(where: {
@@ -391,6 +411,7 @@ struct CompanionRootView: View {
             navigation.pendingProjectID = project.id
         }
         applyPendingProjectIfNeeded()
+        return true
     }
 
     private func signIn() async {
