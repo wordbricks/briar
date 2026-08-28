@@ -5,12 +5,12 @@ Briar keeps issue development parallel and serializes only delivery to
 cohort, and are assembled by the designated local Worker as ordinary merge
 commits on `briar/merge-queue/<batch-id>`. The Worker validates that exact
 integration SHA with the repository commands stored on the selected workflow
-boundary, then publishes it to `main` with an exact-base lease. The lane
-remains occupied until signed GitHub webhooks confirm
-that every original pull request merged.
+boundary, then merges each original pull request in order through GitHub's
+ordinary pull-request merge API. The lane remains occupied until signed GitHub
+webhooks confirm that every original pull request merged.
 
 This feature is default-off. Applying its migration does not change a GitHub
-repository, enable a project profile, or activate a ruleset.
+repository or enable a project profile.
 
 ## Invariants
 
@@ -37,44 +37,29 @@ The coordinator enforces these boundaries:
 - validation proof is stored before status publication, so a publication retry
   never reruns CI;
 - one combined status is posted to the claimed SHA as `briar/merge-queue`;
+- each original PR is merged with its sealed head SHA, using an enabled
+  repository merge method, and GitHub applies the repository's existing rules;
+- after each merge, `main` must have the same tree as the corresponding
+  validated integration prefix before the next PR can merge;
 - Briar never directly resumes member runs. The existing signed-PR path resumes
   them only after the batch itself is complete.
 
-GitHub branch protection remains the authoritative `main` gate. The exact-main
-ruleset must grant always-on bypass to exactly one trusted publisher GitHub App
-or a dedicated single-member publisher team used by the local Worker's `gh`
-credential. The D1 lane and `--force-with-lease`
-serialize that publisher; no other user, role, team, or App may bypass it.
-
-## Required GitHub policy
-
-Before enabling a Briar profile, create one repository-level branch ruleset
-that targets only `refs/heads/main` and verify all of the following:
-
-- enforcement is active and the same single GitHub App or dedicated publisher
-  team has `always` bypass on every effective exact-main ruleset;
-- pull requests are required;
-- deletion and non-fast-forward updates are blocked;
-- linear-history, required-signature, and commit-metadata rules do not apply to
-  the publisher; cohort publication intentionally creates merge commits;
-- only `briar/merge-queue` is required for coordinator publication;
-- required status checks use `strict_required_status_checks_policy: false`.
-
-Disabling strict branch updates is intentional. The merge queue builds a
-cumulative commit against the current protected base, so individual pull
-requests do not need to rerun the same CI merely because another pull request
-merged first.
+GitHub remains the authoritative merge gate. Briar neither reads nor modifies
+repository rulesets, branch protection, required checks, reviews, or bypass
+actors. Existing repository policy is applied by the same GitHub merge API used
+for an ordinary PR. A policy that rejects the Worker's authenticated `gh` user
+also rejects the queued merge and is reported as a GitHub merge failure.
 
 The Briar GitHub App needs Pull requests read and the Pull request webhook
 subscription. It remains read-only. Neither Merge queues permission nor the
 Merge group event is used. The local Worker's existing `gh` credential fetches
-PR refs, publishes integration refs and statuses, and performs the lease-fenced
-fast-forward to `main`.
+PR refs, publishes the temporary integration ref and status, and merges the
+original PRs through GitHub. The App supplies signed inbound lifecycle events;
+it is not a merge publisher or ruleset bypass actor.
 
 ## Safe rollout
 
-Do not activate the production ruleset as part of a code deployment or pull
-request review. Roll out in this order during an explicit maintenance window:
+Roll out in this order:
 
 1. Apply the Briar migrations with every merge-queue profile absent or
    disabled.
@@ -82,15 +67,11 @@ request review. Roll out in this order during an explicit maintenance window:
    These commands must validate an exact detached integration SHA and must not
    deploy, publish, or require a pull-request branch identity.
 3. Confirm signed Pull request deliveries reach Briar.
-4. Create the exact-main ruleset inactive or in evaluation mode and inspect its
-   full JSON, including bypass actors and required check sources.
-5. Confirm the designated local Worker has the repository checkout, every tool
+4. Confirm the designated local Worker has the repository checkout, every tool
    required by the validation commands, authenticated `gh`, and one free
    regular execution slot.
-6. Configure the profile disabled, activate the GitHub ruleset, and run the
-   fail-closed doctor. It checks the effective rules even while the profile is
-   disabled, so no batch can be claimed during this preflight.
-7. Enable the project profile last. Start with a canary window and two pull
+5. Configure the profile disabled and run the read-only doctor.
+6. Enable the project profile last. Start with a canary window and two pull
    requests; candidates arriving after the cohort freezes wait for the next
    batch.
 
@@ -102,10 +83,8 @@ briar merge-queue configure --enable \
 ```
 
 `doctor` is read-only. It validates the repository validation plan, local `gh`
-authentication, immutable repository identity, effective exact-main active
-rulesets, exactly one publisher bypass actor, branch protections, the single
-`briar/merge-queue` status context, and `strict=false`. It never
-creates or edits GitHub rulesets.
+authentication, origin remote, and immutable repository identity. It does not
+inspect or change GitHub rulesets.
 
 The profile API is owner/admin-only:
 
@@ -170,6 +149,5 @@ cohort and integration ref, remove or repair its original entries, and rework th
 member runs so new exact heads produce a new cohort.
 
 For rollback, stop new profile claims first, drain or resolve the active cohort,
-confirm no integration publish is active, restore the previous protected-branch
-policy, and only then remove the trusted publisher bypass. The API refuses
-to disable or retarget a profile while an active batch holds its lane.
+and confirm no integration publish is active. The API refuses to disable or
+retarget a profile while an active batch holds its lane.

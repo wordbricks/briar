@@ -37,8 +37,9 @@ slug from `https://github.com/apps/<app-slug>`. The App does not need Contents
 or Commit statuses write access, an App private key, or a long-lived user or
 installation token. Signed webhooks are inbound authority only; the designated
 local Worker uses its existing `gh` login for bors-style integration refs,
-exact-base publication, and status reporting. GitHub's native Merge queues
-permission and Merge group webhook are not required.
+ordinary pull-request merges, and status reporting. Briar does not inspect or
+modify repository rulesets. GitHub's native Merge queues permission and Merge
+group webhook are not required.
 
 GitHub sends a signed `ping` delivery when the webhook is saved. A successful
 configuration receives an HTTP 200 response from Briar.
