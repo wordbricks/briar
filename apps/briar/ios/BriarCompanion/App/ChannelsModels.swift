@@ -734,6 +734,7 @@ struct ChannelMessage: Codable, Hashable, Identifiable, Sendable {
         enum Status: String, Codable, Hashable, Sendable {
             case pending
             case accepted
+            case declined
         }
     }
 }
@@ -962,6 +963,26 @@ struct CreateChannelMessageRequest: Codable, Sendable {
 
 struct CreateChannelMessageResponse: Codable, Sendable {
     let message: ChannelMessage
+    let agentReplies: [ChannelAgentReply]
+
+    init(message: ChannelMessage, agentReplies: [ChannelAgentReply] = []) {
+        self.message = message
+        self.agentReplies = agentReplies
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case message
+        case agentReplies
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        message = try container.decode(ChannelMessage.self, forKey: .message)
+        agentReplies = try container.decodeIfPresent(
+            [ChannelAgentReply].self,
+            forKey: .agentReplies
+        ) ?? []
+    }
 }
 
 struct ToggleChannelMessageReactionRequest: Codable, Sendable {
@@ -1037,6 +1058,15 @@ struct AcceptChannelProposalResponse: Codable, Equatable, Sendable {
     enum Outcome: String, Codable, Equatable, Sendable {
         case accepted
         case alreadyAccepted = "already_accepted"
+    }
+}
+
+struct DeclineChannelProposalResponse: Codable, Equatable, Sendable {
+    let outcome: Outcome
+
+    enum Outcome: String, Codable, Equatable, Sendable {
+        case declined
+        case alreadyDeclined = "already_declined"
     }
 }
 

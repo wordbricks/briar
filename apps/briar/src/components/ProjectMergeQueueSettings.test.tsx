@@ -30,13 +30,26 @@ const profile: MergeQueueProfile = {
   baseBranch: "main",
   enabled: false,
   readinessStageId: "ci_qa",
+  validationCommands: ["bun run ci:local"],
   quietWindowMs: 300_000,
   maxBatchSize: 5,
   updatedAt: "2026-08-21T00:00:00.000Z",
 };
 const stages = [
-  { id: "reviewing", label: "Review", required: true, evidence: [] },
-  { id: "ci_qa", label: "CI", required: true, evidence: [] },
+  {
+    id: "reviewing",
+    label: "Review",
+    required: true,
+    evidence: [],
+    checks: ["bun run check"],
+  },
+  {
+    id: "ci_qa",
+    label: "CI",
+    required: true,
+    evidence: [],
+    checks: ["bun run ci:local"],
+  },
 ];
 
 describe("ProjectMergeQueueSettings", () => {
@@ -87,6 +100,7 @@ describe("ProjectMergeQueueSettings", () => {
           ...profile,
           enabled: true,
           readinessStageId: "reviewing",
+          validationCommands: ["bun run check"],
         },
       })),
     };

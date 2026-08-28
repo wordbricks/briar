@@ -382,6 +382,15 @@ describe("conversational Agent Skill execution approval", () => {
     kind: "issue_processing" | "custom" = "custom",
     executionMode: "conversation" | "task" = "task",
     approvalPolicy: "invoke_is_consent" | "explicit" = "explicit",
+    skillRuntime: {
+      provider: "codex" | "claude";
+      model: string;
+      effort: "high" | "medium";
+    } = {
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "high",
+    },
   ) => createProjectAgent(db, projectId, {
     name: `Release Agent ${sequence + 1}`,
     provider: "codex",
@@ -393,9 +402,9 @@ describe("conversational Agent Skill execution approval", () => {
       name: kind === "custom" ? "iOS deployment" : "Issue processing",
       description: "Use for the approved release workflow.",
       body: "Execute the exact approved release workflow.",
-      provider: "codex",
-      model: "gpt-5.6-sol",
-      effort: "high",
+      provider: skillRuntime.provider,
+      model: skillRuntime.model,
+      effort: skillRuntime.effort,
       kind,
       executionMode,
       approvalPolicy,
@@ -974,7 +983,11 @@ describe("conversational Agent Skill execution approval", () => {
   }, 60_000);
 
   it("continues explicit approval in the original channel session", async () => {
-    const agent = await createAgent("custom", "conversation", "explicit");
+    const agent = await createAgent("custom", "conversation", "explicit", {
+      provider: "claude",
+      model: "claude-sonnet",
+      effort: "medium",
+    });
     await addChannelAgent(db, {
       channelId,
       agentId: agent.id,
@@ -1005,7 +1018,7 @@ describe("conversational Agent Skill execution approval", () => {
         id: agent.id,
         projectId,
         skillId: agent.skills[0].id,
-        provider: "codex",
+        provider: agent.skills[0].provider,
       }],
       createdAt: new Date().toISOString(),
     });
@@ -1127,6 +1140,9 @@ describe("conversational Agent Skill execution approval", () => {
           conversationId: string | null;
           claimReason: string;
         };
+        provider: string;
+        model: string | null;
+        effort: string | null;
         skillExecutionTarget: {
           request: string;
           executionMode: string;
@@ -1145,6 +1161,9 @@ describe("conversational Agent Skill execution approval", () => {
         conversationId: null,
         claimReason: "ttl_expired_reactivated",
       },
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      effort: "high",
       skillExecutionTarget: {
         request,
         executionMode: "conversation",

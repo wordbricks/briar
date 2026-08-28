@@ -39,12 +39,16 @@ install -d -o root -g root -m 0755 /opt/briar/bin
 install -d -o root -g briar -m 0750 /var/lib/briar
 install -o root -g root -m 0755 \
   "$source_dir/briar-managed-enroll" \
+  "$source_dir/briar-managed-computer-health" \
   "$source_dir/briar-remote-desktop" \
   "$source_dir/resolve-remote-desktop-packages" \
   "$source_dir/install-remote-desktop" \
   "$source_dir/verify-remote-desktop" \
   /opt/briar/bin/
 install -o root -g root -m 0644 \
+  "$source_dir/briar-managed-computer.target" \
+  "$source_dir/briar-managed-computer-health.service" \
+  "$source_dir/briar-managed-computer-health.timer" \
   "$source_dir/briar-managed-enroll.service" \
   "$source_dir/briar-managed-runtime-updater.service" \
   "$source_dir/briar-managed-worker.service" \
@@ -60,12 +64,16 @@ install -o root -g root -m 0644 "$agent_bundle" \
   /opt/briar/bin/briar-remote-session-agent.js
 
 systemctl daemon-reload
-systemctl enable \
+systemctl disable \
   briar-managed-enroll.service \
   briar-managed-runtime-updater.service \
   briar-managed-worker.service \
   briar-remote-desktop.service \
-  briar-remote-session-agent.service
+  briar-remote-session-agent.service \
+  2>/dev/null || true
+systemctl enable \
+  briar-managed-computer.target \
+  briar-managed-computer-health.timer
 
 installed_lock="$(mktemp)"
 trap 'rm -f "$installed_lock"' EXIT

@@ -5,7 +5,6 @@
       "dependsOn": ["^transit"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/config/merge-group-ci-image.json",
         "$TURBO_ROOT$/package.json",
         "$TURBO_ROOT$/third-party/agency-agents-LICENSE.md",
         "$TURBO_ROOT$/third-party/ponytail-LICENSE.md"
@@ -92,7 +91,6 @@
       "dependsOn": ["transit", "skills:check"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/config/merge-group-ci-image.json",
         "$TURBO_ROOT$/package.json"
       ],
       "outputs": ["dist-cli/briar.js"]

@@ -11,10 +11,8 @@ function readConfig(filename: string) {
 }
 
 describe("Tauri content security policy", () => {
-  it.each([
-    ["iOS", "tauri.ios.conf.json"],
-    ["Android", "tauri.android.conf.json"],
-  ])("allows the official sprite repository on %s", (_, filename) => {
+  it("allows the official sprite repository on Android", () => {
+    const filename = "tauri.android.conf.json";
     const csp = readConfig(filename).app.security.csp;
     expect(csp).toContain("https://briar-api.wbai.workers.dev");
     expect(csp).toContain("https://raw.githubusercontent.com");

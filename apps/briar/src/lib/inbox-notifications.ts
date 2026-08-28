@@ -536,7 +536,6 @@ export async function sendInboxNotification(
       body,
       group: "briar-inbox",
       ...(mobilePlatform === "android" ? { channelId } : {}),
-      ...(mobilePlatform === "ios" && playSound ? { sound: "default" } : {}),
       autoCancel: true,
       extra: {
         briarInboxTarget: JSON.stringify(target),

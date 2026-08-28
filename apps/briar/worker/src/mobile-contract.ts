@@ -658,7 +658,7 @@ export const mobileChannelIssueBatchProposalPayloadSchema = strict(
 
 const mobileChannelProposalBaseFields = {
   id: uuidString,
-  status: Schema.Literals(["pending", "accepted"]),
+  status: Schema.Literals(["pending", "accepted", "declined"]),
   projectId: nullable(uuidString),
   resultRunId: nullable(uuidString),
   resultItems: optional(mutableArray(mobileChannelIssueBatchResultItemSchema)),
@@ -856,6 +856,12 @@ export const mobileAcceptChannelProposalResponseSchema = mutableStruct({
   resultItems: optional(mutableArray(mobileChannelIssueBatchResultItemSchema)),
   executionProposal: optionalNullable(mobileIssueExecutionProposalSchema),
 });
+
+export const mobileDeclineChannelProposalResponseSchema = strict(
+  mutableStruct({
+    outcome: Schema.Literals(["declined", "already_declined"]),
+  }),
+);
 
 export const mobileIssueExecutionApprovalRequestSchema = strict(mutableStruct({
   provider: mobileProviderSchema,

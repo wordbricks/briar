@@ -152,6 +152,7 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var subscriptionPending = false
     @Published private(set) var optimisticMessageIDs: Set<UUID> = []
     @Published private(set) var acceptingProposalID: UUID?
+    @Published private(set) var decliningProposalID: UUID?
     @Published private(set) var approvingExecutionProposalID: UUID?
     @Published private(set) var preparingExecutionProposalID: UUID?
     @Published private(set) var approvingSkillExecutionProposalID: UUID?
@@ -187,6 +188,7 @@ final class ChannelsStore: ObservableObject {
     private var skillExecutionProposalRevisions: [UUID: Int] = [:]
     private var latestSkillExecutionProposals: [UUID: AgentSkillExecutionProposal] = [:]
     private var skillExecutionProposalIDsByMessage: [UUID: UUID] = [:]
+    private var agentReplyTombstones: Set<UUID> = []
     private var isForeground = true
     private var changesRefreshRequested = false
     private var pollingTask: Task<Void, Never>?
@@ -236,6 +238,7 @@ final class ChannelsStore: ObservableObject {
         skillExecutionProposalRevisions = [:]
         latestSkillExecutionProposals = [:]
         skillExecutionProposalIDsByMessage = [:]
+        agentReplyTombstones = []
         focusedChannelID = nil
         focusedThreadParentID = nil
         nextMessageCursor = nil
@@ -257,6 +260,7 @@ final class ChannelsStore: ObservableObject {
         catalogRefreshInFlight = false
         conversationLoadInFlight = false
         acceptingProposalID = nil
+        decliningProposalID = nil
         approvingExecutionProposalID = nil
         preparingExecutionProposalID = nil
         approvingSkillExecutionProposalID = nil
@@ -380,6 +384,9 @@ final class ChannelsStore: ObservableObject {
         // Reply jobs are live execution state. A cached running job can finish
         // while another screen is open, so restoring it would replay a stale
         // typing indicator until the authoritative channel load completes.
+        let repliesBeforeAuthoritativeLoad = agentReplies.filter {
+            $0.channelId == channelID
+        }
         agentReplies = []
         if let cachedConversation {
             recordProposalMessages(cachedConversation.messages)
@@ -425,7 +432,11 @@ final class ChannelsStore: ObservableObject {
             hasEarlierMessages = nextMessageCursor != nil
             members = response.members
             agents = response.agents
-            agentReplies = response.agentReplies ?? []
+            replaceAgentReplies(
+                with: response.agentReplies ?? [],
+                channelID: channelID,
+                previous: repliesBeforeAuthoritativeLoad
+            )
             cacheFocusedConversation()
             errorMessage = nil
         } catch {
@@ -902,6 +913,7 @@ final class ChannelsStore: ObservableObject {
                 thread = Self.mergeMessages(thread, updates: [response.message], removing: [])
                 cacheFocusedThread()
             }
+            mergeAgentReplies(response.agentReplies)
             optimisticMessageIDs.remove(clientMessageID)
             errorMessage = nil
         } catch {
@@ -1082,6 +1094,7 @@ final class ChannelsStore: ObservableObject {
         // Approval is a state-changing operation. Keep one request in flight so
         // repeated taps (including on another card) cannot race each other.
         guard acceptingProposalID == nil,
+              decliningProposalID == nil,
               approvingExecutionProposalID == nil,
               preparingExecutionProposalID == nil,
               approvingSkillExecutionProposalID == nil,
@@ -1268,6 +1281,66 @@ final class ChannelsStore: ObservableObject {
             else { return nil }
             errorMessage = CompanionStore.message(for: error)
             return nil
+        }
+    }
+
+    func declineProposal(channelID: UUID, proposalID: UUID) async -> Bool {
+        guard let organizationID, let token else { return false }
+        guard focusedChannelID == channelID else { return false }
+        guard acceptingProposalID == nil,
+              decliningProposalID == nil,
+              approvingExecutionProposalID == nil,
+              preparingExecutionProposalID == nil,
+              approvingSkillExecutionProposalID == nil,
+              preparingSkillExecutionProposalID == nil,
+              latestProposals[proposalID]?.status == .pending
+        else { return false }
+        let expectedGeneration = generation
+        let expectedFocusRevision = authoritativeLoadRevision
+        let expectedFocusedChannelID = focusedChannelID
+        let expectedFocusedThreadParentID = focusedThreadParentID
+        decliningProposalID = proposalID
+        defer {
+            if expectedGeneration == generation,
+               decliningProposalID == proposalID {
+                decliningProposalID = nil
+            }
+        }
+        do {
+            let _: DeclineChannelProposalResponse = try await api.send(
+                MobileAPIContract.Endpoint.declineChannelProposal(
+                    organizationID: organizationID,
+                    channelID: channelID,
+                    proposalID: proposalID
+                ),
+                method: "POST",
+                token: token,
+                body: nil,
+                as: DeclineChannelProposalResponse.self
+            )
+            guard expectedGeneration == generation,
+                  expectedFocusRevision == authoritativeLoadRevision,
+                  expectedFocusedChannelID == focusedChannelID,
+                  expectedFocusedThreadParentID == focusedThreadParentID
+            else { return false }
+            for index in messages.indices where messages[index].proposal?.id == proposalID {
+                messages[index].proposal = declinedProposal(messages[index].proposal)
+            }
+            for index in thread.indices where thread[index].proposal?.id == proposalID {
+                thread[index].proposal = declinedProposal(thread[index].proposal)
+            }
+            latestProposals[proposalID] = messages.compactMap(\.proposal).first {
+                $0.id == proposalID
+            } ?? thread.compactMap(\.proposal).first { $0.id == proposalID }
+            proposalRevisions[proposalID, default: 0] &+= 1
+            cacheFocusedConversation()
+            cacheFocusedThread()
+            errorMessage = nil
+            return true
+        } catch {
+            guard expectedGeneration == generation else { return false }
+            errorMessage = CompanionStore.message(for: error)
+            return false
         }
     }
 
@@ -1776,6 +1849,7 @@ final class ChannelsStore: ObservableObject {
     private func invalidateProposalAcceptancePresentation() {
         acceptanceRevision &+= 1
         acceptingProposalID = nil
+        decliningProposalID = nil
         approvingExecutionProposalID = nil
         preparingExecutionProposalID = nil
         approvingSkillExecutionProposalID = nil
@@ -1795,6 +1869,21 @@ final class ChannelsStore: ObservableObject {
             payload: proposal.payload,
             resultRunId: response.resultRunId,
             resultItems: response.resultItems ?? []
+        )
+    }
+
+    private func declinedProposal(
+        _ proposal: ChannelMessage.Proposal?
+    ) -> ChannelMessage.Proposal? {
+        guard let proposal else { return nil }
+        return ChannelMessage.Proposal(
+            id: proposal.id,
+            actionType: proposal.actionType,
+            status: .declined,
+            projectId: proposal.projectId,
+            payload: proposal.payload,
+            resultRunId: nil,
+            resultItems: []
         )
     }
 
@@ -1959,9 +2048,7 @@ final class ChannelsStore: ObservableObject {
 
     private func apply(_ delta: ChannelDeltaResponse) {
         if let incomingReplies = delta.agentReplies {
-            var byID = Dictionary(uniqueKeysWithValues: agentReplies.map { ($0.id, $0) })
-            for reply in incomingReplies { byID[reply.id] = reply }
-            agentReplies = Array(byID.values)
+            mergeAgentReplies(incomingReplies)
         }
         let removedChannelIDs = Set(delta.removedChannelIds)
         var nextChannels = channels.filter { !removedChannelIDs.contains($0.id) }
@@ -2240,6 +2327,70 @@ final class ChannelsStore: ObservableObject {
             }
             return left.id.uuidString < right.id.uuidString
         }
+    }
+
+    private static func agentReplyIsTerminal(_ reply: ChannelAgentReply) -> Bool {
+        reply.status == .completed || reply.status == .failed
+    }
+
+    private static func agentReplyStatusRank(_ reply: ChannelAgentReply) -> Int {
+        if agentReplyIsTerminal(reply) { return 2 }
+        return reply.status == .running ? 1 : 0
+    }
+
+    private static func agentReplyShouldReplace(
+        current: ChannelAgentReply,
+        incoming: ChannelAgentReply
+    ) -> Bool {
+        let currentTerminal = agentReplyIsTerminal(current)
+        let incomingTerminal = agentReplyIsTerminal(incoming)
+        if currentTerminal != incomingTerminal { return incomingTerminal }
+        if incoming.updatedAt != current.updatedAt {
+            return incoming.updatedAt > current.updatedAt
+        }
+        return agentReplyStatusRank(incoming) > agentReplyStatusRank(current)
+    }
+
+    private func mergeAgentReplies(_ incoming: [ChannelAgentReply]) {
+        for reply in incoming where Self.agentReplyIsTerminal(reply) {
+            agentReplyTombstones.insert(reply.id)
+        }
+        var byID = Dictionary(uniqueKeysWithValues: agentReplies.map { ($0.id, $0) })
+        for reply in incoming {
+            if agentReplyTombstones.contains(reply.id),
+               !Self.agentReplyIsTerminal(reply) {
+                continue
+            }
+            if let current = byID[reply.id],
+               !Self.agentReplyShouldReplace(current: current, incoming: reply) {
+                continue
+            }
+            byID[reply.id] = reply
+        }
+        agentReplies = byID.values.sorted { $0.id.uuidString < $1.id.uuidString }
+    }
+
+    private func replaceAgentReplies(
+        with incoming: [ChannelAgentReply],
+        channelID: UUID,
+        previous: [ChannelAgentReply]
+    ) {
+        let authoritative = incoming.filter { $0.channelId == channelID }
+        let concurrent = agentReplies.filter { $0.channelId == channelID }
+        let incomingIDs = Set(authoritative.map(\.id))
+        for reply in previous where !incomingIDs.contains(reply.id) {
+            agentReplyTombstones.insert(reply.id)
+        }
+        for reply in authoritative where Self.agentReplyIsTerminal(reply) {
+            agentReplyTombstones.insert(reply.id)
+        }
+        agentReplies = authoritative
+            .filter {
+                !agentReplyTombstones.contains($0.id) ||
+                    Self.agentReplyIsTerminal($0)
+            }
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+        mergeAgentReplies(concurrent)
     }
 
     func typingStatuses(messageIDs: Set<UUID>) -> [AgentTypingStatus] {

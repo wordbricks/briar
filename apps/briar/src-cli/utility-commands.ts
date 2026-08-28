@@ -3,7 +3,6 @@ import {
   inspectMergeQueueDoctor,
   mergeQueueProfileFromResponse,
 } from "./merge-queue";
-import { resolveMergeGroupContainerRuntime } from "./merge-group-validation";
 import {
   configureBrowserSkillGuide,
   getSkillGuide,
@@ -175,7 +174,6 @@ async function mergeQueueDoctorCommand() {
   const result = inspectMergeQueueDoctor({
     profile,
     repositoryPath: project.repositoryPath,
-    runtime: resolveMergeGroupContainerRuntime(),
   });
   if (has("--json")) {
     console.log(JSON.stringify(result, null, 2));

@@ -691,7 +691,7 @@ export type ChannelMessageDocumentContent = ChannelMessageDocument & {
 export type ChannelMessageProposal = {
   id: string;
   actionType: ChannelActionType;
-  status: "pending" | "accepted";
+  status: "pending" | "accepted" | "declined";
   projectId: string | null;
   payload: unknown;
   resultRunId: string | null;

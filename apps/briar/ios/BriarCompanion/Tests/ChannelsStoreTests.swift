@@ -9,6 +9,10 @@ final class ChannelsStoreTests: XCTestCase {
     private let otherChannelID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
     private let rootID = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
     private let replyID = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
+    private let replyJobAID = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+    private let replyJobBID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc")!
+    private let agentAID = UUID(uuidString: "66666666-6666-4666-8666-666666666666")!
+    private let agentBID = UUID(uuidString: "99999999-9999-4999-8999-999999999999")!
     private let proposalID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
     private let executionProposalID = UUID(
         uuidString: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd"
@@ -133,6 +137,290 @@ final class ChannelsStoreTests: XCTestCase {
         await sendTask.value
         XCTAssertTrue(store.messages.isEmpty)
         XCTAssertFalse(store.isMessageOptimistic(optimistic.id))
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testAuthoritativeEmptyReplySnapshotRemovesAndTombstonesRunningJob() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let running = agentReply(id: replyJobAID, agentID: agentAID, status: .running)
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let deltaPath = MobileAPIContract.Endpoint.channelChanges(
+            organizationID: organizationID,
+            cursor: 10
+        )
+        let api = ChannelPollingAPI(routes: [
+            listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+            detailPath: [
+                try encoded(ChannelDetailResponse(
+                    channel: channel,
+                    members: [],
+                    agents: [],
+                    messages: [],
+                    agentReplies: [running]
+                )),
+                try encoded(ChannelDetailResponse(
+                    channel: channel,
+                    members: [],
+                    agents: [],
+                    messages: [],
+                    agentReplies: []
+                )),
+            ],
+            deltaPath: [try encoded(ChannelDeltaResponse(
+                cursor: 11,
+                hasMore: false,
+                channels: [],
+                removedChannelIds: [],
+                messages: [],
+                removedMessageIds: [],
+                agentReplies: [agentReply(
+                    id: replyJobAID,
+                    agentID: agentAID,
+                    status: .running,
+                    updatedAt: Date(timeIntervalSince1970: 1_700_000_300)
+                )]
+            ))],
+        ])
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+        XCTAssertEqual(store.agentReplies, [running])
+
+        await store.openChannel(channelID)
+        XCTAssertTrue(store.agentReplies.isEmpty)
+        await store.refreshChanges()
+        XCTAssertTrue(store.agentReplies.isEmpty)
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testReplyArrivingDuringAuthoritativeLoadSurvivesOlderEmptySnapshot() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let concurrent = agentReply(id: replyJobAID, agentID: agentAID, status: .queued)
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let sendPath = MobileAPIContract.Endpoint.channelMessages(
+            organizationID: organizationID,
+            channelID: channelID
+        )
+        let emptyDetail = try encoded(ChannelDetailResponse(
+            channel: channel,
+            members: [],
+            agents: [],
+            messages: [],
+            agentReplies: []
+        ))
+        let api = ChannelPollingAPI(
+            routes: [
+                listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+                detailPath: [emptyDetail, emptyDetail],
+                sendPath: [try encoded(CreateChannelMessageResponse(
+                    message: message(id: rootID, channelID: channelID, body: "Hello"),
+                    agentReplies: [concurrent]
+                ))],
+            ],
+            requestDelays: [detailPath: [.zero, .milliseconds(100)]]
+        )
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+        let reloading = Task { await store.openChannel(channelID) }
+        await waitForRequests(api, path: detailPath, count: 2)
+        await store.send(
+            channelID: channelID,
+            parentMessageID: nil,
+            body: "Hello",
+            currentUserID: "user-1",
+            mentions: []
+        )
+        await reloading.value
+
+        XCTAssertEqual(store.agentReplies, [concurrent])
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testTerminalDeltaCannotBeReversedAndLeavesOtherAgentActive() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let first = agentReply(id: replyJobAID, agentID: agentAID, status: .running)
+        let second = agentReply(
+            id: replyJobBID,
+            agentID: agentBID,
+            status: .running,
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_200)
+        )
+        let completed = agentReply(
+            id: replyJobAID,
+            agentID: agentAID,
+            status: .completed,
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_200)
+        )
+        let stale = agentReply(
+            id: replyJobAID,
+            agentID: agentAID,
+            status: .running,
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_300)
+        )
+        let olderSecond = agentReply(
+            id: replyJobBID,
+            agentID: agentBID,
+            status: .queued,
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_100)
+        )
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let delta10Path = MobileAPIContract.Endpoint.channelChanges(
+            organizationID: organizationID,
+            cursor: 10
+        )
+        let delta11Path = MobileAPIContract.Endpoint.channelChanges(
+            organizationID: organizationID,
+            cursor: 11
+        )
+        let api = ChannelPollingAPI(routes: [
+            listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+            detailPath: [try encoded(ChannelDetailResponse(
+                channel: channel,
+                members: [],
+                agents: [],
+                messages: [],
+                agentReplies: [first, second]
+            ))],
+            delta10Path: [try encoded(ChannelDeltaResponse(
+                cursor: 11,
+                hasMore: false,
+                channels: [],
+                removedChannelIds: [],
+                messages: [],
+                removedMessageIds: [],
+                agentReplies: [completed]
+            ))],
+            delta11Path: [try encoded(ChannelDeltaResponse(
+                cursor: 12,
+                hasMore: false,
+                channels: [],
+                removedChannelIds: [],
+                messages: [],
+                removedMessageIds: [],
+                agentReplies: [stale, olderSecond]
+            ))],
+        ])
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+        await store.refreshChanges()
+        await store.refreshChanges()
+
+        XCTAssertEqual(
+            store.agentReplies.first(where: { $0.id == replyJobAID })?.status,
+            .completed
+        )
+        XCTAssertEqual(
+            store.agentReplies.filter { $0.status == .queued || $0.status == .running }.map(\.id),
+            [replyJobBID]
+        )
+        XCTAssertEqual(
+            store.agentReplies.first(where: { $0.id == replyJobBID })?.status,
+            .running
+        )
+        store.applicationDidEnterBackground()
+    }
+
+    @MainActor
+    func testLateSendReplyCannotReviveJobCompletedByDelta() async throws {
+        let channel = summary(id: channelID, name: "Briar")
+        let completed = agentReply(
+            id: replyJobAID,
+            agentID: agentAID,
+            status: .completed,
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_200)
+        )
+        let staleQueued = agentReply(
+            id: replyJobAID,
+            agentID: agentAID,
+            status: .queued,
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_300)
+        )
+        let listPath = MobileAPIContract.Endpoint.channels(organizationID: organizationID)
+        let detailPath = MobileAPIContract.Endpoint.channel(
+            organizationID: organizationID,
+            channelID: channelID,
+            messageLimit: ChannelsStore.messagePageSize
+        )
+        let sendPath = MobileAPIContract.Endpoint.channelMessages(
+            organizationID: organizationID,
+            channelID: channelID
+        )
+        let deltaPath = MobileAPIContract.Endpoint.channelChanges(
+            organizationID: organizationID,
+            cursor: 10
+        )
+        let api = ChannelPollingAPI(
+            routes: [
+                listPath: [try encoded(ChannelsResponse(channels: [channel], cursor: 10))],
+                detailPath: [try encoded(ChannelDetailResponse(
+                    channel: channel,
+                    members: [],
+                    agents: [],
+                    messages: [],
+                    agentReplies: []
+                ))],
+                sendPath: [try encoded(CreateChannelMessageResponse(
+                    message: message(id: rootID, channelID: channelID, body: "Hello"),
+                    agentReplies: [staleQueued]
+                ))],
+                deltaPath: [try encoded(ChannelDeltaResponse(
+                    cursor: 11,
+                    hasMore: false,
+                    channels: [],
+                    removedChannelIds: [],
+                    messages: [],
+                    removedMessageIds: [],
+                    agentReplies: [completed]
+                ))],
+            ],
+            delays: [sendPath: .milliseconds(100)]
+        )
+        let store = ChannelsStore(api: api, pollInterval: .seconds(3_600))
+
+        store.select(organizationID: organizationID, token: "token")
+        await waitForChannels(store, count: 1)
+        await store.openChannel(channelID)
+        let sending = Task {
+            await store.send(
+                channelID: channelID,
+                parentMessageID: nil,
+                body: "Hello",
+                currentUserID: "user-1",
+                mentions: []
+            )
+        }
+        await waitForRequests(api, path: sendPath, count: 1)
+        await store.refreshChanges()
+        await sending.value
+
+        XCTAssertEqual(store.agentReplies.map(\.status), [.completed])
+        XCTAssertTrue(store.typingStatuses(messageIDs: [rootID]).isEmpty)
         store.applicationDidEnterBackground()
     }
 
@@ -1611,6 +1899,27 @@ final class ChannelsStoreTests: XCTestCase {
             skillExecutionProposal: skillExecutionProposal,
             createdAt: createdAt,
             deletedAt: deletedAt
+        )
+    }
+
+    private func agentReply(
+        id: UUID,
+        agentID: UUID,
+        status: ChannelAgentReply.Status,
+        updatedAt: Date = Date(timeIntervalSince1970: 1_700_000_100)
+    ) -> ChannelAgentReply {
+        ChannelAgentReply(
+            id: id,
+            agentId: agentID,
+            channelId: channelID,
+            triggerMessageId: rootID,
+            parentMessageId: rootID,
+            replyMessageId: replyID,
+            status: status,
+            attempts: status == .queued ? 0 : 1,
+            error: status == .failed ? "Failed" : nil,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            updatedAt: updatedAt
         )
     }
 

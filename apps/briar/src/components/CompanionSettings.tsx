@@ -19,8 +19,8 @@ import { useI18n, type Locale } from "../i18n";
 import {
   changeAppIcon,
   getCurrentAppIcon,
+  type AppIconName,
 } from "../lib/app-icon";
-import type { AppIconName } from "../generated/tauri";
 import type { SessionUser } from "../types";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { InboxNotificationSettings } from "./InboxNotificationSettings";

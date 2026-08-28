@@ -24,8 +24,6 @@ export const commands = {
 	readSessionToken: () => __TAURI_INVOKE<string | null>("read_session_token"),
 	writeSessionToken: (token: string) => __TAURI_INVOKE<null>("write_session_token", { token }),
 	clearSessionToken: () => __TAURI_INVOKE<null>("clear_session_token"),
-	currentAppIcon: () => __TAURI_INVOKE<AppIconName>("current_app_icon"),
-	setAppIcon: (icon: AppIconName) => __TAURI_INVOKE<null>("set_app_icon", { icon }),
 	setAppBadgeCount: (count: number) => __TAURI_INVOKE<null>("set_app_badge_count", { count }),
 	validateRepositoryPath: (path: string) => __TAURI_INVOKE<string>("validate_repository_path", { path }),
 	cloneGithubSshRepository: (repositoryUrl: string) => __TAURI_INVOKE<ClonedProjectRepository>("clone_github_ssh_repository", { repositoryUrl }),
@@ -186,8 +184,6 @@ export type AgentUsageWindow = {
 	windowMinutes: number,
 	resetsAt: number | null,
 };
-
-export type AppIconName = "purple" | "gray" | "pink" | "green";
 
 export type AppMenuSettingsEvent = null;
 

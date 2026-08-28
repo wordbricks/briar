@@ -11,7 +11,10 @@ import { agentProviders } from "../src/lib/agent-provider";
 import { autoHuntSources } from "../src/lib/auto-hunt-contract";
 import { IsoDateTimeWithOffset } from "../src/lib/date-time-schema";
 import { OrganizationAgentContextDescriptor } from "../src/lib/organization-agent-context-contract";
-import { MERGE_GROUP_CI_CONTEXTS } from "../src/lib/merge-group-validation-contract";
+import {
+  MERGE_QUEUE_VALIDATION_CONTEXT,
+  MERGE_QUEUE_VALIDATION_MAX_COMMANDS,
+} from "../src/lib/merge-queue-validation-contract";
 import { WorkflowConfig, WorkflowStageId } from "./config-contract";
 
 const rejectExcessProperties = {
@@ -316,7 +319,7 @@ const MergeGroupRef = Schema.String.check(
     ),
   ),
 );
-const MergeGroupContext = Schema.Literals(MERGE_GROUP_CI_CONTEXTS);
+const MergeGroupContext = Schema.Literal(MERGE_QUEUE_VALIDATION_CONTEXT);
 const MergeBatchValidationResult = strict(Schema.Struct({
   context: MergeGroupContext,
   passed: Schema.Boolean,
@@ -376,6 +379,9 @@ const ClaimedMergeBatchInput = strict(Schema.Struct({
   repositoryId: PositiveInteger,
   repository: GithubRepositoryName,
   baseBranch: Schema.Literal("main"),
+  validationCommands: mutableArray(
+    Schema.String.check(Schema.isLengthBetween(1, 500)),
+  ).check(Schema.isLengthBetween(1, MERGE_QUEUE_VALIDATION_MAX_COMMANDS)),
   phase: Schema.Literals([
     "enqueue",
     "tail_authority",
@@ -483,9 +489,9 @@ const ClaimedMergeBatchInput = strict(Schema.Struct({
         claim.batch.validationResults.map((result) => result.context),
       );
       if (
-        claim.batch.validationResults.length !== MERGE_GROUP_CI_CONTEXTS.length ||
-        contexts.size !== MERGE_GROUP_CI_CONTEXTS.length ||
-        !MERGE_GROUP_CI_CONTEXTS.every((context) => contexts.has(context))
+        claim.batch.validationResults.length !== 1 ||
+        contexts.size !== 1 ||
+        !contexts.has(MERGE_QUEUE_VALIDATION_CONTEXT)
       ) {
         issues.push({
           path: ["batch", "validationResults"],

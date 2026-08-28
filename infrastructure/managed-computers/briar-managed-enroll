@@ -10,7 +10,7 @@ credential_file="$state_dir/worker-credential.json"
 if [[ ! -e "$config_file" && -s "$credential_file" ]]; then
   if [[ "$(stat -c '%U:%G %a' "$credential_file")" != "root:briar 640" ]]; then
     echo "Existing Briar credential has unsafe ownership or mode" >&2
-    exit 1
+    exit 2
   fi
   exit 0
 fi
@@ -75,10 +75,13 @@ BRIAR_VERSION="${BRIAR_VERSION:-unknown}" /opt/briar/bin/bun --eval '
   };
 
   if (!response.ok) {
+    const retryableStatus = response.status === 408 ||
+      response.status === 409 || response.status === 425 ||
+      response.status === 429 || response.status >= 500;
     console.error(
       `briar-managed-enroll: enrollment failed http_status=${response.status} error_code=${safeErrorCode()}`,
     );
-    process.exit(response.status === 409 ? 75 : 1);
+    process.exit(retryableStatus ? 75 : 2);
   }
 
   let enrollment;

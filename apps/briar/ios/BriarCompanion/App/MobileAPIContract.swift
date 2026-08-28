@@ -144,6 +144,14 @@ enum MobileAPIContract {
             "\(channel(organizationID: organizationID, channelID: channelID))/proposals/\(proposalID.uuidString.lowercased())/accept-execution"
         }
 
+        static func declineChannelProposal(
+            organizationID: UUID,
+            channelID: UUID,
+            proposalID: UUID
+        ) -> String {
+            "\(channel(organizationID: organizationID, channelID: channelID))/proposals/\(proposalID.uuidString.lowercased())/decline"
+        }
+
         static func acceptChannelSkillExecutionProposal(
             organizationID: UUID,
             channelID: UUID,

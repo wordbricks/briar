@@ -31,6 +31,10 @@ install -d -m 0755 \
 for file in \
   assert-debian-13-x86_64 \
   briar \
+  briar-managed-computer-health \
+  briar-managed-computer-health.service \
+  briar-managed-computer-health.timer \
+  briar-managed-computer.target \
   briar-managed-enroll \
   briar-managed-enroll.service \
   briar-open-browser \
@@ -58,7 +62,8 @@ for file in \
   install -m 0644 "$script_dir/$file" "$output/$file"
 done
 for executable in \
-  assert-debian-13-x86_64 briar briar-managed-enroll \
+  assert-debian-13-x86_64 briar briar-managed-computer-health \
+  briar-managed-enroll \
   briar-open-browser \
   briar-managed-runtime-update-request briar-managed-runtime-updater \
   briar-remote-desktop \

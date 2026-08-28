@@ -6,7 +6,6 @@ release_env="$workspace_root/config/release.env"
 release_secrets="$workspace_root/.env.release"
 release_keys="$workspace_root/.env.keys"
 channel=""
-implementation_override=""
 marketing_version=""
 build_number=""
 upload=false
@@ -21,15 +20,11 @@ usage() {
   cat <<'EOF'
 Usage: scripts/release-ios.sh --channel internal|production \
   --marketing-version X.Y.Z --build-number N \
-  [--implementation tauri|native] [--upload]
+  [--upload]
 
-Runs the complete mobile quality gate, archives the selected iOS implementation
-with the existing app.briar.companion identity, verifies distribution signing,
+Runs the complete mobile quality gate, archives the native SwiftUI iOS app with
+the existing app.briar.companion identity, verifies distribution signing,
 exports an IPA, and optionally uploads that exact IPA to App Store Connect.
-
-Internal releases may explicitly select native before stabilization. Production
-native releases remain locked until config/ios-release.json records the passed
-Internal TestFlight build. Omitting --implementation uses the checked-in default.
 EOF
 }
 
@@ -71,7 +66,6 @@ read_keychains() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --channel) channel="${2:-}"; shift ;;
-    --implementation) implementation_override="${2:-}"; shift ;;
     --marketing-version) marketing_version="${2:-}"; shift ;;
     --build-number) build_number="${2:-}"; shift ;;
     --upload) upload=true ;;
@@ -86,13 +80,9 @@ done
 [[ "$marketing_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
   fail "--marketing-version must use X.Y.Z format."
 [[ "$build_number" =~ ^[1-9][0-9]*$ ]] || fail "--build-number must be a positive integer."
-if [[ -n "$implementation_override" ]]; then
-  [[ "$implementation_override" == "tauri" || "$implementation_override" == "native" ]] ||
-    fail "--implementation must be tauri or native."
-fi
 [[ "$(uname -s)" == "Darwin" ]] || fail "iOS releases require macOS."
 
-for command_name in base64 bun codesign git jq rsync security shasum xcodebuild xcrun; do
+for command_name in base64 bun codesign git jq security shasum xcodebuild xcrun; do
   require_command "$command_name"
 done
 [[ -x /usr/libexec/PlistBuddy ]] || fail "Missing required command: /usr/libexec/PlistBuddy"
@@ -123,18 +113,12 @@ fi
 : "${IOS_PROVISIONING_PROFILE_UUID:?IOS_PROVISIONING_PROFILE_UUID is required}"
 : "${KEYCHAIN_PASSWORD:?KEYCHAIN_PASSWORD is required}"
 
-resolve_args=(resolve --channel "$channel")
-if [[ -n "$implementation_override" ]]; then
-  resolve_args+=(--implementation "$implementation_override")
-fi
-resolved="$(bun run scripts/ios-release-config.ts "${resolve_args[@]}")"
+resolved="$(bun run scripts/ios-release-config.ts resolve --channel "$channel")"
 implementation="$(jq -r '.implementation' <<<"$resolved")"
 bundle_id="$(jq -r '.bundleIdentifier' <<<"$resolved")"
 
-echo "[ios-release] Running contract, Swift, accessibility/layout, and Tauri iOS/Android gates."
-# The Tauri simulator regression build is explicitly unsigned.  Do not expose
-# App Store Connect credentials to it: the Tauri CLI interprets a partial API
-# key configuration as a code-signing request and rejects the missing key path.
+echo "[ios-release] Running contract, native Swift, accessibility/layout, and Tauri Android gates."
+# The Android regression build must not receive Apple release credentials.
 env -u APPLE_API_KEY -u APPLE_API_ISSUER -u APPLE_API_KEY_CONTENT bun run mobile:ci
 
 release_temp="$(mktemp -d "$release_temp_base/briar-ios-release.XXXXXX")"
@@ -188,32 +172,17 @@ common_build_settings=(
   INFOPLIST_KEY_CFBundleVersion="$build_number"
 )
 
-if [[ "$implementation" == "native" ]]; then
-  bun run mobile:contract:check
-  bun run ios:native:project
-  xcodebuild \
-    -project apps/briar/ios/BriarCompanion/BriarCompanion.xcodeproj \
-    -scheme BriarCompanion-Production \
-    -configuration Production \
-    -destination 'generic/platform=iOS' \
-    -archivePath "$archive_path" \
-    "${authentication_args[@]}" \
-    "${common_build_settings[@]}" \
-    clean archive
-else
-  bun run build
-  mkdir -p apps/briar/src-tauri/gen/apple/assets
-  rsync -a --delete apps/briar/dist/ apps/briar/src-tauri/gen/apple/assets/
-  xcodebuild \
-    -project apps/briar/src-tauri/gen/apple/briar.xcodeproj \
-    -scheme briar_iOS \
-    -configuration release \
-    -destination 'generic/platform=iOS' \
-    -archivePath "$archive_path" \
-    "${authentication_args[@]}" \
-    "${common_build_settings[@]}" \
-    clean archive
-fi
+bun run mobile:contract:check
+bun run ios:native:project
+xcodebuild \
+  -project apps/briar/ios/BriarCompanion/BriarCompanion.xcodeproj \
+  -scheme BriarCompanion-Production \
+  -configuration Production \
+  -destination 'generic/platform=iOS' \
+  -archivePath "$archive_path" \
+  "${authentication_args[@]}" \
+  "${common_build_settings[@]}" \
+  clean archive
 
 scripts/verify-ios-archive.sh "$archive_path" "$bundle_id"
 export_options_path="$release_temp/ios-export-options.plist"
@@ -250,7 +219,7 @@ if [[ "$upload" == true ]]; then
     xcrun altool --upload-app --type ios --file "$ipa_path" \
       --apiKey "$APPLE_API_KEY" --apiIssuer "$APPLE_API_ISSUER"
   )
-  echo "[ios-release] Uploaded the verified $implementation IPA. Record its processed App Store build ID before native promotion."
+  echo "[ios-release] Uploaded the verified native IPA."
 else
   echo "[ios-release] Exported verified IPA and manifest in $artifact_root (not uploaded)."
 fi

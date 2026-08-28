@@ -1859,6 +1859,19 @@ export async function acceptChannelProposal(
   );
 }
 
+export async function declineChannelProposal(
+  token: string,
+  organizationId: string,
+  channelId: string,
+  proposalId: string,
+) {
+  return request<{ outcome: "declined" | "already_declined" }>(
+    `/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/decline`,
+    token,
+    { method: "POST" },
+  );
+}
+
 export async function acceptChannelExecutionProposal(
   token: string,
   organizationId: string,

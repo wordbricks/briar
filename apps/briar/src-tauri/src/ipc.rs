@@ -78,8 +78,6 @@ pub(super) fn builder() -> Builder<tauri::Wry> {
             read_session_token,
             write_session_token,
             clear_session_token,
-            current_app_icon,
-            set_app_icon,
             set_app_badge_count,
             validate_repository_path,
             clone_github_ssh_repository,

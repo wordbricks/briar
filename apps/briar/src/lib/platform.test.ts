@@ -24,19 +24,6 @@ describe("platform detection", () => {
     expect(supportsManagedComputerRemoteDesktop()).toBe(false);
   });
 
-  it("detects an iOS WebView as the companion app", () => {
-    vi.stubGlobal("navigator", {
-      userAgent:
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15",
-    });
-    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
-
-    expect(isMobileCompanion()).toBe(true);
-    expect(getMobilePlatform()).toBe("ios");
-    expect(isDesktopTauri()).toBe(false);
-    expect(supportsManagedComputerRemoteDesktop()).toBe(false);
-  });
-
   it("keeps desktop Tauri features on desktop", () => {
     vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 (Macintosh)" });
     vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });

@@ -504,6 +504,8 @@ export function Channels({
     channelSurfaceIsCurrent,
     clearProposalHistory,
     closeThread,
+    declineProposal,
+    decliningProposalId,
     error,
     invalidateChannelSurface,
     loadCreateExecutionProposalContext,
@@ -1348,6 +1350,7 @@ export function Channels({
                       currentUserId={currentUserId}
                       onAcceptProposal={(input) =>
                         acceptProposal(message, input ?? null)}
+                      onDeclineProposal={() => declineProposal(message)}
                       loadCreateExecutionProposalContext={
                         loadCreateExecutionProposalContext
                       }
@@ -1384,6 +1387,9 @@ export function Channels({
                       busy={busy}
                       acceptingProposal={
                         acceptingProposalId === message.proposal?.id
+                      }
+                      decliningProposal={
+                        decliningProposalId === message.proposal?.id
                       }
                       projects={projects}
                       selectedProjectId={
@@ -1503,6 +1509,7 @@ export function Channels({
                 currentUserId={currentUserId}
                 onAcceptProposal={(input) =>
                   acceptProposal(message, input ?? null)}
+                onDeclineProposal={() => declineProposal(message)}
                 loadCreateExecutionProposalContext={
                   loadCreateExecutionProposalContext
                 }
@@ -1536,6 +1543,9 @@ export function Channels({
                 busy={busy}
                 acceptingProposal={
                   acceptingProposalId === message.proposal?.id
+                }
+                decliningProposal={
+                  decliningProposalId === message.proposal?.id
                 }
                 projects={projects}
                 selectedProjectId={
@@ -2816,6 +2826,7 @@ function ChannelInviteDialog({
 
 const MessageRow = memo(function MessageRow({
   acceptingProposal,
+  decliningProposal,
   agents,
   channel,
   highlighted = false,
@@ -2828,6 +2839,7 @@ const MessageRow = memo(function MessageRow({
   currentUserId,
   onOpenThread,
   onAcceptProposal,
+  onDeclineProposal,
   onAcceptExecutionProposal,
   onAcceptSkillExecutionProposal,
   onExecutionProposalAccepted,
@@ -2845,6 +2857,7 @@ const MessageRow = memo(function MessageRow({
   showTypingState = true,
 }: {
   acceptingProposal: boolean;
+  decliningProposal: boolean;
   agents: ChannelAgentSummary[];
   channel: ChannelSummary;
   highlighted?: boolean;
@@ -2870,6 +2883,7 @@ const MessageRow = memo(function MessageRow({
   onAcceptProposal: (
     input?: IssueExecutionApprovalInput,
   ) => Promise<string | null | undefined>;
+  onDeclineProposal: () => void | Promise<void>;
   onAcceptExecutionProposal: (
     input: IssueExecutionApprovalInput,
   ) => Promise<ChannelExecutionProposal>;
@@ -3002,7 +3016,9 @@ const MessageRow = memo(function MessageRow({
               <span>
                 {issueProposal.status === "accepted"
                   ? t("channel.issueProposalAccepted")
-                  : t("channel.issueProposalPending")}
+                  : issueProposal.status === "declined"
+                    ? t("channel.issueProposalDeclined")
+                    : t("channel.issueProposalPending")}
               </span>
               <ChannelIssueProposalDetails
                 projectName={proposalProjectName}
@@ -3029,6 +3045,8 @@ const MessageRow = memo(function MessageRow({
             {requestsExecution && proposalProjectId && proposalIssue ? (
               <>
                 <IssueCreateExecutionApproval
+                  creating={acceptingProposal}
+                  declining={decliningProposal}
                   disabledReason={channel.archivedAt
                     ? t("executionApproval.archived")
                     : busy && !acceptingProposal
@@ -3039,6 +3057,8 @@ const MessageRow = memo(function MessageRow({
                   loadExecutionContext={() =>
                     loadCreateExecutionProposalContext(proposalProjectId)}
                   onAccept={(input) => onAcceptProposal(input)}
+                  onCreate={() => onAcceptProposal()}
+                  onDecline={onDeclineProposal}
                   projectName={proposalProjectName}
                   proposalId={issueProposal.id}
                   targetTitle={proposalIssue.title}
@@ -3062,29 +3082,42 @@ const MessageRow = memo(function MessageRow({
                 ) : null}
               </>
             ) : issueProposal.status === "pending" ? (
-              <button
-                aria-busy={acceptingProposal}
-                className="channel-proposal-approve-button"
-                disabled={
-                  busy || Boolean(channel.archivedAt) ||
-                  !proposalProjectId || !proposalValid
-                }
-                onClick={() => void onAcceptProposal()}
-                type="button"
-              >
-                {acceptingProposal ? (
-                  <>
-                    <Spinner aria-hidden="true" size={15} />
-                    {t("channel.creatingIssue")}
-                  </>
-                ) : (
-                  proposalBatch
-                    ? t("channel.approveCreateIssueBatch", {
-                        count: proposalBatch.items.length,
-                      })
-                    : t("channel.approveCreateIssue")
-                )}
-              </button>
+              <div className="channel-proposal-actions">
+                <button
+                  aria-busy={acceptingProposal}
+                  className="channel-proposal-approve-button"
+                  disabled={
+                    busy || Boolean(channel.archivedAt) ||
+                    !proposalProjectId || !proposalValid
+                  }
+                  onClick={() => void onAcceptProposal()}
+                  type="button"
+                >
+                  {acceptingProposal ? (
+                    <>
+                      <Spinner aria-hidden="true" size={15} />
+                      {t("channel.creatingIssue")}
+                    </>
+                  ) : (
+                    proposalBatch
+                      ? t("channel.approveCreateIssueBatch", {
+                          count: proposalBatch.items.length,
+                        })
+                      : t("channel.approveCreateIssue")
+                  )}
+                </button>
+                <button
+                  aria-busy={decliningProposal}
+                  className="channel-proposal-decline-button"
+                  disabled={busy || Boolean(channel.archivedAt)}
+                  onClick={() => void onDeclineProposal()}
+                  type="button"
+                >
+                  {decliningProposal
+                    ? t("channel.decliningIssueProposal")
+                    : t("channel.declineIssueProposal")}
+                </button>
+              </div>
             ) : issueProposal.projectId &&
               issueProposal.resultRunId &&
               !proposalBatch &&
@@ -3176,6 +3209,7 @@ const MessageRow = memo(function MessageRow({
   );
 }, (previous, next) =>
   previous.acceptingProposal === next.acceptingProposal &&
+  previous.decliningProposal === next.decliningProposal &&
   previous.agents === next.agents &&
   previous.busy === next.busy &&
   previous.channel === next.channel &&

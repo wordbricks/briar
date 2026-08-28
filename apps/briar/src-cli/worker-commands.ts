@@ -24,7 +24,6 @@ import {
   renewMergeBatchClaim,
   type MergeBatchApi,
 } from "./merge-queue";
-import { resolveMergeGroupContainerRuntime } from "./merge-group-validation";
 import {
   supportsRemoteWorkerUpdates,
   workerUpdateLaunch,
@@ -446,10 +445,6 @@ async function workerCommand() {
   }
 
   const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
-  const mergeGroupRuntimeResolution = resolveMergeGroupContainerRuntime();
-  const mergeGroupRuntime = mergeGroupRuntimeResolution.ready
-    ? mergeGroupRuntimeResolution
-    : null;
   const mergeBatchApi: MergeBatchApi = <T = unknown>(
     path: string,
     init: { method: "POST"; body: string },
@@ -467,7 +462,6 @@ async function workerCommand() {
           workerId,
           claimedBy: label,
           repliesOnly: _options?.repliesOnly === true,
-          runtime: mergeGroupRuntime,
         });
         if (mergeBatch) return { work: mergeBatch };
         // The combined API claim is ordered by reply queues first and applies
@@ -876,16 +870,10 @@ async function workerCommand() {
       },
       runIssue: async (issue, signal, reportCheckpoint) => {
         if (issue.workType === "mergeBatch") {
-          if (!mergeGroupRuntime) {
-            throw new Error(
-              "Merge batch was claimed without an audited local container runtime",
-            );
-          }
           await executeClaimedMergeBatch({
             claim: decodeClaimedMergeBatch(issue),
             workerId,
             repositoryPath: project.repositoryPath,
-            runtime: mergeGroupRuntime,
             signal,
             api: mergeBatchApi,
           });

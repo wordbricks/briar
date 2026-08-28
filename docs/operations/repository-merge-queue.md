@@ -4,13 +4,13 @@ Briar keeps issue development parallel and serializes only delivery to
 `main`. Ready pull requests enter one repository lane, form an immutable
 cohort, and are assembled by the designated local Worker as ordinary merge
 commits on `briar/merge-queue/<batch-id>`. The Worker validates that exact
-integration SHA and publishes it to `main` with an exact-base lease. The lane
-remains occupied until signed GitHub webhooks confirm
-that every original pull request merged.
+integration SHA with the repository commands stored on the selected workflow
+boundary, then merges each original pull request in order through GitHub's
+ordinary pull-request merge API. The lane remains occupied until signed GitHub
+webhooks confirm that every original pull request merged.
 
 This feature is default-off. Applying its migration does not change a GitHub
-repository, enable a project profile, publish an OCI image, or activate a
-ruleset.
+repository or enable a project profile.
 
 ## Invariants
 
@@ -29,65 +29,49 @@ The coordinator enforces these boundaries:
   PR identity readback;
 - the Worker fetches every exact PR head, merges the sealed cohort in ordinal
   order, and publishes one immutable integration ref;
-- the exact integration ref and protected `main` ref are fetched into private refs,
-  verified by SHA, and passed credential-free to the isolated executor;
+- the exact integration ref and protected `main` ref are fetched into private
+  refs, verified by SHA, and checked out into a temporary credential-scrubbed
+  workspace;
+- validation commands are snapshotted from the selected workflow stage when
+  the profile is saved and copied onto each batch when collection starts;
 - validation proof is stored before status publication, so a publication retry
   never reruns CI;
-- statuses are posted to the claimed SHA as `signoff/app-worker`,
-  `signoff/d1-migrations`, `signoff/rust`, and `signoff/security`;
+- one combined status is posted to the claimed SHA as `briar/merge-queue`;
+- each original PR is merged with its sealed head SHA, using an enabled
+  repository merge method, and GitHub applies the repository's existing rules;
+- after each merge, `main` must have the same tree as the corresponding
+  validated integration prefix before the next PR can merge;
 - Briar never directly resumes member runs. The existing signed-PR path resumes
   them only after the batch itself is complete.
 
-GitHub branch protection remains the authoritative `main` gate. The exact-main
-ruleset must grant always-on bypass to exactly one trusted publisher GitHub App
-or a dedicated single-member publisher team used by the local Worker's `gh`
-credential. The D1 lane and `--force-with-lease`
-serialize that publisher; no other user, role, team, or App may bypass it.
-
-## Required GitHub policy
-
-Before enabling a Briar profile, create one repository-level branch ruleset
-that targets only `refs/heads/main` and verify all of the following:
-
-- enforcement is active and the same single GitHub App or dedicated publisher
-  team has `always` bypass on every effective exact-main ruleset;
-- pull requests are required;
-- deletion and non-fast-forward updates are blocked;
-- linear-history, required-signature, and commit-metadata rules do not apply to
-  the publisher; cohort publication intentionally creates merge commits;
-- the four `signoff/*` contexts above are required;
-- required status checks use `strict_required_status_checks_policy: false`.
-
-Disabling strict branch updates is intentional. The merge queue builds a
-cumulative commit against the current protected base, so individual pull
-requests do not need to rerun the same CI merely because another pull request
-merged first.
+GitHub remains the authoritative merge gate. Briar neither reads nor modifies
+repository rulesets, branch protection, required checks, reviews, or bypass
+actors. Existing repository policy is applied by the same GitHub merge API used
+for an ordinary PR. A policy that rejects the Worker's authenticated `gh` user
+also rejects the queued merge and is reported as a GitHub merge failure.
 
 The Briar GitHub App needs Pull requests read and the Pull request webhook
 subscription. It remains read-only. Neither Merge queues permission nor the
 Merge group event is used. The local Worker's existing `gh` credential fetches
-PR refs, publishes integration refs and statuses, and performs the lease-fenced
-fast-forward to `main`.
+PR refs, publishes the temporary integration ref and status, and merges the
+original PRs through GitHub. The App supplies signed inbound lifecycle events;
+it is not a merge publisher or ruleset bypass actor.
 
 ## Safe rollout
 
-Do not activate the production ruleset as part of a code deployment or pull
-request review. Roll out in this order during an explicit maintenance window:
+Roll out in this order:
 
 1. Apply the Briar migrations with every merge-queue profile absent or
    disabled.
-2. Publish an independently reproduced OCI executor digest and update both the
-   audited manifest and compiled digest in one reviewed change. Until then the
-   Worker refuses merge-batch claims.
+2. Confirm the selected readiness stage has repository validation commands.
+   These commands must validate an exact detached integration SHA and must not
+   deploy, publish, or require a pull-request branch identity.
 3. Confirm signed Pull request deliveries reach Briar.
-4. Create the exact-main ruleset inactive or in evaluation mode and inspect its
-   full JSON, including bypass actors and required check sources.
-5. Confirm the designated local Worker has the audited image, repository
-   checkout, authenticated `gh`, and one free regular execution slot.
-6. Configure the profile disabled, activate the GitHub ruleset, and run the
-   fail-closed doctor. It checks the effective rules even while the profile is
-   disabled, so no batch can be claimed during this preflight.
-7. Enable the project profile last. Start with a canary window and two pull
+4. Confirm the designated local Worker has the repository checkout, every tool
+   required by the validation commands, authenticated `gh`, and one free
+   regular execution slot.
+5. Configure the profile disabled and run the read-only doctor.
+6. Enable the project profile last. Start with a canary window and two pull
    requests; candidates arriving after the cohort freezes wait for the next
    batch.
 
@@ -98,11 +82,9 @@ briar merge-queue configure --enable \
   --readiness-stage ci_qa --quiet-window-ms 300000 --max-batch-size 5
 ```
 
-`doctor` is read-only. It validates the audited local runtime, local `gh`
-authentication, immutable repository identity, effective exact-main active
-rulesets, exactly one publisher bypass actor, branch protections, the exact
-four status contexts, and `strict=false`. It never
-creates or edits GitHub rulesets.
+`doctor` is read-only. It validates the repository validation plan, local `gh`
+authentication, origin remote, and immutable repository identity. It does not
+inspect or change GitHub rulesets.
 
 The profile API is owner/admin-only:
 
@@ -127,17 +109,21 @@ claim credentials, Worker identity, validation logs, and failure detail; only
 the PR link, durable state, timestamps, counts, integration SHA, and failure
 code are exposed. The response is private and not cached.
 
-`readinessStageId` must name a stage in the current project workflow. The
-optional `quietWindowMs` and `maxBatchSize` fields preserve their stored values,
-or use the server defaults of 300000 and 5 for a new profile. The Workflow UI
-exposes enablement and the readiness boundary; batching controls remain an
-operator concern.
+`readinessStageId` must name a stage in the current project workflow and that
+stage must contain at least one validation command. The server derives and
+stores `validationCommands` in the returned profile; clients do not submit a
+second command source. The optional `quietWindowMs` and `maxBatchSize` fields
+preserve their stored values, or use the server defaults of 300000 and 5 for a
+new profile. The Workflow UI exposes enablement and the readiness boundary;
+batching controls remain an operator concern.
 
-An enabled profile prevents workflow updates that remove its readiness stage.
-Changing the boundary is also a fresh proof boundary: only completions observed
-after that configuration change can become candidates. Runs whose frozen
-workflow does not contain the newly selected stage remain ineligible rather
-than falling back to another stage.
+An enabled profile prevents workflow updates that remove its readiness stage or
+change that stage's validation commands. Disable the queue, save the workflow,
+then explicitly re-enable it to snapshot the new plan. Changing the boundary or
+validation plan is also a fresh proof boundary: only completions observed after
+that configuration change can become candidates. Runs whose frozen workflow
+does not contain the newly selected stage remain ineligible rather than falling
+back to another stage.
 
 The server derives the immutable repository identity from the connected
 project and GitHub installation. It does not accept a shell command, status
@@ -153,7 +139,7 @@ collecting → frozen → enqueueing → waiting_tail
 ```
 
 A deterministic CI failure publishes failure for the same integration SHA,
-finishes all four durable status results, and leaves the lane `blocked` for operator
+finishes the durable validation result, and leaves the lane `blocked` for operator
 review. Infrastructure failures release the fenced lease for retry;
 they do not publish a false failure. A stale Worker cannot renew, record proof,
 publish completion, or release a claim after its lease expires.
@@ -163,6 +149,5 @@ cohort and integration ref, remove or repair its original entries, and rework th
 member runs so new exact heads produce a new cohort.
 
 For rollback, stop new profile claims first, drain or resolve the active cohort,
-confirm no integration publish is active, restore the previous protected-branch
-policy, and only then remove the trusted publisher bypass. The API refuses
-to disable or retarget a profile while an active batch holds its lane.
+and confirm no integration publish is active. The API refuses to disable or
+retarget a profile while an active batch holds its lane.

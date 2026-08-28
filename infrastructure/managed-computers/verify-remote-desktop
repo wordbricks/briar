@@ -12,17 +12,21 @@ test -s /opt/briar/remote-desktop-packages.lock
 sha256sum --check /opt/briar/remote-desktop-packages.lock.sha256
 
 for service in \
-  briar-managed-enroll.service \
-  briar-managed-worker.service \
-  briar-remote-desktop.service \
-  briar-remote-session-agent.service; do
+  briar-managed-computer.target \
+  briar-managed-computer-health.timer; do
   systemctl is-enabled --quiet "$service"
 done
 
-systemctl is-active --quiet briar-managed-enroll.service
-systemctl is-active --quiet briar-managed-worker.service
-systemctl is-active --quiet briar-remote-desktop.service
-systemctl is-active --quiet briar-remote-session-agent.service
+for service in \
+  briar-managed-computer.target \
+  briar-managed-computer-health.timer \
+  briar-managed-enroll.service \
+  briar-managed-runtime-updater.service \
+  briar-managed-worker.service \
+  briar-remote-desktop.service \
+  briar-remote-session-agent.service; do
+  systemctl is-active --quiet "$service"
+done
 
 mapfile -t listener_addresses < <(
   ss -H -ltn "sport = :${expected_port}" | awk '{print $4}'

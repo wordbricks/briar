@@ -25,61 +25,66 @@ import { leaseExpiryFrom, workerStateAt } from "./workers";
 const mergeBatchWorkJson = (
   claim: NonNullable<Awaited<ReturnType<typeof claimNextMergeBatch>>>,
   claimToken: string,
-) => ({
-  workType: "mergeBatch" as const,
-  workId: claim.batch.id,
-  runId: claim.batch.id,
-  sourceKey: `merge:${claim.batch.repository}#${claim.batch.id.slice(0, 8)}`,
-  title: `Merge ${claim.members.length} PRs into ${claim.batch.base_branch}`,
-  projectId: claim.batch.project_id,
-  repositoryId: claim.batch.repository_id,
-  repository: claim.batch.repository,
-  baseBranch: claim.batch.base_branch,
-  phase: claim.phase,
-  claimToken,
-  claimedAt: claim.batch.claimed_at,
-  leaseExpiresAt: claim.batch.lease_expires_at,
-  claimAttempts: claim.batch.claim_attempts,
-  batch: {
-    id: claim.batch.id,
-    state: claim.batch.state,
-    finalDeliveryId: claim.batch.final_delivery_id,
-    mergeGroupRef: claim.batch.merge_group_ref,
-    mergeGroupSha: claim.batch.merge_group_sha,
-    mergeGroupBaseSha: claim.batch.merge_group_base_sha,
-    validationResults: claim.batch.validation_results_json
-      ? JSON.parse(claim.batch.validation_results_json) as unknown
-      : null,
-    validatedAt: claim.batch.validated_at,
-    publishedAt: claim.batch.published_at,
-    failureCode: claim.batch.failure_code,
-    failureDetail: claim.batch.failure_detail,
-  },
-  members: claim.members.map((member) => ({
-    id: member.id,
-    ordinal: member.ordinal,
-    runId: member.run_id,
-    attempt: member.attempt,
-    revision: member.revision,
-    pullRequestId: member.pull_request_id,
-    pullRequestNodeId: member.pull_request_node_id,
-    pullRequestNumber: member.pull_request_number,
-    pullRequestUrl: member.pull_request_url,
-    headSha: member.frozen_head_sha,
-    baseSha: member.frozen_base_sha,
-    queueEntryId: member.queue_entry_id,
-    state: member.state,
-  })),
-  pendingHeads: claim.pendingHeads.map((head) => ({
-    deliveryId: head.delivery_id,
-    headRef: head.head_ref,
-    headSha: head.head_sha,
-    baseSha: head.base_sha,
-    tailPullRequestNumber: head.tail_pull_request_number,
-    receivedAt: head.received_at,
-  })),
-});
-
+) => {
+  const validationCommands = JSON.parse(
+    claim.batch.validation_commands_json,
+  ) as string[];
+  return {
+    workType: "mergeBatch" as const,
+    workId: claim.batch.id,
+    runId: claim.batch.id,
+    sourceKey: `merge:${claim.batch.repository}#${claim.batch.id.slice(0, 8)}`,
+    title: `Merge ${claim.members.length} PRs into ${claim.batch.base_branch}`,
+    projectId: claim.batch.project_id,
+    repositoryId: claim.batch.repository_id,
+    repository: claim.batch.repository,
+    baseBranch: claim.batch.base_branch,
+    validationCommands,
+    phase: claim.phase,
+    claimToken,
+    claimedAt: claim.batch.claimed_at,
+    leaseExpiresAt: claim.batch.lease_expires_at,
+    claimAttempts: claim.batch.claim_attempts,
+    batch: {
+      id: claim.batch.id,
+      state: claim.batch.state,
+      finalDeliveryId: claim.batch.final_delivery_id,
+      mergeGroupRef: claim.batch.merge_group_ref,
+      mergeGroupSha: claim.batch.merge_group_sha,
+      mergeGroupBaseSha: claim.batch.merge_group_base_sha,
+      validationResults: claim.batch.validation_results_json
+        ? JSON.parse(claim.batch.validation_results_json) as unknown
+        : null,
+      validatedAt: claim.batch.validated_at,
+      publishedAt: claim.batch.published_at,
+      failureCode: claim.batch.failure_code,
+      failureDetail: claim.batch.failure_detail,
+    },
+    members: claim.members.map((member) => ({
+      id: member.id,
+      ordinal: member.ordinal,
+      runId: member.run_id,
+      attempt: member.attempt,
+      revision: member.revision,
+      pullRequestId: member.pull_request_id,
+      pullRequestNodeId: member.pull_request_node_id,
+      pullRequestNumber: member.pull_request_number,
+      pullRequestUrl: member.pull_request_url,
+      headSha: member.frozen_head_sha,
+      baseSha: member.frozen_base_sha,
+      queueEntryId: member.queue_entry_id,
+      state: member.state,
+    })),
+    pendingHeads: claim.pendingHeads.map((head) => ({
+      deliveryId: head.delivery_id,
+      headRef: head.head_ref,
+      headSha: head.head_sha,
+      baseSha: head.base_sha,
+      tailPullRequestNumber: head.tail_pull_request_number,
+      receivedAt: head.received_at,
+    })),
+  };
+};
 
 export type MergeBatchRouteInput = {
   request: Request;

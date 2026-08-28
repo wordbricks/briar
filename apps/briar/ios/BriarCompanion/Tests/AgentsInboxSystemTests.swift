@@ -637,6 +637,7 @@ final class AgentsInboxSystemTests: XCTestCase {
     func testParsesDeepLinksAndUniversalLinks() {
         let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+        let trustedOrigin = URL(string: "https://briar-api.wbai.workers.dev")!
 
         XCTAssertEqual(
             BriarLinkParser.parse("briar-companion://issues/\(projectID.uuidString)/\(runID.uuidString)"),
@@ -644,13 +645,15 @@ final class AgentsInboxSystemTests: XCTestCase {
         )
         XCTAssertEqual(
             BriarLinkParser.parse(
-                "https://briar-api.wbai.workers.dev/open/issues/\(projectID.uuidString)/\(runID.uuidString)"
+                "https://briar-api.wbai.workers.dev/open/issues/\(projectID.uuidString)/\(runID.uuidString)",
+                trustedOrigin: trustedOrigin
             ),
             .issue(projectID: projectID, runID: runID)
         )
         XCTAssertNil(
             BriarLinkParser.parse(
-                "https://attacker.example/open/issues/\(projectID.uuidString)/\(runID.uuidString)"
+                "https://attacker.example/open/issues/\(projectID.uuidString)/\(runID.uuidString)",
+                trustedOrigin: trustedOrigin
             )
         )
         XCTAssertEqual(
@@ -659,7 +662,8 @@ final class AgentsInboxSystemTests: XCTestCase {
         )
         XCTAssertEqual(
             BriarLinkParser.parse(
-                "https://briar-api.wbai.workers.dev/open/sessions/\(projectID.uuidString)/session-1"
+                "https://briar-api.wbai.workers.dev/open/sessions/\(projectID.uuidString)/session-1",
+                trustedOrigin: trustedOrigin
             ),
             .session(projectID: projectID, sessionID: "session-1")
         )
@@ -680,7 +684,8 @@ final class AgentsInboxSystemTests: XCTestCase {
         )
         XCTAssertEqual(
             BriarLinkParser.parse(
-                "https://briar-api.wbai.workers.dev/open/channels/\(organizationID.uuidString)/\(channelID.uuidString)/\(messageID.uuidString)"
+                "https://briar-api.wbai.workers.dev/open/channels/\(organizationID.uuidString)/\(channelID.uuidString)/\(messageID.uuidString)",
+                trustedOrigin: trustedOrigin
             ),
             .channel(
                 organizationID: organizationID,

@@ -55,6 +55,7 @@ describe("merge queue profile", () => {
       repository: "Wordbricks/Briar",
       enabled: true,
       readinessStageId: "ci_qa",
+      validationCommands: ["bun run ci:local"],
       quietWindowMs: 30_000,
       maxBatchSize: 5,
       observedAt,
@@ -70,6 +71,7 @@ describe("merge queue profile", () => {
       repository: "wordbricks/briar",
       enabled: true,
       readinessStageId: "ci_qa",
+      validationCommands: ["bun run ci:local"],
       quietWindowMs: 30_000,
       maxBatchSize: 5,
       observedAt,
@@ -86,6 +88,7 @@ describe("merge queue profile", () => {
       repository: "wordbricks/first",
       enabled: false,
       readinessStageId: "ci_qa",
+      validationCommands: ["bun run ci:local"],
       quietWindowMs: 30_000,
       maxBatchSize: 5,
       observedAt,
@@ -97,6 +100,7 @@ describe("merge queue profile", () => {
       repository: "wordbricks/second",
       enabled: false,
       readinessStageId: "ci_qa",
+      validationCommands: ["bun run ci:local"],
       quietWindowMs: 20_000,
       maxBatchSize: 4,
       observedAt: retargetedAt,
@@ -114,6 +118,7 @@ describe("merge queue profile", () => {
       repository: "wordbricks/second",
       enabled: false,
       readinessStageId: "ci_qa",
+      validationCommands: ["bun run ci:local"],
       quietWindowMs: 10_000,
       maxBatchSize: 3,
       observedAt: "2026-08-21T03:02:00.000Z",
@@ -130,6 +135,7 @@ describe("merge queue profile", () => {
       repository: "wordbricks/second",
       enabled: false,
       readinessStageId: "reviewing",
+      validationCommands: ["bun run check"],
       quietWindowMs: 10_000,
       maxBatchSize: 3,
       observedAt: changedAt,
@@ -137,6 +143,26 @@ describe("merge queue profile", () => {
     await expect(getMergeQueueProfile(db, secondProject)).resolves
       .toMatchObject({
         readiness_stage_id: "reviewing",
+        created_at: changedAt,
+      });
+  });
+
+  it("starts a fresh proof boundary when validation commands change", async () => {
+    const changedAt = "2026-08-21T03:04:00.000Z";
+    await configureMergeQueueProfile(db, {
+      projectId: secondProject,
+      repositoryId: 703,
+      repository: "wordbricks/second",
+      enabled: false,
+      readinessStageId: "reviewing",
+      validationCommands: ["bun run check", "bun run test"],
+      quietWindowMs: 10_000,
+      maxBatchSize: 3,
+      observedAt: changedAt,
+    });
+    await expect(getMergeQueueProfile(db, secondProject)).resolves
+      .toMatchObject({
+        validation_commands_json: '["bun run check","bun run test"]',
         created_at: changedAt,
       });
   });
@@ -160,6 +186,7 @@ describe("merge queue profile", () => {
       repository: "wordbricks/briar",
       enabled: true,
       readinessStageId: "reviewing",
+      validationCommands: ["bun run check"],
       quietWindowMs: 30_000,
       maxBatchSize: 5,
       observedAt,
@@ -170,6 +197,7 @@ describe("merge queue profile", () => {
       repository: "wordbricks/briar",
       enabled: false,
       readinessStageId: "ci_qa",
+      validationCommands: ["bun run ci:local"],
       quietWindowMs: 30_000,
       maxBatchSize: 5,
       observedAt,

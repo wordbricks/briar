@@ -43,6 +43,14 @@ import {
 const DEFAULT_MERGE_QUEUE_QUIET_WINDOW_MS = 300_000;
 const DEFAULT_MERGE_QUEUE_MAX_BATCH_SIZE = 5;
 
+const validationCommandsFromStage = (
+  stage: { checks?: unknown } | undefined,
+) => stage && Array.isArray(stage.checks)
+  ? stage.checks.filter((check): check is string =>
+      typeof check === "string" && check.trim().length > 0
+    ).map((check) => check.trim())
+  : [];
+
 const mergeQueueProfileJson = (row: MergeQueueProfileRow | null) => row
   ? {
       projectId: row.project_id,
@@ -51,6 +59,7 @@ const mergeQueueProfileJson = (row: MergeQueueProfileRow | null) => row
       baseBranch: row.base_branch,
       enabled: row.enabled === 1,
       readinessStageId: row.readiness_stage_id,
+      validationCommands: JSON.parse(row.validation_commands_json) as string[],
       quietWindowMs: row.quiet_window_ms,
       maxBatchSize: row.max_batch_size,
       updatedAt: row.updated_at,
@@ -121,17 +130,29 @@ export async function handleProjectSettingsRoute(
     }
     const workflow = settings?.workflow_json
       ? JSON.parse(settings.workflow_json) as {
-          stages?: Array<{ id?: unknown }>;
+          stages?: Array<{ id?: unknown; checks?: unknown }>;
         }
       : null;
-    if (
-      input.enabled &&
-      !workflow?.stages?.some((stage) => stage.id === readinessStageId)
-    ) {
+    const readinessStage = workflow?.stages?.find((stage) =>
+      stage.id === readinessStageId
+    );
+    if (input.enabled && !readinessStage) {
       throw new HttpError(
         409,
         "The merge queue readiness stage is not in the project workflow",
         "MERGE_QUEUE_WORKFLOW_BOUNDARY_CONFLICT",
+      );
+    }
+    const validationCommands = readinessStage
+      ? validationCommandsFromStage(readinessStage)
+      : current
+        ? JSON.parse(current.validation_commands_json) as string[]
+        : [];
+    if (input.enabled && validationCommands.length === 0) {
+      throw new HttpError(
+        409,
+        "The merge queue boundary stage needs at least one validation command",
+        "MERGE_QUEUE_VALIDATION_COMMANDS_REQUIRED",
       );
     }
     const repository = !input.enabled && current
@@ -175,6 +196,7 @@ export async function handleProjectSettingsRoute(
       repository: repository.full_name,
       enabled: input.enabled,
       readinessStageId,
+      validationCommands,
       quietWindowMs: input.quietWindowMs ?? current?.quiet_window_ms ??
         DEFAULT_MERGE_QUEUE_QUIET_WINDOW_MS,
       maxBatchSize: input.maxBatchSize ?? current?.max_batch_size ??
@@ -306,6 +328,24 @@ export async function handleProjectSettingsRoute(
         "Disable the merge queue before removing its workflow boundary stage",
         "MERGE_QUEUE_WORKFLOW_BOUNDARY_CONFLICT",
       );
+    }
+    if (mergeQueueProfile?.enabled === 1) {
+      const boundary = input.workflow.stages.find((stage) =>
+        stage.id === mergeQueueProfile.readiness_stage_id
+      );
+      const storedCommands = JSON.parse(
+        mergeQueueProfile.validation_commands_json,
+      ) as string[];
+      if (
+        JSON.stringify(validationCommandsFromStage(boundary)) !==
+          JSON.stringify(storedCommands)
+      ) {
+        throw new HttpError(
+          409,
+          "Disable the merge queue before changing its workflow validation commands",
+          "MERGE_QUEUE_WORKFLOW_VALIDATION_CONFLICT",
+        );
+      }
     }
     if (
       !isStoredWorkflowUnchanged(

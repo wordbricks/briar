@@ -30,6 +30,34 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.170",
+        date: "2026년 8월 28일",
+        title: "Merge Queue가 기존 저장소 정책을 그대로 따릅니다",
+        summary:
+          "GitHub 설정을 강제하지 않는 Merge Queue와 더 단순한 모바일·에이전트 경험을 제공합니다.",
+        items: [
+          "Merge Queue가 ruleset이나 bypass 권한을 요구하지 않고 저장소의 기존 PR 병합 정책을 그대로 따릅니다.",
+          "검증된 통합 결과를 확인한 뒤 원본 PR을 GitHub의 일반 병합 API로 순서대로 병합합니다.",
+          "iOS는 네이티브 SwiftUI 앱 하나로 정리하고 중복된 Tauri iOS 빌드 경로를 제거했습니다.",
+          "프로젝트 Skill 실행이 대화 세션 런타임을 사용해 승인과 실행 상태를 더 일관되게 유지합니다.",
+          "저장소 재연결 화면의 밝은 테마와 어두운 테마 대비를 개선했습니다.",
+        ],
+      },
+      {
+        version: "1.2.169",
+        date: "2026년 8월 28일",
+        title: "저장소에 맞는 Merge Queue 검증으로 안전하게 병합합니다",
+        summary:
+          "프로젝트 Workflow의 검증 명령을 Merge Queue에 연결하고, 채널·링크·모바일 사용성을 다듬습니다.",
+        items: [
+          "Merge Queue가 프로젝트 Workflow 경계의 검증 명령을 그대로 사용해 저장소마다 다른 빌드와 테스트 정책을 실행합니다.",
+          "배치마다 정확한 통합 커밋을 격리된 작업 공간에서 검증하고 하나의 briar/merge-queue 상태로 결과를 보고합니다.",
+          "Briar 이슈 링크를 앱 안에서 바로 열고, 채널의 내 메시지에도 계정 표시 이름을 일관되게 보여줍니다.",
+          "채널 답장을 마친 뒤 작성 중 표시가 남을 수 있는 경합을 제거했습니다.",
+          "프로퍼티 필터 라벨과 Companion 하단 내비게이션의 레이아웃을 정돈했습니다.",
+        ],
+      },
+      {
         version: "1.2.168",
         date: "2026년 8월 27일",
         title: "협업 기록과 첨부 미리보기를 더 안정적으로 연결합니다",
@@ -1238,6 +1266,34 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.170",
+        date: "August 28, 2026",
+        title: "Let Merge Queue follow existing repository policy",
+        summary:
+          "Use Merge Queue without imposing GitHub configuration while simplifying mobile and Agent experiences.",
+        items: [
+          "Merge Queue no longer requires rulesets or bypass access and instead honors each repository's existing pull request merge policy.",
+          "After validating the integration result, merge the original pull requests in order through GitHub's standard merge API.",
+          "Keep iOS on one native SwiftUI app and remove the duplicate Tauri iOS build path.",
+          "Run project Skills through the conversation session runtime for more consistent approval and execution state.",
+          "Improve light- and dark-theme contrast throughout the repository reconnect screen.",
+        ],
+      },
+      {
+        version: "1.2.169",
+        date: "August 28, 2026",
+        title: "Merge safely with repository-specific queue validation",
+        summary:
+          "Connect Merge Queue to each project's Workflow checks while refining channels, links, and mobile usability.",
+        items: [
+          "Run the validation commands from the project's Workflow boundary so each repository keeps its own build and test policy.",
+          "Validate every batch at its exact integration commit in an isolated workspace and report one briar/merge-queue status.",
+          "Open Briar issue links directly in the app and consistently show the account display name on your own channel messages.",
+          "Prevent a race that could leave the typing indicator visible after a channel reply finishes.",
+          "Refine property-filter labels and the Companion bottom navigation layout.",
+        ],
+      },
       {
         version: "1.2.168",
         date: "August 27, 2026",
@@ -2538,7 +2594,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-168">
+          <a href="#v1-2-170">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2560,7 +2616,10 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.168" ||
+                      entry.version === "1.2.170" ||
+                      entry.version === "1.2.169"
+                        ? "2026-08-28"
+                        : entry.version === "1.2.168" ||
                       entry.version === "1.2.167" ||
                       entry.version === "1.2.166" ||
                       entry.version === "1.2.165"

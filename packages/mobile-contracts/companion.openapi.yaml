@@ -1819,6 +1819,54 @@
         }
       }
     },
+    "/organizations/{organizationId}/channels/{channelId}/proposals/{proposalId}/decline": {
+      "post": {
+        "operationId": "declineChannelProposal",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OrganizationId"
+          },
+          {
+            "$ref": "#/components/parameters/ChannelId"
+          },
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Issue proposal declined",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeclineChannelProposalResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/organizations/{organizationId}/channels/{channelId}/skill-execution-proposals/{proposalId}/accept": {
       "post": {
         "operationId": "acceptChannelSkillExecutionProposal",
@@ -3366,7 +3414,8 @@
             "type": "string",
             "enum": [
               "pending",
-              "accepted"
+              "accepted",
+              "declined"
             ]
           },
           "acceptedAt": {
@@ -5837,6 +5886,22 @@
               {
                 "type": "null"
               }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeclineChannelProposalResponse": {
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "declined",
+              "already_declined"
             ]
           }
         },
