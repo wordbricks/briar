@@ -1315,6 +1315,7 @@ final class ChannelsStore: ObservableObject {
                 ),
                 method: "POST",
                 token: token,
+                body: nil,
                 as: DeclineChannelProposalResponse.self
             )
             guard expectedGeneration == generation,
