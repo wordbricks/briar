@@ -53,6 +53,4 @@ objc2-user-notifications = { version = "0.3", features = [
   "UNNotificationSound",
   "UNUserNotificationCenter",
 ] }
-
-[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 tauri-plugin-auth-session = "=0.2.2"

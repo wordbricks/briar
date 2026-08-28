@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { getMobilePlatform } from "./platform";
 
 export const appIconNames = ["purple", "gray", "pink", "green"] as const;
@@ -52,14 +51,6 @@ export async function getCurrentAppIcon(): Promise<AppIconName> {
     }
   }
 
-  if (platform === "ios" && window.__TAURI_INTERNALS__) {
-    const icon = await invoke<string>("current_app_icon");
-    if (isAppIconName(icon)) {
-      storeAppIcon(icon);
-      return icon;
-    }
-  }
-
   return storedAppIcon();
 }
 
@@ -71,8 +62,6 @@ export async function changeAppIcon(icon: AppIconName): Promise<void> {
     if (!window.BriarAndroidIcon.set(icon)) {
       throw new Error("Android rejected the selected app icon.");
     }
-  } else if (platform === "ios" && window.__TAURI_INTERNALS__) {
-    await invoke("set_app_icon", { icon });
   }
 
   storeAppIcon(icon);

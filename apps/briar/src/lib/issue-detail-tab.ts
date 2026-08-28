@@ -1,4 +1,4 @@
-/** Detail tabs shown on the shared issue page (desktop, Tauri iOS/Android). */
+/** Detail tabs shown on the shared issue page (desktop and Tauri Android). */
 export type IssueDetailTab =
   | "description"
   | "result"

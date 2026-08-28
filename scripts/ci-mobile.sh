@@ -47,7 +47,7 @@ fi
 echo "[mobile-ci] Validating the shared Companion API contract."
 bun run mobile:contract
 
-echo "[mobile-ci] Validating the fail-closed iOS release selector and regenerating Xcode inputs."
+echo "[mobile-ci] Validating the native-only iOS release contract and regenerating Xcode inputs."
 bun run ios:release:verify
 bun run ios:native:project
 
@@ -103,10 +103,7 @@ ln -s \
   "$mobile_build_root/apps/briar/node_modules"
 cd "$mobile_build_root"
 
-echo "[mobile-ci] Building the existing Tauri iOS release path for the simulator."
-bun --cwd apps/briar tauri ios build --debug --target aarch64-sim --ci --no-sign
-
-echo "[mobile-ci] Building the existing Tauri Android debug release path."
+echo "[mobile-ci] Building the retained Tauri Android debug release path."
 bun run android:build:debug
 
 echo "[mobile-ci] All mobile contract and build checks passed."

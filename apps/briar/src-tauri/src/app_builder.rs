@@ -9,7 +9,7 @@ pub(super) fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init());
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_auth_session::init());
     #[cfg(desktop)]
     let builder = builder
@@ -153,8 +153,6 @@ pub(super) fn run() {
             read_session_token,
             write_session_token,
             clear_session_token,
-            current_app_icon,
-            set_app_icon,
             set_app_badge_count,
             validate_repository_path,
             clone_github_ssh_repository,

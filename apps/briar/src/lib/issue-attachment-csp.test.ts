@@ -26,7 +26,6 @@ describe("issue attachment preview CSP", () => {
   it.each([
     ["desktop production", readConfig("tauri.conf.json").app.security.csp],
     ["desktop development", readConfig("tauri.conf.json").app.security.devCsp!],
-    ["iOS", readConfig("tauri.ios.conf.json").app.security.csp],
     ["Android", readConfig("tauri.android.conf.json").app.security.csp],
   ])("allows Blob image and video previews on %s", (_target, policy) => {
     expect(directive(policy, "img-src").split(/\s+/u)).toContain("blob:");
