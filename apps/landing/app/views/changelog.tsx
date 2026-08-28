@@ -30,6 +30,21 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.171",
+        date: "2026년 8월 29일",
+        title: "채널 작업과 관리형 컴퓨터 운영을 더 안정적으로 연결합니다",
+        summary:
+          "채널 제안·첨부·Agent 답변과 관리형 컴퓨터 운영의 안정성을 높이고 Worker 전달 경로를 보강합니다.",
+        items: [
+          "채널 이슈 제안 카드에서 이슈 만들기, 생성 및 실행, 거절을 독립적으로 선택하고 거절 상태를 안전하게 저장합니다.",
+          "채널 Agent가 세 번 시도해도 실패하면 중복 없이 안내 답장을 남기고 Inbox 알림과 스레드 흐름을 유지합니다.",
+          "HTML artifact 첨부를 text/html 형식으로 이슈와 채널에 저장할 수 있도록 D1 첨부 스키마를 보강했습니다.",
+          "Merge Queue의 claim 요청이 API Worker에 도달하도록 라우팅해 대기 중인 이슈를 안정적으로 가져옵니다.",
+          "관리형 컴퓨터가 부팅 시 서비스와 loopback 화면 리스너를 스스로 복구하고 일시적인 등록 실패를 재시도합니다.",
+          "iOS Companion과 공용 모바일 계약에도 채널 제안 거절 흐름을 반영했습니다.",
+        ],
+      },
+      {
         version: "1.2.170",
         date: "2026년 8월 28일",
         title: "Merge Queue가 기존 저장소 정책을 그대로 따릅니다",
@@ -1266,6 +1281,21 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.171",
+        date: "August 29, 2026",
+        title: "Make channel work and managed computers more reliable",
+        summary:
+          "Harden channel proposals, attachments, and Agent replies while strengthening managed-computer recovery and Worker routing.",
+        items: [
+          "Separate channel issue proposal choices into create, create and execute, or decline, and persist declines safely.",
+          "After three failed channel-Agent attempts, save one generic retry message without duplicates while preserving Inbox notifications and thread context.",
+          "Allow HTML artifact attachments to be stored as text/html in issue and channel attachment tables with a safer D1 schema.",
+          "Route Merge Queue claim requests to the API Worker so queued issues can be claimed reliably.",
+          "Recover managed-computer services and loopback display listeners at boot and retry transient enrollment failures.",
+          "Carry the channel-proposal decline flow through the iOS Companion and shared mobile contract.",
+        ],
+      },
       {
         version: "1.2.170",
         date: "August 28, 2026",
@@ -2594,7 +2624,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-170">
+          <a href="#v1-2-171">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2616,8 +2646,10 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.170" ||
-                      entry.version === "1.2.169"
+                      entry.version === "1.2.171"
+                        ? "2026-08-29"
+                        : entry.version === "1.2.170" ||
+                          entry.version === "1.2.169"
                         ? "2026-08-28"
                         : entry.version === "1.2.168" ||
                       entry.version === "1.2.167" ||
