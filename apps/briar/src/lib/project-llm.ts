@@ -1,15 +1,10 @@
-import type { StructuredAgentResult } from "./agent-result";
 import {
   emptyAgentProviderCapabilityCatalog,
   type AgentProviderCapabilityCatalog,
   type AgentModelCapability,
   type ModelEffort,
 } from "./agent-provider-contract";
-import {
-  agentProviders,
-  sortAgentProviders,
-  type AgentProvider,
-} from "./agent-provider";
+import type { AgentProvider } from "./agent-provider";
 import {
   commands,
   events,
@@ -17,9 +12,10 @@ import {
   type ApprovalPolicy,
   type JsonValue,
   type OpenRouterCredentialStatus,
+  type ProjectAgentRunRequest,
   type ProjectAgentRunResponse,
   type ProjectAgentRunSnapshot,
-  type ProjectLlmProgressPayload,
+  type ProjectLlmRequest,
   type ProjectLlmResponse,
   type ProjectSandboxSettings,
 } from "../generated/tauri";
@@ -280,18 +276,19 @@ const isTauri = () =>
 export const projectLlmChatRequest = (
   input: ProjectLlmChatInput,
   progressId: string | null,
-) => ({
+): ProjectLlmRequest => ({
   message: input.message,
   progressId,
   conversationId: input.conversationId ?? null,
   instructions: input.instructions ?? null,
-  outputSchema:
-    input.outputSchema === undefined || input.outputSchema === null
-      ? null
-      : JSON.parse(JSON.stringify(input.outputSchema)) as JsonValue,
+  outputSchema: input.outputSchema == null
+    ? null
+    : JSON.parse(JSON.stringify(input.outputSchema)) as JsonValue,
 });
 
-export const projectAgentRunRequest = (input: ProjectAgentRunInput) => ({
+export const projectAgentRunRequest = (
+  input: ProjectAgentRunInput,
+): ProjectAgentRunRequest => ({
   sessionId: input.sessionId,
   agentId: input.agent.id,
   agentName: input.agent.name,

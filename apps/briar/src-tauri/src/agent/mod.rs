@@ -107,7 +107,7 @@ impl AgentProviderKind {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize, serde::Serialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum AgentEventDirection {
     Client,
@@ -132,7 +132,11 @@ pub(crate) enum AgentActivityStatus {
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub(crate) enum AgentEvent {
     ConversationStarted {
         conversation_id: String,
@@ -334,7 +338,7 @@ pub(crate) struct AppServerEventRecord {
     pub(crate) session_id: String,
     pub(crate) sequence: u64,
     pub(crate) occurred_at_ms: u64,
-    pub(crate) direction: String,
+    pub(crate) direction: AgentEventDirection,
     #[specta(type = crate::ipc::JsonValue)]
     pub(crate) message: serde_json::Value,
     #[serde(default)]
@@ -356,11 +360,7 @@ impl AppServerEventRecord {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_millis() as u64,
-            direction: match provider_event.direction {
-                AgentEventDirection::Client => "client",
-                AgentEventDirection::Server => "server",
-            }
-            .to_string(),
+            direction: provider_event.direction,
             message: provider_event.raw,
             provider: provider_event.provider,
             event: provider_event.event,

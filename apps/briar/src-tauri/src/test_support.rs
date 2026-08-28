@@ -24,7 +24,7 @@ pub(super) fn config_with_cli_owned_settings(
     let config = CliConfig {
         api_url: "http://127.0.0.1:8787".to_string(),
         user_token: None,
-        agent_providers: AppProviderSettings::default(),
+        agent_providers: StoredAppProviderSettings::default(),
         openrouter_api_key: None,
         app_settings: StoredAppRuntimeSettings::default(),
         projects: vec![CliProject {

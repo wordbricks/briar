@@ -6,9 +6,11 @@ pub(super) async fn load_app_provider_settings(
     app: tauri::AppHandle,
 ) -> Result<AppProviderSettings, String> {
     let config_path = cli_config_path(&app)?;
-    tauri::async_runtime::spawn_blocking(move || app_provider_settings_from(&config_path))
-        .await
-        .map_err(|error| error.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        app_provider_settings_from(&config_path).map(AppProviderSettings::from)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -87,7 +89,8 @@ pub(super) async fn update_app_provider_settings(
 ) -> Result<AppProviderSettings, String> {
     let config_path = cli_config_path(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        update_app_provider_settings_at(&config_path, settings)
+        update_app_provider_settings_at(&config_path, settings.into())
+            .map(AppProviderSettings::from)
     })
     .await
     .map_err(|error| error.to_string())?

@@ -25,6 +25,8 @@ const provider: AgentUsageProvider = {
   },
   monthly: null,
   planType: "plus",
+  accountLabel: null,
+  authenticated: true,
   updatedAt: 1,
   error: null,
 };

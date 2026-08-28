@@ -412,7 +412,7 @@ fn stores_project_approval_policy_locally() {
     );
     update_app_provider_settings_at(
         &config_path,
-        AppProviderSettings {
+        StoredAppProviderSettings {
             codex: false,
             claude: true,
             cursor: true,
@@ -482,7 +482,7 @@ fn initializes_provider_settings_when_local_config_is_missing() {
 
     update_app_provider_settings_at(
         &config_path,
-        AppProviderSettings {
+        StoredAppProviderSettings {
             codex: true,
             claude: false,
             cursor: false,

@@ -360,9 +360,9 @@ pub(super) fn inspect_lovable_repository_compatibility_in(
         issues.push("The React dependency was not found.".to_string());
     }
     let stack = if dependencies.contains("@tanstack/react-start") {
-        Some("tanstack-start".to_string())
+        Some(LovableStack::TanstackStart)
     } else if dependencies.contains("vite") && has_react {
-        Some("vite-react".to_string())
+        Some(LovableStack::ViteReact)
     } else {
         issues.push("Neither TanStack Start nor React + Vite was detected.".to_string());
         None
@@ -501,7 +501,14 @@ pub(super) fn inspect_lovable_repository_compatibility_in(
     }
     let package_manager = declared_package_manager
         .or_else(|| package_manager_signals.iter().next().cloned())
-        .or_else(|| Some("npm".to_string()));
+        .or_else(|| Some("npm".to_string()))
+        .and_then(|manager| match manager.as_str() {
+            "bun" => Some(LovablePackageManager::Bun),
+            "npm" => Some(LovablePackageManager::Npm),
+            "pnpm" => Some(LovablePackageManager::Pnpm),
+            "yarn" => Some(LovablePackageManager::Yarn),
+            _ => None,
+        });
 
     LovableRepositoryCompatibility {
         compatible: issues.is_empty(),

@@ -6,8 +6,8 @@ import {
   listenForInboxNotificationClicks,
   readInboxNotificationPreferences,
   sendInboxNotification,
-  type InboxNotificationTarget,
 } from "../lib/inbox-notifications";
+import type { InboxNotificationTarget } from "../generated/tauri";
 import { inboxSessionMessageVersion } from "../lib/inbox-session-version";
 import {
   classifyInboxMessage,

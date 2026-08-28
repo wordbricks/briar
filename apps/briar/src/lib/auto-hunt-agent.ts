@@ -1,4 +1,3 @@
-import type { AgentProvider } from "./agent-provider";
 import {
   commands,
   events,
@@ -7,56 +6,13 @@ import {
   type AutoHuntDispatchEvent_Deserialize,
 } from "../generated/tauri";
 
-export type AutoHuntAppServerEvent = {
-  sessionId: string;
-  sequence: number;
-  occurredAtMs: number;
-  direction: "client" | "server";
+export type AutoHuntAppServerEvent = Omit<
+  AppServerEventRecord_Deserialize,
+  "event" | "message"
+> & {
   message: Record<string, unknown>;
-  provider?: AgentProvider;
-  event?: AutoHuntAgentEvent;
+  event?: AgentEvent;
 };
-
-export type AutoHuntAgentEvent =
-  | {
-      type: "conversationStarted";
-      conversationId: string;
-    }
-  | {
-      type: "messageStarted" | "messageCompleted";
-      id: string;
-      phase: string | null;
-      text: string;
-    }
-  | {
-      type: "messageDelta";
-      id: string;
-      delta: string;
-    }
-  | {
-      type: "activityStarted";
-      id: string;
-      kind: "command" | "fileChange" | "webSearch" | "tool";
-      title: string;
-      text: string;
-    }
-  | {
-      type: "activityDelta";
-      id: string;
-      delta: string;
-    }
-  | {
-      type: "activityCompleted";
-      id: string;
-      kind: "command" | "fileChange" | "webSearch" | "tool";
-      title: string;
-      text: string;
-      status: "completed" | "failed" | "cancelled";
-    }
-  | {
-      type: "turnCompleted";
-      status: string;
-    };
 
 export type AutoHuntAgentMessage = {
   id: string;
@@ -84,76 +40,13 @@ export type AutoHuntWorkerResult = {
   evidence: Array<Record<string, unknown>>;
 };
 
-export type AutoHuntDispatchWorkerStatus =
-  | "allocating"
-  | "running"
-  | "needs_input"
-  | "completed"
-  | "blocked"
-  | "failed"
-  | "cancelled";
-
-export type AutoHuntDispatchEvent = {
-  dispatchGroupId: string;
-  cursor: number;
-  type: string;
-  workerSessionId: string | null;
-  runId: string | null;
-  status: string;
-  message: string;
-  data?: Record<string, unknown>;
-  occurredAt: string;
-};
-
-export type AutoHuntDispatchGroup = {
-  version: number;
-  dispatchGroupId: string;
-  projectId: string;
-  agentId: string;
-  coordinatorSessionId: string;
-  coordinatorConversationId: string | null;
-  status: "running" | "completed" | "failed" | "interrupted";
-  maxIssues: number;
-  startedAt: string;
-  completedAt: string | null;
-  error: string | null;
-  nextCursor: number;
-  workers: Array<{
-    sessionId: string;
-    runId: string;
-    sourceKey: string;
-    title: string;
-    workspaceRoot: string | null;
-    conversationId: string | null;
-    status: AutoHuntDispatchWorkerStatus;
-    summary: string | null;
-    startedAt: string;
-    completedAt: string | null;
-  }>;
-  events: AutoHuntDispatchEvent[];
-};
-
 const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-
-function nativeAutoHuntAgentEvent(
-  event: AgentEvent | null | undefined,
-): AutoHuntAgentEvent | undefined {
-  if (!event) return undefined;
-  if (event.type === "conversationStarted") {
-    return {
-      type: event.type,
-      conversationId: event.conversation_id,
-    };
-  }
-  return event;
-}
 
 function nativeAutoHuntAppServerEvent(
   event: AppServerEventRecord_Deserialize,
 ): AutoHuntAppServerEvent | null {
   if (
-    (event.direction !== "client" && event.direction !== "server") ||
     !event.message ||
     typeof event.message !== "object" ||
     Array.isArray(event.message)
@@ -162,21 +55,8 @@ function nativeAutoHuntAppServerEvent(
   }
   return {
     ...event,
-    direction: event.direction,
     message: event.message,
-    event: nativeAutoHuntAgentEvent(event.event),
-  };
-}
-
-function nativeAutoHuntDispatchEvent(
-  event: AutoHuntDispatchEvent_Deserialize,
-): AutoHuntDispatchEvent {
-  return {
-    ...event,
-    data:
-      event.data && typeof event.data === "object" && !Array.isArray(event.data)
-        ? event.data
-        : undefined,
+    event: event.event ?? undefined,
   };
 }
 
@@ -194,25 +74,17 @@ export async function loadAutoHuntAppServerEvents(
 export async function loadAutoHuntDispatch(
   dispatchGroupId: string,
   afterCursor = 0,
-): Promise<AutoHuntDispatchGroup | null> {
+): ReturnType<typeof commands.loadAutoHuntDispatch> {
   if (!isTauri()) return null;
-  const dispatch = await commands.loadAutoHuntDispatch(
-    dispatchGroupId,
-    afterCursor,
-  );
-  if (!dispatch) return null;
-  return {
-    ...dispatch,
-    events: dispatch.events.map(nativeAutoHuntDispatchEvent),
-  };
+  return commands.loadAutoHuntDispatch(dispatchGroupId, afterCursor);
 }
 
 export async function listenToAutoHuntDispatchEvents(
-  onEvent: (event: AutoHuntDispatchEvent) => void,
+  onEvent: (event: AutoHuntDispatchEvent_Deserialize) => void,
 ): Promise<() => void> {
   if (!isTauri()) return () => undefined;
   return events.autoHuntDispatchEvent.listen(
-    ({ payload }) => onEvent(nativeAutoHuntDispatchEvent(payload)),
+    ({ payload }) => onEvent(payload),
   );
 }
 

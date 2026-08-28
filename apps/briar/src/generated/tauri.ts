@@ -87,13 +87,13 @@ export const commands = {
 	syncExecutionWorkerLabels: () => __TAURI_INVOKE<JsonValue>("sync_execution_worker_labels"),
 	inspectExecutionWorkers: (projectIds: string[]) => __TAURI_INVOKE<LocalExecutionWorkerStatus[]>("inspect_execution_workers", { projectIds }),
 	currentExecutionWorkerDeviceId: (organizationId: string) => __TAURI_INVOKE<string | null>("current_execution_worker_device_id", { organizationId }),
-	showInboxNotification: (title: string, body: string, target: InboxNotificationTarget, playSound: boolean) => __TAURI_INVOKE<null>("show_inbox_notification", { title, body, target, playSound }),
+	showInboxNotification: (title: string, body: string, target: InboxNotificationTarget_Deserialize, playSound: boolean) => __TAURI_INVOKE<null>("show_inbox_notification", { title, body, target, playSound }),
 	requestInboxNotificationPermission: () => __TAURI_INVOKE<boolean>("request_inbox_notification_permission"),
-	inboxNotificationPermissionStatus: () => __TAURI_INVOKE<string>("inbox_notification_permission_status"),
+	inboxNotificationPermissionStatus: () => __TAURI_INVOKE<InboxNotificationPermissionStatus>("inbox_notification_permission_status"),
 	openInboxNotificationSettings: () => __TAURI_INVOKE<null>("open_inbox_notification_settings"),
-	drainPendingInboxNotificationOpens: () => __TAURI_INVOKE<InboxNotificationTarget[]>("drain_pending_inbox_notification_opens"),
+	drainPendingInboxNotificationOpens: () => __TAURI_INVOKE<InboxNotificationTarget_Serialize[]>("drain_pending_inbox_notification_opens"),
 	armMacosPasswordEditor: () => __TAURI_INVOKE<void>("arm_macos_password_editor"),
-	syncStatusTray: (snapshot: StatusTraySnapshotCommand) => __TAURI_INVOKE<null>("sync_status_tray", { snapshot }),
+	syncStatusTray: (snapshot: StatusTraySnapshot) => __TAURI_INVOKE<null>("sync_status_tray", { snapshot }),
 	syncAppUpdateMenu: (updateAvailable: boolean) => __TAURI_INVOKE<null>("sync_app_update_menu", { updateAvailable }),
 };
 
@@ -103,7 +103,7 @@ export const events = {
 	appMenuUpdate: makeEvent<AppMenuUpdateEvent>("app-menu-update"),
 	autoHuntAppServerEvent: makeEvent<AppServerEventRecord_Deserialize>("auto-hunt-app-server-event"),
 	autoHuntDispatchEvent: makeEvent<AutoHuntDispatchEvent_Deserialize>("auto-hunt-dispatch-event"),
-	inboxNotificationOpen: makeEvent<InboxNotificationTarget>("inbox-notification-open"),
+	inboxNotificationOpen: makeEvent<InboxNotificationTarget_Deserialize>("inbox-notification-open"),
 	inboxNotificationOpenAvailable: makeEvent<InboxNotificationOpenAvailableEvent>("inbox-notification-open-available"),
 	projectAgentSchedulePoll: makeEvent<ProjectAgentSchedulePollEvent>("project-agent-schedule-poll"),
 	projectLlmProgress: makeEvent<ProjectLlmProgressPayload>("project-llm-progress"),
@@ -122,7 +122,9 @@ export type AgentBrowserStatus = {
 	version: string | null,
 };
 
-export type AgentEvent = { type: "conversationStarted"; conversation_id: string } | { type: "messageStarted"; id: string; phase: string | null; text: string } | { type: "messageDelta"; id: string; delta: string } | { type: "messageCompleted"; id: string; phase: string | null; text: string } | { type: "activityStarted"; id: string; kind: AgentActivityKind; title: string; text: string } | { type: "activityDelta"; id: string; delta: string } | { type: "activityCompleted"; id: string; kind: AgentActivityKind; title: string; text: string; status: AgentActivityStatus } | { type: "turnCompleted"; status: string };
+export type AgentEvent = { type: "conversationStarted"; conversationId: string } | { type: "messageStarted"; id: string; phase: string | null; text: string } | { type: "messageDelta"; id: string; delta: string } | { type: "messageCompleted"; id: string; phase: string | null; text: string } | { type: "activityStarted"; id: string; kind: AgentActivityKind; title: string; text: string } | { type: "activityDelta"; id: string; delta: string } | { type: "activityCompleted"; id: string; kind: AgentActivityKind; title: string; text: string; status: AgentActivityStatus } | { type: "turnCompleted"; status: string };
+
+export type AgentEventDirection = "client" | "server";
 
 export type AgentProviderEffort = {
 	id: string,
@@ -188,13 +190,13 @@ export type AppMenuSettingsEvent = null;
 export type AppMenuUpdateEvent = null;
 
 export type AppProviderSettings = {
-	codex?: boolean,
-	claude?: boolean,
-	cursor?: boolean,
-	grok?: boolean,
-	agy?: boolean,
-	opencode?: boolean,
-	openrouter?: boolean,
+	codex: boolean,
+	claude: boolean,
+	cursor: boolean,
+	grok: boolean,
+	agy: boolean,
+	opencode: boolean,
+	openrouter: boolean,
 };
 
 export type AppRuntimeSettings = {
@@ -212,7 +214,7 @@ export type AppServerEventRecord_Deserialize = {
 	sessionId: string,
 	sequence: number,
 	occurredAtMs: number,
-	direction: string,
+	direction: AgentEventDirection,
 	message: JsonValue,
 	provider?: AgentProviderKind,
 	event?: AgentEvent | null,
@@ -222,7 +224,7 @@ export type AppServerEventRecord_Serialize = {
 	sessionId: string,
 	sequence: number,
 	occurredAtMs: number,
-	direction: string,
+	direction: AgentEventDirection,
 	message: JsonValue,
 	provider: AgentProviderKind,
 	event?: AgentEvent | null,
@@ -244,15 +246,12 @@ export type AutoHuntConfig = AutoHuntConfig_Serialize | AutoHuntConfig_Deseriali
 
 export type AutoHuntConfig_Deserialize = {
 	velenOrg?: string | null,
+	dataSource?: string | null,
 	linearEnabled: boolean,
 	linearSource?: string | null,
 	linearTeam?: string | null,
 	githubRepository?: string | null,
 	workflow?: WorkflowConfig_Deserialize,
-} & {
-	dataSource?: string | null,
-} | {
-	velenDataSource?: string | null,
 };
 
 export type AutoHuntConfig_Serialize = {
@@ -404,18 +403,41 @@ export type EgoBrowserStatus = {
 	version: string | null,
 };
 
+export type InboxNotificationKind = "issue" | "conversation" | "session" | "channel";
+
 export type InboxNotificationOpenAvailableEvent = null;
 
-export type InboxNotificationTarget = {
+export type InboxNotificationPermissionStatus = "authorized" | "denied" | "not_determined" | "unsupported";
+
+export type InboxNotificationTarget = InboxNotificationTarget_Serialize | InboxNotificationTarget_Deserialize;
+
+export type InboxNotificationTarget_Deserialize = {
 	messageId: string,
 	projectId: string,
 	targetId: string,
-	kind: string,
-	conversationMessageId: string | null,
-	channelMessageId: string | null,
-	rootMessageId: string | null,
+	kind: InboxNotificationKind,
+	conversationMessageId?: string | null,
+	channelMessageId?: string | null,
+	rootMessageId?: string | null,
 };
 
+export type InboxNotificationTarget_Serialize = {
+	messageId: string,
+	projectId: string,
+	targetId: string,
+	kind: InboxNotificationKind,
+	conversationMessageId?: string | null,
+	channelMessageId?: string | null,
+	rootMessageId?: string | null,
+};
+
+/**
+ *  JSON's recursive value shape for generated TypeScript contracts.
+ *
+ *  `Null(())` exports as the `null` literal, while Specta's default `f64`
+ *  representation also includes `null`; the explicit number override keeps
+ *  the generated union faithful to JSON.
+ */
 export type JsonValue = boolean | number | null | string | JsonValue[] | { [key in string]: JsonValue };
 
 export type LocalExecutionWorkerStatus = {
@@ -433,13 +455,17 @@ export type LocalProjectConnectionPreflight = {
 	provider: AgentProviderKind,
 };
 
+export type LovablePackageManager = "bun" | "npm" | "pnpm" | "yarn";
+
 export type LovableRepositoryCompatibility = {
 	compatible: boolean,
-	stack: string | null,
-	packageManager: string | null,
+	stack: LovableStack | null,
+	packageManager: LovablePackageManager | null,
 	scripts: string[],
 	issues: string[],
 };
+
+export type LovableStack = "tanstack-start" | "vite-react";
 
 export type ModelEffort = string;
 
@@ -519,7 +545,17 @@ export type ProjectAgentRunSnapshot = {
 
 export type ProjectAgentSchedulePollEvent = null;
 
-export type ProjectAutoHuntIssue = ProjectAutoHuntIssue_Serialize | ProjectAutoHuntIssue_Deserialize;
+export type ProjectAutoHuntIssue = {
+	runId: string,
+	runNumber: number,
+	sourceKey: string,
+	title: string,
+	issueDescription?: string | null,
+	priority?: number | null,
+	context?: JsonValue | null,
+	attachments?: ProjectAutoHuntIssueAttachment[],
+	conversation?: ProjectAutoHuntIssueMessage[],
+};
 
 export type ProjectAutoHuntIssueAttachment = {
 	id: string,
@@ -553,36 +589,6 @@ export type ProjectAutoHuntIssueResult = {
 	summary: string,
 };
 
-export type ProjectAutoHuntIssue_Deserialize = {
-	runId: string,
-	runNumber: number,
-	sourceKey: string,
-	title: string,
-	priority?: number | null,
-	context?: JsonValue | null,
-	attachments?: ProjectAutoHuntIssueAttachment[],
-} & {
-	issueDescription?: string | null,
-} | {
-	description?: string | null,
-} & {
-	conversation?: ProjectAutoHuntIssueMessage[],
-} | {
-	messages?: ProjectAutoHuntIssueMessage[],
-};
-
-export type ProjectAutoHuntIssue_Serialize = {
-	runId: string,
-	runNumber: number,
-	sourceKey: string,
-	title: string,
-	issueDescription: string | null,
-	priority: number | null,
-	context: JsonValue | null,
-	attachments: ProjectAutoHuntIssueAttachment[],
-	conversation: ProjectAutoHuntIssueMessage[],
-};
-
 export type ProjectAutoHuntRequest = ProjectAutoHuntRequest_Serialize | ProjectAutoHuntRequest_Deserialize;
 
 export type ProjectAutoHuntRequest_Deserialize = {
@@ -595,7 +601,7 @@ export type ProjectAutoHuntRequest_Deserialize = {
 	agentModel: string | null,
 	responsibility: string,
 	skill: string,
-	issues: ProjectAutoHuntIssue_Deserialize[],
+	issues: ProjectAutoHuntIssue[],
 };
 
 export type ProjectAutoHuntRequest_Serialize = {
@@ -609,7 +615,7 @@ export type ProjectAutoHuntRequest_Serialize = {
 	responsibility: string,
 	skill: string,
 	workflowJson: string,
-	issues: ProjectAutoHuntIssue_Serialize[],
+	issues: ProjectAutoHuntIssue[],
 };
 
 export type ProjectAutoHuntResponse = {
@@ -719,25 +725,25 @@ export type StatusTrayOpenRunPayload = {
 	runId: string,
 };
 
-export type StatusTrayRunItemCommand = {
+export type StatusTrayRunItem = {
 	projectId: string,
 	runId: string,
 	title: string,
 	statusLabel: string,
-	projectName?: string,
+	projectName: string,
 };
 
 /**
- *  Command payload shared with the frontend; converted to the tray module type
- *  only on macOS desktop where the tray is installed.
+ *  Canonical status tray snapshot shared by the frontend command and the
+ *  macOS renderer.
  */
-export type StatusTraySnapshotCommand = {
+export type StatusTraySnapshot = {
 	runningLabel: string,
 	emptyLabel: string,
 	openLabel: string,
 	quitLabel: string,
-	moreLabel?: string,
-	items?: StatusTrayRunItemCommand[],
+	moreLabel: string,
+	items: StatusTrayRunItem[],
 };
 
 export type StructuredAgentResult = {

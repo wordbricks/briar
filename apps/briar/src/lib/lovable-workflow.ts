@@ -2,20 +2,23 @@ import {
   canonicalizeProjectWorkflow,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import type { LovableRepositoryCompatibility } from "../generated/tauri";
+import type {
+  LovablePackageManager,
+  LovableRepositoryCompatibility,
+  LovableStack,
+} from "../generated/tauri";
 
 const packageManagerLabels = {
   bun: "Bun",
   npm: "npm",
   pnpm: "pnpm",
   yarn: "Yarn",
-} as const;
+} as const satisfies Record<LovablePackageManager, string>;
 
-function isSupportedPackageManager(
-  value: string,
-): value is keyof typeof packageManagerLabels {
-  return value in packageManagerLabels;
-}
+const stackLabels = {
+  "tanstack-start": "TanStack Start",
+  "vite-react": "React + Vite",
+} as const satisfies Record<LovableStack, string>;
 
 const validationScriptOrder = ["lint", "typecheck", "test", "build"] as const;
 
@@ -25,8 +28,7 @@ export function lovableWorkflowPreset(
   if (
     !compatibility.compatible ||
     !compatibility.stack ||
-    !compatibility.packageManager ||
-    !isSupportedPackageManager(compatibility.packageManager)
+    !compatibility.packageManager
   ) {
     return null;
   }
@@ -35,9 +37,7 @@ export function lovableWorkflowPreset(
   const checks = validationScriptOrder
     .filter((script) => availableScripts.has(script))
     .map((script) => `${packageManager} run ${script}`);
-  const stackLabel = compatibility.stack === "tanstack-start"
-    ? "TanStack Start"
-    : "React + Vite";
+  const stackLabel = stackLabels[compatibility.stack];
 
   return canonicalizeProjectWorkflow({
     version: 2,

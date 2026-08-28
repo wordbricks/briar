@@ -139,8 +139,8 @@ import {
   inboxNotificationTarget,
   isInboxChannelTarget,
   isInboxRunDetailTarget,
-  type InboxNotificationTarget,
 } from "./lib/inbox-notifications";
+import type { InboxNotificationTarget } from "./generated/tauri";
 import { inboxDetailTargetAtom } from "./lib/inbox-selection";
 import {
   clearFirstRunTutorialPending,
@@ -740,8 +740,8 @@ export function App({
   useEffect(() => {
     if (!runsOnDesktopTauri || projectWindowProjectId) return;
     void commands.syncExecutionWorkerLabels().catch(() => {
-        // Offline startup must not block the rest of the desktop app.
-      });
+      // Offline startup must not block the rest of the desktop app.
+    });
   }, [projectWindowProjectId, runsOnDesktopTauri]);
   // Preview changes the timing, not the macOS presentation surface.
   const usesNativeLaunchIntro = isMacDesktopTauri();

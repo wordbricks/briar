@@ -19,7 +19,11 @@ use objc2_user_notifications::{
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event as _;
 
-use crate::{InboxNotificationTarget, PendingInboxNotificationOpens};
+#[cfg(test)]
+use crate::InboxNotificationKind;
+use crate::{
+    InboxNotificationPermissionStatus, InboxNotificationTarget, PendingInboxNotificationOpens,
+};
 
 const NOTIFICATION_ID_PREFIX: &str = "briar-inbox:v1:";
 
@@ -155,8 +159,8 @@ pub(crate) async fn request_permission() -> Result<bool, String> {
         .map_err(|_| "Notification permission request was cancelled".to_string())?
 }
 
-pub(crate) async fn permission_status() -> Result<String, String> {
-    let (sender, receiver) = oneshot::channel::<String>();
+pub(crate) async fn permission_status() -> Result<InboxNotificationPermissionStatus, String> {
+    let (sender, receiver) = oneshot::channel::<InboxNotificationPermissionStatus>();
     let sender = Cell::new(Some(sender));
     notification_center()?.getNotificationSettingsWithCompletionHandler(&RcBlock::new(
         move |settings: NonNull<UNNotificationSettings>| {
@@ -165,14 +169,16 @@ pub(crate) async fn permission_status() -> Result<String, String> {
             };
             let authorization = unsafe { settings.as_ref() }.authorizationStatus();
             let status = match authorization {
-                UNAuthorizationStatus::Denied => "denied",
+                UNAuthorizationStatus::Denied => InboxNotificationPermissionStatus::Denied,
                 UNAuthorizationStatus::Authorized
                 | UNAuthorizationStatus::Provisional
-                | UNAuthorizationStatus::Ephemeral => "authorized",
-                UNAuthorizationStatus::NotDetermined => "not_determined",
-                _ => "not_determined",
+                | UNAuthorizationStatus::Ephemeral => InboxNotificationPermissionStatus::Authorized,
+                UNAuthorizationStatus::NotDetermined => {
+                    InboxNotificationPermissionStatus::NotDetermined
+                }
+                _ => InboxNotificationPermissionStatus::Unsupported,
             };
-            let _ = sender.send(status.to_string());
+            let _ = sender.send(status);
         },
     ));
     receiver
@@ -225,7 +231,7 @@ mod tests {
             message_id: "issue:run-1".to_string(),
             project_id: "project-1".to_string(),
             target_id: "run-1".to_string(),
-            kind: "issue".to_string(),
+            kind: InboxNotificationKind::Issue,
             conversation_message_id: None,
             channel_message_id: None,
             root_message_id: None,
@@ -237,7 +243,7 @@ mod tests {
             message_id: "channel:reply-1".to_string(),
             project_id: "project-1".to_string(),
             target_id: "channel-1".to_string(),
-            kind: "channel".to_string(),
+            kind: InboxNotificationKind::Channel,
             conversation_message_id: None,
             channel_message_id: Some("reply-1".to_string()),
             root_message_id: Some("root-1".to_string()),

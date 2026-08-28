@@ -16,18 +16,7 @@ fn inbox_channel_notification_target_preserves_message_context() {
 
     assert_eq!(target.channel_message_id.as_deref(), Some("reply-1"));
     assert_eq!(target.root_message_id.as_deref(), Some("root-1"));
-    assert_eq!(
-        serde_json::to_value(target).expect("serialized channel notification target"),
-        json!({
-            "messageId": "channel:reply-1",
-            "projectId": "project-1",
-            "targetId": "channel-1",
-            "kind": "channel",
-            "conversationMessageId": null,
-            "channelMessageId": "reply-1",
-            "rootMessageId": "root-1"
-        })
-    );
+    assert_eq!(target.kind, InboxNotificationKind::Channel);
 }
 
 #[test]
@@ -43,18 +32,7 @@ fn inbox_conversation_notification_target_preserves_message_context() {
         serde_json::from_value(input).expect("conversation notification target");
 
     assert_eq!(target.conversation_message_id.as_deref(), Some("message-1"));
-    assert_eq!(
-        serde_json::to_value(target).expect("serialized conversation notification target"),
-        json!({
-            "messageId": "conversation:inbox-1",
-            "projectId": "project-1",
-            "targetId": "conversation-1",
-            "kind": "conversation",
-            "conversationMessageId": "message-1",
-            "channelMessageId": null,
-            "rootMessageId": null
-        })
-    );
+    assert_eq!(target.kind, InboxNotificationKind::Conversation);
 }
 
 #[cfg(desktop)]

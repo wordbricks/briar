@@ -154,13 +154,14 @@ pub(super) async fn request_inbox_notification_permission() -> Result<bool, Stri
 
 #[tauri::command]
 #[specta::specta]
-pub(super) async fn inbox_notification_permission_status() -> Result<String, String> {
+pub(super) async fn inbox_notification_permission_status(
+) -> Result<InboxNotificationPermissionStatus, String> {
     #[cfg(target_os = "macos")]
     {
         macos_inbox_notifications::permission_status().await
     }
     #[cfg(not(target_os = "macos"))]
-    Ok("unsupported".to_string())
+    Ok(InboxNotificationPermissionStatus::Unsupported)
 }
 
 #[tauri::command]
@@ -250,11 +251,11 @@ pub(super) fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
 #[specta::specta]
 pub(super) fn sync_status_tray(
     app: tauri::AppHandle,
-    snapshot: StatusTraySnapshotCommand,
+    snapshot: StatusTraySnapshot,
 ) -> Result<(), String> {
     #[cfg(all(desktop, target_os = "macos"))]
     {
-        status_tray::sync_snapshot(&app, snapshot.into())
+        status_tray::sync_snapshot(&app, snapshot)
     }
     #[cfg(not(all(desktop, target_os = "macos")))]
     {
@@ -263,58 +264,46 @@ pub(super) fn sync_status_tray(
     }
 }
 
-/// Command payload shared with the frontend; converted to the tray module type
-/// only on macOS desktop where the tray is installed.
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
+/// Canonical status tray snapshot shared by the frontend command and the
+/// macOS renderer.
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct StatusTraySnapshotCommand {
+pub(super) struct StatusTraySnapshot {
     pub(super) running_label: String,
     pub(super) empty_label: String,
     pub(super) open_label: String,
     pub(super) quit_label: String,
-    #[serde(default = "default_status_tray_more_label")]
     pub(super) more_label: String,
-    #[serde(default)]
-    pub(super) items: Vec<StatusTrayRunItemCommand>,
+    pub(super) items: Vec<StatusTrayRunItem>,
 }
 
-pub(super) fn default_status_tray_more_label() -> String {
+fn default_status_tray_more_label() -> String {
     "+{count} more in Briar".to_string()
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, specta::Type)]
+impl Default for StatusTraySnapshot {
+    fn default() -> Self {
+        Self {
+            running_label: "Running".to_string(),
+            empty_label: "No running issues".to_string(),
+            open_label: "Open Briar".to_string(),
+            quit_label: "Quit Briar".to_string(),
+            more_label: default_status_tray_more_label(),
+            items: Vec::new(),
+        }
+    }
+}
+
+#[derive(
+    Clone, Debug, Default, serde::Deserialize, serde::Serialize, specta::Type, PartialEq, Eq,
+)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct StatusTrayRunItemCommand {
+pub(super) struct StatusTrayRunItem {
     pub(super) project_id: String,
     pub(super) run_id: String,
     pub(super) title: String,
     pub(super) status_label: String,
-    #[serde(default)]
     pub(super) project_name: String,
-}
-
-#[cfg(all(desktop, target_os = "macos"))]
-impl From<StatusTraySnapshotCommand> for status_tray::StatusTraySnapshot {
-    fn from(value: StatusTraySnapshotCommand) -> Self {
-        Self {
-            running_label: value.running_label,
-            empty_label: value.empty_label,
-            open_label: value.open_label,
-            quit_label: value.quit_label,
-            more_label: value.more_label,
-            items: value
-                .items
-                .into_iter()
-                .map(|item| status_tray::StatusTrayRunItem {
-                    project_id: item.project_id,
-                    run_id: item.run_id,
-                    title: item.title,
-                    status_label: item.status_label,
-                    project_name: item.project_name,
-                })
-                .collect(),
-        }
-    }
 }
 
 #[tauri::command]

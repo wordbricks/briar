@@ -66,7 +66,7 @@ pub(crate) struct ProjectAutoHuntIssue {
     pub(crate) run_number: u64,
     pub(crate) source_key: String,
     pub(crate) title: String,
-    #[serde(default, alias = "description")]
+    #[serde(default)]
     pub(crate) issue_description: Option<String>,
     #[serde(default)]
     pub(crate) priority: Option<u8>,
@@ -75,7 +75,7 @@ pub(crate) struct ProjectAutoHuntIssue {
     pub(crate) context: Option<Value>,
     #[serde(default)]
     pub(crate) attachments: Vec<ProjectAutoHuntIssueAttachment>,
-    #[serde(default, alias = "messages")]
+    #[serde(default)]
     pub(crate) conversation: Vec<ProjectAutoHuntIssueMessage>,
 }
 

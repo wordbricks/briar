@@ -5,7 +5,7 @@ import {
   inboxDetailTargetAtom,
   selectedInboxMessageIdAtom,
 } from "../lib/inbox-selection";
-import type { InboxNotificationTarget } from "../lib/inbox-notifications";
+import type { InboxNotificationTarget } from "../generated/tauri";
 import { Inbox } from "./Inbox";
 
 export function InboxWithSelection(

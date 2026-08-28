@@ -2,10 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   listenToAutoHuntDispatchEvents,
   loadAutoHuntDispatch,
-  type AutoHuntDispatchEvent,
-  type AutoHuntDispatchGroup,
   type AutoHuntWorkerResult,
 } from "../lib/auto-hunt-agent";
+import type {
+  AutoHuntDispatchEvent,
+  AutoHuntDispatchGroup_Serialize,
+} from "../generated/tauri";
 import { stopProjectAgentSession } from "../lib/project-llm";
 import {
   cancelHuntRun,
@@ -154,7 +156,7 @@ function readSessions(): AutoHuntSession[] {
 }
 
 function outcomeForWorker(
-  status: AutoHuntDispatchGroup["workers"][number]["status"],
+  status: AutoHuntDispatchGroup_Serialize["workers"][number]["status"],
 ): AutoHuntSessionIssueOutcome {
   if (status === "completed" || status === "blocked" || status === "failed") {
     return status;
@@ -165,7 +167,7 @@ function outcomeForWorker(
 
 function reconcileDispatch(
   session: AutoHuntSession,
-  dispatch: AutoHuntDispatchGroup,
+  dispatch: AutoHuntDispatchGroup_Serialize,
 ): AutoHuntSession {
   const workers: AutoHuntWorkerResult[] = dispatch.workers.map((worker) => ({
     sessionId: worker.sessionId,
@@ -177,13 +179,15 @@ function reconcileDispatch(
       ? "cancelled"
       : outcomeForWorker(worker.status),
     summary: worker.summary ?? "",
-    evidence: dispatch.events
-      .filter((event) =>
-        event.runId === worker.runId &&
+    evidence: dispatch.events.flatMap((event) =>
+      event.runId === worker.runId &&
         event.type === "worker_evidence" &&
-        event.data
-      )
-      .map((event) => event.data!),
+        event.data &&
+        typeof event.data === "object" &&
+        !Array.isArray(event.data)
+        ? [event.data]
+        : []
+    ),
   }));
   return {
     ...session,

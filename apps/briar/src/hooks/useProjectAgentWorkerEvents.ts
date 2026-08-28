@@ -5,9 +5,9 @@ import {
 } from "../lib/api";
 import {
   mergeAutoHuntAppServerEvents,
-  type AutoHuntAgentEvent,
   type AutoHuntAppServerEvent,
 } from "../lib/auto-hunt-agent";
+import type { AgentEvent } from "../generated/tauri";
 
 const workerEventPollIntervalMs = 3_000;
 
@@ -150,7 +150,7 @@ function transcriptEvents(
 function normalizedAgentEvent(
   value: unknown,
   sessionId: string,
-): AutoHuntAgentEvent | undefined {
+): AgentEvent | undefined {
   const candidate = record(value);
   if (!candidate || typeof candidate.type !== "string") return undefined;
   if (

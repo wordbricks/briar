@@ -42,7 +42,7 @@ pub(super) fn write_cli_connection(
         CliConfig {
             api_url: api_url.clone(),
             user_token: None,
-            agent_providers: AppProviderSettings::default(),
+            agent_providers: StoredAppProviderSettings::default(),
             openrouter_api_key: None,
             app_settings: StoredAppRuntimeSettings::default(),
             projects: Vec::new(),
@@ -161,7 +161,7 @@ pub(super) fn read_cli_config(config_path: &Path) -> Result<CliConfig, String> {
         return Ok(CliConfig {
             api_url: String::new(),
             user_token: None,
-            agent_providers: AppProviderSettings::default(),
+            agent_providers: StoredAppProviderSettings::default(),
             openrouter_api_key: None,
             app_settings: StoredAppRuntimeSettings::default(),
             projects: Vec::new(),
@@ -673,7 +673,7 @@ pub(super) fn project_llm_settings_from(
 
 pub(super) fn app_provider_settings_from(
     config_path: &Path,
-) -> Result<AppProviderSettings, String> {
+) -> Result<StoredAppProviderSettings, String> {
     Ok(read_cli_config(config_path)?.agent_providers)
 }
 
@@ -763,8 +763,8 @@ pub(super) fn update_browser_automation_settings_at(
 
 pub(super) fn update_app_provider_settings_at(
     config_path: &Path,
-    settings: AppProviderSettings,
-) -> Result<AppProviderSettings, String> {
+    settings: StoredAppProviderSettings,
+) -> Result<StoredAppProviderSettings, String> {
     if !settings.any_enabled() {
         return Err("하나 이상의 에이전트 프로바이더를 활성화해야 합니다.".to_string());
     }

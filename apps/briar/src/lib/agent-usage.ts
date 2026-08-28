@@ -5,6 +5,7 @@ import {
 import {
   commands,
   type AgentProviderKind,
+  type AgentUsageSnapshot as NativeAgentUsageSnapshot,
   type AgentUsageWindow,
   type ProviderUsage,
 } from "../generated/tauri";
@@ -19,25 +20,8 @@ export const quotaUsageProviders = [
   "cursor",
 ] as const satisfies readonly AgentProviderKind[];
 
-/** Normalized app model shared by native reads, CLI probes, and local history. */
-export type AgentUsageProvider = Omit<
-  ProviderUsage,
-  "accountLabel" | "authenticated"
-> & {
-  accountLabel?: string | null;
-  authenticated?: boolean;
-};
-
-export type AgentUsageSnapshot = {
-  claude: AgentUsageProvider;
-  codex: AgentUsageProvider;
-  grok: AgentUsageProvider;
-  agy: AgentUsageProvider;
-  opencode: AgentUsageProvider;
-  openrouter: AgentUsageProvider;
-  cursor: AgentUsageProvider;
-  updatedAt: number;
-};
+export type AgentUsageProvider = ProviderUsage;
+export type AgentUsageSnapshot = NativeAgentUsageSnapshot;
 
 export function emptyUsageProvider(
   provider: AgentProviderKind,
@@ -49,6 +33,8 @@ export function emptyUsageProvider(
     weekly: null,
     monthly: null,
     planType: null,
+    accountLabel: null,
+    authenticated: false,
     updatedAt: 0,
     error: null,
   };
@@ -68,11 +54,7 @@ export async function loadAgentUsage(): Promise<AgentUsageSnapshot> {
   if (!isTauri()) {
     throw new Error("Agent usage is available in the Briar desktop app.");
   }
-  const snapshot = parseUsageSnapshot(await commands.loadAgentUsage());
-  if (!snapshot) {
-    throw new Error("The native agent usage response is invalid.");
-  }
-  return snapshot;
+  return commands.loadAgentUsage();
 }
 
 export async function openAgentProviderLogin(
@@ -96,43 +78,51 @@ function isQuotaUsageProvider(value: unknown): value is AgentProviderKind {
   );
 }
 
-function isUsageProvider(value: unknown): value is AgentUsageProvider {
-  if (!value || typeof value !== "object") return false;
+function usageProviderFrom(value: unknown): AgentUsageProvider | null {
+  if (!value || typeof value !== "object") return null;
   const provider = value as Partial<AgentUsageProvider>;
-  return (
-    isQuotaUsageProvider(provider.provider) &&
-    (provider.status === "ok" ||
-      provider.status === "error" ||
-      provider.status === "unavailable") &&
-    typeof provider.updatedAt === "number"
-  );
+  if (
+    !isQuotaUsageProvider(provider.provider) ||
+    (provider.status !== "ok" &&
+      provider.status !== "error" &&
+      provider.status !== "unavailable") ||
+    typeof provider.updatedAt !== "number"
+  ) {
+    return null;
+  }
+  return {
+    ...provider,
+    accountLabel: typeof provider.accountLabel === "string"
+      ? provider.accountLabel
+      : null,
+    authenticated: provider.authenticated === true,
+  } as AgentUsageProvider;
 }
 
 function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
   if (!value || typeof value !== "object") return null;
   const snapshot = value as Partial<AgentUsageSnapshot>;
+  const claude = usageProviderFrom(snapshot.claude);
+  const codex = usageProviderFrom(snapshot.codex);
+  const grok = usageProviderFrom(snapshot.grok);
   if (
     typeof snapshot.updatedAt !== "number" ||
-    !isUsageProvider(snapshot.claude) ||
-    !isUsageProvider(snapshot.codex) ||
-    !isUsageProvider(snapshot.grok)
+    !claude ||
+    !codex ||
+    !grok
   ) {
     return null;
   }
   return {
-    claude: snapshot.claude,
-    codex: snapshot.codex,
-    grok: snapshot.grok,
-    agy: isUsageProvider(snapshot.agy) ? snapshot.agy : emptyUsageProvider("agy"),
-    opencode: isUsageProvider(snapshot.opencode)
-      ? snapshot.opencode
-      : emptyUsageProvider("opencode"),
-    openrouter: isUsageProvider(snapshot.openrouter)
-      ? snapshot.openrouter
-      : emptyUsageProvider("openrouter"),
-    cursor: isUsageProvider(snapshot.cursor)
-      ? snapshot.cursor
-      : emptyUsageProvider("cursor"),
+    claude,
+    codex,
+    grok,
+    agy: usageProviderFrom(snapshot.agy) ?? emptyUsageProvider("agy"),
+    opencode: usageProviderFrom(snapshot.opencode) ??
+      emptyUsageProvider("opencode"),
+    openrouter: usageProviderFrom(snapshot.openrouter) ??
+      emptyUsageProvider("openrouter"),
+    cursor: usageProviderFrom(snapshot.cursor) ?? emptyUsageProvider("cursor"),
     updatedAt: snapshot.updatedAt,
   };
 }

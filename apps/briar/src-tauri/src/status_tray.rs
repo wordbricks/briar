@@ -4,7 +4,7 @@
 //! issues with their workflow stage / status. The frontend pushes the
 //! localized snapshot; this module only renders native menu chrome.
 
-use serde::{Deserialize, Serialize};
+use super::native_ui::{StatusTrayRunItem, StatusTraySnapshot};
 use std::sync::Mutex;
 use tauri::{
     image::Image,
@@ -26,48 +26,6 @@ const TRAY_ICON_SCALE: f64 = 1.8;
 // requested 1.8x, capped so the full silhouette still fits instead of cropping
 // into a square of inner lines.
 const TRAY_TEMPLATE_PNG: &[u8] = include_bytes!("../../src/assets/brand/briar-mark-dark.png");
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct StatusTrayRunItem {
-    pub project_id: String,
-    pub run_id: String,
-    pub title: String,
-    pub status_label: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub project_name: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct StatusTraySnapshot {
-    pub running_label: String,
-    pub empty_label: String,
-    pub open_label: String,
-    pub quit_label: String,
-    /// Localized overflow label with `{count}` placeholder for hidden runs.
-    #[serde(default = "default_more_label")]
-    pub more_label: String,
-    #[serde(default)]
-    pub items: Vec<StatusTrayRunItem>,
-}
-
-fn default_more_label() -> String {
-    "+{count} more in Briar".to_string()
-}
-
-impl Default for StatusTraySnapshot {
-    fn default() -> Self {
-        Self {
-            running_label: "Running".to_string(),
-            empty_label: "No running issues".to_string(),
-            open_label: "Open Briar".to_string(),
-            quit_label: "Quit Briar".to_string(),
-            more_label: default_more_label(),
-            items: Vec::new(),
-        }
-    }
-}
 
 pub struct StatusTrayState {
     snapshot: Mutex<StatusTraySnapshot>,

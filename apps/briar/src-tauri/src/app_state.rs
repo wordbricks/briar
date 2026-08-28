@@ -14,10 +14,31 @@ pub(super) struct InboxNotificationTarget {
     pub(super) message_id: String,
     pub(super) project_id: String,
     pub(super) target_id: String,
-    pub(super) kind: String,
+    pub(super) kind: InboxNotificationKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) conversation_message_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) channel_message_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) root_message_id: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum InboxNotificationKind {
+    Issue,
+    Conversation,
+    Session,
+    Channel,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum InboxNotificationPermissionStatus {
+    Authorized,
+    Denied,
+    NotDetermined,
+    Unsupported,
 }
 
 #[derive(Clone, Serialize, specta::Type, tauri_specta::Event)]
@@ -95,11 +116,7 @@ pub(super) struct CliProject {
 pub(super) struct AutoHuntConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) velen_org: Option<String>,
-    #[serde(
-        default,
-        alias = "velenDataSource",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) data_source: Option<String>,
     pub(super) linear_enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -465,12 +482,28 @@ pub(super) struct RepositoryReadiness {
     pub(super) issues: Vec<String>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum LovableStack {
+    TanstackStart,
+    ViteReact,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub(super) enum LovablePackageManager {
+    Bun,
+    Npm,
+    Pnpm,
+    Yarn,
+}
+
 #[derive(Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct LovableRepositoryCompatibility {
     pub(super) compatible: bool,
-    pub(super) stack: Option<String>,
-    pub(super) package_manager: Option<String>,
+    pub(super) stack: Option<LovableStack>,
+    pub(super) package_manager: Option<LovablePackageManager>,
     pub(super) scripts: Vec<String>,
     pub(super) issues: Vec<String>,
 }
@@ -520,7 +553,7 @@ pub(super) struct CliConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) user_token: Option<String>,
     #[serde(default)]
-    pub(super) agent_providers: AppProviderSettings,
+    pub(super) agent_providers: StoredAppProviderSettings,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) openrouter_api_key: Option<String>,
     #[serde(default)]
@@ -748,9 +781,9 @@ impl Drop for SleepPreventionState {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct AppProviderSettings {
+pub(super) struct StoredAppProviderSettings {
     #[serde(default = "enabled_by_default")]
     pub(super) codex: bool,
     #[serde(default = "enabled_by_default")]
@@ -773,7 +806,7 @@ pub(super) struct OpenRouterCredentialStatus {
     pub(super) configured: bool,
 }
 
-impl Default for AppProviderSettings {
+impl Default for StoredAppProviderSettings {
     fn default() -> Self {
         Self {
             codex: true,
@@ -787,7 +820,7 @@ impl Default for AppProviderSettings {
     }
 }
 
-impl AppProviderSettings {
+impl StoredAppProviderSettings {
     pub(super) fn is_enabled(self, provider: agent::AgentProviderKind) -> bool {
         match provider {
             agent::AgentProviderKind::Codex => self.codex,
@@ -808,6 +841,46 @@ impl AppProviderSettings {
             || self.agy
             || self.opencode
             || self.openrouter
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AppProviderSettings {
+    pub(super) codex: bool,
+    pub(super) claude: bool,
+    pub(super) cursor: bool,
+    pub(super) grok: bool,
+    pub(super) agy: bool,
+    pub(super) opencode: bool,
+    pub(super) openrouter: bool,
+}
+
+impl From<StoredAppProviderSettings> for AppProviderSettings {
+    fn from(settings: StoredAppProviderSettings) -> Self {
+        Self {
+            codex: settings.codex,
+            claude: settings.claude,
+            cursor: settings.cursor,
+            grok: settings.grok,
+            agy: settings.agy,
+            opencode: settings.opencode,
+            openrouter: settings.openrouter,
+        }
+    }
+}
+
+impl From<AppProviderSettings> for StoredAppProviderSettings {
+    fn from(settings: AppProviderSettings) -> Self {
+        Self {
+            codex: settings.codex,
+            claude: settings.claude,
+            cursor: settings.cursor,
+            grok: settings.grok,
+            agy: settings.agy,
+            opencode: settings.opencode,
+            openrouter: settings.openrouter,
+        }
     }
 }
 

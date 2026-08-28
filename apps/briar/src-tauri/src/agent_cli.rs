@@ -848,7 +848,7 @@ pub(super) fn load_agent_provider_models_sync(
 
 pub(super) fn connected_agent_provider(
     prerequisites: &OnboardingPrerequisites,
-    enabled: AppProviderSettings,
+    enabled: StoredAppProviderSettings,
 ) -> Result<agent::AgentProviderKind, String> {
     [
         (agent::AgentProviderKind::Codex, &prerequisites.codex),

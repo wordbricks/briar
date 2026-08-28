@@ -4,7 +4,12 @@ import {
   isDesktopTauri,
   isMacDesktopTauri,
 } from "./platform";
-import { commands, events } from "../generated/tauri";
+import {
+  commands,
+  events,
+  type InboxNotificationPermissionStatus,
+  type InboxNotificationTarget,
+} from "../generated/tauri";
 
 export const inboxNotificationCategories = [
   "urgent",
@@ -15,27 +20,10 @@ export const inboxNotificationCategories = [
 
 export type InboxNotificationPreferences = Record<InboxCategory, boolean>;
 
-export type InboxNotificationPermissionStatus =
-  | "authorized"
-  | "denied"
-  | "not_determined"
-  | "unsupported";
-
 const storageKey = "briar.settings.inbox-notifications.v1";
 const soundStorageKey = "briar.settings.inbox-notification-sound.v1";
 const targetStorageKey = "briar.inbox.notification-targets.v1";
 const browserOpenEvent = "briar:inbox-notification-open";
-
-export type InboxNotificationTarget = {
-  messageId: string;
-  projectId: string;
-  targetId: string;
-  kind: InboxMessage["kind"];
-  /** Actual IssueMessage.id; messageId remains the Inbox row id for read state. */
-  conversationMessageId?: string;
-  channelMessageId?: string;
-  rootMessageId?: string;
-};
 
 type StoredInboxNotificationTarget = InboxNotificationTarget & {
   storedAt: number;
@@ -165,22 +153,40 @@ export function isInboxChannelTarget(
   );
 }
 
-function isInboxNotificationTarget(
+function inboxNotificationTargetFrom(
   value: unknown,
-): value is InboxNotificationTarget {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+): InboxNotificationTarget | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const target = value as Partial<InboxNotificationTarget>;
-  return (
-    typeof target.messageId === "string" &&
-    typeof target.projectId === "string" &&
-    typeof target.targetId === "string" &&
-    (target.kind === "issue" ||
-      target.kind === "conversation" ||
-      target.kind === "session" ||
-      (target.kind === "channel" &&
-        typeof target.channelMessageId === "string" &&
-        typeof target.rootMessageId === "string"))
-  );
+  if (
+    typeof target.messageId !== "string" ||
+    typeof target.projectId !== "string" ||
+    typeof target.targetId !== "string" ||
+    (target.kind !== "issue" &&
+      target.kind !== "conversation" &&
+      target.kind !== "session" &&
+      target.kind !== "channel") ||
+    (target.kind === "channel" &&
+      (typeof target.channelMessageId !== "string" ||
+        typeof target.rootMessageId !== "string"))
+  ) {
+    return null;
+  }
+  return {
+    messageId: target.messageId,
+    projectId: target.projectId,
+    targetId: target.targetId,
+    kind: target.kind,
+    ...(typeof target.conversationMessageId === "string"
+      ? { conversationMessageId: target.conversationMessageId }
+      : {}),
+    ...(typeof target.channelMessageId === "string"
+      ? { channelMessageId: target.channelMessageId }
+      : {}),
+    ...(typeof target.rootMessageId === "string"
+      ? { rootMessageId: target.rootMessageId }
+      : {}),
+  };
 }
 
 type MacInboxNotificationBridge = {
@@ -198,8 +204,9 @@ export async function listenForMacInboxNotificationClicks(
     const next = drainQueue.catch(() => undefined).then(async () => {
       const pending = await bridge.drain();
       if (stopped || !Array.isArray(pending)) return;
-      for (const target of pending) {
-        if (isInboxNotificationTarget(target)) onOpen(target);
+      for (const candidate of pending) {
+        const target = inboxNotificationTargetFrom(candidate);
+        if (target) onOpen(target);
       }
     });
     drainQueue = next;
@@ -226,7 +233,7 @@ function inboxNotificationId(messageId: string) {
   return (hash >>> 0) & 0x7fff_ffff || 1;
 }
 
-function readStoredTargets(): Record<string, StoredInboxNotificationTarget> {
+function readStoredTargets() {
   if (typeof window === "undefined") return {};
   try {
     const value = JSON.parse(
@@ -234,11 +241,13 @@ function readStoredTargets(): Record<string, StoredInboxNotificationTarget> {
     );
     if (!value || typeof value !== "object" || Array.isArray(value)) return {};
     return Object.fromEntries(
-      Object.entries(value).filter(
-        (entry): entry is [string, StoredInboxNotificationTarget] =>
-          isInboxNotificationTarget(entry[1]) &&
-          typeof (entry[1] as StoredInboxNotificationTarget).storedAt === "number",
-      ),
+      Object.entries(value).flatMap(([id, candidate]) => {
+        const target = inboxNotificationTargetFrom(candidate);
+        const storedAt = (candidate as { storedAt?: unknown }).storedAt;
+        return target && typeof storedAt === "number"
+          ? [[id, { ...target, storedAt }] as const]
+          : [];
+      }),
     );
   } catch {
     return {};
@@ -269,7 +278,7 @@ function targetFromExtra(extra: unknown) {
   if (typeof serialized !== "string") return null;
   try {
     const target: unknown = JSON.parse(serialized);
-    return isInboxNotificationTarget(target) ? target : null;
+    return inboxNotificationTargetFrom(target);
   } catch {
     return null;
   }
@@ -290,21 +299,7 @@ export function targetFromNotificationAction(payload: unknown) {
     return null;
   }
   const stored = readStoredTargets()[String(notificationId)];
-  return stored && isInboxNotificationTarget(stored)
-    ? {
-        messageId: stored.messageId,
-        projectId: stored.projectId,
-        targetId: stored.targetId,
-        kind: stored.kind,
-        ...(stored.conversationMessageId
-          ? { conversationMessageId: stored.conversationMessageId }
-          : {}),
-        ...(stored.channelMessageId
-          ? { channelMessageId: stored.channelMessageId }
-          : {}),
-        ...(stored.rootMessageId ? { rootMessageId: stored.rootMessageId } : {}),
-      }
-    : null;
+  return stored ? inboxNotificationTargetFrom(stored) : null;
 }
 
 function dispatchBrowserNotificationOpen(target: InboxNotificationTarget) {
@@ -328,7 +323,8 @@ export async function listenForInboxNotificationClicks(
         });
       }
       return events.inboxNotificationOpen.listen(({ payload }) => {
-        if (isInboxNotificationTarget(payload)) onOpen(payload);
+        const target = inboxNotificationTargetFrom(payload);
+        if (target) onOpen(target);
       });
     }
 
@@ -341,8 +337,10 @@ export async function listenForInboxNotificationClicks(
   }
 
   const handleOpen = (event: Event) => {
-    const target = (event as CustomEvent<unknown>).detail;
-    if (isInboxNotificationTarget(target)) onOpen(target);
+    const target = inboxNotificationTargetFrom(
+      (event as CustomEvent<unknown>).detail,
+    );
+    if (target) onOpen(target);
   };
   window.addEventListener(browserOpenEvent, handleOpen);
   return () => window.removeEventListener(browserOpenEvent, handleOpen);
@@ -370,12 +368,7 @@ export async function readInboxNotificationPermissionStatus(): Promise<
   InboxNotificationPermissionStatus
 > {
   if (isMacDesktopTauri()) {
-    const status = await commands.inboxNotificationPermissionStatus();
-    return status === "authorized" ||
-        status === "denied" ||
-        status === "not_determined"
-      ? status
-      : "unsupported";
+    return commands.inboxNotificationPermissionStatus();
   }
 
   if (isTauriRuntime()) {
@@ -504,15 +497,7 @@ export async function sendInboxNotification(
       await commands.showInboxNotification(
         title,
         body,
-        {
-          messageId: target.messageId,
-          projectId: target.projectId,
-          targetId: target.targetId,
-          kind: target.kind,
-          conversationMessageId: target.conversationMessageId ?? null,
-          channelMessageId: target.channelMessageId ?? null,
-          rootMessageId: target.rootMessageId ?? null,
-        },
+        target,
         playSound,
       );
       return true;

@@ -1,9 +1,5 @@
 import type { AgentProvider } from "./agent-provider";
-import {
-  commands,
-  type OnboardingPrerequisites,
-  type OpenCodeTerminalPathStatus,
-} from "../generated/tauri";
+import { commands } from "../generated/tauri";
 
 export type PrerequisiteId = "git" | AgentProvider;
 

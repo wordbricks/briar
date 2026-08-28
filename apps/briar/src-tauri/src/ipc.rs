@@ -1,6 +1,11 @@
 use super::*;
 use tauri_specta::{collect_commands, collect_events, Builder, ErrorHandlingMode};
 
+/// JSON's recursive value shape for generated TypeScript contracts.
+///
+/// `Null(())` exports as the `null` literal, while Specta's default `f64`
+/// representation also includes `null`; the explicit number override keeps
+/// the generated union faithful to JSON.
 #[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
 #[serde(untagged)]
 pub(crate) enum JsonValue {
@@ -39,6 +44,8 @@ pub(crate) struct StatusTrayOpenRunPayload {
 pub(super) fn builder() -> Builder<tauri::Wry> {
     Builder::new()
         .error_handling(ErrorHandlingMode::Throw)
+        // Reachable 64-bit values are bounded counters and millisecond
+        // timestamps that remain within JavaScript's safe integer range.
         .dangerously_cast_bigints_to_number()
         .events(collect_events![
             agent::AppServerEventRecord,
@@ -142,7 +149,13 @@ mod tests {
             .expect("failed to export Tauri TypeScript bindings");
         let bindings = std::fs::read_to_string(path)
             .expect("failed to read generated Tauri TypeScript bindings");
-        std::fs::write(path, format!("{}\n", bindings.trim_end()))
+        let bindings = bindings
+            .trim_end()
+            .lines()
+            .map(str::trim_end)
+            .collect::<Vec<_>>()
+            .join("\n");
+        std::fs::write(path, format!("{bindings}\n"))
             .expect("failed to normalize generated Tauri TypeScript bindings");
     }
 

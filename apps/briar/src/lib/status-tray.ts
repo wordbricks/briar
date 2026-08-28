@@ -4,24 +4,9 @@ import {
   commands,
   events,
   type StatusTrayOpenRunPayload,
+  type StatusTrayRunItem,
+  type StatusTraySnapshot,
 } from "../generated/tauri";
-
-export type StatusTrayRunItem = {
-  projectId: string;
-  runId: string;
-  title: string;
-  statusLabel: string;
-  projectName: string;
-};
-
-export type StatusTraySnapshot = {
-  runningLabel: string;
-  emptyLabel: string;
-  openLabel: string;
-  quitLabel: string;
-  moreLabel: string;
-  items: StatusTrayRunItem[];
-};
 
 export function statusLabelForRun(
   run: StatusTrayRun,
@@ -95,15 +80,7 @@ export function listenForStatusTrayOpenRun(
     .then(() => {
       if (cancelled) return;
       return events.statusTrayOpenRun.listen((event) => {
-        const payload = event.payload;
-        if (
-          !payload ||
-          typeof payload.projectId !== "string" ||
-          typeof payload.runId !== "string"
-        ) {
-          return;
-        }
-        onOpen(payload);
+        onOpen(event.payload);
       });
     })
     .then((dispose) => {

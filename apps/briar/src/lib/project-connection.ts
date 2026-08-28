@@ -4,8 +4,6 @@ import {
   isRepositoryWorkflowPending,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import type { ProjectSettings } from "../types";
-import type { AgentProvider } from "./agent-provider";
 import { commands } from "../generated/tauri";
 
 export type LocalAutoHuntConfig = {

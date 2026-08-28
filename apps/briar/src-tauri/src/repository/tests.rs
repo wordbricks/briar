@@ -96,8 +96,11 @@ fn recognizes_standard_tanstack_start_lovable_repositories() {
     let compatibility = inspect_lovable_repository_compatibility_in(repository.path());
 
     assert!(compatibility.compatible, "{:?}", compatibility.issues);
-    assert_eq!(compatibility.stack.as_deref(), Some("tanstack-start"));
-    assert_eq!(compatibility.package_manager.as_deref(), Some("npm"));
+    assert_eq!(compatibility.stack, Some(LovableStack::TanstackStart));
+    assert_eq!(
+        compatibility.package_manager,
+        Some(LovablePackageManager::Npm)
+    );
     assert_eq!(compatibility.scripts, vec!["build", "dev", "lint", "test"]);
 }
 
@@ -123,8 +126,11 @@ fn recognizes_legacy_vite_lovable_repositories() {
     let compatibility = inspect_lovable_repository_compatibility_in(repository.path());
 
     assert!(compatibility.compatible, "{:?}", compatibility.issues);
-    assert_eq!(compatibility.stack.as_deref(), Some("vite-react"));
-    assert_eq!(compatibility.package_manager.as_deref(), Some("bun"));
+    assert_eq!(compatibility.stack, Some(LovableStack::ViteReact));
+    assert_eq!(
+        compatibility.package_manager,
+        Some(LovablePackageManager::Bun)
+    );
 }
 
 #[test]

@@ -186,7 +186,7 @@ fn selects_an_authenticated_llm_provider_for_repository_analysis() {
         provider_prerequisites((true, false), (true, true), (false, false), (false, false));
 
     assert_eq!(
-        connected_agent_provider(&prerequisites, AppProviderSettings::default())
+        connected_agent_provider(&prerequisites, StoredAppProviderSettings::default())
             .expect("Claude should be selected"),
         agent::AgentProviderKind::Claude
     );
@@ -200,7 +200,7 @@ fn skips_authenticated_llm_providers_disabled_in_app_settings() {
     assert_eq!(
         connected_agent_provider(
             &prerequisites,
-            AppProviderSettings {
+            StoredAppProviderSettings {
                 codex: false,
                 claude: true,
                 cursor: true,
@@ -221,7 +221,7 @@ fn selects_connected_opencode_for_repository_analysis() {
         provider_prerequisites((false, false), (false, false), (false, false), (true, true));
 
     assert_eq!(
-        connected_agent_provider(&prerequisites, AppProviderSettings::default())
+        connected_agent_provider(&prerequisites, StoredAppProviderSettings::default())
             .expect("OpenCode should be selected"),
         agent::AgentProviderKind::Opencode
     );
@@ -233,7 +233,7 @@ fn rejects_repository_analysis_without_a_connected_llm_provider() {
         provider_prerequisites((true, false), (false, false), (true, false), (false, false));
 
     assert!(
-        connected_agent_provider(&prerequisites, AppProviderSettings::default())
+        connected_agent_provider(&prerequisites, StoredAppProviderSettings::default())
             .expect_err("a connected provider should be required")
             .contains("연결된 LLM 프로바이더가 없습니다")
     );
