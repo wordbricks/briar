@@ -37,6 +37,9 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     "run_worker_first": [
+      // TODO: Replace this manually synchronized allowlist with routing
+      // derived from an Effect HTTP Router so new API routes cannot silently
+      // fall through to static assets.
       "/app",
       "/app/*",
       "/api/*",
@@ -48,6 +51,7 @@
       "/workers*",
       "/managed-computers*",
       "/worker-claims",
+      "/merge-batch-claims*",
       "/runs*",
       "/transcripts",
       "/issue-reply-claims*",
