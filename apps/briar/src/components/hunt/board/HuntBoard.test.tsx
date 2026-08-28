@@ -203,7 +203,13 @@ describe("HuntBoard", () => {
     await act(async () => statusFilter?.click());
     const completedFilter = Array.from(document.body.querySelectorAll<HTMLElement>(".issue-property-filter-choice")).find(item => item.textContent?.includes("완료"));
     expect(completedFilter).toBeTruthy();
+    expect(completedFilter?.getAttribute("data-state")).toBe("unchecked");
+    expect(completedFilter?.querySelector(".issue-property-filter-check")).toBeNull();
+    expect(completedFilter?.querySelector(":scope > .issue-property-filter-choice-label")?.textContent).toBe("완료");
     await act(async () => completedFilter?.click());
+    expect(completedFilter?.getAttribute("data-state")).toBe("checked");
+    expect(completedFilter?.querySelector(".issue-property-filter-check")).not.toBeNull();
+    expect(completedFilter?.querySelector(":scope > .issue-property-filter-choice-label")?.textContent).toBe("완료");
     expect(container.querySelectorAll(".kanban-card")).toHaveLength(1);
     expect(container.textContent).toContain("D1 작업 이벤트 스키마 추가");
     expect(trigger?.textContent).toContain("1");
