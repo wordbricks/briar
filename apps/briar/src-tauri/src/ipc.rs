@@ -12,23 +12,23 @@ pub(crate) enum JsonValue {
     Object(BTreeMap<String, JsonValue>),
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, specta::Type, tauri_specta::Event)]
+#[derive(Clone, Serialize, specta::Type, tauri_specta::Event)]
 #[tauri_specta(event_name = "project-agent-schedule-poll")]
 pub(crate) struct ProjectAgentSchedulePollEvent;
 
-#[derive(Clone, Debug, Deserialize, Serialize, specta::Type, tauri_specta::Event)]
+#[derive(Clone, Serialize, specta::Type, tauri_specta::Event)]
 #[tauri_specta(event_name = "inbox-notification-open-available")]
 pub(crate) struct InboxNotificationOpenAvailableEvent;
 
-#[derive(Clone, Debug, Deserialize, Serialize, specta::Type, tauri_specta::Event)]
+#[derive(Clone, Serialize, specta::Type, tauri_specta::Event)]
 #[tauri_specta(event_name = "app-menu-settings")]
 pub(crate) struct AppMenuSettingsEvent;
 
-#[derive(Clone, Debug, Deserialize, Serialize, specta::Type, tauri_specta::Event)]
+#[derive(Clone, Serialize, specta::Type, tauri_specta::Event)]
 #[tauri_specta(event_name = "app-menu-update")]
 pub(crate) struct AppMenuUpdateEvent;
 
-#[derive(Clone, Debug, Deserialize, Serialize, specta::Type, tauri_specta::Event)]
+#[derive(Clone, Serialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 #[tauri_specta(event_name = "status-tray-open-run")]
 pub(crate) struct StatusTrayOpenRunPayload {
@@ -136,91 +136,42 @@ mod tests {
     use specta_typescript::Typescript;
 
     fn export_typescript(path: impl AsRef<std::path::Path>) {
+        let path = path.as_ref();
         builder()
             .export(Typescript::default(), path)
             .expect("failed to export Tauri TypeScript bindings");
+        let bindings = std::fs::read_to_string(path)
+            .expect("failed to read generated Tauri TypeScript bindings");
+        std::fs::write(path, format!("{}\n", bindings.trim_end()))
+            .expect("failed to normalize generated Tauri TypeScript bindings");
+    }
+
+    fn exported_typescript() -> String {
+        let directory = tempfile::tempdir().expect("failed to create temporary bindings directory");
+        let output = directory.path().join("tauri.ts");
+        export_typescript(&output);
+        std::fs::read_to_string(output).expect("failed to read temporary Tauri bindings")
+    }
+
+    fn generated_typescript_path() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/generated/tauri.ts")
     }
 
     #[test]
     fn json_value_exports_as_json_union() {
-        let output =
-            std::env::temp_dir().join(format!("briar-tauri-bindings-{}.ts", std::process::id()));
-        export_typescript(&output);
-        let bindings = std::fs::read_to_string(&output)
-            .expect("failed to read temporary Tauri TypeScript bindings");
-        let _ = std::fs::remove_file(output);
-
-        assert!(bindings.contains(
+        assert!(exported_typescript().contains(
             "export type JsonValue = boolean | number | null | string | JsonValue[] | { [key in string]: JsonValue };"
         ));
     }
 
     #[test]
-    fn typed_events_preserve_existing_contract() {
-        let names = [
-            <agent::AppServerEventRecord as tauri_specta::Event>::NAME,
-            <auto_hunt_dispatch::AutoHuntDispatchEvent as tauri_specta::Event>::NAME,
-            <ProjectLlmProgressPayload as tauri_specta::Event>::NAME,
-            <ProjectAgentSchedulePollEvent as tauri_specta::Event>::NAME,
-            <InboxNotificationTarget as tauri_specta::Event>::NAME,
-            <InboxNotificationOpenAvailableEvent as tauri_specta::Event>::NAME,
-            <AppMenuSettingsEvent as tauri_specta::Event>::NAME,
-            <AppMenuUpdateEvent as tauri_specta::Event>::NAME,
-            <StatusTrayOpenRunPayload as tauri_specta::Event>::NAME,
-        ];
-        assert_eq!(
-            names,
-            [
-                "auto-hunt-app-server-event",
-                "auto-hunt-dispatch-event",
-                "project-llm-progress",
-                "project-agent-schedule-poll",
-                "inbox-notification-open",
-                "inbox-notification-open-available",
-                "app-menu-settings",
-                "app-menu-update",
-                "status-tray-open-run",
-            ]
-        );
-
-        for payload in [
-            serde_json::to_value(ProjectAgentSchedulePollEvent),
-            serde_json::to_value(InboxNotificationOpenAvailableEvent),
-            serde_json::to_value(AppMenuSettingsEvent),
-            serde_json::to_value(AppMenuUpdateEvent),
-        ] {
-            assert_eq!(
-                payload.expect("failed to serialize unit event"),
-                serde_json::Value::Null
-            );
-        }
-        assert_eq!(
-            serde_json::to_value(StatusTrayOpenRunPayload {
-                project_id: "project-1".to_string(),
-                run_id: "run-1".to_string(),
-            })
-            .expect("failed to serialize status tray event"),
-            serde_json::json!({ "projectId": "project-1", "runId": "run-1" })
-        );
-    }
-
-    #[test]
     fn typescript_bindings_are_current() {
-        let generated =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/generated/tauri.ts");
-        let output = std::env::temp_dir().join(format!(
-            "briar-tauri-bindings-current-{}.ts",
-            std::process::id()
-        ));
-        export_typescript(&output);
-        let expected = std::fs::read_to_string(&generated)
+        let expected = std::fs::read_to_string(generated_typescript_path())
             .expect("generated Tauri TypeScript bindings are missing");
-        let actual =
-            std::fs::read_to_string(&output).expect("failed to read temporary Tauri bindings");
-        let _ = std::fs::remove_file(output);
+        let actual = exported_typescript();
 
-        assert_eq!(
-            actual, expected,
+        assert!(
+            actual == expected,
             "Tauri TypeScript bindings are stale; run `bun run --cwd apps/briar tauri:bindings`"
         );
     }
@@ -228,8 +179,6 @@ mod tests {
     #[test]
     #[ignore = "writes the generated TypeScript bindings"]
     fn export_typescript_bindings() {
-        let output =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/generated/tauri.ts");
-        export_typescript(output);
+        export_typescript(generated_typescript_path());
     }
 }

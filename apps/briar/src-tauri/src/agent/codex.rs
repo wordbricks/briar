@@ -139,7 +139,7 @@ pub(crate) enum ProjectAgentRunAction {
     CallHostTool,
 }
 
-#[derive(Debug, Deserialize, specta::Type)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ProjectAgentRunDecision {
     action: ProjectAgentRunAction,
@@ -150,11 +150,10 @@ struct ProjectAgentRunDecision {
     tool_call: Option<ProjectAgentHostToolCall>,
 }
 
-#[derive(Debug, Deserialize, specta::Type)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ProjectAgentHostToolCall {
     name: String,
-    #[specta(type = crate::ipc::JsonValue)]
     arguments: Value,
 }
 
@@ -622,7 +621,7 @@ pub(crate) struct ProjectAutoHuntWorkerResponse {
     pub(crate) evidence: Vec<Value>,
 }
 
-#[derive(Debug, Deserialize, specta::Type)]
+#[derive(Debug, Deserialize)]
 struct AutoHuntCoordinatorSummary {
     summary: String,
 }

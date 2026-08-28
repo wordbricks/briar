@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Deserialize, Serialize, specta::Type)]
+#[derive(Deserialize, Serialize)]
 pub(super) struct StoredSession {
     pub(super) token: String,
 }
@@ -20,7 +20,7 @@ pub(super) struct InboxNotificationTarget {
     pub(super) root_message_id: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, specta::Type, tauri_specta::Event)]
+#[derive(Clone, Serialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 #[tauri_specta(event_name = "project-llm-progress")]
 pub(super) struct ProjectLlmProgressPayload {
@@ -70,7 +70,7 @@ impl ExitConfirmationState {
     }
 }
 
-#[derive(Deserialize, Serialize, specta::Type)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct CliProject {
     pub(super) id: String,
@@ -87,7 +87,6 @@ pub(super) struct CliProject {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) auto_hunt: Option<StoredAutoHuntConfig>,
     #[serde(flatten)]
-    #[specta(type = BTreeMap<String, crate::ipc::JsonValue>)]
     pub(super) extra: BTreeMap<String, serde_json::Value>,
 }
 
@@ -226,7 +225,7 @@ pub(super) fn repository_workflow_bootstrap() -> WorkflowConfig {
     }
 }
 
-#[derive(Default, Deserialize, Serialize, specta::Type)]
+#[derive(Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct StoredAutoHuntConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -244,19 +243,17 @@ pub(super) struct StoredAutoHuntConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) sandbox: Option<StoredSandboxConfig>,
     #[serde(flatten)]
-    #[specta(type = BTreeMap<String, crate::ipc::JsonValue>)]
     pub(super) extra: BTreeMap<String, serde_json::Value>,
 }
 
 /// Auto Hunt filesystem access. Full access is the default; an explicit
 /// `fullAccess: false` confines writes to the checkout and worktree root.
-#[derive(Clone, Default, Deserialize, Serialize, specta::Type)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct StoredSandboxConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) full_access: Option<bool>,
     #[serde(flatten)]
-    #[specta(type = BTreeMap<String, crate::ipc::JsonValue>)]
     pub(super) extra: BTreeMap<String, serde_json::Value>,
 }
 
@@ -275,7 +272,7 @@ impl Default for ProjectSandboxSettings {
 /// Per-issue worktree settings owned by the CLI (`briar project configure`).
 /// The app only reads them, to learn which directory agents must be able to
 /// write in.
-#[derive(Clone, Deserialize, Serialize, specta::Type)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct StoredWorktreeConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -285,11 +282,10 @@ pub(super) struct StoredWorktreeConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) branch_prefix: Option<String>,
     #[serde(flatten)]
-    #[specta(type = BTreeMap<String, crate::ipc::JsonValue>)]
     pub(super) extra: BTreeMap<String, serde_json::Value>,
 }
 
-#[derive(Clone, Deserialize, Serialize, specta::Type)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct StoredLinearConfig {
     pub(super) enabled: bool,
@@ -298,7 +294,6 @@ pub(super) struct StoredLinearConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) team_key: Option<String>,
     #[serde(flatten)]
-    #[specta(type = BTreeMap<String, crate::ipc::JsonValue>)]
     pub(super) extra: BTreeMap<String, serde_json::Value>,
 }
 
@@ -518,7 +513,7 @@ pub(super) struct WorkflowRequirementHealth {
     pub(super) detail: String,
 }
 
-#[derive(Deserialize, Serialize, specta::Type)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct CliConfig {
     pub(super) api_url: String,
@@ -533,11 +528,10 @@ pub(super) struct CliConfig {
     #[serde(default)]
     pub(super) projects: Vec<CliProject>,
     #[serde(flatten)]
-    #[specta(type = BTreeMap<String, crate::ipc::JsonValue>)]
     pub(super) extra: BTreeMap<String, serde_json::Value>,
 }
 
-#[derive(Deserialize, specta::Type)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct StoredExecutionWorker {
     pub(super) worker_id: String,
@@ -559,7 +553,7 @@ pub(super) struct LocalExecutionWorkerStatus {
     pub(super) max_concurrent_sessions: Option<u32>,
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, specta::Type)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct StoredAppRuntimeSettings {
     #[serde(default)]

@@ -74,7 +74,7 @@ pub(crate) struct AgentUsageSnapshot {
     updated_at: u64,
 }
 
-#[derive(Deserialize, specta::Type)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CodexRateLimitWindow {
     used_percent: Option<f64>,
@@ -83,13 +83,13 @@ struct CodexRateLimitWindow {
     resets_at: Option<u64>,
 }
 
-#[derive(Deserialize, specta::Type)]
+#[derive(Deserialize)]
 struct ClaudeCredentials {
     #[serde(rename = "claudeAiOauth")]
     oauth: Option<ClaudeOauthCredentials>,
 }
 
-#[derive(Deserialize, specta::Type)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ClaudeOauthCredentials {
     access_token: Option<String>,
@@ -106,17 +106,16 @@ struct ClaudeAccountCredentials {
     plan_type: Option<String>,
 }
 
-#[derive(Deserialize, specta::Type)]
+#[derive(Deserialize)]
 struct ClaudeUsageResponse {
     five_hour: Option<ClaudeUsageWindow>,
     seven_day: Option<ClaudeUsageWindow>,
 }
 
-#[derive(Deserialize, specta::Type)]
+#[derive(Deserialize)]
 struct ClaudeUsageWindow {
     utilization: Option<f64>,
     used_percentage: Option<f64>,
-    #[specta(type = Option<crate::ipc::JsonValue>)]
     resets_at: Option<Value>,
 }
 
@@ -128,7 +127,7 @@ struct GrokAuthSession {
     account_label: Option<String>,
 }
 
-#[derive(Deserialize, specta::Type)]
+#[derive(Deserialize)]
 struct GrokAuthEntry {
     key: Option<String>,
     user_id: Option<String>,
@@ -138,7 +137,7 @@ struct GrokAuthEntry {
     team_id: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, specta::Type)]
+#[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GrokBillingConfig {
     credit_usage_percent: Option<f64>,
@@ -150,7 +149,7 @@ struct GrokBillingConfig {
     used: Option<GrokMoneyValue>,
 }
 
-#[derive(Clone, Debug, Deserialize, specta::Type)]
+#[derive(Clone, Debug, Deserialize)]
 struct GrokUsagePeriod {
     #[serde(rename = "type")]
     kind: Option<String>,
@@ -158,9 +157,8 @@ struct GrokUsagePeriod {
     end: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, specta::Type)]
+#[derive(Clone, Debug, Deserialize)]
 struct GrokMoneyValue {
-    #[specta(type = Option<crate::ipc::JsonValue>)]
     val: Option<Value>,
 }
 

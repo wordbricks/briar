@@ -27,7 +27,7 @@ const TRAY_ICON_SCALE: f64 = 1.8;
 // into a square of inner lines.
 const TRAY_TEMPLATE_PNG: &[u8] = include_bytes!("../../src/assets/brand/briar-mark-dark.png");
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq, specta::Type)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusTrayRunItem {
     pub project_id: String,
@@ -38,7 +38,7 @@ pub struct StatusTrayRunItem {
     pub project_name: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, specta::Type)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusTraySnapshot {
     pub running_label: String,

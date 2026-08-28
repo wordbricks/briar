@@ -21,7 +21,7 @@ pub(crate) struct PlannedUpdateAgentRecovery {
     pub(crate) request: ProjectAgentRunRequest,
 }
 
-#[derive(Debug, Deserialize, Serialize, specta::Type)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PlannedUpdateMarker {
     version: u8,

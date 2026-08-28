@@ -107,7 +107,7 @@ impl AgentProviderKind {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, specta::Type)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum AgentEventDirection {
     Client,
@@ -184,7 +184,7 @@ pub(crate) struct AgentProviderEvent {
 pub(crate) type AgentEventSink =
     Arc<dyn Fn(AgentProviderEvent) -> Result<(), String> + Send + Sync>;
 
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, specta::Type)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum SandboxMode {
     ReadOnly,

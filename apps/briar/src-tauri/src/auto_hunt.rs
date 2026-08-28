@@ -1,7 +1,7 @@
 use super::*;
 use tauri_specta::Event as _;
 
-#[derive(Debug, Deserialize, specta::Type)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct CliClaimResponse {
     pub(super) work: Option<CliClaimedRun>,
@@ -9,7 +9,7 @@ pub(super) struct CliClaimResponse {
     pub(super) workspace_error: Option<String>,
 }
 
-#[derive(Debug, Deserialize, specta::Type)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct CliClaimedRun {
     pub(super) run_id: String,
@@ -21,19 +21,17 @@ pub(super) struct CliClaimedRun {
     #[serde(default)]
     pub(super) priority: Option<u8>,
     #[serde(default)]
-    #[specta(type = Option<crate::ipc::JsonValue>)]
     pub(super) context: Option<serde_json::Value>,
     #[serde(default)]
     pub(super) attachments: Vec<agent::ProjectAutoHuntIssueAttachment>,
     #[serde(default)]
     pub(super) messages: Vec<agent::ProjectAutoHuntIssueMessage>,
-    #[specta(type = crate::ipc::JsonValue)]
     pub(super) workflow: serde_json::Value,
     #[serde(default)]
     pub(super) workspace: Option<CliClaimedWorkspace>,
 }
 
-#[derive(Debug, Deserialize, specta::Type)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct CliClaimedWorkspace {
     #[serde(rename = "type")]
@@ -41,10 +39,9 @@ pub(super) struct CliClaimedWorkspace {
     pub(super) path: String,
 }
 
-#[derive(Debug, Deserialize, specta::Type)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct CliRunEvidenceResponse {
-    #[specta(type = Vec<crate::ipc::JsonValue>)]
     pub(super) evidence: Vec<serde_json::Value>,
 }
 
