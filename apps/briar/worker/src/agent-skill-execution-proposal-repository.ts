@@ -339,7 +339,7 @@ export async function acceptConversationAgentSkillExecutionProposal(
               proposal.provider, proposal.model, proposal.effort,
               proposal.request, source.session_id, proposal.reply_message_id,
               proposal.thread_root_message_id, proposal.result_message_id,
-              proposal.provider, worker.device_id, proposal.id,
+              session.provider, worker.device_id, proposal.id,
               proposal.accepted_at, proposal.accepted_at
        from briar_agent_skill_execution_proposals proposal
        join briar_channel_agent_reply_jobs source

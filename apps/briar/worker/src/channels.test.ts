@@ -3320,10 +3320,12 @@ describe("organization channels", () => {
         name: "Direct response",
         description: "Use for direct questions that need a concise answer.",
         body: "Reply concisely.",
-        provider: "claude",
-        model: null,
-        effort: null,
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        effort: "high",
         kind: "custom",
+        executionMode: "conversation",
+        approvalPolicy: "explicit",
         position: 0,
       }],
       createdAt: at(20),
@@ -3588,10 +3590,20 @@ describe("organization channels", () => {
     expect(selectedSkillMessage.status).toBe(201);
     const selectedSkillBody = await selectedSkillMessage.json() as {
       message: { mentionedAgentIds: string[] };
-      agentReplies: Array<{ id: string; agentId: string }>;
+      agentReplies: Array<{
+        id: string;
+        agentId: string;
+        status: string;
+        error: string | null;
+      }>;
     };
     expect(selectedSkillBody.message.mentionedAgentIds).toEqual([]);
     expect(selectedSkillBody.agentReplies).toHaveLength(1);
+    expect(selectedSkillBody.agentReplies[0]).toMatchObject({
+      agentId,
+      status: "queued",
+      error: null,
+    });
     await expect(getChannelAgentReplyJob(
       db,
       organizationId,

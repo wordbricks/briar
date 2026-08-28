@@ -370,7 +370,6 @@ export async function handleChannelMessageRoute(
         const selectedSkill = selectedSkillTarget?.agent.id === agent.id
           ? selectedSkillTarget.skill
           : null;
-        const replyRuntime = selectedSkill ?? agent;
         const retainedSession = await getChannelReplySessionForThread(db, {
           channelId: channel.id,
           threadRootMessageId: input.parentMessageId ?? messageId,
@@ -380,6 +379,9 @@ export async function handleChannelMessageRoute(
             retainedSession.retained_until > createdAt
           ? retainedSession
           : null;
+        const replyRuntime = selectedSkill?.execution_mode === "conversation"
+          ? liveSession ?? agent
+          : selectedSkill ?? agent;
         const assignedWorkerId = liveSession
           ? liveSession.owner_worker_id
           : agent.designated_worker_id;

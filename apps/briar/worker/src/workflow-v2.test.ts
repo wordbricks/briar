@@ -195,6 +195,9 @@ describe("workflow v2 D1 persistence and transitions", () => {
         // 0140 extends the Agent Skill approval tables and result projections
         // deliberately excluded from this historical workflow fixture.
         "0140_agent_skill_execution_modes.sql",
+        // 0143 replaces the Agent Skill approval trigger and therefore
+        // depends on the approval tables deliberately excluded above.
+        "0143_conversation_skill_session_runtime.sql",
       ],
     });
 
