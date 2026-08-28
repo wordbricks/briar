@@ -145,6 +145,29 @@ Android regression build before release. Do not delete the Tauri iOS source
 until the configured retention version has shipped and the rollback window has
 been closed in a separate reviewed change.
 
+## 2026-08-28 — 1.2.168 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.168`
+- App Store Connect build: `1`
+- App Store Connect build ID: `b89eeb18-97b3-439b-82ec-43eaf6dce255`
+- Latest main commit: `90ac23d23471d5d9dadeb1cb868c62ca87acf05a`
+- Release source commit: `90ac23d23471d5d9dadeb1cb868c62ca87acf05a`
+- Implementation: Tauri
+- Toolchain: Xcode 26.6, iOS 26.5 SDK, Tauri CLI 2.11.4
+- Minimum iOS version: 14.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Automatic tester notification: enabled
+- IPA SHA-256: `389474240eb2e52ee023a8c455d50b4dd370988b9d423d109a54daa5d05db00d`
+
+The release passed the shared API contract, Swift unit/UI tests, iPhone and
+iPad accessibility/layout checks, Production analyze/build, session/download/
+log security checks, and Tauri iOS/Android regression builds. The archive
+identity, App Store provisioning, distribution signature, and production
+entitlements were independently verified before upload. App Store Connect
+reported the minimum iOS 14.0 setting as a future Spring 2027 upload warning.
+
 ## 2026-08-24 — 1.2.154 (1)
 
 - App: Briar Companion (`app.briar.companion`)
