@@ -1,5 +1,7 @@
 import * as Schema from "effect/Schema";
-import { MERGE_GROUP_CI_CONTEXTS } from "../../src/lib/merge-group-validation-contract";
+import {
+  MERGE_QUEUE_VALIDATION_CONTEXT,
+} from "../../src/lib/merge-queue-validation-contract";
 import {
   integerBetween,
   mutableArray,
@@ -12,7 +14,7 @@ import { decodeRequestSync } from "./request-schema";
 const GitObjectId = Schema.String.check(
   Schema.isPattern(/^[0-9a-f]{40}$/u),
 );
-const MergeGroupContext = Schema.Literals(MERGE_GROUP_CI_CONTEXTS);
+const MergeGroupContext = Schema.Literal(MERGE_QUEUE_VALIDATION_CONTEXT);
 
 export const MergeQueueProfileUpdate = strictSchema(Schema.Struct({
   enabled: Schema.Boolean,
@@ -74,10 +76,7 @@ export const MergeBatchValidationInput = strictSchema(Schema.Struct({
   ...MergeBatchClaimIdentity,
   mergeGroupSha: GitObjectId,
   validationResults: mutableArray(MergeBatchValidationResult).check(
-    Schema.isLengthBetween(
-      MERGE_GROUP_CI_CONTEXTS.length,
-      MERGE_GROUP_CI_CONTEXTS.length,
-    ),
+    Schema.isLengthBetween(1, 1),
   ),
 }));
 

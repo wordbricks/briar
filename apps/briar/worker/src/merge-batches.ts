@@ -1,7 +1,6 @@
 import {
-  MERGE_GROUP_CI_CONTEXTS,
-  type MergeGroupCiContext,
-} from "../../src/lib/merge-group-validation-contract";
+  MERGE_QUEUE_VALIDATION_CONTEXT,
+} from "../../src/lib/merge-queue-validation-contract";
 
 export const DEFAULT_MERGE_BATCH_QUIET_WINDOW_MS = 5 * 60_000;
 export const MAX_MERGE_BATCH_SIZE = 5;
@@ -32,6 +31,7 @@ export type MergeBatchRow = {
   merge_group_ref: string | null;
   merge_group_sha: string | null;
   merge_group_base_sha: string | null;
+  validation_commands_json: string;
   validation_results_json: string | null;
   validated_at: string | null;
   published_at: string | null;
@@ -126,7 +126,7 @@ export type MergeQueueAuthorityEntry = {
 };
 
 export type MergeBatchValidationResult = {
-  context: MergeGroupCiContext;
+  context: typeof MERGE_QUEUE_VALIDATION_CONTEXT;
   passed: boolean;
   exitCode: number;
   failureCode: "ci_failed" | "output_limit" | null;
@@ -147,7 +147,7 @@ const liveLeaseFence = `
   and claim_token_hash = ? and lease_expires_at > ?`;
 
 function validationProofPassed(results: readonly unknown[]) {
-  if (results.length !== MERGE_GROUP_CI_CONTEXTS.length) return null;
+  if (results.length !== 1) return null;
   const contexts = new Set<string>();
   let allPassed = true;
   for (const result of results) {
@@ -173,8 +173,7 @@ function validationProofPassed(results: readonly unknown[]) {
     if (!result.passed) allPassed = false;
   }
   if (
-    contexts.size !== results.length ||
-    !MERGE_GROUP_CI_CONTEXTS.every((context) => contexts.has(context))
+    contexts.size !== 1 || !contexts.has(MERGE_QUEUE_VALIDATION_CONTEXT)
   ) return null;
   return allPassed;
 }
@@ -435,7 +434,8 @@ async function ensureCollectingBatch(
   const lane = await db.prepare(
     `select candidate.project_id, candidate.repository_id,
             candidate.repository, candidate.base_branch,
-            candidate.ready_at, profile.quiet_window_ms
+            candidate.ready_at, profile.quiet_window_ms,
+            profile.validation_commands_json
      from briar_merge_batch_candidates candidate
      join briar_merge_queue_profiles profile
        on profile.project_id = candidate.project_id
@@ -464,6 +464,7 @@ async function ensureCollectingBatch(
     base_branch: string;
     ready_at: string;
     quiet_window_ms: number;
+    validation_commands_json: string;
   }>();
   if (!lane) return null;
 
@@ -472,8 +473,8 @@ async function ensureCollectingBatch(
   await db.prepare(
     `insert or ignore into briar_merge_batches (
        id, project_id, repository_id, repository, base_branch, state,
-       quiet_until, created_at, updated_at
-     ) values (?, ?, ?, ?, ?, 'collecting', ?, ?, ?)`,
+       quiet_until, validation_commands_json, created_at, updated_at
+     ) values (?, ?, ?, ?, ?, 'collecting', ?, ?, ?, ?)`,
   ).bind(
     id,
     lane.project_id,
@@ -481,6 +482,7 @@ async function ensureCollectingBatch(
     lane.repository,
     lane.base_branch,
     quietUntil,
+    lane.validation_commands_json,
     observedAt,
     observedAt,
   ).run();
@@ -1605,7 +1607,7 @@ export async function recordMergeBatchValidationProof(
 ) {
   const allPassed = validationProofPassed(input.validationResults);
   if (allPassed === null) return null;
-  const canonicalResults = MERGE_GROUP_CI_CONTEXTS.map((context) =>
+  const canonicalResults = [MERGE_QUEUE_VALIDATION_CONTEXT].map((context) =>
     input.validationResults.find((result) =>
       typeof result === "object" && result !== null &&
       "context" in result && result.context === context

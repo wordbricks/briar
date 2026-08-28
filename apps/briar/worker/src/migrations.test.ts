@@ -23,6 +23,73 @@ import {
   executeD1Sql,
 } from "./test-helpers/d1";
 
+it("disables legacy merge queues until repository validation is configured", async () => {
+  const miniflare = new Miniflare({
+    modules: true,
+    script: "export default { fetch() { return new Response('ok') } }",
+    d1Databases: { DB: "merge-queue-validation-migration" },
+  });
+  try {
+    const db = (await miniflare.getD1Database("DB")) as unknown as D1Database;
+    await applyD1Migrations(db, {
+      through: "0141_agent_designated_workers.sql",
+    });
+    const now = "2026-08-28T00:00:00.000Z";
+    await executeD1Sql(db, `
+      insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
+      values ('queue-migration-owner', 'Owner', 'queue-migration@example.com',
+              1, '${now}', '${now}');
+      insert into briar_organizations (
+        id, name, handle, created_at, updated_at
+      ) values (
+        'queue-migration-org', 'Queue Migration', 'queue-migration',
+        '${now}', '${now}'
+      );
+      insert into briar_projects (
+        id, owner_user_id, organization_id, name, agent_token_hash,
+        created_at, updated_at
+      ) values (
+        'queue-migration-project', 'queue-migration-owner',
+        'queue-migration-org', 'Queue Migration', '${"a".repeat(64)}',
+        '${now}', '${now}'
+      );
+      insert into briar_merge_queue_profiles (
+        project_id, repository_id, repository, base_branch, enabled,
+        quiet_window_ms, max_batch_size, created_at, updated_at,
+        readiness_stage_id
+      ) values (
+        'queue-migration-project', 701, 'wordbricks/legacy', 'main', 1,
+        30000, 5, '${now}', '${now}', 'ci_qa'
+      );
+      insert into briar_merge_batches (
+        id, project_id, repository_id, repository, base_branch, state,
+        quiet_until, created_at, updated_at
+      ) values (
+        'queue-migration-batch', 'queue-migration-project', 701,
+        'wordbricks/legacy', 'main', 'completed', '${now}', '${now}', '${now}'
+      );
+    `);
+
+    await applyD1Migrations(db, {
+      files: ["0143_project_merge_queue_validation.sql"],
+    });
+    await expect(db.prepare(
+      `select enabled, validation_commands_json
+       from briar_merge_queue_profiles where project_id = ?`,
+    ).bind("queue-migration-project").first()).resolves.toEqual({
+      enabled: 0,
+      validation_commands_json: "[]",
+    });
+    await expect(db.prepare(
+      `select validation_commands_json from briar_merge_batches where id = ?`,
+    ).bind("queue-migration-batch").first()).resolves.toEqual({
+      validation_commands_json: "[]",
+    });
+  } finally {
+    await miniflare.dispose();
+  }
+}, 60_000);
+
 it("backfills every existing organization member into every existing project", async () => {
   const miniflare = new Miniflare({
     modules: true,

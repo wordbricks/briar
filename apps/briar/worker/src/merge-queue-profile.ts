@@ -5,6 +5,7 @@ export type MergeQueueProfileRow = {
   base_branch: "main";
   enabled: number;
   readiness_stage_id: string;
+  validation_commands_json: string;
   quiet_window_ms: number;
   max_batch_size: number;
   created_at: string;
@@ -32,12 +33,14 @@ export async function configureMergeQueueProfile(
     repository: string;
     enabled: boolean;
     readinessStageId: string;
+    validationCommands: readonly string[];
     quietWindowMs: number;
     maxBatchSize: number;
     observedAt: string;
   },
 ) {
   const repository = input.repository.toLowerCase();
+  const validationCommandsJson = JSON.stringify(input.validationCommands);
   const active = await db.prepare(
     `select id, repository_id, repository, base_branch from briar_merge_batches
      where project_id = ? and state in (${activeBatchStates}) limit 1`,
@@ -52,7 +55,8 @@ export async function configureMergeQueueProfile(
     active && (
       !input.enabled || active.repository_id !== input.repositoryId ||
       active.repository !== repository || active.base_branch !== "main" ||
-      current?.readiness_stage_id !== input.readinessStageId
+      current?.readiness_stage_id !== input.readinessStageId ||
+      current?.validation_commands_json !== validationCommandsJson
     )
   ) {
     return { outcome: "active_batch" as const, profile: current };
@@ -77,8 +81,9 @@ export async function configureMergeQueueProfile(
     await db.prepare(
       `insert into briar_merge_queue_profiles (
        project_id, repository_id, repository, base_branch, enabled,
-       readiness_stage_id, quiet_window_ms, max_batch_size, created_at, updated_at
-     ) values (?, ?, ?, 'main', ?, ?, ?, ?, ?, ?)
+       readiness_stage_id, validation_commands_json, quiet_window_ms,
+       max_batch_size, created_at, updated_at
+     ) values (?, ?, ?, 'main', ?, ?, ?, ?, ?, ?, ?)
      on conflict(project_id) do update set
        repository_id = excluded.repository_id,
        repository = excluded.repository,
@@ -88,10 +93,13 @@ export async function configureMergeQueueProfile(
            or briar_merge_queue_profiles.repository <> excluded.repository
            or briar_merge_queue_profiles.readiness_stage_id <>
              excluded.readiness_stage_id
+           or briar_merge_queue_profiles.validation_commands_json <>
+             excluded.validation_commands_json
          then excluded.created_at else briar_merge_queue_profiles.created_at
        end,
        enabled = excluded.enabled,
        readiness_stage_id = excluded.readiness_stage_id,
+       validation_commands_json = excluded.validation_commands_json,
        quiet_window_ms = excluded.quiet_window_ms,
        max_batch_size = excluded.max_batch_size,
        updated_at = excluded.updated_at`,
@@ -101,6 +109,7 @@ export async function configureMergeQueueProfile(
       repository,
       input.enabled ? 1 : 0,
       input.readinessStageId,
+      validationCommandsJson,
       input.quietWindowMs,
       input.maxBatchSize,
       input.observedAt,

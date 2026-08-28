@@ -5,7 +5,6 @@ import {
   type MergeBatchApi,
   type MergeQueueCommandRunner,
 } from "./merge-queue";
-import type { MergeGroupContainerRuntime } from "./merge-group-validation";
 import {
   decodeClaimedMergeBatch,
   type ClaimedMergeBatch,
@@ -22,26 +21,17 @@ const integrationSha = "d".repeat(40);
 const treeSha = "e".repeat(40);
 const logSha256 = "f".repeat(64);
 const integrationRef = `refs/heads/briar/merge-queue/${batchId}`;
-const runtime: MergeGroupContainerRuntime = {
-  executable: "/usr/local/bin/docker",
-  image: `ghcr.io/wordbricks/briar-merge-group-ci@sha256:${"9".repeat(64)}`,
-};
 const validationResults: NonNullable<
   ClaimedMergeBatch["batch"]["validationResults"]
-> = ([
-  "app-worker",
-  "d1-migrations",
-  "rust",
-  "security",
-] as const).map((context) => ({
-  context,
+> = [{
+  context: "merge-queue",
   passed: true,
   exitCode: 0,
   failureCode: null,
-  log: `${context} passed`,
+  log: "merge queue validation passed",
   logSha256,
   logTruncated: false,
-}));
+}];
 
 function claimFixture(
   phase: ClaimedMergeBatch["phase"] = "tail_authority",
@@ -58,6 +48,7 @@ function claimFixture(
     repositoryId: 701,
     repository: "wordbricks/briar",
     baseBranch: "main",
+    validationCommands: ["bun run ci:local"],
     phase,
     claimToken: `briar_merge_claim_${"8".repeat(64)}`,
     claimedAt: "2026-08-21T01:00:00+00:00",
@@ -154,7 +145,6 @@ describe("local provider-independent merge-queue worker", () => {
       claim: claimFixture("enqueue"),
       workerId: "worker-1",
       repositoryPath: "/repo",
-      runtime,
       signal: new AbortController().signal,
       api: api.api,
       runCommand: run,
@@ -188,7 +178,6 @@ describe("local provider-independent merge-queue worker", () => {
       claim: claimFixture(),
       workerId: "worker-1",
       repositoryPath: "/repo",
-      runtime,
       signal: new AbortController().signal,
       api: api.api,
       runCommand: run,
@@ -201,6 +190,59 @@ describe("local provider-independent merge-queue worker", () => {
       path: `/merge-batch-claims/${batchId}/authority`,
       body: { integrationRef, integrationSha, baseSha: liveBaseSha },
     });
+  });
+
+  it("runs the snapshotted workflow commands against the exact integration SHA", async () => {
+    const commands: Array<{
+      command: readonly string[];
+      options: Parameters<MergeQueueCommandRunner>[1];
+    }> = [];
+    const run: MergeQueueCommandRunner = (command, options) => {
+      commands.push({ command: [...command], options });
+      if (command[0] === "git" && command[1] === "rev-parse") {
+        return successful(
+          command.at(-1)?.includes("validation-base")
+            ? liveBaseSha
+            : integrationSha,
+        );
+      }
+      if (command[0] === "git") return successful();
+      if (command.at(-1) === "bun run ci:local") {
+        return successful("repository checks passed\n");
+      }
+      throw new Error(`unexpected command: ${command.join(" ")}`);
+    };
+    const api = recordingApi();
+    await executeClaimedMergeBatch({
+      claim: claimFixture("validate"),
+      workerId: "worker-1",
+      repositoryPath: "/repo",
+      signal: new AbortController().signal,
+      api: api.api,
+      runCommand: run,
+    });
+
+    const validation = commands.find(({ command }) =>
+      command.at(-1) === "bun run ci:local"
+    );
+    expect(validation?.options.cwd).toMatch(
+      /briar-merge-queue-validation\..+\/workspace$/u,
+    );
+    expect(validation?.options.env).toMatchObject({ CI: "1" });
+    expect(validation?.options.env).not.toHaveProperty("GITHUB_TOKEN");
+    expect(api.calls.find((call) => call.path.endsWith("/validation")))
+      .toMatchObject({
+        path: `/merge-batch-claims/${batchId}/validation`,
+        body: {
+          mergeGroupSha: integrationSha,
+          validationResults: [{
+            context: "merge-queue",
+            passed: true,
+            exitCode: 0,
+            log: "$ bun run ci:local\nrepository checks passed\n",
+          }],
+        },
+      });
   });
 
   it("re-fences every status and lease-publishes the tested SHA to main", async () => {
@@ -224,7 +266,6 @@ describe("local provider-independent merge-queue worker", () => {
       claim: claimFixture("publish"),
       workerId: "worker-1",
       repositoryPath: "/repo",
-      runtime,
       signal: new AbortController().signal,
       api: api.api,
       runCommand: run,
@@ -232,8 +273,9 @@ describe("local provider-independent merge-queue worker", () => {
     const statuses = commands.filter((command) =>
       command[2] === `repos/wordbricks/briar/statuses/${integrationSha}`
     );
-    expect(statuses).toHaveLength(4);
-    expect(api.calls.filter((call) => call.path.endsWith("/lease"))).toHaveLength(4);
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]).toContain("context=briar/merge-queue");
+    expect(api.calls.filter((call) => call.path.endsWith("/lease"))).toHaveLength(1);
     expect(commands.some((command) =>
       command[1] === "push" &&
       command.includes(`--force-with-lease=refs/heads/main:${liveBaseSha}`) &&
@@ -259,13 +301,12 @@ describe("local provider-independent merge-queue worker", () => {
       claim: claimFixture("publish", failedProof),
       workerId: "worker-1",
       repositoryPath: "/repo",
-      runtime,
       signal: new AbortController().signal,
       api: api.api,
       runCommand: run,
     });
     expect(commands.every((command) => command[0] === "gh")).toBe(true);
-    expect(commands.filter((command) => command[0] === "gh")).toHaveLength(4);
+    expect(commands.filter((command) => command[0] === "gh")).toHaveLength(1);
     expect(api.calls.at(-1)?.path).toBe(`/merge-batch-claims/${batchId}/published`);
   });
 
@@ -293,12 +334,11 @@ describe("local provider-independent merge-queue worker", () => {
       claim,
       workerId: "worker-1",
       repositoryPath: "/repo",
-      runtime,
       signal: new AbortController().signal,
       api: api.api,
       runCommand: run,
     });
-    expect(commands.filter((command) => command[1] === "ls-remote")).toHaveLength(4);
+    expect(commands.filter((command) => command[1] === "ls-remote")).toHaveLength(1);
     expect(commands.some((command) => command[1] === "push")).toBe(false);
     expect(api.calls.at(-1)?.path).toBe(`/merge-batch-claims/${batchId}/published`);
   });
@@ -311,6 +351,7 @@ describe("local provider-independent merge-queue worker", () => {
       baseBranch: "main" as const,
       enabled: true,
       readinessStageId: "ci_qa",
+      validationCommands: ["bun run ci:local"],
       quietWindowMs: 30_000,
       maxBatchSize: 5,
       updatedAt: "2026-08-21T01:00:00Z",
@@ -324,9 +365,7 @@ describe("local provider-independent merge-queue worker", () => {
         ruleset_id: 99,
         parameters: {
           strict_required_status_checks_policy: false,
-          required_status_checks: validationResults.map((result) => ({
-            context: `signoff/${result.context}`,
-          })),
+          required_status_checks: [{ context: "briar/merge-queue" }],
         },
       },
     ]];
@@ -361,7 +400,6 @@ describe("local provider-independent merge-queue worker", () => {
     const result = inspectMergeQueueDoctor({
       profile,
       repositoryPath: "/repo",
-      runtime: { ready: true, ...runtime },
       runCommand: run,
     });
     expect(result.ok).toBe(true);
@@ -374,7 +412,6 @@ describe("local provider-independent merge-queue worker", () => {
     const broadBypass = inspectMergeQueueDoctor({
       profile,
       repositoryPath: "/repo",
-      runtime: { ready: true, ...runtime },
       runCommand: (command, options) => {
         if ((command.at(-1) ?? "").includes("rulesets/99")) {
           return successful(JSON.stringify({
