@@ -206,7 +206,7 @@ describe("inbox notification navigation", () => {
     expect(isInboxRunDetailTarget(sessionTarget)).toBe(false);
   });
 
-  it("falls back to the stored target for iOS action payloads", () => {
+  it("falls back to the stored target for native notification action payloads", () => {
     const target = inboxNotificationTarget(message);
     window.localStorage.setItem(
       "briar.inbox.notification-targets.v1",
