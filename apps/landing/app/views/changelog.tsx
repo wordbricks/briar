@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.169",
+        date: "2026년 8월 28일",
+        title: "저장소에 맞는 Merge Queue 검증으로 안전하게 병합합니다",
+        summary:
+          "프로젝트 Workflow의 검증 명령을 Merge Queue에 연결하고, 채널·링크·모바일 사용성을 다듬습니다.",
+        items: [
+          "Merge Queue가 프로젝트 Workflow 경계의 검증 명령을 그대로 사용해 저장소마다 다른 빌드와 테스트 정책을 실행합니다.",
+          "배치마다 정확한 통합 커밋을 격리된 작업 공간에서 검증하고 하나의 briar/merge-queue 상태로 결과를 보고합니다.",
+          "Briar 이슈 링크를 앱 안에서 바로 열고, 채널의 내 메시지에도 계정 표시 이름을 일관되게 보여줍니다.",
+          "채널 답장을 마친 뒤 작성 중 표시가 남을 수 있는 경합을 제거했습니다.",
+          "프로퍼티 필터 라벨과 Companion 하단 내비게이션의 레이아웃을 정돈했습니다.",
+        ],
+      },
+      {
         version: "1.2.168",
         date: "2026년 8월 27일",
         title: "협업 기록과 첨부 미리보기를 더 안정적으로 연결합니다",
@@ -1238,6 +1252,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.169",
+        date: "August 28, 2026",
+        title: "Merge safely with repository-specific queue validation",
+        summary:
+          "Connect Merge Queue to each project's Workflow checks while refining channels, links, and mobile usability.",
+        items: [
+          "Run the validation commands from the project's Workflow boundary so each repository keeps its own build and test policy.",
+          "Validate every batch at its exact integration commit in an isolated workspace and report one briar/merge-queue status.",
+          "Open Briar issue links directly in the app and consistently show the account display name on your own channel messages.",
+          "Prevent a race that could leave the typing indicator visible after a channel reply finishes.",
+          "Refine property-filter labels and the Companion bottom navigation layout.",
+        ],
+      },
       {
         version: "1.2.168",
         date: "August 27, 2026",
@@ -2538,7 +2566,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-168">
+          <a href="#v1-2-169">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2560,7 +2588,9 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.168" ||
+                      entry.version === "1.2.169"
+                        ? "2026-08-28"
+                        : entry.version === "1.2.168" ||
                       entry.version === "1.2.167" ||
                       entry.version === "1.2.166" ||
                       entry.version === "1.2.165"
