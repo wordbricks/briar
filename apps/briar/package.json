@@ -22,7 +22,7 @@
     "ios:release:verify": "bun run ../../scripts/ios-release-config.ts verify",
     "qa:release-updater": "bash ../../scripts/qa-production-updater-build.sh",
     "tauri": "tauri",
-    "tauri:bindings": "cargo test --manifest-path src-tauri/Cargo.toml export_typescript_bindings -- --nocapture",
+    "tauri:bindings": "cargo test --manifest-path src-tauri/Cargo.toml export_typescript_bindings -- --ignored --nocapture",
     "tauri:bindings:check": "bun run tauri:bindings && git diff --exit-code -- src/generated/tauri.ts",
     "tauri:build:release": "bash ../../scripts/with-release-env.sh bun run tauri build && bash ../../scripts/verify-release-config.sh",
     "android:init": "tauri android init",

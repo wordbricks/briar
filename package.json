@@ -40,7 +40,7 @@
     "lint:repo:type-aware": "oxlint --type-aware scripts --config .oxlintrc.jsonc",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test //#test:repo-tools",
-    "test:repo-tools": "vitest run --maxWorkers=1 --no-file-parallelism scripts/apply-remote-d1-migrations.test.ts scripts/macos-dmg-release.test.ts scripts/verify-encrypted-env.test.ts",
+    "test:repo-tools": "vitest run --maxWorkers=1 --no-file-parallelism scripts/apply-remote-d1-migrations.test.ts scripts/macos-dmg-release.test.ts scripts/verify-encrypted-env.test.ts tools/oxlint/anti-slop/rules/no-raw-tauri-ipc.test.ts",
     "prepare": "effect-tsgo patch --typescript --no-oxlint",
     "ci:local": "bash scripts/ci-local.sh",
     "ci:signoff": "bash scripts/ci-local.sh --signoff",

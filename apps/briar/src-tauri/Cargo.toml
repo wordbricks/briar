@@ -6,6 +6,9 @@ authors = ["Wordbricks"]
 license = "Apache-2.0"
 edition = "2021"
 
+[lints.clippy]
+disallowed_methods = "deny"
+
 [lib]
 name = "briar_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]

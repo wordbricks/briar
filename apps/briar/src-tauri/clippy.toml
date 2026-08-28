@@ -1,0 +1,12 @@
+disallowed-methods = [
+  { path = "tauri::Emitter::emit", reason = "Use a typed tauri_specta::Event so the app IPC contract stays in the generated TypeScript bindings." },
+  { path = "tauri::Emitter::emit_str", reason = "Use a typed tauri_specta::Event so the app IPC contract stays in the generated TypeScript bindings." },
+  { path = "tauri::Emitter::emit_to", reason = "Use a typed tauri_specta::Event so the app IPC contract stays in the generated TypeScript bindings." },
+  { path = "tauri::Emitter::emit_str_to", reason = "Use a typed tauri_specta::Event so the app IPC contract stays in the generated TypeScript bindings." },
+  { path = "tauri::Emitter::emit_filter", reason = "Use a typed tauri_specta::Event so the app IPC contract stays in the generated TypeScript bindings." },
+  { path = "tauri::Emitter::emit_str_filter", reason = "Use a typed tauri_specta::Event so the app IPC contract stays in the generated TypeScript bindings." },
+  { path = "tauri::Listener::listen", reason = "Use a typed tauri_specta::Event listener so the app IPC contract stays in the generated TypeScript bindings." },
+  { path = "tauri::Listener::listen_any", reason = "Use a typed tauri_specta::Event listener so the app IPC contract stays in the generated TypeScript bindings." },
+  { path = "tauri::Listener::once", reason = "Use a typed tauri_specta::Event listener so the app IPC contract stays in the generated TypeScript bindings." },
+  { path = "tauri::Listener::once_any", reason = "Use a typed tauri_specta::Event listener so the app IPC contract stays in the generated TypeScript bindings." },
+]

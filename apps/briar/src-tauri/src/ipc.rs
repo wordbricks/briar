@@ -135,13 +135,17 @@ mod tests {
     use super::*;
     use specta_typescript::Typescript;
 
+    fn export_typescript(path: impl AsRef<std::path::Path>) {
+        builder()
+            .export(Typescript::default(), path)
+            .expect("failed to export Tauri TypeScript bindings");
+    }
+
     #[test]
     fn json_value_exports_as_json_union() {
         let output =
             std::env::temp_dir().join(format!("briar-tauri-bindings-{}.ts", std::process::id()));
-        builder()
-            .export(Typescript::default(), &output)
-            .expect("failed to export temporary Tauri TypeScript bindings");
+        export_typescript(&output);
         let bindings = std::fs::read_to_string(&output)
             .expect("failed to read temporary Tauri TypeScript bindings");
         let _ = std::fs::remove_file(output);
@@ -201,12 +205,31 @@ mod tests {
     }
 
     #[test]
+    fn typescript_bindings_are_current() {
+        let generated =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/generated/tauri.ts");
+        let output = std::env::temp_dir().join(format!(
+            "briar-tauri-bindings-current-{}.ts",
+            std::process::id()
+        ));
+        export_typescript(&output);
+        let expected = std::fs::read_to_string(&generated)
+            .expect("generated Tauri TypeScript bindings are missing");
+        let actual =
+            std::fs::read_to_string(&output).expect("failed to read temporary Tauri bindings");
+        let _ = std::fs::remove_file(output);
+
+        assert_eq!(
+            actual, expected,
+            "Tauri TypeScript bindings are stale; run `bun run --cwd apps/briar tauri:bindings`"
+        );
+    }
+
+    #[test]
+    #[ignore = "writes the generated TypeScript bindings"]
     fn export_typescript_bindings() {
         let output =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/generated/tauri.ts");
-
-        builder()
-            .export(Typescript::default(), output)
-            .expect("failed to export Tauri TypeScript bindings");
+        export_typescript(output);
     }
 }
