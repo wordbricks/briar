@@ -28,7 +28,11 @@ const projects = [
   {
     id: "project-1",
     name: "Briar",
+    issueKeyPrefix: "BR",
+    scheduleTabEnabled: true,
     organizationId: "organization-1",
+    organizationName: "Wordbricks",
+    role: "owner" as const,
     icon: "data:image/png;base64,AA==",
     createdAt: "2026-07-23",
   },

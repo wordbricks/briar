@@ -2,25 +2,6 @@ import XCTest
 @testable import BriarCompanion
 
 final class MobileAPIContractTests: XCTestCase {
-    private struct OpenAPIOperation {
-        let method: String
-        let path: String
-    }
-
-    private var operations: [String: [String: Any]] = [:]
-
-    override func setUpWithError() throws {
-        let bundle = Bundle(for: Self.self)
-        let fixtureURL = try XCTUnwrap(
-            bundle.url(forResource: "companion-v1", withExtension: "json")
-        )
-        let fixtureData = try Data(contentsOf: fixtureURL)
-        let fixture = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: fixtureData) as? [String: Any]
-        )
-        operations = try XCTUnwrap(fixture["operations"] as? [String: [String: Any]])
-    }
-
     func testChannelRealtimeEndpointAndSocketPayloadUseCursorNotifications() throws {
         let organizationID = UUID(
             uuidString: "22222222-2222-4222-8222-222222222222"
@@ -56,7 +37,7 @@ final class MobileAPIContractTests: XCTestCase {
         )
     }
 
-    func testChannelIssueProposalPayloadIsDetailedAndBackwardCompatible() throws {
+    func testChannelIssueProposalPayloadDecodesCanonicalDetails() throws {
         let detailed = try JSONDecoder.mobileContract.decode(
             ChannelMessage.Proposal.self,
             from: Data(
@@ -83,39 +64,6 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(detailed.payload?.issue?.description, "Ship the guided setup.")
         XCTAssertEqual(detailed.payload?.issue?.priority, 2)
         XCTAssertEqual(detailed.payload?.issue?.status, .queued)
-
-        let legacy = try JSONDecoder.mobileContract.decode(
-            ChannelMessage.Proposal.self,
-            from: Data(
-                #"""
-                {
-                  "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-                  "actionType": "request_issue_create",
-                  "status": "pending",
-                  "projectId": null,
-                  "resultRunId": null
-                }
-                """#.utf8
-            )
-        )
-        XCTAssertNil(legacy.payload)
-
-        let unknownPayload = try JSONDecoder.mobileContract.decode(
-            ChannelMessage.Proposal.self,
-            from: Data(
-                #"""
-                {
-                  "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-                  "actionType": "request_issue_create",
-                  "status": "pending",
-                  "projectId": null,
-                  "payload": "legacy-shape",
-                  "resultRunId": null
-                }
-                """#.utf8
-            )
-        )
-        XCTAssertNil(unknownPayload.payload)
     }
 
     func testChannelIssueBatchProposalAndAcceptedMappingsDecode() throws {
@@ -538,37 +486,6 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(blocks[4].richTextElements?.first?.sections?.first?.elements.first?.style?.bold, true)
     }
 
-    func testCreateAcceptanceExecutionProposalIsOptionalForOlderServers() throws {
-        let channelResponses = [
-            #"{"outcome":"accepted","projectId":"11111111-1111-4111-8111-111111111111","resultRunId":"33333333-3333-4333-8333-333333333333"}"#,
-            #"{"outcome":"accepted","projectId":"11111111-1111-4111-8111-111111111111","resultRunId":"33333333-3333-4333-8333-333333333333","executionProposal":null}"#,
-        ]
-        for payload in channelResponses {
-            let response = try JSONDecoder.mobileContract.decode(
-                AcceptChannelProposalResponse.self,
-                from: Data(payload.utf8)
-            )
-            XCTAssertNil(response.executionProposal)
-        }
-
-        var actionPayload = try XCTUnwrap(
-            operations["acceptIssueActionProposal"]?["response"] as? [String: Any]
-        )
-        actionPayload.removeValue(forKey: "executionProposal")
-        let missing = try JSONDecoder.mobileContract.decode(
-            AcceptIssueActionProposalResponse.self,
-            from: JSONSerialization.data(withJSONObject: actionPayload)
-        )
-        XCTAssertNil(missing.executionProposal)
-
-        actionPayload["executionProposal"] = NSNull()
-        let null = try JSONDecoder.mobileContract.decode(
-            AcceptIssueActionProposalResponse.self,
-            from: JSONSerialization.data(withJSONObject: actionPayload)
-        )
-        XCTAssertNil(null.executionProposal)
-    }
-
     func testChannelIssueProposalRejectsPartiallyMalformedCanonicalDetails() throws {
         let malformedIssues = [
             #"{"title":"Missing fields"}"#,
@@ -596,412 +513,36 @@ final class MobileAPIContractTests: XCTestCase {
         }
     }
 
-    func testGeneratedProjectsContractAppliesDefaultsAndRequiresNullableIcon() throws {
+    func testGeneratedProjectsContractRequiresCurrentFields() throws {
         let projects = try JSONDecoder.mobileContract.decode(
             ProjectsResponse.self,
             from: Data(
-                #"{"projects":[{"id":"11111111-1111-4111-8111-111111111111","name":"Briar","icon":null,"organizationId":"22222222-2222-4222-8222-222222222222","organizationName":"Wordbricks","role":"owner","createdAt":"2026-08-20T00:00:00.000Z"}]}"#.utf8
+                #"{"projects":[{"id":"11111111-1111-4111-8111-111111111111","name":"Briar","issueKeyPrefix":"BR","scheduleTabEnabled":true,"icon":null,"organizationId":"22222222-2222-4222-8222-222222222222","organizationName":"Wordbricks","role":"owner","createdAt":"2026-08-20T00:00:00.000Z"}]}"#.utf8
             )
         )
         let project = try XCTUnwrap(projects.projects.first)
-        XCTAssertEqual(project.issueKeyPrefix, "AH")
+        XCTAssertEqual(project.issueKeyPrefix, "BR")
         XCTAssertTrue(project.scheduleTabEnabled)
         XCTAssertNil(project.icon)
 
-        XCTAssertThrowsError(
-            try JSONDecoder.mobileContract.decode(
-                ProjectsResponse.self,
-                from: Data(
-                    #"{"projects":[{"id":"11111111-1111-4111-8111-111111111111","name":"Briar","organizationId":"22222222-2222-4222-8222-222222222222","organizationName":"Wordbricks","role":"owner","createdAt":"2026-08-20T00:00:00.000Z"}]}"#.utf8
+        for incompleteProject in [
+            #"{"id":"11111111-1111-4111-8111-111111111111","name":"Briar","scheduleTabEnabled":true,"icon":null,"organizationId":"22222222-2222-4222-8222-222222222222","organizationName":"Wordbricks","role":"owner","createdAt":"2026-08-20T00:00:00.000Z"}"#,
+            #"{"id":"11111111-1111-4111-8111-111111111111","name":"Briar","issueKeyPrefix":"BR","icon":null,"organizationId":"22222222-2222-4222-8222-222222222222","organizationName":"Wordbricks","role":"owner","createdAt":"2026-08-20T00:00:00.000Z"}"#,
+            #"{"id":"11111111-1111-4111-8111-111111111111","name":"Briar","issueKeyPrefix":"BR","scheduleTabEnabled":true,"organizationId":"22222222-2222-4222-8222-222222222222","organizationName":"Wordbricks","role":"owner","createdAt":"2026-08-20T00:00:00.000Z"}"#,
+        ] {
+            XCTAssertThrowsError(
+                try JSONDecoder.mobileContract.decode(
+                    ProjectsResponse.self,
+                    from: Data("{\"projects\":[\(incompleteProject)]}".utf8)
                 )
             )
-        )
+        }
 
         let operation: AuthenticatedMobileAPIOperation<ProjectsResponse> =
             MobileAPIOperations.listProjects
         XCTAssertEqual(operation.id, "listProjects")
         XCTAssertEqual(MobileAPIOperations.listProjects.method, "GET")
         XCTAssertEqual(MobileAPIOperations.listProjects.path, "/projects")
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.projects,
-            MobileAPIOperations.listProjects.path
-        )
     }
 
-    func testSharedFixtureOperationsMatchOpenAPI() throws {
-        let bundle = Bundle(for: Self.self)
-        let openAPIURL = try XCTUnwrap(
-            bundle.url(forResource: "companion.openapi", withExtension: "yaml")
-        )
-        let openAPIData = try Data(contentsOf: openAPIURL)
-        let document = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: openAPIData) as? [String: Any]
-        )
-        let info = try XCTUnwrap(document["info"] as? [String: Any])
-        XCTAssertEqual(info["version"] as? String, MobileAPIContract.version)
-
-        let components = try XCTUnwrap(document["components"] as? [String: Any])
-        let schemas = try XCTUnwrap(components["schemas"] as? [String: Any])
-        for responseName in [
-            "AcceptIssueActionProposalResponse",
-            "AcceptChannelProposalResponse",
-        ] {
-            let schema = try XCTUnwrap(schemas[responseName] as? [String: Any])
-            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
-            XCTAssertNotNil(properties["executionProposal"])
-            let required = schema["required"] as? [String] ?? []
-            XCTAssertFalse(required.contains("executionProposal"))
-        }
-        let channelProposalSchema = try XCTUnwrap(
-            schemas["ChannelProposal"] as? [String: Any]
-        )
-        let channelProposalProperties = try XCTUnwrap(
-            channelProposalSchema["properties"] as? [String: Any]
-        )
-        XCTAssertNotNil(channelProposalProperties["resultItems"])
-        XCTAssertNotNil(schemas["ChannelIssueBatchProposalPayload"])
-        let acceptanceSchema = try XCTUnwrap(
-            schemas["AcceptChannelProposalResponse"] as? [String: Any]
-        )
-        let acceptanceProperties = try XCTUnwrap(
-            acceptanceSchema["properties"] as? [String: Any]
-        )
-        XCTAssertNotNil(acceptanceProperties["resultItems"])
-
-        let paths = try XCTUnwrap(document["paths"] as? [String: Any])
-        let httpMethods: Set<String> = ["get", "post", "put", "patch", "delete"]
-        var openAPIOperations: [String: OpenAPIOperation] = [:]
-        for (path, rawPathItem) in paths {
-            let pathItem = try XCTUnwrap(rawPathItem as? [String: Any])
-            for (method, rawOperation) in pathItem where httpMethods.contains(method) {
-                let operation = try XCTUnwrap(rawOperation as? [String: Any])
-                let operationID = try XCTUnwrap(operation["operationId"] as? String)
-                let previous = openAPIOperations.updateValue(
-                    OpenAPIOperation(method: method, path: path),
-                    forKey: operationID
-                )
-                XCTAssertNil(previous, "OpenAPI operationId \(operationID)가 중복되었습니다.")
-            }
-        }
-
-        let expectedQueryTemplates = [
-            "getChannelDelta": "since={since}",
-            "getDashboardDelta": "cursor={cursor}",
-        ]
-        for (operationID, fixtureOperation) in operations {
-            let openAPIOperation = try XCTUnwrap(
-                openAPIOperations[operationID],
-                "fixture operation \(operationID)가 OpenAPI에 없습니다."
-            )
-            let fixtureMethod = try XCTUnwrap(fixtureOperation["method"] as? String)
-            let fixturePath = try XCTUnwrap(fixtureOperation["path"] as? String)
-            let pathParts = fixturePath.split(
-                separator: "?",
-                maxSplits: 1,
-                omittingEmptySubsequences: false
-            )
-
-            XCTAssertEqual(fixtureMethod.lowercased(), openAPIOperation.method)
-            XCTAssertEqual(String(pathParts[0]), openAPIOperation.path)
-            if pathParts.count == 2 {
-                let expectedQuery = try XCTUnwrap(
-                    expectedQueryTemplates[operationID],
-                    "fixture operation \(operationID)에 예상하지 않은 query template이 있습니다."
-                )
-                XCTAssertEqual(String(pathParts[1]), expectedQuery)
-            } else if expectedQueryTemplates[operationID] != nil {
-                XCTFail("\(operationID) fixture에는 query template이 필요합니다.")
-            }
-        }
-    }
-
-    func testDecodesEveryReadResponseFromSharedWorkerFixture() throws {
-        let health: HealthResponse = try decodeResponse("getHealth")
-        let device: DeviceCodeResponse = try decodeResponse("beginDeviceAuthorization")
-        let token: DeviceTokenResponse = try decodeResponse("pollDeviceToken")
-        let pending: DeviceTokenErrorResponse = try decode(
-            "pollDeviceToken",
-            field: "errorResponse"
-        )
-        let user: CurrentUserResponse = try decodeResponse("getCurrentUser")
-        let projects: ProjectsResponse = try decodeResponse("listProjects")
-        let snapshot: DashboardSnapshot = try decodeResponse("getDashboardSnapshot")
-        let delta: DashboardDelta = try decodeResponse("getDashboardDelta")
-        let events: RunEventsResponse = try decodeResponse("listRunEvents")
-        let messages: IssueMessagesResponse = try decodeResponse("listIssueMessages")
-        let evidence: RunEvidenceResponse = try decodeResponse("listRunEvidence")
-        let agents: ProjectAgentsResponse = try decodeResponse("listProjectAgents")
-        let sessions: ProjectAgentSessionsResponse = try decodeResponse("listProjectAgentSessions")
-        let directTask: ProjectAgentTaskResponse = try decodeResponse("runProjectAgentTask")
-        let resume: ResumeRunResponse = try decodeResponse("resumeRun")
-        let dispatch: DispatchRunResponse = try decodeResponse("dispatchRun")
-        let reassign: DispatchRunResponse = try decodeResponse("reassignRun")
-        let accepted: AcceptIssueReworkProposalResponse = try decodeResponse(
-            "acceptIssueReworkProposal"
-        )
-        let acceptedAction: AcceptIssueActionProposalResponse = try decodeResponse(
-            "acceptIssueActionProposal"
-        )
-        let acceptedExecution: AcceptIssueExecutionProposalResponse = try decodeResponse(
-            "acceptIssueExecutionProposal"
-        )
-        let channels: ChannelsResponse = try decodeResponse("listChannels")
-        let channel: ChannelDetailResponse = try decodeResponse("getChannel")
-        let channelMessages: ChannelMessagesResponse = try decodeResponse(
-            "listChannelMessages"
-        )
-        let deletedChannelMessage: DeleteChannelMessageResponse = try decodeResponse(
-            "deleteChannelMessage"
-        )
-        let acceptedChannelProposal: AcceptChannelProposalResponse = try decodeResponse(
-            "acceptChannelProposal"
-        )
-        let acceptedChannelExecution: AcceptChannelExecutionProposalResponse = try decodeResponse(
-            "acceptChannelExecutionProposal"
-        )
-
-        XCTAssertTrue(health.ok)
-        XCTAssertEqual(device.userCode, "BRIAR123")
-        XCTAssertEqual(token.tokenType, "Bearer")
-        XCTAssertEqual(pending.error, .authorizationPending)
-        XCTAssertEqual(user.user.email, "user@example.com")
-        XCTAssertEqual(projects.projects.first?.role, .owner)
-        XCTAssertEqual(projects.projects.first?.effectiveIssueKeyPrefix, "BR")
-        XCTAssertEqual(projects.projects.first?.issueKey(runNumber: 42), "BR-42")
-        XCTAssertEqual(snapshot.cursor, 41)
-        XCTAssertEqual(snapshot.runs.first?.status, .running)
-        XCTAssertEqual(snapshot.runs.first?.workflow?.stages.count, 3)
-        XCTAssertEqual(snapshot.runs.first?.requestedProvider, .codex)
-        XCTAssertEqual(snapshot.runs.first?.requestedWorkerId, "worker-1")
-        XCTAssertEqual(snapshot.runs.first?.createdByUserId, "fixture-user")
-        XCTAssertEqual(snapshot.runs.first?.attachments?.first?.filename, "design.png")
-        XCTAssertEqual(snapshot.workers?.first?.readiness, "available")
-        XCTAssertEqual(snapshot.workers?.first?.icon?.type, .emoji)
-        XCTAssertEqual(snapshot.workers?.first?.icon?.value, "🍋")
-        XCTAssertEqual(delta.cursor, 42)
-        XCTAssertEqual(delta.runs.first?.status, .completed)
-        XCTAssertEqual(delta.runs.first?.structuredResult?.outcome, "completed")
-        XCTAssertEqual(events.events.first?.workflowStage, "implementing")
-        XCTAssertEqual(events.events.first?.actorName, "Briar User")
-        XCTAssertEqual(messages.messages.first?.author.name, "Briar User")
-        XCTAssertEqual(evidence.evidence.first?.status, .passed)
-        XCTAssertEqual(evidence.evidence.first?.images?.first?.filename, "companion.png")
-        XCTAssertEqual(agents.agents.first?.name, "Issue processing agent")
-        XCTAssertEqual(sessions.sessions.first?.id, "session-fixture-1")
-        XCTAssertEqual(directTask.session.status, .running)
-        XCTAssertEqual(directTask.session.requestedWorkerId, "worker-1")
-        XCTAssertEqual(resume.checkpointKey, "user-before-production_qa")
-        XCTAssertEqual(resume.attempt, 2)
-        XCTAssertEqual(resume.revision, 3)
-        XCTAssertEqual(dispatch.dispatchMode, "any")
-        XCTAssertNil(dispatch.requestedWorkerId)
-        XCTAssertEqual(dispatch.outcome, "dispatched")
-        XCTAssertEqual(reassign.dispatchMode, "specific")
-        XCTAssertEqual(reassign.requestedWorkerId, "worker-1")
-        XCTAssertEqual(accepted.proposal.status, .accepted)
-        XCTAssertEqual(accepted.revision, 2)
-        XCTAssertEqual(acceptedAction.proposal.type, .create)
-        XCTAssertEqual(acceptedAction.proposal.issue?.title, "Native dashboard sync")
-        XCTAssertEqual(acceptedAction.proposal.executeAfterCreate, true)
-        XCTAssertEqual(acceptedAction.executionProposal?.status, .pending)
-        XCTAssertNil(acceptedAction.executionProposal?.delegatedByAgentName)
-        XCTAssertEqual(acceptedExecution.proposal.status, .accepted)
-        XCTAssertEqual(acceptedExecution.proposal.requestedProvider, .codex)
-        XCTAssertEqual(acceptedExecution.dispatch.dispatchMode, "any")
-        XCTAssertEqual(channels.channels.count, 2)
-        XCTAssertEqual(channels.cursor, 12)
-        XCTAssertEqual(channel.messages.first?.body, "@Honey 온보딩 개편 계획서를 정리해줘")
-        XCTAssertEqual(
-            channel.messages.first?.mentionedAgentIds,
-            [UUID(uuidString: "66666666-6666-4666-8666-666666666666")!]
-        )
-        XCTAssertEqual(channelMessages.messages.last?.proposal?.status, .pending)
-        XCTAssertTrue(deletedChannelMessage.deleted)
-        XCTAssertEqual(deletedChannelMessage.message?.body, "[deleted]")
-        XCTAssertNotNil(deletedChannelMessage.message?.deletedAt)
-        XCTAssertNil(deletedChannelMessage.parentMessage)
-        XCTAssertNil(channel.nextCursor)
-        XCTAssertNil(channelMessages.nextCursor)
-        XCTAssertEqual(
-            channelMessages.messages.last?.proposal?.payload?.issue?.title,
-            "온보딩 개편"
-        )
-        XCTAssertEqual(
-            channelMessages.messages.last?.proposal?.payload?.issue?.status,
-            .backlog
-        )
-        XCTAssertEqual(
-            channelMessages.messages.last?.proposal?.payload?.executeAfterCreate,
-            true
-        )
-        XCTAssertEqual(acceptedChannelProposal.outcome, .accepted)
-        XCTAssertEqual(
-            acceptedChannelProposal.projectId.uuidString.lowercased(),
-            "11111111-1111-4111-8111-111111111111"
-        )
-        XCTAssertEqual(acceptedChannelProposal.executionProposal?.status, .pending)
-        XCTAssertEqual(
-            acceptedChannelProposal.executionProposal?.delegatedByAgentName,
-            "Bumble"
-        )
-        XCTAssertEqual(acceptedChannelExecution.outcome, .accepted)
-        XCTAssertEqual(acceptedChannelExecution.proposal.delegatedByAgentName, "Bumble")
-        XCTAssertEqual(acceptedChannelExecution.dispatch.requestedWorkerId, "worker-1")
-    }
-
-    func testEndpointBuildersProduceExpectedPaths() {
-        XCTAssertEqual(MobileAPIContract.Endpoint.health, "/health")
-        XCTAssertEqual(MobileAPIContract.Endpoint.deviceCode, "/api/auth/device/code")
-        XCTAssertEqual(MobileAPIContract.Endpoint.deviceToken, "/api/auth/device/token")
-        XCTAssertEqual(MobileAPIContract.Endpoint.currentUser, "/me")
-        XCTAssertEqual(MobileAPIContract.Endpoint.projects, "/projects")
-        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.dashboard(projectID: projectID),
-            "/projects/11111111-1111-4111-8111-111111111111/dashboard"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.dashboardDelta(projectID: projectID, cursor: 41),
-            "/projects/11111111-1111-4111-8111-111111111111/dashboard/delta?cursor=41"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.projectAgentTasks(projectID: projectID),
-            "/projects/11111111-1111-4111-8111-111111111111/agent-tasks"
-        )
-        let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.runEvents(projectID: projectID, runID: runID),
-            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/events"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID),
-            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/messages"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.runEvidence(projectID: projectID, runID: runID),
-            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/evidence"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.runResume(projectID: projectID, runID: runID),
-            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/resume"
-        )
-        let proposalID = UUID(uuidString: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")!
-        let organizationID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
-        let channelID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.directMessages(organizationID: organizationID),
-            "/organizations/22222222-2222-4222-8222-222222222222/dms"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.organizationMembers(organizationID: organizationID),
-            "/organizations/22222222-2222-4222-8222-222222222222/members"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.organizationAgents(organizationID: organizationID),
-            "/organizations/22222222-2222-4222-8222-222222222222/agents"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.channelChanges(
-                organizationID: organizationID,
-                cursor: 12
-            ),
-            "/organizations/22222222-2222-4222-8222-222222222222/channel-changes?since=12"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.channel(
-                organizationID: organizationID,
-                channelID: channelID,
-                messageLimit: 20
-            ),
-            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333?limit=20"
-        )
-        let messageCursor = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.channelMessage(
-                organizationID: organizationID,
-                channelID: channelID,
-                messageID: messageCursor
-            ),
-            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/messages/44444444-4444-4444-8444-444444444444"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.channelMessages(
-                organizationID: organizationID,
-                channelID: channelID,
-                cursor: messageCursor,
-                limit: 20
-            ),
-            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/messages?limit=20&cursor=44444444-4444-4444-8444-444444444444"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.channelThreadSubscription(
-                organizationID: organizationID,
-                channelID: channelID,
-                messageID: messageCursor
-            ),
-            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/messages/44444444-4444-4444-8444-444444444444/subscription"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.acceptChannelProposal(
-                organizationID: organizationID,
-                channelID: channelID,
-                proposalID: proposalID
-            ),
-            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.acceptChannelExecutionProposal(
-                organizationID: organizationID,
-                channelID: channelID,
-                proposalID: proposalID
-            ),
-            "/organizations/22222222-2222-4222-8222-222222222222/channels/33333333-3333-4333-8333-333333333333/proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept-execution"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.acceptIssueReworkProposal(
-                projectID: projectID,
-                runID: runID,
-                proposalID: proposalID
-            ),
-            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/rework-proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.acceptIssueActionProposal(
-                projectID: projectID,
-                runID: runID,
-                proposalID: proposalID
-            ),
-            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/issue-action-proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.acceptIssueExecutionProposal(
-                projectID: projectID,
-                conversationRunID: runID,
-                proposalID: proposalID
-            ),
-            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/issue-execution-proposals/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/accept"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.projectAgents(projectID: projectID, locale: "en"),
-            "/projects/11111111-1111-4111-8111-111111111111/agents?locale=en"
-        )
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.projectAgentSessions(projectID: projectID),
-            "/projects/11111111-1111-4111-8111-111111111111/agent-sessions"
-        )
-    }
-
-    private func decodeResponse<Response: Decodable>(_ operationID: String) throws -> Response {
-        try decode(operationID, field: "response")
-    }
-
-    private func decode<Response: Decodable>(
-        _ operationID: String,
-        field: String
-    ) throws -> Response {
-        let operation = try XCTUnwrap(operations[operationID])
-        let response = try XCTUnwrap(operation[field])
-        let data = try JSONSerialization.data(withJSONObject: response)
-        return try JSONDecoder.mobileContract.decode(Response.self, from: data)
-    }
 }

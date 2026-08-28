@@ -18,13 +18,23 @@ const projects: Project[] = [
   {
     id: "project-1",
     name: "Briar",
+    issueKeyPrefix: "BR",
+    scheduleTabEnabled: true,
     icon: "data:image/webp;base64,briar-icon",
+    organizationId: "organization-1",
+    organizationName: "Briar",
+    role: "owner",
     createdAt: "2026-07-01T00:00:00.000Z",
   },
   {
     id: "project-2",
     name: "Sprout",
+    issueKeyPrefix: "SP",
+    scheduleTabEnabled: true,
     icon: "data:image/webp;base64,sprout-icon",
+    organizationId: "organization-1",
+    organizationName: "Briar",
+    role: "member",
     createdAt: "2026-07-02T00:00:00.000Z",
   },
 ];

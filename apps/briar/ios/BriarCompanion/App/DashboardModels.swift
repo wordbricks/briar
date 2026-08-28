@@ -390,7 +390,7 @@ struct OrganizationMember: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct DashboardSnapshot: Codable, Equatable, Sendable {
-    var project: ProjectsResponse.Project
+    var project: Project
     var runs: [DashboardRun]
     var workers: [DashboardWorker]?
     var organizationProviders: [AgentProvider]?
@@ -402,7 +402,7 @@ struct DashboardSnapshot: Codable, Equatable, Sendable {
     var generatedAt: Date
 
     init(
-        project: ProjectsResponse.Project,
+        project: Project,
         runs: [DashboardRun],
         workers: [DashboardWorker]? = nil,
         organizationProviders: [AgentProvider]? = nil,
@@ -431,7 +431,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
     let hasMore: Bool
     let runs: [DashboardRun]
     let deletedRunIds: [UUID]
-    let project: ProjectsResponse.Project?
+    let project: Project?
     let workers: [DashboardWorker]?
     let organizationProviders: [AgentProvider]?
     let executionPolicy: ProjectExecutionWorkerPolicy?
@@ -445,7 +445,7 @@ struct DashboardDelta: Codable, Equatable, Sendable {
         hasMore: Bool,
         runs: [DashboardRun],
         deletedRunIds: [UUID],
-        project: ProjectsResponse.Project?,
+        project: Project?,
         workers: [DashboardWorker]? = nil,
         organizationProviders: [AgentProvider]? = nil,
         executionPolicy: ProjectExecutionWorkerPolicy? = nil,

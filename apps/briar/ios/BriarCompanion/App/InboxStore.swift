@@ -101,7 +101,7 @@ final class InboxStore: ObservableObject {
     func update(
         snapshot: DashboardSnapshot?,
         sessions: [ProjectAgentSession],
-        project: ProjectsResponse.Project
+        project: Project
     ) {
         if let userID {
             loadReadVersions(storageKey: storageKey(for: userID))

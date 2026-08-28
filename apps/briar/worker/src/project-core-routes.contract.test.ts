@@ -47,7 +47,7 @@ describe("project route mobile contract", () => {
     expect(authenticate).not.toHaveBeenCalled();
   });
 
-  it("routes listProjects through the canonical wire validator", async () => {
+  it("routes listProjects through the canonical response validator", async () => {
     const listProjects = vi.fn<ProjectListRouteServices["listProjects"]>(
       async () => [projectRow],
     );

@@ -1,6 +1,6 @@
 # ADR-0007: 독립 SwiftUI Companion 기반과 모바일 API 경계
 
-- 상태: 승인
+- 상태: 승인 (2026-08-28 개정)
 - 날짜: 2026-08-02
 
 ## 배경
@@ -11,10 +11,10 @@
 
 1. `apps/briar/src-tauri/gen/apple`과 `apps/briar/src-tauri/gen/android`는 기존 Companion 릴리스 경로로 계속 유지한다. 이 ADR에서는 해당 앱의 bundle/application ID, scheme, 빌드 설정을 바꾸지 않는다.
 2. 새 iOS 코드는 `apps/briar/ios/BriarCompanion`의 독립 Xcode 프로젝트로 둔다. 개발 앱은 `app.briar.companion.native.dev`, scheme은 `BriarCompanion-Dev`를 사용한다. 따라서 기존 `app.briar.companion` 앱과 같은 시뮬레이터에 동시에 설치할 수 있다.
-3. 네이티브 앱이 사용하는 서버 경계는 `packages/mobile-contracts/companion.openapi.yaml`에 OpenAPI 3.1 subset으로 명시한다. 첫 subset은 서비스 상태, device authorization 시작/폴링, 현재 사용자, 프로젝트 목록만 포함한다.
-4. iOS는 `briar-mobile`, Android는 `briar-android` client ID를 사용하되 응답 모델과 오류 의미는 공유한다. Worker fixture와 계약 테스트가 두 client ID, endpoint, 응답 필수 필드를 함께 검증한다.
-5. API 계약은 추가 방식으로 확장한다. 기존 필드 삭제·이름 변경·의미 변경은 새 계약 버전과 명시적 이행 계획 없이는 허용하지 않는다. 알 수 없는 응답 필드는 모바일 클라이언트가 무시한다.
-6. 모바일 플랫폼 빌드는 필수 `app-worker` signoff와 분리한다. Worker 모바일 계약은 일반 테스트에서 계속 검증하고, 새 SwiftUI App/Unit/UI Test와 기존 Tauri iOS/Android 빌드는 명시적인 `bun run mobile:ci`에서 검사한다.
+3. 네이티브 앱이 사용하는 서버 경계는 `@briar/mobile-contracts`의 Effect Schema와 operation descriptor로 명시한다. OpenAPI 3.1 문서와 Swift DTO/client는 이 실행 가능한 계약에서 생성한다.
+4. iOS는 `briar-mobile`, Android는 `briar-android` client ID를 사용하되 응답 모델과 오류 의미는 공유한다. 실제 Worker 라우트와 두 클라이언트의 decoder가 같은 operation descriptor를 사용한다.
+5. 초기 앱 단계에서는 이전 모바일 계약과의 하위 호환성을 유지하지 않는다. 필드 삭제·이름 변경·필수화는 canonical schema에서 직접 수행하며, 누락 필드를 허용하기 위한 default, alias, 이중 wire schema를 두지 않는다. 릴리스 안정화 뒤 호환성 정책이 필요해지면 별도 ADR로 도입한다.
+6. 모바일 플랫폼 빌드는 필수 `app-worker` signoff와 분리한다. 생성물 currentness, 실제 Worker 라우트 validation, TypeScript/Swift decoder의 핵심 경계를 일반 테스트에서 검증하고, 새 SwiftUI App/Unit/UI Test와 기존 Tauri iOS/Android 빌드는 명시적인 `bun run mobile:ci`에서 검사한다.
 
 ## 오류와 복구 원칙
 
@@ -25,7 +25,7 @@
 
 ## Android 동등성
 
-이번 단계는 iOS 렌더링 기반을 만드는 작업이므로 별도 Android UI 프로젝트를 만들지 않는다. Android Tauri 앱은 계속 같은 사용자 기능을 제공하며, 모바일 API 계약 테스트에서는 Android client ID를 함께 검증한다. 기존 Android 빌드는 명시적인 모바일 CI에서 확인한다. 이후 iOS 기능 PR은 아래 표의 Android 열을 함께 갱신해야 한다.
+이번 단계는 iOS 렌더링 기반을 만드는 작업이므로 별도 Android UI 프로젝트를 만들지 않는다. Android Tauri 앱은 계속 같은 사용자 기능을 제공하며, 공유 TypeScript client와 operation descriptor가 Android 경계도 함께 검증한다. 기존 Android 빌드는 명시적인 모바일 CI에서 확인한다. 이후 iOS 기능 PR은 아래 표의 Android 열을 함께 갱신해야 한다.
 
 ## 결과
 

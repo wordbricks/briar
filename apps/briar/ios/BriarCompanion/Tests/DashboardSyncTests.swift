@@ -3,9 +3,11 @@ import XCTest
 @testable import BriarCompanion
 
 final class DashboardSyncTests: XCTestCase {
-    private let project = ProjectsResponse.Project(
+    private let project = Project(
         id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
         name: "Briar",
+        issueKeyPrefix: "AH",
+        scheduleTabEnabled: true,
         icon: nil,
         organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
         organizationName: "Wordbricks",
@@ -141,9 +143,11 @@ final class DashboardSyncTests: XCTestCase {
 
     @MainActor
     func testEnsureRunAvailableSelectsAndLoadsTheTargetProject() async {
-        let targetProject = ProjectsResponse.Project(
+        let targetProject = Project(
             id: UUID(uuidString: "55555555-5555-4555-8555-555555555555")!,
             name: "Target",
+            issueKeyPrefix: "AH",
+            scheduleTabEnabled: true,
             icon: nil,
             organizationId: project.organizationId,
             organizationName: project.organizationName,
@@ -208,7 +212,7 @@ final class DashboardSyncTests: XCTestCase {
                 expiresIn: 3_600
             )],
             MobileAPIContract.Endpoint.currentUser: [user],
-            MobileAPIContract.Endpoint.projects: [ProjectsResponse(projects: [project])],
+            MobileAPIOperations.listProjects.path: [ProjectsResponse(projects: [project])],
             MobileAPIContract.Endpoint.dashboard(projectID: project.id): [
                 snapshot(cursor: 7, title: "Loaded after login"),
             ],
@@ -245,9 +249,11 @@ final class DashboardSyncTests: XCTestCase {
 
     @MainActor
     func testProjectSwitchDiscardsThePreviousProjectsSlowResponse() async {
-        let otherProject = ProjectsResponse.Project(
+        let otherProject = Project(
             id: UUID(uuidString: "55555555-5555-4555-8555-555555555555")!,
             name: "Other",
+            issueKeyPrefix: "AH",
+            scheduleTabEnabled: true,
             icon: nil,
             organizationId: project.organizationId,
             organizationName: project.organizationName,
@@ -301,9 +307,11 @@ final class DashboardSyncTests: XCTestCase {
 
     @MainActor
     func testFirstLoadFallsBackToFirstProjectWhenNothingPersisted() async throws {
-        let otherProject = ProjectsResponse.Project(
+        let otherProject = Project(
             id: UUID(uuidString: "88888888-8888-4888-8888-888888888888")!,
             name: "Briar Mobile",
+            issueKeyPrefix: "AH",
+            scheduleTabEnabled: true,
             icon: nil,
             organizationId: project.organizationId,
             organizationName: project.organizationName,
@@ -319,7 +327,7 @@ final class DashboardSyncTests: XCTestCase {
         ))
         let api = RoutingAPIClient(routes: [
             MobileAPIContract.Endpoint.currentUser: [user],
-            MobileAPIContract.Endpoint.projects: [
+            MobileAPIOperations.listProjects.path: [
                 ProjectsResponse(projects: [project, otherProject]),
             ],
         ])
@@ -332,9 +340,11 @@ final class DashboardSyncTests: XCTestCase {
 
     @MainActor
     func testLoadRestoresLastSelectedProject() async throws {
-        let otherProject = ProjectsResponse.Project(
+        let otherProject = Project(
             id: UUID(uuidString: "88888888-8888-4888-8888-888888888888")!,
             name: "Briar Mobile",
+            issueKeyPrefix: "AH",
+            scheduleTabEnabled: true,
             icon: nil,
             organizationId: project.organizationId,
             organizationName: project.organizationName,
@@ -350,7 +360,7 @@ final class DashboardSyncTests: XCTestCase {
         ))
         let api = RoutingAPIClient(routes: [
             MobileAPIContract.Endpoint.currentUser: [user],
-            MobileAPIContract.Endpoint.projects: [
+            MobileAPIOperations.listProjects.path: [
                 ProjectsResponse(projects: [project, otherProject]),
             ],
         ])
@@ -377,7 +387,7 @@ final class DashboardSyncTests: XCTestCase {
         ))
         let api = RoutingAPIClient(routes: [
             MobileAPIContract.Endpoint.currentUser: [user],
-            MobileAPIContract.Endpoint.projects: [
+            MobileAPIOperations.listProjects.path: [
                 ProjectsResponse(projects: [project]),
             ],
         ])
@@ -395,9 +405,11 @@ final class DashboardSyncTests: XCTestCase {
 
     @MainActor
     func testProjectCatalogRefreshFindsProjectsCreatedAfterLogin() async throws {
-        let newProject = ProjectsResponse.Project(
+        let newProject = Project(
             id: UUID(uuidString: "99999999-9999-4999-8999-999999999999")!,
             name: "Created by teammate",
+            issueKeyPrefix: "AH",
+            scheduleTabEnabled: true,
             icon: nil,
             organizationId: project.organizationId,
             organizationName: project.organizationName,
@@ -413,7 +425,7 @@ final class DashboardSyncTests: XCTestCase {
         ))
         let api = RoutingAPIClient(routes: [
             MobileAPIContract.Endpoint.currentUser: [user],
-            MobileAPIContract.Endpoint.projects: [
+            MobileAPIOperations.listProjects.path: [
                 ProjectsResponse(projects: [project]),
                 ProjectsResponse(projects: [project, newProject]),
             ],
@@ -430,9 +442,11 @@ final class DashboardSyncTests: XCTestCase {
     @MainActor
     func testPreviousAccountProjectRefreshCannotOverwriteANewLogin() async throws {
         let previousProject = project
-        let nextProject = ProjectsResponse.Project(
+        let nextProject = Project(
             id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
             name: "Next account project",
+            issueKeyPrefix: "AH",
+            scheduleTabEnabled: true,
             icon: nil,
             organizationId: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
             organizationName: "Next organization",
@@ -456,11 +470,11 @@ final class DashboardSyncTests: XCTestCase {
         let api = TokenRoutingAPIClient(
             routes: [
                 "previous:\(MobileAPIContract.Endpoint.currentUser)": previousUser,
-                "previous:\(MobileAPIContract.Endpoint.projects)": ProjectsResponse(
+                "previous:\(MobileAPIOperations.listProjects.path)": ProjectsResponse(
                     projects: [previousProject]
                 ),
                 "next:\(MobileAPIContract.Endpoint.currentUser)": nextUser,
-                "next:\(MobileAPIContract.Endpoint.projects)": ProjectsResponse(
+                "next:\(MobileAPIOperations.listProjects.path)": ProjectsResponse(
                     projects: [nextProject]
                 ),
             ],

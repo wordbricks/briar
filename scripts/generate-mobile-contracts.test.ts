@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mobileOperationCatalog } from "../packages/mobile-contracts/src/index";
 import {
+  renderOpenApi,
   renderSwift,
   renderSwiftObject,
 } from "./generate-mobile-contracts";
@@ -19,6 +20,20 @@ describe("mobile Swift contract rendering", () => {
     );
   });
 
+  it("inserts migrated paths and schemas without OpenAPI placeholders", () => {
+    const rendered = renderOpenApi(JSON.stringify({
+      openapi: "3.1.0",
+      info: { title: "Mobile API", version: "0.0.0" },
+      paths: {},
+      components: { schemas: {} },
+    }, null, 2));
+    const openApi = JSON.parse(rendered);
+
+    expect(openApi.paths["/projects"].get.operationId).toBe("listProjects");
+    expect(openApi.components.schemas).toHaveProperty("Project");
+    expect(openApi.components.schemas).toHaveProperty("ProjectsResponse");
+  });
+
   it("preserves optional properties and nullable array items", () => {
     const rendered = renderSwiftObject(
       "ExampleResponse",
@@ -35,8 +50,6 @@ describe("mobile Swift contract rendering", () => {
         },
         required: ["aliases"],
       },
-      {},
-      new Set(),
     );
 
     expect(rendered).toContain("let nickname: String?");

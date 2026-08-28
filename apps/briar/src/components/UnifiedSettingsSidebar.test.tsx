@@ -21,13 +21,23 @@ const projects: Project[] = [
   {
     id: "project-1",
     name: "Briar",
+    issueKeyPrefix: "BR",
+    scheduleTabEnabled: true,
+    icon: null,
     organizationId: organization.id,
+    organizationName: organization.name,
+    role: "owner",
     createdAt: "2026-01-01T00:00:00.000Z",
   },
   {
     id: "project-2",
     name: "Velen",
+    issueKeyPrefix: "VE",
+    scheduleTabEnabled: true,
+    icon: null,
     organizationId: organization.id,
+    organizationName: organization.name,
+    role: "member",
     createdAt: "2026-01-02T00:00:00.000Z",
   },
 ];

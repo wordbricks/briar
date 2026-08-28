@@ -71,7 +71,7 @@ struct ChannelsHomeView: View {
 
     let activeProjectID: UUID?
     let currentUserID: String?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     let onIssueOpen: ChannelIssueOpenHandler
@@ -175,7 +175,7 @@ struct ChannelMessagesView: View {
 
     let channel: ChannelSummary
     let currentUserID: String?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     let onIssueOpen: ChannelIssueOpenHandler
@@ -660,7 +660,7 @@ struct ChannelThreadView: View {
     let parentMessageID: UUID
     var highlightMessageID: UUID? = nil
     let currentUserID: String?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     let onIssueOpen: ChannelIssueOpenHandler
@@ -827,7 +827,7 @@ private struct ChannelConversationView: View {
     let messages: [ChannelMessage]
     let onIssueOpen: ChannelIssueOpenHandler
     let parentMessageID: UUID?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     let onSkillSessionMaterialized: SkillSessionMaterializedHandler
@@ -1103,7 +1103,7 @@ private struct ChannelMessageRow: View {
     let onDelete: () async -> Void
     let onToggleReaction: (String) async -> Void
     let onOpenThread: (() -> Void)?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     var showsThreadSummary = false
@@ -1823,11 +1823,11 @@ private struct ChannelProposalCard: View {
         UUID
     ) async -> ChannelsStore.ExecutionApprovalContext?
     let openingExecution: Bool
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let proposal: ChannelMessage.Proposal
     let workers: [DashboardWorker]
 
-    private var availableProjects: [ProjectsResponse.Project] {
+    private var availableProjects: [Project] {
         projects
             .filter { $0.organizationId == channel.organizationId }
             .sorted {
@@ -2212,7 +2212,7 @@ private struct ChannelExecutionProposalCard: View {
     ) async throws -> AcceptChannelExecutionProposalResponse
     let onIssueOpen: (UUID, UUID) async -> Void
     let onPrepare: () async -> ChannelsStore.ExecutionApprovalContext?
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     let proposal: IssueExecutionProposal
     let workers: [DashboardWorker]
 

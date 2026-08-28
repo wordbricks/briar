@@ -1,9 +1,6 @@
 import Foundation
 
 enum MobileAPIContract {
-    // New operations are additive so existing Android and Tauri clients stay
-    // on the stable 1.0 contract version.
-    static let version = "1.0.0"
     static let iOSClientID = "briar-mobile"
     static let androidClientID = "briar-android"
 
@@ -359,7 +356,7 @@ struct CurrentUserResponse: Codable, Equatable, Sendable {
     }
 }
 
-extension ProjectsResponse.Project {
+extension Project {
     var effectiveIssueKeyPrefix: String {
         let normalized = issueKeyPrefix.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard normalized.range(of: #"^[A-Z0-9]{1,3}$"#, options: .regularExpression) != nil

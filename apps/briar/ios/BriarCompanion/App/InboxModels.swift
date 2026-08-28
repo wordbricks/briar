@@ -197,7 +197,7 @@ enum InboxMessageBuilder {
     static func build(
         snapshot: DashboardSnapshot?,
         sessions: [ProjectAgentSession],
-        project: ProjectsResponse.Project,
+        project: Project,
         currentUserID: String? = nil
     ) -> [InboxMessage] {
         var messages: [InboxMessage] = []

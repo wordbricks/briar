@@ -96,14 +96,72 @@ const replaceJsonProperty = (
   return `${source.slice(0, valueStart)}${rendered}${source.slice(valueEnd)}`;
 };
 
-const renderOpenApi = (source: string): string => {
+const insertJsonObjectProperty = (
+  source: string,
+  parentIndentation: number,
+  parentName: string,
+  childIndentation: number,
+  childName: string,
+  value: unknown,
+) => {
+  const parentPrefix = " ".repeat(parentIndentation);
+  const parentMarker = `${parentPrefix}${JSON.stringify(parentName)}: `;
+  const parentStart = source.indexOf(parentMarker);
+  if (parentStart < 0) {
+    throw new Error(`Could not find OpenAPI parent property ${parentName}`);
+  }
+  if (source.indexOf(parentMarker, parentStart + parentMarker.length) >= 0) {
+    throw new Error(`OpenAPI parent property ${parentName} is ambiguous`);
+  }
+  const valueStart = parentStart + parentMarker.length;
+  const valueEnd = jsonValueEnd(source, valueStart);
+  if (source[valueStart] !== "{") {
+    throw new Error(`OpenAPI parent property ${parentName} must be an object`);
+  }
+
+  const closingBrace = valueEnd - 1;
+  let contentEnd = closingBrace;
+  while (/\s/u.test(source[contentEnd - 1] ?? "")) contentEnd -= 1;
+
+  const childPrefix = " ".repeat(childIndentation);
+  const rendered = JSON.stringify(value, null, 2).replaceAll(
+    "\n",
+    `\n${childPrefix}`,
+  );
+  const property = `${childPrefix}${JSON.stringify(childName)}: ${rendered}`;
+
+  if (contentEnd === valueStart + 1) {
+    return `${source.slice(0, valueStart + 1)}\n${property}\n${parentPrefix}${source.slice(closingBrace)}`;
+  }
+  return `${source.slice(0, contentEnd)},\n${property}${source.slice(contentEnd)}`;
+};
+
+const upsertJsonObjectProperty = (
+  source: string,
+  parentIndentation: number,
+  parentName: string,
+  childIndentation: number,
+  childName: string,
+  value: unknown,
+) => {
+  const childMarker = `${" ".repeat(childIndentation)}${JSON.stringify(childName)}: `;
+  return source.includes(childMarker)
+    ? replaceJsonProperty(source, childIndentation, childName, value)
+    : insertJsonObjectProperty(
+      source,
+      parentIndentation,
+      parentName,
+      childIndentation,
+      childName,
+      value,
+    );
+};
+
+export const renderOpenApi = (source: string): string => {
   const openApi = objectAt(JSON.parse(source), "OpenAPI document");
   const paths = objectAt(openApi.paths, "OpenAPI paths");
   const components = objectAt(openApi.components, "OpenAPI components");
-  const componentSchemas = objectAt(
-    components.schemas,
-    "OpenAPI component schemas",
-  );
+  objectAt(components.schemas, "OpenAPI component schemas");
 
   let output = source;
   const generatedComponents = new Map<string, string>();
@@ -114,20 +172,24 @@ const renderOpenApi = (source: string): string => {
       );
     }
     const generated = operationSchemaDocument(
-      operation.response.wireSchema,
+      operation.response.schema,
       true,
     );
     for (const [name, schema] of Object.entries(generated.definitions)) {
-      if (!(name in componentSchemas)) {
-        throw new Error(`OpenAPI template is missing component ${name}`);
-      }
       const serialized = JSON.stringify(schema);
       const previous = generatedComponents.get(name);
       if (previous !== undefined && previous !== serialized) {
         throw new Error(`Conflicting generated OpenAPI component ${name}`);
       }
       generatedComponents.set(name, serialized);
-      output = replaceJsonProperty(output, 6, name, schema);
+      output = upsertJsonObjectProperty(
+        output,
+        4,
+        "schemas",
+        6,
+        name,
+        schema,
+      );
     }
 
     const rewrittenPaths = new Set<string>();
@@ -144,9 +206,7 @@ const renderOpenApi = (source: string): string => {
         }
       }
     }
-    if (!(operation.path in paths)) {
-      throw new Error(`OpenAPI template is missing path ${operation.path}`);
-    }
+    paths[operation.path] ??= {};
     const pathItem = objectAt(
       paths[operation.path],
       `OpenAPI path ${operation.path}`,
@@ -178,7 +238,14 @@ const renderOpenApi = (source: string): string => {
     };
     rewrittenPaths.add(operation.path);
     for (const path of rewrittenPaths) {
-      output = replaceJsonProperty(output, 4, path, paths[path]);
+      output = upsertJsonObjectProperty(
+        output,
+        2,
+        "paths",
+        4,
+        path,
+        paths[path],
+      );
     }
   }
 
@@ -197,7 +264,6 @@ type SwiftProperty = {
   readonly required: boolean;
   readonly optional: boolean;
   readonly nullable: boolean;
-  readonly defaultValue?: string | boolean | number;
 };
 
 type SwiftType = {
@@ -367,18 +433,9 @@ const swiftType = (
   };
 };
 
-const swiftDefault = (value: string | boolean | number) =>
-  Predicate.isString(value) ? JSON.stringify(value) : String(value);
-
-const indentLines = (source: string, indentation: string) =>
-  source.split("\n").map((line) => line.length === 0 ? line : `${indentation}${line}`)
-    .join("\n");
-
 export const renderSwiftObject = (
   name: string,
   schema: JsonObject,
-  definitions: JsonObject,
-  nestedDefinitions: ReadonlySet<string>,
 ): string => {
   if (schema.type !== "object") throw new Error(`${name} must be an object schema`);
   const properties = objectAt(schema.properties, `${name}.properties`);
@@ -397,13 +454,7 @@ export const renderSwiftObject = (
         `${name}.${propertyName}`,
       );
       const type = swiftType(schemaObject, propertyName, enums);
-      const defaultValue = Predicate.isString(schemaObject.default) ||
-          Predicate.isBoolean(schemaObject.default) ||
-          Predicate.isNumber(schemaObject.default)
-        ? schemaObject.default
-        : undefined;
-      const isOptional = type.nullable ||
-        (!required.has(propertyName) && defaultValue === undefined);
+      const isOptional = type.nullable || !required.has(propertyName);
       return {
         name: propertyName,
         type: `${type.baseType}${isOptional ? "?" : ""}`,
@@ -411,31 +462,13 @@ export const renderSwiftObject = (
         required: required.has(propertyName),
         optional: isOptional,
         nullable: type.nullable,
-        ...(defaultValue === undefined ? {} : { defaultValue }),
       };
     },
   );
 
-  const needsCustomCodable = fields.some((field) =>
-    field.defaultValue !== undefined || field.optional
-  );
+  const needsCustomCodable = fields.some((field) => field.optional);
   const lines = [`struct ${name}: Codable, Equatable, Sendable {`];
   for (const field of fields) lines.push(`    let ${field.name}: ${field.type}`);
-
-  for (const definitionName of nestedDefinitions) {
-    const nestedSchema = definitions[definitionName];
-    if (nestedSchema === undefined) continue;
-    lines.push("");
-    lines.push(indentLines(
-      renderSwiftObject(
-        definitionName,
-        objectAt(nestedSchema, definitionName),
-        definitions,
-        new Set(),
-      ),
-      "    ",
-    ));
-  }
 
   for (const swiftEnum of enums) {
     lines.push("");
@@ -453,9 +486,7 @@ export const renderSwiftObject = (
     lines.push("");
     lines.push("    init(");
     fields.forEach((field, index) => {
-      const defaultSuffix = field.defaultValue === undefined
-        ? (!field.required && field.optional ? " = nil" : "")
-        : ` = ${swiftDefault(field.defaultValue)}`;
+      const defaultSuffix = !field.required && field.optional ? " = nil" : "";
       lines.push(
         `        ${field.name}: ${field.type}${defaultSuffix}${index === fields.length - 1 ? "" : ","}`,
       );
@@ -471,17 +502,7 @@ export const renderSwiftObject = (
     lines.push("    init(from decoder: Decoder) throws {");
     lines.push("        let container = try decoder.container(keyedBy: CodingKeys.self)");
     for (const field of fields) {
-      if (field.defaultValue !== undefined) {
-        lines.push(`        if container.contains(.${field.name}) {`);
-        lines.push(
-          `            ${field.name} = try container.decode(${field.baseType}.self, forKey: .${field.name})`,
-        );
-        lines.push("        } else {");
-        lines.push(
-          `            ${field.name} = ${swiftDefault(field.defaultValue)}`,
-        );
-        lines.push("        }");
-      } else if (field.required && field.nullable) {
+      if (field.required && field.nullable) {
         lines.push(`        guard container.contains(.${field.name}) else {`);
         lines.push("            throw DecodingError.keyNotFound(");
         lines.push(`                CodingKeys.${field.name},`);
@@ -519,7 +540,7 @@ export const renderSwiftObject = (
     lines.push("    func encode(to encoder: Encoder) throws {");
     lines.push("        var container = encoder.container(keyedBy: CodingKeys.self)");
     for (const field of fields) {
-      lines.push(field.required || field.defaultValue !== undefined
+      lines.push(field.required
         ? `        try container.encode(${field.name}, forKey: .${field.name})`
         : `        try container.encodeIfPresent(${field.name}, forKey: .${field.name})`);
     }
@@ -538,23 +559,24 @@ export const renderSwift = (): string => {
       true,
     );
     const definitions: JsonObject = generated.definitions;
-    const responseSchema = objectAt(
-      definitions[operation.response.component],
-      operation.response.component,
-    );
-    const rendered = renderSwiftObject(
-      operation.response.component,
-      responseSchema,
-      definitions,
-      new Set(operation.swift.nestedResponseComponents),
-    );
-    const previous = renderedResponses.get(operation.response.component);
-    if (previous !== undefined && previous !== rendered) {
+    for (const [definitionName, definitionSchema] of Object.entries(definitions)) {
+      const rendered = renderSwiftObject(
+        definitionName,
+        objectAt(definitionSchema, definitionName),
+      );
+      const previous = renderedResponses.get(definitionName);
+      if (previous !== undefined && previous !== rendered) {
+        throw new Error(
+          `Conflicting generated Swift response ${definitionName}`,
+        );
+      }
+      renderedResponses.set(definitionName, rendered);
+    }
+    if (!renderedResponses.has(operation.response.component)) {
       throw new Error(
-        `Conflicting generated Swift response ${operation.response.component}`,
+        `Missing generated Swift response ${operation.response.component}`,
       );
     }
-    renderedResponses.set(operation.response.component, rendered);
   }
   const responses = [...renderedResponses.values()].join("\n\n");
   const operations = mobileOperations.map((operation) => {
@@ -567,9 +589,6 @@ export const renderSwift = (): string => {
         path: ${JSON.stringify(operation.path)}
     )`;
   }).join("\n\n");
-  const endpoints = mobileOperations.map((operation) =>
-    `    static let ${swiftIdentifier(operation.swift.endpointName)} = MobileAPIOperations.${swiftIdentifier(operation.id)}.path`
-  ).join("\n");
   return `// Generated by scripts/generate-mobile-contracts.ts. Do not edit.
 
 import Foundation
@@ -578,10 +597,6 @@ ${responses}
 
 enum MobileAPIOperations {
 ${operations}
-}
-
-extension MobileAPIContract.Endpoint {
-${endpoints}
 }
 `;
 };

@@ -1,3 +1,4 @@
+import type { MobileProject } from "@briar/mobile-contracts";
 import {
   type AutoHuntQaStatus,
   type AutoHuntRunStatus,
@@ -678,17 +679,7 @@ export type HuntRunPlacement = {
   workflowStage: AutoHuntWorkflowStageId | null;
 };
 
-export type Project = {
-  id: string;
-  name: string;
-  issueKeyPrefix?: string;
-  scheduleTabEnabled?: boolean;
-  icon?: string | null;
-  organizationId?: string;
-  organizationName?: string;
-  role?: "owner" | "admin" | "member";
-  createdAt: string;
-};
+export type Project = MobileProject;
 
 export type ProjectAgent = {
   id: string;

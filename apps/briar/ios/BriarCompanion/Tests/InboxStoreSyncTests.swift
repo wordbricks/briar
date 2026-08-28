@@ -3,9 +3,11 @@ import XCTest
 
 @MainActor
 final class InboxStoreSyncTests: XCTestCase {
-    private let project = ProjectsResponse.Project(
+    private let project = Project(
         id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
         name: "Briar",
+        issueKeyPrefix: "AH",
+        scheduleTabEnabled: true,
         icon: nil,
         organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
         organizationName: "Wordbricks",
@@ -181,9 +183,11 @@ final class InboxStoreSyncTests: XCTestCase {
     }
 
     func testOrganizationFeedKeepsUnselectedProjectMessages() async throws {
-        let secondProject = ProjectsResponse.Project(
+        let secondProject = Project(
             id: UUID(uuidString: "44444444-4444-4444-8444-444444444444")!,
             name: "Second project",
+            issueKeyPrefix: "AH",
+            scheduleTabEnabled: true,
             icon: nil,
             organizationId: project.organizationId,
             organizationName: project.organizationName,

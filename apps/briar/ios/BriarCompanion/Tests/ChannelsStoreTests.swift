@@ -1740,9 +1740,11 @@ final class ChannelsStoreTests: XCTestCase {
         workerReadiness: String = "available",
         workerAcceptingWork: Bool = true
     ) -> DashboardSnapshot {
-        let project = ProjectsResponse.Project(
+        let project = Project(
             id: projectID,
             name: "Target",
+            issueKeyPrefix: "AH",
+            scheduleTabEnabled: true,
             icon: nil,
             organizationId: organizationID,
             organizationName: "Wordbricks",

@@ -13,6 +13,9 @@ const projects: Project[] = [
   {
     id: "project-1",
     name: "Briar",
+    issueKeyPrefix: "BR",
+    scheduleTabEnabled: true,
+    icon: null,
     organizationId: "organization-1",
     organizationName: "Briar",
     role: "owner",

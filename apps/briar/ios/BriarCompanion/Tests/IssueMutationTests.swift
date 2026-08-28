@@ -551,9 +551,11 @@ final class IssueMutationTests: XCTestCase {
         )
 
         let snapshot = DashboardSnapshot(
-            project: ProjectsResponse.Project(
+            project: Project(
                 id: Self.projectID,
                 name: "Target",
+                issueKeyPrefix: "AH",
+                scheduleTabEnabled: true,
                 icon: nil,
                 organizationId: UUID(
                     uuidString: "22222222-2222-4222-8222-222222222222"
@@ -651,9 +653,11 @@ final class IssueMutationTests: XCTestCase {
             availableSessions: 1
         )
         let snapshot = DashboardSnapshot(
-            project: ProjectsResponse.Project(
+            project: Project(
                 id: Self.projectID,
                 name: "Target",
+                issueKeyPrefix: "AH",
+                scheduleTabEnabled: true,
                 icon: nil,
                 organizationId: UUID(
                     uuidString: "22222222-2222-4222-8222-222222222222"

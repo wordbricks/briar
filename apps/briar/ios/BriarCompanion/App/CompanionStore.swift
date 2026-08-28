@@ -10,7 +10,7 @@ struct OrganizationSummary: Identifiable, Equatable, Sendable {
 final class CompanionStore: ObservableObject {
     @Published private(set) var user: CurrentUserResponse.User?
     @Published private(set) var organizations: [OrganizationSummary] = []
-    @Published private(set) var projects: [ProjectsResponse.Project] = []
+    @Published private(set) var projects: [Project] = []
     @Published var selectedProjectID: UUID? {
         didSet {
             persistSelectedProjectID()
@@ -146,7 +146,7 @@ final class CompanionStore: ObservableObject {
         errorMessage = nil
     }
 
-    private func applyProjectCatalog(_ nextProjects: [ProjectsResponse.Project]) {
+    private func applyProjectCatalog(_ nextProjects: [Project]) {
         projects = nextProjects
         organizations = Dictionary(
             grouping: nextProjects,
@@ -158,7 +158,7 @@ final class CompanionStore: ObservableObject {
 
     private static func storedProjectID(
         for userID: String,
-        in projects: [ProjectsResponse.Project],
+        in projects: [Project],
         defaults: UserDefaults
     ) -> UUID? {
         guard let raw = defaults.string(forKey: selectedProjectKey(for: userID)),
@@ -169,7 +169,7 @@ final class CompanionStore: ObservableObject {
         return stored
     }
 
-    static func defaultProjectID(for projects: [ProjectsResponse.Project]) -> UUID? {
+    static func defaultProjectID(for projects: [Project]) -> UUID? {
         // The API returns projects grouped by organization; the first project is
         // the first project of the first organization, matching the web client.
         projects.first?.id

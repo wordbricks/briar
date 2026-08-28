@@ -141,6 +141,7 @@ import {
   type AutoHuntWorkflowCheckpoint,
 } from "../lib/auto-hunt-contract";
 import { isMobileCompanion, isWebApp } from "../lib/platform";
+import { defaultIssueKeyPrefix } from "../lib/issue-key";
 import { canonicalizeIssueAttachmentReferences } from "../lib/issue-markdown";
 import { mergeIssueMessages } from "../lib/issue-message-merge";
 import {
@@ -1590,6 +1591,9 @@ export function useBriar(options: UseBriarOptions = {}) {
         const project: Project = {
           id: crypto.randomUUID(),
           name: input.name.trim(),
+          issueKeyPrefix: defaultIssueKeyPrefix,
+          scheduleTabEnabled: true,
+          icon: null,
           organizationId: organization.id,
           organizationName: organization.name,
           role: organization.role,

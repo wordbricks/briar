@@ -31,11 +31,11 @@ prepares shared build inputs once, and runs the four independent contexts in
 parallel before publishing any status. Do not precede it with a separate
 `bun run check`; that check is already part of `signoff/app-worker`.
 
-Mobile compatibility validation is separate from the required pull request
+Mobile contract validation is separate from the required pull request
 signoffs. On a macOS worker with Xcode, JDK 17, Android SDK 36, and a
 `Briar iPhone 17 Pro` simulator, `bun run mobile:ci`:
 
-- validates the Companion OpenAPI subset against Worker fixtures;
+- checks generated Companion OpenAPI/Swift artifacts and exercises the canonical Worker route and client decoders;
 - builds and runs the independent SwiftUI App, Unit Test, and UI Test targets;
 - builds the existing Tauri iOS project for an Apple Silicon simulator; and
 - builds the existing Tauri Android debug APK.

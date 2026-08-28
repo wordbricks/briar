@@ -3,7 +3,7 @@
   "info": {
     "title": "Briar Companion Mobile API",
     "version": "1.0.0",
-    "description": "Additive subset shared by native iOS (briar-mobile) and Android (briar-android) Companion clients."
+    "description": "Current contract shared by native iOS (briar-mobile) and Android (briar-android) Companion clients."
   },
   "servers": [
     {
@@ -2254,12 +2254,10 @@
           "issueKeyPrefix": {
             "type": "string",
             "pattern": "^[A-Z0-9]{1,3}$",
-            "description": "a string matching the RegExp ^[A-Z0-9]{1,3}$",
-            "default": "AH"
+            "description": "a string matching the RegExp ^[A-Z0-9]{1,3}$"
           },
           "scheduleTabEnabled": {
-            "type": "boolean",
-            "default": true
+            "type": "boolean"
           },
           "icon": {
             "anyOf": [

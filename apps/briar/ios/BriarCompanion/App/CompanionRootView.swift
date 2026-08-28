@@ -272,7 +272,7 @@ struct CompanionRootView: View {
 
     private func authenticatedContent(
         token: String,
-        project: ProjectsResponse.Project
+        project: Project
     ) -> some View {
         CompanionShellView(
             navigation: navigation,
@@ -317,7 +317,7 @@ struct CompanionRootView: View {
         )
     }
 
-    private var currentProject: ProjectsResponse.Project? {
+    private var currentProject: Project? {
         guard let projectID = companion.selectedProjectID else { return nil }
         return companion.projects.first(where: { $0.id == projectID })
     }
@@ -482,7 +482,7 @@ struct CompanionLoginView: View {
 }
 
 struct ProjectSelectionView: View {
-    let projects: [ProjectsResponse.Project]
+    let projects: [Project]
     @Binding var selectedProjectID: UUID?
     let continueAction: () -> Void
     let signOut: () -> Void
@@ -514,7 +514,7 @@ struct ProjectSelectionView: View {
         )
     }
 
-    private var visibleProjects: [ProjectsResponse.Project] {
+    private var visibleProjects: [Project] {
         guard let selectedOrganizationID else { return projects }
         return projects.filter { $0.organizationId == selectedOrganizationID }
     }

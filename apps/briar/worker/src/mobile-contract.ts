@@ -1,8 +1,6 @@
 import * as Schema from "effect/Schema";
 import {
-  listProjectsOperation,
   mobileProjectSchema as mobileDashboardProjectSchema,
-  mobileProjectsResponseSchema,
 } from "@briar/mobile-contracts";
 import {
   AgentProviderCapabilityCatalog,
@@ -114,8 +112,6 @@ export const mobileCurrentUserResponseSchema = mutableStruct({
     image: optionalNullable(Schema.String),
   }),
 });
-
-export { mobileProjectsResponseSchema };
 
 export const mobileIssueAttachmentSchema = mutableStruct({
   id: uuidString,
@@ -1287,137 +1283,6 @@ export const mobileAgentSkillExecutionApprovalResponseSchema = strict(
     ? undefined
     : "Approved Agent Skill execution response is not canonical";
 }));
-
-export const mobileOperationSchemas = {
-  getHealth: { response: mobileHealthResponseSchema },
-  beginDeviceAuthorization: {
-    request: mobileDeviceCodeRequestSchema,
-    response: mobileDeviceCodeResponseSchema,
-  },
-  pollDeviceToken: {
-    request: mobileDeviceTokenRequestSchema,
-    response: mobileDeviceTokenResponseSchema,
-    errorResponse: mobileDeviceTokenErrorSchema,
-  },
-  getCurrentUser: { response: mobileCurrentUserResponseSchema },
-  listProjects: { response: listProjectsOperation.response.schema },
-  getInboxFeed: { response: mobileInboxFeedResponseSchema },
-  getInboxReadStates: { response: mobileInboxReadStatesSchema },
-  putInboxReadStates: {
-    request: mobileInboxReadStatesSchema,
-    response: mobileInboxReadStatesSchema,
-  },
-  getDashboardSnapshot: { response: mobileDashboardSnapshotSchema },
-  getDashboardDelta: {
-    response: mobileDashboardDeltaSchema,
-    errorResponse: mobileDashboardCursorExpiredSchema,
-  },
-  listRunEvents: { response: mobileRunEventsResponseSchema },
-  listIssueMessages: { response: mobileIssueMessagesResponseSchema },
-  listRunEvidence: { response: mobileRunEvidenceResponseSchema },
-  createIssue: {
-    request: mobileCreateIssueRequestSchema,
-    response: mobileCreateIssueResponseSchema,
-  },
-  updateIssue: {
-    request: mobileUpdateIssueRequestSchema,
-    response: mobileUpdateIssueResponseSchema,
-  },
-  putIssueSubscription: { response: mobileIssueSubscriptionResponseSchema },
-  deleteIssueSubscription: { response: mobileIssueSubscriptionResponseSchema },
-  deleteIssue: { response: Schema.Null },
-  updateIssuePreferences: {
-    request: mobilePreferencesSchema,
-    response: mobilePreferencesResponseSchema,
-  },
-  addIssueDependency: { response: mobileDependencyResponseSchema },
-  removeIssueDependency: { response: Schema.Null },
-  moveRun: {
-    request: mobileMoveRunRequestSchema,
-    response: mobileMoveRunResponseSchema,
-  },
-  retryRun: {
-    request: mobileRecoveryRequestSchema,
-    response: mobileRecoveryResponseSchema,
-  },
-  cancelRun: {
-    request: mobileRecoveryRequestSchema,
-    response: mobileRecoveryResponseSchema,
-  },
-  resumeRun: {
-    request: mobileResumeRequestSchema,
-    response: mobileResumeResponseSchema,
-  },
-  dispatchRun: {
-    request: mobileDispatchRequestSchema,
-    response: mobileDispatchResponseSchema,
-  },
-  reassignRun: {
-    request: mobileDispatchRequestSchema,
-    response: mobileDispatchResponseSchema,
-  },
-  completeResultReview: { response: mobileResultReviewSchema },
-  createIssueMessage: {
-    request: mobileCreateMessageRequestSchema,
-    response: mobileCreateMessageResponseSchema,
-  },
-  getIssueAgentReply: { response: mobileAgentReplyResponseSchema },
-  acceptIssueReworkProposal: {
-    response: mobileAcceptIssueReworkProposalResponseSchema,
-  },
-  acceptIssueActionProposal: {
-    response: mobileAcceptIssueActionProposalResponseSchema,
-  },
-  acceptIssueExecutionProposal: {
-    request: mobileIssueExecutionApprovalRequestSchema,
-    response: mobileIssueExecutionApprovalResponseSchema,
-  },
-  acceptIssueSkillExecutionProposal: {
-    request: mobileAgentSkillExecutionApprovalRequestSchema,
-    response: mobileAgentSkillExecutionApprovalResponseSchema,
-  },
-  listProjectAgents: { response: mobileProjectAgentsResponseSchema },
-  listProjectAgentSessions: {
-    response: mobileProjectAgentSessionsResponseSchema,
-  },
-  runProjectAgentTask: {
-    request: mobileProjectAgentTaskRequestSchema,
-    response: mobileProjectAgentTaskResponseSchema,
-  },
-  listChannels: { response: mobileChannelsResponseSchema },
-  getChannelDelta: { response: mobileChannelDeltaResponseSchema },
-  getChannel: { response: mobileChannelDetailResponseSchema },
-  listChannelMessages: { response: mobileChannelMessagesResponseSchema },
-  createChannelMessage: {
-    request: mobileCreateChannelMessageRequestSchema,
-    response: mobileCreateChannelMessageResponseSchema,
-  },
-  deleteChannelMessage: {
-    response: mobileDeleteChannelMessageResponseSchema,
-  },
-  toggleChannelMessageReaction: {
-    request: mobileToggleChannelMessageReactionRequestSchema,
-    response: mobileToggleChannelMessageReactionResponseSchema,
-  },
-  putChannelThreadSubscription: {
-    response: mobileChannelThreadSubscriptionResponseSchema,
-  },
-  deleteChannelThreadSubscription: {
-    response: mobileChannelThreadSubscriptionResponseSchema,
-  },
-  acceptChannelProposal: {
-    request: mobileAcceptChannelProposalRequestSchema,
-    response: mobileAcceptChannelProposalResponseSchema,
-  },
-  acceptChannelExecutionProposal: {
-    request: mobileIssueExecutionApprovalRequestSchema,
-    response: mobileIssueExecutionApprovalResponseSchema,
-  },
-  acceptChannelSkillExecutionProposal: {
-    request: mobileAgentSkillExecutionApprovalRequestSchema,
-    response: mobileAgentSkillExecutionApprovalResponseSchema,
-  },
-} as const;
 
 export const decodeMobileHealthResponse = Schema.decodeUnknownSync(
   mobileHealthResponseSchema,

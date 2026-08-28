@@ -1,4 +1,3 @@
-import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { IsoDateTimeUtc } from "./date-time";
 import { defineOperation } from "./operation";
@@ -22,21 +21,13 @@ const mutableStruct = <const Fields extends Schema.Struct.Fields>(
 const mutableArray = <S extends Schema.Top>(item: S) =>
   Schema.mutable(Schema.Array(item));
 
-const issueKeyPrefix = Schema.String.check(
-  Schema.isPattern(/^[A-Z0-9]{1,3}$/u),
-).annotate({ default: "AH" }).pipe(
-  Schema.withDecodingDefaultTypeKey(Effect.succeed("AH")),
-);
-
-const scheduleTabEnabled = Schema.Boolean.annotate({ default: true }).pipe(
-  Schema.withDecodingDefaultTypeKey(Effect.succeed(true)),
-);
-
 export const mobileProjectSchema = mutableStruct({
   id: Schema.String.check(Schema.isUUID()),
   name: Schema.String,
-  issueKeyPrefix,
-  scheduleTabEnabled,
+  issueKeyPrefix: Schema.String.check(
+    Schema.isPattern(/^[A-Z0-9]{1,3}$/u),
+  ),
+  scheduleTabEnabled: Schema.Boolean,
   icon: Schema.NullOr(Schema.String),
   organizationId: Schema.String.check(Schema.isUUID()),
   organizationName: Schema.String,
@@ -52,10 +43,6 @@ export const mobileProjectsResponseSchema = mutableStruct({
 
 export type MobileProjectsResponse = typeof mobileProjectsResponseSchema.Type;
 
-export const mobileProjectsWireResponseSchema = Schema.toType(
-  mobileProjectsResponseSchema,
-);
-
 export const listProjectsOperation = defineOperation({
   id: "listProjects",
   method: "GET",
@@ -68,10 +55,5 @@ export const listProjectsOperation = defineOperation({
     contentType: "application/json",
     component: "ProjectsResponse",
     schema: mobileProjectsResponseSchema,
-    wireSchema: mobileProjectsWireResponseSchema,
-  },
-  swift: {
-    endpointName: "projects",
-    nestedResponseComponents: ["Project"],
   },
 });

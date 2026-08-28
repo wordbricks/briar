@@ -10,6 +10,9 @@ import { I18nProvider } from "../i18n";
 const project: Project = {
   id: "project-1",
   name: "Briar",
+  issueKeyPrefix: "BR",
+  scheduleTabEnabled: true,
+  icon: null,
   organizationId: "org-1",
   organizationName: "Briar Org",
   role: "owner",

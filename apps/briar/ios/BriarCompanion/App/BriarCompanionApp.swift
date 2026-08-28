@@ -50,18 +50,22 @@ private struct UITestCompanionFlow: View {
     let offline: Bool
     let locale: CompanionLocale
     private let api: UITestAPIClient
-    private let project = ProjectsResponse.Project(
+    private let project = Project(
         id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
         name: "Briar",
+        issueKeyPrefix: "AH",
+        scheduleTabEnabled: true,
         icon: nil,
         organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
         organizationName: "Wordbricks",
         role: .owner,
         createdAt: Date(timeIntervalSince1970: 1_775_260_800)
     )
-    private let alternateProject = ProjectsResponse.Project(
+    private let alternateProject = Project(
         id: UUID(uuidString: "88888888-8888-4888-8888-888888888888")!,
         name: "Briar Mobile",
+        issueKeyPrefix: "AH",
+        scheduleTabEnabled: true,
         icon: nil,
         organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
         organizationName: "Wordbricks",
@@ -149,7 +153,7 @@ private struct UITestCompanionFlow: View {
         }
     }
 
-    private var selectedProject: ProjectsResponse.Project {
+    private var selectedProject: Project {
         [project, alternateProject].first(where: { $0.id == selectedProjectID }) ?? project
     }
 

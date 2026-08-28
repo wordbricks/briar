@@ -93,10 +93,6 @@ targets:
     platform: iOS
     sources:
       - path: Tests
-      - path: ../../../../packages/mobile-contracts/fixtures/companion-v1.json
-        buildPhase: resources
-      - path: ../../../../packages/mobile-contracts/companion.openapi.yaml
-        buildPhase: resources
     dependencies:
       - target: BriarCompanion
     settings:

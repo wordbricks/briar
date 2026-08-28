@@ -2453,7 +2453,7 @@ final class ChannelsStore: ObservableObject {
 
     func groups(
         activeProjectID: UUID?,
-        projects: [ProjectsResponse.Project],
+        projects: [Project],
         commonLabel: String,
         unknownProjectLabel: String
     ) -> [ChannelGroup] {

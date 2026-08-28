@@ -27,8 +27,8 @@ struct CompanionShellView: View {
     @ObservedObject var channels: ChannelsStore
     let issueConversationView: IssueConversationViewTracker
 
-    let projects: [ProjectsResponse.Project]
-    let project: ProjectsResponse.Project
+    let projects: [Project]
+    let project: Project
     let snapshot: DashboardSnapshot?
     let errorMessage: String?
     let token: String
@@ -456,8 +456,8 @@ struct TaskListView: View {
     @State private var dispatchRun: DashboardRun?
     @StateObject private var mutations: IssueMutationStore
 
-    let project: ProjectsResponse.Project
-    let projects: [ProjectsResponse.Project]
+    let project: Project
+    let projects: [Project]
     let projectAgents: [ProjectAgent]
     let snapshot: DashboardSnapshot?
     let errorMessage: String?
@@ -472,8 +472,8 @@ struct TaskListView: View {
 
     @MainActor
     init(
-        project: ProjectsResponse.Project,
-        projects: [ProjectsResponse.Project] = [],
+        project: Project,
+        projects: [Project] = [],
         projectAgents: [ProjectAgent] = [],
         snapshot: DashboardSnapshot?,
         errorMessage: String?,
@@ -944,7 +944,7 @@ struct RunDetailView: View {
 
     private let projectID: UUID
     private let issueKeyPrefix: String
-    private let projects: [ProjectsResponse.Project]
+    private let projects: [Project]
     private let allRuns: [DashboardRun]
     private let projectAgents: [ProjectAgent]
     private let workers: [DashboardWorker]
@@ -975,7 +975,7 @@ struct RunDetailView: View {
         MessageMentions.issueHandles(members: members, agents: projectAgents)
     }
 
-    private var transferDestinations: [ProjectsResponse.Project] {
+    private var transferDestinations: [Project] {
         let currentOrganization = projects.first(where: { $0.id == projectID })?.organizationId
         return projects.filter { project in
             project.id != projectID &&
@@ -1006,7 +1006,7 @@ struct RunDetailView: View {
         issueKeyPrefix: String = "AH",
         token: String,
         api: any MobileAPIClientProtocol,
-        projects: [ProjectsResponse.Project] = [],
+        projects: [Project] = [],
         allRuns: [DashboardRun] = [],
         projectAgents: [ProjectAgent] = [],
         workers: [DashboardWorker] = [],

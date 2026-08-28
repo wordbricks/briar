@@ -4,7 +4,6 @@ export {
   listProjectsOperation,
   mobileProjectSchema,
   mobileProjectsResponseSchema,
-  mobileProjectsWireResponseSchema,
   type MobileProject,
   type MobileProjectsResponse,
 } from "./list-projects";

@@ -57,55 +57,6 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(refreshCount, 2)
     }
 
-    func testDecodesAgentAndSessionFixturesFromSharedContract() throws {
-        let bundle = Bundle(for: Self.self)
-        let fixtureURL = try XCTUnwrap(bundle.url(forResource: "companion-v1", withExtension: "json"))
-        let fixture = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: Data(contentsOf: fixtureURL)) as? [String: Any]
-        )
-        let operations = try XCTUnwrap(fixture["operations"] as? [String: [String: Any]])
-
-        let agentsPayload = try XCTUnwrap(operations["listProjectAgents"]?["response"])
-        let agentsData = try JSONSerialization.data(withJSONObject: agentsPayload)
-        let agents = try JSONDecoder.mobileContract.decode(ProjectAgentsResponse.self, from: agentsData)
-        XCTAssertEqual(agents.agents.count, 1)
-        XCTAssertEqual(agents.agents.first?.name, "Issue processing agent")
-        XCTAssertEqual(agents.agents.first?.provider, .codex)
-        XCTAssertEqual(agents.agents.first?.skills.count, 1)
-        XCTAssertEqual(agents.agents.first?.skills.first?.name, "Issue processing")
-        XCTAssertEqual(
-            agents.agents.first?.skills.first?.id,
-            UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
-        )
-        guard case let .data(avatarData) = ProfileImageSource.parse(agents.agents.first?.avatar) else {
-            return XCTFail("shared agent fixture should contain a data URL avatar")
-        }
-        XCTAssertFalse(avatarData.isEmpty)
-
-        let sessionsPayload = try XCTUnwrap(operations["listProjectAgentSessions"]?["response"])
-        let sessionsData = try JSONSerialization.data(withJSONObject: sessionsPayload)
-        let sessions = try JSONDecoder.mobileContract.decode(
-            ProjectAgentSessionsResponse.self,
-            from: sessionsData
-        )
-        XCTAssertEqual(sessions.sessions.count, 1)
-        XCTAssertEqual(sessions.sessions.first?.status, .completed)
-        XCTAssertEqual(sessions.sessions.first?.agentName, "Issue processing agent")
-        XCTAssertEqual(sessions.sessions.first?.issues.first?.runNumber, 3832)
-        XCTAssertEqual(sessions.sessions.first?.requestedByUserId, "fixture-user")
-
-        let taskPayload = try XCTUnwrap(operations["runProjectAgentTask"]?["response"])
-        let taskData = try JSONSerialization.data(withJSONObject: taskPayload)
-        let task = try JSONDecoder.mobileContract.decode(ProjectAgentTaskResponse.self, from: taskData)
-        XCTAssertEqual(
-            task.session.skillId,
-            UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
-        )
-        XCTAssertEqual(task.session.requestedWorkerId, "worker-1")
-        XCTAssertEqual(task.session.workerId, "worker-1")
-        XCTAssertEqual(task.session.agentName, "Issue processing agent")
-    }
-
     func testProjectAgentTaskRequestEncodesCanonicalUUIDs() throws {
         let agentID = UUID(uuidString: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA")!
         let skillID = UUID(uuidString: "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB")!
@@ -842,10 +793,11 @@ final class AgentsInboxSystemTests: XCTestCase {
 
     @MainActor
     func testInboxClassificationAndReadState() async throws {
-        let project = ProjectsResponse.Project(
+        let project = Project(
             id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
             name: "Briar",
             issueKeyPrefix: "WB",
+            scheduleTabEnabled: true,
             icon: nil,
             organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
             organizationName: "Wordbricks",
@@ -1156,9 +1108,11 @@ final class AgentsInboxSystemTests: XCTestCase {
     }
 
     func testInboxSessionMessagesAreLimitedToTheCurrentRequester() {
-        let project = ProjectsResponse.Project(
+        let project = Project(
             id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
             name: "Briar",
+            issueKeyPrefix: "AH",
+            scheduleTabEnabled: true,
             icon: nil,
             organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
             organizationName: "Wordbricks",

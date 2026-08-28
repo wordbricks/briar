@@ -15,6 +15,11 @@ import {
 const project: Project = {
   id: "11111111-1111-4111-8111-111111111111",
   name: "Briar",
+  issueKeyPrefix: "BR",
+  scheduleTabEnabled: true,
+  icon: null,
+  organizationId: "organization-1",
+  organizationName: "Briar",
   role: "owner",
   createdAt: "2026-08-21T00:00:00.000Z",
 };

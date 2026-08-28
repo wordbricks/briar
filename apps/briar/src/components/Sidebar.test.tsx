@@ -44,6 +44,9 @@ const sidebarProps = {
     {
       id: "project-1",
       name: "Briar",
+      issueKeyPrefix: "BR",
+      scheduleTabEnabled: true,
+      icon: null,
       organizationId: "organization-1",
       organizationName: "Briar",
       role: "owner" as const,
@@ -360,6 +363,9 @@ describe("Sidebar", () => {
           {
             id: "project-2",
             name: "Console",
+            issueKeyPrefix: "CO",
+            scheduleTabEnabled: true,
+            icon: null,
             organizationId: "organization-1",
             organizationName: "Briar",
             role: "member",
@@ -463,6 +469,9 @@ describe("Sidebar", () => {
           {
             id: "project-2",
             name: "Console",
+            issueKeyPrefix: "CO",
+            scheduleTabEnabled: true,
+            icon: null,
             organizationId: "organization-1",
             organizationName: "Briar",
             role: "member",
@@ -514,6 +523,9 @@ describe("Sidebar", () => {
           {
             id: "project-2",
             name: "Console",
+            issueKeyPrefix: "CO",
+            scheduleTabEnabled: true,
+            icon: null,
             organizationId: "organization-1",
             organizationName: "Briar",
             role: "member",
@@ -563,6 +575,9 @@ describe("Sidebar", () => {
           {
             id: "project-2",
             name: "Console",
+            issueKeyPrefix: "CO",
+            scheduleTabEnabled: true,
+            icon: null,
             organizationId: "organization-1",
             organizationName: "Briar",
             role: "member",
@@ -625,6 +640,9 @@ describe("Sidebar", () => {
           {
             id: "project-2",
             name: "Console",
+            issueKeyPrefix: "CO",
+            scheduleTabEnabled: true,
+            icon: null,
             organizationId: "organization-1",
             organizationName: "Briar",
             role: "owner" as const,
@@ -676,6 +694,9 @@ describe("Sidebar", () => {
           {
             id: "project-2",
             name: "Console",
+            issueKeyPrefix: "CO",
+            scheduleTabEnabled: true,
+            icon: null,
             organizationId: "organization-2",
             organizationName: "Wordbricks",
             role: "member",
@@ -1178,6 +1199,9 @@ describe("Sidebar", () => {
           {
             id: "project-2",
             name: "Console",
+            issueKeyPrefix: "CO",
+            scheduleTabEnabled: true,
+            icon: null,
             organizationId: "organization-1",
             organizationName: "Briar",
             role: "member",

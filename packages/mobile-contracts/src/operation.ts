@@ -22,7 +22,6 @@ export type MobileOperationDefinition<
   Method extends MobileHttpMethod,
   Path extends string,
   ResponseSchema extends Schema.ConstraintDecoder<unknown>,
-  WireResponseSchema extends Schema.ConstraintDecoder<unknown>,
   ResponseComponent extends string,
   Security extends MobileOperationSecurity = MobileOperationSecurity,
 > = {
@@ -37,14 +36,8 @@ export type MobileOperationDefinition<
     readonly description: string;
     readonly contentType: "application/json";
     readonly component: ResponseComponent;
-    /** Client decoder, including additive backwards-compatibility defaults. */
+    /** Canonical response used by the Worker, clients, and generators. */
     readonly schema: ResponseSchema;
-    /** Current server output shape used for response validation and OpenAPI. */
-    readonly wireSchema: WireResponseSchema;
-  };
-  readonly swift: {
-    readonly endpointName: string;
-    readonly nestedResponseComponents: readonly string[];
   };
 };
 
@@ -52,7 +45,6 @@ export type AnyMobileOperation = MobileOperationDefinition<
   string,
   MobileHttpMethod,
   string,
-  Schema.ConstraintDecoder<unknown>,
   Schema.ConstraintDecoder<unknown>,
   string
 >;
@@ -62,7 +54,6 @@ export const defineOperation = <
   const Method extends MobileHttpMethod,
   const Path extends string,
   ResponseSchema extends Schema.ConstraintDecoder<unknown>,
-  WireResponseSchema extends Schema.ConstraintDecoder<unknown>,
   const ResponseComponent extends string,
   const Security extends MobileOperationSecurity,
 >(
@@ -71,7 +62,6 @@ export const defineOperation = <
     Method,
     Path,
     ResponseSchema,
-    WireResponseSchema,
     ResponseComponent,
     Security
   >,
@@ -93,9 +83,8 @@ export const matchesMobileOperation = (
 };
 
 /**
- * Validate the wire value, returning the decoded value only for callers that
- * explicitly need defaults or transformations. Server response helpers should
- * serialize their original value so additive fields are not stripped.
+ * Decode a response for a client. Server response helpers validate but
+ * serialize their original value so response extensions are not stripped.
  */
 export const decodeMobileOperationResponse = <
   Operation extends MobileOperationDefinition<
@@ -103,22 +92,20 @@ export const decodeMobileOperationResponse = <
     MobileHttpMethod,
     string,
     Schema.ConstraintDecoder<unknown>,
-    Schema.ConstraintDecoder<unknown>,
     string
   >,
 >(operation: Operation, input: unknown): Operation["response"]["schema"]["Type"] =>
   Schema.decodeUnknownSync(operation.response.schema, { errors: "all" })(input);
 
-/** Validate the exact current server response without applying client defaults. */
+/** Validate a server response against the canonical operation schema. */
 export const validateMobileOperationResponse = <
   Operation extends MobileOperationDefinition<
     string,
     MobileHttpMethod,
     string,
     Schema.ConstraintDecoder<unknown>,
-    Schema.ConstraintDecoder<unknown>,
     string
   >,
 >(operation: Operation, input: unknown): void => {
-  Schema.decodeUnknownSync(operation.response.wireSchema, { errors: "all" })(input);
+  Schema.decodeUnknownSync(operation.response.schema, { errors: "all" })(input);
 };

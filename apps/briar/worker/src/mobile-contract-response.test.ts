@@ -15,7 +15,7 @@ const currentProject = {
 } as const;
 
 describe("canonical mobile responses", () => {
-  it("validates the current wire shape without stripping additive fields", async () => {
+  it("validates the canonical shape without stripping additive fields", async () => {
     const response = mobileJson(listProjectsOperation, {
       projects: [{ ...currentProject, futureProjectField: true }],
       futureEnvelopeField: "preserved",
@@ -28,7 +28,7 @@ describe("canonical mobile responses", () => {
     });
   });
 
-  it("rejects a success response that omits a current wire field", () => {
+  it("rejects a success response that omits a canonical field", () => {
     const { scheduleTabEnabled: _scheduleTabEnabled, ...staleProject } =
       currentProject;
 

@@ -16,10 +16,12 @@ const projectId = "22222222-2222-4222-8222-222222222222";
 const agentId = "11111111-1111-4111-8111-111111111111";
 
 describe("API response contracts", () => {
-  it("uses the shared project defaults and strips response extensions", () => {
+  it("requires the shared project fields and strips response extensions", () => {
     const project = {
       id: projectId,
       name: "Briar",
+      issueKeyPrefix: "BR",
+      scheduleTabEnabled: true,
       icon: null,
       organizationId: "33333333-3333-4333-8333-333333333333",
       organizationName: "Wordbricks",
@@ -33,7 +35,7 @@ describe("API response contracts", () => {
     ).toEqual({
       id: projectId,
       name: "Briar",
-      issueKeyPrefix: "AH",
+      issueKeyPrefix: "BR",
       scheduleTabEnabled: true,
       icon: null,
       organizationId: "33333333-3333-4333-8333-333333333333",
@@ -57,6 +59,13 @@ describe("API response contracts", () => {
     ).toThrow();
     const { icon: _icon, ...missingIcon } = project;
     expect(() => decodeProjectResponse(missingIcon)).toThrow();
+    const { issueKeyPrefix: _issueKeyPrefix, ...missingIssueKeyPrefix } = project;
+    expect(() => decodeProjectResponse(missingIssueKeyPrefix)).toThrow();
+    const {
+      scheduleTabEnabled: _scheduleTabEnabled,
+      ...missingScheduleTabEnabled
+    } = project;
+    expect(() => decodeProjectResponse(missingScheduleTabEnabled)).toThrow();
   });
 
   it("keeps organization logo defaults and record key/value validation", () => {

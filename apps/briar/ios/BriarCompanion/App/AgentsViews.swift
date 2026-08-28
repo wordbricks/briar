@@ -3,7 +3,7 @@ import SwiftUI
 struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
     @ObservedObject var agents: AgentsStore
     @ObservedObject var navigation: CompanionNavigationModel
-    let project: ProjectsResponse.Project
+    let project: Project
     let token: String
     let api: any MobileAPIClientProtocol
     let snapshot: DashboardSnapshot?
@@ -615,7 +615,7 @@ struct SessionDetailView: View {
     let session: ProjectAgentSession
     let agent: ProjectAgent?
     let projectAgents: [ProjectAgent]
-    let project: ProjectsResponse.Project
+    let project: Project
     let token: String
     let api: any MobileAPIClientProtocol
     let snapshot: DashboardSnapshot?
@@ -629,7 +629,7 @@ struct SessionDetailView: View {
         session: ProjectAgentSession,
         agent: ProjectAgent?,
         projectAgents: [ProjectAgent] = [],
-        project: ProjectsResponse.Project,
+        project: Project,
         token: String,
         api: any MobileAPIClientProtocol,
         snapshot: DashboardSnapshot?,
