@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodically check the Briar managed computer runtime
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Persistent=true
+Unit=briar-managed-computer-health.service
+
+[Install]
+WantedBy=timers.target

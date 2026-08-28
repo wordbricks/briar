@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+set -u
+
+if [[ "$(id -u)" != "0" && "${BRIAR_HEALTH_TEST_MODE:-}" != "1" ]]; then
+  echo "briar-managed-computer-health must run as root" >&2
+  exit 1
+fi
+
+systemctl_binary="${BRIAR_HEALTH_SYSTEMCTL:-/usr/bin/systemctl}"
+ss_binary="${BRIAR_HEALTH_SS:-/usr/bin/ss}"
+stat_binary="${BRIAR_HEALTH_STAT:-/usr/bin/stat}"
+credential_file="${BRIAR_MANAGED_CREDENTIAL_FILE:-/var/lib/briar/worker-credential.json}"
+expected_port="${BRIAR_REMOTE_DISPLAY_PORT:-5901}"
+recheck_delay="${BRIAR_HEALTH_RECHECK_DELAY_SECONDS:-1}"
+
+services=(
+  briar-managed-computer.target
+  briar-managed-enroll.service
+  briar-managed-runtime-updater.service
+  briar-managed-worker.service
+  briar-remote-desktop.service
+  briar-remote-session-agent.service
+)
+failures=()
+credential_ok=false
+remote_display_ok=false
+
+log() {
+  printf 'briar-managed-computer-health: %s\n' "$*" >&2
+}
+
+if [[ ! -x "$systemctl_binary" || ! -x "$ss_binary" || ! -x "$stat_binary" ]]; then
+  log "required health-check command is unavailable"
+  exit 1
+fi
+if ! [[ "$expected_port" =~ ^[1-9][0-9]{0,4}$ ]] ||
+  ((expected_port > 65535)); then
+  log "remote display port is invalid"
+  exit 1
+fi
+if ! [[ "$recheck_delay" =~ ^[0-9]+$ ]]; then
+  log "health recheck delay is invalid"
+  exit 1
+fi
+
+is_active() {
+  "$systemctl_binary" is-active --quiet "$1" >/dev/null 2>&1
+}
+
+unit_property() {
+  "$systemctl_binary" show "$1" --property="$2" --value 2>/dev/null || true
+}
+
+check_credential() {
+  credential_ok=false
+  if [[ ! -s "$credential_file" ]]; then
+    failures+=(credential_missing)
+    return
+  fi
+  if [[ "$($stat_binary -c '%U:%G %a' "$credential_file" 2>/dev/null)" != \
+    "root:briar 640" ]]; then
+    failures+=(credential_permissions)
+    return
+  fi
+  credential_ok=true
+}
+
+check_services() {
+  local service
+  for service in "${services[@]}"; do
+    if ! is_active "$service"; then
+      failures+=("inactive:$service")
+    fi
+  done
+}
+
+check_remote_display() {
+  local listener_output listener_address
+  remote_display_ok=false
+  if ! listener_output="$($ss_binary -H -ltn "sport = :${expected_port}" \
+    2>/dev/null)"; then
+    failures+=(remote_display_socket_query_failed)
+    return
+  fi
+  while IFS= read -r listener_address; do
+    [[ -z "$listener_address" ]] && continue
+    case "$listener_address" in
+      "127.0.0.1:${expected_port}" | "[::1]:${expected_port}")
+        remote_display_ok=true
+        ;;
+      *)
+        failures+=("non_loopback_listener:$listener_address")
+        ;;
+    esac
+  done < <(awk '{print $4}' <<< "$listener_output")
+  if [[ "$remote_display_ok" != true ]]; then
+    failures+=("remote_display_not_listening:${expected_port}")
+  fi
+}
+
+check_health() {
+  failures=()
+  check_credential
+  check_services
+  check_remote_display
+}
+
+recover_service() {
+  local action="$1"
+  local service="$2"
+  log "attempting ${action} ${service}"
+  if ! "$systemctl_binary" "$action" "$service" >/dev/null 2>&1; then
+    log "${action} failed for ${service}"
+    return 1
+  fi
+}
+
+recover() {
+  local enrollment_state service
+  if [[ "$credential_ok" != true ]]; then
+    enrollment_state="$(unit_property briar-managed-enroll.service ActiveState)"
+    case "$enrollment_state" in
+      activating|deactivating)
+        log "enrollment is still ${enrollment_state}; waiting for it to finish"
+        ;;
+      *)
+        if [[ "$(unit_property briar-managed-enroll.service ExecMainStatus)" == "2" ]]; then
+          log "enrollment is in a permanent failure state; waiting for new configuration"
+        else
+          recover_service restart briar-managed-enroll.service || true
+        fi
+        ;;
+    esac
+  elif ! is_active briar-managed-enroll.service; then
+    recover_service start briar-managed-enroll.service || true
+  fi
+
+  for service in \
+    briar-managed-runtime-updater.service \
+    briar-managed-worker.service \
+    briar-remote-desktop.service \
+    briar-remote-session-agent.service; do
+    if ! is_active "$service"; then
+      recover_service start "$service" || true
+    fi
+  done
+
+  if [[ "$remote_display_ok" != true ]]; then
+    recover_service restart briar-remote-desktop.service || true
+    recover_service restart briar-remote-session-agent.service || true
+  fi
+  recover_service start briar-managed-computer.target || true
+}
+
+check_health
+if ((${#failures[@]} > 0)); then
+  log "health check failed: ${failures[*]}"
+  recover
+  sleep "$recheck_delay"
+  check_health
+fi
+
+if ((${#failures[@]} > 0)); then
+  log "health check still failing: ${failures[*]}"
+  exit 1
+fi
+
+log "health check passed"

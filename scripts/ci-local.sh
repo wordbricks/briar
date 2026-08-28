@@ -71,6 +71,7 @@ run_app_worker() {
   fi
   bun run check
   bun run managed-computer:image:check
+  bash scripts/qa-managed-computer-health.sh
   bun run test:d1:prepare
   bun run test
   bash -n \
@@ -84,10 +85,12 @@ run_app_worker() {
     scripts/verify-bundled-runtime.sh \
     scripts/qa-production-updater-build.sh \
     scripts/qa-macos-lifecycle.sh \
+    scripts/qa-managed-computer-health.sh \
     scripts/release-cargo-cache.sh \
     infrastructure/managed-computers/assert-debian-13-x86_64 \
     infrastructure/managed-computers/bootstrap-ssm.sh.tftpl \
     infrastructure/managed-computers/briar \
+    infrastructure/managed-computers/briar-managed-computer-health \
     infrastructure/managed-computers/briar-managed-enroll \
     infrastructure/managed-computers/briar-remote-desktop \
     infrastructure/managed-computers/build-managed-computer-image \

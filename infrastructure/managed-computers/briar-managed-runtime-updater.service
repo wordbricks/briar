@@ -30,7 +30,3 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 LockPersonality=true
-
-[Install]
-WantedBy=multi-user.target
-

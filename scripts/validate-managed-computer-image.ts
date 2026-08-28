@@ -133,6 +133,19 @@ if (
 ) {
   fail("package lock verification must preserve requested package names");
 }
+for (const required of [
+  '"$source_dir/briar-managed-computer-health"',
+  '"$source_dir/briar-managed-computer.target"',
+  '"$source_dir/briar-managed-computer-health.service"',
+  '"$source_dir/briar-managed-computer-health.timer"',
+  "systemctl disable",
+  "briar-managed-computer.target",
+  "briar-managed-computer-health.timer",
+]) {
+  if (!remoteDesktopInstaller.includes(required)) {
+    fail(`remote desktop installer omits ${required}`);
+  }
+}
 
 const packer = await text(join(image, "image.pkr.hcl"));
 if (!packer.includes(`required_version = "= ${lock.PACKER_VERSION}"`)) {
@@ -162,6 +175,16 @@ if (
   artifactPreparer.match(/\bbriar-open-browser\b/gu)?.length !== 2
 ) {
   fail("browser helper must be packaged once and marked executable once");
+}
+for (const required of [
+  "briar-managed-computer-health",
+  "briar-managed-computer-health.service",
+  "briar-managed-computer-health.timer",
+  "briar-managed-computer.target",
+]) {
+  if (!artifactPreparer.includes(required)) {
+    fail(`image artifact preparation omits ${required}`);
+  }
 }
 
 const browserHelperPath = join(image, "briar-open-browser");
@@ -265,6 +288,85 @@ if (
   fail("remote desktop service omits the cold-start timeout");
 }
 
+const enrollment = await text(join(image, "briar-managed-enroll"));
+for (const required of [
+  "const retryableStatus = response.status === 408",
+  "response.status === 409 || response.status === 425",
+  "response.status === 429 || response.status >= 500",
+  "process.exit(retryableStatus ? 75 : 2)",
+]) {
+  if (!enrollment.includes(required)) {
+    fail(`managed enrollment retry policy omits ${required}`);
+  }
+}
+const enrollmentService = await text(
+  join(image, "briar-managed-enroll.service"),
+);
+if (!enrollmentService.includes("RestartPreventExitStatus=2")) {
+  fail("managed enrollment must retry transient failures");
+}
+if (enrollmentService.includes("RestartPreventExitStatus=1")) {
+  fail("managed enrollment must not suppress transient failures");
+}
+
+const managedComputerTarget = await text(
+  join(image, "briar-managed-computer.target"),
+);
+for (const required of [
+  "Requires=briar-managed-enroll.service",
+  "Requires=briar-managed-runtime-updater.service",
+  "Requires=briar-managed-worker.service",
+  "Requires=briar-remote-desktop.service",
+  "Requires=briar-remote-session-agent.service",
+  "After=network-online.target",
+  "Before=multi-user.target",
+  "WantedBy=multi-user.target",
+]) {
+  if (!managedComputerTarget.includes(required)) {
+    fail(`managed computer target omits ${required}`);
+  }
+}
+const health = await text(join(image, "briar-managed-computer-health"));
+for (const required of [
+  "briar-managed-computer.target",
+  "briar-managed-enroll.service",
+  "briar-managed-runtime-updater.service",
+  "briar-managed-worker.service",
+  "briar-remote-desktop.service",
+  "briar-remote-session-agent.service",
+  "is-active --quiet",
+  "credential_permissions",
+  "non_loopback_listener",
+  "recover_service restart briar-managed-enroll.service",
+  "recover_service start briar-managed-computer.target",
+  "health check still failing",
+]) {
+  if (!health.includes(required)) {
+    fail(`managed computer health watchdog omits ${required}`);
+  }
+}
+const healthService = await text(
+  join(image, "briar-managed-computer-health.service"),
+);
+if (!healthService.includes(
+  "ExecStart=/opt/briar/bin/briar-managed-computer-health",
+)) {
+  fail("managed computer health service omits its executable");
+}
+const healthTimer = await text(
+  join(image, "briar-managed-computer-health.timer"),
+);
+for (const required of [
+  "OnBootSec=30s",
+  "OnUnitActiveSec=60s",
+  "Unit=briar-managed-computer-health.service",
+  "WantedBy=timers.target",
+]) {
+  if (!healthTimer.includes(required)) {
+    fail(`managed computer health timer omits ${required}`);
+  }
+}
+
 const remoteDesktopVerifier = await text(
   join(image, "verify-remote-desktop"),
 );
@@ -345,6 +447,18 @@ for (const required of [
   if (!service.includes(required)) fail(`managed worker unit omits ${required}`);
 }
 if (service.includes("briar_worker_")) fail("managed worker unit embeds a token");
+for (const unitName of [
+  "briar-managed-enroll.service",
+  "briar-managed-runtime-updater.service",
+  "briar-managed-worker.service",
+  "briar-remote-desktop.service",
+  "briar-remote-session-agent.service",
+]) {
+  const unit = await text(join(image, unitName));
+  if (unit.includes("[Install]")) {
+    fail(`${unitName} must be started through briar-managed-computer.target`);
+  }
+}
 
 const updater = await text(join(image, "briar-managed-runtime-updater"));
 for (const required of [
@@ -412,6 +526,9 @@ const pilotGuide = await text(
   join(root, "docs", "operations", "managed-computer-pilot.md"),
 );
 for (const required of [
+  "briar-managed-computer.target",
+  "briar-managed-computer-health.timer",
+  "systemctl start briar-managed-computer.target",
   "gh auth login --hostname github.com --git-protocol https --web",
   "gh auth status --hostname github.com",
   "GH_BROWSER",
@@ -427,6 +544,7 @@ if (pilotGuide.includes("--skip-ssh-key")) {
 
 for (const executable of [
   "briar",
+  "briar-managed-computer-health",
   "briar-managed-runtime-update-request",
   "briar-managed-runtime-updater",
   "briar-open-browser",
