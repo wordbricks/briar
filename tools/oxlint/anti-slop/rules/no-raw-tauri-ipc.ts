@@ -3,8 +3,10 @@ import { defineRule } from "@oxlint/plugins";
 import type { ESTree, Variable } from "@oxlint/plugins";
 
 const RAW_TAURI_MODULES = new Set([
+  "@tauri-apps/api",
   "@tauri-apps/api/core",
   "@tauri-apps/api/event",
+  "@tauri-apps/api/index",
 ]);
 const GENERATED_BINDINGS_PATH = "/apps/briar/src/generated/tauri.ts";
 const AUTH_SESSION_PATH = "/apps/briar/src/lib/auth-session.ts";

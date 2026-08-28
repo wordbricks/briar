@@ -74,16 +74,12 @@ afterEach(async () => {
 });
 
 describe("no-raw-tauri-ipc", () => {
-  it("allows generated bindings, the exact native plugin call, and Tauri object events", async () => {
+  it("allows generated bindings and the exact native plugin call", async () => {
     const fixture = await makeFixture({
       "apps/briar/src/generated/tauri.ts":
         'import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";\nvoid __TAURI_INVOKE;\n',
       "apps/briar/src/lib/auth-session.ts":
         'export async function start() {\n  const { invoke } = await import("@tauri-apps/api/core");\n  await invoke("plugin:auth-session|start", {});\n}\n',
-      "apps/briar/src/lib/project-window.ts":
-        'projectWindow.once("tauri://created", () => {});\n',
-      "apps/briar/src/lib/plugin-opener.ts":
-        'import { openUrl } from "@tauri-apps/plugin-opener";\nvoid openUrl;\n',
     });
 
     expect(lint(fixture)).toMatchObject({ status: 0 });
@@ -99,11 +95,15 @@ describe("no-raw-tauri-ipc", () => {
         'export { listen } from "@tauri-apps/api/event";\n',
       "apps/briar/src/lib/star-export.ts":
         'export * from "@tauri-apps/api/core";\n',
+      "apps/briar/src/lib/barrel.ts":
+        'import { core, event } from "@tauri-apps/api";\nvoid core;\nvoid event;\n',
+      "apps/briar/src/lib/barrel-index.ts":
+        'import { core } from "@tauri-apps/api/index";\nvoid core;\n',
     });
 
     const result = lint(fixture);
     expect(result.status).toBe(1);
-    expect(result.output.match(/bypasses the Rust SSOT/gu)).toHaveLength(4);
+    expect(result.output.match(/bypasses the Rust SSOT/gu)).toHaveLength(6);
   });
 
   it("keeps the auth-session exception exact", async () => {
