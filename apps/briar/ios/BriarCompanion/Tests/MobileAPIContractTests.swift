@@ -596,6 +596,38 @@ final class MobileAPIContractTests: XCTestCase {
         }
     }
 
+    func testGeneratedProjectsContractAppliesDefaultsAndRequiresNullableIcon() throws {
+        let projects = try JSONDecoder.mobileContract.decode(
+            ProjectsResponse.self,
+            from: Data(
+                #"{"projects":[{"id":"11111111-1111-4111-8111-111111111111","name":"Briar","icon":null,"organizationId":"22222222-2222-4222-8222-222222222222","organizationName":"Wordbricks","role":"owner","createdAt":"2026-08-20T00:00:00.000Z"}]}"#.utf8
+            )
+        )
+        let project = try XCTUnwrap(projects.projects.first)
+        XCTAssertEqual(project.issueKeyPrefix, "AH")
+        XCTAssertTrue(project.scheduleTabEnabled)
+        XCTAssertNil(project.icon)
+
+        XCTAssertThrowsError(
+            try JSONDecoder.mobileContract.decode(
+                ProjectsResponse.self,
+                from: Data(
+                    #"{"projects":[{"id":"11111111-1111-4111-8111-111111111111","name":"Briar","organizationId":"22222222-2222-4222-8222-222222222222","organizationName":"Wordbricks","role":"owner","createdAt":"2026-08-20T00:00:00.000Z"}]}"#.utf8
+                )
+            )
+        )
+
+        let operation: AuthenticatedMobileAPIOperation<ProjectsResponse> =
+            MobileAPIOperations.listProjects
+        XCTAssertEqual(operation.id, "listProjects")
+        XCTAssertEqual(MobileAPIOperations.listProjects.method, "GET")
+        XCTAssertEqual(MobileAPIOperations.listProjects.path, "/projects")
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.projects,
+            MobileAPIOperations.listProjects.path
+        )
+    }
+
     func testSharedFixtureOperationsMatchOpenAPI() throws {
         let bundle = Bundle(for: Self.self)
         let openAPIURL = try XCTUnwrap(

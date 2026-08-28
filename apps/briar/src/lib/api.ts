@@ -1,4 +1,5 @@
 import { briarApiUrl, briarWebAppOrigin } from "./api-config";
+import { listProjectsOperation } from "@briar/mobile-contracts";
 export { briarApiUrl } from "./api-config";
 import { ApiError, isApiErrorStatus } from "./api/errors";
 export {
@@ -8,7 +9,10 @@ export {
   errorWithMessage,
   isApiErrorStatus,
 } from "./api/errors";
-import { request } from "./api/request";
+import {
+  request,
+  requestMobileOperationUnknown,
+} from "./api/request";
 export {
   deleteAccount,
   loadSession,
@@ -323,8 +327,11 @@ export async function deleteInboxReadState(
 }
 
 export async function loadProjects(token: string): Promise<Project[]> {
-  const result = await request<{ projects: unknown[] }>("/projects", token);
-  return decodeProjectsResponse(result.projects);
+  const result = await requestMobileOperationUnknown(
+    listProjectsOperation,
+    token,
+  );
+  return decodeProjectsResponse(result);
 }
 
 export async function loadOrganizations(

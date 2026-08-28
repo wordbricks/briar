@@ -1,5 +1,10 @@
 import * as Schema from "effect/Schema";
 import {
+  listProjectsOperation,
+  mobileProjectSchema as mobileDashboardProjectSchema,
+  mobileProjectsResponseSchema,
+} from "@briar/mobile-contracts";
+import {
   AgentProviderCapabilityCatalog,
   ModelEffort as mobileEffortSchema,
 } from "../../src/lib/agent-provider-contract";
@@ -110,24 +115,7 @@ export const mobileCurrentUserResponseSchema = mutableStruct({
   }),
 });
 
-const mobileDashboardProjectSchema = mutableStruct({
-  id: uuidString,
-  name: Schema.String,
-  issueKeyPrefix: defaulted(
-    Schema.String.check(Schema.isPattern(/^[A-Z0-9]{1,3}$/u)),
-    "AH",
-  ),
-  scheduleTabEnabled: defaulted(Schema.Boolean, true),
-  icon: nullable(Schema.String),
-  organizationId: uuidString,
-  organizationName: Schema.String,
-  role: mobileRoleSchema,
-  createdAt: isoDateTime,
-});
-
-export const mobileProjectsResponseSchema = mutableStruct({
-  projects: mutableArray(mobileDashboardProjectSchema),
-});
+export { mobileProjectsResponseSchema };
 
 export const mobileIssueAttachmentSchema = mutableStruct({
   id: uuidString,
@@ -1312,7 +1300,7 @@ export const mobileOperationSchemas = {
     errorResponse: mobileDeviceTokenErrorSchema,
   },
   getCurrentUser: { response: mobileCurrentUserResponseSchema },
-  listProjects: { response: mobileProjectsResponseSchema },
+  listProjects: { response: listProjectsOperation.response.schema },
   getInboxFeed: { response: mobileInboxFeedResponseSchema },
   getInboxReadStates: { response: mobileInboxReadStatesSchema },
   putInboxReadStates: {
@@ -1437,10 +1425,6 @@ export const decodeMobileHealthResponse = Schema.decodeUnknownSync(
 );
 export const decodeMobileCurrentUserResponse = Schema.decodeUnknownSync(
   mobileCurrentUserResponseSchema,
-  mobileSchemaDecodeOptions,
-);
-export const decodeMobileProjectsResponse = Schema.decodeUnknownSync(
-  mobileProjectsResponseSchema,
   mobileSchemaDecodeOptions,
 );
 

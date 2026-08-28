@@ -12,7 +12,6 @@ enum MobileAPIContract {
         static let deviceCode = "/api/auth/device/code"
         static let deviceToken = "/api/auth/device/token"
         static let currentUser = "/me"
-        static let projects = "/projects"
         static let inboxReadStates = "/inbox/read-states"
 
         static func inbox(organizationID: UUID) -> String {
@@ -360,32 +359,10 @@ struct CurrentUserResponse: Codable, Equatable, Sendable {
     }
 }
 
-struct ProjectsResponse: Codable, Equatable, Sendable {
-    let projects: [Project]
-
-    struct Project: Codable, Equatable, Sendable {
-        let id: UUID
-        let name: String
-        var issueKeyPrefix: String? = nil
-        let icon: String?
-        let organizationId: UUID
-        let organizationName: String
-        let role: Role
-        let createdAt: Date
-
-        enum Role: String, Codable, Sendable {
-            case owner
-            case admin
-            case member
-        }
-    }
-}
-
 extension ProjectsResponse.Project {
     var effectiveIssueKeyPrefix: String {
-        let normalized = issueKeyPrefix?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        guard let normalized,
-              normalized.range(of: #"^[A-Z0-9]{1,3}$"#, options: .regularExpression) != nil
+        let normalized = issueKeyPrefix.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard normalized.range(of: #"^[A-Z0-9]{1,3}$"#, options: .regularExpression) != nil
         else { return "AH" }
         return normalized
     }
@@ -425,6 +402,18 @@ enum MobileAPIError: LocalizedError, Equatable {
             return L10n.text("파일을 내려받지 못했습니다. 잠시 후 다시 시도해 주세요.")
         }
     }
+}
+
+struct AuthenticatedMobileAPIOperation<Response: Decodable & Sendable>: Sendable {
+    let id: String
+    let method: String
+    let path: String
+}
+
+struct PublicMobileAPIOperation<Response: Decodable & Sendable>: Sendable {
+    let id: String
+    let method: String
+    let path: String
 }
 
 protocol MobileAPIClientProtocol: Sendable {
@@ -525,6 +514,31 @@ extension MobileRealtimeClientProtocol {
 }
 
 extension MobileAPIClientProtocol {
+    func send<Response: Decodable & Sendable>(
+        _ operation: AuthenticatedMobileAPIOperation<Response>,
+        token: String
+    ) async throws -> Response {
+        try await send(
+            operation.path,
+            method: operation.method,
+            token: token,
+            body: nil,
+            as: Response.self
+        )
+    }
+
+    func send<Response: Decodable & Sendable>(
+        _ operation: PublicMobileAPIOperation<Response>
+    ) async throws -> Response {
+        try await send(
+            operation.path,
+            method: operation.method,
+            token: nil,
+            body: nil,
+            as: Response.self
+        )
+    }
+
     func get<Response: Decodable & Sendable>(
         _ path: String,
         token: String? = nil,

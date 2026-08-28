@@ -1,27 +1,31 @@
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import {
+  decodeMobileOperationResponse,
+  listProjectsOperation,
+  mobileProjectSchema,
+  type MobileProject,
+} from "@briar/mobile-contracts";
+import {
   DataImageString,
-  defaulted,
   mutableArray,
   NonNegativeInteger,
-  UuidString,
 } from "./schema-helpers";
 
-export const ProjectResponse = Schema.Struct({
-  id: UuidString,
-  name: Schema.String,
-  issueKeyPrefix: defaulted(
-    Schema.String.check(Schema.isPattern(/^[A-Z0-9]{1,3}$/u)),
-    "AH",
-  ),
-  scheduleTabEnabled: defaulted(Schema.Boolean, true),
-  icon: defaulted(Schema.NullOr(DataImageString), null),
-  organizationId: UuidString,
-  organizationName: Schema.String,
-  role: Schema.Literals(["owner", "admin", "member"]),
-  createdAt: Schema.String,
-});
+export const ProjectResponse = mobileProjectSchema;
 export type ProjectResponse = typeof ProjectResponse.Type;
+
+const decodeProjectIcon = Schema.decodeUnknownOption(
+  Schema.NullOr(DataImageString),
+);
+
+const toProjectResponse = (project: MobileProject): ProjectResponse => ({
+  ...project,
+  // The HTTP contract permits future icon representations. The desktop UI
+  // currently renders only bounded image data URLs, so keep that domain guard
+  // after decoding the shared wire DTO.
+  icon: Option.getOrNull(decodeProjectIcon(project.icon)),
+});
 
 const ProjectUsageTimelinePointResponse = Schema.Struct({
   startAt: Schema.String,
@@ -52,10 +56,15 @@ export const ProjectUsageSummaryResponse = Schema.Struct({
 export type ProjectUsageSummaryResponse =
   typeof ProjectUsageSummaryResponse.Type;
 
-const ProjectsResponse = mutableArray(ProjectResponse);
+const decodeSharedProjectResponse = Schema.decodeUnknownSync(ProjectResponse);
 
-export const decodeProjectResponse = Schema.decodeUnknownSync(ProjectResponse);
-export const decodeProjectsResponse = Schema.decodeUnknownSync(ProjectsResponse);
+export const decodeProjectResponse = (input: unknown): ProjectResponse =>
+  toProjectResponse(decodeSharedProjectResponse(input));
+
+export const decodeProjectsResponse = (input: unknown): ProjectResponse[] =>
+  decodeMobileOperationResponse(listProjectsOperation, input).projects.map(
+    toProjectResponse,
+  );
 export const decodeProjectUsageSummaryResponse = Schema.decodeUnknownSync(
   ProjectUsageSummaryResponse,
 );

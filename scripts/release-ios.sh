@@ -189,6 +189,7 @@ common_build_settings=(
 )
 
 if [[ "$implementation" == "native" ]]; then
+  bun run mobile:contract:check
   bun run ios:native:project
   xcodebuild \
     -project apps/briar/ios/BriarCompanion/BriarCompanion.xcodeproj \

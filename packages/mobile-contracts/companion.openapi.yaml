@@ -2241,40 +2241,41 @@
       },
       "Project": {
         "type": "object",
-        "required": [
-          "id",
-          "name",
-          "issueKeyPrefix",
-          "icon",
-          "organizationId",
-          "organizationName",
-          "role",
-          "createdAt"
-        ],
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "format": "uuid",
+            "description": "a UUID"
           },
           "name": {
             "type": "string"
           },
           "issueKeyPrefix": {
             "type": "string",
-            "pattern": "^[A-Z0-9]{1,3}$"
+            "pattern": "^[A-Z0-9]{1,3}$",
+            "description": "a string matching the RegExp ^[A-Z0-9]{1,3}$",
+            "default": "AH"
           },
           "scheduleTabEnabled": {
-            "type": "boolean"
+            "type": "boolean",
+            "default": true
           },
           "icon": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "organizationId": {
             "type": "string",
-            "format": "uuid"
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "format": "uuid",
+            "description": "a UUID"
           },
           "organizationName": {
             "type": "string"
@@ -2289,16 +2290,30 @@
           },
           "createdAt": {
             "type": "string",
-            "format": "date-time"
+            "allOf": [
+              {
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?Z$",
+                "description": "an ISO 8601 UTC date-time",
+                "format": "date-time"
+              }
+            ]
           }
         },
+        "required": [
+          "id",
+          "name",
+          "issueKeyPrefix",
+          "scheduleTabEnabled",
+          "icon",
+          "organizationId",
+          "organizationName",
+          "role",
+          "createdAt"
+        ],
         "additionalProperties": true
       },
       "ProjectsResponse": {
         "type": "object",
-        "required": [
-          "projects"
-        ],
         "properties": {
           "projects": {
             "type": "array",
@@ -2307,6 +2322,9 @@
             }
           }
         },
+        "required": [
+          "projects"
+        ],
         "additionalProperties": true
       },
       "IssueAttachment": {

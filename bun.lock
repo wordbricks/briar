@@ -125,6 +125,9 @@
     "packages/mobile-contracts": {
       "name": "@briar/mobile-contracts",
       "version": "0.0.0",
+      "dependencies": {
+        "effect": "catalog:",
+      },
     },
     "packages/tsconfig": {
       "name": "@briar/tsconfig",

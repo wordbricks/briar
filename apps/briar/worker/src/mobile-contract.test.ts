@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { listProjectsOperation } from "@briar/mobile-contracts";
 import * as Option from "effect/Option";
 import { describe, expect, it } from "vitest";
 import {
@@ -61,6 +62,9 @@ const openapi = JSON.parse(readFileSync(
       IssueExecutionApprovalRequest: {
         required: string[];
       };
+      Project: {
+        required: string[];
+      };
     };
   };
 };
@@ -81,6 +85,23 @@ describe("Companion mobile API contract", () => {
       expect(documentedOperation?.operationId).toBe(operationId);
       expect(operation.status).toBe(200);
     }
+  });
+
+  it("derives the migrated project operation and wire requirements from code", () => {
+    const fixtureOperation = fixture.operations[listProjectsOperation.id];
+    expect(fixtureOperation).toMatchObject({
+      method: listProjectsOperation.method,
+      path: listProjectsOperation.path,
+      status: listProjectsOperation.response.status,
+    });
+    expect(
+      openapi.paths[listProjectsOperation.path]?.[
+        listProjectsOperation.method.toLowerCase()
+      ]?.operationId,
+    ).toBe(listProjectsOperation.id);
+    expect(openapi.components.schemas.Project.required).toEqual(
+      expect.arrayContaining(["issueKeyPrefix", "scheduleTabEnabled", "icon"]),
+    );
   });
 
   it("validates every shared request, response, and polling error fixture", () => {

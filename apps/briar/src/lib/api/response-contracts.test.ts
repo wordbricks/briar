@@ -7,23 +7,29 @@ import {
   decodeProjectAgentScheduleRunResponse,
   decodeProjectAgentSessionResponse,
 } from "./project-agent-contract";
-import { decodeProjectResponse } from "./project-contract";
+import {
+  decodeProjectResponse,
+  decodeProjectsResponse,
+} from "./project-contract";
 
 const projectId = "22222222-2222-4222-8222-222222222222";
 const agentId = "11111111-1111-4111-8111-111111111111";
 
 describe("API response contracts", () => {
-  it("keeps project defaults and strips non-strict response extensions", () => {
+  it("uses the shared project defaults and strips response extensions", () => {
+    const project = {
+      id: projectId,
+      name: "Briar",
+      icon: null,
+      organizationId: "33333333-3333-4333-8333-333333333333",
+      organizationName: "Wordbricks",
+      role: "owner",
+      createdAt: "2026-08-20T00:00:00.000Z",
+      futureField: true,
+    } as const;
+
     expect(
-      decodeProjectResponse({
-        id: projectId,
-        name: "Briar",
-        organizationId: "33333333-3333-4333-8333-333333333333",
-        organizationName: "Wordbricks",
-        role: "owner",
-        createdAt: "not-required-to-be-a-datetime",
-        futureField: true,
-      }),
+      decodeProjectResponse(project),
     ).toEqual({
       id: projectId,
       name: "Briar",
@@ -33,18 +39,24 @@ describe("API response contracts", () => {
       organizationId: "33333333-3333-4333-8333-333333333333",
       organizationName: "Wordbricks",
       role: "owner",
-      createdAt: "not-required-to-be-a-datetime",
+      createdAt: "2026-08-20T00:00:00.000Z",
     });
+    expect(
+      decodeProjectsResponse({ projects: [project], futureEnvelopeField: true }),
+    ).toEqual([decodeProjectResponse(project)]);
+    expect(decodeProjectResponse({
+      ...project,
+      icon: "https://example.com/future-icon.png",
+    }).icon).toBeNull();
+
     expect(() =>
       decodeProjectResponse({
-        id: "not-a-uuid",
-        name: "Briar",
-        organizationId: "33333333-3333-4333-8333-333333333333",
-        organizationName: "Wordbricks",
-        role: "owner",
-        createdAt: "2026-08-20T00:00:00.000Z",
+        ...project,
+        createdAt: "not-a-datetime",
       }),
     ).toThrow();
+    const { icon: _icon, ...missingIcon } = project;
+    expect(() => decodeProjectResponse(missingIcon)).toThrow();
   });
 
   it("keeps organization logo defaults and record key/value validation", () => {

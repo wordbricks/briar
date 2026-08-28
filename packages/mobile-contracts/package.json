@@ -3,8 +3,13 @@
   "version": "0.0.0",
   "license": "Apache-2.0",
   "private": true,
+  "type": "module",
   "exports": {
+    ".": "./src/index.ts",
     "./companion.openapi.yaml": "./companion.openapi.yaml",
     "./fixtures/companion-v1.json": "./fixtures/companion-v1.json"
+  },
+  "dependencies": {
+    "effect": "catalog:"
   }
 }

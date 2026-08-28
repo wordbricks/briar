@@ -1,10 +1,15 @@
 import { normalizeProjectAgentLocale } from "../../src/lib/project-agent";
+import {
+  listProjectsOperation,
+  matchesMobileOperation,
+} from "@briar/mobile-contracts";
 import type { BriarAuth } from "./auth";
 import { processArchiveCleanupQueue } from "./archive";
 import { sha256 } from "./crypto-digest";
 import { issueProjectAgentToken } from "./hunt-run-claim-repository";
 import { corsHeaders, HttpError, json } from "./http-response";
-import { decodeMobileProjectsResponse } from "./mobile-contract";
+import { authenticateMobileOperation } from "./mobile-contract-auth";
+import { mobileJson } from "./mobile-contract-response";
 import { canManageOrganization } from "./organization-access";
 import { createOrganization } from "./organization-command-repository";
 import { listOrganizations } from "./organization-repository";
@@ -39,18 +44,40 @@ export type ProjectCoreRouteInput = {
   context?: ExecutionContext;
 };
 
+export type ProjectListRouteServices = {
+  readonly requireSession: typeof requireSession;
+  readonly listProjects: typeof listProjects;
+};
+
+const projectListRouteServices: ProjectListRouteServices = {
+  requireSession,
+  listProjects,
+};
+
 export async function handleProjectCoreRoute(
   routeInput: ProjectCoreRouteInput,
+  listRouteServices: ProjectListRouteServices = projectListRouteServices,
 ): Promise<Response | undefined> {
   const { request, url, auth, db, attachmentsBucket, env, context } = routeInput;
   const { pathname } = url;
 
-  if (pathname === "/projects" && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const projects = await listProjects(db, session.user.id);
-    return json(decodeMobileProjectsResponse({
+  if (
+    matchesMobileOperation(
+      listProjectsOperation,
+      request.method,
+      pathname,
+    )
+  ) {
+    const session = await authenticateMobileOperation(
+      listProjectsOperation,
+      auth,
+      request,
+      listRouteServices.requireSession,
+    );
+    const projects = await listRouteServices.listProjects(db, session.user.id);
+    return mobileJson(listProjectsOperation, {
       projects: projects.map(projectJson),
-    }));
+    });
   }
 
   if (pathname === "/projects" && request.method === "POST") {

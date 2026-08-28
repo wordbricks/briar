@@ -127,6 +127,10 @@ describe("Effect mobile contract behavior", () => {
         createdAt: "2026-08-20T00:00:00.000Z",
       }],
     });
+    expect(projects.projects[0]).toMatchObject({
+      issueKeyPrefix: "AH",
+      scheduleTabEnabled: true,
+    });
     projects.projects[0]!.name = "Renamed";
     projects.projects.push({ ...projects.projects[0]!, name: "Second" });
     expect(projects.projects.map((project) => project.name)).toEqual([

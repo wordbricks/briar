@@ -59,12 +59,9 @@ final class CompanionStore: ObservableObject {
                 body: nil,
                 as: CurrentUserResponse.self
             )
-            async let projectResponse: ProjectsResponse = api.send(
-                MobileAPIContract.Endpoint.projects,
-                method: "GET",
-                token: token,
-                body: nil,
-                as: ProjectsResponse.self
+            async let projectResponse = api.send(
+                MobileAPIOperations.listProjects,
+                token: token
             )
             let (loadedUser, loadedProjects) = try await (userResponse, projectResponse)
             guard
@@ -109,12 +106,9 @@ final class CompanionStore: ObservableObject {
         projectCatalogRevision &+= 1
         let expectedCatalogRevision = projectCatalogRevision
         do {
-            let response: ProjectsResponse = try await api.send(
-                MobileAPIContract.Endpoint.projects,
-                method: "GET",
-                token: token,
-                body: nil,
-                as: ProjectsResponse.self
+            let response = try await api.send(
+                MobileAPIOperations.listProjects,
+                token: token
             )
             guard
                 activeToken == token,
