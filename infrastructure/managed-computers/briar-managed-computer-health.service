@@ -1,0 +1,16 @@
+[Unit]
+Description=Check and recover the Briar managed computer runtime
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/briar/bin/briar-managed-computer-health
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/var/lib/briar
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true

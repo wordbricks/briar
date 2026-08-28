@@ -20,7 +20,7 @@
 1. `/opt/briar/bin/briar` CLI와 여섯 provider runner bundle. `/opt/briar/bin`에는 버전이 고정된 Bun·Node.js·Rust(`rustfmt`, `clippy`)·`cargo-audit`·`gitleaks`, Codex·Claude·Cursor Agent·Grok·Antigravity·OpenCode CLI와 `agent-browser`를 설치한다. OpenRouter는 같은 OpenCode 실행파일을 사용한다. 로그인 terminal과 managed Worker 모두 이 경로와 같은 `CARGO_HOME`·`RUSTUP_HOME`을 사용한다.
 2. 승인 시점의 AWS Systems Manager Agent(`amazon-ssm-agent`). 버전과 설치 파일 SHA-256은 `image-lock.env`에 함께 고정한다.
 3. 비특권 `briar` 사용자와 XFCE, 실제 Google Chrome, GitHub CLI, TigerVNC, D-Bus, C/C++ build toolchain과 Noto CJK 글꼴. XFCE Terminal은 Korean glyph를 포함하는 `Noto Sans Mono CJK KR`을 기본으로 사용한다. `remote-desktop-packages.txt`의 각 Debian 패키지는 승인된 Debian 13 snapshot에서 `resolve-remote-desktop-packages`로 정확한 `package=version` lock을 만든 후 설치한다. `briar` 사용자 세션의 `GH_BROWSER`만 `/opt/briar/bin/briar-open-browser`로 설정하며, 다른 CLI 로그인을 방해하지 않도록 전역 `BROWSER`는 변경하지 않는다.
-4. `briar-managed-enroll.service`, `briar-managed-worker.service`, loopback 원격 데스크톱과 outbound 원격 세션 서비스를 설치하고 부팅 대상으로 활성화한다. Worker supervisor는 `/var/lib/briar/worker-credential.json`의 machine credential을 값으로 복사하지 않고 파일에서 읽으며, 설정된 각 프로젝트에 Worker 프로세스를 하나씩 유지한다.
+4. `briar-managed-computer.target`과 health timer를 설치하고 부팅 대상으로 활성화한다. target이 enrollment, signed runtime updater, Worker supervisor, loopback 원격 데스크톱과 outbound 원격 세션 서비스를 순서대로 묶는다. 개별 서비스는 target이 관리하므로 각각을 별도 multi-user 부팅 링크로 활성화하지 않는다. Worker supervisor는 `/var/lib/briar/worker-credential.json`의 machine credential을 값으로 복사하지 않고 파일에서 읽으며, 설정된 각 프로젝트에 Worker 프로세스를 하나씩 유지한다.
 5. `briar managed-computer setup`이 소유자의 사용자 세션과 이미 등록된 machine credential을 짧게 연결한다. 저장소와 provider가 준비되고 heartbeat 건강 검사를 통과하기 전에는 Worker가 `acceptingWork=false`, 동시 실행 수 1을 보고한다.
 
 `image.pkr.hcl`은 공식 Debian 13 amd64 EBS AMI를 명시적인 ID로 받아 SSM communicator로만 빌드한다. 빌더에는 public IP와 SSH key가 없고, IMDSv2와 암호화된 gp3 root volume을 강제한다. 다음 검사는 실제 AWS 리소스를 만들지 않는다.
@@ -66,6 +66,30 @@ device session이 비워진 뒤 updater가 버전 고정 URL에서 번들과 서
 업데이트한다. Debian, Chrome, Bun, Rust와 provider CLI 같은 base toolchain은 계속
 AMI 교체로 배포한다. updater가 포함되기 전에 생성된 기존 managed computer는 이
 기능을 스스로 설치할 수 없으므로 updater-capable AMI로 한 번 교체해야 한다.
+
+### 1.2 부팅 순서와 자동 복구
+
+부팅 진입점은 `briar-managed-computer.target` 하나다. target은
+`briar-managed-enroll.service`가 먼저 성공한 뒤 signed runtime updater, Worker,
+loopback 데스크톱, outbound remote-session agent를 시작하고 모든 서비스가 준비될
+때까지 `multi-user.target` 완료를 기다린다. 개별 서비스의 `WantedBy` 링크를
+만들면 부팅 순서가 다시 깨질 수 있으므로 이미지 설치기는 기존 개별 링크를
+제거하고 target만 enable한다.
+
+Enrollment는 네트워크 오류와 HTTP 408·409·425·429·5xx를 일시적 실패로 보고
+systemd가 10초 후 다시 시도한다. 잘못된 요청이나 권한 오류 같은 영구적 4xx는
+별도 종료 코드로 남겨 무한 재시도하지 않는다. 성공한 credential은 기존과 같은
+`root:briar`, mode `0640`으로만 저장한다.
+
+`briar-managed-computer-health.timer`는 부팅 30초 후부터 60초마다
+`briar-managed-computer-health.service`를 실행한다. watchdog은 credential 파일의
+존재·권한, target과 다섯 하위 서비스의 active 상태, TigerVNC의 loopback listener를
+확인하고, 실패하면 enrollment를 다시 실행한 뒤 하위 서비스를 순서대로 start하고
+필요한 데스크톱/agent를 restart한다. 재확인에도 실패하면 종료 코드와 서비스명만
+journal에 남기고 다음 주기에 다시 시도한다. credential 값·키 입력·화면 데이터는
+출력하지 않는다. remote-session agent 자체의 WSS heartbeat/reconnect와 Worker의
+서버 heartbeat는 기존 애플리케이션 경로가 계속 담당하며, watchdog은 그 위의 로컬
+프로세스·소켓 부팅 복구 계층이다.
 
 ## 2. AWS 스택
 
@@ -253,7 +277,7 @@ CLI는 로그인 사용자가 해당 컴퓨터의 신청자인지, credential의
 3. 일반 멤버, 두 번째 사용자 사용, 두 번째 조직 컴퓨터, fleet 한도 초과가 각기 거절된다.
 4. EC2의 Launch Template 버전, `HttpTokens=required`, 암호화 EBS, 네 가지 Briar 태그, 빈 inbound 규칙, SSH key 미설정을 확인한다.
 5. SSM이 Online인 실제 인스턴스만 enrollment에 성공하고, nonce 만료·원본 document 변조·다른 instance identity·다른 조직 ID는 거절된다.
-6. 인스턴스에서 `/opt/briar/bin/verify-remote-desktop`을 실행한다. 5901 포트가 loopback에만 열리고 데스크톱·세션 에이전트가 `briar` 사용자로 실행되며 package lock checksum이 일치해야 한다.
+6. 인스턴스에서 `/opt/briar/bin/verify-remote-desktop`을 실행한다. 관리 컴퓨터 target과 health timer가 enable·active이고, 5901 포트가 loopback에만 열리며 데스크톱·세션 에이전트가 `briar` 사용자로 실행되고 package lock checksum이 일치해야 한다. 인스턴스를 한 번 재부팅한 뒤 target이 모든 하위 서비스를 올리고 health timer의 첫 실행이 성공하는지도 확인한다.
 7. `sudo -u briar -H bash -lc 'command -v bun node cargo rustc cargo-audit gitleaks codex claude cursor-agent grok agy opencode agent-browser'`에서 모든 실행파일이 `/opt/briar/bin`으로 해석되는지 확인한다. `gh`는 `/usr/bin/gh`, `GH_BROWSER`는 실행 가능한 `/opt/briar/bin/briar-open-browser`로 해석되어야 한다. `gh auth login --help`에서 `--hostname`, `--git-protocol`, `--web`을, `gh auth status --help`에서 `--hostname`을 확인하되 AMI 검증 중에는 인증하지 않는다. 버전은 `/opt/briar/image-manifest.json`과 같아야 하며 provider와 GitHub는 아직 인증되지 않은 상태여야 한다.
 8. 빈 테스트 저장소를 새 worktree로 clone한 뒤 `bun run ci:local`을 실행한다. `bun install --frozen-lockfile`로 `node_modules`를 bootstrap하고 C linker, Rust, `cargo-audit`, `gitleaks` 누락 없이 완료되는지 확인한다. `node_modules`나 사용자 저장소를 AMI 자체에 미리 넣지 않는다.
 9. 원격 Terminal과 Chrome에서 한글 안내 문구와 한글 파일명이 네모 상자 없이 보이는지 확인하고 `fc-match ':lang=ko'`가 Noto CJK KR 글꼴을 고르는지 확인한다.
@@ -273,7 +297,7 @@ CLI는 로그인 사용자가 해당 컴퓨터의 신청자인지, credential의
 
 - 새 신청은 검증된 새 AMI ID를 넣어 CloudFormation을 갱신하고, 스택 출력의 **새 숫자 Launch Template 버전**을 Worker 설정에 기록한다. `$Latest`/`$Default`는 사용하지 않는다.
 - 기존 컴퓨터는 실행 중인 작업을 drain하고 중지한 뒤 암호화 root EBS snapshot을 만든다. 같은 인스턴스를 다시 시작하여 검증된 같은 source commit의 이미지 artifact로 런타임·서비스를 갱신하면 `/home/briar`와 기존 로그인 상태를 유지할 수 있다. AMI 빌드 전용 `install-image-runtime`을 운영 인스턴스에 직접 실행하지 않는다.
-- 업그레이드 후 enrollment credential을 재발급하지 않는다. 기존 credential 파일을 확인한 뒤 `systemctl start briar-managed-worker.service briar-remote-desktop.service briar-remote-session-agent.service`를 실행하고 `verify-remote-desktop`, Worker heartbeat, 실제 Briar 원격 연결을 확인한다. 실패하면 인스턴스를 중지하고 사전 snapshot으로 root volume을 복원한다.
+- 업그레이드 후 enrollment credential을 재발급하지 않는다. 기존 credential 파일을 확인한 뒤 `systemctl start briar-managed-computer.target`을 실행하고 `verify-remote-desktop`, health timer, Worker heartbeat, 실제 Briar 원격 연결을 확인한다. 실패하면 인스턴스를 중지하고 사전 snapshot으로 root volume을 복원한다.
 - 기존 컴퓨터를 새 AMI로 교체해야 한다면 사용자에게 로그아웃/재인증을 명시적으로 안내하고 새 D1 컴퓨터 레코드와 새 credential을 발급한다. 다른 컴퓨터의 홈이나 credential을 복사하지 않는다.
 
 릴리스 기록에는 `sourceCommit`, `amiId`, `baseAmiId`, `packageLockSha256`, `launchTemplateId`, `launchTemplateVersion`, `securityGroupId`, 검증 인스턴스 ID, 검증 시각, 10분 세션 측정값, 승인자를 모두 적는다. **실제 값과 관찰 결과가 없는 항목을 완료로 표시하지 않는다.**

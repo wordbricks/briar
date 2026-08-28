@@ -20,6 +20,3 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
 ReadOnlyPaths=/var/lib/briar
-
-[Install]
-WantedBy=multi-user.target

@@ -179,11 +179,8 @@ jq -e \
 
 for service in \
   amazon-ssm-agent.service \
-  briar-managed-enroll.service \
-  briar-managed-runtime-updater.service \
-  briar-managed-worker.service \
-  briar-remote-desktop.service \
-  briar-remote-session-agent.service; do
+  briar-managed-computer.target \
+  briar-managed-computer-health.timer; do
   systemctl is-enabled --quiet "$service"
 done
 test "$(systemctl show briar-managed-worker.service --property=User --value)" = \
@@ -203,6 +200,9 @@ if systemctl cat briar-managed-worker.service | grep -q 'briar_worker_'; then
   exit 1
 fi
 systemd-analyze verify \
+  /etc/systemd/system/briar-managed-computer.target \
+  /etc/systemd/system/briar-managed-computer-health.service \
+  /etc/systemd/system/briar-managed-computer-health.timer \
   /etc/systemd/system/briar-managed-enroll.service \
   /etc/systemd/system/briar-managed-runtime-updater.service \
   /etc/systemd/system/briar-managed-worker.service \
