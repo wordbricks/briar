@@ -30,7 +30,8 @@ import {
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { CompanionSettings } from "./components/CompanionSettings";
 import { ConnectionHealth } from "./components/ConnectionHealth";
-import { HuntDashboard, RunPage } from "./components/HuntDashboard";
+import { HuntDashboard } from "./components/hunt/HuntDashboard";
+import { RunPage } from "./components/hunt/detail/RunPage";
 import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
