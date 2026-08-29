@@ -799,6 +799,8 @@ enum L10n {
         case channelHome
         case projectLobbyOpen
         case projectLobbyOpenDescription
+        case projectAgentsOpen
+        case projectAgentsOpenDescription
         case projectLobbyTitle
         case projectLobbyDescription
         case projectLobbyAll
@@ -880,6 +882,8 @@ enum L10n {
             case .channelHome: "홈"
             case .projectLobbyOpen: "프로젝트 홈 보기"
             case .projectLobbyOpenDescription: "주요 지표와 최근 작업을 확인하세요."
+            case .projectAgentsOpen: "Agents 보기"
+            case .projectAgentsOpenDescription: "Agent와 실행 세션을 확인하세요."
             case .projectLobbyTitle: "프로젝트 현황"
             case .projectLobbyDescription: "프로젝트의 현재 작업 상태를 한눈에 확인하세요."
             case .projectLobbyAll: "전체 이슈"
@@ -964,6 +968,8 @@ enum L10n {
             case .channelHome: "Home"
             case .projectLobbyOpen: "View project home"
             case .projectLobbyOpenDescription: "Check key metrics and recent work."
+            case .projectAgentsOpen: "View agents"
+            case .projectAgentsOpenDescription: "View agents and their execution sessions."
             case .projectLobbyTitle: "Project overview"
             case .projectLobbyDescription: "See the project's current work status at a glance."
             case .projectLobbyAll: "All issues"
@@ -1048,6 +1054,8 @@ enum L10n {
             case .channelHome: "主页"
             case .projectLobbyOpen: "查看项目主页"
             case .projectLobbyOpenDescription: "查看关键指标和最近工作。"
+            case .projectAgentsOpen: "查看智能体"
+            case .projectAgentsOpenDescription: "查看智能体及其运行会话。"
             case .projectLobbyTitle: "项目概览"
             case .projectLobbyDescription: "一目了然地查看项目当前工作状态。"
             case .projectLobbyAll: "全部问题"
