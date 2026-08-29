@@ -11,7 +11,7 @@ import {
 } from "./managed-computer-remote-repository";
 
 type RemoteSocketAttachment = {
-  role: "agent" | "controller";
+  role: "agent" | "controller" | "setup-agent" | "setup-controller";
   sessionId: string | null;
   connectionGeneration: number;
   maxExpiresAt: string | null;
@@ -30,6 +30,7 @@ type ActiveRemoteSession = {
 const activeSessionStorageKey = "active-session";
 const socketOpen = 1;
 const maxRemoteFrameBytes = 8 * 1024 * 1024;
+const maxSetupFrameBytes = 64 * 1024;
 
 function messageSize(message: string | ArrayBuffer) {
   return typeof message === "string"
@@ -62,6 +63,11 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
         controllerConnected: this.ctx.getWebSockets("controller").some(
           (socket) => socket.readyState === socketOpen,
         ),
+        setupAgentConnected: this.ctx.getWebSockets("setup-agent").some(
+          (socket) => socket.readyState === socketOpen,
+        ),
+        setupControllerConnected: this.ctx.getWebSockets("setup-controller")
+          .some((socket) => socket.readyState === socketOpen),
       });
     }
     if (url.pathname === "/disconnect" && request.method === "POST") {
@@ -100,7 +106,85 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
     const role = request.headers.get("X-Briar-Remote-Role");
     if (role === "agent") return this.connectAgent(request);
     if (role === "controller") return this.connectController(request);
+    if (role === "setup-agent") return this.connectSetupAgent(request);
+    if (role === "setup-controller") {
+      return this.connectSetupController(request);
+    }
     return new Response("Invalid remote role", { status: 400 });
+  }
+
+  private connectSetupAgent(request: Request) {
+    const protocol = request.headers.get("X-Briar-Remote-Protocol") ?? "";
+    if (!protocol) {
+      return new Response("Missing setup agent protocol", { status: 400 });
+    }
+    const pair = new WebSocketPair();
+    const [client, server] = Object.values(pair);
+    for (const existing of this.ctx.getWebSockets("setup-agent")) {
+      existing.close(4001, "Managed setup agent replaced");
+    }
+    this.ctx.acceptWebSocket(server, ["setup-agent"]);
+    server.serializeAttachment({
+      role: "setup-agent",
+      sessionId: null,
+      connectionGeneration: 0,
+      maxExpiresAt: null,
+      controllerBytes: 0,
+      screenBytes: 0,
+    } satisfies RemoteSocketAttachment);
+    const controller = this.ctx.getWebSockets("setup-controller").find(
+      (socket) => socket.readyState === socketOpen,
+    );
+    const current = controller ? attachment(controller) : null;
+    if (current?.sessionId) {
+      server.send(JSON.stringify({
+        type: "setup_controller_ready",
+        sessionId: current.sessionId,
+      }));
+    }
+    return new Response(null, {
+      status: 101,
+      headers: { "Sec-WebSocket-Protocol": protocol },
+      webSocket: client,
+    });
+  }
+
+  private connectSetupController(request: Request) {
+    const sessionId = request.headers.get("X-Briar-Setup-Session") ?? "";
+    const expiresAt = request.headers.get("X-Briar-Setup-Expires-At") ?? "";
+    const protocol = request.headers.get("X-Briar-Remote-Protocol") ?? "";
+    if (
+      !sessionId || !Number.isFinite(Date.parse(expiresAt)) ||
+      expiresAt <= new Date().toISOString() || !protocol
+    ) {
+      return new Response("Invalid setup session", { status: 400 });
+    }
+    const agent = this.ctx.getWebSockets("setup-agent").find((socket) =>
+      socket.readyState === socketOpen
+    );
+    if (!agent) {
+      return new Response("Managed setup agent offline", { status: 409 });
+    }
+    for (const existing of this.ctx.getWebSockets("setup-controller")) {
+      existing.close(4002, "Setup controller replaced");
+    }
+    const pair = new WebSocketPair();
+    const [client, server] = Object.values(pair);
+    this.ctx.acceptWebSocket(server, ["setup-controller"]);
+    server.serializeAttachment({
+      role: "setup-controller",
+      sessionId,
+      connectionGeneration: 0,
+      maxExpiresAt: expiresAt,
+      controllerBytes: 0,
+      screenBytes: 0,
+    } satisfies RemoteSocketAttachment);
+    agent.send(JSON.stringify({ type: "setup_controller_ready", sessionId }));
+    return new Response(null, {
+      status: 101,
+      headers: { "Sec-WebSocket-Protocol": protocol },
+      webSocket: client,
+    });
   }
 
   private connectAgent(request: Request) {
@@ -211,6 +295,46 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
       socket.close(4006, "Remote desktop session expired");
       return;
     }
+    if (
+      current.role === "setup-agent" || current.role === "setup-controller"
+    ) {
+      if (typeof message !== "string") {
+        socket.close(1008, "Managed setup messages must be text");
+        return;
+      }
+      if (messageSize(message) > maxSetupFrameBytes) {
+        socket.close(1009, "Managed setup message is too large");
+        return;
+      }
+      try {
+        JSON.parse(message);
+      } catch {
+        socket.close(1008, "Managed setup message must be JSON");
+        return;
+      }
+      const targetRole = current.role === "setup-agent"
+        ? "setup-controller"
+        : "setup-agent";
+      const target = this.ctx.getWebSockets(targetRole).find((candidate) =>
+        candidate.readyState === socketOpen
+      );
+      if (!target) {
+        if (current.role === "setup-controller") {
+          socket.close(4004, "Managed setup agent offline");
+        }
+        return;
+      }
+      const targetState = attachment(target);
+      if (
+        targetState?.maxExpiresAt &&
+        targetState.maxExpiresAt <= new Date().toISOString()
+      ) {
+        target.close(4006, "Managed setup session expired");
+        return;
+      }
+      target.send(message);
+      return;
+    }
     if (messageSize(message) > maxRemoteFrameBytes) {
       socket.close(1009, "Remote desktop frame is too large");
       return;
@@ -258,6 +382,27 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
   ) {
     const current = attachment(socket);
     if (!current) return;
+    if (current.role === "setup-agent") {
+      const replacement = this.ctx.getWebSockets("setup-agent").some(
+        (candidate) => candidate !== socket && candidate.readyState === socketOpen,
+      );
+      if (replacement) return;
+      for (const controller of this.ctx.getWebSockets("setup-controller")) {
+        controller.close(4004, "Managed setup agent offline");
+      }
+      return;
+    }
+    if (current.role === "setup-controller") {
+      if (!current.sessionId) return;
+      for (const agent of this.ctx.getWebSockets("setup-agent")) {
+        if (agent.readyState !== socketOpen) continue;
+        agent.send(JSON.stringify({
+          type: "setup_controller_ended",
+          sessionId: current.sessionId,
+        }));
+      }
+      return;
+    }
     if (current.role === "agent") {
       const replacement = this.ctx.getWebSockets("agent").some((candidate) =>
         candidate !== socket && candidate.readyState === socketOpen
@@ -300,7 +445,9 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
   async webSocketError(socket: WebSocket) {
     const current = attachment(socket);
     socket.close(1011, "Remote socket error");
-    if (current?.role === "controller") {
+    if (
+      current?.role === "controller" || current?.role === "setup-controller"
+    ) {
       await this.webSocketClose(socket, 1011, "Remote socket error", false);
     }
   }
