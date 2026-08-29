@@ -183,6 +183,7 @@ type ChannelsProps = {
   surface?: "channel" | "dm";
   inboxDetail?: boolean;
   onInboxDetailClose?: () => void;
+  onInboxChannelOpen?: (channelId: string) => void;
   requestedMessage?: {
     channelId: string;
     messageId: string;
@@ -313,6 +314,7 @@ export function Channels({
   onRequestedMessageOpen,
   inboxDetail = false,
   onInboxDetailClose,
+  onInboxChannelOpen,
   onCreateAgent,
   surface = "channel",
 }: ChannelsProps) {
@@ -1466,9 +1468,28 @@ export function Channels({
           )}
           <aside className="channel-thread">
           <header data-tauri-drag-region="deep">
-            <span>
-              <MessageSquare size={15} /> {t("channel.thread")}
-            </span>
+            <div className="channel-thread-heading">
+              <span>
+                <MessageSquare size={15} /> {t("channel.thread")}
+              </span>
+              {showRequestedThreadOnly && onInboxChannelOpen ? (
+                <button
+                  aria-label={t("channel.openChannel", {
+                    name: activeChannelName,
+                  })}
+                  className="channel-thread-channel-link"
+                  onClick={() => onInboxChannelOpen(activeChannel.id)}
+                  type="button"
+                >
+                  {activeChannel.visibility === "private" ? (
+                    <Lock aria-hidden="true" size={13} />
+                  ) : (
+                    <Hash aria-hidden="true" size={13} />
+                  )}
+                  <span>{activeChannelName}</span>
+                </button>
+              ) : null}
+            </div>
             <div className="channel-thread-header-actions">
               <ChannelThreadSubscribeControls
                 currentUserId={currentUserId}

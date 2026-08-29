@@ -321,7 +321,8 @@ describe("Channels", () => {
     await cleanup();
   });
 
-  it("keeps an Inbox thread reply centered instead of jumping to the thread end", async () => {
+  it("keeps an Inbox thread reply centered and links its channel", async () => {
+    const openChannel = vi.fn();
     const rootMessage: ChannelMessage = {
       id: "channel-root-1",
       channelId: selectedChannel.id,
@@ -407,6 +408,7 @@ describe("Channels", () => {
           inboxDetail
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
+          onInboxChannelOpen={openChannel}
           onInboxDetailClose={() => undefined}
           organizationId="org-1"
           requestedMessage={{
@@ -426,6 +428,12 @@ describe("Channels", () => {
     expect(highlighted?.dataset.channelMessageId).toBe(replyMessage.id);
     expect(container.querySelector(".channel-thread")).not.toBeNull();
     expect(document.activeElement).toBe(highlighted);
+    const channelLink = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Open #General"]',
+    );
+    expect(channelLink?.textContent).toContain("General");
+    await act(async () => channelLink?.click());
+    expect(openChannel).toHaveBeenCalledWith(selectedChannel.id);
 
     requestAnimationFrame.mockRestore();
     await cleanup();
