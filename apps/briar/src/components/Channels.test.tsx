@@ -128,6 +128,98 @@ describe("Channels", () => {
     await cleanup();
   });
 
+  it("loads earlier messages when the desktop timeline reaches the top", async () => {
+    const initialMessages = Array.from({ length: 20 }, (_, index) =>
+      virtualMessage(selectedChannel.id, index + 20));
+    const earlierMessages = Array.from({ length: 20 }, (_, index) =>
+      virtualMessage(selectedChannel.id, index));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "POST") {
+        return new Response(JSON.stringify({
+          url: "ws://realtime.test/socket",
+        }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url.includes("/messages?")) {
+        return new Response(JSON.stringify({
+          messages: earlierMessages,
+          nextCursor: null,
+        }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({
+        channel: selectedChannel,
+        members: [],
+        agents: [],
+        messages: initialMessages,
+        agentReplies: [],
+        nextCursor: "older-cursor",
+      }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const requestAnimationFrame = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        callback(0);
+        return 0;
+      });
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <Channels
+          activeChannelId={selectedChannel.id}
+          channelCatalogCursor={0}
+          channels={[selectedChannel]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          token="token"
+        />
+      </I18nProvider>,
+    );
+    await act(async () => Promise.resolve());
+
+    const scroller = container.querySelector<HTMLElement>(".channel-messages");
+    expect(scroller).not.toBeNull();
+    let scrollTop = 0;
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 500 },
+      scrollHeight: { configurable: true, value: 3000 },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = value;
+        },
+      },
+    });
+    scrollTop = 2500;
+    scroller?.dispatchEvent(new Event("scroll"));
+    scrollTop = 0;
+    await act(async () => {
+      scroller?.dispatchEvent(new Event("scroll"));
+      await Promise.resolve();
+    });
+
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("cursor=older-cursor"))).toBe(true);
+    expect(container.textContent).toContain("메시지 0");
+    expect(container.textContent).toContain("메시지 39");
+
+    requestAnimationFrame.mockRestore();
+    await cleanup();
+  });
+
   it("highlights and focuses a requested Inbox channel message", async () => {
     const message: ChannelMessage = {
       id: "channel-message-1",

@@ -44,6 +44,30 @@ describe("inbox notification change detection", () => {
     ).toEqual(["changed", "new"]);
   });
 
+  it("tracks a thread by its stable group while its oldest unread row stays selected", () => {
+    const firstReply = {
+      ...message("conversation:first", "reply-2"),
+      notificationGroupId: "conversation-thread:project-1:run-1:root-1",
+    };
+
+    expect(
+      findChangedInboxMessages(
+        {
+          "conversation-thread:project-1:run-1:root-1": "reply-1",
+        },
+        [firstReply],
+      ),
+    ).toEqual([firstReply]);
+    expect(
+      findChangedInboxMessages(
+        {
+          "conversation-thread:project-1:run-1:root-1": "reply-2",
+        },
+        [{ ...firstReply, id: "conversation:second" }],
+      ),
+    ).toEqual([]);
+  });
+
   it("ignores legacy and canonical versions of the same terminal session", () => {
     const terminalSession: InboxMessageWithReadState = {
       id: "session:session-1",

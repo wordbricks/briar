@@ -1160,6 +1160,154 @@ final class AgentsInboxSystemTests: XCTestCase {
         }
     }
 
+    func testInboxCollapsesThreadRepliesAtTheOldestUnreadMessage() async throws {
+        let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let runID = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
+        let rootID = UUID(uuidString: "88888888-8888-4888-8888-888888888888")!
+        let firstID = UUID(uuidString: "99999999-9999-4999-8999-999999999991")!
+        let secondID = UUID(uuidString: "99999999-9999-4999-8999-999999999992")!
+        let first = InboxMessage(
+            id: "conversation:\(firstID.uuidString.lowercased())",
+            kind: .conversation,
+            projectId: projectID,
+            projectName: "Briar",
+            targetId: runID.uuidString.lowercased(),
+            title: "Grouped thread",
+            occurredAt: Date(timeIntervalSince1970: 1_700_000_100),
+            version: firstID.uuidString.lowercased(),
+            body: "Oldest unread reply",
+            authorName: "First member",
+            statusLabel: "답글",
+            requiresAttention: true,
+            priority: nil,
+            structuredResult: nil,
+            reason: "thread_reply",
+            rootMessageId: rootID,
+            conversationMessageId: firstID
+        )
+        let second = InboxMessage(
+            id: "conversation:\(secondID.uuidString.lowercased())",
+            kind: .conversation,
+            projectId: projectID,
+            projectName: "Briar",
+            targetId: runID.uuidString.lowercased(),
+            title: "Grouped thread",
+            occurredAt: Date(timeIntervalSince1970: 1_700_000_200),
+            version: secondID.uuidString.lowercased(),
+            body: "Newest unread reply",
+            authorName: "Second member",
+            statusLabel: "답글",
+            requiresAttention: true,
+            priority: nil,
+            structuredResult: nil,
+            reason: "thread_reply",
+            rootMessageId: rootID,
+            conversationMessageId: secondID
+        )
+
+        let groupedMessages = InboxMessageBuilder.collapseThreads([second, first])
+        XCTAssertEqual(groupedMessages.count, 1)
+        let grouped = try XCTUnwrap(groupedMessages.first)
+
+        XCTAssertEqual(grouped.id, first.id)
+        XCTAssertEqual(grouped.conversationMessageId, firstID)
+        XCTAssertEqual(grouped.body, "Oldest unread reply")
+        XCTAssertEqual(grouped.occurredAt, second.occurredAt)
+        XCTAssertEqual(grouped.version, second.version)
+        XCTAssertEqual(grouped.threadMessageCount, 2)
+        XCTAssertEqual(grouped.threadUnreadCount, 2)
+        XCTAssertEqual(grouped.groupedReadVersions, [
+            first.id: first.version,
+            second.id: second.version,
+        ])
+
+        var readFirst = first
+        readFirst.isUnread = false
+        let next = try XCTUnwrap(
+            InboxMessageBuilder.collapseThreads([readFirst, second]).first
+        )
+        XCTAssertEqual(next.id, second.id)
+        XCTAssertEqual(next.conversationMessageId, secondID)
+        XCTAssertEqual(next.threadUnreadCount, 1)
+
+        let project = ProjectsResponse.Project(
+            id: projectID,
+            name: "Briar",
+            icon: nil,
+            organizationId: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
+            organizationName: "Wordbricks",
+            role: .owner,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let run = DashboardRun(
+            id: runID,
+            title: "Grouped thread",
+            status: .running,
+            subscribers: [
+                IssueSubscriber(userId: "u1", subscribedAt: Date(timeIntervalSince1970: 1_700_000_000)),
+            ],
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_200)
+        )
+        let snapshot = DashboardSnapshot(
+            project: project,
+            runs: [run],
+            conversationNotifications: [
+                ConversationNotification(
+                    id: firstID,
+                    runId: runID,
+                    runTitle: run.title,
+                    rootMessageId: rootID,
+                    body: "Oldest unread reply",
+                    author: IssueMessage.Author(
+                        id: "member-1",
+                        name: "First member",
+                        image: nil,
+                        provider: nil
+                    ),
+                    reason: "thread_reply",
+                    createdAt: first.occurredAt
+                ),
+                ConversationNotification(
+                    id: secondID,
+                    runId: runID,
+                    runTitle: run.title,
+                    rootMessageId: rootID,
+                    body: "Newest unread reply",
+                    author: IssueMessage.Author(
+                        id: "member-2",
+                        name: "Second member",
+                        image: nil,
+                        provider: nil
+                    ),
+                    reason: "thread_reply",
+                    createdAt: second.occurredAt
+                ),
+            ],
+            cursor: 1,
+            generatedAt: second.occurredAt
+        )
+
+        await MainActor.run {
+            let suiteName = "AgentsInboxThreadGroupingTests.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            defer { defaults.removePersistentDomain(forName: suiteName) }
+            let store = InboxStore(defaults: defaults)
+            store.configure(token: nil, userID: "u1")
+            store.update(snapshot: snapshot, sessions: [], project: project)
+
+            XCTAssertEqual(store.messages.count, 1)
+            XCTAssertEqual(store.unreadCount, 1)
+            XCTAssertEqual(store.messages.first?.conversationMessageId, firstID)
+
+            store.markRead(id: first.id)
+
+            XCTAssertEqual(store.messages.count, 1)
+            XCTAssertEqual(store.unreadCount, 0)
+            XCTAssertFalse(store.messages.first?.isUnread ?? true)
+            XCTAssertEqual(store.messages.first?.conversationMessageId, secondID)
+        }
+    }
+
     func testInboxSessionMessagesAreLimitedToTheCurrentRequester() {
         let project = ProjectsResponse.Project(
             id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,

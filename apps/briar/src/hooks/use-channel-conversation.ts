@@ -789,6 +789,7 @@ export function useChannelConversation({
             currentMessages.length > result.messages.length
             ? messageNextCursorRef.current
             : result.nextCursor ?? null;
+        messageNextCursorRef.current = nextCursor;
         setMessageNextCursor(nextCursor);
 
         const target = requestedMessage?.channelId === requestedChannelId
@@ -886,13 +887,13 @@ export function useChannelConversation({
   const loadEarlierChannelMessages = useCallback(
     async (signal?: AbortSignal): Promise<LoadEarlierMessagesResult> => {
       const activeId = channelIdRef.current;
+      const cursor = messageNextCursorRef.current;
       if (
         !activeId ||
-        threadParentIdRef.current ||
-        !messageNextCursor ||
+        !cursor ||
         earlierMessagesPending.current
       ) {
-        return { applied: false, nextCursor: messageNextCursor };
+        return { applied: false, nextCursor: cursor };
       }
       const context = captureChannelSurface();
       earlierMessagesPending.current = true;
@@ -903,23 +904,24 @@ export function useChannelConversation({
           organizationId,
           activeId,
           undefined,
-          { limit: pageSize, cursor: messageNextCursor, signal },
+          { limit: pageSize, cursor, signal },
         );
         if (!channelSurfaceIsCurrent(context)) {
-          return { applied: false, nextCursor: messageNextCursor };
+          return { applied: false, nextCursor: cursor };
         }
         recordProposalMessages(result.messages);
         updateRootMessages((current) =>
           mergeChannelMessages(current, result.messages, [])
         );
         const nextCursor = result.nextCursor ?? null;
+        messageNextCursorRef.current = nextCursor;
         setMessageNextCursor(nextCursor);
         return { applied: true, nextCursor };
       } catch (cause) {
         if (!signal?.aborted && channelSurfaceIsCurrent(context)) {
           setError(channelConversationError(cause));
         }
-        return { applied: false, nextCursor: messageNextCursor };
+        return { applied: false, nextCursor: cursor };
       } finally {
         earlierMessagesPending.current = false;
         if (channelSurfaceIsCurrent(context)) setLoadingEarlierMessages(false);
@@ -928,7 +930,6 @@ export function useChannelConversation({
     [
       captureChannelSurface,
       channelSurfaceIsCurrent,
-      messageNextCursor,
       organizationId,
       pageSize,
       recordProposalMessages,
