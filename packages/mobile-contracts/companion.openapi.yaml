@@ -431,6 +431,61 @@
         }
       }
     },
+    "/projects/{projectId}/runs/{runId}/messages/delta": {
+      "get": {
+        "operationId": "getIssueConversationDelta",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/RunId"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Issue conversation changes after the supplied cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueMessagesDeltaResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "description": "Cursor retention window expired; request a new issue conversation snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueConversationCursorExpiredError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{projectId}/runs/{runId}/messages": {
       "get": {
         "operationId": "listIssueMessages",
@@ -3853,9 +3908,14 @@
       "IssueMessagesResponse": {
         "type": "object",
         "required": [
+          "cursor",
           "messages"
         ],
         "properties": {
+          "cursor": {
+            "type": "integer",
+            "minimum": 0
+          },
           "messages": {
             "type": "array",
             "items": {
@@ -3936,6 +3996,39 @@
                 }
               },
               "additionalProperties": true
+            }
+          },
+          "agentReplies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueAgentReply"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "IssueMessagesDeltaResponse": {
+        "type": "object",
+        "required": [
+          "cursor",
+          "hasMore",
+          "changed"
+        ],
+        "properties": {
+          "cursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueMessagesResponse/properties/messages/items"
             }
           },
           "agentReplies": {

@@ -1449,8 +1449,8 @@ struct RunDetailView: View {
             }
             .onChange(of: selectedTab, initial: true) { _, tab in
                 if tab == .conversation {
-                    issueConversationView?.view(runID: run.id) {
-                        await detail.load(queueIfLoading: true)
+                    issueConversationView?.view(projectID: projectID, runID: run.id) {
+                        await detail.syncConversationChanges()
                     }
                 } else {
                     issueConversationView?.leave(runID: run.id)

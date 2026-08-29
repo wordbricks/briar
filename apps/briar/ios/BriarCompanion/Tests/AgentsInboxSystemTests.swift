@@ -57,6 +57,39 @@ final class AgentsInboxSystemTests: XCTestCase {
         XCTAssertEqual(refreshCount, 2)
     }
 
+    @MainActor
+    func testIssueConversationTrackerRoutesOnlyMatchingProjectRealtimeChanges() async {
+        let tracker = IssueConversationViewTracker()
+        let visibleProjectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let visibleRunID = UUID()
+        var refreshCount = 0
+
+        tracker.view(projectID: visibleProjectID, runID: visibleRunID) {
+            refreshCount += 1
+        }
+
+        await tracker.receiveRealtimeNotification(
+            ChannelRealtimeNotification(
+                topic: "project",
+                cursor: 2,
+                projectId: "22222222-2222-4222-8222-222222222222"
+            )
+        )
+        XCTAssertEqual(refreshCount, 0)
+
+        await tracker.receiveRealtimeNotification(
+            ChannelRealtimeNotification(
+                topic: "project",
+                cursor: 3,
+                projectId: visibleProjectID.uuidString.uppercased()
+            )
+        )
+        XCTAssertEqual(refreshCount, 1)
+
+        await tracker.receiveRealtimeNotification(ChannelRealtimeNotification(topic: "ready"))
+        XCTAssertEqual(refreshCount, 2)
+    }
+
     func testDecodesAgentAndSessionFixturesFromSharedContract() throws {
         let bundle = Bundle(for: Self.self)
         let fixtureURL = try XCTUnwrap(bundle.url(forResource: "companion-v1", withExtension: "json"))

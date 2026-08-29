@@ -484,26 +484,56 @@ struct RunEvent: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct IssueMessagesResponse: Codable, Equatable, Sendable {
+    let cursor: Int?
     let messages: [IssueMessage]
     let agentReplies: [IssueAgentReplyJob]
 
-    init(messages: [IssueMessage], agentReplies: [IssueAgentReplyJob] = []) {
+    init(
+        messages: [IssueMessage],
+        agentReplies: [IssueAgentReplyJob] = [],
+        cursor: Int? = nil
+    ) {
+        self.cursor = cursor
         self.messages = messages
         self.agentReplies = agentReplies
     }
 
     private enum CodingKeys: String, CodingKey {
+        case cursor
         case messages
         case agentReplies
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        cursor = try container.decodeIfPresent(Int.self, forKey: .cursor)
         messages = try container.decode([IssueMessage].self, forKey: .messages)
         agentReplies = try container.decodeIfPresent(
             [IssueAgentReplyJob].self,
             forKey: .agentReplies
         ) ?? []
+    }
+}
+
+struct IssueMessagesDeltaResponse: Codable, Equatable, Sendable {
+    let cursor: Int
+    let hasMore: Bool
+    let changed: Bool
+    let messages: [IssueMessage]?
+    let agentReplies: [IssueAgentReplyJob]?
+
+    init(
+        cursor: Int,
+        hasMore: Bool,
+        changed: Bool,
+        messages: [IssueMessage]? = nil,
+        agentReplies: [IssueAgentReplyJob]? = nil
+    ) {
+        self.cursor = cursor
+        self.hasMore = hasMore
+        self.changed = changed
+        self.messages = messages
+        self.agentReplies = agentReplies
     }
 }
 

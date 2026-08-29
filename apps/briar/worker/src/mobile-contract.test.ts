@@ -234,6 +234,7 @@ describe("Companion mobile API contract", () => {
     const parsedIssueMessages = decodeMobileSchema(
       mobileIssueMessagesResponseSchema,
       {
+        cursor: 41,
         messages: [{
           ...issueMessage,
           proposedAction: {

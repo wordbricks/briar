@@ -230,6 +230,7 @@ struct CompanionRootView: View {
             inbox.receiveRealtimeNotification(notification)
             Task {
                 await channels.receiveRealtimeNotification(notification)
+                await issueConversationView.receiveRealtimeNotification(notification)
             }
         }
         .onChange(of: scenePhase) { _, phase in

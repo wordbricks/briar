@@ -353,6 +353,7 @@
       "path": "/projects/{projectId}/runs/{runId}/messages",
       "status": 200,
       "response": {
+        "cursor": 41,
         "messages": [
           {
             "id": "99999999-9999-4999-8999-999999999999",
@@ -371,6 +372,39 @@
             "updatedAt": "2026-08-02T01:00:00.000Z"
           }
         ]
+      }
+    },
+    "getIssueConversationDelta": {
+      "method": "GET",
+      "path": "/projects/{projectId}/runs/{runId}/messages/delta?cursor={cursor}",
+      "status": 200,
+      "response": {
+        "cursor": 42,
+        "hasMore": false,
+        "changed": true,
+        "messages": [
+          {
+            "id": "99999999-9999-4999-8999-999999999999",
+            "runId": "33333333-3333-4333-8333-333333333333",
+            "parentMessageId": null,
+            "body": "Please verify the offline state.",
+            "attachments": [],
+            "author": {
+              "id": "fixture-user",
+              "name": "Briar User",
+              "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+              "provider": null
+            },
+            "replyCount": 0,
+            "createdAt": "2026-08-02T01:00:00.000Z",
+            "updatedAt": "2026-08-02T01:00:00.000Z"
+          }
+        ],
+        "agentReplies": []
+      },
+      "errorResponse": {
+        "code": "issue_conversation_cursor_expired",
+        "message": "Conversation cursor expired; reload the full snapshot"
       }
     },
     "listRunEvidence": {

@@ -655,6 +655,7 @@ final class MobileAPIContractTests: XCTestCase {
         let expectedQueryTemplates = [
             "getChannelDelta": "since={since}",
             "getDashboardDelta": "cursor={cursor}",
+            "getIssueConversationDelta": "cursor={cursor}",
         ]
         for (operationID, fixtureOperation) in operations {
             let openAPIOperation = try XCTUnwrap(
@@ -697,6 +698,9 @@ final class MobileAPIContractTests: XCTestCase {
         let delta: DashboardDelta = try decodeResponse("getDashboardDelta")
         let events: RunEventsResponse = try decodeResponse("listRunEvents")
         let messages: IssueMessagesResponse = try decodeResponse("listIssueMessages")
+        let conversationDelta: IssueMessagesDeltaResponse = try decodeResponse(
+            "getIssueConversationDelta"
+        )
         let evidence: RunEvidenceResponse = try decodeResponse("listRunEvidence")
         let agents: ProjectAgentsResponse = try decodeResponse("listProjectAgents")
         let sessions: ProjectAgentSessionsResponse = try decodeResponse("listProjectAgentSessions")
@@ -751,7 +755,11 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(delta.runs.first?.structuredResult?.outcome, "completed")
         XCTAssertEqual(events.events.first?.workflowStage, "implementing")
         XCTAssertEqual(events.events.first?.actorName, "Briar User")
+        XCTAssertEqual(messages.cursor, 41)
         XCTAssertEqual(messages.messages.first?.author.name, "Briar User")
+        XCTAssertEqual(conversationDelta.cursor, 42)
+        XCTAssertTrue(conversationDelta.changed)
+        XCTAssertEqual(conversationDelta.messages?.first?.id, messages.messages.first?.id)
         XCTAssertEqual(evidence.evidence.first?.status, .passed)
         XCTAssertEqual(evidence.evidence.first?.images?.first?.filename, "companion.png")
         XCTAssertEqual(agents.agents.first?.name, "Issue processing agent")
@@ -844,6 +852,14 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertEqual(
             MobileAPIContract.Endpoint.runMessages(projectID: projectID, runID: runID),
             "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/messages"
+        )
+        XCTAssertEqual(
+            MobileAPIContract.Endpoint.runMessagesDelta(
+                projectID: projectID,
+                runID: runID,
+                cursor: 41
+            ),
+            "/projects/11111111-1111-4111-8111-111111111111/runs/33333333-3333-4333-8333-333333333333/messages/delta?cursor=41"
         )
         XCTAssertEqual(
             MobileAPIContract.Endpoint.runEvidence(projectID: projectID, runID: runID),
