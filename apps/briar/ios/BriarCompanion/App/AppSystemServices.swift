@@ -169,21 +169,44 @@ struct InboxNotificationPreferences: Equatable, Sendable {
 
 @MainActor
 final class IssueConversationViewTracker: ObservableObject {
+    private(set) var projectID: UUID?
     private(set) var runID: UUID?
     private var refreshAction: (() async -> Void)?
 
-    func view(runID: UUID, refresh: @escaping () async -> Void) {
+    func view(
+        projectID: UUID? = nil,
+        runID: UUID,
+        refresh: @escaping () async -> Void
+    ) {
+        self.projectID = projectID
         self.runID = runID
         refreshAction = refresh
     }
 
     func leave(runID: UUID) {
         guard self.runID == runID else { return }
+        projectID = nil
         self.runID = nil
         refreshAction = nil
     }
 
     func refreshChanges() async {
+        await refreshAction?()
+    }
+
+    func receiveRealtimeNotification(
+        _ notification: ChannelRealtimeNotification
+    ) async {
+        let matchesVisibleProject: Bool
+        if let projectID, let notificationProjectID = notification.projectId {
+            matchesVisibleProject = notificationProjectID
+                .caseInsensitiveCompare(projectID.uuidString) == .orderedSame
+        } else {
+            matchesVisibleProject = false
+        }
+        guard notification.topic == "ready" ||
+            (notification.topic == "project" && matchesVisibleProject)
+        else { return }
         await refreshAction?()
     }
 }
