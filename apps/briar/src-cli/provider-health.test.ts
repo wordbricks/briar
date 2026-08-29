@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -7,6 +7,7 @@ import {
   grokAuthenticated,
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
+  opencodeAuthenticated,
   parseClaudeAuthStatus,
   parseCursorAuthStatus,
   providerHealthReadinessDetail,
@@ -340,6 +341,24 @@ describe("inspectWorkerProviderHealth", () => {
     } finally {
       if (previousGrokHome === undefined) delete process.env.GROK_HOME;
       else process.env.GROK_HOME = previousGrokHome;
+      await rm(home, { recursive: true });
+    }
+  });
+
+  it("requires at least one stored OpenCode provider credential", async () => {
+    const home = await mkdtemp(join(tmpdir(), "briar-opencode-health-"));
+    try {
+      await expect(opencodeAuthenticated(home)).resolves.toBe(false);
+      const authDirectory = join(home, ".local", "share", "opencode");
+      await mkdir(authDirectory, { recursive: true });
+      await writeFile(join(authDirectory, "auth.json"), "{}\n");
+      await expect(opencodeAuthenticated(home)).resolves.toBe(false);
+      await writeFile(
+        join(authDirectory, "auth.json"),
+        JSON.stringify({ opencode: { type: "api", key: "stored" } }),
+      );
+      await expect(opencodeAuthenticated(home)).resolves.toBe(true);
+    } finally {
       await rm(home, { recursive: true });
     }
   });

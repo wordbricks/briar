@@ -168,6 +168,20 @@ export const grokAuthenticated = async (home: string, now: number) => {
   }
 };
 
+export const opencodeAuthenticated = async (home: string) => {
+  try {
+    const parsed = JSON.parse(
+      await readFile(join(home, ".local", "share", "opencode", "auth.json"), "utf8"),
+    ) as unknown;
+    return Boolean(
+      parsed && typeof parsed === "object" && !Array.isArray(parsed) &&
+        Object.keys(parsed).length > 0,
+    );
+  } catch {
+    return false;
+  }
+};
+
 const defaultDependencies: ProviderHealthDependencies = {
   home: homedir(),
   openrouterApiKey: process.env.OPENROUTER_API_KEY?.trim() || null,
@@ -184,8 +198,7 @@ const defaultDependencies: ProviderHealthDependencies = {
       return cursorAuthenticated(binary);
     }
     if (provider === "opencode") {
-      // OpenCode delegates credentials to its configured model providers.
-      return true;
+      return opencodeAuthenticated(home);
     }
     if (provider === "openrouter") {
       return Boolean(openrouterApiKey?.trim());

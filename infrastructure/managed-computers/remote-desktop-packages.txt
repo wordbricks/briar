@@ -2,6 +2,7 @@
 # list to exact package=version entries in remote-desktop-packages.lock before install.
 dbus-x11
 build-essential
+bsdutils
 ca-certificates
 curl
 desktop-file-utils
