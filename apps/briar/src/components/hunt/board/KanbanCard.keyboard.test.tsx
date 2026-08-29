@@ -4,7 +4,7 @@ import { act } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HuntDashboard } from "@/components/HuntDashboard";
+import { HuntDashboard } from "@/components/hunt/HuntDashboard";
 import { AppKeyboardCommandProvider } from "@/hooks/appKeyboardCommands";
 import { demoDashboard } from "@/lib/demo-data";
 import { saveKeyboardNavigationPreferences } from "@/lib/keybindings";

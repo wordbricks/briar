@@ -15,7 +15,12 @@ import {
   useAppKeyboardCommandState,
 } from "@/hooks/appKeyboardCommands";
 import type { ExecutionWorker, HuntRun, IssueMessage, IssueMessageSendResult, ProjectAgent, RunEvidence, UpdateIssueInput } from "@/types";
-import { CreateIssueDialog, EditIssueDialog, HuntDashboard, IssueAgentActivityPanel, RunPage, runMatchesIssuePropertyFilters, type IssuePropertyFilters } from "@/components/HuntDashboard";
+import { HuntDashboard } from "@/components/hunt/HuntDashboard";
+import { IssueAgentActivityPanel } from "@/components/hunt/detail/IssueAgentActivityPanel";
+import { RunPage } from "@/components/hunt/detail/RunPage";
+import { CreateIssueDialog } from "@/components/hunt/editor/CreateIssueDialog";
+import { EditIssueDialog } from "@/components/hunt/editor/EditIssueDialog";
+import { runMatchesIssuePropertyFilters, type IssuePropertyFilters } from "@/components/hunt/model/filters";
 import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 const dashboardProps = {
