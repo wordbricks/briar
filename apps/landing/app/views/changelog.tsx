@@ -30,6 +30,23 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.172",
+        date: "2026년 8월 29일",
+        title: "채널, Inbox, 모바일 홈을 한 흐름으로 연결합니다",
+        summary:
+          "채널 스레드 맥락과 Inbox 탐색을 다듬고, 모바일 프로젝트 홈과 관리형 컴퓨터 설정을 추가했습니다.",
+        items: [
+          "Inbox 채널 스레드 알림에 채널 이름과 공개 범위를 표시하고, 채널로 이동해 같은 스레드 맥락을 이어갈 수 있습니다.",
+          "같은 이슈 대화나 채널 스레드의 Inbox 알림을 하나로 묶고, 미확인 개수와 읽음 상태를 데스크톱·Android·iOS에서 동기화합니다.",
+          "Inbox에서 읽지 않은 메시지만 볼 수 있고, 채널 과거 메시지 로딩과 프로젝트 탭의 Lobby 이동을 안정화했습니다.",
+          "모바일 Home에 프로젝트 Lobby와 Agents 진입을 추가해 프로젝트 지표, 최근 실행, 이슈 상세로 바로 이동할 수 있습니다.",
+          "현재 사용자에게 보내는 self-DM을 만들고 기존 대화를 재사용할 수 있습니다.",
+          "Codex, Claude, Grok, OpenCode 인증과 GitHub 저장소 연결을 관리형 컴퓨터 설정 흐름에서 안전하게 진행하고 Worker를 자동으로 연결합니다.",
+          "HTML artifact 미리보기의 단계·탭·버튼을 Production CSP 안에서 다시 동작하게 하고, iframe 격리와 외부 네트워크 차단을 유지합니다.",
+          "대화에 사용한 Agent Skill catalog를 보존하고, 관리형 컴퓨터 새 프로비저닝이 검증된 Launch Template을 사용하도록 갱신했습니다.",
+        ],
+      },
+      {
         version: "1.2.171",
         date: "2026년 8월 29일",
         title: "채널 작업과 관리형 컴퓨터 운영을 더 안정적으로 연결합니다",
@@ -1281,6 +1298,23 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.172",
+        date: "August 29, 2026",
+        title: "Connect channels, Inbox, and mobile project homes",
+        summary:
+          "Refine channel-thread context and Inbox navigation while adding mobile project homes and guided managed-computer setup.",
+        items: [
+          "Show the channel name and visibility in Inbox channel-thread alerts, then open the channel while preserving the selected thread context.",
+          "Group Inbox alerts from the same issue conversation or channel thread and sync unread counts and read state across desktop, Android, and iOS.",
+          "Filter Inbox to unread messages, stabilize channel history loading, and restore project-tab navigation to the project Lobby.",
+          "Add project Lobby and Agents entry points to mobile Home with project metrics, recent runs, and issue drill-down.",
+          "Create and reuse a self-DM for messages sent to the current user.",
+          "Guide Codex, Claude, Grok, and OpenCode authentication plus GitHub repository binding from managed-computer setup, then bind the Worker automatically.",
+          "Restore interactive HTML artifact previews under the Production CSP while keeping iframe isolation and external network access blocked.",
+          "Retain Agent Skill catalogs with conversations and point new managed-computer provisioning at the verified Launch Template.",
+        ],
+      },
       {
         version: "1.2.171",
         date: "August 29, 2026",
@@ -2624,7 +2658,7 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
           <p>
             <strong>Briar</strong> <span>1.2</span>
           </p>
-          <a href="#v1-2-171">
+          <a href="#v1-2-172">
             {changelog.current} <span aria-hidden="true">↓</span>
           </a>
         </div>
@@ -2646,9 +2680,10 @@ export default function ChangelogView({ locale }: { locale: Locale }) {
                   </div>
                   <time
                     dateTime={
-                      entry.version === "1.2.171"
+                      entry.version === "1.2.172"
                         ? "2026-08-29"
-                        : entry.version === "1.2.170" ||
+                        : entry.version === "1.2.171" ||
+                          entry.version === "1.2.170" ||
                           entry.version === "1.2.169"
                         ? "2026-08-28"
                         : entry.version === "1.2.168" ||
