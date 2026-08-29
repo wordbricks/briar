@@ -1315,6 +1315,7 @@ export const ko = {
   "inbox.collapseActivity": "접기",
   "inbox.nextAction": "다음 행동: {action}",
   "inbox.unread": "읽지 않음",
+  "inbox.unreadOnly": "읽지 않은 메시지만 보기",
   "inbox.unreadCount": "읽지 않은 메시지 {count}개",
   "inbox.markRead": "읽음으로 표시",
   "inbox.markUnread": "읽지 않음으로 표시",
@@ -2357,6 +2358,7 @@ export type Messages = Record<MessageKey, string>;
 export const en = {
   ...ko,
   "inbox.markUnread": "Mark as unread",
+  "inbox.unreadOnly": "Show unread messages only",
   "commandPalette.title": "Command palette",
   "commandPalette.description": "Search commands, pages, issues, projects, channels, and direct messages.",
   "commandPalette.globalContext": "All of Briar",
@@ -3757,6 +3759,7 @@ export const en = {
 export const zh = {
   ...en,
   "inbox.markUnread": "标为未读",
+  "inbox.unreadOnly": "仅显示未读消息",
   "commandPalette.title": "命令面板",
   "commandPalette.description": "搜索命令、页面、问题、项目、频道和私信。",
   "commandPalette.globalContext": "整个 Briar",
