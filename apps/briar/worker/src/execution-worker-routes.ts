@@ -2,6 +2,7 @@ import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import type { BriarAuth } from "./auth";
 import { sha256 } from "./crypto-digest";
 import { corsHeaders, HttpError, json } from "./http-response";
+import { hasOrganizationCapability } from "./organization-access";
 import { managedComputerByDeviceId } from "./managed-computer-repository";
 import { endManagedComputerRemoteSessionsAndDisconnect } from "./managed-computer-remote-service";
 import { getProject } from "./project-command-repository";
@@ -101,6 +102,9 @@ export async function handleExecutionWorkerRoute(
     const session = await requireSession(auth, request);
     const project = await getProject(db, projectId, session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const input = decodeWorkerRegister(await readJson(request));
     const observedAt = new Date().toISOString();
     const workerToken = `briar_worker_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
@@ -141,6 +145,9 @@ export async function handleExecutionWorkerRoute(
     const session = await requireSession(auth, request);
     const project = await getProject(db, projectId, session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const input = decodeWorkerBind(await readJson(request));
     const observedAt = new Date().toISOString();
     const binding = await bindExecutionWorkerProject(db, projectId, {
@@ -178,12 +185,8 @@ export async function handleExecutionWorkerRoute(
     if (!device || device.organization_id !== project.organization_id) {
       throw new HttpError(404, "Worker not found");
     }
-    if (
-      device.owner_user_id !== session.user.id &&
-      project.member_role !== "owner" &&
-      project.member_role !== "admin"
-    ) {
-      throw new HttpError(403, "Worker owner or organization admin access required");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = decodeWorkerConcurrency(await readJson(request));
     const observedAt = new Date().toISOString();
@@ -233,12 +236,8 @@ export async function handleExecutionWorkerRoute(
       }
       throw new HttpError(404, "Worker not found");
     }
-    if (
-      device.owner_user_id !== session.user.id &&
-      project.member_role !== "owner" &&
-      project.member_role !== "admin"
-    ) {
-      throw new HttpError(403, "Worker owner or organization admin access required");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const managedComputer = await managedComputerByDeviceId(db, device.id);
     const remainingBindings = await db.prepare(

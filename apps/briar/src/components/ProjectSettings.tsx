@@ -87,6 +87,7 @@ import {
   type ModelEffort,
 } from "../lib/project-llm";
 import { useAgentProviderModels } from "../hooks/useAgentProviderModels";
+import { hasOrganizationCapability } from "../lib/organization-role";
 import type { AutoHuntHealth, VelenInspection } from "../lib/project-connection";
 import type {
   LinearImportConnectResult,
@@ -189,6 +190,14 @@ export function ProjectSettings({
   velen: VelenInspection | null;
 }) {
   const { localeTag, t } = useI18n();
+  const canManageProject = hasOrganizationCapability(
+    project.role,
+    "projects:manage",
+  );
+  const canManageDevelopment = hasOrganizationCapability(
+    project.role,
+    "development:manage",
+  );
   const providerModels = useAgentProviderModels();
   const [activeSection, setActiveSection] =
     useState<ProjectSettingsSection>(initialSection ?? "general");
@@ -685,7 +694,7 @@ export function ProjectSettings({
                   <div className="flex max-w-sm items-center gap-2">
                     <Input
                       aria-label={t("settings.issueKeyPrefix")}
-                      disabled={project.role === "member" || issueKeyPrefixSaving}
+                      disabled={!canManageProject || issueKeyPrefixSaving}
                       maxLength={3}
                       onChange={(event) => {
                         setIssueKeyPrefix(
@@ -698,7 +707,7 @@ export function ProjectSettings({
                     />
                     <Button
                       disabled={
-                        project.role === "member" ||
+                        !canManageProject ||
                         issueKeyPrefixSaving ||
                         !isIssueKeyPrefix(issueKeyPrefix) ||
                         issueKeyPrefix ===
@@ -766,7 +775,7 @@ export function ProjectSettings({
                         {t("settings.projectIconDescription")}
                       </Typography>
                     </div>
-                    {project.role !== "member" ? (
+                    {canManageProject ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <Button
                           className={isIconSaving ? "pointer-events-none opacity-50" : undefined}
@@ -845,7 +854,7 @@ export function ProjectSettings({
 
           {activeSection === "tabs" ? (
             <ProjectTabsSettings
-              canEdit={project.role !== "member"}
+              canEdit={canManageProject}
               error={scheduleTabError}
               onScheduleChange={(enabled) => {
                 if (scheduleTabSaving) return;
@@ -1186,7 +1195,7 @@ export function ProjectSettings({
 
           <div hidden={activeSection !== "execution"}>
             <ProjectExecutionSettings
-              canManage={project.role === "owner" || project.role === "admin"}
+              canManage={canManageDevelopment}
               initialPolicy={dashboard?.executionPolicy}
               project={project}
               token={sessionToken}
@@ -1429,7 +1438,7 @@ export function ProjectSettings({
                                       !onSaveCheckpointPolicy ||
                                       !checkpointPolicy ||
                                       locked ||
-                                      (scope === "project" && project.role === "member")
+                                      (scope === "project" && !canManageDevelopment)
                                     }
                                     id={checkboxId}
                                     onCheckedChange={(checked) => {

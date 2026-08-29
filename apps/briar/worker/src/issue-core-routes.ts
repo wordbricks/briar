@@ -16,6 +16,7 @@ import {
 } from "./db";
 import { corsHeaders, HttpError, json } from "./http-response";
 import { issueAttachmentJson } from "./issue-conversation-json";
+import { hasOrganizationCapability } from "./organization-access";
 import {
   decodeExecutionPreferences,
 } from "./issue-request-contract";
@@ -72,6 +73,9 @@ export async function handleIssueCoreRoute(input: {
     const session = await requireSession(auth, request);
     const project = await getProject(db, issuesMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
+      throw new HttpError(403, "Issue editing permission required");
+    }
     const { input, attachments, attachmentReferences } =
       await readIssueRequest(request);
     await requireIssueAssigneeMembership(
@@ -143,6 +147,9 @@ export async function handleIssueCoreRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "organization:read")) {
+      throw new HttpError(403, "Project reading permission required");
+    }
     const run = await getHuntRunForProject(
       db,
       project.id,
@@ -184,6 +191,9 @@ export async function handleIssueCoreRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
+      throw new HttpError(403, "Issue editing permission required");
+    }
     const outcome = await createIssueDependency(db, project.id, {
       dependentRunId: issueDependencyMatch[2],
       prerequisiteRunId: issueDependencyMatch[3],
@@ -219,6 +229,9 @@ export async function handleIssueCoreRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
+      throw new HttpError(403, "Issue editing permission required");
+    }
     await deleteIssueDependency(
       db,
       project.id,
@@ -235,6 +248,9 @@ export async function handleIssueCoreRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
     const input = decodeExecutionPreferences(await readJson(request));
     const run = await updateIssueExecutionPreferences(
       db,
@@ -261,6 +277,9 @@ export async function handleIssueCoreRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
     const input = decodeIssueCheckpointsInput(await readJson(request));
     const outcome = await updateIssueCheckpoints(
       db,
@@ -289,6 +308,9 @@ export async function handleIssueCoreRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "results:review")) {
+      throw new HttpError(403, "Result review permission required");
+    }
     const review = await completeIssueResultReview(
       db,
       project.id,
@@ -309,6 +331,9 @@ export async function handleIssueCoreRoute(input: {
     const session = await requireSession(auth, request);
     const project = await getProject(db, issueUpdateMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
+      throw new HttpError(403, "Issue editing permission required");
+    }
     const { input, attachments, attachmentReferences, keptAttachmentIds } =
       await readIssueUpdateRequest(request);
     await requireIssueAssigneeMembership(
@@ -345,6 +370,9 @@ export async function handleIssueCoreRoute(input: {
     const session = await requireSession(auth, request);
     const project = await getProject(db, issueUpdateMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
+      throw new HttpError(403, "Issue editing permission required");
+    }
     const observedAt = new Date().toISOString();
     const outcome = await deleteIssue(
       db,

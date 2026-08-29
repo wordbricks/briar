@@ -1,7 +1,7 @@
 import { compareSemanticVersions, isSemanticVersion } from "../../src/lib/semantic-version";
 import type { BriarAuth } from "./auth";
 import { corsHeaders, HttpError, json } from "./http-response";
-import { canManageOrganization } from "./organization-access";
+import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
 import { managedComputerByDeviceId } from "./managed-computer-repository";
 import { endManagedComputerRemoteSessionsAndDisconnect } from "./managed-computer-remote-service";
@@ -40,7 +40,9 @@ export async function handleOrganizationWorkerRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationWorkersMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const observedAt = new Date().toISOString();
     return json({
       workers: await listOrganizationExecutionWorkers(
@@ -49,7 +51,7 @@ export async function handleOrganizationWorkerRoute(
         observedAt,
       ),
       latestVersion: await readLatestVersion(env.RELEASES),
-      canManage: canManageOrganization(role),
+      canManage: hasOrganizationCapability(role, "development:manage"),
       generatedAt: observedAt,
     });
   }
@@ -62,7 +64,9 @@ export async function handleOrganizationWorkerRoute(
     const organizationId = organizationWorkerUpdateMatch[1];
     const deviceId = organizationWorkerUpdateMatch[2];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const device = (
       await listOrganizationExecutionWorkers(
         db,
@@ -71,14 +75,8 @@ export async function handleOrganizationWorkerRoute(
       )
     ).find((candidate) => candidate.deviceId === deviceId);
     if (!device) throw new HttpError(404, "Worker not found");
-    if (
-      device.ownerUserId !== session.user.id &&
-      !canManageOrganization(role)
-    ) {
-      throw new HttpError(
-        403,
-        "Worker owner or organization admin access required",
-      );
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     if (!device.remoteUpdateSupported) {
       throw new HttpError(409, "Worker does not support remote updates");
@@ -116,7 +114,9 @@ export async function handleOrganizationWorkerRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationWorkerMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const device = await db
       .prepare(
         `select id, owner_user_id
@@ -126,14 +126,8 @@ export async function handleOrganizationWorkerRoute(
       .bind(organizationWorkerMatch[2], organizationId)
       .first<{ id: string; owner_user_id: string }>();
     if (!device) throw new HttpError(404, "Worker not found");
-    if (
-      device.owner_user_id !== session.user.id &&
-      !canManageOrganization(role)
-    ) {
-      throw new HttpError(
-        403,
-        "Worker owner or organization admin access required",
-      );
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = decodeWorkerSettings(await readJson(request));
     const observedAt = new Date().toISOString();
@@ -174,7 +168,9 @@ export async function handleOrganizationWorkerRoute(
       `worker-deprovision:${deviceId}`,
     );
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const device = await db
       .prepare(
         `select id, owner_user_id
@@ -197,14 +193,8 @@ export async function handleOrganizationWorkerRoute(
       }
       throw new HttpError(404, "Worker not found");
     }
-    if (
-      device.owner_user_id !== session.user.id &&
-      !canManageOrganization(role)
-    ) {
-      throw new HttpError(
-        403,
-        "Worker owner or organization admin access required",
-      );
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const managedComputer = await managedComputerByDeviceId(db, device.id);
     let deleted: boolean;

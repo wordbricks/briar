@@ -30,6 +30,7 @@ import {
   type IssueMessageRow,
 } from "./db";
 import { corsHeaders, HttpError, json } from "./http-response";
+import { hasOrganizationCapability } from "./organization-access";
 import {
   deleteUnreferencedUploadedIssueObjects,
   issueAttachmentResponse,
@@ -214,6 +215,9 @@ export async function handleIssueConversationRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "conversations:write")) {
+      throw new HttpError(403, "Conversation editing permission required");
+    }
     const run = await getHuntRunForProject(
       db,
       project.id,
@@ -410,6 +414,9 @@ export async function handleIssueConversationRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "conversations:write")) {
+      throw new HttpError(403, "Conversation editing permission required");
+    }
     const input = decodeIssueMessageEditInput(await readJson(request));
     const message = await getIssueMessage(
       db,
@@ -483,6 +490,9 @@ export async function handleIssueConversationRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "conversations:write")) {
+      throw new HttpError(403, "Conversation editing permission required");
+    }
     const message = await getIssueMessage(
       db,
       project.id,

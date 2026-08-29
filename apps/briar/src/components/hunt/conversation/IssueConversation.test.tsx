@@ -1079,7 +1079,7 @@ describe("IssueConversation", () => {
           name: "Member One",
           email: "member@example.com",
           image: null,
-          role: "member",
+          role: "developer",
           createdAt,
         }]}
         onBack={() => undefined}

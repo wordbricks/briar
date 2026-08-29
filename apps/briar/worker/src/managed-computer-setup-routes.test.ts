@@ -57,7 +57,7 @@ describe("managed computer setup routes", () => {
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
-         ) values (?, ?, 'member', ?, ?)`,
+         ) values (?, ?, 'developer', ?, ?)`,
       ).bind(organizationId, memberId, now, now),
       db.prepare(
         `insert into briar_projects (
@@ -148,14 +148,18 @@ describe("managed computer setup routes", () => {
   const requestId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 
   it("allows the requester to issue a hashed, idempotent setup ticket", async () => {
-    const forbidden = await worker.fetch(request(
+    const developerRequestId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const developerTicket = await worker.fetch(request(
       setupPath,
       "POST",
       memberToken,
-      { projectId, requestId },
-      requestId,
+      { projectId, requestId: developerRequestId },
+      developerRequestId,
     ), env());
-    expect(forbidden.status).toBe(403);
+    expect(developerTicket.status).toBe(201);
+    await db.prepare(
+      `delete from briar_managed_computer_setup_sessions where request_id = ?`,
+    ).bind(developerRequestId).run();
 
     const first = await worker.fetch(request(
       setupPath,

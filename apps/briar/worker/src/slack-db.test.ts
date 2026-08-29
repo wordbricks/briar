@@ -47,7 +47,7 @@ describe("Slack D1 integration", () => {
       values ('member', 'Member', 'member@example.com', 1, '${now}', '${now}');
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values ('${organizationId}', 'member', 'member', '${now}', '${now}');
+      ) values ('${organizationId}', 'member', 'developer', '${now}', '${now}');
       insert into briar_projects (
         id, owner_user_id, organization_id, name, agent_token_hash,
         created_at, updated_at

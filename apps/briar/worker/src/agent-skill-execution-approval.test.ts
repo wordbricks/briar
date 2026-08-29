@@ -230,7 +230,7 @@ describe("conversational Agent Skill execution approval", () => {
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
-         ) values (?, ?, 'member', ?, ?)`,
+         ) values (?, ?, 'developer', ?, ?)`,
       ).bind(organizationId, memberId, observedAt, observedAt),
       db.prepare(
         `insert into briar_projects (

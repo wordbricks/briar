@@ -166,7 +166,7 @@ describe("channel issue proposal approval route", () => {
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
-         ) values (?, ?, 'member', ?, ?)`,
+         ) values (?, ?, 'developer', ?, ?)`,
       ).bind(organizationId, memberId, now, now),
       db.prepare(
         `insert into briar_organization_members (

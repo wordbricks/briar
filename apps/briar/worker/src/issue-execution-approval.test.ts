@@ -188,7 +188,7 @@ describe("conversational issue execution approval", () => {
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
-         ) values (?, ?, 'member', ?, ?)`,
+         ) values (?, ?, 'developer', ?, ?)`,
       ).bind(organizationId, memberId, initialAt, initialAt),
     ]);
     for (const [id, name] of [
@@ -1514,7 +1514,7 @@ describe("conversational issue execution approval", () => {
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
-         ) values (?, ?, 'member', ?, ?)`,
+         ) values (?, ?, 'developer', ?, ?)`,
       ).bind(organizationId, approverId, initialAt, initialAt),
       db.prepare(
         `insert into briar_project_members (

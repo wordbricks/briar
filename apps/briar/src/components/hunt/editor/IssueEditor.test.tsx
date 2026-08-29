@@ -498,7 +498,7 @@ describe("IssueEditor", () => {
           name: "Kim",
           email: "kim@example.com",
           image: null,
-          role: "member",
+          role: "developer",
           createdAt: "2026-07-01T00:00:00.000Z",
         }]}
         onClose={() => undefined}

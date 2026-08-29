@@ -2,6 +2,7 @@ import type { AgentProvider } from "../../src/lib/agent-provider";
 import { getAgentSkill } from "./agent-skills";
 import type { BriarAuth } from "./auth";
 import { HttpError, json } from "./http-response";
+import { hasOrganizationCapability } from "./organization-access";
 import { getProjectAgent } from "./project-agent-repository";
 import { projectAgentSessionJson } from "./project-agent-session-json";
 import {
@@ -49,6 +50,9 @@ export async function handleProjectAgentTaskRoute(
     session.user.id,
   );
   if (!project) throw new HttpError(404, "Project not found");
+  if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+    throw new HttpError(403, "Development management permission required");
+  }
   const input = decodeProjectAgentTaskInput(await readJson(request));
   const existingJob = await getProjectAgentTaskJobByRequest(
     db,

@@ -26,7 +26,7 @@ const projectsResponse = {
       icon: null,
       organizationId: "22222222-2222-4222-8222-222222222222",
       organizationName: "Wordbricks",
-      role: "admin",
+      role: "co-owner",
       createdAt: "2026-08-26T00:01:00.000Z",
     },
   ],
@@ -67,7 +67,7 @@ describe("project list", () => {
         "Velen",
         "  Project ID: 33333333-3333-4333-8333-333333333333",
         "  Organization: Wordbricks (22222222-2222-4222-8222-222222222222)",
-        "  Role: admin",
+        "  Role: co-owner",
       ].join("\n"),
     );
   });
@@ -94,7 +94,7 @@ describe("project list", () => {
           name: "Velen",
           organizationId: "22222222-2222-4222-8222-222222222222",
           organizationName: "Wordbricks",
-          role: "admin",
+          role: "co-owner",
         },
       ],
     });

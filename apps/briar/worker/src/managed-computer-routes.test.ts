@@ -56,7 +56,7 @@ describe("managed computer routes", () => {
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
-         ) values (?, ?, 'member', ?, ?)`,
+         ) values (?, ?, 'developer', ?, ?)`,
       ).bind(organizationId, memberId, now, now),
     ]);
   }, 60_000);
@@ -164,7 +164,7 @@ describe("managed computer routes", () => {
     ]);
   };
 
-  it("shows product metadata to a member but forbids promotion approval", async () => {
+  it("lets a developer inspect product metadata and validate promotions", async () => {
     const product = await worker.fetch(request(
       `/organizations/${organizationId}/managed-computers/product`,
       "GET",
@@ -173,7 +173,7 @@ describe("managed computer routes", () => {
     expect(product.status).toBe(200);
     const productPayload = await product.json();
     expect(productPayload).toMatchObject({
-      canApply: false,
+      canApply: true,
       applicationsEnabled: true,
       product: { monthlyPriceCents: 10_000 },
     });
@@ -184,7 +184,7 @@ describe("managed computer routes", () => {
       memberToken,
       { code: "GETBRIAR" },
     ), env());
-    expect(validation.status).toBe(403);
+    expect(validation.status).toBe(200);
   });
 
   it("does not discount an invalid code and requires matching idempotency", async () => {
@@ -257,7 +257,7 @@ describe("managed computer routes", () => {
     });
   });
 
-  it("lets an organization admin retire a stable computer idempotently", async () => {
+  it("lets a developer retire a stable computer idempotently", async () => {
     const computerId = "33333333-3333-4333-8333-333333333334";
     await seedManagedComputer({
       computerId,
@@ -266,21 +266,14 @@ describe("managed computer routes", () => {
       state: "failed",
     });
 
+    const immediateStop = executionContext();
     const memberAttempt = await worker.fetch(request(
       `/organizations/${organizationId}/managed-computers/${computerId}`,
       "DELETE",
       memberToken,
-    ), env());
-    expect(memberAttempt.status).toBe(403);
-
-    const immediateStop = executionContext();
-    const first = await worker.fetch(request(
-      `/organizations/${organizationId}/managed-computers/${computerId}`,
-      "DELETE",
-      ownerToken,
     ), env(), immediateStop.context);
-    expect(first.status).toBe(202);
-    expect(await first.json()).toMatchObject({
+    expect(memberAttempt.status).toBe(202);
+    expect(await memberAttempt.json()).toMatchObject({
       duplicate: false,
       computer: { id: computerId, state: "draining" },
     });
@@ -307,7 +300,7 @@ describe("managed computer routes", () => {
       detail_json: string;
     }>();
     expect(audits.results).toHaveLength(1);
-    expect(audits.results[0]?.actor_user_id).toBe(ownerId);
+    expect(audits.results[0]?.actor_user_id).toBe(memberId);
     expect(JSON.parse(audits.results[0]?.detail_json ?? "{}"))
       .toEqual({ reason: "user_retired" });
     await expect(db.prepare(

@@ -13,7 +13,7 @@ import {
   type MergeQueueProfileRow,
 } from "./merge-queue-profile";
 import { getMergeQueueStatus } from "./merge-queue-status";
-import { canManageOrganization } from "./organization-access";
+import { hasOrganizationCapability } from "./organization-access";
 import { getProject } from "./project-command-repository";
 import {
   getProjectSettings,
@@ -114,8 +114,8 @@ export async function handleProjectSettingsRoute(
     if (request.method === "GET") {
       return json({ profile: mergeQueueProfileJson(current) });
     }
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = decodeMergeQueueProfileUpdate(await readJson(request));
     const settings = await getProjectSettings(db, project.id);
@@ -237,8 +237,11 @@ export async function handleProjectSettingsRoute(
       });
     }
     const input = decodeCheckpointPolicyInput(await readJson(request));
-    if (input.scope === "project" && !canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (
+      input.scope === "project" &&
+      !hasOrganizationCapability(project.member_role, "development:manage")
+    ) {
+      throw new HttpError(403, "Development management permission required");
     }
     const current = await loadWorkflowCheckpointPolicy(
       db,
@@ -289,8 +292,8 @@ export async function handleProjectSettingsRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     return json({ metrics: await collectStorageMetrics(db, project.id) });
   }
@@ -311,8 +314,8 @@ export async function handleProjectSettingsRoute(
     const session = await requireSession(auth, request);
     const project = await getProject(db, settingsMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = parseProjectSettingsInput(await readJson(request));
     const currentSettings = await getProjectSettings(db, project.id);
@@ -397,8 +400,8 @@ export async function handleProjectSettingsRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    if (!canManageOrganization(project.member_role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = decodeExecutionWorkerPolicy(await readJson(request));
     const policy = await updateProjectExecutionWorkerPolicy(db, project.id, {

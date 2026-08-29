@@ -4,8 +4,9 @@ import {
   isRepositoryWorkflowPending,
   type AutoHuntWorkflow,
 } from "./auto-hunt-contract";
-import type { ProjectSettings } from "../types";
+import type { OrganizationRole, ProjectSettings } from "../types";
 import type { AgentProvider } from "./agent-provider";
+import { hasOrganizationCapability } from "./organization-role";
 
 export type VelenOrganization = { name: string; slug: string };
 export type VelenSource = {
@@ -128,7 +129,7 @@ export async function preflightThenCreateProject<T>(
 }
 
 export async function resolveProjectConnectionWorkflow(
-  role: "owner" | "admin" | "member" | undefined,
+  role: OrganizationRole | undefined,
   existingWorkflow: AutoHuntWorkflow | undefined,
   generateWorkflow: () => Promise<AutoHuntWorkflow>,
   compatiblePreset?: AutoHuntWorkflow,
@@ -142,9 +143,9 @@ export async function resolveProjectConnectionWorkflow(
       shouldPersistProjectSettings: false,
     };
   }
-  if (role === "member") {
+  if (!hasOrganizationCapability(role, "development:manage")) {
     throw new Error(
-      "An organization owner or admin must generate the project workflow before members can connect a repository.",
+      "An organization owner, co-owner, or developer must generate the project workflow before connecting a repository.",
     );
   }
   if (
