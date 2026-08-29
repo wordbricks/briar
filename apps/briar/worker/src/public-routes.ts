@@ -109,6 +109,9 @@ const appLinkPage = (
 ) => {
   const appUrl =
     `briar-companion://${resource}/${projectId}/${targetId}${extraPath}${search}`;
+  const webLink = resource === "issues"
+    ? `<a class="open web" href="/app/open/issues/${encodeURIComponent(projectId)}/${encodeURIComponent(targetId)}">웹에서 보기</a>`
+    : "";
   const subject = resource === "issues"
     ? "이슈"
     : resource === "sessions"
@@ -130,11 +133,14 @@ const appLinkPage = (
       : extraPath
         ? "message"
         : "channel";
+  const openingPrompt = resource === "issues"
+    ? "앱이 자동으로 열리지 않으면 아래에서 열 방법을 선택해 주세요."
+    : "앱이 자동으로 열리지 않으면 아래 버튼을 눌러 주세요.";
   const body = `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/png" href="/brand/briar-icon.png"><title>Briar에서 ${subject} 열기</title><style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0a0d;color:#f4f1f8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.card{width:min(390px,calc(100vw - 32px));padding:32px;border:1px solid #302b38;border-radius:18px;background:#151219;box-shadow:0 30px 100px #0009;text-align:center}.brand{display:flex;align-items:center;justify-content:center;gap:10px;font-size:21px;font-weight:750}.brand img{width:30px;height:30px;border-radius:7px}h1{margin:30px 0 10px;font-size:22px}.copy{margin:0;color:#aaa3b2;font-size:13px;line-height:1.65}.open{height:44px;margin-top:24px;padding:0 18px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;color:#19151f;background:#eee9f7;font-size:14px;font-weight:700;text-decoration:none}.hint{min-height:18px;margin:14px 0 0;color:#777080;font-size:11px}</style></head>
-<body><main class="card"><div class="brand"><img src="/brand/briar-icon.png" alt="">briar</div><h1>Briar에서 ${subjectWithParticle} 여는 중입니다</h1><p class="copy">앱이 자동으로 열리지 않으면 아래 버튼을 눌러 주세요.<br>The ${englishSubject} will open in the Briar app.</p><a class="open" href="${appUrl}">Briar 앱 열기</a><p class="hint" id="hint"></p></main>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0a0d;color:#f4f1f8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.card{width:min(390px,calc(100vw - 32px));padding:32px;border:1px solid #302b38;border-radius:18px;background:#151219;box-shadow:0 30px 100px #0009;text-align:center}.brand{display:flex;align-items:center;justify-content:center;gap:10px;font-size:21px;font-weight:750}.brand img{width:30px;height:30px;border-radius:7px}h1{margin:30px 0 10px;font-size:22px}.copy{margin:0;color:#aaa3b2;font-size:13px;line-height:1.65}.actions{display:grid;gap:10px;margin-top:24px}.open{height:44px;padding:0 18px;display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:10px;color:#19151f;background:#eee9f7;font-size:14px;font-weight:700;text-decoration:none}.open.web{border-color:#47404f;color:#eee9f7;background:transparent}.hint{min-height:18px;margin:14px 0 0;color:#777080;font-size:11px}</style></head>
+<body><main class="card"><div class="brand"><img src="/brand/briar-icon.png" alt="">briar</div><h1>Briar에서 ${subjectWithParticle} 여는 중입니다</h1><p class="copy">${openingPrompt}<br>The ${englishSubject} will open in the Briar app.</p><div class="actions"><a class="open" href="${appUrl}">Briar 앱 열기</a>${webLink}</div><p class="hint" id="hint"></p></main>
 <script>const appUrl=${JSON.stringify(appUrl)};window.location.replace(appUrl);window.setTimeout(()=>{document.querySelector('#hint').textContent='Briar 앱이 설치되어 있어야 합니다.'},1200)</script></body></html>`;
   return new Response(head ? null : body, {
     headers: {
