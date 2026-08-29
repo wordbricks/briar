@@ -39,7 +39,14 @@ import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
 
 type Candidate =
-  | { type: "user"; id: string; name: string; image: string | null; detail: string }
+  | {
+      type: "user";
+      id: string;
+      name: string;
+      image: string | null;
+      detail: string;
+      isSelf: boolean;
+    }
   | {
       type: "agent";
       id: string;
@@ -159,6 +166,10 @@ export function DirectMessages({
   onCreateAgent,
 }: DirectMessagesProps) {
   const { localeTag, t } = useI18n();
+  const candidateLabel = (candidate: Candidate) =>
+    candidate.type === "user" && candidate.isSelf
+      ? t("dm.self")
+      : candidate.name;
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(channels.length === 0);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -179,15 +190,18 @@ export function DirectMessages({
     ])
       .then(([members, agentResult]) => {
         if (cancelled) return;
-        const memberCandidates: Candidate[] = members
-          .filter((member: OrganizationMember) => member.userId !== currentUserId)
-          .map((member: OrganizationMember) => ({
+        const memberCandidates: Candidate[] = members.map(
+          (member: OrganizationMember) => ({
             type: "user",
             id: member.userId,
             name: member.name,
             image: member.image,
-            detail: member.email,
-          }));
+            detail: member.userId === currentUserId
+              ? t("dm.selfDescription")
+              : member.email,
+            isSelf: member.userId === currentUserId,
+          }),
+        );
         const agentCandidates: Candidate[] = agentResult.agents.map(
           (agent: ChannelAgentSummary) => ({
             type: "agent",
@@ -211,7 +225,7 @@ export function DirectMessages({
     return () => {
       cancelled = true;
     };
-  }, [creating, currentUserId, organizationId, token]);
+  }, [creating, currentUserId, organizationId, t, token]);
 
   const directMessages = useMemo(
     () => sortDirectMessages(channels.filter((channel) => channel.kind === "dm")),
@@ -230,14 +244,20 @@ export function DirectMessages({
     const query = candidateSearch.trim().toLocaleLowerCase();
     return candidates.filter((candidate) =>
       !query || `${candidate.name} ${candidate.detail} ${
-        candidate.type === "agent" ? candidate.projectName ?? "" : ""
+        candidate.type === "agent"
+          ? candidate.projectName ?? ""
+          : candidate.isSelf
+          ? t("dm.self")
+          : ""
       }`.toLocaleLowerCase().includes(query)
     );
-  }, [candidateSearch, candidates]);
+  }, [candidateSearch, candidates, t]);
   const selected = useMemo(
     () => candidates.filter((candidate) => selectedKeys.has(candidateKey(candidate))),
     [candidates, selectedKeys],
   );
+  const isSelfMessage = selected.length === 1 && selected[0]?.type === "user" &&
+    selected[0].isSelf;
   const showMainOnMobile =
     creating || visibleDirectMessages.some((channel) => channel.id === activeChannelId);
 
@@ -405,13 +425,16 @@ export function DirectMessages({
               <div className="dm-recipient-field flex min-h-[35px] min-w-0 flex-1 flex-wrap items-center gap-[5px]">
                 {selected.map((candidate) => (
                   <button
-                    aria-label={t("dm.removeRecipient", { name: candidate.name })}
+                    aria-label={t("dm.removeRecipient", {
+                      name: candidateLabel(candidate),
+                    })}
                     className="dm-recipient-chip flex h-7 items-center gap-[5px] rounded-full border border-primary/25 bg-primary/10 px-2 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     key={candidateKey(candidate)}
                     onClick={() => toggleCandidate(candidate)}
                     type="button"
                   >
-                    {candidate.name}<X aria-hidden="true" size={12} />
+                    {candidateLabel(candidate)}
+                    <X aria-hidden="true" size={12} />
                   </button>
                 ))}
                 <input
@@ -431,7 +454,11 @@ export function DirectMessages({
                 variant="default"
               >
                 {submitting ? <Spinner aria-hidden="true" size={14} /> : <MessageCircle aria-hidden="true" size={15} />}
-                {selected.length > 1 ? t("dm.startGroup") : t("dm.start")}
+                {isSelfMessage
+                  ? t("dm.self")
+                  : selected.length > 1
+                  ? t("dm.startGroup")
+                  : t("dm.start")}
               </Button>
             </div>
             <div className="dm-candidate-popover scrollbar-subtle absolute left-5 top-[57px] z-20 max-h-[360px] w-[min(600px,calc(100%_-_40px))] overflow-auto rounded-xl border border-border bg-popover p-[7px] shadow-[0_16px_42px_rgba(20,20,18,.14),0_2px_7px_rgba(20,20,18,.08)]">
@@ -460,8 +487,14 @@ export function DirectMessages({
                         {candidate.image ? <img alt="" src={candidate.image} /> : candidate.type === "agent" ? <Bot aria-hidden="true" size={17} /> : participantInitial(candidate.name)}
                       </span>
                       <span className="grid min-w-0 gap-0.5">
-                        <strong className="truncate text-sm">{candidate.name}</strong>
-                        <small className="truncate text-xs text-muted-foreground">{candidate.detail}</small>
+                        <strong className="truncate text-sm">
+                          {candidate.type === "user" && candidate.isSelf
+                            ? t("dm.self")
+                            : candidate.name}
+                        </strong>
+                        <small className="truncate text-xs text-muted-foreground">
+                          {candidate.detail}
+                        </small>
                       </span>
                       {candidate.type === "agent" ? (
                         <span className="dm-candidate-badges flex min-w-0 items-center justify-end gap-[5px]">
