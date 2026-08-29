@@ -12,6 +12,7 @@ import {
   decodeManagedComputerRemoteSessionRequest,
   decodeManagedComputerRetry,
   decodeManagedComputerSetupBind,
+  decodeManagedComputerSetupAccess,
   decodeManagedComputerSetupSession,
 } from "./managed-computer-request-contract";
 import { managedComputerConfig, managedComputerJson } from "./managed-computer-model";
@@ -30,6 +31,7 @@ import {
   enrollManagedComputer,
   issueManagedComputerSetupSession,
   managedComputerProductResponse,
+  managedComputerSetupContext,
   managedComputerSetupStatus,
   retryManagedComputerProvisioning,
   validateManagedComputerPromotion,
@@ -44,6 +46,13 @@ import {
   managedComputerRemoteAgentToken,
   recordManagedComputerRemoteRejection,
 } from "./managed-computer-remote-service";
+import {
+  connectManagedComputerSetupAgent,
+  connectManagedComputerSetupClient,
+  managedComputerSetupAgentStatus,
+  managedComputerSetupAgentToken,
+  managedComputerSetupClientSocket,
+} from "./managed-computer-setup-relay-service";
 import { canManageOrganization } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
 import { readJson } from "./request-readers";
@@ -103,6 +112,72 @@ export async function handleManagedComputerRoute(
     }, {
       status: result.duplicate ? 200 : 201,
       headers: { ...corsHeaders, "Cache-Control": "private, no-store" },
+    });
+  }
+
+  const managedComputerSetupContextMatch = pathname.match(
+    /^\/managed-computers\/([0-9a-f-]+)\/setup\/context$/u,
+  );
+  if (managedComputerSetupContextMatch && request.method === "POST") {
+    const principal = await requireWorkerCredential(db, request);
+    const input = decodeManagedComputerSetupAccess(await readJson(request));
+    return privateNoStoreJson(await managedComputerSetupContext(db, {
+      managedComputerId: managedComputerSetupContextMatch[1],
+      organizationId: principal.organizationId,
+      deviceId: principal.deviceId,
+      setupToken: input.setupToken,
+      observedAt: new Date().toISOString(),
+    }));
+  }
+
+  const managedComputerSetupAgentMatch = pathname.match(
+    /^\/managed-computers\/([0-9a-f-]+)\/setup-agent$/u,
+  );
+  if (managedComputerSetupAgentMatch && request.method === "GET") {
+    const agent = managedComputerSetupAgentToken(request);
+    if (!agent) {
+      throw new HttpError(
+        401,
+        "Invalid managed setup agent credential",
+        "MANAGED_COMPUTER_SETUP_AGENT_TOKEN_INVALID",
+      );
+    }
+    const credentialHeaders = new Headers(request.headers);
+    credentialHeaders.set("Authorization", `Bearer ${agent.token}`);
+    const principal = await requireWorkerCredential(
+      db,
+      new Request(request, { headers: credentialHeaders }),
+    );
+    const computer = await managedComputerById(
+      db,
+      managedComputerSetupAgentMatch[1],
+    );
+    if (
+      !computer || computer.organization_id !== principal.organizationId ||
+      computer.briar_device_id !== principal.deviceId ||
+      !["needs_setup", "ready"].includes(computer.state)
+    ) {
+      throw new HttpError(
+        403,
+        "Worker is not authorized for this managed computer",
+        "MANAGED_COMPUTER_SETUP_AGENT_REJECTED",
+      );
+    }
+    return connectManagedComputerSetupAgent(env, {
+      managedComputerId: computer.id,
+      request,
+    });
+  }
+
+  const managedComputerSetupClientMatch = pathname.match(
+    /^\/managed-computers\/([0-9a-f-]+)\/setup-sessions\/([0-9a-f-]+)\/connect$/u,
+  );
+  if (managedComputerSetupClientMatch && request.method === "GET") {
+    return connectManagedComputerSetupClient(db, env, {
+      managedComputerId: managedComputerSetupClientMatch[1],
+      sessionId: managedComputerSetupClientMatch[2],
+      request,
+      observedAt: new Date().toISOString(),
     });
   }
 
@@ -291,6 +366,15 @@ export async function handleManagedComputerRoute(
       requestId: input.requestId,
       observedAt: new Date().toISOString(),
     });
+    const socket = managedComputerSetupClientSocket(request.url, {
+      managedComputerId,
+      sessionId: result.session.id,
+      setupToken: result.setupToken,
+    });
+    const agentConnected = await managedComputerSetupAgentStatus(
+      env,
+      managedComputerId,
+    );
     return Response.json({
       session: {
         id: result.session.id,
@@ -301,6 +385,8 @@ export async function handleManagedComputerRoute(
         expiresAt: result.session.expires_at,
       },
       setupToken: result.setupToken,
+      socket,
+      agentConnected,
       duplicate: result.duplicate,
     }, {
       status: result.duplicate ? 200 : 201,

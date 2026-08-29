@@ -26,6 +26,7 @@ import type {
   ProjectAgentScheduleRecurrence,
 } from "./lib/project-agent-schedule";
 import type { IssueDifficulty } from "./lib/issue-difficulty";
+import type { ManagedComputerSetupProvider } from "./lib/managed-computer-setup-protocol";
 
 export type HuntStatus = AutoHuntRunStatus;
 export type HuntSource = AutoHuntSource;
@@ -672,6 +673,23 @@ export type ManagedComputerRemoteSessionTicket = {
   socket: { url: string; protocol: string };
   reconnected: boolean;
 };
+
+export type ManagedComputerSetupSessionTicket = {
+  session: {
+    id: string;
+    managedComputerId: string;
+    organizationId: string;
+    projectId: string;
+    status: "pending" | "consumed";
+    expiresAt: string;
+  };
+  setupToken: string;
+  socket: { url: string; protocol: string };
+  agentConnected: boolean;
+  duplicate: boolean;
+};
+
+export type { ManagedComputerSetupProvider };
 
 export type HuntRunPlacement = {
   status: Exclude<HuntStatus, "paused">;

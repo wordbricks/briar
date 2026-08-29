@@ -102,12 +102,14 @@ export async function handleOrganizationChannelRoute(
     const role = await getOrganizationRole(db, organizationId, session.user.id);
     if (!role) throw new HttpError(404, "Organization not found");
     const input = decodeDirectMessageInput(await readJson(request));
-    const memberIds = [...new Set(input.memberIds)].filter(
+    const selectedMemberIds = [...new Set(input.memberIds)];
+    const selfSelected = selectedMemberIds.includes(session.user.id);
+    const memberIds = selectedMemberIds.filter(
       (userId) => userId !== session.user.id,
     );
     const agentIds = [...new Set(input.agentIds)];
-    if (memberIds.length + agentIds.length === 0) {
-      throw new HttpError(400, "At least one other participant is required");
+    if (selectedMemberIds.length + agentIds.length === 0) {
+      throw new HttpError(400, "At least one participant is required");
     }
 
     const [organizationMembers, organizationAgents] = await Promise.all([
@@ -120,7 +122,7 @@ export async function handleOrganizationChannelRoute(
     const agentsById = new Map(
       organizationAgents.map((agent) => [agent.id, agent]),
     );
-    for (const userId of memberIds) {
+    for (const userId of selectedMemberIds) {
       if (!membersById.has(userId)) {
         throw new HttpError(404, "Organization member not found");
       }
@@ -131,8 +133,11 @@ export async function handleOrganizationChannelRoute(
       }
     }
 
-    const dmKey = memberIds.length + agentIds.length === 1
-      ? memberIds.length === 1
+    const selectedParticipantCount = selectedMemberIds.length + agentIds.length;
+    const dmKey = selectedParticipantCount === 1
+      ? selfSelected
+        ? `self:${session.user.id}`
+        : memberIds.length === 1
         ? `users:${JSON.stringify([session.user.id, memberIds[0]!].sort())}`
         : `agent:${JSON.stringify([session.user.id, agentIds[0]!])}`
       : null;
@@ -147,7 +152,7 @@ export async function handleOrganizationChannelRoute(
     }
 
     const participantNames = [
-      ...memberIds.map((userId) => membersById.get(userId)!.name),
+      ...selectedMemberIds.map((userId) => membersById.get(userId)!.name),
       ...agentIds.map((agentId) => agentsById.get(agentId)!.name),
     ];
     const channelId = crypto.randomUUID();

@@ -368,6 +368,25 @@ const channelSelectForUser = `${channelSelectColumns},
            as last_unread_message_at
   from briar_channels channel`;
 
+const channelParticipantCountSql = `(
+  (select count(*) from briar_channel_members
+   where channel_id = briar_channels.id) +
+  (select count(*) from briar_channel_agents
+   where channel_id = briar_channels.id)
+)`;
+
+// A self-DM has only its owner in the roster, while an ordinary one-to-one DM
+// has the owner plus one other participant. Clear either key as soon as its
+// roster no longer matches that shape so an expanded self-DM cannot be reused.
+const dmKeyAfterParticipantChangeSql = `case
+  when kind = 'dm' and (
+    (dm_key like 'self:%' and ${channelParticipantCountSql} <> 1)
+    or (dm_key is not null and dm_key not like 'self:%'
+      and ${channelParticipantCountSql} <> 2)
+  ) then null
+  else dm_key
+end`;
+
 /**
  * Public channels are readable by every organization member; private channels
  * require an explicit membership row. Organization membership itself is checked
@@ -1271,15 +1290,7 @@ export async function addChannelMember(
     db.prepare(
       `update briar_channels
        set updated_at = ?,
-           dm_key = case
-             when kind = 'dm' and (
-               (select count(*) from briar_channel_members
-                where channel_id = briar_channels.id) +
-               (select count(*) from briar_channel_agents
-                where channel_id = briar_channels.id)
-             ) <> 2 then null
-             else dm_key
-           end
+           dm_key = ${dmKeyAfterParticipantChangeSql}
        where id = ?`,
     ).bind(input.createdAt, input.channelId),
   ]);
@@ -1299,15 +1310,7 @@ export async function removeChannelMember(
     db.prepare(
       `update briar_channels
        set updated_at = ?,
-           dm_key = case
-             when kind = 'dm' and (
-               (select count(*) from briar_channel_members
-                where channel_id = briar_channels.id) +
-               (select count(*) from briar_channel_agents
-                where channel_id = briar_channels.id)
-             ) <> 2 then null
-             else dm_key
-           end
+           dm_key = ${dmKeyAfterParticipantChangeSql}
        where id = ?`,
     ).bind(removedAt, channelId),
   ]);
@@ -1380,15 +1383,7 @@ export async function addChannelAgent(
     db.prepare(
       `update briar_channels
        set updated_at = ?,
-           dm_key = case
-             when kind = 'dm' and (
-               (select count(*) from briar_channel_members
-                where channel_id = briar_channels.id) +
-               (select count(*) from briar_channel_agents
-                where channel_id = briar_channels.id)
-             ) <> 2 then null
-             else dm_key
-           end
+           dm_key = ${dmKeyAfterParticipantChangeSql}
        where id = ?`,
     ).bind(input.createdAt, input.channelId),
   ]);
@@ -1416,15 +1411,7 @@ export async function removeChannelAgent(
     db.prepare(
       `update briar_channels
        set updated_at = ?,
-           dm_key = case
-             when kind = 'dm' and (
-               (select count(*) from briar_channel_members
-                where channel_id = briar_channels.id) +
-               (select count(*) from briar_channel_agents
-                where channel_id = briar_channels.id)
-             ) <> 2 then null
-             else dm_key
-           end
+           dm_key = ${dmKeyAfterParticipantChangeSql}
        where id = ?`,
     ).bind(removedAt, channelId),
   ]);

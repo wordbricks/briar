@@ -22,7 +22,7 @@ import {
 } from "../lib/api";
 import { ApiError } from "../lib/api/errors";
 import { supportsManagedComputerRemoteDesktop } from "../lib/platform";
-import type { ManagedComputer, ManagedComputerProduct } from "../types";
+import type { ManagedComputer, ManagedComputerProduct, Project } from "../types";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import {
@@ -37,6 +37,7 @@ import { Input } from "./ui/input";
 import { Spinner } from "./ui/spinner";
 import { Typography } from "./ui/typography";
 import { ManagedComputerRemoteDesktop } from "./ManagedComputerRemoteDesktop";
+import { ManagedComputerSetupWizard } from "./ManagedComputerSetupWizard";
 
 type PromotionCheck = {
   valid: boolean;
@@ -98,9 +99,11 @@ function managedComputerDescriptionKey(state: ManagedComputer["state"]) {
 
 export function ManagedComputersCard({
   organizationId,
+  projects,
   token,
 }: {
   organizationId: string;
+  projects: Project[];
   token: string;
 }) {
   const { t } = useI18n();
@@ -118,6 +121,7 @@ export function ManagedComputersCard({
     null,
   );
   const [remoteComputer, setRemoteComputer] = useState<ManagedComputer | null>(null);
+  const [setupComputer, setSetupComputer] = useState<ManagedComputer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
 
@@ -338,9 +342,7 @@ export function ManagedComputersCard({
                     </div>
                     <Typography className="mt-1" tone="muted" variant="caption">
                       {computer.state === "needs_setup"
-                        ? t(product?.remoteDesktopEnabled && remoteDesktopSupported
-                          ? "managedComputer.setupRequired"
-                          : "managedComputer.remote.unavailable")
+                        ? t("managedComputer.setupRequired")
                         : computer.state === "ready"
                           ? t("managedComputer.readyDescription")
                           : computer.state === "failed"
@@ -350,6 +352,16 @@ export function ManagedComputersCard({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {computer.state === "needs_setup" ? (
+                    <Button
+                      onClick={() => setSetupComputer(computer)}
+                      size="sm"
+                      type="button"
+                    >
+                      <ServerCog size={14} />
+                      {t("managedComputer.setupAction")}
+                    </Button>
+                  ) : null}
                   {product?.remoteDesktopEnabled && remoteDesktopSupported &&
                       ["needs_setup", "ready"].includes(computer.state) ? (
                     <Button
@@ -359,7 +371,9 @@ export function ManagedComputersCard({
                       variant="outline"
                     >
                       <MonitorUp size={14} />
-                      {t("managedComputer.remote.open")}
+                      {t(computer.state === "needs_setup"
+                        ? "managedComputer.setupAdvanced"
+                        : "managedComputer.remote.open")}
                     </Button>
                   ) : null}
                   {computer.retryAvailable ? (
@@ -572,6 +586,20 @@ export function ManagedComputersCard({
           computer={remoteComputer}
           onClose={() => setRemoteComputer(null)}
           organizationId={organizationId}
+          token={token}
+        />
+      ) : null}
+
+      {setupComputer ? (
+        <ManagedComputerSetupWizard
+          computer={setupComputer}
+          onComplete={() => void refresh()}
+          onOpenChange={(open) => {
+            if (!open) setSetupComputer(null);
+          }}
+          open
+          organizationId={organizationId}
+          projects={projects}
           token={token}
         />
       ) : null}
