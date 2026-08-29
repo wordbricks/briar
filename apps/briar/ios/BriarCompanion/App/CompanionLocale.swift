@@ -211,6 +211,17 @@ enum L10n {
         "작업 요청": "Task request",
         "에이전트 작업 요청": "Agent task request",
         "실행 호스트": "Execution host",
+        "호스트": "Host",
+        "호스트 상태": "Host status",
+        "이슈 메뉴": "Issue menu",
+        "활성 호스트": "Active hosts",
+        "연결된 호스트 없음": "No connected hosts",
+        "이 프로젝트에서 사용할 수 있는 Worker가 없습니다.": "No Worker is available for this project.",
+        "호스트 상태 새로고침": "Refresh host status",
+        "마지막 동기화": "Last synced",
+        "활성 세션 %d/%d": "%d of %d sessions active",
+        "사용 가능": "Available",
+        "공유 중지": "Sharing disabled",
         "먼저 실행할 Skill을 선택해 주세요.": "Select a skill first.",
         "선택한 Skill을 실행할 수 있는 Worker가 없습니다.": "No worker can run the selected skill.",
         "취소": "Cancel",
@@ -533,6 +544,17 @@ enum L10n {
         "프로젝트에 연결된 Agent가 여기에 표시됩니다.": "与项目关联的 Agent 将显示在这里。",
         "아직 동기화된 세션이 없습니다.": "还没有同步的会话。",
         "실행 Worker": "执行 Worker",
+        "호스트": "主机",
+        "호스트 상태": "主机状态",
+        "이슈 메뉴": "问题菜单",
+        "활성 호스트": "活跃主机",
+        "연결된 호스트 없음": "没有已连接的主机",
+        "이 프로젝트에서 사용할 수 있는 Worker가 없습니다.": "此项目没有可用的 Worker。",
+        "호스트 상태 새로고침": "刷新主机状态",
+        "마지막 동기화": "上次同步",
+        "활성 세션 %d/%d": "%d/%d 个会话正在运行",
+        "사용 가능": "可用",
+        "공유 중지": "已停止共享",
         "실행 가능": "可执行",
         "실행 승인": "执行批准",
         "이슈 생성·실행 승인": "批准创建并执行问题",
@@ -799,6 +821,8 @@ enum L10n {
         case channelHome
         case projectLobbyOpen
         case projectLobbyOpenDescription
+        case projectAgentsOpen
+        case projectAgentsOpenDescription
         case projectLobbyTitle
         case projectLobbyDescription
         case projectLobbyAll
@@ -880,6 +904,8 @@ enum L10n {
             case .channelHome: "홈"
             case .projectLobbyOpen: "프로젝트 홈 보기"
             case .projectLobbyOpenDescription: "주요 지표와 최근 작업을 확인하세요."
+            case .projectAgentsOpen: "Agents 보기"
+            case .projectAgentsOpenDescription: "Agent와 실행 세션을 확인하세요."
             case .projectLobbyTitle: "프로젝트 현황"
             case .projectLobbyDescription: "프로젝트의 현재 작업 상태를 한눈에 확인하세요."
             case .projectLobbyAll: "전체 이슈"
@@ -964,6 +990,8 @@ enum L10n {
             case .channelHome: "Home"
             case .projectLobbyOpen: "View project home"
             case .projectLobbyOpenDescription: "Check key metrics and recent work."
+            case .projectAgentsOpen: "View agents"
+            case .projectAgentsOpenDescription: "View agents and their execution sessions."
             case .projectLobbyTitle: "Project overview"
             case .projectLobbyDescription: "See the project's current work status at a glance."
             case .projectLobbyAll: "All issues"
@@ -1048,6 +1076,8 @@ enum L10n {
             case .channelHome: "主页"
             case .projectLobbyOpen: "查看项目主页"
             case .projectLobbyOpenDescription: "查看关键指标和最近工作。"
+            case .projectAgentsOpen: "查看智能体"
+            case .projectAgentsOpenDescription: "查看智能体及其运行会话。"
             case .projectLobbyTitle: "项目概览"
             case .projectLobbyDescription: "一目了然地查看项目当前工作状态。"
             case .projectLobbyAll: "全部问题"

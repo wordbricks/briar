@@ -7,12 +7,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { Typography } from "@/components/ui/typography";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { NativeSelect } from "@/components/NativeSelect";
 import { CompanionBottomNavigation, type CompanionStatusFilter } from "@/components/CompanionBottomNavigation";
 import type { AutoHuntSession } from "@/hooks/useAutoHuntSessions";
 import { inboxIssueMessageVersion } from "@/hooks/useInbox";
-import { useAppKeyboardCommandScope } from "@/hooks/appKeyboardCommands";
+import { AppKeyboardCommandBoundary, useAppKeyboardCommandScope } from "@/hooks/appKeyboardCommands";
 import { useAppCollectionKeyboardCommandScope } from "@/hooks/useAppCollectionKeyboardCommandScope";
 import {
   useControlledCollectionNavigation,
@@ -91,7 +91,7 @@ function resolveKeyboardKanbanRunId(
   ] ?? currentRunId;
 }
 
-export function HuntDashboard({
+function HuntDashboardContent({
   agents = [],
   companionMode = false,
   companionStatus,
@@ -1015,7 +1015,7 @@ export function HuntDashboard({
           </>}
         </div>}
       </div>
-      {companionMode && <CompanionBottomNavigation activeDestination={status} onCreate={() => setIsIssueDialogOpen(true)} onDmsOpen={() => onCompanionDmsOpen?.()} onInboxOpen={() => onCompanionInboxOpen?.()} onHomeOpen={() => onCompanionHomeOpen?.()} onStatusChange={setStatus} unreadDmCount={companionUnreadDmCount} unreadInboxCount={companionUnreadInboxCount} />}
+      {companionMode && <CompanionBottomNavigation activeDestination={status} onCreate={() => setIsIssueDialogOpen(true)} onDmsOpen={() => onCompanionDmsOpen?.()} onInboxOpen={() => onCompanionInboxOpen?.()} onHomeOpen={() => onCompanionHomeOpen?.()} onStatusChange={setStatus} unreadDmCount={companionUnreadDmCount} unreadInboxCount={companionUnreadInboxCount} workers={dashboard?.workers ?? []} />}
       {createIssueDialog}
       {editingRun && <EditIssueDialog isSubmitting={updatingIssueId === editingRun.id} onClose={() => setEditingRunId(null)} onLoadAttachment={onLoadAttachment} onUpdate={async input => {
       await onUpdateIssue(editingRun.id, input);
@@ -1123,4 +1123,14 @@ export function HuntDashboard({
         </DialogContent>
       </Dialog>
     </MainContent>;
+}
+
+export function HuntDashboard(
+  props: ComponentProps<typeof HuntDashboardContent>,
+) {
+  return (
+    <AppKeyboardCommandBoundary>
+      <HuntDashboardContent {...props} />
+    </AppKeyboardCommandBoundary>
+  );
 }

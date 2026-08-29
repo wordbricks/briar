@@ -11,6 +11,7 @@ typealias SkillSessionOpenHandler = @MainActor (UUID, String) -> Void
 
 enum CompanionHomeRoute: Hashable {
     case projectLobby
+    case agents
 }
 
 private struct ChannelExecutionApprovalError: LocalizedError, Sendable {
@@ -117,6 +118,26 @@ struct ChannelsHomeView: View {
                     .padding(.vertical, 4)
                 }
                 .accessibilityIdentifier("project-lobby-link")
+
+                NavigationLink(value: CompanionHomeRoute.agents) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "cpu")
+                            .font(.headline)
+                            .foregroundStyle(.tint)
+                            .frame(width: 36, height: 36)
+                            .background(.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(L10n.text(.projectAgentsOpen, locale: locale))
+                                .font(.subheadline.weight(.semibold))
+                            Text(L10n.text(.projectAgentsOpenDescription, locale: locale))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .accessibilityIdentifier("project-agents-link")
             }
 
             ForEach(groups) { group in

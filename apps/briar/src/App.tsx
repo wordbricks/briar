@@ -30,7 +30,8 @@ import {
 import { CompanionEmptyState, CompanionHeader } from "./components/CompanionHeader";
 import { CompanionSettings } from "./components/CompanionSettings";
 import { ConnectionHealth } from "./components/ConnectionHealth";
-import { HuntDashboard, RunPage } from "./components/HuntDashboard";
+import { HuntDashboard } from "./components/hunt/HuntDashboard";
+import { RunPage } from "./components/hunt/detail/RunPage";
 import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
@@ -2049,7 +2050,6 @@ export function App({
       : null;
   const shouldShowInitialOnboarding =
     !briar.remoteMode &&
-    !briar.user &&
     !hasCompletedOnboarding;
   const shouldShowFirstOrganizationSetup =
     resolveShouldShowFirstOrganizationSetup({
@@ -2304,12 +2304,6 @@ export function App({
     setCompletedDispatchRunId(null);
     setDispatchRun(null);
   }, [briar.activeProjectId]);
-
-  useEffect(() => {
-    if (!briar.user || hasCompletedOnboarding) return;
-    markInitialOnboardingComplete();
-    setHasCompletedOnboarding(true);
-  }, [briar.user, hasCompletedOnboarding]);
 
   const acceptCurrentInvitation = useCallback(async () => {
     if (!invitationToken) return;
@@ -3496,6 +3490,10 @@ export function App({
           setRequestedChannelMessage(null);
           setInboxDetailTarget(null);
         }}
+        onInboxChannelOpen={(channelId) => {
+          setInboxDetailTarget(null);
+          openOrganizationChannel(channelId);
+        }}
         onCreateAgent={() => {
           setSettingsTarget({
             scope: "organization",
@@ -3566,10 +3564,15 @@ export function App({
   } else if (shouldShowInitialOnboarding) {
     content = (
       <InitialOnboarding
+        authenticated={Boolean(briar.user)}
         error={briar.error}
         loading={briar.loading}
         loginCode={briar.loginCode}
         onCancelLogin={briar.cancelLogin}
+        onComplete={() => {
+          markInitialOnboardingComplete();
+          setHasCompletedOnboarding(true);
+        }}
         onLogin={(method) => void briar.login({ method, locale })}
       />
     );

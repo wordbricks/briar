@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
+    @Binding var path: NavigationPath
     @ObservedObject var agents: AgentsStore
     @ObservedObject var navigation: CompanionNavigationModel
     let project: ProjectsResponse.Project
@@ -11,161 +12,144 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
     let refreshDashboard: () async -> Void
     @ToolbarContentBuilder let toolbarContent: () -> ToolbarContentType
 
-    @State private var path = NavigationPath()
-
     var body: some View {
-        NavigationStack(path: $path) {
-            List {
-                if let errorMessage = agents.errorMessage, agents.agents.isEmpty {
-                    Section {
-                        Label(errorMessage, systemImage: "wifi.exclamationmark")
-                            .foregroundStyle(.orange)
-                    }
+        List {
+            if let errorMessage = agents.errorMessage, agents.agents.isEmpty {
+                Section {
+                    Label(errorMessage, systemImage: "wifi.exclamationmark")
+                        .foregroundStyle(.orange)
                 }
+            }
 
-                Section("Agents") {
-                    if agents.agents.isEmpty {
-                        ContentUnavailableView(
-                            L10n.text("표시할 Agent 없음"),
-                            systemImage: "cpu",
-                            description: Text(L10n.text("프로젝트에 연결된 Agent가 여기에 표시됩니다."))
-                        )
-                    } else {
-                        ForEach(agents.agents) { agent in
-                            NavigationLink(value: AgentRoute.agent(agent.id)) {
-                                AgentRow(agent: agent, sessionCount: agents.sessions(for: agent.id).count)
-                            }
-                            .accessibilityIdentifier("agent-row-\(agent.id.uuidString.lowercased())")
+            Section("Agents") {
+                if agents.agents.isEmpty {
+                    ContentUnavailableView(
+                        L10n.text("표시할 Agent 없음"),
+                        systemImage: "cpu",
+                        description: Text(L10n.text("프로젝트에 연결된 Agent가 여기에 표시됩니다."))
+                    )
+                } else {
+                    ForEach(agents.agents) { agent in
+                        NavigationLink(value: AgentRoute.agent(agent.id)) {
+                            AgentRow(agent: agent, sessionCount: agents.sessions(for: agent.id).count)
                         }
+                        .accessibilityIdentifier("agent-row-\(agent.id.uuidString.lowercased())")
                     }
                 }
+            }
 
-                Section(L10n.text("세션")) {
-                    let sessions = agents.sessions
-                    if sessions.isEmpty {
-                        Text(L10n.text("아직 동기화된 세션이 없습니다."))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(sessions.prefix(30)) { session in
-                            NavigationLink(value: AgentRoute.session(session.id)) {
-                                let agent = session.agentId.flatMap { agents.agent(id: $0) }
-                                SessionRow(
-                                    session: session,
-                                    agentName: agent?.name,
-                                    agentAvatar: agent?.avatar
-                                )
-                            }
-                            .accessibilityIdentifier("session-row-\(session.id)")
+            Section(L10n.text("세션")) {
+                let sessions = agents.sessions
+                if sessions.isEmpty {
+                    Text(L10n.text("아직 동기화된 세션이 없습니다."))
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(sessions.prefix(30)) { session in
+                        NavigationLink(value: AgentRoute.session(session.id)) {
+                            let agent = session.agentId.flatMap { agents.agent(id: $0) }
+                            SessionRow(
+                                session: session,
+                                agentName: agent?.name,
+                                agentAvatar: agent?.avatar
+                            )
                         }
+                        .accessibilityIdentifier("session-row-\(session.id)")
                     }
                 }
+            }
 
-                if let workers = snapshot?.workers, !workers.isEmpty {
-                    Section(L10n.text("실행 Worker")) {
-                        ForEach(workers) { worker in
-                            HStack(spacing: 12) {
-                                Image(systemName: "desktopcomputer")
-                                    .foregroundStyle(worker.readiness == "available" ? Color.green : Color.secondary)
-                                VStack(alignment: .leading) {
-                                    Text(worker.label).font(.headline)
-                                    Text(worker.readinessDetail ?? worker.readiness)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text(L10n.format("%d 실행 중", worker.activeSessions))
-                                    .font(.caption)
+            if let workers = snapshot?.workers, !workers.isEmpty {
+                Section(L10n.text("실행 Worker")) {
+                    ForEach(workers) { worker in
+                        HStack(spacing: 12) {
+                            Image(systemName: "desktopcomputer")
+                                .foregroundStyle(worker.readiness == "available" ? Color.green : Color.secondary)
+                            VStack(alignment: .leading) {
+                                Text(worker.label).font(.headline)
+                                Text(worker.readinessDetail ?? worker.readiness)
+                                    .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
+                            Spacer()
+                            Text(L10n.format("%d 실행 중", worker.activeSessions))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
             }
-            .navigationTitle("Agents")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { toolbarContent() }
-            .navigationDestination(for: AgentRoute.self) { route in
-                switch route {
-                case let .agent(id):
-                    if let agent = agents.agent(id: id) {
-                        AgentDetailView(
-                            agent: agent,
-                            sessions: agents.sessions(for: id),
-                            workers: snapshot?.workers ?? [],
-                            onRun: { skill, request, workerID in
-                                _ = try await agents.run(
-                                    agent: agent,
-                                    skill: skill,
-                                    request: request,
-                                    workerID: workerID
-                                )
-                            },
-                            onOpenSession: { path.append(AgentRoute.session($0)) }
-                        )
-                    } else {
-                        ContentUnavailableView(L10n.text("Agent를 찾을 수 없음"), systemImage: "cpu")
-                    }
-                case let .session(id):
-                    if let session = agents.session(id: id) {
-                        SessionDetailView(
-                            session: session,
-                            agent: session.agentId.flatMap { agents.agent(id: $0) },
-                            projectAgents: agents.agents.filter {
-                                $0.projectId == project.id
-                            },
-                            project: project,
-                            token: token,
-                            api: api,
-                            snapshot: snapshot,
-                            issueConversationView: issueConversationView,
-                            refreshDashboard: refreshDashboard,
-                            onSkillSessionMaterialized: { agents.materialize($0) },
-                            onSkillSessionOpen: { projectID, sessionID in
-                                navigation.open(
-                                    .session(projectID: projectID, sessionID: sessionID)
-                                )
-                            }
-                        )
-                    } else {
-                        ContentUnavailableView(L10n.text("세션을 찾을 수 없음"), systemImage: "list.bullet.rectangle")
-                    }
+        }
+        .navigationTitle("Agents")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { toolbarContent() }
+        .navigationDestination(for: AgentRoute.self) { route in
+            switch route {
+            case let .agent(id):
+                if let agent = agents.agent(id: id) {
+                    AgentDetailView(
+                        agent: agent,
+                        sessions: agents.sessions(for: id),
+                        workers: snapshot?.workers ?? [],
+                        onRun: { skill, request, workerID in
+                            _ = try await agents.run(
+                                agent: agent,
+                                skill: skill,
+                                request: request,
+                                workerID: workerID
+                            )
+                        },
+                        onOpenSession: { path.append(AgentRoute.session($0)) }
+                    )
+                } else {
+                    ContentUnavailableView(L10n.text("Agent를 찾을 수 없음"), systemImage: "cpu")
+                }
+            case let .session(id):
+                if let session = agents.session(id: id) {
+                    SessionDetailView(
+                        session: session,
+                        agent: session.agentId.flatMap { agents.agent(id: $0) },
+                        projectAgents: agents.agents.filter {
+                            $0.projectId == project.id
+                        },
+                        project: project,
+                        token: token,
+                        api: api,
+                        snapshot: snapshot,
+                        issueConversationView: issueConversationView,
+                        refreshDashboard: refreshDashboard,
+                        onSkillSessionMaterialized: { agents.materialize($0) },
+                        onSkillSessionOpen: { projectID, sessionID in
+                            navigation.open(
+                                .session(projectID: projectID, sessionID: sessionID)
+                            )
+                        }
+                    )
+                } else {
+                    ContentUnavailableView(L10n.text("세션을 찾을 수 없음"), systemImage: "list.bullet.rectangle")
                 }
             }
-            .refreshable {
-                await agents.refresh()
-                await refreshDashboard()
+        }
+        .refreshable {
+            await agents.refresh()
+            await refreshDashboard()
+        }
+        .overlay {
+            if agents.isRefreshing && agents.agents.isEmpty {
+                ProgressView(L10n.text("Agent를 불러오는 중…"))
             }
-            .overlay {
-                if agents.isRefreshing && agents.agents.isEmpty {
-                    ProgressView(L10n.text("Agent를 불러오는 중…"))
+        }
+        .alert(
+            L10n.text("Agent 실행"),
+            isPresented: Binding(
+                get: { agents.executionError != nil },
+                set: { isPresented in
+                    if !isPresented { agents.clearExecutionError() }
                 }
-            }
-            .alert(
-                L10n.text("Agent 실행"),
-                isPresented: Binding(
-                    get: { agents.executionError != nil },
-                    set: { isPresented in
-                        if !isPresented { agents.clearExecutionError() }
-                    }
-                )
-            ) {
-                Button(L10n.text("확인")) { agents.clearExecutionError() }
-            } message: {
-                Text(L10n.text(agents.executionError ?? "실행 요청을 처리하지 못했습니다."))
-            }
-        }
-        .onChange(of: navigation.pathSessionToken) { _, _ in
-            guard navigation.pendingProjectID == project.id else { return }
-            if let sessionID = navigation.consumePendingSession() {
-                path.append(AgentRoute.session(sessionID))
-            }
-        }
-        .task(id: "\(project.id.uuidString):\(navigation.pathSessionToken)") {
-            guard navigation.pendingProjectID == project.id else { return }
-            if let sessionID = navigation.pendingSessionID {
-                _ = navigation.consumePendingSession()
-                path.append(AgentRoute.session(sessionID))
-            }
+            )
+        ) {
+            Button(L10n.text("확인")) { agents.clearExecutionError() }
+        } message: {
+            Text(L10n.text(agents.executionError ?? "실행 요청을 처리하지 못했습니다."))
         }
         .onChange(of: snapshot) { _, nextSnapshot in
             guard let nextSnapshot else { return }

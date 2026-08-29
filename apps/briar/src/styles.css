@@ -5823,6 +5823,35 @@ button.issue-message-state { width:100%; cursor:pointer; }
   font-weight: 650;
 }
 .channel-thread > header span { display: inline-flex; align-items: center; gap: 6px; }
+.channel-thread-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+.channel-thread-channel-link {
+  display: inline-flex;
+  min-width: 0;
+  max-width: min(240px, 32vw);
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground, #777168);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 550;
+}
+.channel-thread-channel-link > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channel-thread-channel-link:hover { background: var(--accent, #f2efe9); color: var(--foreground, #24211d); }
+.channel-thread-channel-link:focus-visible { outline: 2px solid var(--ring, currentColor); outline-offset: 1px; }
 .channel-thread-header-actions,
 .channel-thread-subscribe { display: inline-flex; align-items: center; gap: 8px; }
 .channel-thread-header-actions > button[aria-label] {
