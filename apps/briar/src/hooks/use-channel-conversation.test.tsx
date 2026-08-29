@@ -150,12 +150,14 @@ function Harness({
   initialMessages = [],
   initialReplies = [],
   initialNextCursor = null,
+  initialThreadParentId = null,
   realtimeEnabled = false,
 }: {
   activeChannel: ChannelSummary;
   initialMessages?: ChannelMessage[];
   initialReplies?: ChannelAgentReply[];
   initialNextCursor?: string | null;
+  initialThreadParentId?: string | null;
   realtimeEnabled?: boolean;
 }) {
   const [members, setMembers] = React.useState<ChannelMember[]>([member]);
@@ -164,7 +166,9 @@ function Harness({
   const [replies, setReplies] = React.useState<ChannelAgentReply[]>(
     initialReplies,
   );
-  const [threadParentId, setThreadParentId] = React.useState<string | null>(null);
+  const [threadParentId, setThreadParentId] = React.useState<string | null>(
+    initialThreadParentId,
+  );
   const [threadMessages, setThreadMessages] = React.useState<ChannelMessage[]>([]);
   const [messageNextCursor, setMessageNextCursor] = React.useState<string | null>(
     initialNextCursor,
@@ -313,6 +317,72 @@ describe("useChannelConversation", () => {
       ["current"],
     ));
     expect(current().messages.map((item) => item.id)).toEqual(["older", "new"]);
+  });
+
+  it("uses the latest cursor when a stale scroll callback runs after refresh", async () => {
+    api.loadChannel.mockResolvedValueOnce({
+      channel: channel("channel-a"),
+      members: [member],
+      agents: [],
+      messages: [message("current")],
+      agentReplies: [],
+      nextCursor: "cursor-2",
+    });
+    api.listChannelMessages.mockResolvedValueOnce({
+      messages: [message("older", { createdAt: "2026-08-01T00:00:00.000Z" })],
+      nextCursor: null,
+    });
+    ({ cleanup, root } = await renderHarness({
+      activeChannel: channel("channel-a"),
+      initialMessages: [message("current")],
+      initialNextCursor: "cursor-1",
+    }));
+
+    const staleScrollCallback = current().loadEarlierChannelMessages;
+    await act(async () => {
+      await current().loadChannelConversation({
+        channelId: "channel-a",
+        messageLimit: 20,
+        mergeWithCurrentMessages: false,
+      });
+    });
+    await act(async () => {
+      await staleScrollCallback();
+    });
+
+    expect(api.listChannelMessages).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-a",
+      undefined,
+      expect.objectContaining({ limit: 20, cursor: "cursor-2" }),
+    );
+  });
+
+  it("loads root history while the desktop thread surface is open", async () => {
+    api.listChannelMessages.mockResolvedValueOnce({
+      messages: [message("older", { createdAt: "2026-08-01T00:00:00.000Z" })],
+      nextCursor: null,
+    });
+    ({ cleanup, root } = await renderHarness({
+      activeChannel: channel("channel-a"),
+      initialMessages: [message("current")],
+      initialNextCursor: "cursor-1",
+      initialThreadParentId: "root",
+    }));
+
+    await act(async () => {
+      await current().loadEarlierChannelMessages();
+    });
+
+    expect(api.listChannelMessages).toHaveBeenCalledWith(
+      "token",
+      "org-1",
+      "channel-a",
+      undefined,
+      expect.objectContaining({ limit: 20, cursor: "cursor-1" }),
+    );
+    expect(current().messages.map((item) => item.id)).toEqual(["older", "current"]);
   });
 
   it("drains a realtime cursor notification through the shared delta loop", async () => {
