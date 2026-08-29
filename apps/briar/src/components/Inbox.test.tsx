@@ -177,6 +177,81 @@ describe("Inbox", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
+  it("shows only unread messages within the selected project and categories", async () => {
+    const messages = [
+      issue("briar-unread", "Unread Briar failure", {
+        status: "failed",
+        priority: 1,
+      }),
+      issue("briar-read", "Read Briar failure", {
+        isUnread: false,
+        status: "failed",
+        priority: 1,
+      }),
+      issue("briar-activity", "Unread Briar activity", {
+        priority: 4,
+      }),
+      issue("sprout-unread", "Unread Sprout failure", {
+        projectId: "project-2",
+        projectName: "Sprout",
+        status: "failed",
+        priority: 1,
+      }),
+    ];
+
+    await renderReactTestRoot(
+      root,
+      <TestProviders>
+        <Inbox
+          isSidebarOpen
+          messages={messages}
+          onMarkAllRead={vi.fn()}
+          onMarkRead={vi.fn()}
+          onOpen={vi.fn()}
+          projects={projects}
+          unreadCount={3}
+        />
+      </TestProviders>,
+    );
+
+    const unreadOnlyFilter = container.querySelector<HTMLButtonElement>(
+      ".inbox-filter.unread-only",
+    );
+    expect(unreadOnlyFilter?.getAttribute("aria-label")).toBe(
+      "읽지 않은 메시지만 보기",
+    );
+    expect(unreadOnlyFilter?.getAttribute("aria-pressed")).toBe("false");
+
+    await act(async () => unreadOnlyFilter?.click());
+
+    expect(unreadOnlyFilter?.getAttribute("aria-pressed")).toBe("true");
+    expect(container.textContent).toContain("Unread Briar failure");
+    expect(container.textContent).not.toContain("Read Briar failure");
+    expect(container.textContent).not.toContain("Unread Briar activity");
+    expect(container.textContent).toContain("Unread Sprout failure");
+    expect(container.textContent).toContain("2개 표시");
+
+    const projectFilter = container.querySelector<HTMLButtonElement>(
+      '[aria-label="프로젝트 필터"]',
+    );
+    await act(async () => projectFilter?.click());
+    const briarOption = document.querySelector<HTMLButtonElement>(
+      '[role="option"][data-value="project-1"]',
+    );
+    await act(async () => briarOption?.click());
+
+    expect(container.textContent).toContain("Unread Briar failure");
+    expect(container.textContent).not.toContain("Unread Sprout failure");
+    expect(container.textContent).toContain("1개 표시");
+
+    await act(async () => unreadOnlyFilter?.click());
+
+    expect(container.textContent).toContain("Unread Briar failure");
+    expect(container.textContent).toContain("Read Briar failure");
+    expect(container.textContent).not.toContain("Unread Briar activity");
+    expect(container.textContent).toContain("2개 표시");
+  });
+
   it("marks one message as read without opening its destination", async () => {
     const message = issue("unread", "Review this update", {
       priority: 1,
