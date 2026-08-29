@@ -3496,6 +3496,10 @@ export function App({
           setRequestedChannelMessage(null);
           setInboxDetailTarget(null);
         }}
+        onInboxChannelOpen={(channelId) => {
+          setInboxDetailTarget(null);
+          openOrganizationChannel(channelId);
+        }}
         onCreateAgent={() => {
           setSettingsTarget({
             scope: "organization",
