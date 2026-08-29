@@ -118,6 +118,8 @@ export function IssueConversation({
   const isSubscribed = subscriptionOverride ?? backendSubscribed;
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const focusedHighlightedMessageKeyRef = useRef<string | null>(null);
+  const pendingSentMessageIdRef = useRef<string | null>(null);
+  const userHasSentMessageRef = useRef(false);
   const onLoadRef = useRef(onLoad);
   const mountedRef = useRef(true);
   const activeRunIdRef = useRef(run.id);
@@ -200,6 +202,8 @@ export function IssueConversation({
     setConversationCursor(null);
     setAgentReplyStates({});
     focusedHighlightedMessageKeyRef.current = null;
+    pendingSentMessageIdRef.current = null;
+    userHasSentMessageRef.current = false;
   }, [run.id]);
   useEffect(() => {
     mountedRef.current = true;
@@ -449,13 +453,28 @@ export function IssueConversation({
   }, [profilesByHandle]);
   useLayoutEffect(() => {
     const messageList = messageListRef.current;
-    if (messageList && !highlightedMessageId) {
+    if (!messageList) return;
+    if (pendingSentMessageIdRef.current) {
+      const sentMessageId = pendingSentMessageIdRef.current;
+      messageList.scrollTop = messageList.scrollHeight;
+      scrollConversationToBottom(messageList);
+      setIsAwayFromBottom(false);
+      const target = [...messageList.querySelectorAll<HTMLElement>(
+        "[data-issue-message-id]",
+      )].find(element => element.dataset.issueMessageId === sentMessageId);
+      if (target) {
+        target.focus({ preventScroll: true });
+        pendingSentMessageIdRef.current = null;
+      }
+      return;
+    }
+    if (!highlightedMessageId) {
       messageList.scrollTop = messageList.scrollHeight;
       setIsAwayFromBottom(false);
     }
   }, [highlightedMessageId, loading, messages.length, pendingAgentReplyCount]);
   useLayoutEffect(() => {
-    if (!highlightedMessageId || loading) return;
+    if (userHasSentMessageRef.current || !highlightedMessageId || loading || pendingSentMessageIdRef.current) return;
     const targetKey = `${run.id}:${highlightedMessageId}`;
     if (focusedHighlightedMessageKeyRef.current === targetKey) return;
     const messageList = messageListRef.current;
@@ -481,6 +500,9 @@ export function IssueConversation({
       } : candidate), message];
     });
     const clientMessageId = crypto.randomUUID();
+    pendingSentMessageIdRef.current = clientMessageId;
+    userHasSentMessageRef.current = true;
+    focusedHighlightedMessageKeyRef.current = `${run.id}:${clientMessageId}`;
     const createdAt = new Date().toISOString();
     const currentMember = mentionMembers.find(member => member.userId === currentUserId);
     const previewUrls = attachments.map(attachment => URL.createObjectURL(attachment));

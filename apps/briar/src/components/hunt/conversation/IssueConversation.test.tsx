@@ -1152,4 +1152,170 @@ describe("IssueConversation", () => {
     });
     await cleanup();
   });
+
+  it("scrolls to the bottom and focuses the newly sent message when submitting input", async () => {
+    const existingMessage: IssueMessage = {
+      id: "message-existing",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "기존 메시지",
+      author: {
+        id: "other",
+        name: "Other",
+        image: null,
+        provider: null,
+      },
+      replyCount: 0,
+      createdAt: "2026-08-15T00:00:00.000Z",
+      updatedAt: "2026-08-15T00:00:00.000Z",
+    };
+    const onSendIssueMessage = vi.fn(async (input: { body: string; clientMessageId?: string }) => ({
+      message: {
+        id: input.clientMessageId ?? "message-sent",
+        runId: demoDashboard.runs[0].id,
+        parentMessageId: null,
+        body: input.body,
+        author: {
+          id: "jay",
+          name: "Jay",
+          image: null,
+          provider: null,
+        },
+        replyCount: 0,
+        createdAt: "2026-08-15T00:01:00.000Z",
+        updatedAt: "2026-08-15T00:01:00.000Z",
+      },
+      agentReply: null,
+    }));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => [existingMessage]}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={onSendIssueMessage}
+        run={demoDashboard.runs[0]}
+      />,
+    );
+    const messageList = container.querySelector<HTMLElement>(".issue-message-list");
+    if (messageList) {
+      Object.defineProperties(messageList, {
+        scrollHeight: { configurable: true, value: 1200 },
+        scrollTop: { configurable: true, writable: true, value: 100 },
+        clientHeight: { configurable: true, value: 400 },
+      });
+    }
+    const draft = "새로 보낸 메시지";
+    const textarea = container.querySelector<HTMLTextAreaElement>(".issue-message-composer textarea");
+    await act(async () => {
+      if (!textarea) return;
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(textarea, draft);
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".issue-message-composer .issue-message-send")?.click();
+      await Promise.resolve();
+    });
+    const sentMessageElement = [...container.querySelectorAll<HTMLElement>("[data-issue-message-id]")].at(-1);
+    expect(sentMessageElement?.textContent).toContain(draft);
+    expect(document.activeElement).toBe(sentMessageElement);
+    expect(messageList?.scrollTop).toBe(1200);
+    await cleanup();
+  });
+
+  it("scrolls to the bottom and focuses the sent message even when a highlighted message was active", async () => {
+    const highlightedMessage: IssueMessage = {
+      id: "message-highlighted",
+      runId: demoDashboard.runs[0].id,
+      parentMessageId: null,
+      body: "하이라이트된 메시지",
+      author: {
+        id: "other",
+        name: "Other",
+        image: null,
+        provider: null,
+      },
+      replyCount: 0,
+      createdAt: "2026-08-15T00:00:00.000Z",
+      updatedAt: "2026-08-15T00:00:00.000Z",
+    };
+    const onSendIssueMessage = vi.fn(async (input: { body: string; clientMessageId?: string }) => ({
+      message: {
+        id: input.clientMessageId ?? "message-new",
+        runId: demoDashboard.runs[0].id,
+        parentMessageId: null,
+        body: input.body,
+        author: {
+          id: "jay",
+          name: "Jay",
+          image: null,
+          provider: null,
+        },
+        replyCount: 0,
+        createdAt: "2026-08-15T00:02:00.000Z",
+        updatedAt: "2026-08-15T00:02:00.000Z",
+      },
+      agentReply: null,
+    }));
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <RunPage
+        highlightedMessageId={highlightedMessage.id}
+        initialDetailTab="conversation"
+        isSidebarOpen
+        error={null}
+        isRecovering={false}
+        onBack={() => undefined}
+        onCancel={async () => undefined}
+        onLoadAttachment={async () => new Blob()}
+        onLoadIssueMessages={async () => [highlightedMessage]}
+        onLoadRunEvidence={async () => []}
+        onMove={async () => undefined}
+        onRetry={async () => undefined}
+        onSendIssueMessage={onSendIssueMessage}
+        run={demoDashboard.runs[0]}
+      />,
+    );
+    const highlightedElement = container.querySelector<HTMLElement>('[data-inbox-highlighted="true"]');
+    expect(document.activeElement).toBe(highlightedElement);
+
+    const messageList = container.querySelector<HTMLElement>(".issue-message-list");
+    if (messageList) {
+      Object.defineProperties(messageList, {
+        scrollHeight: { configurable: true, value: 1500 },
+        scrollTop: { configurable: true, writable: true, value: 200 },
+        clientHeight: { configurable: true, value: 400 },
+      });
+    }
+
+    const draft = "하이라이트 이후 내가 보낸 메시지";
+    const textarea = container.querySelector<HTMLTextAreaElement>(".issue-message-composer textarea");
+    await act(async () => {
+      if (!textarea) return;
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(textarea, draft);
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".issue-message-composer .issue-message-send")?.click();
+      await Promise.resolve();
+    });
+    const sentMessageElement = [...container.querySelectorAll<HTMLElement>("[data-issue-message-id]")].at(-1);
+    expect(sentMessageElement?.textContent).toContain(draft);
+    expect(document.activeElement).toBe(sentMessageElement);
+    expect(messageList?.scrollTop).toBe(1500);
+    await cleanup();
+  });
 });
