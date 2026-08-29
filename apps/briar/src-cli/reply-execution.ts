@@ -26,6 +26,7 @@ import {
   logDetachedProviderTurnDiagnostic,
   runDetachedProviderTurn,
 } from "./detached-provider-turn";
+import { materializeDetachedAgentSkillCatalog } from "./agent-skill-discovery";
 import { TranscriptBatcher } from "./transcript-batcher";
 import { ChannelActivityPublisher } from "./channel-activity-publisher";
 import {
@@ -823,6 +824,15 @@ async function runClaimedChannelReply(
       fallbackName: "Briar Channel",
       scope: reply.scope,
     });
+    // A retained channel session resumes the same provider conversation across
+    // replies. Keep its Skill catalog at a stable workspace path for that
+    // conversation; workspace/session TTL cleanup owns its eventual removal.
+    const retainedSkillCatalog = reply.session
+      ? await materializeDetachedAgentSkillCatalog(agent, {
+          temporaryParentPath: workspacePath,
+          lifetime: "retained-conversation",
+        })
+      : null;
     const prompt = detachedChannelReplyPrompt({
       agent,
       snapshot: {
@@ -860,6 +870,7 @@ async function runClaimedChannelReply(
         delegationTargets: reply.scope.kind === "organization"
           ? reply.delegationTargets
           : undefined,
+        skillCatalog: reply.session ? retainedSkillCatalog : undefined,
         environment: providerExecutionEnvironment(config, agent.provider, {
           ...process.env,
           PATH: workerExecutionPath(),
