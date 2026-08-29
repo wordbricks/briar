@@ -494,6 +494,7 @@ struct CompanionShellView: View {
 struct TaskListView: View {
     @State private var filter = TaskFilter.all
     @State private var showingCreateIssue = false
+    @State private var showingHostStatus = false
     @State private var dispatchRun: DashboardRun?
     @StateObject private var mutations: IssueMutationStore
 
@@ -653,14 +654,31 @@ struct TaskListView: View {
                 .accessibilityIdentifier("task-list")
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { showingCreateIssue = true } label: {
-                    Image(systemName: "plus")
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack {
+                Spacer()
+                Menu {
+                    Button { showingCreateIssue = true } label: {
+                        Label(L10n.text("새 이슈"), systemImage: "plus")
+                    }
+                    .accessibilityIdentifier("create-issue-button")
+                    Button { showingHostStatus = true } label: {
+                        Label(L10n.text("호스트"), systemImage: "desktopcomputer")
+                    }
+                    .accessibilityIdentifier("host-status-menu-item")
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.title3.weight(.semibold))
+                        .frame(width: 56, height: 56)
+                        .foregroundStyle(.white)
+                        .background(Color.accentColor, in: Circle())
+                        .shadow(color: .black.opacity(0.18), radius: 10, y: 5)
                 }
-                .accessibilityLabel(L10n.text("새 이슈"))
-                .accessibilityIdentifier("create-issue-button")
+                .accessibilityLabel(L10n.text("이슈 메뉴"))
+                .accessibilityIdentifier("task-floating-menu")
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         }
         .sheet(isPresented: $showingCreateIssue) {
             CreateIssueSheet(
@@ -670,6 +688,14 @@ struct TaskListView: View {
                 capabilities: AgentProviderCapabilityCatalog(workers: snapshot?.workers ?? []),
                 refresh: refresh
             )
+        }
+        .sheet(isPresented: $showingHostStatus) {
+            HostStatusSheet(
+                workers: snapshot?.workers ?? [],
+                generatedAt: snapshot?.generatedAt,
+                refresh: refresh
+            )
+            .presentationDetents([.medium, .large])
         }
         .sheet(item: $dispatchRun) { run in
             DispatchIssueSheet(
@@ -681,6 +707,166 @@ struct TaskListView: View {
                 refresh: refresh
             )
         }
+    }
+}
+
+func hostReadinessLabel(
+    _ readiness: String,
+    locale: CompanionLocale = L10n.current
+) -> String {
+    switch readiness {
+    case "available": L10n.text("사용 가능", locale: locale)
+    case "busy": L10n.text("실행 중", locale: locale)
+    case "offline": L10n.text("오프라인", locale: locale)
+    case "needs_attention": L10n.text("확인 필요", locale: locale)
+    case "disabled": L10n.text("공유 중지", locale: locale)
+    default: readiness
+    }
+}
+
+private struct HostStatusSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var isRefreshing = false
+
+    let workers: [DashboardWorker]
+    let generatedAt: Date?
+    let refresh: () async -> Void
+
+    private var activeWorkerCount: Int {
+        workers.filter {
+            $0.acceptingWork && ($0.readiness == "available" || $0.readiness == "busy")
+        }.count
+    }
+
+    private var sortedWorkers: [DashboardWorker] {
+        workers.sorted {
+            $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if workers.isEmpty {
+                    ContentUnavailableView(
+                        L10n.text("연결된 호스트 없음"),
+                        systemImage: "desktopcomputer",
+                        description: Text(L10n.text("이 프로젝트에서 사용할 수 있는 Worker가 없습니다."))
+                    )
+                } else {
+                    List {
+                        Section {
+                            LabeledContent(
+                                L10n.text("활성 호스트"),
+                                value: "\(activeWorkerCount)/\(workers.count)"
+                            )
+                            if let generatedAt {
+                                LabeledContent(
+                                    L10n.text("마지막 동기화"),
+                                    value: L10n.dateTime(generatedAt)
+                                )
+                            }
+                        }
+
+                        Section(L10n.text("호스트")) {
+                            ForEach(sortedWorkers) { worker in
+                                HostStatusRow(worker: worker)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle(L10n.text("호스트 상태"))
+            .navigationBarTitleDisplayMode(.inline)
+            .accessibilityIdentifier("host-status-sheet")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.text("닫기")) { dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        Task {
+                            isRefreshing = true
+                            await refresh()
+                            isRefreshing = false
+                        }
+                    } label: {
+                        if isRefreshing {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                    }
+                    .disabled(isRefreshing)
+                    .accessibilityLabel(L10n.text("호스트 상태 새로고침"))
+                    .accessibilityIdentifier("host-status-refresh")
+                }
+            }
+        }
+    }
+}
+
+private struct HostStatusRow: View {
+    let worker: DashboardWorker
+
+    private var maximumSessions: Int {
+        max(1, worker.activeSessions + worker.availableSessions)
+    }
+
+    private var readinessColor: Color {
+        switch worker.readiness {
+        case "available": .green
+        case "busy": .blue
+        case "needs_attention": .orange
+        case "offline", "disabled": .secondary
+        default: .secondary
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack(alignment: .bottomTrailing) {
+                RunWorkerIconView(worker: worker, label: worker.label)
+                    .scaleEffect(1.6)
+                    .frame(width: 32, height: 32)
+                Circle()
+                    .fill(readinessColor)
+                    .frame(width: 10, height: 10)
+                    .overlay(Circle().stroke(Color(uiColor: .systemBackground), lineWidth: 2))
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(worker.label)
+                        .font(.headline)
+                    Spacer(minLength: 8)
+                    Text(hostReadinessLabel(worker.readiness))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(readinessColor)
+                }
+                if let detail = worker.readinessDetail, !detail.isEmpty {
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                ProgressView(
+                    value: Double(min(worker.activeSessions, maximumSessions)),
+                    total: Double(maximumSessions)
+                )
+                Text(
+                    L10n.format(
+                        "활성 세션 %d/%d",
+                        worker.activeSessions,
+                        maximumSessions
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 5)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("host-status-worker-\(worker.id)")
     }
 }
 

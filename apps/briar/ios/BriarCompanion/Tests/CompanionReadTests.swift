@@ -247,6 +247,15 @@ final class CompanionReadTests: XCTestCase {
         XCTAssertTrue(workerCanRunAgentSkill(legacyProvider, provider: .codex))
     }
 
+    func testHostReadinessLabelsCoverEveryDashboardState() {
+        XCTAssertEqual(hostReadinessLabel("available", locale: .ko), "사용 가능")
+        XCTAssertEqual(hostReadinessLabel("busy", locale: .en), "Running")
+        XCTAssertEqual(hostReadinessLabel("offline", locale: .en), "Offline")
+        XCTAssertEqual(hostReadinessLabel("needs_attention", locale: .zh), "需要处理")
+        XCTAssertEqual(hostReadinessLabel("disabled", locale: .en), "Sharing disabled")
+        XCTAssertEqual(hostReadinessLabel("future_state", locale: .ko), "future_state")
+    }
+
     @MainActor
     func testRunDetailAuthoritativeNullInvalidatesPendingExecutionContext() async throws {
         let proposal = executionProposal()
