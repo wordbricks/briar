@@ -112,6 +112,7 @@ export function Inbox({
           : defaultInboxFilters,
       ),
   );
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState("all");
   const [visibleCount, setVisibleCount] = useState(INBOX_PAGE_SIZE);
   const [cursorMessageId, setCursorMessageId] = useState<string | null>(
@@ -161,14 +162,21 @@ export function Inbox({
   );
   const filteredMessages = useMemo(
     () =>
-      projectMessages.filter((message) =>
-        activeFilters.has(classifyInboxMessage(message)),
+      projectMessages.filter(
+        (message) =>
+          activeFilters.has(classifyInboxMessage(message)) &&
+          (!showUnreadOnly || message.isUnread),
       ),
-    [activeFilters, projectMessages],
+    [activeFilters, projectMessages, showUnreadOnly],
   );
   const filterKey = useMemo(
-    () => `${effectiveProjectId}:${[...activeFilters].sort().join(",")}`,
-    [activeFilters, effectiveProjectId],
+    () =>
+      `${effectiveProjectId}:${showUnreadOnly ? "unread" : "all"}:${[
+        ...activeFilters,
+      ]
+        .sort()
+        .join(",")}`,
+    [activeFilters, effectiveProjectId, showUnreadOnly],
   );
   const visibleMessages = useMemo(
     () => pageInboxMessages(filteredMessages, visibleCount),
@@ -332,6 +340,21 @@ export function Inbox({
                   className="inbox-filters flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   role="group"
                 >
+                  <button
+                    aria-label={t("inbox.unreadOnly")}
+                    aria-pressed={showUnreadOnly}
+                    className={cn(
+                      "inbox-filter unread-only relative inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] border p-0 transition-[transform,border-color,background-color,color] duration-150 ease-out motion-reduce:transition-none active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+                      showUnreadOnly
+                        ? "border-border bg-secondary text-foreground hover:border-border hover:bg-secondary hover:text-foreground"
+                        : "border-input bg-muted text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground",
+                    )}
+                    onClick={() => setShowUnreadOnly((current) => !current)}
+                    title={t("inbox.unreadOnly")}
+                    type="button"
+                  >
+                    <Mail aria-hidden="true" size={14} />
+                  </button>
                   {inboxFilters.map((category) => {
                     const label = t(
                       `inbox.category.${category}` as MessageKey,
