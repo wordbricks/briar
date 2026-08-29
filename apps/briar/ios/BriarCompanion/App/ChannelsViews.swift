@@ -1552,19 +1552,31 @@ private struct ChannelAttachmentCard: View {
     let open: @MainActor (URL) -> Void
 
     var body: some View {
-        AuthenticatedImagePreview(
-            sourceID: attachment.url,
-            filename: attachment.filename,
-            detail: ByteCountFormatter.string(
-                fromByteCount: Int64(attachment.byteSize),
-                countStyle: .file
-            ),
-            accessibilityID: "channel-message-attachment-\(attachment.id.uuidString.lowercased())",
-            load: {
-                try await load(attachment)
-            },
-            open: open
-        )
+        Group {
+            if IssueAttachmentMedia.isHTML(
+                contentType: attachment.contentType,
+                filename: attachment.filename
+            ) {
+                AuthenticatedHTMLArtifactPreview(
+                    filename: attachment.filename,
+                    byteSize: attachment.byteSize,
+                    accessibilityID: "channel-message-html-\(attachment.id.uuidString.lowercased())",
+                    load: { try await load(attachment) }
+                )
+            } else {
+                AuthenticatedImagePreview(
+                    sourceID: attachment.url,
+                    filename: attachment.filename,
+                    detail: ByteCountFormatter.string(
+                        fromByteCount: Int64(attachment.byteSize),
+                        countStyle: .file
+                    ),
+                    accessibilityID: "channel-message-attachment-\(attachment.id.uuidString.lowercased())",
+                    load: { try await load(attachment) },
+                    open: open
+                )
+            }
+        }
         .padding(10)
         .background(
             Color(.secondarySystemBackground),

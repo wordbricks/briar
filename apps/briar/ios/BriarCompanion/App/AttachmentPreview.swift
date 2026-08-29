@@ -23,6 +23,20 @@ enum IssueAttachmentMedia {
         return imageExtensions.contains(ext)
     }
 
+    static func isHTML(contentType: String, filename: String) -> Bool {
+        let normalizedType = contentType
+            .split(separator: ";", maxSplits: 1)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        if normalizedType == "text/html" { return true }
+        let ext = URL(fileURLWithPath: filename)
+            .pathExtension
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return ext == "html" || ext == "htm"
+    }
+
     /// Reference ids embedded as `![alt](briar-attachment://id)` in issue markdown.
     static func embeddedReferences(in markdown: String?) -> Set<String> {
         guard let markdown, !markdown.isEmpty else { return [] }
@@ -107,6 +121,7 @@ struct IdentifiedIssueDescriptionBlock: Identifiable, Equatable {
 import ImageIO
 import QuickLook
 import UIKit
+import WebKit
 
 /// In-memory cache so List cell recycle / `.task` restart does not re-download and flash.
 @MainActor
@@ -182,6 +197,371 @@ enum AuthenticatedImageDecoding {
 
     private static func fallbackImage(at url: URL) throws -> UIImage? {
         UIImage(data: try Data(contentsOf: url))
+    }
+}
+
+enum HTMLArtifactPreviewConfiguration {
+    static let path = "/html-artifact-preview"
+    static let protocolVersion = 1
+    static let renderMessageType = "briar-html-artifact-preview:render"
+    static let maximumPayloadBytes = 20 * 1_024 * 1_024
+
+    static func allowsPayload(byteCount: Int) -> Bool {
+        byteCount >= 0 && byteCount <= maximumPayloadBytes
+    }
+
+    static func previewURL(apiBaseURL: URL) -> URL? {
+        guard
+            let scheme = apiBaseURL.scheme?.lowercased(),
+            scheme == "https" || scheme == "http",
+            apiBaseURL.host != nil,
+            var components = URLComponents(
+                url: apiBaseURL,
+                resolvingAgainstBaseURL: false
+            ),
+            components.user == nil,
+            components.password == nil,
+            components.query == nil,
+            components.fragment == nil,
+            components.path.isEmpty || components.path == "/"
+        else { return nil }
+        components.path = path
+        return components.url
+    }
+
+    static var previewURL: URL? {
+        let configured = ProcessInfo.processInfo.environment["BRIAR_API_URL"] ??
+            "https://briar-api.wbai.workers.dev"
+        guard let apiBaseURL = URL(string: configured) else { return nil }
+        return previewURL(apiBaseURL: apiBaseURL)
+    }
+}
+
+enum HTMLArtifactDocument {
+    static func read(from url: URL) throws -> String {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        if let fileSize = attributes[.size] as? NSNumber,
+           !HTMLArtifactPreviewConfiguration.allowsPayload(
+               byteCount: fileSize.intValue
+           )
+        {
+            throw CocoaError(.fileReadTooLarge)
+        }
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+        guard HTMLArtifactPreviewConfiguration.allowsPayload(byteCount: data.count) else {
+            throw CocoaError(.fileReadTooLarge)
+        }
+        let document = String(decoding: data, as: UTF8.self)
+        guard HTMLArtifactPreviewConfiguration.allowsPayload(
+            byteCount: document.utf8.count
+        ) else {
+            throw CocoaError(.fileReadTooLarge)
+        }
+        return document
+    }
+}
+
+struct AuthenticatedHTMLArtifactPreview: View {
+    let filename: String
+    let byteSize: Int
+    let accessibilityID: String
+    let load: @MainActor () async throws -> URL
+
+    @State private var presented = false
+
+    var body: some View {
+        Button {
+            presented = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "chevron.left.forwardslash.chevron.right")
+                    .font(.title3)
+                    .foregroundStyle(.tint)
+                    .frame(width: 42, height: 42)
+                    .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(filename)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(2)
+                    Text(ByteCountFormatter.string(
+                        fromByteCount: Int64(byteSize),
+                        countStyle: .file
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Text("HTML")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.tint)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.format("%@ 미리보기", filename))
+        .accessibilityIdentifier(accessibilityID)
+        .sheet(isPresented: $presented) {
+            HTMLArtifactPreviewSheet(filename: filename, load: load)
+        }
+    }
+}
+
+private struct HTMLArtifactPreviewSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let filename: String
+    let load: @MainActor () async throws -> URL
+
+    @State private var document: String?
+    @State private var failed = false
+    @State private var loading = true
+    @State private var loadAttempt = 0
+    @State private var shellAttempt = UUID()
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                if let document,
+                   let shellURL = HTMLArtifactPreviewConfiguration.previewURL
+                {
+                    IsolatedHTMLArtifactWebView(
+                        document: document,
+                        shellURL: shellURL,
+                        onRendered: {
+                            loading = false
+                            failed = false
+                        },
+                        onFailure: {
+                            loading = false
+                            failed = true
+                        }
+                    )
+                    .id(shellAttempt)
+                }
+                if loading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(.systemBackground))
+                } else if failed {
+                    ContentUnavailableView {
+                        Label(
+                            L10n.text("미리보기를 열 수 없음"),
+                            systemImage: "exclamationmark.triangle"
+                        )
+                    } actions: {
+                        Button(L10n.text("다시 시도")) { retry() }
+                    }
+                    .background(Color(.systemBackground))
+                }
+            }
+            .navigationTitle(filename)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.text("닫기")) { dismiss() }
+                }
+            }
+        }
+        .task(id: loadAttempt) { await loadDocument() }
+    }
+
+    @MainActor
+    private func loadDocument() async {
+        guard document == nil else { return }
+        loading = true
+        failed = false
+        do {
+            let downloadedURL = try await load()
+            let loadedDocument = try await Task.detached(priority: .userInitiated) {
+                try HTMLArtifactDocument.read(from: downloadedURL)
+            }.value
+            guard !Task.isCancelled else { return }
+            document = loadedDocument
+            shellAttempt = UUID()
+            if HTMLArtifactPreviewConfiguration.previewURL == nil {
+                loading = false
+                failed = true
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            loading = false
+            failed = true
+        }
+    }
+
+    private func retry() {
+        loading = true
+        failed = false
+        if document == nil {
+            loadAttempt += 1
+        } else {
+            shellAttempt = UUID()
+        }
+    }
+}
+
+private struct IsolatedHTMLArtifactWebView: UIViewRepresentable {
+    let document: String
+    let shellURL: URL
+    let onRendered: @MainActor () -> Void
+    let onFailure: @MainActor () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            document: document,
+            shellURL: shellURL,
+            onRendered: onRendered,
+            onFailure: onFailure
+        )
+    }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.navigationDelegate = context.coordinator
+        webView.allowsLinkPreview = false
+        context.coordinator.startTimeout()
+        webView.load(URLRequest(
+            url: shellURL,
+            cachePolicy: .reloadIgnoringLocalCacheData,
+            timeoutInterval: 5
+        ))
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {}
+
+    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+        coordinator.cancel()
+        webView.stopLoading()
+        webView.navigationDelegate = nil
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        private let document: String
+        private let shellURL: URL
+        private let onRendered: () -> Void
+        private let onFailure: () -> Void
+        private var allowedInitialNavigation = false
+        private var completed = false
+        private var timeout: DispatchWorkItem?
+
+        init(
+            document: String,
+            shellURL: URL,
+            onRendered: @escaping () -> Void,
+            onFailure: @escaping () -> Void
+        ) {
+            self.document = document
+            self.shellURL = shellURL
+            self.onRendered = onRendered
+            self.onFailure = onFailure
+        }
+
+        func startTimeout() {
+            let workItem = DispatchWorkItem { [weak self] in self?.finish(success: false) }
+            timeout = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
+        }
+
+        func cancel() {
+            timeout?.cancel()
+            timeout = nil
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+        ) {
+            if !allowedInitialNavigation,
+               navigationAction.request.url == shellURL
+            {
+                allowedInitialNavigation = true
+                decisionHandler(.allow)
+                return
+            }
+            decisionHandler(.cancel)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationResponse: WKNavigationResponse,
+            decisionHandler: @escaping @MainActor @Sendable (WKNavigationResponsePolicy) -> Void
+        ) {
+            guard
+                navigationResponse.response.url == shellURL,
+                let response = navigationResponse.response as? HTTPURLResponse,
+                response.statusCode == 200,
+                let policy = response.value(forHTTPHeaderField: "Content-Security-Policy"),
+                policy.contains("sandbox allow-scripts"),
+                policy.contains("connect-src 'none'"),
+                response.value(forHTTPHeaderField: "Referrer-Policy") == "no-referrer"
+            else {
+                decisionHandler(.cancel)
+                finish(success: false)
+                return
+            }
+            decisionHandler(.allow)
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            Task { @MainActor [weak self, weak webView] in
+                guard let self, let webView else { return }
+                do {
+                    let value = try await webView.evaluateJavaScript(
+                        "globalThis.__BRIAR_HTML_ARTIFACT_PREVIEW_READY__ === true"
+                    )
+                    guard value as? Bool == true else {
+                        finish(success: false)
+                        return
+                    }
+                    _ = try await webView.callAsyncJavaScript(
+                        "window.postMessage(message, '*')",
+                        arguments: [
+                            "message": [
+                                "type": HTMLArtifactPreviewConfiguration.renderMessageType,
+                                "version": HTMLArtifactPreviewConfiguration.protocolVersion,
+                                "html": self.document,
+                            ],
+                        ],
+                        in: nil,
+                        contentWorld: .page
+                    )
+                    finish(success: true)
+                } catch {
+                    finish(success: false)
+                }
+            }
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            finish(success: false)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFail navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            finish(success: false)
+        }
+
+        private func finish(success: Bool) {
+            guard !completed else { return }
+            completed = true
+            cancel()
+            if success { onRendered() } else { onFailure() }
+        }
     }
 }
 

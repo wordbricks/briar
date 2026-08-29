@@ -1,4 +1,11 @@
 import briarIconPng from "../../src/assets/brand/briar-logo-dark.png";
+import {
+  htmlArtifactPreviewMaxBytes,
+  htmlArtifactPreviewMessageType,
+  htmlArtifactPreviewPath,
+  htmlArtifactPreviewProtocolVersion,
+} from "../../src/lib/html-artifact-preview-contract";
+import { htmlArtifactContentSecurityPolicy } from "../../src/lib/agent-reply-attachments";
 import { devicePage as otpDevicePage } from "./auth-device";
 import { json } from "./http-response";
 import { decodeMobileHealthResponse } from "./mobile-contract";
@@ -47,6 +54,50 @@ const appleAppSiteAssociation = (head: boolean) =>
       },
     },
   );
+
+export const htmlArtifactPreviewDocument = `<!doctype html>
+<html><head><meta charset="utf-8"><title>HTML artifact preview</title></head><body>
+<script>(()=>{"use strict";
+const host=window.parent;
+const version=${htmlArtifactPreviewProtocolVersion};
+const maxBytes=${htmlArtifactPreviewMaxBytes};
+const types=${JSON.stringify(htmlArtifactPreviewMessageType)};
+const send=(type)=>host.postMessage({type,version},"*");
+let accepted=false;
+const receive=(event)=>{
+  if(accepted||event.source!==host||!event.data||typeof event.data!=="object")return;
+  if(event.data.version!==version)return;
+  if(event.data.type===types.probe){send(types.ready);return;}
+  if(event.data.type!==types.render)return;
+  accepted=true;
+  window.removeEventListener("message",receive);
+  const html=event.data.html;
+  if(typeof html!=="string"||new TextEncoder().encode(html).byteLength>maxBytes){send(types.error);return;}
+  try{
+    document.open();
+    document.write(html);
+    document.close();
+    send(types.rendered);
+  }catch{send(types.error);}
+};
+window.addEventListener("message",receive);
+Object.defineProperty(globalThis,"__BRIAR_HTML_ARTIFACT_PREVIEW_READY__",{value:true});
+send(types.ready);
+})();</script></body></html>`;
+
+const htmlArtifactPreviewResponse = (head: boolean) =>
+  new Response(head ? null : htmlArtifactPreviewDocument, {
+    headers: {
+      "Cache-Control": "public, max-age=300",
+      "Content-Security-Policy":
+        `sandbox allow-scripts; ${htmlArtifactContentSecurityPolicy}`,
+      "Content-Type": "text/html; charset=utf-8",
+      "Permissions-Policy":
+        "accelerometer=(), autoplay=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 
 const appLinkPage = (
   resource: "issues" | "sessions" | "channels",
@@ -104,6 +155,13 @@ export async function handlePublicRoute(input: {
 }): Promise<Response | undefined> {
   const { request, env } = input;
   const url = new URL(request.url);
+
+  if (
+    url.pathname === htmlArtifactPreviewPath &&
+    (request.method === "GET" || request.method === "HEAD")
+  ) {
+    return htmlArtifactPreviewResponse(request.method === "HEAD");
+  }
 
   if (
     (request.method === "GET" || request.method === "HEAD") &&

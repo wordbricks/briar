@@ -1379,7 +1379,22 @@ struct RunDetailView: View {
 
     @ViewBuilder
     private func attachmentRow(_ attachment: IssueAttachment) -> some View {
-        if IssueAttachmentMedia.isImage(
+        if IssueAttachmentMedia.isHTML(
+            contentType: attachment.contentType,
+            filename: attachment.filename
+        ) {
+            AuthenticatedHTMLArtifactPreview(
+                filename: attachment.filename,
+                byteSize: attachment.byteSize,
+                accessibilityID: "issue-attachment-html-\(attachment.id.uuidString.lowercased())",
+                load: {
+                    try await detail.download(
+                        path: attachment.url,
+                        filename: attachment.filename
+                    )
+                }
+            )
+        } else if IssueAttachmentMedia.isImage(
             contentType: attachment.contentType,
             filename: attachment.filename
         ) {
@@ -1838,22 +1853,39 @@ struct RunDetailView: View {
                     )
                 }
                 ForEach(message.attachments ?? []) { attachment in
-                    AuthenticatedImagePreview(
-                        sourceID: attachment.url,
-                        filename: attachment.filename,
-                        detail: ByteCountFormatter.string(
-                            fromByteCount: Int64(attachment.byteSize),
-                            countStyle: .file
-                        ),
-                        accessibilityID: "issue-message-image-\(attachment.id.uuidString.lowercased())",
-                        load: {
-                            try await detail.download(
-                                path: attachment.url,
-                                filename: attachment.filename
-                            )
-                        },
-                        open: { previewFile = PreviewFile(url: $0) }
-                    )
+                    if IssueAttachmentMedia.isHTML(
+                        contentType: attachment.contentType,
+                        filename: attachment.filename
+                    ) {
+                        AuthenticatedHTMLArtifactPreview(
+                            filename: attachment.filename,
+                            byteSize: attachment.byteSize,
+                            accessibilityID: "issue-message-html-\(attachment.id.uuidString.lowercased())",
+                            load: {
+                                try await detail.download(
+                                    path: attachment.url,
+                                    filename: attachment.filename
+                                )
+                            }
+                        )
+                    } else {
+                        AuthenticatedImagePreview(
+                            sourceID: attachment.url,
+                            filename: attachment.filename,
+                            detail: ByteCountFormatter.string(
+                                fromByteCount: Int64(attachment.byteSize),
+                                countStyle: .file
+                            ),
+                            accessibilityID: "issue-message-image-\(attachment.id.uuidString.lowercased())",
+                            load: {
+                                try await detail.download(
+                                    path: attachment.url,
+                                    filename: attachment.filename
+                                )
+                            },
+                            open: { previewFile = PreviewFile(url: $0) }
+                        )
+                    }
                 }
                 if let proposal = message.proposedAction {
                     VStack(alignment: .leading, spacing: 8) {
@@ -3235,7 +3267,7 @@ struct MarkdownText: View {
     }
 }
 
-/// Renders issue description markdown and loads `briar-attachment://` images with auth.
+/// Renders issue description markdown and loads referenced attachments with auth.
 struct IssueDescriptionView: View {
     let markdown: String
     let attachments: [IssueAttachment]
@@ -3255,39 +3287,56 @@ struct IssueDescriptionView: View {
                     case let .attachment(reference, alt):
                         if let attachment = attachments.first(where: {
                             $0.id.uuidString.lowercased() == reference.lowercased()
-                        }),
-                        IssueAttachmentMedia.isImage(
-                            contentType: attachment.contentType,
-                            filename: attachment.filename
-                        ) {
-                            AuthenticatedImagePreview(
-                                sourceID: attachment.url,
-                                filename: alt.isEmpty ? attachment.filename : alt,
-                                detail: ByteCountFormatter.string(
-                                    fromByteCount: Int64(attachment.byteSize),
-                                    countStyle: .file
-                                ),
-                                accessibilityID: "issue-inline-image-\(attachment.id.uuidString.lowercased())",
-                                load: { try await download(attachment) },
-                                open: open
-                            )
-                        } else {
-                            Label {
-                                Text(alt.isEmpty ? L10n.text("첨부 이미지") : alt)
-                            } icon: {
-                                Image(systemName: "photo.badge.exclamationmark")
-                            }
-                            .foregroundStyle(.secondary)
-                            .accessibilityLabel(
-                                L10n.format(
-                                    "%@ 이미지를 불러올 수 없음",
-                                    alt.isEmpty ? L10n.text("첨부 이미지") : alt
+                        }) {
+                            if IssueAttachmentMedia.isHTML(
+                                contentType: attachment.contentType,
+                                filename: attachment.filename
+                            ) {
+                                AuthenticatedHTMLArtifactPreview(
+                                    filename: alt.isEmpty ? attachment.filename : alt,
+                                    byteSize: attachment.byteSize,
+                                    accessibilityID: "issue-inline-html-\(attachment.id.uuidString.lowercased())",
+                                    load: { try await download(attachment) }
                                 )
-                            )
+                            } else if IssueAttachmentMedia.isImage(
+                                contentType: attachment.contentType,
+                                filename: attachment.filename
+                            ) {
+                                AuthenticatedImagePreview(
+                                    sourceID: attachment.url,
+                                    filename: alt.isEmpty ? attachment.filename : alt,
+                                    detail: ByteCountFormatter.string(
+                                        fromByteCount: Int64(attachment.byteSize),
+                                        countStyle: .file
+                                    ),
+                                    accessibilityID: "issue-inline-image-\(attachment.id.uuidString.lowercased())",
+                                    load: { try await download(attachment) },
+                                    open: open
+                                )
+                            } else {
+                                unavailableAttachmentLabel(alt: alt)
+                            }
+                        } else {
+                            unavailableAttachmentLabel(alt: alt)
                         }
                     }
                 }
             }
         }
+    }
+
+    private func unavailableAttachmentLabel(alt: String) -> some View {
+        Label {
+            Text(alt.isEmpty ? L10n.text("첨부 이미지") : alt)
+        } icon: {
+            Image(systemName: "photo.badge.exclamationmark")
+        }
+        .foregroundStyle(.secondary)
+        .accessibilityLabel(
+            L10n.format(
+                "%@ 이미지를 불러올 수 없음",
+                alt.isEmpty ? L10n.text("첨부 이미지") : alt
+            )
+        )
     }
 }

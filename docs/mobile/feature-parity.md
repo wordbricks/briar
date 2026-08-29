@@ -15,7 +15,7 @@
 | 이슈 설명 및 결과 상세 | 제공 | 제공 | dashboard snapshot/delta의 Markdown 설명, structured result, 리뷰 필드를 읽기 전용으로 사용 |
 | 실행 진행 상황 | 제공 | 제공 | snapshot/delta 공유 계약, 15초 polling, foreground·오프라인 복귀, cursor 만료 시 snapshot 복구 |
 | 이벤트 및 증빙 | 제공 | 제공 | 인증된 GET 경로만 사용하며 증빙 이미지는 두 앱의 상세 화면에 표시하고 원본 확대용 임시 파일로 다운로드 |
-| 이슈 대화 및 첨부 | 제공 | 제공 | 이미지 첨부와 본문 인라인 이미지는 인증 다운로드로 표시하며, 비이미지 파일은 기존 미리보기를 유지한다. 메시지·답글, Agent reply polling, multipart 업로드를 공유하며 전송 실패 시 본문·멘션·첨부를 복원함 |
+| 이슈 대화 및 첨부 | 제공 | 제공 | 이미지와 HTML 아티팩트는 인증 다운로드로 표시한다. HTML은 자격 증명이 없는 API 셸에 한 번만 전달하고, Android는 sandbox iframe, iOS는 비영구 WKWebView로 앱 세션과 외부 네트워크에서 격리한다. 메시지·답글, Agent reply polling, multipart 업로드를 공유하며 전송 실패 시 본문·멘션·첨부를 복원함 |
 | 메시지 텍스트 범위 선택·복사 | 제공 | 제공 | iOS는 편집 불가 UITextView, Android는 메시지 본문에 `user-select: text`를 사용 |
 | 채널·DM 스레드 진입 | 제공 | 제공 | 채널 답글 요약과 스레드 진입, DM 인라인 답글 동작을 공유 |
 | 이슈 생성·편집·삭제와 draft | 제공 | 제공 | 제목·설명·우선순위·backlog/queued, 5개/파일당 20MB/전체 25MB 제한, 성공 전 draft 보존 |

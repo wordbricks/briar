@@ -5534,8 +5534,9 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .html-artifact-dialog-header h2 { overflow:hidden; color:var(--foreground); font-size:var(--text-base); text-overflow:ellipsis; white-space:nowrap; }
 .html-artifact-dialog-header p { font-size:var(--text-2xs); }
 .html-artifact-dialog-body { min-width:0; min-height:0; display:grid; place-items:stretch; overflow:hidden; background:white; }
-.html-artifact-dialog-body iframe { width:100%; height:100%; border:0; background:white; }
-.html-artifact-state { min-height:100%; display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted-foreground); background:var(--card); font-size:var(--text-sm); }
+.html-artifact-dialog-body iframe { width:100%; height:100%; grid-area:1/1; border:0; background:white; }
+.html-artifact-dialog-body iframe.is-pending { visibility:hidden; }
+.html-artifact-state { min-height:100%; z-index:1; grid-area:1/1; display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted-foreground); background:var(--card); font-size:var(--text-sm); }
 .html-artifact-state.is-error { flex-direction:column; }
 .html-artifact-state.is-error p { margin:0; color:var(--destructive); }
 .html-artifact-state button { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:8px; background:var(--card); padding:7px 10px; color:var(--foreground); }
