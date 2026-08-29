@@ -120,6 +120,19 @@ struct CompanionShellView: View {
                                 )
                             }
                         )
+                    case .agents:
+                        AgentsHomeView(
+                            path: $homePath,
+                            agents: agents,
+                            navigation: navigation,
+                            project: project,
+                            token: token,
+                            api: api,
+                            snapshot: snapshot,
+                            issueConversationView: issueConversationView,
+                            refreshDashboard: refresh,
+                            toolbarContent: { companionToolbar(showsProjectMenu: true) }
+                        )
                     }
                 }
             }
