@@ -1,5 +1,11 @@
 import { CircleAlert, FileCode2, RefreshCw } from "lucide-react";
-import { useCallback, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,8 +18,18 @@ import { useI18n } from "@/i18n";
 import {
   formatAttachmentBytes,
 } from "@/lib/issue-attachments";
-import { sandboxHtmlArtifactDocument } from "@/lib/agent-reply-attachments";
+import { briarApiUrl } from "@/lib/api-config";
+import {
+  htmlArtifactPreviewMaxBytes,
+  htmlArtifactPreviewMessageType,
+  htmlArtifactPreviewPath,
+  htmlArtifactPreviewProtocolVersion,
+  isHtmlArtifactPreviewMessage,
+} from "@/lib/html-artifact-preview-contract";
 import { cn } from "@/lib/utils";
+
+const shellReadyTimeoutMs = 5_000;
+const htmlArtifactPreviewUrl = `${briarApiUrl}${htmlArtifactPreviewPath}`;
 
 function readBlobText(blob: Blob) {
   if (typeof blob.text === "function") return blob.text();
@@ -38,26 +54,123 @@ export function HtmlArtifactPreview({
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const [document, setDocument] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [artifactDocument, setArtifactDocument] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
+    "idle",
+  );
+  const attachmentLoadId = useRef(0);
+  const attachmentLoading = useRef(false);
+  const frame = useRef<HTMLIFrameElement>(null);
+  const shellReady = useRef(false);
+  const payloadSent = useRef(false);
+
+  const startAttempt = useCallback(() => {
+    shellReady.current = false;
+    payloadSent.current = false;
+    setStatus("loading");
+    setAttempt((value) => value + 1);
+  }, []);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setFailed(false);
+    if (attachmentLoading.current) return;
+    attachmentLoading.current = true;
+    const loadId = ++attachmentLoadId.current;
+    setStatus("loading");
     try {
       const blob = await loadAttachment();
-      setDocument(sandboxHtmlArtifactDocument(await readBlobText(blob)));
+      if (blob.size > htmlArtifactPreviewMaxBytes) {
+        throw new Error("HTML artifact payload is too large");
+      }
+      const nextDocument = await readBlobText(blob);
+      if (loadId === attachmentLoadId.current) {
+        setArtifactDocument(nextDocument);
+      }
     } catch {
-      setFailed(true);
+      if (loadId === attachmentLoadId.current) setStatus("error");
     } finally {
-      setLoading(false);
+      if (loadId === attachmentLoadId.current) attachmentLoading.current = false;
     }
   }, [loadAttachment]);
 
+  const sendArtifact = useCallback(() => {
+    if (!open || !shellReady.current || payloadSent.current || !artifactDocument) {
+      return;
+    }
+    const target = frame.current?.contentWindow;
+    if (!target) return;
+    payloadSent.current = true;
+    // sandbox without allow-same-origin has an opaque origin, so source identity
+    // is verified on receipt and "*" is required as the target origin.
+    target.postMessage({
+      type: htmlArtifactPreviewMessageType.render,
+      version: htmlArtifactPreviewProtocolVersion,
+      html: artifactDocument,
+    }, "*");
+  }, [artifactDocument, open]);
+
+  useEffect(() => {
+    sendArtifact();
+  }, [attempt, sendArtifact]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const receiveMessage = (event: MessageEvent<unknown>) => {
+      if (event.source !== frame.current?.contentWindow || event.origin !== "null") {
+        return;
+      }
+      if (
+        isHtmlArtifactPreviewMessage(
+          event.data,
+          htmlArtifactPreviewMessageType.ready,
+        )
+      ) {
+        shellReady.current = true;
+        sendArtifact();
+        return;
+      }
+      if (
+        payloadSent.current &&
+        isHtmlArtifactPreviewMessage(
+          event.data,
+          htmlArtifactPreviewMessageType.rendered,
+        )
+      ) {
+        setStatus("ready");
+        return;
+      }
+      if (
+        payloadSent.current &&
+        isHtmlArtifactPreviewMessage(
+          event.data,
+          htmlArtifactPreviewMessageType.error,
+        )
+      ) {
+        setStatus("error");
+      }
+    };
+    window.addEventListener("message", receiveMessage);
+    return () => window.removeEventListener("message", receiveMessage);
+  }, [attempt, open, sendArtifact]);
+
+  useEffect(() => {
+    if (!open || status !== "loading") return;
+    const timeout = window.setTimeout(() => {
+      if (!shellReady.current) setStatus("error");
+    }, shellReadyTimeoutMs);
+    return () => window.clearTimeout(timeout);
+  }, [attempt, open, status]);
+
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
-    if (nextOpen && !document && !loading) void load();
+    if (!nextOpen) return;
+    startAttempt();
+    if (!artifactDocument) void load();
+  };
+
+  const retry = () => {
+    startAttempt();
+    if (!artifactDocument) void load();
   };
 
   return (
@@ -93,27 +206,37 @@ export function HtmlArtifactPreview({
             </DialogDescription>
           </DialogHeader>
           <div className="html-artifact-dialog-body">
-            {loading ? (
+            {status !== "idle" ? (
+              <iframe
+                className={status === "ready" ? undefined : "is-pending"}
+                key={attempt}
+                onLoad={() => {
+                  frame.current?.contentWindow?.postMessage({
+                    type: htmlArtifactPreviewMessageType.probe,
+                    version: htmlArtifactPreviewProtocolVersion,
+                  }, "*");
+                }}
+                ref={frame}
+                referrerPolicy="no-referrer"
+                sandbox="allow-scripts"
+                src={htmlArtifactPreviewUrl}
+                title={t("htmlArtifact.frameTitle", { name: filename })}
+              />
+            ) : null}
+            {status === "loading" ? (
               <div className="html-artifact-state" role="status">
                 <Spinner aria-hidden="true" size={20} />
                 {t("htmlArtifact.loading")}
               </div>
-            ) : failed ? (
+            ) : status === "error" ? (
               <div className="html-artifact-state is-error" role="alert">
                 <CircleAlert aria-hidden="true" size={20} />
                 <p>{t("htmlArtifact.loadFailed")}</p>
-                <button onClick={() => void load()} type="button">
+                <button onClick={retry} type="button">
                   <RefreshCw aria-hidden="true" size={15} />
                   {t("htmlArtifact.retry")}
                 </button>
               </div>
-            ) : document ? (
-              <iframe
-                referrerPolicy="no-referrer"
-                sandbox="allow-scripts"
-                srcDoc={document}
-                title={t("htmlArtifact.frameTitle", { name: filename })}
-              />
             ) : null}
           </div>
         </DialogContent>

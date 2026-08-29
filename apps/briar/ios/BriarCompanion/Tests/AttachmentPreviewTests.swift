@@ -13,6 +13,45 @@ final class AttachmentPreviewTests: XCTestCase {
         XCTAssertFalse(IssueAttachmentMedia.isImage(contentType: "", filename: "notes.txt"))
     }
 
+    func testDetectsHTMLArtifactsFromContentTypeOrFilename() {
+        XCTAssertTrue(IssueAttachmentMedia.isHTML(
+            contentType: "text/html; charset=utf-8",
+            filename: "lesson.bin"
+        ))
+        XCTAssertTrue(IssueAttachmentMedia.isHTML(
+            contentType: "text/plain",
+            filename: "lesson.HTML"
+        ))
+        XCTAssertFalse(IssueAttachmentMedia.isHTML(
+            contentType: "image/svg+xml",
+            filename: "lesson.svg"
+        ))
+    }
+
+    func testBuildsCredentialFreeExactPreviewShellURL() {
+        XCTAssertEqual(
+            HTMLArtifactPreviewConfiguration.previewURL(
+                apiBaseURL: URL(string: "https://briar-api.wbai.workers.dev")!
+            )?.absoluteString,
+            "https://briar-api.wbai.workers.dev/html-artifact-preview"
+        )
+        XCTAssertNil(HTMLArtifactPreviewConfiguration.previewURL(
+            apiBaseURL: URL(string: "https://token@example.com")!
+        ))
+        XCTAssertNil(HTMLArtifactPreviewConfiguration.previewURL(
+            apiBaseURL: URL(string: "https://example.com?token=secret")!
+        ))
+    }
+
+    func testRejectsOversizedHTMLPayloads() {
+        XCTAssertTrue(HTMLArtifactPreviewConfiguration.allowsPayload(
+            byteCount: 20 * 1_024 * 1_024
+        ))
+        XCTAssertFalse(HTMLArtifactPreviewConfiguration.allowsPayload(
+            byteCount: 20 * 1_024 * 1_024 + 1
+        ))
+    }
+
     func testParsesInlineBriarAttachmentMarkdownBlocks() {
         let markdown = """
         설명 시작
