@@ -1015,7 +1015,7 @@ export function HuntDashboard({
           </>}
         </div>}
       </div>
-      {companionMode && <CompanionBottomNavigation activeDestination={status} onCreate={() => setIsIssueDialogOpen(true)} onDmsOpen={() => onCompanionDmsOpen?.()} onInboxOpen={() => onCompanionInboxOpen?.()} onHomeOpen={() => onCompanionHomeOpen?.()} onStatusChange={setStatus} unreadDmCount={companionUnreadDmCount} unreadInboxCount={companionUnreadInboxCount} />}
+      {companionMode && <CompanionBottomNavigation activeDestination={status} onCreate={() => setIsIssueDialogOpen(true)} onDmsOpen={() => onCompanionDmsOpen?.()} onInboxOpen={() => onCompanionInboxOpen?.()} onHomeOpen={() => onCompanionHomeOpen?.()} onStatusChange={setStatus} unreadDmCount={companionUnreadDmCount} unreadInboxCount={companionUnreadInboxCount} workers={dashboard?.workers ?? []} />}
       {createIssueDialog}
       {editingRun && <EditIssueDialog isSubmitting={updatingIssueId === editingRun.id} onClose={() => setEditingRunId(null)} onLoadAttachment={onLoadAttachment} onUpdate={async input => {
       await onUpdateIssue(editingRun.id, input);

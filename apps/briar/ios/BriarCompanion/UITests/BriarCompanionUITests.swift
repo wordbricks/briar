@@ -81,6 +81,30 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-attention-filter")
     }
 
+    func testTaskFloatingMenuShowsHostStatus() {
+        let app = launchInsideCompanion()
+
+        let menu = app.buttons["task-floating-menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: transitionTimeout))
+        menu.tap()
+
+        let hostItem = app.buttons["host-status-menu-item"]
+        XCTAssertTrue(hostItem.waitForExistence(timeout: 5))
+        hostItem.tap()
+
+        XCTAssertTrue(
+            app.navigationBars["호스트 상태"]
+                .waitForExistence(timeout: transitionTimeout)
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["host-status-worker-worker-1"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(app.staticTexts["Mac Studio"].exists)
+        XCTAssertTrue(app.staticTexts["Release Mac"].exists)
+        captureScreenshot(named: "companion-host-status")
+    }
+
     func testHomeOpensAgentsBelowProjectLobby() {
         let app = launchInsideCompanion()
 
