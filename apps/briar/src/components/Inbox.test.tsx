@@ -215,6 +215,41 @@ describe("Inbox", () => {
     expect(openButton?.hasAttribute("data-keyboard-list-current")).toBe(true);
   });
 
+  it("shows one unread-count badge for a collapsed thread", async () => {
+    const message = issue("conversation:first", "Grouped thread", {
+      kind: "conversation",
+      targetId: "run-1",
+      messageId: "first",
+      rootMessageId: "root-1",
+      body: "Oldest unread reply",
+      authorName: "Member",
+      reason: "thread_reply",
+      threadMessageCount: 3,
+      threadUnreadCount: 3,
+    });
+
+    await renderReactTestRoot(
+      root,
+      <TestProviders>
+        <Inbox
+          isSidebarOpen
+          messages={[message]}
+          onMarkAllRead={vi.fn()}
+          onMarkRead={vi.fn()}
+          onOpen={vi.fn()}
+          projects={projects}
+          unreadCount={1}
+        />
+      </TestProviders>,
+    );
+
+    const badge = container.querySelector(
+      '[aria-label="읽지 않은 메시지 3개"]',
+    );
+    expect(badge?.textContent).toBe("3");
+    expect(container.querySelectorAll(".inbox-message")).toHaveLength(1);
+  });
+
   it("marks one read message as unread without opening its destination", async () => {
     const message = issue("read", "Revisit this update", {
       isUnread: false,
