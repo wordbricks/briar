@@ -169,13 +169,20 @@ describe("managed computer setup routes", () => {
     const firstPayload = await first.json() as {
       setupToken: string;
       duplicate: boolean;
-      session: { status: string };
+      session: { id: string; status: string };
+      socket: { url: string; protocol: string };
+      agentConnected: boolean;
     };
     expect(firstPayload).toMatchObject({
       duplicate: false,
       session: { status: "pending" },
     });
     expect(firstPayload.setupToken).toMatch(/^briar_setup_[A-Za-z0-9_-]{43}$/u);
+    expect(firstPayload.socket).toEqual({
+      url: `wss://briar.example/managed-computers/${managedComputerId}/setup-sessions/${firstPayload.session.id}/connect`,
+      protocol: `briar-setup-v1.${firstPayload.setupToken}`,
+    });
+    expect(firstPayload.agentConnected).toBe(false);
 
     const stored = await db.prepare(
       `select token_hash from briar_managed_computer_setup_sessions
@@ -195,6 +202,41 @@ describe("managed computer setup routes", () => {
     await expect(replay.json()).resolves.toMatchObject({
       duplicate: true,
       setupToken: firstPayload.setupToken,
+    });
+  });
+
+  it("returns authoritative project context only to the enrolled computer", async () => {
+    const contextRequestId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+    const ticket = await worker.fetch(request(
+      setupPath,
+      "POST",
+      ownerToken,
+      { projectId, requestId: contextRequestId },
+      contextRequestId,
+    ), env());
+    const { setupToken } = await ticket.json() as { setupToken: string };
+    const contextPath = `/managed-computers/${managedComputerId}/setup/context`;
+
+    const userRejected = await worker.fetch(request(
+      contextPath,
+      "POST",
+      ownerToken,
+      { setupToken },
+    ), env());
+    expect(userRejected.status).toBe(401);
+
+    const context = await worker.fetch(request(
+      contextPath,
+      "POST",
+      machineToken,
+      { setupToken },
+    ), env());
+    expect(context.status).toBe(200);
+    expect(context.headers.get("cache-control")).toBe("private, no-store");
+    await expect(context.json()).resolves.toMatchObject({
+      session: { projectId },
+      project: { id: projectId, name: "Managed project" },
+      settings: { githubRepository: null },
     });
   });
 
@@ -286,7 +328,7 @@ describe("managed computer setup routes", () => {
          (select count(*) from briar_managed_computer_setup_sessions) sessions,
          (select count(*) from briar_execution_workers where device_id = ?) workers`,
     ).bind(deviceId).first<Record<string, number>>();
-    expect(counts).toEqual({ sessions: 2, workers: 1 });
+    expect(counts).toEqual({ sessions: 3, workers: 1 });
 
     const status = await worker.fetch(request(
       `/organizations/${organizationId}/managed-computers/${managedComputerId}/setup`,

@@ -248,25 +248,15 @@ Identity public key는 AWS의 **해당 리전 RSA 인증서**를 공식 `regions
 
 ### 3.1 소유자 setup/bind
 
-Enrollment이 끝나면 `/var/lib/briar/worker-credential.json`에는 컴퓨터 전용 machine credential만 있고 사용자·저장소·provider 로그인은 없다. 컴퓨터 소유자가 원격 화면에서 대상 저장소를 clone하고 필요한 provider CLI에 로그인한 뒤 다음 명령을 실행한다.
+Enrollment이 끝나면 `/var/lib/briar/worker-credential.json`에는 컴퓨터 전용 machine credential만 있고 사용자·저장소·provider 로그인은 없다. 소유자는 Briar에서 `설정하기`를 누르고 프로젝트와 Codex, Claude, Grok, OpenCode 중 하나를 고른다. 관리형 컴퓨터의 outbound setup agent가 GitHub 인증, provider 인증, 저장소 clone, Worker bind를 순서대로 수행한다.
 
-GitHub 저장소를 사용할 때는 원격 Terminal의 `briar` 사용자 세션에서 다음 브라우저 인증을 먼저 실행한다. `gh`가 전달한 HTTPS URL은 `GH_BROWSER` helper가 Google Chrome 새 창으로 분리 실행하고 즉시 반환하며, Chrome 출력은 터미널이나 디스크에 남기지 않는다. 이 로그인은 AMI 빌드 중 실행하지 않으며 GitHub credential을 이미지에 포함하지 않는다.
+GitHub·Codex·Grok은 화면에 표시된 device URL과 일회용 코드를 사용한다. Claude는 브라우저 로그인이 반환한 authorization code를, OpenCode는 계정에서 만든 API key를 설정창에 입력한다. 입력값은 기존 setup WebSocket relay를 통해 관리형 컴퓨터에만 전달하며 D1, 감사 로그, Durable Object storage에 저장하지 않는다. setup relay는 JSON text frame만 허용하고 64 KiB를 초과하는 frame과 binary frame을 거절한다.
 
-```bash
-gh auth login --hostname github.com --git-protocol https --web
-gh auth status --hostname github.com
-```
+setup agent는 고정된 명령만 pseudo-terminal에서 실행한다. 사용자 입력을 shell 명령이나 인자로 조합하지 않으며 terminal echo를 끈다. 현재 adapter 명령은 `codex login --device-auth`, `claude auth login --claudeai`, `grok login --device-auth`, `opencode auth login --provider opencode --pure`이다. GitHub 연결은 `gh auth login --hostname github.com --git-protocol https --web --insecure-storage` 뒤 `gh auth setup-git`을 실행한다. 운영 검증에서는 `gh auth status --hostname github.com`으로 인증된 계정을 확인한다.
 
-```bash
-briar login
-briar managed-computer setup \
-  --project <briar-project-id> \
-  --repository <absolute-repository-path> \
-  --provider codex
-briar managed-computer status
-```
+사용자 인증으로 만든 10분짜리 setup ticket은 setup WebSocket과 machine context 요청을 승인하고 Worker bind 때 한 번만 소비한다. machine context는 ticket에 연결된 프로젝트와 서버의 authoritative `githubRepository`·workflow만 반환한다. setup agent는 `/home/briar/workspaces/<project-id>`만 만들며 기존 디렉터리가 다른 원격 저장소라면 덮어쓰지 않고 중단한다. 설정이 저장되면 `briar-managed-worker.service`가 프로젝트 Worker를 시작하고, 정상 heartbeat가 관찰된 뒤에만 컴퓨터가 `ready`가 된다.
 
-CLI는 로그인 사용자가 해당 컴퓨터의 신청자인지, credential의 컴퓨터·조직·device ID가 API와 같은지, 경로가 실제 Git 저장소인지, 선택한 provider CLI가 설치·인증·사용 가능한지 확인한다. 사용자 인증으로 10분짜리 setup ticket을 만들고 machine credential로 한 번만 소비한다. D1에는 ticket hash와 연결 결과만 남고 사용자 토큰·machine credential·provider 인증정보는 저장하지 않는다. 설정이 저장되면 `briar-managed-worker.service`가 프로젝트 Worker를 시작하고, 정상 heartbeat가 관찰된 뒤에만 컴퓨터가 `ready`가 된다.
+원격 화면과 기존 `briar managed-computer setup` 명령은 장애 분석용 고급 경로로 유지한다. 정상 사용자 setup에는 Briar 사용자 로그인, SSH, AWS 권한, 인바운드 포트가 필요하지 않다.
 
 ## 4. 스테이징 검증
 
@@ -284,8 +274,8 @@ CLI는 로그인 사용자가 해당 컴퓨터의 신청자인지, credential의
 10. `aws ec2 describe-security-groups --group-ids <SecurityGroupId>`에서 `IpPermissions=[]`, `aws ec2 describe-instances --instance-ids <id>`에서 public IP 없음과 정확한 AMI ID를 독립적으로 확인한다. 원격 화면 서비스 때문에 SSH/VNC/RDP ingress를 추가하지 않는다.
 11. 조직 owner/admin 또는 신청자가 `화면 열기`로 1280×720 이상 화면을 연다. 일반 키, Ctrl/Alt 조합키, 마우스, 화면 맞춤, 전체 화면, 브라우저 새로고침 후 재연결을 포함해 10분 이상 조작한다.
 12. 같은 컴퓨터의 두 번째 제어자, 일반 멤버, 다른 조직, 60초가 지난 토큰과 한 번 사용한 토큰을 각각 거절한다. 네트워크 단절과 Durable Object 재시작에서는 재연결하거나 명시적으로 종료되어야 한다.
-13. 원격 화면에서 테스트 저장소와 테스트 모델 제공자에 로그인하고 같은 `/home/briar`를 사용하는 Worker 건강 검사가 `acceptingWork=true`가 되어 `사용 가능`으로 전환되는지 확인한다. 실제 작은 이슈 하나를 claim·수정·검증·완료해 CLI 설치 확인과 실제 Agent 실행을 구분한다.
-14. setup ticket 원문이 D1·Cloudflare 로그·systemd unit에 없고, 만료된 ticket·다른 컴퓨터의 machine credential·다른 조직 프로젝트가 모두 거절되는지 확인한다.
+13. `설정하기`에서 Codex, Claude, Grok, OpenCode가 처음부터 모두 표시되는지 확인한다. 각 provider를 한 번씩 선택해 외부 브라우저 인증, GitHub clone, Worker bind와 `사용 가능` 전환을 검증한다. 실제 작은 이슈 하나를 claim·수정·검증·완료해 CLI 설치 확인과 실제 Agent 실행을 구분한다.
+14. setup ticket, Claude authorization code, OpenCode API key 원문이 D1·Cloudflare 로그·Durable Object storage·systemd unit에 없고, 만료된 ticket·다른 컴퓨터의 machine credential·다른 조직 프로젝트가 모두 거절되는지 확인한다. setup relay가 binary frame과 64 KiB 초과 text frame을 거절하는지도 확인한다.
 15. D1 감사 테이블과 Cloudflare 로그에는 세션 ID, 상태, 사유 코드, 방향별 바이트 수만 남고 화면 바이트, 키 입력, 비밀번호, protocol token, Worker credential이 없음을 표본 검사한다.
 16. 스테이징에서 10분 세션의 평균/최대 대역폭, 왕복 지연, Durable Object 요청·기간·메모리와 예상 월 비용을 릴리스 기록에 남긴다. 승인 기준을 넘으면 공개 플래그를 켜지 않고 WebRTC 또는 승인된 전송 계층 검토로 넘긴다.
 17. 실패 후 재시도는 새 provisioning job의 EC2 `ClientToken`으로 새 인스턴스를 만들고, 이전 인스턴스는 `briar-managed` 및 컴퓨터 ID 태그를 확인한 뒤 종료하는지 확인한다. 같은 Workflow 안의 AWS 재시도에서는 동일 `ClientToken`이 중복 생성을 막는지 확인한다.

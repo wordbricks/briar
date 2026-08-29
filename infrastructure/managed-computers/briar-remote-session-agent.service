@@ -1,5 +1,5 @@
 [Unit]
-Description=Briar managed computer outbound remote session agent
+Description=Briar managed computer outbound remote and guided setup agent
 After=network-online.target briar-managed-enroll.service briar-remote-desktop.service
 Wants=network-online.target briar-remote-desktop.service
 Requires=briar-managed-enroll.service briar-remote-desktop.service
@@ -20,3 +20,4 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
 ReadOnlyPaths=/var/lib/briar
+ReadWritePaths=/home/briar

@@ -300,7 +300,11 @@ export function OrganizationWorkersSettings({
         <SettingsAlert className="mb-4 mt-0">{error}</SettingsAlert>
       ) : null}
 
-      <ManagedComputersCard organizationId={organization.id} token={token} />
+      <ManagedComputersCard
+        organizationId={organization.id}
+        projects={organizationProjects}
+        token={token}
+      />
 
       <section className="mb-8 w-full max-w-[820px] overflow-hidden rounded-xl border border-border bg-card shadow-xs">
         <header className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
