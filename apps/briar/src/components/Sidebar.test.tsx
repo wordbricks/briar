@@ -495,9 +495,9 @@ describe("Sidebar", () => {
     await cleanup();
   });
 
-  it("opens project issues when the project name is clicked", async () => {
+  it("opens project lobby when the project name is clicked", async () => {
     const onProjectChange = vi.fn();
-    const onIssuesOpen = vi.fn();
+    const onLobbyOpen = vi.fn();
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
@@ -507,7 +507,7 @@ describe("Sidebar", () => {
         {...sidebarProps}
         activePage="issues"
         activeProjectId="project-1"
-        onIssuesOpen={onIssuesOpen}
+        onLobbyOpen={onLobbyOpen}
         onProjectChange={onProjectChange}
         projects={[
           ...sidebarProps.projects,
@@ -535,11 +535,11 @@ describe("Sidebar", () => {
 
     await act(async () => briarHeading?.click());
     expect(onProjectChange).not.toHaveBeenCalled();
-    expect(onIssuesOpen).toHaveBeenCalledOnce();
+    expect(onLobbyOpen).toHaveBeenCalledOnce();
 
     await act(async () => consoleHeading?.click());
     expect(onProjectChange).toHaveBeenCalledWith("project-2");
-    expect(onIssuesOpen).toHaveBeenCalledTimes(2);
+    expect(onLobbyOpen).toHaveBeenCalledTimes(2);
 
     await cleanup();
   });

@@ -7,6 +7,7 @@ import {
   managedComputerRemoteHeartbeatResponse,
   managedComputerRemoteHeartbeatTimeoutMs,
 } from "../src/lib/managed-computer-remote-protocol";
+import { ManagedComputerSetupAgent } from "./managed-computer-setup-agent";
 
 const RemoteAgentConfig = Schema.Struct({
   credential: Schema.String.check(
@@ -324,10 +325,16 @@ async function main() {
   const config = parseManagedComputerRemoteAgentConfig(
     JSON.parse(await readFile(credentialPath, "utf8")) as unknown,
   );
-  const agent = new ManagedComputerRemoteSessionAgent(config);
-  process.on("SIGTERM", () => agent.stop());
-  process.on("SIGINT", () => agent.stop());
-  agent.start();
+  const remoteAgent = new ManagedComputerRemoteSessionAgent(config);
+  const setupAgent = new ManagedComputerSetupAgent(config);
+  const stop = () => {
+    remoteAgent.stop();
+    setupAgent.stop();
+  };
+  process.on("SIGTERM", stop);
+  process.on("SIGINT", stop);
+  remoteAgent.start();
+  setupAgent.start();
 }
 
 if (import.meta.main) {

@@ -28,6 +28,12 @@ export const ManagedComputerSetupBind = strictSchema(Schema.Struct({
   worker: WorkerRuntimeMetadata,
 }));
 
+export const ManagedComputerSetupAccess = strictSchema(Schema.Struct({
+  setupToken: Schema.String.check(
+    Schema.isPattern(/^briar_setup_[A-Za-z0-9_-]{43}$/u),
+  ),
+}));
+
 export const ManagedComputerRemoteSessionRequest = strictSchema(Schema.Struct({
   requestId: UuidString,
   reconnectSessionId: Schema.optional(UuidString),
@@ -85,6 +91,9 @@ export const decodeManagedComputerSetupSession = decodeRequestSync(
 );
 export const decodeManagedComputerSetupBind = decodeRequestSync(
   ManagedComputerSetupBind,
+);
+export const decodeManagedComputerSetupAccess = decodeRequestSync(
+  ManagedComputerSetupAccess,
 );
 export const decodeManagedComputerRemoteSessionRequest = decodeRequestSync(
   ManagedComputerRemoteSessionRequest,

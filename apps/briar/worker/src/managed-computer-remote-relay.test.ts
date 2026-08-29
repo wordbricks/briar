@@ -6,7 +6,7 @@ import {
 import { ManagedComputerRemoteSessionHub } from "./managed-computer-remote-relay";
 
 type Attachment = {
-  role: "agent" | "controller";
+  role: "agent" | "controller" | "setup-agent" | "setup-controller";
   sessionId: string | null;
   connectionGeneration: number;
   maxExpiresAt: string | null;
@@ -153,6 +153,59 @@ describe("ManagedComputerRemoteSessionHub", () => {
     expect(controller.close).toHaveBeenCalledWith(
       1011,
       "Remote display unavailable",
+    );
+  });
+
+  it("forwards only bounded text messages for guided setup", async () => {
+    const sessionId = "11111111-1111-4111-8111-111111111111";
+    const controller = new FakeSocket({
+      role: "setup-controller",
+      sessionId,
+      connectionGeneration: 0,
+      maxExpiresAt: "2099-01-01T00:00:00.000Z",
+      controllerBytes: 0,
+      screenBytes: 0,
+    });
+    const agent = new FakeSocket({
+      role: "setup-agent",
+      sessionId: null,
+      connectionGeneration: 0,
+      maxExpiresAt: null,
+      controllerBytes: 0,
+      screenBytes: 0,
+    });
+    const hub = new ManagedComputerRemoteSessionHub(
+      {
+        getWebSockets: (tag?: string) =>
+          tag === "setup-agent"
+            ? [agent]
+            : tag === "setup-controller"
+              ? [controller]
+              : [agent, controller],
+        setWebSocketAutoResponse: vi.fn(),
+      } as unknown as DurableObjectState,
+      {} as Env,
+    );
+    const start = JSON.stringify({ type: "start" });
+    const progress = JSON.stringify({ type: "state" });
+    await hub.webSocketMessage(controller as unknown as WebSocket, start);
+    await hub.webSocketMessage(agent as unknown as WebSocket, progress);
+    expect(agent.sent).toEqual([start]);
+    expect(controller.sent).toEqual([progress]);
+
+    await hub.webSocketMessage(
+      controller as unknown as WebSocket,
+      new ArrayBuffer(1),
+    );
+    expect(controller.close).toHaveBeenCalledWith(
+      1008,
+      "Managed setup messages must be text",
+    );
+
+    await hub.webSocketMessage(controller as unknown as WebSocket, "not-json");
+    expect(controller.close).toHaveBeenCalledWith(
+      1008,
+      "Managed setup message must be JSON",
     );
   });
 

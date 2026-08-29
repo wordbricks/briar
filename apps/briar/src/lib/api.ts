@@ -88,6 +88,7 @@ import type {
   ManagedComputer,
   ManagedComputerProduct,
   ManagedComputerRemoteSessionTicket,
+  ManagedComputerSetupSessionTicket,
   MergeQueueProfile,
   MergeQueueStatus,
   ProjectExecutionWorkerPolicy,
@@ -578,6 +579,23 @@ export async function createManagedComputerRemoteSession(
 ) {
   return request<ManagedComputerRemoteSessionTicket>(
     `/organizations/${organizationId}/managed-computers/${managedComputerId}/remote-sessions`,
+    token,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": input.requestId },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function createManagedComputerSetupSession(
+  token: string,
+  organizationId: string,
+  managedComputerId: string,
+  input: { projectId: string; requestId: string },
+) {
+  return request<ManagedComputerSetupSessionTicket>(
+    `/organizations/${organizationId}/managed-computers/${managedComputerId}/setup-sessions`,
     token,
     {
       method: "POST",
