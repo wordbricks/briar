@@ -96,7 +96,7 @@ export function IssueMessageItem({
   const proposal = message.proposedAction;
   const proposalTitle = proposal?.type === "request_issue_update" ? t("run.issueUpdateProposalTitle") : proposal?.type === "request_issue_create" ? t("run.issueCreateProposalTitle") : t("run.reworkProposalTitle");
   const proposalAcceptLabel = proposal?.type === "request_issue_update" ? t("run.issueUpdateProposalAccept") : proposal?.type === "request_issue_create" ? t("run.issueCreateProposalAccept") : t("run.reworkProposalAccept");
-  return <article aria-current={highlighted ? "true" : undefined} className={`issue-message${highlighted ? " is-inbox-target" : ""}${message.optimistic ? " is-optimistic" : ""}`} data-issue-message-id={message.id} data-inbox-highlighted={highlighted ? "true" : undefined} tabIndex={highlighted ? -1 : undefined}>
+  return <article aria-current={highlighted ? "true" : undefined} className={`issue-message${highlighted ? " is-inbox-target" : ""}${message.optimistic ? " is-optimistic" : ""}`} data-issue-message-id={message.id} data-inbox-highlighted={highlighted ? "true" : undefined} tabIndex={-1}>
       <MessageAvatar message={message} />
       <div>
         <header>
