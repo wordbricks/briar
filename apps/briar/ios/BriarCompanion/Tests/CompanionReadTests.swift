@@ -50,6 +50,25 @@ final class CompanionReadTests: XCTestCase {
         XCTAssertEqual(completed.map(\.title), ["Finished contract"])
     }
 
+    func testProjectLobbySummaryCountsStatusBucketsAndLimitsRecentRuns() {
+        let extraRuns = (0..<4).map { index in
+            DashboardRun(
+                id: UUID(),
+                title: "Backlog \(index)",
+                status: .backlog,
+                updatedAt: newer.addingTimeInterval(TimeInterval(index + 1))
+            )
+        }
+        let summary = ProjectLobbySummary(runs: runs + extraRuns)
+
+        XCTAssertEqual(summary.total, 7)
+        XCTAssertEqual(summary.active, 1)
+        XCTAssertEqual(summary.attention, 1)
+        XCTAssertEqual(summary.completed, 1)
+        XCTAssertEqual(summary.recent.count, 5)
+        XCTAssertEqual(summary.recent.first?.title, "Backlog 3")
+    }
+
     func testSearchCoversTitleDescriptionDetailAndResult() {
         XCTAssertEqual(TaskSearch.results(in: runs, query: "native").count, 1)
         XCTAssertEqual(TaskSearch.results(in: runs, query: "Markdown").count, 1)

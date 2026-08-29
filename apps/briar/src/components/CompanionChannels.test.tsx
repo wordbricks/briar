@@ -68,6 +68,32 @@ describe("CompanionChannels", () => {
     vi.restoreAllMocks();
   });
 
+  it("puts the project lobby entry before the channel groups", async () => {
+    const { cleanup, container, root } = createReactTestRoot();
+    const onLobbyOpen = vi.fn();
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <CompanionChannels
+          activeProjectId={null}
+          currentUserId="user-1"
+          onLobbyOpen={onLobbyOpen}
+          organizationId="org-1"
+          projects={[]}
+          token="token"
+        />
+      </I18nProvider>,
+    );
+
+    const firstButton = container.querySelector<HTMLButtonElement>(
+      ".companion-channels > button",
+    );
+    expect(firstButton?.textContent).toContain("View project home");
+    await act(async () => firstButton?.click());
+    expect(onLobbyOpen).toHaveBeenCalledOnce();
+    await cleanup();
+  });
+
   it("preserves the mobile channel stack and accessible back navigation", async () => {
     const { cleanup, container, root } = createReactTestRoot();
     await renderReactTestRoot(

@@ -1337,7 +1337,7 @@ export function App({
   >(null);
   const [dispatchRun, setDispatchRun] = useState<HuntRun | null>(null);
   const [companionPage, setCompanionPage] = useState<
-    "issues" | "dms" | "home" | "inbox" | "settings"
+    "issues" | "dms" | "home" | "inbox" | "lobby" | "settings"
   >("issues");
   const [companionStatus, setCompanionStatus] =
     useState<CompanionStatusFilter>("all");
@@ -1645,7 +1645,7 @@ export function App({
         return true;
       }
       if (!briar.companionMode || companionPage === "issues") return false;
-      setCompanionPage("issues");
+      setCompanionPage(companionPage === "lobby" ? "home" : "issues");
       setRequestedRunId(null);
       setRequestedSessionId(null);
       return true;
@@ -4416,7 +4416,9 @@ export function App({
             onAccountSave={briar.updateAccountProfile}
             user={briar.user}
           />
-        ) : companionPage === "home" && briar.activeOrganizationId && briar.token ? (
+        ) : companionPage === "home" &&
+          briar.activeOrganizationId &&
+          (briar.token || briar.demoMode) ? (
           <>
             <CompanionChannels
               activeProjectId={activeProject?.id ?? null}
@@ -4426,7 +4428,7 @@ export function App({
               projects={activeOrganizationProjects}
               onSkillSessionAccepted={autoHunt.adoptRemoteSession}
               onViewingChannelChange={handleViewingChannelChange}
-              token={briar.token}
+              token={briar.token ?? ""}
               channelCache={companionChannelCache.current}
               requestedMessage={requestedChannelMessage}
               requestedChannelId={requestedChannelId}
@@ -4439,12 +4441,52 @@ export function App({
                 setCompanionStatus("all");
                 setCompanionPage("issues");
               }}
+              onLobbyOpen={() => setCompanionPage("lobby")}
             />
             <CompanionBottomNavigation
               activeDestination="home"
               onDmsOpen={() => setCompanionPage("dms")}
               onInboxOpen={() => setCompanionPage("inbox")}
               onHomeOpen={() => {}}
+              onStatusChange={(status) => {
+                setCompanionStatus(status);
+                setCompanionPage("issues");
+              }}
+              unreadDmCount={unreadDirectMessageCount}
+              unreadInboxCount={inbox.unreadCount}
+            />
+          </>
+        ) : companionPage === "lobby" && activeProject ? (
+          <>
+            <ProjectLobby
+              companionMode
+              connectionState={briar.activeProjectConnectionState}
+              dashboard={briar.dashboard}
+              isSidebarOpen={false}
+              onBack={() => setCompanionPage("home")}
+              onLoadUsageSummary={loadProjectHomeUsage}
+              onOpenAgents={() => setCompanionPage("issues")}
+              onOpenIssue={(runId) => {
+                setRequestedRunId(runId);
+                setCompanionStatus("all");
+                setCompanionPage("issues");
+              }}
+              onOpenIssues={() => {
+                setRequestedRunId(null);
+                setCompanionStatus("all");
+                setCompanionPage("issues");
+              }}
+              onOpenRepository={() => undefined}
+              onOpenSettings={() => setCompanionPage("settings")}
+              project={activeProject}
+              readiness={briar.projectReadiness[activeProject.id] ?? null}
+              requiresLocalReadiness={!briar.remoteMode}
+            />
+            <CompanionBottomNavigation
+              activeDestination="home"
+              onDmsOpen={() => setCompanionPage("dms")}
+              onInboxOpen={() => setCompanionPage("inbox")}
+              onHomeOpen={() => setCompanionPage("home")}
               onStatusChange={(status) => {
                 setCompanionStatus(status);
                 setCompanionPage("issues");
