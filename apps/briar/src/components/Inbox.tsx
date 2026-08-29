@@ -112,6 +112,7 @@ export function Inbox({
           : defaultInboxFilters,
       ),
   );
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState("all");
   const [visibleCount, setVisibleCount] = useState(INBOX_PAGE_SIZE);
   const [cursorMessageId, setCursorMessageId] = useState<string | null>(
@@ -161,14 +162,21 @@ export function Inbox({
   );
   const filteredMessages = useMemo(
     () =>
-      projectMessages.filter((message) =>
-        activeFilters.has(classifyInboxMessage(message)),
+      projectMessages.filter(
+        (message) =>
+          activeFilters.has(classifyInboxMessage(message)) &&
+          (!showUnreadOnly || message.isUnread),
       ),
-    [activeFilters, projectMessages],
+    [activeFilters, projectMessages, showUnreadOnly],
   );
   const filterKey = useMemo(
-    () => `${effectiveProjectId}:${[...activeFilters].sort().join(",")}`,
-    [activeFilters, effectiveProjectId],
+    () =>
+      `${effectiveProjectId}:${showUnreadOnly ? "unread" : "all"}:${[
+        ...activeFilters,
+      ]
+        .sort()
+        .join(",")}`,
+    [activeFilters, effectiveProjectId, showUnreadOnly],
   );
   const visibleMessages = useMemo(
     () => pageInboxMessages(filteredMessages, visibleCount),
@@ -332,6 +340,21 @@ export function Inbox({
                   className="inbox-filters flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   role="group"
                 >
+                  <button
+                    aria-label={t("inbox.unreadOnly")}
+                    aria-pressed={showUnreadOnly}
+                    className={cn(
+                      "inbox-filter unread-only relative inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] border p-0 transition-[transform,border-color,background-color,color] duration-150 ease-out motion-reduce:transition-none active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+                      showUnreadOnly
+                        ? "border-border bg-secondary text-foreground hover:border-border hover:bg-secondary hover:text-foreground"
+                        : "border-input bg-muted text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground",
+                    )}
+                    onClick={() => setShowUnreadOnly((current) => !current)}
+                    title={t("inbox.unreadOnly")}
+                    type="button"
+                  >
+                    <Mail aria-hidden="true" size={14} />
+                  </button>
                   {inboxFilters.map((category) => {
                     const label = t(
                       `inbox.category.${category}` as MessageKey,
@@ -639,13 +662,25 @@ function InboxMessageRow({
           ) : null}
         </span>
         <span className="inbox-message-copy col-start-2 row-span-2 grid min-w-0 grid-rows-[1fr_1fr] items-center gap-0">
-          <Typography
-            as="strong"
-            className="min-w-0 truncate text-xs font-semibold leading-[1.25]"
-            variant="bodySm"
-          >
-            {messageTitle(t, message)}
-          </Typography>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <Typography
+              as="strong"
+              className="min-w-0 truncate text-xs font-semibold leading-[1.25]"
+              variant="bodySm"
+            >
+              {messageTitle(t, message)}
+            </Typography>
+            {(message.threadUnreadCount ?? 0) > 1 ? (
+              <span
+                aria-label={t("inbox.unreadCount", {
+                  count: message.threadUnreadCount ?? 0,
+                })}
+                className="inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-primary/10 px-1 font-mono text-[10px] font-semibold leading-none text-primary"
+              >
+                {message.threadUnreadCount}
+              </span>
+            ) : null}
+          </span>
           <small className={cn(
             "inbox-message-detail flex min-w-0 items-center gap-[5px] overflow-hidden text-2xs leading-[1.3] whitespace-nowrap text-muted-foreground",
             compact && "gap-[3px] text-xs",

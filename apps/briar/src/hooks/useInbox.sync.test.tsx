@@ -232,4 +232,83 @@ describe("Inbox read-state synchronization", () => {
     await flushPromises();
     expect(sync.saveReadStates).toHaveBeenCalledTimes(2);
   });
+
+  it("collapses one thread, opens its oldest unread reply, and reads every reply", async () => {
+    sync.startPolling.mockImplementationOnce((refresh) => {
+      refresh("poll");
+      return () => undefined;
+    });
+    const dashboard = {
+      ...dashboardAt(1),
+      conversationNotifications: [
+        {
+          id: "thread-reply-1",
+          runId: "inbox-sync-run",
+          runTitle: "Grouped thread",
+          rootMessageId: "thread-root",
+          body: "Oldest unread reply",
+          author: {
+            id: "member-1",
+            name: "First member",
+            image: null,
+            provider: null,
+          },
+          reason: "thread_reply" as const,
+          createdAt: "2026-08-11T00:01:00.000Z",
+        },
+        {
+          id: "thread-reply-2",
+          runId: "inbox-sync-run",
+          runTitle: "Grouped thread",
+          rootMessageId: "thread-root",
+          body: "Newest unread reply",
+          author: {
+            id: "member-2",
+            name: "Second member",
+            image: null,
+            provider: null,
+          },
+          reason: "thread_reply" as const,
+          createdAt: "2026-08-11T00:02:00.000Z",
+        },
+      ],
+    };
+
+    await renderHarness({
+      dashboard,
+      token: "token-a",
+      userId: "user-a",
+    });
+    await vi.waitFor(() => expect(inbox.initialSyncComplete).toBe(true));
+    const thread = inbox.messages.find(
+      (message) => message.kind === "conversation",
+    );
+
+    expect(thread).toMatchObject({
+      id: "conversation:thread-reply-1",
+      messageId: "thread-reply-1",
+      version: "thread-reply-2",
+      body: "Oldest unread reply",
+      isUnread: true,
+      threadMessageCount: 2,
+      threadUnreadCount: 2,
+    });
+
+    await act(async () => inbox.markRead(thread!.id));
+
+    expect(sync.saveReadStates).toHaveBeenCalledWith("token-a", {
+      "conversation:thread-reply-1": "thread-reply-1",
+      "conversation:thread-reply-2": "thread-reply-2",
+    });
+    expect(
+      inbox.messages.filter((message) => message.kind === "conversation"),
+    ).toEqual([
+      expect.objectContaining({
+        id: "conversation:thread-reply-2",
+        messageId: "thread-reply-2",
+        isUnread: false,
+        threadUnreadCount: 0,
+      }),
+    ]);
+  });
 });
