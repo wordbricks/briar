@@ -659,6 +659,7 @@ describe("detached Agent runner", () => {
   it("uses frontmatter descriptions for Skill discovery and loads bodies on demand", () => {
     const skillCatalog = {
       rootPath: "/private/briar-agent-skills-42",
+      lifetime: "provider-turn" as const,
       entries: [
         {
           skillId: "skill-issue",

@@ -68,6 +68,7 @@ describe("detached Agent Skill discovery", () => {
         "skill-ios",
         "skill-notes",
       ]);
+      expect(catalog?.lifetime).toBe("provider-turn");
       expect(catalog?.entries[0]?.description).toContain("TestFlight");
       await expect(readFile(join(catalog!.rootPath, ".gitignore"), "utf8"))
         .resolves.toBe("*\n");
@@ -80,6 +81,38 @@ describe("detached Agent Skill discovery", () => {
       const rootPath = catalog!.rootPath;
       await cleanupDetachedAgentSkillCatalog(catalog);
       await expect(stat(rootPath)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await rm(temporaryParentPath, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps one stable catalog path for a retained conversation and refreshes it", async () => {
+    const temporaryParentPath = await mkdtemp(
+      join(tmpdir(), "briar-retained-skill-catalog-test-"),
+    );
+    try {
+      const first = await materializeDetachedAgentSkillCatalog(agent, {
+        temporaryParentPath,
+        lifetime: "retained-conversation",
+      });
+      expect(first?.rootPath).toBe(join(temporaryParentPath, ".briar-agent-skills"));
+      expect(first?.lifetime).toBe("retained-conversation");
+      await expect(stat(first!.entries[0]!.path)).resolves.toBeDefined();
+
+      const refreshed = await materializeDetachedAgentSkillCatalog({
+        ...agent,
+        skills: [{ ...agent.skills[0]!, body: "Updated release instructions." }],
+      }, {
+        temporaryParentPath,
+        lifetime: "retained-conversation",
+      });
+      expect(refreshed?.rootPath).toBe(first?.rootPath);
+      await expect(readFile(refreshed!.entries[0]!.path, "utf8"))
+        .resolves.toContain("Updated release instructions.");
+      await expect(stat(first!.rootPath)).resolves.toBeDefined();
+
+      await cleanupDetachedAgentSkillCatalog(refreshed);
+      await expect(stat(first!.rootPath)).rejects.toMatchObject({ code: "ENOENT" });
     } finally {
       await rm(temporaryParentPath, { recursive: true, force: true });
     }
