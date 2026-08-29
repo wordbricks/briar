@@ -95,6 +95,33 @@ struct CompanionShellView: View {
                 .navigationTitle(L10n.text(.channelHome, locale: companionLocale))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { companionToolbar(showsProjectMenu: true) }
+                .navigationDestination(for: CompanionHomeRoute.self) { route in
+                    switch route {
+                    case .projectLobby:
+                        ProjectLobbyView(
+                            project: project,
+                            snapshot: snapshot,
+                            errorMessage: errorMessage,
+                            refresh: refresh,
+                            onTasksOpen: { navigation.selectedTab = .tasks },
+                            onIssueOpen: { projectID, runID, sourceIsCurrent in
+                                await navigation.openIssueWhenAvailable(
+                                    projectID: projectID,
+                                    runID: runID,
+                                    ensureAvailable: {
+                                        targetProjectID,
+                                        targetRunID in
+                                        await ensureIssueAvailable(
+                                            targetProjectID,
+                                            targetRunID
+                                        )
+                                    },
+                                    sourceIsCurrent: sourceIsCurrent
+                                )
+                            }
+                        )
+                    }
+                }
             }
             .tabItem { Label(L10n.text(.channelHome, locale: companionLocale), systemImage: "house") }
             .tag(CompanionNavigationModel.Tab.home)
@@ -239,6 +266,7 @@ struct CompanionShellView: View {
             Task { await openPendingChannel() }
         }
         .onChange(of: project.id) { _, _ in
+            homePath = NavigationPath()
             taskPath = NavigationPath()
             directMessagesPath = NavigationPath()
         }

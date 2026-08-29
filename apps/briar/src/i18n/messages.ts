@@ -1235,6 +1235,8 @@ export const ko = {
   "companion.navTasks": "작업",
   "companion.navAgents": "에이전트",
   "companion.navHome": "홈",
+  "companion.viewLobby": "프로젝트 홈 보기",
+  "companion.viewLobbyDescription": "주요 지표와 최근 작업을 확인하세요.",
   "companion.channelsCommon": "공통 채널",
   "companion.channelsOtherProject": "다른 프로젝트",
   "companion.channelsEmpty": "채널이 없습니다.",
@@ -2408,6 +2410,8 @@ export type Messages = Record<MessageKey, string>;
 
 export const en = {
   ...ko,
+  "companion.viewLobby": "View project home",
+  "companion.viewLobbyDescription": "Check key metrics and recent work.",
   "inbox.markUnread": "Mark as unread",
   "inbox.unreadOnly": "Show unread messages only",
   "commandPalette.title": "Command palette",
@@ -3860,6 +3864,8 @@ export const en = {
 } satisfies Messages;
 export const zh = {
   ...en,
+  "companion.viewLobby": "查看项目主页",
+  "companion.viewLobbyDescription": "查看关键指标和最近工作。",
   "inbox.markUnread": "标为未读",
   "inbox.unreadOnly": "仅显示未读消息",
   "commandPalette.title": "命令面板",

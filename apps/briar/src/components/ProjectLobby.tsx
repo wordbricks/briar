@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CheckCircle2,
   CircleAlert,
+  ChevronLeft,
   Clock3,
   Github,
   Home,
@@ -124,6 +125,7 @@ function statusLabel(run: HuntRun, t: ReturnType<typeof useI18n>["t"]) {
 }
 
 export function ProjectLobby({
+  companionMode = false,
   connectionState,
   dashboard,
   isSidebarOpen,
@@ -133,10 +135,12 @@ export function ProjectLobby({
   onOpenIssues,
   onOpenRepository,
   onOpenSettings,
+  onBack,
   project,
   readiness,
   requiresLocalReadiness,
 }: {
+  companionMode?: boolean;
   connectionState: LocalProjectConnectionState;
   dashboard: DashboardPayload | null;
   isSidebarOpen: boolean;
@@ -150,6 +154,7 @@ export function ProjectLobby({
   onOpenIssues: () => void;
   onOpenRepository: () => void;
   onOpenSettings: () => void;
+  onBack?: () => void;
   project: Project;
   readiness: RepositoryReadiness | null;
   requiresLocalReadiness: boolean;
@@ -347,6 +352,150 @@ export function ProjectLobby({
       </ol>
     );
   };
+
+  if (companionMode) {
+    return (
+      <MainContent
+        className="flex min-h-0 flex-col overflow-hidden"
+        companionMode
+        id="project-lobby"
+      >
+        <div className="scrollbar-subtle min-h-0 flex-1 overflow-auto bg-background px-4 pt-3 pb-[120px]">
+          <section className="mx-auto grid w-full max-w-xl gap-4">
+            <header className="flex items-center gap-2 py-1">
+              {onBack ? (
+                <button
+                  aria-label={t("navigation.back")}
+                  className="grid size-10 shrink-0 place-items-center rounded-full border-0 bg-transparent text-foreground active:bg-muted"
+                  onClick={onBack}
+                  type="button"
+                >
+                  <ChevronLeft aria-hidden size={21} />
+                </button>
+              ) : null}
+              <ProjectIcon className="size-8 shrink-0" project={project} />
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-xs text-muted-foreground">
+                  {project.name}
+                </span>
+                <h1 className="m-0 truncate text-lg font-semibold tracking-tight">
+                  {t("lobby.title")}
+                </h1>
+              </div>
+              <button
+                aria-label={t("lobby.refresh")}
+                className="grid size-10 shrink-0 place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-xs disabled:opacity-60"
+                disabled={usageLoading}
+                onClick={() => void refreshUsage(true)}
+                type="button"
+              >
+                <Spinner aria-hidden icon={RefreshCw} size={17} spinning={usageLoading} />
+              </button>
+            </header>
+
+            <p className="m-0 text-sm leading-relaxed text-muted-foreground">
+              {t("companion.viewLobbyDescription")}
+            </p>
+
+            <section
+              aria-label={t("lobby.metrics")}
+              className="grid grid-cols-2 gap-2.5"
+            >
+              {[
+                {
+                  icon: Sparkles,
+                  label: t("lobby.tokens"),
+                  value: formatCompact(totalTokens, localeTag),
+                },
+                {
+                  icon: CheckCircle2,
+                  label: t("lobby.completed"),
+                  value: formatCompact(completedIssues, localeTag),
+                },
+                {
+                  icon: Clock3,
+                  label: t("lobby.active"),
+                  value: formatCompact(activeRuns.length, localeTag),
+                },
+                {
+                  icon: CircleAlert,
+                  label: t("dashboard.attention"),
+                  value: formatCompact(attentionRuns.length, localeTag),
+                },
+              ].map(({ icon: Icon, label, value }) => (
+                <article
+                  className="grid min-h-[112px] content-center gap-2 rounded-2xl border border-border bg-card p-4 shadow-xs"
+                  key={label}
+                >
+                  <span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                    <Icon aria-hidden className="text-primary" size={16} />
+                    {label}
+                  </span>
+                  <strong className="font-mono text-2xl font-semibold tracking-tight text-foreground">
+                    {value}
+                  </strong>
+                </article>
+              ))}
+            </section>
+
+            {usageError ? (
+              <p className="m-0 rounded-xl border border-[var(--status-destructive-border)] bg-[var(--status-destructive-surface)] p-3 text-xs text-[var(--status-destructive-foreground)]" role="status">
+                {t("lobby.usageUnavailable")}
+              </p>
+            ) : null}
+
+            <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+              <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3.5">
+                <div className="min-w-0">
+                  <h2 className="m-0 text-sm font-semibold">
+                    {t("lobby.recentActivity")}
+                  </h2>
+                  <p className="mt-0.5 mb-0 truncate text-xs text-muted-foreground">
+                    {t("lobby.recentActivityDescription")}
+                  </p>
+                </div>
+                <button
+                  className="shrink-0 rounded-lg border-0 bg-muted px-2.5 py-1.5 text-xs font-semibold text-foreground"
+                  onClick={onOpenIssues}
+                  type="button"
+                >
+                  {t("lobby.viewAll")}
+                </button>
+              </header>
+              {recentRuns.length > 0 ? (
+                <div className="grid">
+                  {recentRuns.map((run) => (
+                    <button
+                      className="grid min-h-[64px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 border-t border-border bg-transparent px-4 py-2.5 text-left first:border-t-0 active:bg-muted"
+                      key={run.id}
+                      onClick={() => onOpenIssue(run.id)}
+                      type="button"
+                    >
+                      <span className="grid min-w-0 gap-1">
+                        <strong className="truncate text-sm font-semibold text-foreground">
+                          {run.title}
+                        </strong>
+                        <small className="text-xs text-muted-foreground">
+                          {project.issueKeyPrefix
+                            ? `${project.issueKeyPrefix}-${run.runNumber}`
+                            : `#${run.runNumber}`} · {statusLabel(run, t)}
+                        </small>
+                      </span>
+                      <ArrowRight aria-hidden className="text-muted-foreground" size={16} />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="m-0 px-4 py-8 text-center text-sm text-muted-foreground">
+                  {t("lobby.noActivity")}
+                </p>
+              )}
+            </section>
+          </section>
+        </div>
+      </MainContent>
+    );
+  }
 
   return (
     <MainContent id="project-lobby">

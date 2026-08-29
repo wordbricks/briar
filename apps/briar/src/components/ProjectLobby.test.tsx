@@ -32,6 +32,52 @@ const emptyUsageSummary: ProjectUsageSummary = {
 };
 
 describe("ProjectLobby", () => {
+  it("renders a compact companion overview with back and recent-work actions", async () => {
+    localStorage.setItem("briar.locale.v1", "en");
+    const { cleanup, container, root } = createReactTestRoot();
+    const onBack = vi.fn();
+    const onOpenIssue = vi.fn();
+
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <ProjectLobby
+          companionMode
+          connectionState="connected"
+          dashboard={demoDashboard}
+          isSidebarOpen={false}
+          onBack={onBack}
+          onLoadUsageSummary={async () => emptyUsageSummary}
+          onOpenAgents={() => undefined}
+          onOpenIssue={onOpenIssue}
+          onOpenIssues={() => undefined}
+          onOpenRepository={() => undefined}
+          onOpenSettings={() => undefined}
+          project={demoDashboard.project}
+          readiness={demoRepositoryReadiness}
+          requiresLocalReadiness
+        />
+      </I18nProvider>,
+    );
+
+    expect(container.querySelector(".companion-mode")).not.toBeNull();
+    expect(container.textContent).toContain("Project overview");
+    expect(container.textContent).toContain("Recent activity");
+    expect(container.querySelector(".project-lobby-date-range")).toBeNull();
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Back"]')?.click();
+    });
+    expect(onBack).toHaveBeenCalledOnce();
+
+    const issueButton = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent?.includes(demoDashboard.runs[0]!.title),
+    );
+    await act(async () => issueButton?.click());
+    expect(onOpenIssue).toHaveBeenCalledWith(demoDashboard.runs[0]!.id);
+    await cleanup();
+  });
+
   it("loads the latest 14 days by default and applies a custom date range", async () => {
     const { cleanup, container, root } = createReactTestRoot();
     const expectedDefault = defaultProjectUsageDateRange();
