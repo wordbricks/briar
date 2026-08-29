@@ -3306,6 +3306,136 @@ describe("organization channels", () => {
     expect(again).toHaveLength(2);
   });
 
+  it("creates an isolated, idempotent self-DM and clears its key when expanded", async () => {
+    const apiEnv = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "channels-context-test-secret-channels-context-test",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const directMessagesEndpoint =
+      `https://briar-api.example/organizations/${organizationId}/dms`;
+    const createSelfRequest = () => new Request(directMessagesEndpoint, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${ownerSessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ memberIds: [ownerId], agentIds: [] }),
+    });
+
+    const created = await apiWorker.fetch(createSelfRequest(), apiEnv);
+    expect(created.status).toBe(201);
+    const createdBody = await created.json() as {
+      channel: {
+        id: string;
+        kind: string;
+        name: string;
+        visibility: string;
+        memberCount: number;
+        agentCount: number;
+        dmParticipants: Array<{
+          type: string;
+          id: string;
+          name: string;
+          image: string | null;
+        }>;
+      };
+    };
+    expect(createdBody.channel).toMatchObject({
+      kind: "dm",
+      name: "Owner",
+      visibility: "private",
+      memberCount: 1,
+      agentCount: 0,
+      dmParticipants: [{
+        type: "user",
+        id: ownerId,
+        name: "Owner",
+        image: null,
+      }],
+    });
+
+    const repeated = await apiWorker.fetch(createSelfRequest(), apiEnv);
+    expect(repeated.status).toBe(200);
+    expect((await repeated.json() as { channel: { id: string } }).channel.id)
+      .toBe(createdBody.channel.id);
+
+    const listed = await apiWorker.fetch(new Request(
+      `https://briar-api.example/organizations/${organizationId}/channels`,
+      { headers: { authorization: `Bearer ${ownerSessionToken}` } },
+    ), apiEnv);
+    expect(listed.status).toBe(200);
+    expect((await listed.json() as {
+      channels: Array<{ id: string; kind: string; name: string }>;
+    }).channels).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: createdBody.channel.id,
+        kind: "dm",
+        name: "Owner",
+      }),
+    ]));
+
+    const message = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/messages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ body: "A private note to myself" }),
+      },
+    ), apiEnv);
+    expect(message.status).toBe(201);
+    expect((await message.json() as {
+      message: { body: string; author: { type: string; id: string } };
+    }).message).toMatchObject({
+      body: "A private note to myself",
+      author: { type: "user", id: ownerId },
+    });
+
+    const timeline = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}?limit=20`,
+      { headers: { authorization: `Bearer ${ownerSessionToken}` } },
+    ), apiEnv);
+    expect(timeline.status).toBe(200);
+    expect((await timeline.json() as {
+      messages: Array<{ body: string }>;
+    }).messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ body: "A private note to myself" }),
+    ]));
+
+    const outsiderTimeline = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}?limit=20`,
+      { headers: { authorization: `Bearer ${outsiderSessionToken}` } },
+    ), apiEnv);
+    expect(outsiderTimeline.status).toBe(404);
+
+    const expanded = await apiWorker.fetch(new Request(
+      `${directMessagesEndpoint.replace(/\/dms$/u, "")}/channels/${createdBody.channel.id}/members/${outsiderId}`,
+      {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${ownerSessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ role: "member" }),
+      },
+    ), apiEnv);
+    expect(expanded.status).toBe(200);
+    await expect(db.prepare(
+      "select dm_key from briar_channels where id = ?",
+    ).bind(createdBody.channel.id).first<{ dm_key: string | null }>()).resolves
+      .toEqual({ dm_key: null });
+
+    const recreated = await apiWorker.fetch(createSelfRequest(), apiEnv);
+    expect(recreated.status).toBe(201);
+    expect((await recreated.json() as { channel: { id: string } }).channel.id)
+      .not.toBe(createdBody.channel.id);
+  });
+
   it("creates idempotent DMs and lets a busy preferred Worker answer", async () => {
     const agentId = "aa000000-0000-4000-8000-000000000120";
     await createOrganizationAgent(db, {
