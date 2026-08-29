@@ -1195,7 +1195,7 @@ export async function deleteChannel(
              where membership.organization_id = attachment.organization_id
                and membership.user_id = ?
                and (
-                 membership.role = 'owner'
+                 membership.role in ('owner', 'co-owner')
                  or attachment.channel_id in (
                    select channel.id from briar_channels channel
                    where channel.id = attachment.channel_id
@@ -1231,7 +1231,7 @@ export async function deleteChannel(
              where membership.organization_id = briar_channels.organization_id
                and membership.user_id = ?
                and (
-                 membership.role = 'owner'
+                 membership.role in ('owner', 'co-owner')
                  or briar_channels.created_by_user_id = ?
                )
            )
@@ -2063,7 +2063,7 @@ async function getChannelMessageDeletionTarget(
                 select 1 from briar_organization_members membership
                 where membership.organization_id = channel.organization_id
                   and membership.user_id = ?
-                  and membership.role in ('owner', 'admin')
+                  and membership.role in ('owner', 'co-owner')
               )
               or exists (
                 select 1 from briar_channel_members membership
@@ -2132,7 +2132,7 @@ export async function deleteChannelMessage(
           select 1 from briar_organization_members membership
           where membership.organization_id = channel.organization_id
             and membership.user_id = ?
-            and membership.role in ('owner', 'admin')
+            and membership.role in ('owner', 'co-owner')
         )
         or exists (
           select 1 from briar_channel_members membership

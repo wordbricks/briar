@@ -140,7 +140,7 @@ describe("organization channels", () => {
       .prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
-         ) values (?, ?, 'member', ?, ?)`,
+         ) values (?, ?, 'developer', ?, ?)`,
       )
       .bind(organizationId, outsiderId, at(0), at(0))
       .run();
@@ -1034,7 +1034,7 @@ describe("organization channels", () => {
     await expect(archives.head(objectKey)).resolves.toBeNull();
   });
 
-  it("does not delete or queue attachments after an admin role is removed", async () => {
+  it("does not delete or queue attachments after a co-owner role is removed", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000017";
     const messageId = "f0000000-0000-4000-8000-000000000017";
     const attachmentId = "fa000000-0000-4000-8000-000000000017";
@@ -1043,7 +1043,7 @@ describe("organization channels", () => {
     await db
       .prepare(
         `update briar_organization_members
-         set role = 'admin', updated_at = ?
+         set role = 'co-owner', updated_at = ?
          where organization_id = ? and user_id = ?`,
       )
       .bind(at(8), organizationId, outsiderId)
@@ -1081,6 +1081,15 @@ describe("organization channels", () => {
       createdAt: at(8),
     });
 
+    await db
+      .prepare(
+        `update briar_organization_members
+         set role = 'viewer', updated_at = ?
+         where organization_id = ? and user_id = ?`,
+      )
+      .bind(at(9), organizationId, outsiderId)
+      .run();
+
     const apiEnv = {
       DB: db,
       ARCHIVES: archives,
@@ -1088,31 +1097,20 @@ describe("organization channels", () => {
       GOOGLE_CLIENT_ID: "google-client-test",
       GOOGLE_CLIENT_SECRET: "google-secret-test",
     } as unknown as Env;
-    const adminResponse = await apiWorker.fetch(new Request(
+    const formerCoOwnerResponse = await apiWorker.fetch(new Request(
       `https://briar-api.example/organizations/${organizationId}/channels/${channelId}`,
       {
         method: "DELETE",
         headers: { authorization: `Bearer ${outsiderSessionToken}` },
       },
     ), apiEnv);
-    expect(adminResponse.status).toBe(403);
+    expect(formerCoOwnerResponse.status).toBe(403);
 
     await expect(
       deleteChannel(db, organizationId, channelId, outsiderId, at(8)),
     ).resolves.toBe(false);
     await expect(getChannelById(db, organizationId, channelId))
       .resolves.toMatchObject({ id: channelId });
-
-    // The route may have observed the prior admin role. The deletion batch must
-    // authorize again after the downgrade and leave both D1 resources intact.
-    await db
-      .prepare(
-        `update briar_organization_members
-         set role = 'member', updated_at = ?
-         where organization_id = ? and user_id = ?`,
-      )
-      .bind(at(9), organizationId, outsiderId)
-      .run();
 
     await expect(
       deleteChannel(db, organizationId, channelId, outsiderId, at(9)),
@@ -1138,6 +1136,14 @@ describe("organization channels", () => {
         .bind(objectKey)
         .first(),
     ).resolves.toBeNull();
+    await db
+      .prepare(
+        `update briar_organization_members
+         set role = 'developer', updated_at = ?
+         where organization_id = ? and user_id = ?`,
+      )
+      .bind(at(10), organizationId, outsiderId)
+      .run();
   });
 
   it("lets a channel creator delete through the authenticated API route", async () => {

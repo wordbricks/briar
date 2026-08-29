@@ -43,7 +43,13 @@ export const mobileClientIdSchema = Schema.Literals(mobileClientIds);
 const mobileProviderSchema = Schema.Literals(agentProviders);
 const mobileIssueDifficultySchema = Schema.Literals(issueDifficulties);
 
-const mobileRoleSchema = Schema.Literals(["owner", "admin", "member"]);
+const mobileRoleSchema = Schema.Literals([
+  "owner",
+  "co-owner",
+  "developer",
+  "editor",
+  "viewer",
+]);
 const mobileRunStatusSchema = Schema.Literals([
   "backlog",
   "queued",

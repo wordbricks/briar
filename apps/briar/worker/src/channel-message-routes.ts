@@ -16,7 +16,10 @@ import {
   uploadStoredAttachments,
 } from "./attachment-storage";
 import { channelAttachmentResponse } from "./channel-attachment-response";
-import { requireChannelAccess } from "./channel-route-access";
+import {
+  requireChannelAccess,
+  requireChannelWriteAccess,
+} from "./channel-route-access";
 import { decodeChannelMessageReactionInput } from "./channel-route-decoders";
 import {
   channelJson,
@@ -274,7 +277,7 @@ export async function handleChannelMessageRoute(
   if (channelMessagesMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
     const organizationId = channelMessagesMatch[1];
-    const channel = await requireChannelAccess(
+    const channel = await requireChannelWriteAccess(
       db,
       organizationId,
       channelMessagesMatch[2],
@@ -491,7 +494,7 @@ export async function handleChannelMessageRoute(
     const session = await requireSession(auth, request);
     const organizationId = channelMessageMatch[1];
     const channelId = channelMessageMatch[2];
-    await requireChannelAccess(
+    await requireChannelWriteAccess(
       db,
       organizationId,
       channelId,
@@ -580,7 +583,7 @@ export async function handleChannelMessageRoute(
   );
   if (channelMessageReactionMatch && request.method === "PUT") {
     const session = await requireSession(auth, request);
-    const channel = await requireChannelAccess(
+    const channel = await requireChannelWriteAccess(
       db,
       channelMessageReactionMatch[1],
       channelMessageReactionMatch[2],

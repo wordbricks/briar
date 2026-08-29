@@ -51,7 +51,7 @@ describe("managed computer remote desktop routes", () => {
       ) values ('${organizationId}', '${ownerId}', 'owner', '${now}', '${now}');
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values ('${organizationId}', '${memberId}', 'member', '${now}', '${now}');
+      ) values ('${organizationId}', '${memberId}', 'developer', '${now}', '${now}');
     `);
     await createPromotionalManagedComputer(db, {
       entitlementId: "33333333-3333-4333-8333-333333333333",
@@ -141,15 +141,19 @@ describe("managed computer remote desktop routes", () => {
     },
   );
 
-  it("allows the requester but denies a general member and a cross-site origin", async () => {
-    const deniedMember = await worker.fetch(
+  it("allows a developer but denies a cross-site origin", async () => {
+    const developerResponse = await worker.fetch(
       createRequest(memberToken, "66666666-6666-4666-8666-666666666666"),
       env(),
     );
-    expect(deniedMember.status).toBe(403);
-    expect(await deniedMember.json()).toMatchObject({
-      code: "MANAGED_COMPUTER_REMOTE_FORBIDDEN",
-    });
+    expect(developerResponse.status).toBe(201);
+    const developerSession = await developerResponse.json<{
+      session: { id: string };
+    }>();
+    await db.prepare(
+      `update briar_managed_computer_remote_sessions
+       set state = 'ended', ended_at = ?, updated_at = ? where id = ?`,
+    ).bind(now, now, developerSession.session.id).run();
     const deniedOrigin = await worker.fetch(
       createRequest(
         ownerToken,
@@ -178,7 +182,6 @@ describe("managed computer remote desktop routes", () => {
     ).all<{ reason_code: string }>();
     expect(audits.results?.map((event) => event.reason_code)).toEqual(
       expect.arrayContaining([
-        "permission_denied",
         "origin_rejected",
       ]),
     );

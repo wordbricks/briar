@@ -1,4 +1,4 @@
-import type { OrganizationRole } from "./organization-repository";
+import type { OrganizationRole } from "../types";
 
 export type OrganizationCapability =
   | "organization:read"
@@ -12,6 +12,13 @@ export type OrganizationCapability =
   | "issues:write"
   | "issues:execute"
   | "results:review";
+
+export const organizationAssignableRoles = [
+  "co-owner",
+  "developer",
+  "editor",
+  "viewer",
+] as const;
 
 const roleCapabilities = {
   owner: [
@@ -54,13 +61,17 @@ const roleCapabilities = {
     "results:review",
   ],
   viewer: ["organization:read"],
-} as const satisfies Record<OrganizationRole, readonly OrganizationCapability[]>;
+} as const satisfies Record<
+  OrganizationRole,
+  readonly OrganizationCapability[]
+>;
 
 export const hasOrganizationCapability = (
-  role: OrganizationRole | null,
+  role: OrganizationRole | null | undefined,
   capability: OrganizationCapability,
-) =>
-  role !== null &&
-  (roleCapabilities[role] as readonly OrganizationCapability[]).includes(
-    capability,
-  );
+) => Boolean(
+  role &&
+    (roleCapabilities[role] as readonly OrganizationCapability[]).includes(
+      capability,
+    ),
+);

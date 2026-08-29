@@ -10,6 +10,7 @@ import {
 } from "./db";
 import { parseJsonObject } from "./agent-result-json";
 import { HttpError, json } from "./http-response";
+import { hasOrganizationCapability } from "./organization-access";
 import { decodeProjectTransferInput } from "./project-request-contract";
 import { readJson } from "./request-readers";
 import {
@@ -53,6 +54,9 @@ export async function handleIssueControlRoute(input: {
       session.user.id,
     );
     if (!sourceProject) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(sourceProject.member_role, "issues:write")) {
+      throw new HttpError(403, "Issue editing permission required");
+    }
     const body = decodeProjectTransferInput(await readJson(request));
     if (body.targetProjectId === sourceProject.id) {
       throw new HttpError(400, "Target project must be different");
@@ -124,6 +128,9 @@ export async function handleIssueControlRoute(input: {
     const session = await requireSession(auth, request);
     const project = await getProject(db, recoveryMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
     const input = decodeRecoveryUserInput(await readJson(request));
     const result = await recoverHuntRun(db, project.id, {
       runId: recoveryMatch[2],
@@ -170,6 +177,9 @@ export async function handleIssueControlRoute(input: {
     const session = await requireSession(auth, request);
     const project = await getProject(db, resumeRunMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
     const input = decodeResumeUserInput(await readJson(request));
     const result = await resumeRunWithCheckpointIdentity(
       db,
@@ -203,6 +213,9 @@ export async function handleIssueControlRoute(input: {
     const session = await requireSession(auth, request);
     const project = await getProject(db, pausedReworkMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
     const input = decodePausedRunReworkInput(await readJson(request));
     try {
       const result = await reworkHuntRun(db, project.id, {
@@ -237,6 +250,9 @@ export async function handleIssueControlRoute(input: {
     const session = await requireSession(auth, request);
     const project = await getProject(db, moveRunMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
     const input = decodeMoveRunInput(await readJson(request));
     try {
       const result = await moveHuntRun(db, project.id, {
@@ -266,6 +282,9 @@ export async function handleIssueControlRoute(input: {
     const session = await requireSession(auth, request);
     const project = await getProject(db, dispatchRunMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
     const input = decodeDispatchRun(await readJson(request));
     const dispatched = await dispatchHuntRun(
       db,
@@ -296,6 +315,9 @@ export async function handleIssueControlRoute(input: {
     const session = await requireSession(auth, request);
     const project = await getProject(db, unassignRunMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
     const input = decodeRequestIdInput(await readJson(request));
     const result = await unassignHuntRun(db, project.organization_id, project.id, {
       runId: unassignRunMatch[2],
@@ -314,8 +336,8 @@ export async function handleIssueControlRoute(input: {
     const session = await requireSession(auth, request);
     const project = await getProject(db, executionAuditMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
-    if (project.member_role !== "owner" && project.member_role !== "admin") {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+      throw new HttpError(403, "Issue execution permission required");
     }
     const runId = new URL(request.url).searchParams.get("runId") ?? undefined;
     const [hotEvents, archivedEvents] = await Promise.all([

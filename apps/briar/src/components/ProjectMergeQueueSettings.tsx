@@ -21,6 +21,7 @@ import type {
   MergeQueueStatus,
   Project,
 } from "../types";
+import { hasOrganizationCapability } from "../lib/organization-role";
 import { SelectMenu } from "./SelectMenu";
 import { Spinner } from "./ui/spinner";
 
@@ -65,7 +66,10 @@ export function ProjectMergeQueueSettings({
   token: string | null;
 }) {
   const { localeTag, t } = useI18n();
-  const canManage = project.role === "owner" || project.role === "admin";
+  const canManage = hasOrganizationCapability(
+    project.role,
+    "development:manage",
+  );
   const [profile, setProfile] = useState<MergeQueueProfile | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [readinessStageId, setReadinessStageId] = useState("");

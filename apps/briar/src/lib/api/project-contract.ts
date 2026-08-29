@@ -18,7 +18,13 @@ export const ProjectResponse = Schema.Struct({
   icon: defaulted(Schema.NullOr(DataImageString), null),
   organizationId: UuidString,
   organizationName: Schema.String,
-  role: Schema.Literals(["owner", "admin", "member"]),
+  role: Schema.Literals([
+    "owner",
+    "co-owner",
+    "developer",
+    "editor",
+    "viewer",
+  ]),
   createdAt: Schema.String,
 });
 export type ProjectResponse = typeof ProjectResponse.Type;

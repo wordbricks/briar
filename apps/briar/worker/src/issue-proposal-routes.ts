@@ -23,6 +23,7 @@ import {
   reworkHuntRun,
 } from "./db";
 import { HttpError, json } from "./http-response";
+import { hasOrganizationCapability } from "./organization-access";
 import {
   issueActionProposalJson,
   issueExecutionProposalJson,
@@ -73,6 +74,9 @@ export async function handleIssueProposalRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
     const proposal = await getIssueReworkProposal(
       db,
       project.id,
@@ -149,6 +153,9 @@ export async function handleIssueProposalRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:write")) {
+      throw new HttpError(403, "Issue editing permission required");
+    }
     const proposal = await getIssueActionProposal(
       db,
       project.id,
@@ -364,6 +371,9 @@ export async function handleIssueProposalRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
     if (!(await agentSkillExecutionApprovalTablesAvailable(db))) {
       throw new HttpError(
         503,
@@ -407,6 +417,9 @@ export async function handleIssueProposalRoute(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
     if (!(await issueExecutionApprovalTablesAvailable(db))) {
       throw new HttpError(
         503,

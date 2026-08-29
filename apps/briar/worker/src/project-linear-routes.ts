@@ -11,6 +11,7 @@ import {
 } from "../../src/lib/linear-import";
 import type { BriarAuth } from "./auth";
 import { HttpError, json } from "./http-response";
+import { hasOrganizationCapability } from "./organization-access";
 import {
   decodeLinearApiKeyInput,
   decodeLinearImportInput,
@@ -53,6 +54,9 @@ export async function handleProjectLinearRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const input = decodeLinearApiKeyInput(await readJson(request));
     try {
       const { viewer, teams } = await fetchLinearViewerAndTeams(input.apiKey);
@@ -75,6 +79,9 @@ export async function handleProjectLinearRoute(
     const session = await requireSession(auth, request);
     const project = await getProject(db, linearStatesMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const input = decodeLinearStatesInput(await readJson(request));
     try {
       const states = await fetchLinearWorkflowStates(
@@ -100,6 +107,9 @@ export async function handleProjectLinearRoute(
     const session = await requireSession(auth, request);
     const project = await getProject(db, linearImportMatch[1], session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const input = decodeLinearImportInput(await readJson(request));
     const settings = await getProjectSettings(db, project.id);
     const workflow = settings?.workflow_json

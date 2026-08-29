@@ -15,6 +15,7 @@ import {
   dashboardRunJson,
   statusTrayRunJson,
 } from "./dashboard-json";
+import { hasOrganizationCapability } from "./organization-access";
 import {
   getHuntRunForProject,
   getProject,
@@ -89,7 +90,9 @@ export async function handleDashboardRoute(input: {
       organizationId,
       session.user.id,
     );
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const runs = await listOrganizationStatusTrayRuns(
       db,
       organizationId,

@@ -11,6 +11,7 @@ import {
   json,
   privateNoStoreJson,
 } from "./http-response";
+import { hasOrganizationCapability } from "./organization-access";
 import {
   projectAgentSessionJson,
   projectAgentSessionSummaryJson,
@@ -196,6 +197,9 @@ export async function handleProjectAgentSessionRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     if (
       await agentSkillExecutionApprovalTablesAvailable(db) &&
       await projectAgentSessionIsApprovalOwned(

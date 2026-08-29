@@ -362,7 +362,7 @@ describe("Sidebar", () => {
             name: "Console",
             organizationId: "organization-1",
             organizationName: "Briar",
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}
@@ -465,7 +465,7 @@ describe("Sidebar", () => {
             name: "Console",
             organizationId: "organization-1",
             organizationName: "Briar",
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}
@@ -516,7 +516,7 @@ describe("Sidebar", () => {
             name: "Console",
             organizationId: "organization-1",
             organizationName: "Briar",
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}
@@ -565,7 +565,7 @@ describe("Sidebar", () => {
             name: "Console",
             organizationId: "organization-1",
             organizationName: "Briar",
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}
@@ -667,7 +667,7 @@ describe("Sidebar", () => {
             name: "Wordbricks",
             handle: "wordbricks",
             logo: null,
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}
@@ -678,7 +678,7 @@ describe("Sidebar", () => {
             name: "Console",
             organizationId: "organization-2",
             organizationName: "Wordbricks",
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}
@@ -1180,7 +1180,7 @@ describe("Sidebar", () => {
             name: "Console",
             organizationId: "organization-1",
             organizationName: "Briar",
-            role: "member",
+            role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
         ]}

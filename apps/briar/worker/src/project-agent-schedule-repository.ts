@@ -471,6 +471,18 @@ export async function listClaimableProjectAgentScheduleProjectIds(
         and membership.user_id = ?
        where project.id in (${placeholders})
          and (
+           membership.role in ('owner', 'co-owner')
+           or (
+             membership.role = 'developer'
+             and exists (
+               select 1 from briar_project_members project_membership
+               where project_membership.project_id = project.id
+                 and project_membership.organization_id = project.organization_id
+                 and project_membership.user_id = membership.user_id
+             )
+           )
+         )
+         and (
            exists (
              select 1 from briar_project_agent_schedule_runs run
              where run.project_id = project.id and run.status = 'running'

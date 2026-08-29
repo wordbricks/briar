@@ -23,6 +23,7 @@ import {
 } from "./worker-request-contract";
 import { sha256 } from "./crypto-digest";
 import { corsHeaders, HttpError, json } from "./http-response";
+import { hasOrganizationCapability } from "./organization-access";
 import {
   projectAgentScheduleJson,
   projectAgentScheduleRunJson,
@@ -68,6 +69,9 @@ export async function handleProjectAgentScheduleRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const input = decodeProjectAgentScheduleInput(
       await readJson(request),
     );
@@ -90,6 +94,9 @@ export async function handleProjectAgentScheduleRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const input = decodeProjectAgentScheduleInput(
       await readJson(request),
     );
@@ -112,6 +119,9 @@ export async function handleProjectAgentScheduleRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const result = await deleteProjectAgentSchedule(
       db,
       project.id,
@@ -179,6 +189,9 @@ export async function handleProjectAgentScheduleRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const settings = await getProjectSettings(db, project.id);
     const workflow = normalizeAutoHuntWorkflow(
       settings?.workflow_json ? JSON.parse(settings.workflow_json) : null,
@@ -209,6 +222,9 @@ export async function handleProjectAgentScheduleRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const input = decodeProjectAgentScheduleRunCompletion(
       await readJson(request),
     );
@@ -241,6 +257,9 @@ export async function handleProjectAgentScheduleRoute(
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
+    if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
+    }
     const input = decodeProjectAgentScheduleRunRenew(
       await readJson(request),
     );

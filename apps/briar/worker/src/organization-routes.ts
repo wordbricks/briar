@@ -19,7 +19,7 @@ import {
   listOrganizationIssueSubscriptionRunIds,
 } from "./issue-notification-repository";
 import { issueSubscribers } from "./issue-subscribers";
-import { canManageOrganization } from "./organization-access";
+import { hasOrganizationCapability } from "./organization-access";
 import {
   createOrganizationAgent,
   deleteOrganizationAgent,
@@ -132,7 +132,8 @@ export async function handleOrganizationRoute(
   if (organizationInboxMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const organizationId = organizationInboxMatch[1];
-    if (!(await getOrganizationRole(db, organizationId, session.user.id))) {
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!hasOrganizationCapability(role, "organization:read")) {
       throw new HttpError(404, "Organization not found");
     }
     const result = await loadOrganizationInboxConditionalSnapshot({
@@ -267,7 +268,10 @@ export async function handleOrganizationRoute(
       throw new HttpError(404, "Invitation not found");
     }
     return json({
-      invitation: organizationInvitationJson(result.invitation, acceptedAt),
+      invitation: publicOrganizationInvitationJson(
+        result.invitation,
+        acceptedAt,
+      ),
       alreadyAccepted: result.outcome === "already_accepted",
     });
   }
@@ -285,7 +289,9 @@ export async function handleOrganizationRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationUsageRunsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const days = decodeUsageRangeDays(url.searchParams.get("days") ?? "90");
     const generatedAt = Date.now();
     const since = organizationUsageQuerySince(days, generatedAt);
@@ -378,15 +384,15 @@ export async function handleOrganizationRoute(
       organizationMatch[1],
       session.user.id,
     );
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "organization:update")) {
+      throw new HttpError(403, "Organization management permission required");
     }
     const input = decodeOrganizationUpdateInput(await readJson(request));
     const organization = await updateOrganization(
       db,
       organizationMatch[1],
       input.name,
-      role,
+      role!,
     );
     if (!organization) throw new HttpError(404, "Organization not found");
     return json({ organization: organizationJson(organization) });
@@ -402,15 +408,15 @@ export async function handleOrganizationRoute(
       organizationLogoMatch[1],
       session.user.id,
     );
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "organization:update")) {
+      throw new HttpError(403, "Organization management permission required");
     }
     const input = decodeOrganizationLogoInput(await readJson(request));
     const organization = await updateOrganizationLogo(
       db,
       organizationLogoMatch[1],
       input.logo,
-      role,
+      role!,
     );
     if (!organization) throw new HttpError(404, "Organization not found");
     return json({ organization: organizationJson(organization) });
@@ -423,8 +429,8 @@ export async function handleOrganizationRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationInvitationsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "invitations:manage")) {
+      throw new HttpError(403, "Invitation management permission required");
     }
     const invitations = await listOrganizationInvitations(db, organizationId);
     const observedAt = new Date().toISOString();
@@ -438,8 +444,8 @@ export async function handleOrganizationRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationInvitationsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "invitations:manage")) {
+      throw new HttpError(403, "Invitation management permission required");
     }
     const input = decodeOrganizationInvitationInput(await readJson(request));
     const token = `briar_invite_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
@@ -482,8 +488,8 @@ export async function handleOrganizationRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationInvitationMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "invitations:manage")) {
+      throw new HttpError(403, "Invitation management permission required");
     }
     const revoked = await revokeOrganizationInvitation(
       db,
@@ -505,7 +511,9 @@ export async function handleOrganizationRoute(
       organizationMembersMatch[1],
       session.user.id,
     );
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     return json({
       members: await organizationMembersJson(
         db,
@@ -520,8 +528,8 @@ export async function handleOrganizationRoute(
       organizationMembersMatch[1],
       session.user.id,
     );
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "members:manage")) {
+      throw new HttpError(403, "Member management permission required");
     }
     const input = decodeOrganizationMemberInput(await readJson(request));
     const userId = await addOrganizationMember(
@@ -548,8 +556,8 @@ export async function handleOrganizationRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationMemberProjectsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "members:manage")) {
+      throw new HttpError(403, "Member management permission required");
     }
     const input = decodeOrganizationMemberProjectsInput(
       await readJson(request),
@@ -566,7 +574,7 @@ export async function handleOrganizationRoute(
     if (outcome === "role_has_full_access") {
       throw new HttpError(
         409,
-        "Organization owners and admins always have access to every project",
+        "Organization owners and co-owners always have access to every project",
       );
     }
     if (outcome === "project_not_found") {
@@ -587,8 +595,8 @@ export async function handleOrganizationRoute(
       organizationId,
       session.user.id,
     );
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "members:manage")) {
+      throw new HttpError(403, "Member management permission required");
     }
     if (memberId === session.user.id) {
       throw new HttpError(400, "You cannot change your own organization role");
@@ -615,8 +623,8 @@ export async function handleOrganizationRoute(
       organizationMemberMatch[1],
       session.user.id,
     );
-    if (role !== "owner") {
-      throw new HttpError(403, "Organization owner access required");
+    if (!hasOrganizationCapability(role, "members:manage")) {
+      throw new HttpError(403, "Member management permission required");
     }
     const removed = await removeOrganizationMember(
       db,
@@ -634,19 +642,21 @@ export async function handleOrganizationRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationAgentsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const agents = await listOrganizationAgents(db, organizationId);
     return json({
       agents: agents.map(organizationAgentJson),
-      canManage: canManageOrganization(role),
+      canManage: hasOrganizationCapability(role, "development:manage"),
     });
   }
   if (organizationAgentsMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
     const organizationId = organizationAgentsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = decodeOrganizationAgentWrite(await readJson(request));
     const agent = await createOrganizationAgent(db, {
@@ -672,8 +682,8 @@ export async function handleOrganizationRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationAgentMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = decodeOrganizationAgentWrite(await readJson(request));
     const agent = await updateOrganizationAgent(db, {
@@ -695,8 +705,8 @@ export async function handleOrganizationRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationAgentMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const deleted = await deleteOrganizationAgent(
       db,

@@ -1,6 +1,6 @@
 import { issueTitleAbsoluteMaxLength } from "../../src/lib/issue-title";
 import type { BriarAuth } from "./auth";
-import { canManageOrganization } from "./organization-access";
+import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
 import { decodeSlackOAuthInput } from "./account-organization-request-contract";
 import {
@@ -522,14 +522,16 @@ export async function handleOrganizationSlackRoute(input: {
       organizationSlackMatch[1],
       session.user.id,
     );
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const [projects, installations] = await Promise.all([
       listOrganizationProjects(db, organizationSlackMatch[1]),
       listSlackInstallations(db, organizationSlackMatch[1]),
     ]);
     return json({
       configured: slackConfigAvailable(env),
-      canManage: canManageOrganization(role),
+      canManage: hasOrganizationCapability(role, "organization:update"),
       projects: projects.map((project) => ({
         id: project.id,
         name: project.name,
@@ -544,8 +546,8 @@ export async function handleOrganizationSlackRoute(input: {
       organizationSlackMatch[1],
       session.user.id,
     );
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "organization:update")) {
+      throw new HttpError(403, "Organization management permission required");
     }
     if (!slackConfigAvailable(env)) {
       throw new HttpError(503, "Slack integration is not configured");
@@ -594,8 +596,8 @@ export async function handleOrganizationSlackRoute(input: {
       organizationSlackInstallationMatch[1],
       session.user.id,
     );
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "organization:update")) {
+      throw new HttpError(403, "Organization management permission required");
     }
     const teamId = decodeURIComponent(
       organizationSlackInstallationMatch[2],
@@ -609,7 +611,7 @@ export async function handleOrganizationSlackRoute(input: {
         observedAt,
       });
       if (outcome === "forbidden") {
-        throw new HttpError(403, "Organization admin access required");
+        throw new HttpError(403, "Organization management permission required");
       }
       if (outcome === "not_found") {
         throw new HttpError(404, "Slack workspace not found");

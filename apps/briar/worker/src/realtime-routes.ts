@@ -25,6 +25,7 @@ import {
   privateNoStoreJson,
 } from "./http-response";
 import { getOrganizationInboxSyncVersion } from "./organization-inbox-outbox-repository";
+import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
 import { getProject } from "./project-command-repository";
 import { requireSession } from "./session-auth";
@@ -51,7 +52,9 @@ async function requireChannelAccess(
   userId: string,
 ) {
   const role = await getOrganizationRole(db, organizationId, userId);
-  if (!role) throw new HttpError(404, "Organization not found");
+  if (!hasOrganizationCapability(role, "organization:read")) {
+    throw new HttpError(404, "Organization not found");
+  }
   const channel = await getChannel(db, organizationId, channelId, userId);
   if (!channel) throw new HttpError(404, "Channel not found");
   return channel;
@@ -70,7 +73,9 @@ export async function handleRealtimeRoute(
     const session = await requireSession(auth, request);
     const organizationId = channelEventsMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const issued = await createChannelRealtimeTicket(env.BETTER_AUTH_SECRET, {
       organizationId,
       userId: session.user.id,

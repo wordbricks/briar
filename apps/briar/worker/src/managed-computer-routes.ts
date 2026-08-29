@@ -53,7 +53,7 @@ import {
   managedComputerSetupAgentToken,
   managedComputerSetupClientSocket,
 } from "./managed-computer-setup-relay-service";
-import { canManageOrganization } from "./organization-access";
+import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
 import { readJson } from "./request-readers";
 import { requireSession } from "./session-auth";
@@ -239,10 +239,12 @@ export async function handleManagedComputerRoute(
     const session = await requireSession(auth, request);
     const organizationId = managedComputerProductMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     return json({
       ...managedComputerProductResponse(env),
-      canApply: canManageOrganization(role),
+      canApply: hasOrganizationCapability(role, "development:manage"),
     });
   }
 
@@ -253,8 +255,8 @@ export async function handleManagedComputerRoute(
     const session = await requireSession(auth, request);
     const organizationId = managedComputerPromotionMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = decodeManagedComputerPromotionValidation(
       await readJson(request),
@@ -274,7 +276,9 @@ export async function handleManagedComputerRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationManagedComputersMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!role) throw new HttpError(404, "Organization not found");
+    if (!hasOrganizationCapability(role, "organization:read")) {
+      throw new HttpError(404, "Organization not found");
+    }
     const observedAt = new Date().toISOString();
     const computers = await listOrganizationManagedComputers(db, organizationId);
     const refreshed = await Promise.all(computers.map((computer) =>
@@ -293,8 +297,8 @@ export async function handleManagedComputerRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationManagedComputersMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = decodeManagedComputerApplication(await readJson(request));
     const idempotencyKey = request.headers.get("idempotency-key")?.trim();
@@ -340,8 +344,7 @@ export async function handleManagedComputerRoute(
     );
     if (
       !computer ||
-      (!canManageOrganization(role) &&
-        computer.requester_user_id !== session.user.id)
+      !hasOrganizationCapability(role, "development:manage")
     ) {
       throw new HttpError(
         403,
@@ -409,8 +412,7 @@ export async function handleManagedComputerRoute(
     );
     if (
       !computer ||
-      (!canManageOrganization(role) &&
-        computer.requester_user_id !== session.user.id)
+      !hasOrganizationCapability(role, "development:manage")
     ) {
       throw new HttpError(
         403,
@@ -440,8 +442,7 @@ export async function handleManagedComputerRoute(
     const observedAt = new Date().toISOString();
     if (
       !computer ||
-      (!canManageOrganization(role) &&
-        computer.requester_user_id !== session.user.id)
+      !hasOrganizationCapability(role, "development:manage")
     ) {
       const attemptedComputer = computer ??
         await managedComputerById(db, managedComputerId);
@@ -517,8 +518,7 @@ export async function handleManagedComputerRoute(
     const observedAt = new Date().toISOString();
     if (
       !computer ||
-      (!canManageOrganization(role) &&
-        computer.requester_user_id !== session.user.id)
+      !hasOrganizationCapability(role, "development:manage")
     ) {
       const attemptedComputer = computer ??
         await managedComputerById(db, managedComputerId);
@@ -578,8 +578,8 @@ export async function handleManagedComputerRoute(
     const session = await requireSession(auth, request);
     const organizationId = organizationManagedComputerRetryMatch[1];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const input = decodeManagedComputerRetry(await readJson(request));
     const idempotencyKey = request.headers.get("idempotency-key")?.trim();
@@ -617,8 +617,8 @@ export async function handleManagedComputerRoute(
     const organizationId = organizationManagedComputerMatch[1];
     const managedComputerId = organizationManagedComputerMatch[2];
     const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!canManageOrganization(role)) {
-      throw new HttpError(403, "Organization admin access required");
+    if (!hasOrganizationCapability(role, "development:manage")) {
+      throw new HttpError(403, "Development management permission required");
     }
     const existing = await organizationManagedComputer(
       db,
@@ -692,7 +692,8 @@ export async function handleManagedComputerRoute(
   if (organizationManagedComputerMatch && request.method === "GET") {
     const session = await requireSession(auth, request);
     const organizationId = organizationManagedComputerMatch[1];
-    if (!(await getOrganizationRole(db, organizationId, session.user.id))) {
+    const role = await getOrganizationRole(db, organizationId, session.user.id);
+    if (!hasOrganizationCapability(role, "organization:read")) {
       throw new HttpError(404, "Organization not found");
     }
     let computer = await organizationManagedComputer(

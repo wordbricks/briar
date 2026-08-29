@@ -7,6 +7,7 @@ import type {
   ChannelMember,
   DirectMessageParticipant,
 } from "../lib/channels-contract";
+import type { OrganizationRole } from "../types";
 import {
   Dialog,
   DialogContent,
@@ -22,8 +23,18 @@ export type ProfileTarget =
       name: string;
       email: string;
       image: string | null;
-      role: "owner" | "admin" | "member";
-      roleContext: "organization" | "channel";
+      role: OrganizationRole;
+      roleContext: "organization";
+      createdAt: string;
+    }
+  | {
+      type: "user";
+      id: string;
+      name: string;
+      email: string;
+      image: string | null;
+      role: ChannelMember["role"];
+      roleContext: "channel";
       createdAt: string;
     }
   | {

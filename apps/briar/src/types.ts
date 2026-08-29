@@ -674,6 +674,15 @@ export type ManagedComputerRemoteSessionTicket = {
   reconnected: boolean;
 };
 
+export type OrganizationRole =
+  | "owner"
+  | "co-owner"
+  | "developer"
+  | "editor"
+  | "viewer";
+
+export type OrganizationAssignableRole = Exclude<OrganizationRole, "owner">;
+
 export type ManagedComputerSetupSessionTicket = {
   session: {
     id: string;
@@ -704,7 +713,7 @@ export type Project = {
   icon?: string | null;
   organizationId?: string;
   organizationName?: string;
-  role?: "owner" | "admin" | "member";
+  role?: OrganizationRole;
   createdAt: string;
 };
 
@@ -861,7 +870,7 @@ export type Organization = {
   name: string;
   handle: string;
   logo: string | null;
-  role: "owner" | "admin" | "member";
+  role: OrganizationRole;
   createdAt: string;
 };
 
@@ -870,7 +879,7 @@ export type OrganizationMember = {
   name: string;
   email: string;
   image: string | null;
-  role: "owner" | "admin" | "member";
+  role: OrganizationRole;
   projectIds?: string[];
   createdAt: string;
 };
@@ -886,7 +895,7 @@ export type OrganizationInvitation = {
   initialProjectName: string;
   email: string;
   emailHint: string;
-  role: "admin" | "member";
+  role: OrganizationAssignableRole;
   status: OrganizationInvitationStatus;
   expiresAt: string;
   acceptedAt: string | null;
