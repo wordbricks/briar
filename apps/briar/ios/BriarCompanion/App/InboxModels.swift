@@ -34,8 +34,8 @@ struct InboxMessage: Identifiable, Equatable, Sendable {
     let projectName: String
     let targetId: String
     let title: String
-    let occurredAt: Date
-    let version: String
+    var occurredAt: Date
+    var version: String
     let body: String?
     let authorName: String?
     let statusLabel: String?
@@ -49,6 +49,11 @@ struct InboxMessage: Identifiable, Equatable, Sendable {
     var channelName: String? = nil
     var issueKey: String? = nil
     var authorImage: String? = nil
+    var notificationGroupId: String? = nil
+    var groupedReadVersions: [String: String] = [:]
+    var threadMessageCount = 1
+    var threadUnreadCount = 0
+    var threadRequiresAction = false
 
     var isUnread: Bool = true
 }
@@ -337,12 +342,75 @@ enum InboxMessageBuilder {
         return messages.sorted { $0.occurredAt > $1.occurredAt }
     }
 
+    /// One Slack-style Inbox alert per issue/channel thread. The row retains
+    /// the oldest unread reply as its navigation target and the newest reply as
+    /// its sort timestamp/version.
+    static func collapseThreads(_ messages: [InboxMessage]) -> [InboxMessage] {
+        var standalone: [InboxMessage] = []
+        var threads: [String: [InboxMessage]] = [:]
+
+        for message in messages {
+            guard let groupID = threadGroupID(message) else {
+                standalone.append(message)
+                continue
+            }
+            threads[groupID, default: []].append(message)
+        }
+
+        let collapsed = threads.map { groupID, group -> InboxMessage in
+            let chronological = group.sorted {
+                $0.occurredAt == $1.occurredAt
+                    ? $0.id < $1.id
+                    : $0.occurredAt < $1.occurredAt
+            }
+            let latest = chronological.last!
+            let unread = chronological.filter(\.isUnread)
+            var representative = unread.first ?? latest
+            let relevant = unread.isEmpty ? chronological : unread
+
+            representative.occurredAt = latest.occurredAt
+            representative.version = latest.version
+            representative.isUnread = !unread.isEmpty
+            representative.notificationGroupId = groupID
+            representative.groupedReadVersions = Dictionary(
+                uniqueKeysWithValues: chronological.map { ($0.id, $0.version) }
+            )
+            representative.threadMessageCount = chronological.count
+            representative.threadUnreadCount = unread.count
+            representative.threadRequiresAction = relevant.contains {
+                $0.reason != "subscription"
+            }
+            return representative
+        }
+
+        return (standalone + collapsed).sorted {
+            $0.occurredAt == $1.occurredAt
+                ? $0.id < $1.id
+                : $0.occurredAt > $1.occurredAt
+        }
+    }
+
+    private static func threadGroupID(_ message: InboxMessage) -> String? {
+        guard let rootMessageID = message.rootMessageId else { return nil }
+        let root = rootMessageID.uuidString.lowercased()
+        switch message.kind {
+        case .conversation:
+            return "conversation-thread:\(message.projectId.uuidString.lowercased()):\(message.targetId):\(root)"
+        case .channel:
+            return "channel-thread:\(message.targetId):\(root)"
+        case .issue, .session:
+            return nil
+        }
+    }
+
     static func classify(_ message: InboxMessage) -> InboxCategory {
         if message.kind == .channel {
             return .actionRequired
         }
         if message.kind == .conversation {
-            return message.reason == "subscription" ? .activity : .actionRequired
+            return message.threadRequiresAction || message.reason != "subscription"
+                ? .actionRequired
+                : .activity
         }
         if message.kind == .session {
             return message.requiresAttention ? .actionRequired : .activity

@@ -203,7 +203,7 @@ final class LocalNotificationService: ObservableObject {
     @Published var preferences = InboxNotificationPreferences.load()
     @Published private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
 
-    private var knownIDs = Set<String>()
+    private var knownVersions: [String: String] = [:]
     private var baselineID: String?
     private let center = UNUserNotificationCenter.current()
     private let foregroundDelegate = InboxNotificationForegroundDelegate()
@@ -246,27 +246,32 @@ final class LocalNotificationService: ObservableObject {
         viewingChannelThreadID: UUID? = nil,
         viewingIssueConversationID: UUID? = nil
     ) async {
-        let currentIDs = Set(messages.map(\.id))
+        let currentVersions = Dictionary(
+            uniqueKeysWithValues: messages.map {
+                ($0.notificationGroupId ?? $0.id, $0.version)
+            }
+        )
         guard self.baselineID == baselineID else {
             self.baselineID = baselineID
-            knownIDs = currentIDs
+            knownVersions = currentVersions
             return
         }
         let enabled = InboxCategory.allCases.filter { preferences[$0] }
         guard !enabled.isEmpty else {
-            knownIDs = currentIDs
+            knownVersions = currentVersions
             return
         }
 
         let authorized = await requestAuthorizationIfNeeded()
         guard authorized else {
-            knownIDs = currentIDs
+            knownVersions = currentVersions
             return
         }
 
         let newcomers = messages.filter { message in
-            message.isUnread &&
-                !knownIDs.contains(message.id) &&
+            let identity = message.notificationGroupId ?? message.id
+            return message.isUnread &&
+                knownVersions[identity] != message.version &&
                 enabled.contains(InboxMessageBuilder.classify(message)) &&
                 Self.shouldDeliver(
                     message,
@@ -278,7 +283,7 @@ final class LocalNotificationService: ObservableObject {
         for message in newcomers.prefix(5) {
             await schedule(message)
         }
-        knownIDs = currentIDs
+        knownVersions = currentVersions
     }
 
     static func shouldDeliver(
@@ -316,7 +321,7 @@ final class LocalNotificationService: ObservableObject {
             ],
         ]
         let request = UNNotificationRequest(
-            identifier: "inbox-\(message.id)",
+            identifier: "inbox-\(message.notificationGroupId ?? message.id)",
             content: content,
             trigger: nil
         )

@@ -662,13 +662,25 @@ function InboxMessageRow({
           ) : null}
         </span>
         <span className="inbox-message-copy col-start-2 row-span-2 grid min-w-0 grid-rows-[1fr_1fr] items-center gap-0">
-          <Typography
-            as="strong"
-            className="min-w-0 truncate text-xs font-semibold leading-[1.25]"
-            variant="bodySm"
-          >
-            {messageTitle(t, message)}
-          </Typography>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <Typography
+              as="strong"
+              className="min-w-0 truncate text-xs font-semibold leading-[1.25]"
+              variant="bodySm"
+            >
+              {messageTitle(t, message)}
+            </Typography>
+            {(message.threadUnreadCount ?? 0) > 1 ? (
+              <span
+                aria-label={t("inbox.unreadCount", {
+                  count: message.threadUnreadCount ?? 0,
+                })}
+                className="inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-primary/10 px-1 font-mono text-[10px] font-semibold leading-none text-primary"
+              >
+                {message.threadUnreadCount}
+              </span>
+            ) : null}
+          </span>
           <small className={cn(
             "inbox-message-detail flex min-w-0 items-center gap-[5px] overflow-hidden text-2xs leading-[1.3] whitespace-nowrap text-muted-foreground",
             compact && "gap-[3px] text-xs",
