@@ -160,6 +160,7 @@ import {
 } from "./lib/project-window";
 import {
   listenForBriarLinks,
+  parseWebAppIssuePath,
   type BriarLinkTarget,
 } from "./lib/issue-links";
 import { listenForClickedIssueLinks } from "./lib/external-links";
@@ -1299,7 +1300,11 @@ export function App({
     ],
   );
   const [pendingBriarLink, setPendingBriarLink] =
-    useState<BriarLinkTarget | null>(null);
+    useState<BriarLinkTarget | null>(() => {
+      if (!runsOnWeb) return null;
+      const target = parseWebAppIssuePath(window.location.pathname);
+      return target ? { kind: "issue", ...target } : null;
+    });
   const [pendingInboxNotificationTarget, setPendingInboxNotificationTarget] =
     useState<InboxNotificationTarget | null>(null);
   const setInboxDetailTarget = useAtomSet(inboxDetailTargetAtom);

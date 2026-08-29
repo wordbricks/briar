@@ -3,6 +3,8 @@ import { formatIssueKey } from "./issue-key";
 
 const issueLinkPathPattern =
   /^\/open\/issues\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
+const webAppIssueLinkPathPattern =
+  /^\/app\/open\/issues\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
 const sessionLinkPathPattern =
   /^\/open\/sessions\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
 const channelLinkPathPattern =
@@ -132,6 +134,11 @@ export function parseIssueLink(
   }
 
   return null;
+}
+
+export function parseWebAppIssuePath(pathname: string): IssueLinkTarget | null {
+  const match = pathname.match(webAppIssueLinkPathPattern);
+  return match ? { projectId: match[1], runId: match[2] } : null;
 }
 
 export function parseSessionLink(

@@ -7,6 +7,7 @@ import {
   parseChannelLink,
   parseIssueLink,
   parseSessionLink,
+  parseWebAppIssuePath,
   sessionShareUrl,
 } from "./issue-links";
 
@@ -67,6 +68,19 @@ describe("issue links", () => {
         `https://attacker.example/open/issues/${projectId}/${runId}`,
         apiOrigin,
       ),
+    ).toBeNull();
+  });
+
+  it("parses an issue destination from the web app path", () => {
+    expect(
+      parseWebAppIssuePath(`/app/open/issues/${projectId}/${runId}`),
+    ).toEqual({ projectId, runId });
+    expect(
+      parseWebAppIssuePath(`/app/open/issues/${projectId}/${runId}/`),
+    ).toEqual({ projectId, runId });
+    expect(parseWebAppIssuePath("/app/open/issues/nope/nope")).toBeNull();
+    expect(
+      parseWebAppIssuePath(`/open/issues/${projectId}/${runId}`),
     ).toBeNull();
   });
 
