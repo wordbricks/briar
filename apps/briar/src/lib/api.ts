@@ -174,6 +174,14 @@ export {
   loadLinearImportStates,
 } from "./app-rpc/linear-import";
 export {
+  createGithubInstallUrl,
+  createProjectGithubCredential,
+  loadGithubIntegration,
+  type GithubIntegration,
+  type GithubIntegrationRepository,
+  type ProjectGithubCredential,
+} from "./app-rpc/github";
+export {
   loadMergeQueueProfile,
   loadMergeQueueStatus,
   updateMergeQueueProfile,
@@ -348,75 +356,6 @@ export async function loadProjects(token: string): Promise<Project[]> {
   return listProjects(token);
 }
 
-export type GithubIntegrationRepository = {
-  id: string;
-  owner: string;
-  name: string;
-  fullName: string;
-  private?: boolean;
-};
-
-export type GithubIntegration = {
-  configured: boolean;
-  canManage: boolean;
-  connected: boolean;
-  installationId: string | number | null;
-  accountLogin: string | null;
-  accountAvatarUrl: string | null;
-  repositories: GithubIntegrationRepository[];
-  connectedAt: string | null;
-};
-
-const githubIntegrationPath = (organizationId: string) =>
-  `/organizations/${organizationId}/integrations/github`;
-
-export async function loadGithubIntegration(
-  token: string,
-  organizationId: string,
-) {
-  const result = await request<{
-    configured: boolean;
-    canManage: boolean;
-    connected: boolean;
-    installationId?: string | number | null;
-    accountLogin?: string | null;
-    accountAvatarUrl?: string | null;
-    repositories?: Array<{
-      id: string | number;
-      owner: string;
-      name: string;
-      fullName: string;
-      private?: boolean;
-    }>;
-    connectedAt?: string | null;
-  }>(
-    githubIntegrationPath(organizationId),
-    token,
-  );
-  return {
-    ...result,
-    installationId: result.installationId ?? null,
-    accountLogin: result.accountLogin ?? null,
-    accountAvatarUrl: result.accountAvatarUrl ?? null,
-    repositories: (result.repositories ?? []).map((repository) => ({
-      ...repository,
-      id: String(repository.id),
-    })),
-    connectedAt: result.connectedAt ?? null,
-  } satisfies GithubIntegration;
-}
-
-export async function createGithubInstallUrl(
-  token: string,
-  organizationId: string,
-) {
-  return request<{ installUrl: string }>(
-    `${githubIntegrationPath(organizationId)}/install-url`,
-    token,
-    { method: "POST" },
-  );
-}
-
 const normalizeDashboardRuns = (runs: DashboardPayload["runs"]) =>
   runs.map((run) => ({
     ...run,
@@ -569,23 +508,4 @@ export async function loadRunEvidenceImage(
     throw new Error(`증빙 이미지를 열 수 없습니다. (${response.status})`);
   }
   return response.blob();
-}
-
-export type ProjectGithubCredential = {
-  project: { id: string; organizationId: string };
-  repository: { id: number; fullName: string; cloneUrl: string };
-  username: string;
-  password: string;
-  expiresAt: string;
-};
-
-export async function createProjectGithubCredential(
-  token: string,
-  projectId: string,
-) {
-  return request<ProjectGithubCredential>(
-    `/projects/${projectId}/github/credentials`,
-    token,
-    { method: "POST" },
-  );
 }
