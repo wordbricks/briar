@@ -33,9 +33,15 @@ test "$(dpkg-query --show --showformat='${Version}' google-chrome-stable)" = \
 test "$(dpkg-query --show --showformat='${Version}' amazon-ssm-agent)" = \
   "$SSM_AGENT_PACKAGE_VERSION"
 
-/opt/briar/bin/codex --version | grep -Fq "$CODEX_CLI_VERSION"
+codex_version_output="$(sudo -u briar -H /opt/briar/bin/codex --version 2>&1)"
+grep -Fq "$CODEX_CLI_VERSION" <<< "$codex_version_output"
+if grep -Fq "could not create PATH aliases" <<< "$codex_version_output"; then
+  echo "Codex cannot write temporary helper aliases as the managed user" >&2
+  exit 1
+fi
 /opt/briar/bin/claude --version | grep -Fq "$CLAUDE_CODE_VERSION"
 /opt/briar/bin/agent-browser --version | grep -Fq "$AGENT_BROWSER_VERSION"
+/opt/briar/bin/velen --version | grep -Fq "$VELEN_CLI_VERSION"
 /opt/briar/bin/opencode --version | grep -Fxq "$OPENCODE_CLI_VERSION"
 /opt/briar/bin/grok --version | grep -Fq "grok $GROK_CLI_VERSION"
 /opt/briar/bin/cursor-agent --version | grep -Fxq "$CURSOR_AGENT_VERSION"
@@ -54,6 +60,8 @@ pkg-config --exists webkit2gtk-4.1
 pkg-config --exists ayatana-appindicator3-0.1
 test -x /usr/bin/google-chrome-stable
 test -x /opt/briar/bin/briar-open-browser
+grep -Fq -- '--no-first-run' /opt/briar/bin/briar-open-browser
+grep -Fq -- '--no-default-browser-check' /opt/briar/bin/briar-open-browser
 test -r /usr/share/applications/google-chrome.desktop
 grep -Fq 'Icon=google-chrome' /usr/share/applications/google-chrome.desktop
 test -x "/home/briar/Desktop/Google Chrome.desktop"
@@ -64,7 +72,7 @@ fc-match -f '%{family}\n' ':lang=ko' | grep -Fq 'Noto Sans CJK KR'
 
 for binary in \
   bun bunx node cargo rustc rustfmt cargo-audit gitleaks \
-  briar codex claude agent-browser opencode grok cursor-agent agy; do
+  briar codex claude agent-browser velen opencode grok cursor-agent agy; do
   test "$(sudo -u briar -H bash -lc "command -v $binary")" = \
     "/opt/briar/bin/$binary"
 done
@@ -79,6 +87,8 @@ done
 sudo -u briar -H test -w /home/briar/.cargo
 sudo -u briar -H test -w /home/briar/.rustup/downloads
 sudo -u briar -H test -w /home/briar/.rustup/tmp
+sudo -u briar -H test -w /home/briar/.codex
+sudo -u briar -H test -w /home/briar/.codex/log
 sudo -u briar -H bash -lc 'rustup run 1.96.0 rustc --version' \
   | grep -Fq "rustc $RUST_TOOLCHAIN_VERSION "
 
@@ -155,6 +165,7 @@ jq -e \
   --arg baseAmiId "${BRIAR_BASE_AMI_ID:-$(jq -r .baseAmiId /opt/briar/image-manifest.json)}" \
   --arg nodeVersion "$NODE_VERSION" \
   --arg rustVersion "$RUST_TOOLCHAIN_VERSION" \
+  --arg velenVersion "$VELEN_CLI_VERSION" \
   --arg opencodeVersion "$OPENCODE_CLI_VERSION" \
   --arg grokVersion "$GROK_CLI_VERSION" \
   --arg cursorVersion "$CURSOR_AGENT_VERSION" \
@@ -162,6 +173,7 @@ jq -e \
   '.schemaVersion == 2 and .sourceCommit == $sourceCommit and
    .baseAmiId == $baseAmiId and .runtime.googleChrome != "" and
    .runtime.node == $nodeVersion and .runtime.rust == $rustVersion and
+   .runtime.velen == $velenVersion and
    .runtime.providers.opencode == $opencodeVersion and
    .runtime.providers.grok == $grokVersion and
    .runtime.providers.cursor == $cursorVersion and
@@ -186,6 +198,8 @@ systemctl show briar-managed-worker.service --property=Environment --value \
   | grep -Fq 'RUSTUP_HOME=/home/briar/.rustup'
 systemctl show briar-managed-worker.service --property=Environment --value \
   | grep -Fq 'BRIAR_MANAGED_RUNTIME_UPDATER=/opt/briar/bin/briar-managed-runtime-update-request'
+systemctl show briar-remote-session-agent.service --property=Environment --value \
+  | grep -Fq 'PATH=/opt/briar/bin:'
 systemctl show briar-remote-session-agent.service --property=ReadWritePaths --value \
   | grep -Fq '/home/briar'
 if systemctl cat briar-managed-worker.service | grep -q 'briar_worker_'; then

@@ -7,6 +7,7 @@
       "dependencies": {
         "@anthropic-ai/claude-code": "2.1.243",
         "@openai/codex": "0.149.1",
+        "@wordbricks/velen": "0.2.44",
         "agent-browser": "0.34.0",
       },
     },
@@ -44,6 +45,14 @@
 
     "@openai/codex-win32-x64": ["@openai/codex@0.149.1-win32-x64", "", { "os": "win32", "cpu": "x64" }, "sha512-G3QXGAg7nyyhqOeooAMUekBCeHd8a1QByhKcVAFyzNBaI06t6Ft7nsF+1SzFS0spuIdU4YyMi5YD26ukADBQUQ=="],
 
+    "@wordbricks/velen": ["@wordbricks/velen@0.2.44", "", { "optionalDependencies": { "velen-darwin-arm64": "npm:@wordbricks/velen@0.2.44-darwin-arm64", "velen-linux-arm64": "npm:@wordbricks/velen@0.2.44-linux-arm64", "velen-linux-x64": "npm:@wordbricks/velen@0.2.44-linux-x64" }, "bin": { "velen": "bin/velen.js" } }, "sha512-J3n6y3vrpO561WemfZzaCWttEb1dmznze1YI8AIPB3HRj7Xcf3V+JHB+AaI7GAW/9tVnrFN5RShWV8d98rxS/Q=="],
+
     "agent-browser": ["agent-browser@0.34.0", "", { "bin": { "agent-browser": "./bin/agent-browser.js" } }, "sha512-eR6Ey4I/DMs9zZ60b3ziV6pgLIgpxXWzggr3dfFbtskLmeXPJAgXCIIwVL4PihVYJqEUpvWgUKlZ2CIjY1u44g=="],
+
+    "velen-darwin-arm64": ["@wordbricks/velen@0.2.44-darwin-arm64", "", { "os": "darwin", "cpu": "arm64" }, "sha512-FWHxZPn3ufVBeA8M3Xxbkz82Z9jR0hucRStxi3q+YnSl8aV4vUjfobNqHte568OfCd6iH9+muS72f8ddOctGnQ=="],
+
+    "velen-linux-arm64": ["@wordbricks/velen@0.2.44-linux-arm64", "", { "os": "linux", "cpu": "arm64" }, "sha512-6xtUiqKjyxb1JxQ8d9L51XioM20jGvOB3rifi7eQ7Cuu3OBK2VdSyyq6PQvLIImx1raSaXuyebnxF01DQwx1ew=="],
+
+    "velen-linux-x64": ["@wordbricks/velen@0.2.44-linux-x64", "", { "os": "linux", "cpu": "x64" }, "sha512-a/IaK6CN5b3/s5/OBs1mv564vGJAwtgKkt8JLQE1+H1dJLM6SLsXRF3gskkbB3HlpJmQ94QSLVStIvWaj9A9IQ=="],
   }
 }

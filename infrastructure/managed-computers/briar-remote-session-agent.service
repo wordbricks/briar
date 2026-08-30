@@ -12,6 +12,7 @@ Environment=HOME=/home/briar
 Environment=BRIAR_MANAGED_CREDENTIAL_FILE=/var/lib/briar/worker-credential.json
 Environment=BRIAR_REMOTE_DISPLAY_HOST=127.0.0.1
 Environment=BRIAR_REMOTE_DISPLAY_PORT=5901
+Environment=PATH=/opt/briar/bin:/opt/briar/provider/node_modules/.bin:/home/briar/.cargo/bin:/home/briar/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/opt/briar/bin/bun /opt/briar/bin/briar-remote-session-agent.js
 Restart=always
 RestartSec=2

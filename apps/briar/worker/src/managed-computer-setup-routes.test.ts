@@ -8,6 +8,7 @@ import {
 
 const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const projectId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const secondProjectId = "99999999-9999-4999-8999-999999999999";
 const managedComputerId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const deviceId = `managed-${managedComputerId}`;
 const ownerId = "managed-setup-owner";
@@ -65,6 +66,12 @@ describe("managed computer setup routes", () => {
            created_at, updated_at
          ) values (?, ?, ?, 'Managed project', ?, ?, ?)`,
       ).bind(projectId, ownerId, organizationId, "a".repeat(64), now, now),
+      db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, 'Second managed project', ?, ?, ?)`,
+      ).bind(secondProjectId, ownerId, organizationId, "e".repeat(64), now, now),
       db.prepare(
         `insert into briar_managed_computer_entitlements (
            id, organization_id, requester_user_id, source, source_reference,
@@ -345,5 +352,55 @@ describe("managed computer setup routes", () => {
       session: { projectId, status: "consumed" },
       worker: { acceptingWork: false, readiness: "needs_attention" },
     });
+  });
+
+  it("adds another project after the managed computer is ready", async () => {
+    await db.prepare(
+      `update briar_managed_computers
+       set state = 'ready', state_updated_at = ?, updated_at = ?
+       where id = ?`,
+    ).bind(now, now, managedComputerId).run();
+    const addProjectRequestId = "77777777-7777-4777-8777-777777777777";
+    const ticket = await worker.fetch(request(
+      setupPath,
+      "POST",
+      ownerToken,
+      { projectId: secondProjectId, requestId: addProjectRequestId },
+      addProjectRequestId,
+    ), env());
+    expect(ticket.status).toBe(201);
+    const { setupToken } = await ticket.json() as { setupToken: string };
+
+    const binding = await worker.fetch(request(
+      `/managed-computers/${managedComputerId}/setup/bind`,
+      "POST",
+      machineToken,
+      {
+        setupToken,
+        worker: {
+          agentProvider: "codex",
+          providers: ["codex"],
+          versions: { briar: "1.2.154", codex: "0.149.1" },
+        },
+      },
+    ), env());
+    expect(binding.status).toBe(201);
+    await expect(binding.json()).resolves.toMatchObject({
+      projectId: secondProjectId,
+      deviceId,
+      worker: {
+        acceptingWork: false,
+        readiness: "needs_attention",
+      },
+    });
+
+    const projectBindings = await db.prepare(
+      `select project_id from briar_execution_workers
+       where device_id = ? order by project_id`,
+    ).bind(deviceId).all<{ project_id: string }>();
+    expect(projectBindings.results.map((row) => row.project_id)).toEqual([
+      secondProjectId,
+      projectId,
+    ].sort());
   });
 });
