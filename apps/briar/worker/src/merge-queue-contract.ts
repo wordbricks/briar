@@ -16,15 +16,6 @@ const GitObjectId = Schema.String.check(
 );
 const MergeGroupContext = Schema.Literal(MERGE_QUEUE_VALIDATION_CONTEXT);
 
-export const MergeQueueProfileUpdate = strictSchema(Schema.Struct({
-  enabled: Schema.Boolean,
-  readinessStageId: Schema.optional(Schema.String.check(
-    Schema.isPattern(/^[a-z][a-z0-9_-]{0,63}$/u),
-  )),
-  quietWindowMs: Schema.optional(integerBetween(1_000, 300_000)),
-  maxBatchSize: Schema.optional(integerBetween(2, 5)),
-}));
-
 export const MergeBatchClaimInput = strictSchema(Schema.Struct({
   projectId: UuidString,
   workerId: trimmedText(1, 128),
@@ -93,9 +84,6 @@ export const MergeBatchBlockInput = strictSchema(Schema.Struct({
   detail: Schema.Trim.check(Schema.isLengthBetween(1, 4_000)),
 }));
 
-export const decodeMergeQueueProfileUpdate = decodeRequestSync(
-  MergeQueueProfileUpdate,
-);
 export const decodeMergeBatchClaimInput = decodeRequestSync(
   MergeBatchClaimInput,
 );
