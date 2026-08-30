@@ -469,6 +469,8 @@ nonisolated struct BriarAPI_OrganizationMember: Sendable {
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
   mutating func clearCreatedAt() {self._createdAt = nil}
 
+  var projectIds: [String] = []
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -600,41 +602,13 @@ nonisolated struct BriarAPI_StructuredRunResult: Sendable {
 
   var outcome: BriarAPI_StructuredRunResult.Outcome = .unspecified
 
-  var importance: String {
-    get {_importance ?? String()}
-    set {_importance = newValue}
-  }
-  /// Returns true if `importance` has been explicitly set.
-  var hasImportance: Bool {self._importance != nil}
-  /// Clears the value of `importance`. Subsequent reads from it will return its default value.
-  mutating func clearImportance() {self._importance = nil}
+  var importance: BriarAPI_StructuredRunResult.Importance = .unspecified
 
-  var urgency: String {
-    get {_urgency ?? String()}
-    set {_urgency = newValue}
-  }
-  /// Returns true if `urgency` has been explicitly set.
-  var hasUrgency: Bool {self._urgency != nil}
-  /// Clears the value of `urgency`. Subsequent reads from it will return its default value.
-  mutating func clearUrgency() {self._urgency = nil}
+  var urgency: BriarAPI_StructuredRunResult.Urgency = .unspecified
 
-  var impact: String {
-    get {_impact ?? String()}
-    set {_impact = newValue}
-  }
-  /// Returns true if `impact` has been explicitly set.
-  var hasImpact: Bool {self._impact != nil}
-  /// Clears the value of `impact`. Subsequent reads from it will return its default value.
-  mutating func clearImpact() {self._impact = nil}
+  var impact: BriarAPI_StructuredRunResult.Impact = .unspecified
 
-  var humanActionRequired: Bool {
-    get {_humanActionRequired ?? false}
-    set {_humanActionRequired = newValue}
-  }
-  /// Returns true if `humanActionRequired` has been explicitly set.
-  var hasHumanActionRequired: Bool {self._humanActionRequired != nil}
-  /// Clears the value of `humanActionRequired`. Subsequent reads from it will return its default value.
-  mutating func clearHumanActionRequired() {self._humanActionRequired = nil}
+  var humanActionRequired: Bool = false
 
   var nextAction: String {
     get {_nextAction ?? String()}
@@ -702,12 +676,134 @@ nonisolated struct BriarAPI_StructuredRunResult: Sendable {
 
   }
 
+  nonisolated enum Importance: SwiftProtobuf.Enum, Swift.CaseIterable {
+    typealias RawValue = Int
+    case unspecified // = 0
+    case routine // = 1
+    case important // = 2
+    case critical // = 3
+    case UNRECOGNIZED(Int)
+
+    init() {
+      self = .unspecified
+    }
+
+    init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .routine
+      case 2: self = .important
+      case 3: self = .critical
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .routine: return 1
+      case .important: return 2
+      case .critical: return 3
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    static let allCases: [BriarAPI_StructuredRunResult.Importance] = [
+      .unspecified,
+      .routine,
+      .important,
+      .critical,
+    ]
+
+  }
+
+  nonisolated enum Urgency: SwiftProtobuf.Enum, Swift.CaseIterable {
+    typealias RawValue = Int
+    case unspecified // = 0
+    case normal // = 1
+    case timeSensitive // = 2
+    case immediate // = 3
+    case UNRECOGNIZED(Int)
+
+    init() {
+      self = .unspecified
+    }
+
+    init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .normal
+      case 2: self = .timeSensitive
+      case 3: self = .immediate
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .normal: return 1
+      case .timeSensitive: return 2
+      case .immediate: return 3
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    static let allCases: [BriarAPI_StructuredRunResult.Urgency] = [
+      .unspecified,
+      .normal,
+      .timeSensitive,
+      .immediate,
+    ]
+
+  }
+
+  nonisolated enum Impact: SwiftProtobuf.Enum, Swift.CaseIterable {
+    typealias RawValue = Int
+    case unspecified // = 0
+    case issue // = 1
+    case project // = 2
+    case organization // = 3
+    case UNRECOGNIZED(Int)
+
+    init() {
+      self = .unspecified
+    }
+
+    init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .issue
+      case 2: self = .project
+      case 3: self = .organization
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .issue: return 1
+      case .project: return 2
+      case .organization: return 3
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    static let allCases: [BriarAPI_StructuredRunResult.Impact] = [
+      .unspecified,
+      .issue,
+      .project,
+      .organization,
+    ]
+
+  }
+
   init() {}
 
-  fileprivate var _importance: String? = nil
-  fileprivate var _urgency: String? = nil
-  fileprivate var _impact: String? = nil
-  fileprivate var _humanActionRequired: Bool? = nil
   fileprivate var _nextAction: String? = nil
   fileprivate var _dueAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
@@ -1491,7 +1587,7 @@ nonisolated extension BriarAPI_User: SwiftProtobuf.Message, SwiftProtobuf._Messa
 
 nonisolated extension BriarAPI_OrganizationMember: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".OrganizationMember"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{1}name\0\u{1}email\0\u{1}image\0\u{1}role\0\u{3}created_at\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{1}name\0\u{1}email\0\u{1}image\0\u{1}role\0\u{3}created_at\0\u{3}project_ids\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1505,6 +1601,7 @@ nonisolated extension BriarAPI_OrganizationMember: SwiftProtobuf.Message, SwiftP
       case 4: try { try decoder.decodeSingularStringField(value: &self._image) }()
       case 5: try { try decoder.decodeSingularEnumField(value: &self.role) }()
       case 6: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      case 7: try { try decoder.decodeRepeatedStringField(value: &self.projectIds) }()
       default: break
       }
     }
@@ -1533,6 +1630,9 @@ nonisolated extension BriarAPI_OrganizationMember: SwiftProtobuf.Message, SwiftP
     try { if let v = self._createdAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
     } }()
+    if !self.projectIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.projectIds, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1543,6 +1643,7 @@ nonisolated extension BriarAPI_OrganizationMember: SwiftProtobuf.Message, SwiftP
     if lhs._image != rhs._image {return false}
     if lhs.role != rhs.role {return false}
     if lhs._createdAt != rhs._createdAt {return false}
+    if lhs.projectIds != rhs.projectIds {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1748,10 +1849,10 @@ nonisolated extension BriarAPI_StructuredRunResult: SwiftProtobuf.Message, Swift
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.summary) }()
       case 2: try { try decoder.decodeSingularEnumField(value: &self.outcome) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._importance) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._urgency) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._impact) }()
-      case 6: try { try decoder.decodeSingularBoolField(value: &self._humanActionRequired) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.importance) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.urgency) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self.impact) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.humanActionRequired) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self._nextAction) }()
       case 8: try { try decoder.decodeSingularMessageField(value: &self._dueAt) }()
       default: break
@@ -1770,18 +1871,18 @@ nonisolated extension BriarAPI_StructuredRunResult: SwiftProtobuf.Message, Swift
     if self.outcome != .unspecified {
       try visitor.visitSingularEnumField(value: self.outcome, fieldNumber: 2)
     }
-    try { if let v = self._importance {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._urgency {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._impact {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._humanActionRequired {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
-    } }()
+    if self.importance != .unspecified {
+      try visitor.visitSingularEnumField(value: self.importance, fieldNumber: 3)
+    }
+    if self.urgency != .unspecified {
+      try visitor.visitSingularEnumField(value: self.urgency, fieldNumber: 4)
+    }
+    if self.impact != .unspecified {
+      try visitor.visitSingularEnumField(value: self.impact, fieldNumber: 5)
+    }
+    if self.humanActionRequired != false {
+      try visitor.visitSingularBoolField(value: self.humanActionRequired, fieldNumber: 6)
+    }
     try { if let v = self._nextAction {
       try visitor.visitSingularStringField(value: v, fieldNumber: 7)
     } }()
@@ -1794,10 +1895,10 @@ nonisolated extension BriarAPI_StructuredRunResult: SwiftProtobuf.Message, Swift
   static func ==(lhs: BriarAPI_StructuredRunResult, rhs: BriarAPI_StructuredRunResult) -> Bool {
     if lhs.summary != rhs.summary {return false}
     if lhs.outcome != rhs.outcome {return false}
-    if lhs._importance != rhs._importance {return false}
-    if lhs._urgency != rhs._urgency {return false}
-    if lhs._impact != rhs._impact {return false}
-    if lhs._humanActionRequired != rhs._humanActionRequired {return false}
+    if lhs.importance != rhs.importance {return false}
+    if lhs.urgency != rhs.urgency {return false}
+    if lhs.impact != rhs.impact {return false}
+    if lhs.humanActionRequired != rhs.humanActionRequired {return false}
     if lhs._nextAction != rhs._nextAction {return false}
     if lhs._dueAt != rhs._dueAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1807,6 +1908,18 @@ nonisolated extension BriarAPI_StructuredRunResult: SwiftProtobuf.Message, Swift
 
 nonisolated extension BriarAPI_StructuredRunResult.Outcome: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0OUTCOME_UNSPECIFIED\0\u{1}OUTCOME_COMPLETED\0\u{1}OUTCOME_PARTIAL\0\u{1}OUTCOME_BLOCKED\0\u{1}OUTCOME_FAILED\0")
+}
+
+nonisolated extension BriarAPI_StructuredRunResult.Importance: SwiftProtobuf._ProtoNameProviding {
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0IMPORTANCE_UNSPECIFIED\0\u{1}IMPORTANCE_ROUTINE\0\u{1}IMPORTANCE_IMPORTANT\0\u{1}IMPORTANCE_CRITICAL\0")
+}
+
+nonisolated extension BriarAPI_StructuredRunResult.Urgency: SwiftProtobuf._ProtoNameProviding {
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0URGENCY_UNSPECIFIED\0\u{1}URGENCY_NORMAL\0\u{1}URGENCY_TIME_SENSITIVE\0\u{1}URGENCY_IMMEDIATE\0")
+}
+
+nonisolated extension BriarAPI_StructuredRunResult.Impact: SwiftProtobuf._ProtoNameProviding {
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0IMPACT_UNSPECIFIED\0\u{1}IMPACT_ISSUE\0\u{1}IMPACT_PROJECT\0\u{1}IMPACT_ORGANIZATION\0")
 }
 
 nonisolated extension BriarAPI_ResultReview: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {

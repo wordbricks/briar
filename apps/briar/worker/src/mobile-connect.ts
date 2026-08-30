@@ -1,26 +1,26 @@
-import { timestampFromDate } from "@bufbuild/protobuf/wkt";
-import {
-  Code,
-  ConnectError,
-  createConnectRouter,
-} from "@connectrpc/connect";
+import { createConnectRouter } from "@connectrpc/connect";
 import { createFetchHandler } from "@connectrpc/connect/protocol";
 import {
   ProjectService,
 } from "@briar/mobile-contracts/gen/briar/mobile/v1/project_pb";
-import {
-  ProjectRole,
-} from "@briar/mobile-contracts/gen/briar/mobile/v1/common_pb";
 import type { BriarAuth } from "./auth";
-import { withCorsHeaders, HttpError } from "./http-response";
-import { projectJson } from "./project-json";
+import { withCorsHeaders } from "./http-response";
+import { registerMobileAccountService } from "./mobile-connect-account";
+import { registerMobileAgentService } from "./mobile-connect-agent";
+import { registerMobileChannelService } from "./mobile-connect-channel";
+import { registerMobileDashboardService } from "./mobile-connect-dashboard";
+import { withConnectErrors } from "./mobile-connect-errors";
+import { registerMobileInboxService } from "./mobile-connect-inbox";
+import { registerMobileIssueService } from "./mobile-connect-issue";
+import { mobileProject } from "./mobile-connect-mappers";
 import { listProjects } from "./project-repository";
 import { requireSession } from "./session-auth";
 
 export type MobileConnectRouteInput = {
   readonly request: Request;
   readonly auth: BriarAuth;
-  readonly db: D1Database;
+  readonly env: Env;
+  readonly context?: ExecutionContext;
 };
 
 export type MobileConnectServices = {
@@ -33,96 +33,17 @@ const mobileConnectServices: MobileConnectServices = {
   listProjects,
 };
 
-const projectRole = {
-  owner: ProjectRole.OWNER,
-  "co-owner": ProjectRole.CO_OWNER,
-  developer: ProjectRole.DEVELOPER,
-  editor: ProjectRole.EDITOR,
-  viewer: ProjectRole.VIEWER,
-} as const satisfies Record<
-  ReturnType<typeof projectJson>["role"],
-  ProjectRole
->;
-
-const connectCodeFromHttpStatus = (status: number): Code => {
-  switch (status) {
-    case 400:
-      return Code.InvalidArgument;
-    case 401:
-      return Code.Unauthenticated;
-    case 403:
-      return Code.PermissionDenied;
-    case 404:
-      return Code.NotFound;
-    case 409:
-      return Code.FailedPrecondition;
-    case 413:
-    case 429:
-      return Code.ResourceExhausted;
-    case 501:
-      return Code.Unimplemented;
-    case 503:
-      return Code.Unavailable;
-    default:
-      return Code.Internal;
-  }
-};
-
-const toConnectError = (error: unknown): ConnectError => {
-  if (error instanceof ConnectError) return error;
-  if (error instanceof HttpError) {
-    return new ConnectError(
-      error.message,
-      connectCodeFromHttpStatus(error.status),
-      undefined,
-      undefined,
-      error,
-    );
-  }
-  return new ConnectError(
-    "Internal server error",
-    Code.Internal,
-    undefined,
-    undefined,
-    error,
-  );
-};
-
 const createProjectService = (
-  { request, auth, db }: MobileConnectRouteInput,
+  { request, auth, env }: MobileConnectRouteInput,
   services: MobileConnectServices,
 ) => ({
-  listProjects: async () => {
-    try {
+  listProjects: async () => withConnectErrors(async () => {
       const session = await services.requireSession(auth, request);
-      const rows = await services.listProjects(db, session.user.id);
+      const rows = await services.listProjects(env.DB, session.user.id);
       return {
-        projects: rows.map((row) => {
-          const project = projectJson(row);
-          const createdAt = new Date(project.createdAt);
-          if (Number.isNaN(createdAt.getTime())) {
-            throw new ConnectError(
-              "Project has an invalid creation timestamp",
-              Code.Internal,
-            );
-          }
-          return {
-            id: project.id,
-            name: project.name,
-            issueKeyPrefix: project.issueKeyPrefix,
-            scheduleTabEnabled: project.scheduleTabEnabled,
-            icon: project.icon ?? undefined,
-            organizationId: project.organizationId,
-            organizationName: project.organizationName,
-            role: projectRole[project.role],
-            createdAt: timestampFromDate(createdAt),
-          };
-        }),
+        projects: rows.map(mobileProject),
       };
-    } catch (error) {
-      throw toConnectError(error);
-    }
-  },
+    }),
 });
 
 /** Serve a generated Connect RPC when the request targets a registered method. */
@@ -136,6 +57,37 @@ export async function handleMobileConnectRequest(
     grpcWeb: false,
   });
   router.service(ProjectService, createProjectService(input, services));
+  const sharedInput = {
+    request: input.request,
+    auth: input.auth,
+    db: input.env.DB,
+  };
+  registerMobileAccountService(router, sharedInput);
+  registerMobileDashboardService(router, {
+    ...sharedInput,
+    archivesBucket: input.env.ARCHIVES,
+  });
+  registerMobileInboxService(router, {
+    ...sharedInput,
+    env: input.env,
+    context: input.context,
+  });
+  registerMobileIssueService(router, {
+    ...sharedInput,
+    env: input.env,
+    context: input.context,
+  });
+  registerMobileAgentService(router, {
+    ...sharedInput,
+    env: input.env,
+    context: input.context,
+  });
+  registerMobileChannelService(router, {
+    ...sharedInput,
+    attachmentsBucket: input.env.ATTACHMENTS,
+    env: input.env,
+    context: input.context,
+  });
 
   const pathname = new URL(input.request.url).pathname;
   const handler = router.handlers.find(

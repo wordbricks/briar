@@ -36,6 +36,11 @@ describe("mobile Connect adapter", () => {
   it("serves an authenticated ListProjects RPC and maps auth failures", async () => {
     const auth = {} as BriarAuth;
     const db = {} as D1Database;
+    const env = {
+      DB: db,
+      ARCHIVES: {} as R2Bucket,
+      ATTACHMENTS: {} as R2Bucket,
+    } as Env;
     const requireSession = vi.fn<MobileConnectServices["requireSession"]>(
       async () => ({
         user: { id: "user-1" },
@@ -48,7 +53,7 @@ describe("mobile Connect adapter", () => {
     const request = connectRequest();
 
     const response = await handleMobileConnectRequest(
-      { request, auth, db },
+      { request, auth, env },
       services,
     );
 
@@ -73,7 +78,7 @@ describe("mobile Connect adapter", () => {
 
     requireSession.mockRejectedValueOnce(new HttpError(401, "Unauthorized"));
     const unauthorized = await handleMobileConnectRequest(
-      { request: connectRequest(), auth, db },
+      { request: connectRequest(), auth, env },
       services,
     );
 

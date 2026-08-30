@@ -90,6 +90,7 @@ message OrganizationMember {
   optional string image = 4;
   ProjectRole role = 5;
   google.protobuf.Timestamp created_at = 6;
+  repeated string project_ids = 7;
 }
 
 message IssueSubscriber {
@@ -129,12 +130,33 @@ message StructuredRunResult {
     OUTCOME_FAILED = 4;
   }
 
+  enum Importance {
+    IMPORTANCE_UNSPECIFIED = 0;
+    IMPORTANCE_ROUTINE = 1;
+    IMPORTANCE_IMPORTANT = 2;
+    IMPORTANCE_CRITICAL = 3;
+  }
+
+  enum Urgency {
+    URGENCY_UNSPECIFIED = 0;
+    URGENCY_NORMAL = 1;
+    URGENCY_TIME_SENSITIVE = 2;
+    URGENCY_IMMEDIATE = 3;
+  }
+
+  enum Impact {
+    IMPACT_UNSPECIFIED = 0;
+    IMPACT_ISSUE = 1;
+    IMPACT_PROJECT = 2;
+    IMPACT_ORGANIZATION = 3;
+  }
+
   string summary = 1;
   Outcome outcome = 2;
-  optional string importance = 3;
-  optional string urgency = 4;
-  optional string impact = 5;
-  optional bool human_action_required = 6;
+  Importance importance = 3;
+  Urgency urgency = 4;
+  Impact impact = 5;
+  bool human_action_required = 6;
   optional string next_action = 7;
   optional google.protobuf.Timestamp due_at = 8;
 }

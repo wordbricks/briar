@@ -195,7 +195,7 @@ message DashboardRun {
   string title = 7;
   RunStatus status = 8;
   optional string workflow_stage = 9;
-  optional AutoHuntWorkflow workflow = 10;
+  AutoHuntWorkflow workflow = 10;
   optional google.protobuf.Timestamp paused_at = 11;
   optional google.protobuf.Timestamp resume_requested_at = 12;
   optional WorkflowCheckpoint checkpoint = 13;

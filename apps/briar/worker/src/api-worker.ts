@@ -631,7 +631,8 @@ export default {
       const connectResponse = await handleMobileConnectRequest({
         request,
         auth,
-        db: env.DB,
+        env,
+        context: ctx,
       });
       // Connect uses POST for reads as well as writes. RPC implementations own
       // mutation scheduling instead of relying on the legacy HTTP verb fallback.
