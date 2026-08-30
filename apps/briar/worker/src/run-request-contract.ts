@@ -45,6 +45,13 @@ export const UsageRangeDays = Schema.Unknown.pipe(
 export type UsageRangeDays = typeof UsageRangeDays.Type;
 
 export const ProjectUsagePeriod = Schema.Literals(["day", "week", "month"]);
+export const UtcCalendarDate = Schema.String.check(
+  Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/u),
+);
+export const ProjectUsageDateRangeInput = strictSchema(Schema.Struct({
+  from: UtcCalendarDate,
+  to: UtcCalendarDate,
+}));
 
 export const RunStatus = Schema.Literals(autoHuntPersistedRunStatuses);
 export const WorkflowStageId = Schema.Trim.check(
@@ -449,6 +456,9 @@ export function parseProjectSettingsInput(value: unknown) {
 
 export const decodeUsageRangeDays = decodeRequestSync(UsageRangeDays);
 export const decodeProjectUsagePeriod = decodeRequestSync(ProjectUsagePeriod);
+export const decodeProjectUsageDateRange = decodeRequestSync(
+  ProjectUsageDateRangeInput,
+);
 export const decodeRunEvent = decodeRequestSync(RunEvent);
 export const decodeRunEvidenceInput = decodeRequestSync(RunEvidenceInput);
 export const decodeRecoveryUserInput = decodeRequestSync(RecoveryUserInput);

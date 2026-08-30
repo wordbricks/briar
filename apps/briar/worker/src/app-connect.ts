@@ -10,6 +10,7 @@ import { registerAppFleetService } from "./app-connect-fleet";
 import { registerAppInboxService } from "./app-connect-inbox";
 import { registerAppIssueService } from "./app-connect-issue";
 import { registerAppOrganizationService } from "./app-connect-organization";
+import { registerAppReportingService } from "./app-connect-reporting";
 import { registerAppRealtimeService } from "./app-connect-realtime";
 import {
   appConnectProjectServices,
@@ -53,6 +54,7 @@ export async function handleAppConnectRequest(
   };
   registerAppAccountService(router, sharedInput);
   registerAppOrganizationService(router, sharedInput);
+  registerAppReportingService(router, sharedInput);
   registerAppDashboardService(router, {
     ...sharedInput,
     archivesBucket: input.env.ARCHIVES,
