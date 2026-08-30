@@ -89,7 +89,7 @@ describe("AccountService", () => {
   const deviceToken = "a".repeat(64);
   const fcmToken = "f".repeat(96);
 
-  it("updates nullable profile fields through typed oneofs", async () => {
+  it("updates nullable profile oneofs without overwriting username conflicts", async () => {
     const response = await client.updateAccountProfile(
       {
         usernameUpdate: { case: "username", value: "owner_dev" },
@@ -111,6 +111,44 @@ describe("AccountService", () => {
       name: "Owner Renamed",
       image: null,
     });
+
+    await client.updateAccountProfile(
+      {
+        usernameUpdate: { case: "username", value: "taken_name" },
+        name: "Member",
+        imageUpdate: { case: "clearImage", value: {} },
+      },
+      options(memberToken),
+    );
+    const conflict = await client.updateAccountProfile(
+      {
+        usernameUpdate: { case: "username", value: "taken_name" },
+        name: "Must Not Persist",
+        imageUpdate: { case: "clearImage", value: {} },
+      },
+      options(ownerToken),
+    ).catch((cause: unknown) => cause);
+    expect(conflict).toBeInstanceOf(ConnectError);
+    expect((conflict as ConnectError).code).toBe(Code.FailedPrecondition);
+    expect((conflict as ConnectError).rawMessage).toBe(
+      "Username is already taken",
+    );
+    await expect(db.prepare(
+      `select username, name from "user" where id = 'owner'`,
+    ).first()).resolves.toEqual({
+      username: "owner_dev",
+      name: "Owner Renamed",
+    });
+
+    const cleared = await client.updateAccountProfile(
+      {
+        usernameUpdate: { case: "clearUsername", value: {} },
+        name: "Owner Renamed",
+        imageUpdate: { case: "clearImage", value: {} },
+      },
+      options(ownerToken),
+    );
+    expect(cleared.user?.username).toBeUndefined();
 
     const error = await client.updateAccountProfile(
       {

@@ -1,5 +1,7 @@
-import { fromBinary } from "@bufbuild/protobuf";
+import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
+import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
+  CreateIssueRequestSchema,
   CreateIssueResponseSchema,
 } from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { Miniflare } from "miniflare";
@@ -137,14 +139,23 @@ describe("SVG issue attachment lifecycle", () => {
   const issueRequest = (title: string, file: File) => {
     const reference = crypto.randomUUID();
     const form = new FormData();
-    form.set("title", title);
     form.set(
-      "description",
-      `SVG regression\n\n![${file.name}](briar-attachment://${reference})`,
+      "request",
+      new File([
+        toBinary(
+          CreateIssueRequestSchema,
+          create(CreateIssueRequestSchema, {
+            projectId,
+            title,
+            description:
+              `SVG regression\n\n![${file.name}](briar-attachment://${reference})`,
+            priority: 2,
+            status: RunStatus.QUEUED,
+            attachmentReferences: [reference],
+          }),
+        ),
+      ], "request.pb", { type: "application/protobuf" }),
     );
-    form.set("priority", "2");
-    form.set("status", "queued");
-    form.set("attachmentReferences", JSON.stringify([reference]));
     form.append("attachments", file, file.name);
     return new Request(`https://briar.example/projects/${projectId}/issues`, {
       method: "POST",
