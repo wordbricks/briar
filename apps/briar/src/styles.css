@@ -567,9 +567,9 @@ body { overflow: hidden; font-synthesis: none; }
 .my-issues-project-filter-trigger > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .my-issues-project-option { min-width:0; display:flex; align-items:center; gap:8px; }
 .my-issues-project-icon { width:16px; height:16px; flex:0 0 16px; }
-.my-issues-scroll { gap:0; padding:0 18px 24px; overflow:auto; }
+.my-issues-scroll { gap:0; padding:0; overflow:auto; }
 .my-issues-filter-bar { flex:0 0 auto; margin:0 -18px 18px; padding-left:18px; padding-right:18px; }
-.my-issues-load-error { margin:0 0 14px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid color-mix(in srgb,var(--destructive) 30%,var(--border)); border-radius:10px; color:var(--destructive); background:color-mix(in srgb,var(--destructive) 6%,var(--card)); font-size:var(--text-xs); }
+.my-issues-load-error { margin:14px 18px 0; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid color-mix(in srgb,var(--destructive) 30%,var(--border)); border-radius:10px; color:var(--destructive); background:color-mix(in srgb,var(--destructive) 6%,var(--card)); font-size:var(--text-xs); }
 .my-issues-loading { min-height:260px; display:grid; place-items:center; }
 .my-issues-scroll > .empty-state { flex:1; }
 .my-issues-refresh-button { width:34px; height:34px; }
@@ -760,6 +760,9 @@ body { overflow: hidden; font-synthesis: none; }
 .kanban-card.has-multiple-assignees .kanban-card-kicker { padding-right:39px; }
 .kanban-card.has-three-assignees .kanban-card-kicker { padding-right:56px; }
 .kanban-card.has-four-assignees .kanban-card-kicker { padding-right:73px; }
+.kanban-card.read-only,.kanban-card.read-only:active { cursor:pointer; }
+.kanban-card-project { min-width:0; display:flex; align-items:center; gap:6px; }
+.kanban-card-project-icon { width:16px; height:16px; flex:0 0 16px; object-fit:contain; }
 .issue-assignee-avatar { width:100%; height:100%; display:block; object-fit:cover; border-radius:inherit; }
 .issue-assignee-avatar.fallback { display:grid; place-items:center; color:#fff; background:#7662b7; font-size:13px; font-weight:700; }
 .kanban-card-badges > i.kanban-assignee { width:22px; min-width:22px; height:22px; min-height:22px; padding:0; overflow:hidden; justify-content:center; box-sizing:border-box; border-radius:50%; }

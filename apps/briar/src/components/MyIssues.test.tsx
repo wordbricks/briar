@@ -37,6 +37,7 @@ const myCreatedIssue = {
   title: "Created issue",
   createdByUserId: "user-1",
   assigneeUserId: null,
+  source: "issue" as const,
 };
 const myAssignedIssue = {
   ...demoDashboard.runs[1]!,
@@ -45,6 +46,7 @@ const myAssignedIssue = {
   title: "Assigned issue",
   createdByUserId: "someone-else",
   assigneeUserId: "user-1",
+  source: "feedback" as const,
 };
 const unrelatedIssue = {
   ...demoDashboard.runs[2]!,
@@ -74,11 +76,13 @@ describe("MyIssues", () => {
     vi.restoreAllMocks();
   });
 
-  async function renderPage(onOpenIssue = vi.fn()) {
-    const dashboards = {
+  async function renderPage(
+    onOpenIssue = vi.fn(),
+    dashboards: Record<string, DashboardPayload> = {
       [projectOne.id]: dashboardFor(projectOne, [myCreatedIssue, unrelatedIssue]),
       [projectTwo.id]: dashboardFor(projectTwo, [myAssignedIssue]),
-    };
+    },
+  ) {
     const loadProjectDashboard = vi.fn(async (projectId: string) => dashboards[projectId] ?? null);
     await renderReactTestRoot(
       root,
@@ -144,5 +148,173 @@ describe("MyIssues", () => {
     await act(async () => row.click());
 
     expect(onOpenIssue).toHaveBeenCalledWith("project-two", "my-assigned");
+  });
+
+  it("does not reload when the same projects arrive in a new array", async () => {
+    const dashboards = {
+      [projectOne.id]: dashboardFor(projectOne, [myCreatedIssue]),
+      [projectTwo.id]: dashboardFor(projectTwo, [myAssignedIssue]),
+    };
+    const firstLoader = vi.fn(async (projectId: string) => dashboards[projectId] ?? null);
+    const replacementLoader = vi.fn(async (projectId: string) => dashboards[projectId] ?? null);
+    const render = (projects: Project[], loadProjectDashboard = firstLoader) =>
+      renderReactTestRoot(
+        root,
+        <I18nProvider>
+          <AppKeyboardCommandProvider>
+            <MyIssues
+              currentUserId="user-1"
+              isSidebarOpen
+              loadProjectDashboard={loadProjectDashboard}
+              onOpenIssue={vi.fn()}
+              organizationId="demo-organization"
+              organizationName="Briar"
+              projects={projects}
+            />
+          </AppKeyboardCommandProvider>
+        </I18nProvider>,
+      );
+
+    await render([projectOne, projectTwo]);
+    await render([{ ...projectOne }, { ...projectTwo }], replacementLoader);
+    await render([projectOne, projectTwo], replacementLoader);
+
+    expect(firstLoader).toHaveBeenCalledTimes(2);
+    expect(replacementLoader).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Created issue");
+    expect(container.textContent).toContain("Assigned issue");
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[aria-label="Retry"]')?.click();
+    });
+    expect(replacementLoader).toHaveBeenCalledTimes(2);
+  });
+
+  it("reloads when the project ID composition changes", async () => {
+    const dashboards = {
+      [projectOne.id]: dashboardFor(projectOne, [myCreatedIssue]),
+      [projectTwo.id]: dashboardFor(projectTwo, [myAssignedIssue]),
+    };
+    const loadProjectDashboard = vi.fn(async (projectId: string) => dashboards[projectId] ?? null);
+    const render = (projects: Project[]) => renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <AppKeyboardCommandProvider>
+          <MyIssues
+            currentUserId="user-1"
+            isSidebarOpen
+            loadProjectDashboard={loadProjectDashboard}
+            onOpenIssue={vi.fn()}
+            organizationId="demo-organization"
+            organizationName="Briar"
+            projects={projects}
+          />
+        </AppKeyboardCommandProvider>
+      </I18nProvider>,
+    );
+
+    await render([projectOne]);
+    expect(loadProjectDashboard).toHaveBeenCalledTimes(1);
+    await render([projectOne, projectTwo]);
+
+    expect(loadProjectDashboard).toHaveBeenCalledTimes(3);
+    expect(container.textContent).toContain("Created issue");
+    expect(container.textContent).toContain("Assigned issue");
+  });
+
+  it("keeps existing issues visible during a manual background refresh", async () => {
+    const dashboards = {
+      [projectOne.id]: dashboardFor(projectOne, [myCreatedIssue]),
+      [projectTwo.id]: dashboardFor(projectTwo, [myAssignedIssue]),
+    };
+    const pendingResolvers: Array<() => void> = [];
+    const loadProjectDashboard = vi.fn((projectId: string) => {
+      if (loadProjectDashboard.mock.calls.length <= 2) {
+        return Promise.resolve(dashboards[projectId] ?? null);
+      }
+      return new Promise<DashboardPayload | null>((resolve) => {
+        pendingResolvers.push(() => resolve(dashboards[projectId] ?? null));
+      });
+    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <AppKeyboardCommandProvider>
+          <MyIssues
+            currentUserId="user-1"
+            isSidebarOpen
+            loadProjectDashboard={loadProjectDashboard}
+            onOpenIssue={vi.fn()}
+            organizationId="demo-organization"
+            organizationName="Briar"
+            projects={[projectOne, projectTwo]}
+          />
+        </AppKeyboardCommandProvider>
+      </I18nProvider>,
+    );
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[aria-label="Retry"]')?.click();
+    });
+    expect(loadProjectDashboard).toHaveBeenCalledTimes(4);
+    expect(container.textContent).toContain("Created issue");
+    expect(container.textContent).toContain("Assigned issue");
+    expect(container.querySelector(".issues-loading-overlay")).toBeNull();
+
+    await act(async () => pendingResolvers.forEach((resolve) => resolve()));
+  });
+
+  it("uses the shared filters and shows project metadata in list and kanban", async () => {
+    await renderPage();
+    const search = container.querySelector<HTMLInputElement>('[aria-label="Search my issues"]')!;
+    const setInputValue = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    await act(async () => {
+      setInputValue?.call(search, "Assigned");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(container.querySelectorAll(".issue-list-row")).toHaveLength(1);
+    expect(container.textContent).toContain("1 issue");
+
+    await act(async () => {
+      setInputValue?.call(search, "");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+      container.querySelector<HTMLButtonElement>('[aria-label="Kanban view"]')?.click();
+    });
+    expect(container.querySelectorAll(".kanban-card")).toHaveLength(2);
+    expect(container.querySelectorAll(".kanban-card-project-icon")).toHaveLength(2);
+    expect(container.textContent).toContain("WEB-101");
+    expect(container.textContent).toContain("MOB-202");
+  });
+
+  it("places each project issue in a column from its owning workflow", async () => {
+    const mobileWorkflow = {
+      ...demoDashboard.settings.workflow,
+      stages: [{ id: "mobile_qa", label: "Mobile QA", required: true }],
+      completion: { requiredStages: ["mobile_qa"] },
+    };
+    const mobileRun = {
+      ...myAssignedIssue,
+      status: "running" as const,
+      workflowStage: "mobile_qa",
+    };
+    await renderPage(vi.fn(), {
+      [projectOne.id]: dashboardFor(projectOne, [myCreatedIssue]),
+      [projectTwo.id]: {
+        ...dashboardFor(projectTwo, [mobileRun]),
+        settings: { ...demoDashboard.settings, workflow: mobileWorkflow },
+      },
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[aria-label="Kanban view"]')?.click();
+    });
+
+    const mobileColumn = container.querySelector(
+      '[data-kanban-column-id="stage:project-two:mobile_qa"]',
+    );
+    expect(mobileColumn?.textContent).toContain("Assigned issue");
+    expect(mobileColumn?.querySelector('img[src="data:image/png;base64,project-two"]')).not.toBeNull();
   });
 });
