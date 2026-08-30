@@ -4,7 +4,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import type { OrganizationMember, User } from "./common_pb";
+import type { User } from "./common_pb";
 import { file_briar_app_v1_common } from "./common_pb";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/app/v1/account.proto.
  */
 export const file_briar_app_v1_account: GenFile = /*@__PURE__*/
-  fileDesc("Chpicmlhci9hcHAvdjEvYWNjb3VudC5wcm90bxIMYnJpYXIuYXBwLnYxIhcKFUdldEN1cnJlbnRVc2VyUmVxdWVzdCI6ChZHZXRDdXJyZW50VXNlclJlc3BvbnNlEiAKBHVzZXIYASABKAsyEi5icmlhci5hcHAudjEuVXNlciI5Ch5MaXN0T3JnYW5pemF0aW9uTWVtYmVyc1JlcXVlc3QSFwoPb3JnYW5pemF0aW9uX2lkGAEgASgJIlQKH0xpc3RPcmdhbml6YXRpb25NZW1iZXJzUmVzcG9uc2USMQoHbWVtYmVycxgBIAMoCzIgLmJyaWFyLmFwcC52MS5Pcmdhbml6YXRpb25NZW1iZXIy5QEKDkFjY291bnRTZXJ2aWNlElsKDkdldEN1cnJlbnRVc2VyEiMuYnJpYXIuYXBwLnYxLkdldEN1cnJlbnRVc2VyUmVxdWVzdBokLmJyaWFyLmFwcC52MS5HZXRDdXJyZW50VXNlclJlc3BvbnNlEnYKF0xpc3RPcmdhbml6YXRpb25NZW1iZXJzEiwuYnJpYXIuYXBwLnYxLkxpc3RPcmdhbml6YXRpb25NZW1iZXJzUmVxdWVzdBotLmJyaWFyLmFwcC52MS5MaXN0T3JnYW5pemF0aW9uTWVtYmVyc1Jlc3BvbnNlQgy6AglCcmlhckFQSV9iBnByb3RvMw", [file_briar_app_v1_common]);
+  fileDesc("Chpicmlhci9hcHAvdjEvYWNjb3VudC5wcm90bxIMYnJpYXIuYXBwLnYxIhcKFUdldEN1cnJlbnRVc2VyUmVxdWVzdCI6ChZHZXRDdXJyZW50VXNlclJlc3BvbnNlEiAKBHVzZXIYASABKAsyEi5icmlhci5hcHAudjEuVXNlcjJtCg5BY2NvdW50U2VydmljZRJbCg5HZXRDdXJyZW50VXNlchIjLmJyaWFyLmFwcC52MS5HZXRDdXJyZW50VXNlclJlcXVlc3QaJC5icmlhci5hcHAudjEuR2V0Q3VycmVudFVzZXJSZXNwb25zZUIMugIJQnJpYXJBUElfYgZwcm90bzM", [file_briar_app_v1_common]);
 
 /**
  * @generated from message briar.app.v1.GetCurrentUserRequest
@@ -45,40 +45,6 @@ export const GetCurrentUserResponseSchema: GenMessage<GetCurrentUserResponse> = 
   messageDesc(file_briar_app_v1_account, 1);
 
 /**
- * @generated from message briar.app.v1.ListOrganizationMembersRequest
- */
-export type ListOrganizationMembersRequest = Message<"briar.app.v1.ListOrganizationMembersRequest"> & {
-  /**
-   * @generated from field: string organization_id = 1;
-   */
-  organizationId: string;
-};
-
-/**
- * Describes the message briar.app.v1.ListOrganizationMembersRequest.
- * Use `create(ListOrganizationMembersRequestSchema)` to create a new message.
- */
-export const ListOrganizationMembersRequestSchema: GenMessage<ListOrganizationMembersRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_account, 2);
-
-/**
- * @generated from message briar.app.v1.ListOrganizationMembersResponse
- */
-export type ListOrganizationMembersResponse = Message<"briar.app.v1.ListOrganizationMembersResponse"> & {
-  /**
-   * @generated from field: repeated briar.app.v1.OrganizationMember members = 1;
-   */
-  members: OrganizationMember[];
-};
-
-/**
- * Describes the message briar.app.v1.ListOrganizationMembersResponse.
- * Use `create(ListOrganizationMembersResponseSchema)` to create a new message.
- */
-export const ListOrganizationMembersResponseSchema: GenMessage<ListOrganizationMembersResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_account, 3);
-
-/**
  * @generated from service briar.app.v1.AccountService
  */
 export const AccountService: GenService<{
@@ -89,14 +55,6 @@ export const AccountService: GenService<{
     methodKind: "unary";
     input: typeof GetCurrentUserRequestSchema;
     output: typeof GetCurrentUserResponseSchema;
-  },
-  /**
-   * @generated from rpc briar.app.v1.AccountService.ListOrganizationMembers
-   */
-  listOrganizationMembers: {
-    methodKind: "unary";
-    input: typeof ListOrganizationMembersRequestSchema;
-    output: typeof ListOrganizationMembersResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_briar_app_v1_account, 0);

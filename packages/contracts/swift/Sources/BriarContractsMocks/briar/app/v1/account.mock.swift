@@ -24,16 +24,10 @@ import SwiftProtobuf
 open class BriarAPI_AccountServiceClientMock: BriarAPI_AccountServiceClientInterface, @unchecked Sendable {
     /// Mocked for async calls to `getCurrentUser()`.
     public var mockAsyncGetCurrentUser = { (_: BriarAPI_GetCurrentUserRequest) -> ResponseMessage<BriarAPI_GetCurrentUserResponse> in .init(result: .success(.init())) }
-    /// Mocked for async calls to `listOrganizationMembers()`.
-    public var mockAsyncListOrganizationMembers = { (_: BriarAPI_ListOrganizationMembersRequest) -> ResponseMessage<BriarAPI_ListOrganizationMembersResponse> in .init(result: .success(.init())) }
 
     public init() {}
 
     open func `getCurrentUser`(request: BriarAPI_GetCurrentUserRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetCurrentUserResponse> {
         return self.mockAsyncGetCurrentUser(request)
-    }
-
-    open func `listOrganizationMembers`(request: BriarAPI_ListOrganizationMembersRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListOrganizationMembersResponse> {
-        return self.mockAsyncListOrganizationMembers(request)
     }
 }

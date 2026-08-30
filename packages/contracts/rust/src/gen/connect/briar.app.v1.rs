@@ -8,18 +8,6 @@ pub type OwnedGetCurrentUserRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetCurrentUserResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::GetCurrentUserResponseView<'static>,
 >;
-///Shorthand for `OwnedView<ListOrganizationMembersRequestView<'static>>`.
-pub type OwnedListOrganizationMembersRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersRequestView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<ListOrganizationMembersResponseView<'static>>`.
-pub type OwnedListOrganizationMembersResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersResponseView<
-        'static,
-    >,
->;
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::GetCurrentUserResponse>
 for crate::proto::briar::app::v1::__buffa::view::GetCurrentUserResponseView<'_> {
     fn encode(
@@ -54,59 +42,11 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::ListOrganizationMembersResponse,
->
-for crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersResponseView<
-    '_,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::ListOrganizationMembersResponse,
->
-for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersResponseView<
-        'static,
-    >,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-    /// An `OwnedView` still holds the buffer it was decoded from, so
-    /// its large fields can be handed to the response body by
-    /// reference count instead of copied. The bare view impl above
-    /// cannot do this: it has borrows but no buffer to name.
-    fn encode_segments(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body_segments(
-            self.reborrow(),
-            self.bytes(),
-            codec,
-        )
-    }
-}
 /// Full service name for this service.
 pub const ACCOUNT_SERVICE_SERVICE_NAME: &str = "briar.app.v1.AccountService";
 /// Static [`Spec`](::connectrpc::Spec) for the `GetCurrentUser` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const ACCOUNT_SERVICE_GET_CURRENT_USER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.AccountService/GetCurrentUser",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `ListOrganizationMembers` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const ACCOUNT_SERVICE_LIST_ORGANIZATION_MEMBERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.AccountService/ListOrganizationMembers",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -184,29 +124,6 @@ pub trait AccountService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the ListOrganizationMembers RPC.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn list_organization_members<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::briar::app::v1::ListOrganizationMembersRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::ListOrganizationMembersResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -268,35 +185,6 @@ impl<S: AccountService> AccountServiceExt for S {
                 },
             )
             .with_spec(ACCOUNT_SERVICE_GET_CURRENT_USER_SPEC)
-            .route_view(
-                ACCOUNT_SERVICE_SERVICE_NAME,
-                "ListOrganizationMembers",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::ListOrganizationMembersRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.list_organization_members(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::briar::app::v1::ListOrganizationMembersResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(ACCOUNT_SERVICE_LIST_ORGANIZATION_MEMBERS_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -357,12 +245,6 @@ impl<T: AccountService> ::connectrpc::Dispatcher for AccountServiceServer<T> {
                         .with_spec(ACCOUNT_SERVICE_GET_CURRENT_USER_SPEC),
                 )
             }
-            "ListOrganizationMembers" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(ACCOUNT_SERVICE_LIST_ORGANIZATION_MEMBERS_SPEC),
-                )
-            }
             _ => None,
         }
     }
@@ -397,28 +279,6 @@ impl<T: AccountService> ::connectrpc::Dispatcher for AccountServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::GetCurrentUserResponse,
-                        >(format)
-                })
-            }
-            "ListOrganizationMembers" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::ListOrganizationMembersRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                        ctx.decode_options(),
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::ListOrganizationMembersRequest,
-                    >::from_parts(&req, &body);
-                    svc.list_organization_members(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::briar::app::v1::ListOrganizationMembersResponse,
                         >(format)
                 })
             }
@@ -591,51 +451,6 @@ where
                 &self.transport,
                 &self.config,
                 ACCOUNT_SERVICE_GET_CURRENT_USER_SPEC
-                    .with_origin(::connectrpc::SpecOrigin::Client),
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the ListOrganizationMembers RPC. Sends a request to /briar.app.v1.AccountService/ListOrganizationMembers.
-    pub async fn list_organization_members(
-        &self,
-        request: crate::proto::briar::app::v1::ListOrganizationMembersRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.list_organization_members_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the ListOrganizationMembers RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn list_organization_members_with_options(
-        &self,
-        request: crate::proto::briar::app::v1::ListOrganizationMembersRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                ACCOUNT_SERVICE_LIST_ORGANIZATION_MEMBERS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
@@ -16079,6 +15894,2860 @@ where
                 &self.transport,
                 &self.config,
                 INBOX_SERVICE_DELETE_INBOX_READ_STATE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+}
+
+///Shorthand for `OwnedView<ListOrganizationsRequestView<'static>>`.
+pub type OwnedListOrganizationsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListOrganizationsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListOrganizationsResponseView<'static>>`.
+pub type OwnedListOrganizationsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListOrganizationsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<CreateOrganizationRequestView<'static>>`.
+pub type OwnedCreateOrganizationRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateOrganizationRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CreateOrganizationResponseView<'static>>`.
+pub type OwnedCreateOrganizationResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateOrganizationResponseView<'static>,
+>;
+///Shorthand for `OwnedView<CheckOrganizationHandleAvailabilityRequestView<'static>>`.
+pub type OwnedCheckOrganizationHandleAvailabilityRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CheckOrganizationHandleAvailabilityRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CheckOrganizationHandleAvailabilityResponseView<'static>>`.
+pub type OwnedCheckOrganizationHandleAvailabilityResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CheckOrganizationHandleAvailabilityResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateOrganizationRequestView<'static>>`.
+pub type OwnedUpdateOrganizationRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationRequestView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateOrganizationResponseView<'static>>`.
+pub type OwnedUpdateOrganizationResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationResponseView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateOrganizationLogoRequestView<'static>>`.
+pub type OwnedUpdateOrganizationLogoRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationLogoRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateOrganizationLogoResponseView<'static>>`.
+pub type OwnedUpdateOrganizationLogoResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationLogoResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListOrganizationInvitationsRequestView<'static>>`.
+pub type OwnedListOrganizationInvitationsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListOrganizationInvitationsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListOrganizationInvitationsResponseView<'static>>`.
+pub type OwnedListOrganizationInvitationsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListOrganizationInvitationsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateOrganizationInvitationRequestView<'static>>`.
+pub type OwnedCreateOrganizationInvitationRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateOrganizationInvitationRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateOrganizationInvitationResponseView<'static>>`.
+pub type OwnedCreateOrganizationInvitationResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateOrganizationInvitationResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RevokeOrganizationInvitationRequestView<'static>>`.
+pub type OwnedRevokeOrganizationInvitationRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RevokeOrganizationInvitationRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RevokeOrganizationInvitationResponseView<'static>>`.
+pub type OwnedRevokeOrganizationInvitationResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RevokeOrganizationInvitationResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetOrganizationInvitationRequestView<'static>>`.
+pub type OwnedGetOrganizationInvitationRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetOrganizationInvitationRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetOrganizationInvitationResponseView<'static>>`.
+pub type OwnedGetOrganizationInvitationResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetOrganizationInvitationResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<AcceptOrganizationInvitationRequestView<'static>>`.
+pub type OwnedAcceptOrganizationInvitationRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::AcceptOrganizationInvitationRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<AcceptOrganizationInvitationResponseView<'static>>`.
+pub type OwnedAcceptOrganizationInvitationResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::AcceptOrganizationInvitationResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListOrganizationMembersRequestView<'static>>`.
+pub type OwnedListOrganizationMembersRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListOrganizationMembersResponseView<'static>>`.
+pub type OwnedListOrganizationMembersResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateOrganizationMemberRoleRequestView<'static>>`.
+pub type OwnedUpdateOrganizationMemberRoleRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberRoleRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateOrganizationMemberRoleResponseView<'static>>`.
+pub type OwnedUpdateOrganizationMemberRoleResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberRoleResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateOrganizationMemberProjectsRequestView<'static>>`.
+pub type OwnedUpdateOrganizationMemberProjectsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberProjectsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateOrganizationMemberProjectsResponseView<'static>>`.
+pub type OwnedUpdateOrganizationMemberProjectsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberProjectsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RemoveOrganizationMemberRequestView<'static>>`.
+pub type OwnedRemoveOrganizationMemberRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RemoveOrganizationMemberRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RemoveOrganizationMemberResponseView<'static>>`.
+pub type OwnedRemoveOrganizationMemberResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RemoveOrganizationMemberResponseView<
+        'static,
+    >,
+>;
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListOrganizationsResponse>
+for crate::proto::briar::app::v1::__buffa::view::ListOrganizationsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListOrganizationsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListOrganizationsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateOrganizationResponse>
+for crate::proto::briar::app::v1::__buffa::view::CreateOrganizationResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateOrganizationResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateOrganizationResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CheckOrganizationHandleAvailabilityResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::CheckOrganizationHandleAvailabilityResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CheckOrganizationHandleAvailabilityResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CheckOrganizationHandleAvailabilityResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateOrganizationResponse>
+for crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateOrganizationResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateOrganizationLogoResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationLogoResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateOrganizationLogoResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationLogoResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListOrganizationInvitationsResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::ListOrganizationInvitationsResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListOrganizationInvitationsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListOrganizationInvitationsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateOrganizationInvitationResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::CreateOrganizationInvitationResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateOrganizationInvitationResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateOrganizationInvitationResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RevokeOrganizationInvitationResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::RevokeOrganizationInvitationResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RevokeOrganizationInvitationResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RevokeOrganizationInvitationResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::GetOrganizationInvitationResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::GetOrganizationInvitationResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::GetOrganizationInvitationResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetOrganizationInvitationResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::AcceptOrganizationInvitationResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::AcceptOrganizationInvitationResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::AcceptOrganizationInvitationResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::AcceptOrganizationInvitationResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListOrganizationMembersResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListOrganizationMembersResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateOrganizationMemberRoleResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberRoleResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateOrganizationMemberRoleResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberRoleResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateOrganizationMemberProjectsResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberProjectsResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateOrganizationMemberProjectsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberProjectsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RemoveOrganizationMemberResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::RemoveOrganizationMemberResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RemoveOrganizationMemberResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RemoveOrganizationMemberResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+/// Full service name for this service.
+pub const ORGANIZATION_SERVICE_SERVICE_NAME: &str = "briar.app.v1.OrganizationService";
+/// Static [`Spec`](::connectrpc::Spec) for the `ListOrganizations` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_LIST_ORGANIZATIONS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/ListOrganizations",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateOrganization` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_CREATE_ORGANIZATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/CreateOrganization",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CheckOrganizationHandleAvailability` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_CHECK_ORGANIZATION_HANDLE_AVAILABILITY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/CheckOrganizationHandleAvailability",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateOrganization` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/UpdateOrganization",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateOrganizationLogo` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_LOGO_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/UpdateOrganizationLogo",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListOrganizationInvitations` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_LIST_ORGANIZATION_INVITATIONS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/ListOrganizationInvitations",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateOrganizationInvitation` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_CREATE_ORGANIZATION_INVITATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/CreateOrganizationInvitation",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RevokeOrganizationInvitation` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_REVOKE_ORGANIZATION_INVITATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/RevokeOrganizationInvitation",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `GetOrganizationInvitation` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_GET_ORGANIZATION_INVITATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/GetOrganizationInvitation",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `AcceptOrganizationInvitation` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_ACCEPT_ORGANIZATION_INVITATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/AcceptOrganizationInvitation",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListOrganizationMembers` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_LIST_ORGANIZATION_MEMBERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/ListOrganizationMembers",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateOrganizationMemberRole` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_MEMBER_ROLE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/UpdateOrganizationMemberRole",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateOrganizationMemberProjects` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_MEMBER_PROJECTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/UpdateOrganizationMemberProjects",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RemoveOrganizationMember` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const ORGANIZATION_SERVICE_REMOVE_ORGANIZATION_MEMBER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.OrganizationService/RemoveOrganizationMember",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Server trait for OrganizationService.
+///
+/// # Implementing handlers
+///
+/// Implement methods with plain `async fn`; the returned future satisfies
+/// the `Send` bound automatically.
+///
+/// **Unary and server-streaming requests** arrive as
+/// [`ServiceRequest<'_, Req>`](::connectrpc::ServiceRequest): a zero-copy
+/// view of the request plus its body, valid for the duration of the call.
+/// Fields are read directly (`request.name` is a `&str` into the decoded
+/// buffer) and the borrow may be held across `.await` points. Anything
+/// that must outlive the call — `tokio::spawn`, channels, server state,
+/// or data captured by a returned response stream — takes owned data:
+/// call `request.to_owned_message()` (or copy the specific fields)
+/// first.
+///
+/// **Client-streaming and bidi requests** arrive as
+/// [`InboundStream<Req>`](::connectrpc::InboundStream) — a
+/// `ServiceStream` of [`StreamMessage`](::connectrpc::StreamMessage)s.
+/// Each item owns its decoded buffer and is `Send + 'static`, so items
+/// can be buffered or moved into spawned tasks; read fields zero-copy
+/// through the generated accessor methods (`item.name()`) or `.view()`,
+/// convert with `.to_owned_message()`, or yield an item back unchanged —
+/// `StreamMessage<M>` implements `Encodable<M>`.
+///
+/// Request types resolved through `extern_path` (e.g. well-known types
+/// from another crate) use the same wrappers; the crate that owns the
+/// type must be generated with buffa ≥ 0.9.0 and views enabled so the
+/// backing `HasMessageView` impl exists.
+///
+/// The `impl Encodable<Out>` return bound accepts the owned `Out`, the
+/// generated `OutView<'_>` / `OwnedOutView`,
+/// [`MaybeBorrowed`](::connectrpc::MaybeBorrowed), or
+/// [`PreEncoded`](::connectrpc::PreEncoded) for handlers that encode a
+/// non-`'static` view internally and pass the bytes across the handler
+/// boundary. View bodies are not emitted for output types mapped via
+/// `extern_path` (the impl would be an orphan); return owned for
+/// WKT/extern outputs.
+///
+/// Server-streaming and bidi-streaming methods return
+/// `ServiceStream<impl Encodable<Out> + Send + use<Self>>`. The
+/// `use<Self>` precise-capturing clause excludes `&self`'s lifetime and
+/// the request's lifetime (unary methods use `use<'a, Self>` and may
+/// borrow from `&self`), so stream items must be `'static` and cannot
+/// borrow from the request. To stream view-encoded data, encode each
+/// item inside the stream body and yield
+/// [`PreEncoded`](::connectrpc::PreEncoded) — see its `# Streaming
+/// example` doc.
+#[allow(clippy::type_complexity)]
+pub trait OrganizationService: Send + Sync + 'static {
+    /// Handle the ListOrganizations RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_organizations<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ListOrganizationsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ListOrganizationsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CreateOrganization RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_organization<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CreateOrganizationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CreateOrganizationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CheckOrganizationHandleAvailability RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn check_organization_handle_availability<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CheckOrganizationHandleAvailabilityRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CheckOrganizationHandleAvailabilityResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateOrganization RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_organization<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateOrganizationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateOrganizationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateOrganizationLogo RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_organization_logo<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateOrganizationLogoRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateOrganizationLogoResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ListOrganizationInvitations RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_organization_invitations<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ListOrganizationInvitationsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ListOrganizationInvitationsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CreateOrganizationInvitation RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_organization_invitation<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CreateOrganizationInvitationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CreateOrganizationInvitationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RevokeOrganizationInvitation RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn revoke_organization_invitation<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::RevokeOrganizationInvitationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::RevokeOrganizationInvitationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the GetOrganizationInvitation RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_organization_invitation<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::GetOrganizationInvitationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::GetOrganizationInvitationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the AcceptOrganizationInvitation RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn accept_organization_invitation<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::AcceptOrganizationInvitationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::AcceptOrganizationInvitationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ListOrganizationMembers RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_organization_members<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ListOrganizationMembersRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ListOrganizationMembersResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateOrganizationMemberRole RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_organization_member_role<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateOrganizationMemberRoleRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateOrganizationMemberRoleResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateOrganizationMemberProjects RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_organization_member_projects<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateOrganizationMemberProjectsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateOrganizationMemberProjectsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RemoveOrganizationMember RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn remove_organization_member<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::RemoveOrganizationMemberRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::RemoveOrganizationMemberResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+}
+/// Extension trait for registering a service implementation with a Router.
+///
+/// This trait is automatically implemented for all types that implement the service trait.
+/// Prefer [`Router::add_service`](::connectrpc::Router::add_service) for
+/// top-down registration; `register` remains available for compatibility
+/// and cases where the service-first call shape is more convenient.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use std::sync::Arc;
+///
+/// let service = Arc::new(MyServiceImpl);
+/// let router = service.register(Router::new());
+/// ```
+pub trait OrganizationServiceExt: OrganizationService {
+    /// Register this service implementation with a Router.
+    ///
+    /// Takes ownership of the `Arc<Self>` and returns a new Router with
+    /// this service's methods registered.
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router;
+}
+impl<S: OrganizationService> OrganizationServiceExt for S {
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router {
+        router
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "ListOrganizations",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ListOrganizationsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ListOrganizationsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_organizations(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ListOrganizationsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_LIST_ORGANIZATIONS_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "CreateOrganization",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateOrganizationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CreateOrganizationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_organization(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CreateOrganizationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_CREATE_ORGANIZATION_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "CheckOrganizationHandleAvailability",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CheckOrganizationHandleAvailabilityRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CheckOrganizationHandleAvailabilityRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.check_organization_handle_availability(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CheckOrganizationHandleAvailabilityResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_CHECK_ORGANIZATION_HANDLE_AVAILABILITY_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "UpdateOrganization",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateOrganizationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_organization(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateOrganizationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "UpdateOrganizationLogo",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationLogoRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateOrganizationLogoRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_organization_logo(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateOrganizationLogoResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_LOGO_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "ListOrganizationInvitations",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ListOrganizationInvitationsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ListOrganizationInvitationsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_organization_invitations(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ListOrganizationInvitationsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_LIST_ORGANIZATION_INVITATIONS_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "CreateOrganizationInvitation",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateOrganizationInvitationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CreateOrganizationInvitationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_organization_invitation(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CreateOrganizationInvitationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_CREATE_ORGANIZATION_INVITATION_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "RevokeOrganizationInvitation",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::RevokeOrganizationInvitationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::RevokeOrganizationInvitationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.revoke_organization_invitation(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::RevokeOrganizationInvitationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_REVOKE_ORGANIZATION_INVITATION_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "GetOrganizationInvitation",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::GetOrganizationInvitationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::GetOrganizationInvitationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_organization_invitation(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::GetOrganizationInvitationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_GET_ORGANIZATION_INVITATION_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "AcceptOrganizationInvitation",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::AcceptOrganizationInvitationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::AcceptOrganizationInvitationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.accept_organization_invitation(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::AcceptOrganizationInvitationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_ACCEPT_ORGANIZATION_INVITATION_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "ListOrganizationMembers",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ListOrganizationMembersRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_organization_members(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ListOrganizationMembersResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_LIST_ORGANIZATION_MEMBERS_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "UpdateOrganizationMemberRole",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberRoleRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateOrganizationMemberRoleRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_organization_member_role(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateOrganizationMemberRoleResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_MEMBER_ROLE_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "UpdateOrganizationMemberProjects",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberProjectsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateOrganizationMemberProjectsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_organization_member_projects(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateOrganizationMemberProjectsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_MEMBER_PROJECTS_SPEC)
+            .route_view(
+                ORGANIZATION_SERVICE_SERVICE_NAME,
+                "RemoveOrganizationMember",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::RemoveOrganizationMemberRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::RemoveOrganizationMemberRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.remove_organization_member(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::RemoveOrganizationMemberResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORGANIZATION_SERVICE_REMOVE_ORGANIZATION_MEMBER_SPEC)
+    }
+}
+/// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
+#[doc(hidden)]
+pub struct OrganizationServiceRegisterMarker;
+impl<
+    S: OrganizationService,
+> ::connectrpc::ServiceRegister<OrganizationServiceRegisterMarker>
+for ::std::sync::Arc<S> {
+    fn register_service(self, router: ::connectrpc::Router) -> ::connectrpc::Router {
+        <S as OrganizationServiceExt>::register(self, router)
+    }
+}
+/// Monomorphic dispatcher for `OrganizationService`.
+///
+/// Unlike `.register(Router)` which type-erases each method into an `Arc<dyn ErasedHandler>` stored in a `HashMap`, this struct dispatches via a compile-time `match` on method name: no vtable, no hash lookup.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use connectrpc::ConnectRpcService;
+///
+/// let server = OrganizationServiceServer::new(MyImpl);
+/// let service = ConnectRpcService::new(server);
+/// // hand `service` to axum/hyper as a fallback_service
+/// ```
+pub struct OrganizationServiceServer<T> {
+    inner: ::std::sync::Arc<T>,
+}
+impl<T: OrganizationService> OrganizationServiceServer<T> {
+    /// Wrap a service implementation in a monomorphic dispatcher.
+    pub fn new(service: T) -> Self {
+        Self {
+            inner: ::std::sync::Arc::new(service),
+        }
+    }
+    /// Wrap an already-`Arc`'d service implementation.
+    pub fn from_arc(inner: ::std::sync::Arc<T>) -> Self {
+        Self { inner }
+    }
+}
+impl<T> Clone for OrganizationServiceServer<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: ::std::sync::Arc::clone(&self.inner),
+        }
+    }
+}
+impl<T: OrganizationService> ::connectrpc::Dispatcher for OrganizationServiceServer<T> {
+    #[inline]
+    fn lookup(
+        &self,
+        path: &str,
+    ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
+        let method = path.strip_prefix("briar.app.v1.OrganizationService/")?;
+        match method {
+            "ListOrganizations" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ORGANIZATION_SERVICE_LIST_ORGANIZATIONS_SPEC),
+                )
+            }
+            "CreateOrganization" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ORGANIZATION_SERVICE_CREATE_ORGANIZATION_SPEC),
+                )
+            }
+            "CheckOrganizationHandleAvailability" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            ORGANIZATION_SERVICE_CHECK_ORGANIZATION_HANDLE_AVAILABILITY_SPEC,
+                        ),
+                )
+            }
+            "UpdateOrganization" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_SPEC),
+                )
+            }
+            "UpdateOrganizationLogo" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_LOGO_SPEC),
+                )
+            }
+            "ListOrganizationInvitations" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            ORGANIZATION_SERVICE_LIST_ORGANIZATION_INVITATIONS_SPEC,
+                        ),
+                )
+            }
+            "CreateOrganizationInvitation" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            ORGANIZATION_SERVICE_CREATE_ORGANIZATION_INVITATION_SPEC,
+                        ),
+                )
+            }
+            "RevokeOrganizationInvitation" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            ORGANIZATION_SERVICE_REVOKE_ORGANIZATION_INVITATION_SPEC,
+                        ),
+                )
+            }
+            "GetOrganizationInvitation" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ORGANIZATION_SERVICE_GET_ORGANIZATION_INVITATION_SPEC),
+                )
+            }
+            "AcceptOrganizationInvitation" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            ORGANIZATION_SERVICE_ACCEPT_ORGANIZATION_INVITATION_SPEC,
+                        ),
+                )
+            }
+            "ListOrganizationMembers" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ORGANIZATION_SERVICE_LIST_ORGANIZATION_MEMBERS_SPEC),
+                )
+            }
+            "UpdateOrganizationMemberRole" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_MEMBER_ROLE_SPEC,
+                        ),
+                )
+            }
+            "UpdateOrganizationMemberProjects" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_MEMBER_PROJECTS_SPEC,
+                        ),
+                )
+            }
+            "RemoveOrganizationMember" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ORGANIZATION_SERVICE_REMOVE_ORGANIZATION_MEMBER_SPEC),
+                )
+            }
+            _ => None,
+        }
+    }
+    fn call_unary(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::Payload,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("briar.app.v1.OrganizationService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            "ListOrganizations" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ListOrganizationsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListOrganizationsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ListOrganizationsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_organizations(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ListOrganizationsResponse,
+                        >(format)
+                })
+            }
+            "CreateOrganization" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CreateOrganizationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateOrganizationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CreateOrganizationRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_organization(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CreateOrganizationResponse,
+                        >(format)
+                })
+            }
+            "CheckOrganizationHandleAvailability" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CheckOrganizationHandleAvailabilityRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CheckOrganizationHandleAvailabilityRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CheckOrganizationHandleAvailabilityRequest,
+                    >::from_parts(&req, &body);
+                    svc.check_organization_handle_availability(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CheckOrganizationHandleAvailabilityResponse,
+                        >(format)
+                })
+            }
+            "UpdateOrganization" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateOrganizationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateOrganizationRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_organization(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateOrganizationResponse,
+                        >(format)
+                })
+            }
+            "UpdateOrganizationLogo" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateOrganizationLogoRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationLogoRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateOrganizationLogoRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_organization_logo(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateOrganizationLogoResponse,
+                        >(format)
+                })
+            }
+            "ListOrganizationInvitations" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ListOrganizationInvitationsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListOrganizationInvitationsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ListOrganizationInvitationsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_organization_invitations(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ListOrganizationInvitationsResponse,
+                        >(format)
+                })
+            }
+            "CreateOrganizationInvitation" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CreateOrganizationInvitationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateOrganizationInvitationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CreateOrganizationInvitationRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_organization_invitation(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CreateOrganizationInvitationResponse,
+                        >(format)
+                })
+            }
+            "RevokeOrganizationInvitation" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::RevokeOrganizationInvitationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::RevokeOrganizationInvitationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::RevokeOrganizationInvitationRequest,
+                    >::from_parts(&req, &body);
+                    svc.revoke_organization_invitation(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::RevokeOrganizationInvitationResponse,
+                        >(format)
+                })
+            }
+            "GetOrganizationInvitation" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::GetOrganizationInvitationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::GetOrganizationInvitationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::GetOrganizationInvitationRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_organization_invitation(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::GetOrganizationInvitationResponse,
+                        >(format)
+                })
+            }
+            "AcceptOrganizationInvitation" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::AcceptOrganizationInvitationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::AcceptOrganizationInvitationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::AcceptOrganizationInvitationRequest,
+                    >::from_parts(&req, &body);
+                    svc.accept_organization_invitation(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::AcceptOrganizationInvitationResponse,
+                        >(format)
+                })
+            }
+            "ListOrganizationMembers" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ListOrganizationMembersRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ListOrganizationMembersRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_organization_members(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ListOrganizationMembersResponse,
+                        >(format)
+                })
+            }
+            "UpdateOrganizationMemberRole" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateOrganizationMemberRoleRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberRoleRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateOrganizationMemberRoleRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_organization_member_role(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateOrganizationMemberRoleResponse,
+                        >(format)
+                })
+            }
+            "UpdateOrganizationMemberProjects" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateOrganizationMemberProjectsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberProjectsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateOrganizationMemberProjectsRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_organization_member_projects(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateOrganizationMemberProjectsResponse,
+                        >(format)
+                })
+            }
+            "RemoveOrganizationMember" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::RemoveOrganizationMemberRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::RemoveOrganizationMemberRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::RemoveOrganizationMemberRequest,
+                    >::from_parts(&req, &body);
+                    svc.remove_organization_member(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::RemoveOrganizationMemberResponse,
+                        >(format)
+                })
+            }
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_server_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::buffa::bytes::Bytes,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("briar.app.v1.OrganizationService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+    fn call_client_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("briar.app.v1.OrganizationService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_bidi_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("briar.app.v1.OrganizationService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+}
+/// Client for this service.
+///
+/// Generic over `T: ClientTransport`. For **gRPC** (HTTP/2), use
+/// `Http2Connection` — it has honest `poll_ready` and composes with
+/// `tower::balance` for multi-connection load balancing. For **Connect
+/// over HTTP/1.1** (or unknown protocol), use `HttpClient`.
+///
+/// # Example (gRPC / HTTP/2)
+///
+/// ```rust,ignore
+/// use connectrpc::client::{Http2Connection, ClientConfig};
+/// use connectrpc::Protocol;
+///
+/// let uri: http::Uri = "http://localhost:8080".parse()?;
+/// let conn = Http2Connection::connect_plaintext(uri.clone()).await?.shared(1024);
+/// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
+///
+/// let client = OrganizationServiceClient::new(conn, config);
+/// let response = client.list_organizations(request).await?;
+/// ```
+///
+/// # Example (Connect / HTTP/1.1 or ALPN)
+///
+/// ```rust,ignore
+/// use connectrpc::client::{HttpClient, ClientConfig};
+///
+/// let http = HttpClient::plaintext();  // cleartext http:// only
+/// let config = ClientConfig::new("http://localhost:8080".parse()?);
+///
+/// let client = OrganizationServiceClient::new(http, config);
+/// let response = client.list_organizations(request).await?;
+/// ```
+///
+/// # Working with the response
+///
+/// Unary calls return [`UnaryResponse<OwnedView<FooView>>`](::connectrpc::client::UnaryResponse).
+/// [`view()`](::connectrpc::client::UnaryResponse::view) borrows the response
+/// message, so field access is zero-copy:
+///
+/// ```rust,ignore
+/// let resp = client.list_organizations(request).await?;
+/// let name: &str = resp.view().name;  // borrow into the response buffer
+/// ```
+///
+/// If you need the owned struct (e.g. to store or pass by value), use
+/// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
+///
+/// ```rust,ignore
+/// let owned = client.list_organizations(request).await?.into_owned();
+/// ```
+///
+/// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
+/// zero-copy decoded body (an `OwnedView`) without copying; field access on it
+/// goes through `.reborrow()`. Streaming responses yield one
+/// [`StreamMessage`](::connectrpc::StreamMessage) per received message from
+/// `.message().await` — read fields zero-copy through the generated accessor
+/// methods (`msg.name()`) or `.view()`, or convert with `.to_owned_message()`.
+#[cfg(feature = "client")]
+#[derive(Clone)]
+pub struct OrganizationServiceClient<T> {
+    transport: T,
+    config: ::connectrpc::client::ClientConfig,
+}
+#[cfg(feature = "client")]
+impl<T> OrganizationServiceClient<T>
+where
+    T: ::connectrpc::client::ClientTransport,
+    <T::ResponseBody as ::connectrpc::http_body::Body>::Error: ::std::fmt::Display,
+{
+    /// Create a new client with the given transport and configuration.
+    pub fn new(transport: T, config: ::connectrpc::client::ClientConfig) -> Self {
+        Self { transport, config }
+    }
+    /// Get the client configuration.
+    pub fn config(&self) -> &::connectrpc::client::ClientConfig {
+        &self.config
+    }
+    /// Get a mutable reference to the client configuration.
+    pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
+        &mut self.config
+    }
+    /// Call the ListOrganizations RPC. Sends a request to /briar.app.v1.OrganizationService/ListOrganizations.
+    pub async fn list_organizations(
+        &self,
+        request: crate::proto::briar::app::v1::ListOrganizationsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListOrganizationsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_organizations_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListOrganizations RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_organizations_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ListOrganizationsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListOrganizationsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_LIST_ORGANIZATIONS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateOrganization RPC. Sends a request to /briar.app.v1.OrganizationService/CreateOrganization.
+    pub async fn create_organization(
+        &self,
+        request: crate::proto::briar::app::v1::CreateOrganizationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateOrganizationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_organization_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateOrganization RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_organization_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CreateOrganizationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateOrganizationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_CREATE_ORGANIZATION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CheckOrganizationHandleAvailability RPC. Sends a request to /briar.app.v1.OrganizationService/CheckOrganizationHandleAvailability.
+    pub async fn check_organization_handle_availability(
+        &self,
+        request: crate::proto::briar::app::v1::CheckOrganizationHandleAvailabilityRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CheckOrganizationHandleAvailabilityResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.check_organization_handle_availability_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CheckOrganizationHandleAvailability RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn check_organization_handle_availability_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CheckOrganizationHandleAvailabilityRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CheckOrganizationHandleAvailabilityResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_CHECK_ORGANIZATION_HANDLE_AVAILABILITY_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateOrganization RPC. Sends a request to /briar.app.v1.OrganizationService/UpdateOrganization.
+    pub async fn update_organization(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateOrganizationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_organization_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateOrganization RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_organization_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateOrganizationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateOrganizationLogo RPC. Sends a request to /briar.app.v1.OrganizationService/UpdateOrganizationLogo.
+    pub async fn update_organization_logo(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateOrganizationLogoRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationLogoResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_organization_logo_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateOrganizationLogo RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_organization_logo_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateOrganizationLogoRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationLogoResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_LOGO_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListOrganizationInvitations RPC. Sends a request to /briar.app.v1.OrganizationService/ListOrganizationInvitations.
+    pub async fn list_organization_invitations(
+        &self,
+        request: crate::proto::briar::app::v1::ListOrganizationInvitationsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListOrganizationInvitationsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_organization_invitations_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListOrganizationInvitations RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_organization_invitations_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ListOrganizationInvitationsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListOrganizationInvitationsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_LIST_ORGANIZATION_INVITATIONS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateOrganizationInvitation RPC. Sends a request to /briar.app.v1.OrganizationService/CreateOrganizationInvitation.
+    pub async fn create_organization_invitation(
+        &self,
+        request: crate::proto::briar::app::v1::CreateOrganizationInvitationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateOrganizationInvitationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_organization_invitation_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateOrganizationInvitation RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_organization_invitation_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CreateOrganizationInvitationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateOrganizationInvitationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_CREATE_ORGANIZATION_INVITATION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RevokeOrganizationInvitation RPC. Sends a request to /briar.app.v1.OrganizationService/RevokeOrganizationInvitation.
+    pub async fn revoke_organization_invitation(
+        &self,
+        request: crate::proto::briar::app::v1::RevokeOrganizationInvitationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RevokeOrganizationInvitationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.revoke_organization_invitation_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RevokeOrganizationInvitation RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn revoke_organization_invitation_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::RevokeOrganizationInvitationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RevokeOrganizationInvitationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_REVOKE_ORGANIZATION_INVITATION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetOrganizationInvitation RPC. Sends a request to /briar.app.v1.OrganizationService/GetOrganizationInvitation.
+    pub async fn get_organization_invitation(
+        &self,
+        request: crate::proto::briar::app::v1::GetOrganizationInvitationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetOrganizationInvitationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_organization_invitation_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetOrganizationInvitation RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_organization_invitation_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::GetOrganizationInvitationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetOrganizationInvitationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_GET_ORGANIZATION_INVITATION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AcceptOrganizationInvitation RPC. Sends a request to /briar.app.v1.OrganizationService/AcceptOrganizationInvitation.
+    pub async fn accept_organization_invitation(
+        &self,
+        request: crate::proto::briar::app::v1::AcceptOrganizationInvitationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::AcceptOrganizationInvitationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.accept_organization_invitation_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AcceptOrganizationInvitation RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn accept_organization_invitation_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::AcceptOrganizationInvitationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::AcceptOrganizationInvitationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_ACCEPT_ORGANIZATION_INVITATION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListOrganizationMembers RPC. Sends a request to /briar.app.v1.OrganizationService/ListOrganizationMembers.
+    pub async fn list_organization_members(
+        &self,
+        request: crate::proto::briar::app::v1::ListOrganizationMembersRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_organization_members_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListOrganizationMembers RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_organization_members_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ListOrganizationMembersRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListOrganizationMembersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_LIST_ORGANIZATION_MEMBERS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateOrganizationMemberRole RPC. Sends a request to /briar.app.v1.OrganizationService/UpdateOrganizationMemberRole.
+    pub async fn update_organization_member_role(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateOrganizationMemberRoleRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberRoleResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_organization_member_role_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateOrganizationMemberRole RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_organization_member_role_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateOrganizationMemberRoleRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberRoleResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_MEMBER_ROLE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateOrganizationMemberProjects RPC. Sends a request to /briar.app.v1.OrganizationService/UpdateOrganizationMemberProjects.
+    pub async fn update_organization_member_projects(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateOrganizationMemberProjectsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberProjectsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_organization_member_projects_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateOrganizationMemberProjects RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_organization_member_projects_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateOrganizationMemberProjectsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationMemberProjectsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_UPDATE_ORGANIZATION_MEMBER_PROJECTS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RemoveOrganizationMember RPC. Sends a request to /briar.app.v1.OrganizationService/RemoveOrganizationMember.
+    pub async fn remove_organization_member(
+        &self,
+        request: crate::proto::briar::app::v1::RemoveOrganizationMemberRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RemoveOrganizationMemberResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.remove_organization_member_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RemoveOrganizationMember RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn remove_organization_member_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::RemoveOrganizationMemberRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RemoveOrganizationMemberResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORGANIZATION_SERVICE_REMOVE_ORGANIZATION_MEMBER_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

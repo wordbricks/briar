@@ -8282,276 +8282,6 @@ pub const __GET_CURRENT_USER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyE
     from_json: ::buffa::type_registry::any_from_json::<GetCurrentUserResponse>,
     is_wkt: false,
 };
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct ListOrganizationMembersRequest {
-    /// Field 1: `organization_id`
-    #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub organization_id: ::buffa::alloc::string::String,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for ListOrganizationMembersRequest {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ListOrganizationMembersRequest")
-            .field("organization_id", &self.organization_id)
-            .finish()
-    }
-}
-impl ListOrganizationMembersRequest {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationMembersRequest";
-}
-::buffa::impl_default_instance!(ListOrganizationMembersRequest);
-impl ::buffa::MessageName for ListOrganizationMembersRequest {
-    const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "ListOrganizationMembersRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationMembersRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationMembersRequest";
-}
-impl ::buffa::Message for ListOrganizationMembersRequest {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.organization_id.clear();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for ListOrganizationMembersRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.ListOrganizationMembersRequest";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationMembersRequest {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __LIST_ORGANIZATION_MEMBERS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.ListOrganizationMembersRequest",
-    to_json: ::buffa::type_registry::any_to_json::<ListOrganizationMembersRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<ListOrganizationMembersRequest>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct ListOrganizationMembersResponse {
-    /// Field 1: `members`
-    #[serde(
-        rename = "members",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub members: ::buffa::alloc::vec::Vec<OrganizationMember>,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for ListOrganizationMembersResponse {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ListOrganizationMembersResponse")
-            .field("members", &self.members)
-            .finish()
-    }
-}
-impl ListOrganizationMembersResponse {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationMembersResponse";
-}
-::buffa::impl_default_instance!(ListOrganizationMembersResponse);
-impl ::buffa::MessageName for ListOrganizationMembersResponse {
-    const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "ListOrganizationMembersResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationMembersResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationMembersResponse";
-}
-impl ::buffa::Message for ListOrganizationMembersResponse {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        for v in &self.members {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        __cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        for v in &self.members {
-            ::buffa::types::put_len_delimited_header(
-                1u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            v.write_to(__cache, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&elem),
-                )?;
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.members.push(elem);
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.members.clear();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for ListOrganizationMembersResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.ListOrganizationMembersResponse";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationMembersResponse {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __LIST_ORGANIZATION_MEMBERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.ListOrganizationMembersResponse",
-    to_json: ::buffa::type_registry::any_to_json::<ListOrganizationMembersResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<ListOrganizationMembersResponse>,
-    is_wkt: false,
-};
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum ProjectAgentScheduleRecurrence {
@@ -73730,6 +73460,5563 @@ pub mod inbox_feed_message {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::inbox_feed_message::Content as ContentView;
 }
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum OrganizationInvitationStatus {
+    ORGANIZATION_INVITATION_STATUS_UNSPECIFIED = 0i32,
+    ORGANIZATION_INVITATION_STATUS_PENDING = 1i32,
+    ORGANIZATION_INVITATION_STATUS_ACCEPTED = 2i32,
+    ORGANIZATION_INVITATION_STATUS_EXPIRED = 3i32,
+    ORGANIZATION_INVITATION_STATUS_REVOKED = 4i32,
+}
+impl OrganizationInvitationStatus {
+    ///Idiomatic alias for [`Self::ORGANIZATION_INVITATION_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::ORGANIZATION_INVITATION_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::ORGANIZATION_INVITATION_STATUS_PENDING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Pending: Self = Self::ORGANIZATION_INVITATION_STATUS_PENDING;
+    ///Idiomatic alias for [`Self::ORGANIZATION_INVITATION_STATUS_ACCEPTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Accepted: Self = Self::ORGANIZATION_INVITATION_STATUS_ACCEPTED;
+    ///Idiomatic alias for [`Self::ORGANIZATION_INVITATION_STATUS_EXPIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Expired: Self = Self::ORGANIZATION_INVITATION_STATUS_EXPIRED;
+    ///Idiomatic alias for [`Self::ORGANIZATION_INVITATION_STATUS_REVOKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Revoked: Self = Self::ORGANIZATION_INVITATION_STATUS_REVOKED;
+}
+impl ::core::default::Default for OrganizationInvitationStatus {
+    fn default() -> Self {
+        Self::ORGANIZATION_INVITATION_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for OrganizationInvitationStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for OrganizationInvitationStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = OrganizationInvitationStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(OrganizationInvitationStatus)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<OrganizationInvitationStatus, E> {
+                <OrganizationInvitationStatus as ::buffa::Enumeration>::from_proto_name(
+                        v,
+                    )
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<OrganizationInvitationStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <OrganizationInvitationStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<OrganizationInvitationStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <OrganizationInvitationStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<OrganizationInvitationStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for OrganizationInvitationStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for OrganizationInvitationStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(
+                    Self::ORGANIZATION_INVITATION_STATUS_UNSPECIFIED,
+                )
+            }
+            1i32 => {
+                ::core::option::Option::Some(
+                    Self::ORGANIZATION_INVITATION_STATUS_PENDING,
+                )
+            }
+            2i32 => {
+                ::core::option::Option::Some(
+                    Self::ORGANIZATION_INVITATION_STATUS_ACCEPTED,
+                )
+            }
+            3i32 => {
+                ::core::option::Option::Some(
+                    Self::ORGANIZATION_INVITATION_STATUS_EXPIRED,
+                )
+            }
+            4i32 => {
+                ::core::option::Option::Some(
+                    Self::ORGANIZATION_INVITATION_STATUS_REVOKED,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::ORGANIZATION_INVITATION_STATUS_UNSPECIFIED => {
+                "ORGANIZATION_INVITATION_STATUS_UNSPECIFIED"
+            }
+            Self::ORGANIZATION_INVITATION_STATUS_PENDING => {
+                "ORGANIZATION_INVITATION_STATUS_PENDING"
+            }
+            Self::ORGANIZATION_INVITATION_STATUS_ACCEPTED => {
+                "ORGANIZATION_INVITATION_STATUS_ACCEPTED"
+            }
+            Self::ORGANIZATION_INVITATION_STATUS_EXPIRED => {
+                "ORGANIZATION_INVITATION_STATUS_EXPIRED"
+            }
+            Self::ORGANIZATION_INVITATION_STATUS_REVOKED => {
+                "ORGANIZATION_INVITATION_STATUS_REVOKED"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "ORGANIZATION_INVITATION_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(
+                    Self::ORGANIZATION_INVITATION_STATUS_UNSPECIFIED,
+                )
+            }
+            "ORGANIZATION_INVITATION_STATUS_PENDING" => {
+                ::core::option::Option::Some(
+                    Self::ORGANIZATION_INVITATION_STATUS_PENDING,
+                )
+            }
+            "ORGANIZATION_INVITATION_STATUS_ACCEPTED" => {
+                ::core::option::Option::Some(
+                    Self::ORGANIZATION_INVITATION_STATUS_ACCEPTED,
+                )
+            }
+            "ORGANIZATION_INVITATION_STATUS_EXPIRED" => {
+                ::core::option::Option::Some(
+                    Self::ORGANIZATION_INVITATION_STATUS_EXPIRED,
+                )
+            }
+            "ORGANIZATION_INVITATION_STATUS_REVOKED" => {
+                ::core::option::Option::Some(
+                    Self::ORGANIZATION_INVITATION_STATUS_REVOKED,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::ORGANIZATION_INVITATION_STATUS_UNSPECIFIED,
+            Self::ORGANIZATION_INVITATION_STATUS_PENDING,
+            Self::ORGANIZATION_INVITATION_STATUS_ACCEPTED,
+            Self::ORGANIZATION_INVITATION_STATUS_EXPIRED,
+            Self::ORGANIZATION_INVITATION_STATUS_REVOKED,
+        ]
+    }
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct Organization {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    /// Field 3: `handle`
+    #[serde(
+        rename = "handle",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub handle: ::buffa::alloc::string::String,
+    /// Field 4: `logo`
+    #[serde(rename = "logo", skip_serializing_if = "::core::option::Option::is_none")]
+    pub logo: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 5: `role`
+    #[serde(
+        rename = "role",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub role: ::buffa::EnumValue<ProjectRole>,
+    /// Field 6: `created_at`
+    #[serde(
+        rename = "createdAt",
+        alias = "created_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub created_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for Organization {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("Organization")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("handle", &self.handle)
+            .field("logo", &self.logo)
+            .field("role", &self.role)
+            .field("created_at", &self.created_at)
+            .finish()
+    }
+}
+impl Organization {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.Organization";
+}
+impl Organization {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::logo`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_logo(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.logo = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(Organization);
+impl ::buffa::MessageName for Organization {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "Organization";
+    const FULL_NAME: &'static str = "briar.app.v1.Organization";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.Organization";
+}
+impl ::buffa::Message for Organization {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        if !self.handle.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.handle) as u64;
+        }
+        if let Some(ref v) = self.logo {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.created_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.created_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        }
+        if !self.handle.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.handle, buf);
+        }
+        if let Some(ref v) = self.logo {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(5u32, val, buf);
+            }
+        }
+        if self.created_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.created_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.handle, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.logo.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.role = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.created_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.name.clear();
+        self.handle.clear();
+        self.logo = ::core::option::Option::None;
+        self.role = ::buffa::EnumValue::from(0);
+        self.created_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for Organization {
+    const PROTO_FQN: &'static str = "briar.app.v1.Organization";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for Organization {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ORGANIZATION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.Organization",
+    to_json: ::buffa::type_registry::any_to_json::<Organization>,
+    from_json: ::buffa::type_registry::any_from_json::<Organization>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct OrganizationInvitation {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 3: `organization_name`
+    #[serde(
+        rename = "organizationName",
+        alias = "organization_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_name: ::buffa::alloc::string::String,
+    /// Field 4: `initial_project_id`
+    #[serde(
+        rename = "initialProjectId",
+        alias = "initial_project_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub initial_project_id: ::buffa::alloc::string::String,
+    /// Field 5: `initial_project_name`
+    #[serde(
+        rename = "initialProjectName",
+        alias = "initial_project_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub initial_project_name: ::buffa::alloc::string::String,
+    /// Field 6: `email`
+    #[serde(
+        rename = "email",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub email: ::buffa::alloc::string::String,
+    /// Field 7: `email_hint`
+    #[serde(
+        rename = "emailHint",
+        alias = "email_hint",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub email_hint: ::buffa::alloc::string::String,
+    /// Field 8: `role`
+    #[serde(
+        rename = "role",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub role: ::buffa::EnumValue<ProjectRole>,
+    /// Field 9: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<OrganizationInvitationStatus>,
+    /// Field 10: `expires_at`
+    #[serde(
+        rename = "expiresAt",
+        alias = "expires_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expires_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    /// Field 11: `accepted_at`
+    #[serde(
+        rename = "acceptedAt",
+        alias = "accepted_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub accepted_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    /// Field 12: `created_at`
+    #[serde(
+        rename = "createdAt",
+        alias = "created_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub created_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for OrganizationInvitation {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("OrganizationInvitation")
+            .field("id", &self.id)
+            .field("organization_id", &self.organization_id)
+            .field("organization_name", &self.organization_name)
+            .field("initial_project_id", &self.initial_project_id)
+            .field("initial_project_name", &self.initial_project_name)
+            .field("email", &self.email)
+            .field("email_hint", &self.email_hint)
+            .field("role", &self.role)
+            .field("status", &self.status)
+            .field("expires_at", &self.expires_at)
+            .field("accepted_at", &self.accepted_at)
+            .field("created_at", &self.created_at)
+            .finish()
+    }
+}
+impl OrganizationInvitation {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.OrganizationInvitation";
+}
+::buffa::impl_default_instance!(OrganizationInvitation);
+impl ::buffa::MessageName for OrganizationInvitation {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "OrganizationInvitation";
+    const FULL_NAME: &'static str = "briar.app.v1.OrganizationInvitation";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.OrganizationInvitation";
+}
+impl ::buffa::Message for OrganizationInvitation {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.organization_name.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_name) as u64;
+        }
+        if !self.initial_project_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.initial_project_id)
+                        as u64;
+        }
+        if !self.initial_project_name.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.initial_project_name)
+                        as u64;
+        }
+        if !self.email.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.email) as u64;
+        }
+        if !self.email_hint.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.email_hint) as u64;
+        }
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.expires_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expires_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.accepted_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.accepted_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.created_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.created_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+        }
+        if !self.organization_name.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.organization_name, buf);
+        }
+        if !self.initial_project_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.initial_project_id, buf);
+        }
+        if !self.initial_project_name.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.initial_project_name, buf);
+        }
+        if !self.email.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.email, buf);
+        }
+        if !self.email_hint.is_empty() {
+            ::buffa::types::put_string_field(7u32, &self.email_hint, buf);
+        }
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(8u32, val, buf);
+            }
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(9u32, val, buf);
+            }
+        }
+        if self.expires_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                10u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.expires_at.write_to(__cache, buf);
+        }
+        if self.accepted_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                11u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.accepted_at.write_to(__cache, buf);
+        }
+        if self.created_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                12u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.created_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_name, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.initial_project_id, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.initial_project_name, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.email, buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.email_hint, buf)?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.role = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expires_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.accepted_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.created_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.organization_id.clear();
+        self.organization_name.clear();
+        self.initial_project_id.clear();
+        self.initial_project_name.clear();
+        self.email.clear();
+        self.email_hint.clear();
+        self.role = ::buffa::EnumValue::from(0);
+        self.status = ::buffa::EnumValue::from(0);
+        self.expires_at = ::buffa::MessageField::none();
+        self.accepted_at = ::buffa::MessageField::none();
+        self.created_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for OrganizationInvitation {
+    const PROTO_FQN: &'static str = "briar.app.v1.OrganizationInvitation";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for OrganizationInvitation {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ORGANIZATION_INVITATION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.OrganizationInvitation",
+    to_json: ::buffa::type_registry::any_to_json::<OrganizationInvitation>,
+    from_json: ::buffa::type_registry::any_from_json::<OrganizationInvitation>,
+    is_wkt: false,
+};
+/// Public invitation data deliberately has no email field. The server must never
+/// expose the invited address to a caller that only possesses an invitation token.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct OrganizationInvitationPreview {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 3: `organization_name`
+    #[serde(
+        rename = "organizationName",
+        alias = "organization_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_name: ::buffa::alloc::string::String,
+    /// Field 4: `initial_project_id`
+    #[serde(
+        rename = "initialProjectId",
+        alias = "initial_project_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub initial_project_id: ::buffa::alloc::string::String,
+    /// Field 5: `initial_project_name`
+    #[serde(
+        rename = "initialProjectName",
+        alias = "initial_project_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub initial_project_name: ::buffa::alloc::string::String,
+    /// Field 6: `email_hint`
+    #[serde(
+        rename = "emailHint",
+        alias = "email_hint",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub email_hint: ::buffa::alloc::string::String,
+    /// Field 7: `role`
+    #[serde(
+        rename = "role",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub role: ::buffa::EnumValue<ProjectRole>,
+    /// Field 8: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<OrganizationInvitationStatus>,
+    /// Field 9: `expires_at`
+    #[serde(
+        rename = "expiresAt",
+        alias = "expires_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expires_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    /// Field 10: `accepted_at`
+    #[serde(
+        rename = "acceptedAt",
+        alias = "accepted_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub accepted_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    /// Field 11: `created_at`
+    #[serde(
+        rename = "createdAt",
+        alias = "created_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub created_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for OrganizationInvitationPreview {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("OrganizationInvitationPreview")
+            .field("id", &self.id)
+            .field("organization_id", &self.organization_id)
+            .field("organization_name", &self.organization_name)
+            .field("initial_project_id", &self.initial_project_id)
+            .field("initial_project_name", &self.initial_project_name)
+            .field("email_hint", &self.email_hint)
+            .field("role", &self.role)
+            .field("status", &self.status)
+            .field("expires_at", &self.expires_at)
+            .field("accepted_at", &self.accepted_at)
+            .field("created_at", &self.created_at)
+            .finish()
+    }
+}
+impl OrganizationInvitationPreview {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.OrganizationInvitationPreview";
+}
+::buffa::impl_default_instance!(OrganizationInvitationPreview);
+impl ::buffa::MessageName for OrganizationInvitationPreview {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "OrganizationInvitationPreview";
+    const FULL_NAME: &'static str = "briar.app.v1.OrganizationInvitationPreview";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.OrganizationInvitationPreview";
+}
+impl ::buffa::Message for OrganizationInvitationPreview {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.organization_name.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_name) as u64;
+        }
+        if !self.initial_project_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.initial_project_id)
+                        as u64;
+        }
+        if !self.initial_project_name.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.initial_project_name)
+                        as u64;
+        }
+        if !self.email_hint.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.email_hint) as u64;
+        }
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.expires_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expires_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.accepted_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.accepted_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.created_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.created_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+        }
+        if !self.organization_name.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.organization_name, buf);
+        }
+        if !self.initial_project_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.initial_project_id, buf);
+        }
+        if !self.initial_project_name.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.initial_project_name, buf);
+        }
+        if !self.email_hint.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.email_hint, buf);
+        }
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(7u32, val, buf);
+            }
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(8u32, val, buf);
+            }
+        }
+        if self.expires_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                9u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.expires_at.write_to(__cache, buf);
+        }
+        if self.accepted_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                10u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.accepted_at.write_to(__cache, buf);
+        }
+        if self.created_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                11u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.created_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_name, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.initial_project_id, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.initial_project_name, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.email_hint, buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.role = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expires_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.accepted_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.created_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.organization_id.clear();
+        self.organization_name.clear();
+        self.initial_project_id.clear();
+        self.initial_project_name.clear();
+        self.email_hint.clear();
+        self.role = ::buffa::EnumValue::from(0);
+        self.status = ::buffa::EnumValue::from(0);
+        self.expires_at = ::buffa::MessageField::none();
+        self.accepted_at = ::buffa::MessageField::none();
+        self.created_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for OrganizationInvitationPreview {
+    const PROTO_FQN: &'static str = "briar.app.v1.OrganizationInvitationPreview";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for OrganizationInvitationPreview {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ORGANIZATION_INVITATION_PREVIEW_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.OrganizationInvitationPreview",
+    to_json: ::buffa::type_registry::any_to_json::<OrganizationInvitationPreview>,
+    from_json: ::buffa::type_registry::any_from_json::<OrganizationInvitationPreview>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListOrganizationsRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListOrganizationsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListOrganizationsRequest").finish()
+    }
+}
+impl ListOrganizationsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationsRequest";
+}
+::buffa::impl_default_instance!(ListOrganizationsRequest);
+impl ::buffa::MessageName for ListOrganizationsRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ListOrganizationsRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationsRequest";
+}
+impl ::buffa::Message for ListOrganizationsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListOrganizationsRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListOrganizationsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_ORGANIZATIONS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListOrganizationsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListOrganizationsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListOrganizationsRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListOrganizationsResponse {
+    /// Field 1: `organizations`
+    #[serde(
+        rename = "organizations",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub organizations: ::buffa::alloc::vec::Vec<Organization>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListOrganizationsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListOrganizationsResponse")
+            .field("organizations", &self.organizations)
+            .finish()
+    }
+}
+impl ListOrganizationsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationsResponse";
+}
+::buffa::impl_default_instance!(ListOrganizationsResponse);
+impl ::buffa::MessageName for ListOrganizationsResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ListOrganizationsResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationsResponse";
+}
+impl ::buffa::Message for ListOrganizationsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.organizations {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.organizations {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.organizations.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organizations.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListOrganizationsResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListOrganizationsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_ORGANIZATIONS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListOrganizationsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListOrganizationsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListOrganizationsResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateOrganizationRequest {
+    /// Field 1: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    /// Field 2: `handle`
+    #[serde(
+        rename = "handle",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub handle: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateOrganizationRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateOrganizationRequest")
+            .field("name", &self.name)
+            .field("handle", &self.handle)
+            .finish()
+    }
+}
+impl CreateOrganizationRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationRequest";
+}
+::buffa::impl_default_instance!(CreateOrganizationRequest);
+impl ::buffa::MessageName for CreateOrganizationRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "CreateOrganizationRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateOrganizationRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationRequest";
+}
+impl ::buffa::Message for CreateOrganizationRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        if !self.handle.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.handle) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.name, buf);
+        }
+        if !self.handle.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.handle, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.handle, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.name.clear();
+        self.handle.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateOrganizationRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateOrganizationRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateOrganizationRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_ORGANIZATION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateOrganizationRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CreateOrganizationRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateOrganizationRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateOrganizationResponse {
+    /// Field 1: `organization`
+    #[serde(
+        rename = "organization",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub organization: ::buffa::MessageField<Organization, ::buffa::Inline<Organization>>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateOrganizationResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateOrganizationResponse")
+            .field("organization", &self.organization)
+            .finish()
+    }
+}
+impl CreateOrganizationResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationResponse";
+}
+::buffa::impl_default_instance!(CreateOrganizationResponse);
+impl ::buffa::MessageName for CreateOrganizationResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "CreateOrganizationResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateOrganizationResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationResponse";
+}
+impl ::buffa::Message for CreateOrganizationResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.organization.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.organization.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.organization.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.organization.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.organization.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateOrganizationResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateOrganizationResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateOrganizationResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_ORGANIZATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateOrganizationResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CreateOrganizationResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateOrganizationResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CheckOrganizationHandleAvailabilityRequest {
+    /// Field 1: `handle`
+    #[serde(
+        rename = "handle",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub handle: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CheckOrganizationHandleAvailabilityRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CheckOrganizationHandleAvailabilityRequest")
+            .field("handle", &self.handle)
+            .finish()
+    }
+}
+impl CheckOrganizationHandleAvailabilityRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CheckOrganizationHandleAvailabilityRequest";
+}
+::buffa::impl_default_instance!(CheckOrganizationHandleAvailabilityRequest);
+impl ::buffa::MessageName for CheckOrganizationHandleAvailabilityRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "CheckOrganizationHandleAvailabilityRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.CheckOrganizationHandleAvailabilityRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CheckOrganizationHandleAvailabilityRequest";
+}
+impl ::buffa::Message for CheckOrganizationHandleAvailabilityRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.handle.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.handle) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.handle.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.handle, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.handle, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.handle.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CheckOrganizationHandleAvailabilityRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.CheckOrganizationHandleAvailabilityRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson
+for CheckOrganizationHandleAvailabilityRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CHECK_ORGANIZATION_HANDLE_AVAILABILITY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CheckOrganizationHandleAvailabilityRequest",
+    to_json: ::buffa::type_registry::any_to_json::<
+        CheckOrganizationHandleAvailabilityRequest,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        CheckOrganizationHandleAvailabilityRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CheckOrganizationHandleAvailabilityResponse {
+    /// Field 1: `available`
+    #[serde(
+        rename = "available",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub available: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CheckOrganizationHandleAvailabilityResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CheckOrganizationHandleAvailabilityResponse")
+            .field("available", &self.available)
+            .finish()
+    }
+}
+impl CheckOrganizationHandleAvailabilityResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CheckOrganizationHandleAvailabilityResponse";
+}
+::buffa::impl_default_instance!(CheckOrganizationHandleAvailabilityResponse);
+impl ::buffa::MessageName for CheckOrganizationHandleAvailabilityResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "CheckOrganizationHandleAvailabilityResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.CheckOrganizationHandleAvailabilityResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CheckOrganizationHandleAvailabilityResponse";
+}
+impl ::buffa::Message for CheckOrganizationHandleAvailabilityResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.available {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.available {
+            ::buffa::types::put_bool_field(1u32, self.available, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.available = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.available = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CheckOrganizationHandleAvailabilityResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.CheckOrganizationHandleAvailabilityResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson
+for CheckOrganizationHandleAvailabilityResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CHECK_ORGANIZATION_HANDLE_AVAILABILITY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CheckOrganizationHandleAvailabilityResponse",
+    to_json: ::buffa::type_registry::any_to_json::<
+        CheckOrganizationHandleAvailabilityResponse,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        CheckOrganizationHandleAvailabilityResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UpdateOrganizationRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UpdateOrganizationRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UpdateOrganizationRequest")
+            .field("organization_id", &self.organization_id)
+            .field("name", &self.name)
+            .finish()
+    }
+}
+impl UpdateOrganizationRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationRequest";
+}
+::buffa::impl_default_instance!(UpdateOrganizationRequest);
+impl ::buffa::MessageName for UpdateOrganizationRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "UpdateOrganizationRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationRequest";
+}
+impl ::buffa::Message for UpdateOrganizationRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.name.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UpdateOrganizationRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateOrganizationRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UpdateOrganizationRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UPDATE_ORGANIZATION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateOrganizationRequest",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateOrganizationRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateOrganizationRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UpdateOrganizationResponse {
+    /// Field 1: `organization`
+    #[serde(
+        rename = "organization",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub organization: ::buffa::MessageField<Organization, ::buffa::Inline<Organization>>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UpdateOrganizationResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UpdateOrganizationResponse")
+            .field("organization", &self.organization)
+            .finish()
+    }
+}
+impl UpdateOrganizationResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationResponse";
+}
+::buffa::impl_default_instance!(UpdateOrganizationResponse);
+impl ::buffa::MessageName for UpdateOrganizationResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "UpdateOrganizationResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationResponse";
+}
+impl ::buffa::Message for UpdateOrganizationResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.organization.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.organization.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.organization.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.organization.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.organization.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UpdateOrganizationResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateOrganizationResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UpdateOrganizationResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UPDATE_ORGANIZATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateOrganizationResponse",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateOrganizationResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateOrganizationResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct UpdateOrganizationLogoRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    #[serde(flatten)]
+    pub logo_update: ::core::option::Option<
+        __buffa::oneof::update_organization_logo_request::LogoUpdate,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UpdateOrganizationLogoRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UpdateOrganizationLogoRequest")
+            .field("organization_id", &self.organization_id)
+            .field("logo_update", &self.logo_update)
+            .finish()
+    }
+}
+impl UpdateOrganizationLogoRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationLogoRequest";
+}
+::buffa::impl_default_instance!(UpdateOrganizationLogoRequest);
+impl ::buffa::MessageName for UpdateOrganizationLogoRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "UpdateOrganizationLogoRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationLogoRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationLogoRequest";
+}
+impl ::buffa::Message for UpdateOrganizationLogoRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if let ::core::option::Option::Some(ref v) = self.logo_update {
+            match v {
+                __buffa::oneof::update_organization_logo_request::LogoUpdate::Logo(
+                    x,
+                ) => {
+                    size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                }
+                __buffa::oneof::update_organization_logo_request::LogoUpdate::ClearLogo(
+                    x,
+                ) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.logo_update {
+            match v {
+                __buffa::oneof::update_organization_logo_request::LogoUpdate::Logo(
+                    x,
+                ) => {
+                    ::buffa::types::put_string_field(2u32, x, buf);
+                }
+                __buffa::oneof::update_organization_logo_request::LogoUpdate::ClearLogo(
+                    x,
+                ) => {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.logo_update = ::core::option::Option::Some(
+                    __buffa::oneof::update_organization_logo_request::LogoUpdate::Logo(
+                        ::buffa::types::decode_string(buf)?,
+                    ),
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::update_organization_logo_request::LogoUpdate::ClearLogo(
+                        ref mut existing,
+                    ),
+                ) = self.logo_update
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.logo_update = ::core::option::Option::Some(
+                        __buffa::oneof::update_organization_logo_request::LogoUpdate::ClearLogo(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.logo_update = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UpdateOrganizationLogoRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateOrganizationLogoRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for UpdateOrganizationLogoRequest {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = UpdateOrganizationLogoRequest;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct UpdateOrganizationLogoRequest")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<UpdateOrganizationLogoRequest, A::Error> {
+                let mut __f_organization_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __oneof_logo_update: ::core::option::Option<
+                    __buffa::oneof::update_organization_logo_request::LogoUpdate,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "organizationId" | "organization_id" => {
+                            __f_organization_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "logo" => {
+                            let v: ::core::option::Option<
+                                ::buffa::alloc::string::String,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::alloc::string::String,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_logo_update.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'logo_update'",
+                                        ),
+                                    );
+                                }
+                                __oneof_logo_update = Some(
+                                    __buffa::oneof::update_organization_logo_request::LogoUpdate::Logo(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "clearLogo" | "clear_logo" => {
+                            let v: ::core::option::Option<
+                                ::buffa_types::google::protobuf::Empty,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa_types::google::protobuf::Empty,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_logo_update.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'logo_update'",
+                                        ),
+                                    );
+                                }
+                                __oneof_logo_update = Some(
+                                    __buffa::oneof::update_organization_logo_request::LogoUpdate::ClearLogo(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <UpdateOrganizationLogoRequest as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_organization_id {
+                    __r.organization_id = v;
+                }
+                __r.logo_update = __oneof_logo_update;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UpdateOrganizationLogoRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UPDATE_ORGANIZATION_LOGO_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateOrganizationLogoRequest",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateOrganizationLogoRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateOrganizationLogoRequest>,
+    is_wkt: false,
+};
+pub mod update_organization_logo_request {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::update_organization_logo_request::LogoUpdate;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate as LogoUpdateView;
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UpdateOrganizationLogoResponse {
+    /// Field 1: `organization`
+    #[serde(
+        rename = "organization",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub organization: ::buffa::MessageField<Organization, ::buffa::Inline<Organization>>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UpdateOrganizationLogoResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UpdateOrganizationLogoResponse")
+            .field("organization", &self.organization)
+            .finish()
+    }
+}
+impl UpdateOrganizationLogoResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationLogoResponse";
+}
+::buffa::impl_default_instance!(UpdateOrganizationLogoResponse);
+impl ::buffa::MessageName for UpdateOrganizationLogoResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "UpdateOrganizationLogoResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationLogoResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationLogoResponse";
+}
+impl ::buffa::Message for UpdateOrganizationLogoResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.organization.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.organization.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.organization.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.organization.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.organization.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UpdateOrganizationLogoResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateOrganizationLogoResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UpdateOrganizationLogoResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UPDATE_ORGANIZATION_LOGO_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateOrganizationLogoResponse",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateOrganizationLogoResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateOrganizationLogoResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListOrganizationInvitationsRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListOrganizationInvitationsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListOrganizationInvitationsRequest")
+            .field("organization_id", &self.organization_id)
+            .finish()
+    }
+}
+impl ListOrganizationInvitationsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationInvitationsRequest";
+}
+::buffa::impl_default_instance!(ListOrganizationInvitationsRequest);
+impl ::buffa::MessageName for ListOrganizationInvitationsRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ListOrganizationInvitationsRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationInvitationsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationInvitationsRequest";
+}
+impl ::buffa::Message for ListOrganizationInvitationsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListOrganizationInvitationsRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListOrganizationInvitationsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationInvitationsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_ORGANIZATION_INVITATIONS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListOrganizationInvitationsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListOrganizationInvitationsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        ListOrganizationInvitationsRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListOrganizationInvitationsResponse {
+    /// Field 1: `invitations`
+    #[serde(
+        rename = "invitations",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub invitations: ::buffa::alloc::vec::Vec<OrganizationInvitation>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListOrganizationInvitationsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListOrganizationInvitationsResponse")
+            .field("invitations", &self.invitations)
+            .finish()
+    }
+}
+impl ListOrganizationInvitationsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationInvitationsResponse";
+}
+::buffa::impl_default_instance!(ListOrganizationInvitationsResponse);
+impl ::buffa::MessageName for ListOrganizationInvitationsResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ListOrganizationInvitationsResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationInvitationsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationInvitationsResponse";
+}
+impl ::buffa::Message for ListOrganizationInvitationsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.invitations {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.invitations {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.invitations.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.invitations.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListOrganizationInvitationsResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListOrganizationInvitationsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationInvitationsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_ORGANIZATION_INVITATIONS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListOrganizationInvitationsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListOrganizationInvitationsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        ListOrganizationInvitationsResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateOrganizationInvitationRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `email`
+    #[serde(
+        rename = "email",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub email: ::buffa::alloc::string::String,
+    /// Field 3: `role`
+    #[serde(
+        rename = "role",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub role: ::buffa::EnumValue<ProjectRole>,
+    /// Field 4: `initial_project_id`
+    #[serde(
+        rename = "initialProjectId",
+        alias = "initial_project_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub initial_project_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateOrganizationInvitationRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateOrganizationInvitationRequest")
+            .field("organization_id", &self.organization_id)
+            .field("email", &self.email)
+            .field("role", &self.role)
+            .field("initial_project_id", &self.initial_project_id)
+            .finish()
+    }
+}
+impl CreateOrganizationInvitationRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationInvitationRequest";
+}
+::buffa::impl_default_instance!(CreateOrganizationInvitationRequest);
+impl ::buffa::MessageName for CreateOrganizationInvitationRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "CreateOrganizationInvitationRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateOrganizationInvitationRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationInvitationRequest";
+}
+impl ::buffa::Message for CreateOrganizationInvitationRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.email.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.email) as u64;
+        }
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if !self.initial_project_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.initial_project_id)
+                        as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.email.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.email, buf);
+        }
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if !self.initial_project_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.initial_project_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.email, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.role = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.initial_project_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.email.clear();
+        self.role = ::buffa::EnumValue::from(0);
+        self.initial_project_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateOrganizationInvitationRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateOrganizationInvitationRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateOrganizationInvitationRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_ORGANIZATION_INVITATION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateOrganizationInvitationRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CreateOrganizationInvitationRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        CreateOrganizationInvitationRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateOrganizationInvitationResponse {
+    /// Field 1: `invitation`
+    #[serde(
+        rename = "invitation",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub invitation: ::buffa::MessageField<
+        OrganizationInvitation,
+        ::buffa::Inline<OrganizationInvitation>,
+    >,
+    /// Field 2: `invite_path`
+    #[serde(
+        rename = "invitePath",
+        alias = "invite_path",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub invite_path: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateOrganizationInvitationResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateOrganizationInvitationResponse")
+            .field("invitation", &self.invitation)
+            .field("invite_path", &self.invite_path)
+            .finish()
+    }
+}
+impl CreateOrganizationInvitationResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationInvitationResponse";
+}
+::buffa::impl_default_instance!(CreateOrganizationInvitationResponse);
+impl ::buffa::MessageName for CreateOrganizationInvitationResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "CreateOrganizationInvitationResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateOrganizationInvitationResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationInvitationResponse";
+}
+impl ::buffa::Message for CreateOrganizationInvitationResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.invitation.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.invitation.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if !self.invite_path.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.invite_path) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.invitation.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.invitation.write_to(__cache, buf);
+        }
+        if !self.invite_path.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.invite_path, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.invitation.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.invite_path, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.invitation = ::buffa::MessageField::none();
+        self.invite_path.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateOrganizationInvitationResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateOrganizationInvitationResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateOrganizationInvitationResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_ORGANIZATION_INVITATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateOrganizationInvitationResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CreateOrganizationInvitationResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        CreateOrganizationInvitationResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RevokeOrganizationInvitationRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `invitation_id`
+    #[serde(
+        rename = "invitationId",
+        alias = "invitation_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub invitation_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RevokeOrganizationInvitationRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RevokeOrganizationInvitationRequest")
+            .field("organization_id", &self.organization_id)
+            .field("invitation_id", &self.invitation_id)
+            .finish()
+    }
+}
+impl RevokeOrganizationInvitationRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RevokeOrganizationInvitationRequest";
+}
+::buffa::impl_default_instance!(RevokeOrganizationInvitationRequest);
+impl ::buffa::MessageName for RevokeOrganizationInvitationRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "RevokeOrganizationInvitationRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.RevokeOrganizationInvitationRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RevokeOrganizationInvitationRequest";
+}
+impl ::buffa::Message for RevokeOrganizationInvitationRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.invitation_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.invitation_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.invitation_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.invitation_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.invitation_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.invitation_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RevokeOrganizationInvitationRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.RevokeOrganizationInvitationRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RevokeOrganizationInvitationRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REVOKE_ORGANIZATION_INVITATION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.RevokeOrganizationInvitationRequest",
+    to_json: ::buffa::type_registry::any_to_json::<RevokeOrganizationInvitationRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        RevokeOrganizationInvitationRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RevokeOrganizationInvitationResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RevokeOrganizationInvitationResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RevokeOrganizationInvitationResponse").finish()
+    }
+}
+impl RevokeOrganizationInvitationResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RevokeOrganizationInvitationResponse";
+}
+::buffa::impl_default_instance!(RevokeOrganizationInvitationResponse);
+impl ::buffa::MessageName for RevokeOrganizationInvitationResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "RevokeOrganizationInvitationResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.RevokeOrganizationInvitationResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RevokeOrganizationInvitationResponse";
+}
+impl ::buffa::Message for RevokeOrganizationInvitationResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RevokeOrganizationInvitationResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.RevokeOrganizationInvitationResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RevokeOrganizationInvitationResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REVOKE_ORGANIZATION_INVITATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.RevokeOrganizationInvitationResponse",
+    to_json: ::buffa::type_registry::any_to_json::<RevokeOrganizationInvitationResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        RevokeOrganizationInvitationResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetOrganizationInvitationRequest {
+    /// Field 1: `token`
+    #[serde(
+        rename = "token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub token: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetOrganizationInvitationRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetOrganizationInvitationRequest")
+            .field("token", &self.token)
+            .finish()
+    }
+}
+impl GetOrganizationInvitationRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetOrganizationInvitationRequest";
+}
+::buffa::impl_default_instance!(GetOrganizationInvitationRequest);
+impl ::buffa::MessageName for GetOrganizationInvitationRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "GetOrganizationInvitationRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.GetOrganizationInvitationRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetOrganizationInvitationRequest";
+}
+impl ::buffa::Message for GetOrganizationInvitationRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.token.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.token) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.token.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.token, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.token, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.token.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetOrganizationInvitationRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.GetOrganizationInvitationRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetOrganizationInvitationRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_ORGANIZATION_INVITATION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.GetOrganizationInvitationRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetOrganizationInvitationRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetOrganizationInvitationRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetOrganizationInvitationResponse {
+    /// Field 1: `invitation`
+    #[serde(
+        rename = "invitation",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub invitation: ::buffa::MessageField<
+        OrganizationInvitationPreview,
+        ::buffa::Inline<OrganizationInvitationPreview>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetOrganizationInvitationResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetOrganizationInvitationResponse")
+            .field("invitation", &self.invitation)
+            .finish()
+    }
+}
+impl GetOrganizationInvitationResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetOrganizationInvitationResponse";
+}
+::buffa::impl_default_instance!(GetOrganizationInvitationResponse);
+impl ::buffa::MessageName for GetOrganizationInvitationResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "GetOrganizationInvitationResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.GetOrganizationInvitationResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetOrganizationInvitationResponse";
+}
+impl ::buffa::Message for GetOrganizationInvitationResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.invitation.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.invitation.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.invitation.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.invitation.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.invitation.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.invitation = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetOrganizationInvitationResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.GetOrganizationInvitationResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetOrganizationInvitationResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_ORGANIZATION_INVITATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.GetOrganizationInvitationResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetOrganizationInvitationResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetOrganizationInvitationResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AcceptOrganizationInvitationRequest {
+    /// Field 1: `token`
+    #[serde(
+        rename = "token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub token: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AcceptOrganizationInvitationRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AcceptOrganizationInvitationRequest")
+            .field("token", &self.token)
+            .finish()
+    }
+}
+impl AcceptOrganizationInvitationRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.AcceptOrganizationInvitationRequest";
+}
+::buffa::impl_default_instance!(AcceptOrganizationInvitationRequest);
+impl ::buffa::MessageName for AcceptOrganizationInvitationRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "AcceptOrganizationInvitationRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.AcceptOrganizationInvitationRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.AcceptOrganizationInvitationRequest";
+}
+impl ::buffa::Message for AcceptOrganizationInvitationRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.token.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.token) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.token.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.token, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.token, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.token.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AcceptOrganizationInvitationRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.AcceptOrganizationInvitationRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AcceptOrganizationInvitationRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ACCEPT_ORGANIZATION_INVITATION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.AcceptOrganizationInvitationRequest",
+    to_json: ::buffa::type_registry::any_to_json::<AcceptOrganizationInvitationRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        AcceptOrganizationInvitationRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AcceptOrganizationInvitationResponse {
+    /// Field 1: `invitation`
+    #[serde(
+        rename = "invitation",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub invitation: ::buffa::MessageField<
+        OrganizationInvitationPreview,
+        ::buffa::Inline<OrganizationInvitationPreview>,
+    >,
+    /// Field 2: `already_accepted`
+    #[serde(
+        rename = "alreadyAccepted",
+        alias = "already_accepted",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub already_accepted: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AcceptOrganizationInvitationResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AcceptOrganizationInvitationResponse")
+            .field("invitation", &self.invitation)
+            .field("already_accepted", &self.already_accepted)
+            .finish()
+    }
+}
+impl AcceptOrganizationInvitationResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.AcceptOrganizationInvitationResponse";
+}
+::buffa::impl_default_instance!(AcceptOrganizationInvitationResponse);
+impl ::buffa::MessageName for AcceptOrganizationInvitationResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "AcceptOrganizationInvitationResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.AcceptOrganizationInvitationResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.AcceptOrganizationInvitationResponse";
+}
+impl ::buffa::Message for AcceptOrganizationInvitationResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.invitation.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.invitation.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.already_accepted {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.invitation.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.invitation.write_to(__cache, buf);
+        }
+        if self.already_accepted {
+            ::buffa::types::put_bool_field(2u32, self.already_accepted, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.invitation.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.already_accepted = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.invitation = ::buffa::MessageField::none();
+        self.already_accepted = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AcceptOrganizationInvitationResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.AcceptOrganizationInvitationResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AcceptOrganizationInvitationResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ACCEPT_ORGANIZATION_INVITATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.AcceptOrganizationInvitationResponse",
+    to_json: ::buffa::type_registry::any_to_json::<AcceptOrganizationInvitationResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        AcceptOrganizationInvitationResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListOrganizationMembersRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListOrganizationMembersRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListOrganizationMembersRequest")
+            .field("organization_id", &self.organization_id)
+            .finish()
+    }
+}
+impl ListOrganizationMembersRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationMembersRequest";
+}
+::buffa::impl_default_instance!(ListOrganizationMembersRequest);
+impl ::buffa::MessageName for ListOrganizationMembersRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ListOrganizationMembersRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationMembersRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationMembersRequest";
+}
+impl ::buffa::Message for ListOrganizationMembersRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListOrganizationMembersRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListOrganizationMembersRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationMembersRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_ORGANIZATION_MEMBERS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListOrganizationMembersRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListOrganizationMembersRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListOrganizationMembersRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListOrganizationMembersResponse {
+    /// Field 1: `members`
+    #[serde(
+        rename = "members",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub members: ::buffa::alloc::vec::Vec<OrganizationMember>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListOrganizationMembersResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListOrganizationMembersResponse")
+            .field("members", &self.members)
+            .finish()
+    }
+}
+impl ListOrganizationMembersResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationMembersResponse";
+}
+::buffa::impl_default_instance!(ListOrganizationMembersResponse);
+impl ::buffa::MessageName for ListOrganizationMembersResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ListOrganizationMembersResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationMembersResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationMembersResponse";
+}
+impl ::buffa::Message for ListOrganizationMembersResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.members {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.members {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.members.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.members.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListOrganizationMembersResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListOrganizationMembersResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationMembersResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_ORGANIZATION_MEMBERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListOrganizationMembersResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListOrganizationMembersResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListOrganizationMembersResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UpdateOrganizationMemberRoleRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `user_id`
+    #[serde(
+        rename = "userId",
+        alias = "user_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub user_id: ::buffa::alloc::string::String,
+    /// Field 3: `role`
+    #[serde(
+        rename = "role",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub role: ::buffa::EnumValue<ProjectRole>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UpdateOrganizationMemberRoleRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UpdateOrganizationMemberRoleRequest")
+            .field("organization_id", &self.organization_id)
+            .field("user_id", &self.user_id)
+            .field("role", &self.role)
+            .finish()
+    }
+}
+impl UpdateOrganizationMemberRoleRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberRoleRequest";
+}
+::buffa::impl_default_instance!(UpdateOrganizationMemberRoleRequest);
+impl ::buffa::MessageName for UpdateOrganizationMemberRoleRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "UpdateOrganizationMemberRoleRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationMemberRoleRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberRoleRequest";
+}
+impl ::buffa::Message for UpdateOrganizationMemberRoleRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.user_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.user_id) as u64;
+        }
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.user_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.user_id, buf);
+        }
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.user_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.role = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.user_id.clear();
+        self.role = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UpdateOrganizationMemberRoleRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateOrganizationMemberRoleRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UpdateOrganizationMemberRoleRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UPDATE_ORGANIZATION_MEMBER_ROLE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberRoleRequest",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateOrganizationMemberRoleRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        UpdateOrganizationMemberRoleRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UpdateOrganizationMemberRoleResponse {
+    /// Field 1: `members`
+    #[serde(
+        rename = "members",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub members: ::buffa::alloc::vec::Vec<OrganizationMember>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UpdateOrganizationMemberRoleResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UpdateOrganizationMemberRoleResponse")
+            .field("members", &self.members)
+            .finish()
+    }
+}
+impl UpdateOrganizationMemberRoleResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberRoleResponse";
+}
+::buffa::impl_default_instance!(UpdateOrganizationMemberRoleResponse);
+impl ::buffa::MessageName for UpdateOrganizationMemberRoleResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "UpdateOrganizationMemberRoleResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationMemberRoleResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberRoleResponse";
+}
+impl ::buffa::Message for UpdateOrganizationMemberRoleResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.members {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.members {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.members.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.members.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UpdateOrganizationMemberRoleResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateOrganizationMemberRoleResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UpdateOrganizationMemberRoleResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UPDATE_ORGANIZATION_MEMBER_ROLE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberRoleResponse",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateOrganizationMemberRoleResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        UpdateOrganizationMemberRoleResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UpdateOrganizationMemberProjectsRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `user_id`
+    #[serde(
+        rename = "userId",
+        alias = "user_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub user_id: ::buffa::alloc::string::String,
+    /// Field 3: `project_ids`
+    #[serde(
+        rename = "projectIds",
+        alias = "project_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub project_ids: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UpdateOrganizationMemberProjectsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UpdateOrganizationMemberProjectsRequest")
+            .field("organization_id", &self.organization_id)
+            .field("user_id", &self.user_id)
+            .field("project_ids", &self.project_ids)
+            .finish()
+    }
+}
+impl UpdateOrganizationMemberProjectsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberProjectsRequest";
+}
+::buffa::impl_default_instance!(UpdateOrganizationMemberProjectsRequest);
+impl ::buffa::MessageName for UpdateOrganizationMemberProjectsRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "UpdateOrganizationMemberProjectsRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationMemberProjectsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberProjectsRequest";
+}
+impl ::buffa::Message for UpdateOrganizationMemberProjectsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.user_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.user_id) as u64;
+        }
+        for v in &self.project_ids {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.user_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.user_id, buf);
+        }
+        for v in &self.project_ids {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.user_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.project_ids.push(__elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.user_id.clear();
+        self.project_ids.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UpdateOrganizationMemberProjectsRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateOrganizationMemberProjectsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UpdateOrganizationMemberProjectsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UPDATE_ORGANIZATION_MEMBER_PROJECTS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberProjectsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<
+        UpdateOrganizationMemberProjectsRequest,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        UpdateOrganizationMemberProjectsRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UpdateOrganizationMemberProjectsResponse {
+    /// Field 1: `members`
+    #[serde(
+        rename = "members",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub members: ::buffa::alloc::vec::Vec<OrganizationMember>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UpdateOrganizationMemberProjectsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UpdateOrganizationMemberProjectsResponse")
+            .field("members", &self.members)
+            .finish()
+    }
+}
+impl UpdateOrganizationMemberProjectsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberProjectsResponse";
+}
+::buffa::impl_default_instance!(UpdateOrganizationMemberProjectsResponse);
+impl ::buffa::MessageName for UpdateOrganizationMemberProjectsResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "UpdateOrganizationMemberProjectsResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationMemberProjectsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberProjectsResponse";
+}
+impl ::buffa::Message for UpdateOrganizationMemberProjectsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.members {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.members {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.members.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.members.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UpdateOrganizationMemberProjectsResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateOrganizationMemberProjectsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UpdateOrganizationMemberProjectsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UPDATE_ORGANIZATION_MEMBER_PROJECTS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberProjectsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<
+        UpdateOrganizationMemberProjectsResponse,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        UpdateOrganizationMemberProjectsResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RemoveOrganizationMemberRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `user_id`
+    #[serde(
+        rename = "userId",
+        alias = "user_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub user_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RemoveOrganizationMemberRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RemoveOrganizationMemberRequest")
+            .field("organization_id", &self.organization_id)
+            .field("user_id", &self.user_id)
+            .finish()
+    }
+}
+impl RemoveOrganizationMemberRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RemoveOrganizationMemberRequest";
+}
+::buffa::impl_default_instance!(RemoveOrganizationMemberRequest);
+impl ::buffa::MessageName for RemoveOrganizationMemberRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "RemoveOrganizationMemberRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.RemoveOrganizationMemberRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RemoveOrganizationMemberRequest";
+}
+impl ::buffa::Message for RemoveOrganizationMemberRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.user_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.user_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.user_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.user_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.user_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.user_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RemoveOrganizationMemberRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.RemoveOrganizationMemberRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RemoveOrganizationMemberRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REMOVE_ORGANIZATION_MEMBER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.RemoveOrganizationMemberRequest",
+    to_json: ::buffa::type_registry::any_to_json::<RemoveOrganizationMemberRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<RemoveOrganizationMemberRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RemoveOrganizationMemberResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RemoveOrganizationMemberResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RemoveOrganizationMemberResponse").finish()
+    }
+}
+impl RemoveOrganizationMemberResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RemoveOrganizationMemberResponse";
+}
+::buffa::impl_default_instance!(RemoveOrganizationMemberResponse);
+impl ::buffa::MessageName for RemoveOrganizationMemberResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "RemoveOrganizationMemberResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.RemoveOrganizationMemberResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RemoveOrganizationMemberResponse";
+}
+impl ::buffa::Message for RemoveOrganizationMemberResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RemoveOrganizationMemberResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.RemoveOrganizationMemberResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RemoveOrganizationMemberResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REMOVE_ORGANIZATION_MEMBER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.RemoveOrganizationMemberResponse",
+    to_json: ::buffa::type_registry::any_to_json::<RemoveOrganizationMemberResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<RemoveOrganizationMemberResponse>,
+    is_wkt: false,
+};
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -84924,590 +90211,6 @@ pub mod __buffa {
             type ViewHandle = GetCurrentUserResponseOwnedView;
         }
         impl ::serde::Serialize for GetCurrentUserResponseOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        #[derive(Clone, Debug, Default)]
-        pub struct ListOrganizationMembersRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for ListOrganizationMembersRequestView<'a> {
-            type Owned = super::super::ListOrganizationMembersRequest;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            #[inline]
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::ListOrganizationMembersRequest,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::ListOrganizationMembersRequest,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ListOrganizationMembersRequest {
-                    organization_id: self.organization_id.to_string(),
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for ListOrganizationMembersRequestView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u64;
-                if !self.organization_id.is_empty() {
-                    size
-                        += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
-                                as u64;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u64;
-                ::buffa::saturate_size(size)
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                _cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::EncodeSink,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ListOrganizationMembersRequestView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for ListOrganizationMembersRequestView<'a> {
-            const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "ListOrganizationMembersRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationMembersRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationMembersRequest";
-        }
-        ::buffa::impl_default_view_instance!(ListOrganizationMembersRequestView);
-        ::buffa::impl_view_reborrow!(ListOrganizationMembersRequestView);
-        /** Self-contained, `'static` owned view of a `ListOrganizationMembersRequest` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`ListOrganizationMembersRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListOrganizationMembersRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct ListOrganizationMembersRequestOwnedView(
-            ::buffa::OwnedView<ListOrganizationMembersRequestView<'static>>,
-        );
-        impl ListOrganizationMembersRequestOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    ListOrganizationMembersRequestOwnedView(
-                        ::buffa::OwnedView::decode(bytes)?,
-                    ),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    ListOrganizationMembersRequestOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
-            /// message's encoded size exceeds the 2 GiB protobuf limit, or
-            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::ListOrganizationMembersRequest,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    ListOrganizationMembersRequestOwnedView(
-                        ::buffa::OwnedView::from_owned(msg)?,
-                    ),
-                )
-            }
-            /// Borrow the full [`ListOrganizationMembersRequestView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &ListOrganizationMembersRequestView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// Infallible: this type's constructors wire-decode their
-            /// buffer, and a view produced by wire decoding always
-            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
-            /// whose contract also governs handles converted from a raw
-            /// [`::buffa::OwnedView`].
-            #[must_use]
-            pub fn to_owned_message(
-                &self,
-            ) -> super::super::ListOrganizationMembersRequest {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Field 1: `organization_id`
-            #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
-            }
-        }
-        impl ::core::convert::From<
-            ::buffa::OwnedView<ListOrganizationMembersRequestView<'static>>,
-        > for ListOrganizationMembersRequestOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<ListOrganizationMembersRequestView<'static>>,
-            ) -> Self {
-                ListOrganizationMembersRequestOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<ListOrganizationMembersRequestOwnedView>
-        for ::buffa::OwnedView<ListOrganizationMembersRequestView<'static>> {
-            fn from(wrapper: ListOrganizationMembersRequestOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<ListOrganizationMembersRequestView<'static>>,
-        > for ListOrganizationMembersRequestOwnedView {
-            fn as_ref(
-                &self,
-            ) -> &::buffa::OwnedView<ListOrganizationMembersRequestView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::ListOrganizationMembersRequest {
-            type View<'a> = ListOrganizationMembersRequestView<'a>;
-            type ViewHandle = ListOrganizationMembersRequestOwnedView;
-        }
-        impl ::serde::Serialize for ListOrganizationMembersRequestOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        #[derive(Clone, Debug, Default)]
-        pub struct ListOrganizationMembersResponseView<'a> {
-            /// Field 1: `members`
-            pub members: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::OrganizationMemberView<'a>,
-            >,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for ListOrganizationMembersResponseView<'a> {
-            type Owned = super::super::ListOrganizationMembersResponse;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            #[inline]
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        ctx.register_element_memory(
-                            ::core::mem::size_of::<
-                                super::super::__buffa::view::OrganizationMemberView,
-                            >(),
-                        )?;
-                        view.members
-                            .push(
-                                <super::super::__buffa::view::OrganizationMemberView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::ListOrganizationMembersResponse,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::ListOrganizationMembersResponse,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ListOrganizationMembersResponse {
-                    members: self
-                        .members
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for ListOrganizationMembersResponseView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u64;
-                for v in &self.members {
-                    let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                            + inner_size as u64;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u64;
-                ::buffa::saturate_size(size)
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                __cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::EncodeSink,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                for v in &self.members {
-                    ::buffa::types::put_len_delimited_header(
-                        1u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    v.write_to(__cache, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ListOrganizationMembersResponseView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !self.members.is_empty() {
-                    __map.serialize_entry("members", &*self.members)?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for ListOrganizationMembersResponseView<'a> {
-            const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "ListOrganizationMembersResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationMembersResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationMembersResponse";
-        }
-        ::buffa::impl_default_view_instance!(ListOrganizationMembersResponseView);
-        ::buffa::impl_view_reborrow!(ListOrganizationMembersResponseView);
-        /** Self-contained, `'static` owned view of a `ListOrganizationMembersResponse` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`ListOrganizationMembersResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListOrganizationMembersResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct ListOrganizationMembersResponseOwnedView(
-            ::buffa::OwnedView<ListOrganizationMembersResponseView<'static>>,
-        );
-        impl ListOrganizationMembersResponseOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    ListOrganizationMembersResponseOwnedView(
-                        ::buffa::OwnedView::decode(bytes)?,
-                    ),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    ListOrganizationMembersResponseOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
-            /// message's encoded size exceeds the 2 GiB protobuf limit, or
-            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::ListOrganizationMembersResponse,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    ListOrganizationMembersResponseOwnedView(
-                        ::buffa::OwnedView::from_owned(msg)?,
-                    ),
-                )
-            }
-            /// Borrow the full [`ListOrganizationMembersResponseView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &ListOrganizationMembersResponseView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// Infallible: this type's constructors wire-decode their
-            /// buffer, and a view produced by wire decoding always
-            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
-            /// whose contract also governs handles converted from a raw
-            /// [`::buffa::OwnedView`].
-            #[must_use]
-            pub fn to_owned_message(
-                &self,
-            ) -> super::super::ListOrganizationMembersResponse {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Field 1: `members`
-            #[must_use]
-            pub fn members(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::OrganizationMemberView<'_>,
-            > {
-                &self.0.reborrow().members
-            }
-        }
-        impl ::core::convert::From<
-            ::buffa::OwnedView<ListOrganizationMembersResponseView<'static>>,
-        > for ListOrganizationMembersResponseOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<ListOrganizationMembersResponseView<'static>>,
-            ) -> Self {
-                ListOrganizationMembersResponseOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<ListOrganizationMembersResponseOwnedView>
-        for ::buffa::OwnedView<ListOrganizationMembersResponseView<'static>> {
-            fn from(wrapper: ListOrganizationMembersResponseOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<ListOrganizationMembersResponseView<'static>>,
-        > for ListOrganizationMembersResponseOwnedView {
-            fn as_ref(
-                &self,
-            ) -> &::buffa::OwnedView<ListOrganizationMembersResponseView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::ListOrganizationMembersResponse {
-            type View<'a> = ListOrganizationMembersResponseView<'a>;
-            type ViewHandle = ListOrganizationMembersResponseOwnedView;
-        }
-        impl ::serde::Serialize for ListOrganizationMembersResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -183155,6 +187858,10528 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
+        pub struct OrganizationView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `name`
+            pub name: &'a str,
+            /// Field 3: `handle`
+            pub handle: &'a str,
+            /// Field 4: `logo`
+            pub logo: ::core::option::Option<&'a str>,
+            /// Field 5: `role`
+            pub role: ::buffa::EnumValue<super::super::ProjectRole>,
+            /// Field 6: `created_at`
+            pub created_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for OrganizationView<'a> {
+            type Owned = super::super::Organization;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.handle = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.logo = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.role = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.created_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.created_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::Organization,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::Organization,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::Organization {
+                    id: self.id.to_string(),
+                    name: self.name.to_string(),
+                    handle: self.handle.to_string(),
+                    logo: self.logo.map(|s| s.to_string()),
+                    role: self.role,
+                    created_at: match self.created_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for OrganizationView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if !self.name.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+                }
+                if !self.handle.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.handle) as u64;
+                }
+                if let Some(ref v) = self.logo {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if self.created_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.created_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if !self.name.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.name, buf);
+                }
+                if !self.handle.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.handle, buf);
+                }
+                if let Some(ref v) = self.logo {
+                    ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(5u32, val, buf);
+                    }
+                }
+                if self.created_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.created_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for OrganizationView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+                    __map.serialize_entry("name", self.name)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.handle) {
+                    __map.serialize_entry("handle", self.handle)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.logo {
+                    __map.serialize_entry("logo", __v)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.role) {
+                    __map.serialize_entry("role", &self.role)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .created_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("createdAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for OrganizationView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "Organization";
+            const FULL_NAME: &'static str = "briar.app.v1.Organization";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.Organization";
+        }
+        ::buffa::impl_default_view_instance!(OrganizationView);
+        ::buffa::impl_view_reborrow!(OrganizationView);
+        /** Self-contained, `'static` owned view of a `Organization` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`OrganizationView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`OrganizationView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct OrganizationOwnedView(::buffa::OwnedView<OrganizationView<'static>>);
+        impl OrganizationOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrganizationOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrganizationOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::Organization,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrganizationOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`OrganizationView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &OrganizationView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::Organization {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `name`
+            #[must_use]
+            pub fn name(&self) -> &'_ str {
+                self.0.reborrow().name
+            }
+            /// Field 3: `handle`
+            #[must_use]
+            pub fn handle(&self) -> &'_ str {
+                self.0.reborrow().handle
+            }
+            /// Field 4: `logo`
+            #[must_use]
+            pub fn logo(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().logo
+            }
+            /// Field 5: `role`
+            #[must_use]
+            pub fn role(&self) -> ::buffa::EnumValue<super::super::ProjectRole> {
+                self.0.reborrow().role
+            }
+            /// Field 6: `created_at`
+            #[must_use]
+            pub fn created_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().created_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<OrganizationView<'static>>>
+        for OrganizationOwnedView {
+            fn from(inner: ::buffa::OwnedView<OrganizationView<'static>>) -> Self {
+                OrganizationOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<OrganizationOwnedView>
+        for ::buffa::OwnedView<OrganizationView<'static>> {
+            fn from(wrapper: OrganizationOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<OrganizationView<'static>>>
+        for OrganizationOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<OrganizationView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::Organization {
+            type View<'a> = OrganizationView<'a>;
+            type ViewHandle = OrganizationOwnedView;
+        }
+        impl ::serde::Serialize for OrganizationOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct OrganizationInvitationView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 3: `organization_name`
+            pub organization_name: &'a str,
+            /// Field 4: `initial_project_id`
+            pub initial_project_id: &'a str,
+            /// Field 5: `initial_project_name`
+            pub initial_project_name: &'a str,
+            /// Field 6: `email`
+            pub email: &'a str,
+            /// Field 7: `email_hint`
+            pub email_hint: &'a str,
+            /// Field 8: `role`
+            pub role: ::buffa::EnumValue<super::super::ProjectRole>,
+            /// Field 9: `status`
+            pub status: ::buffa::EnumValue<super::super::OrganizationInvitationStatus>,
+            /// Field 10: `expires_at`
+            pub expires_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Field 11: `accepted_at`
+            pub accepted_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Field 12: `created_at`
+            pub created_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for OrganizationInvitationView<'a> {
+            type Owned = super::super::OrganizationInvitation;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.initial_project_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.initial_project_name = ::buffa::types::borrow_str(
+                            &mut cur,
+                        )?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.email = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.email_hint = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.role = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expires_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expires_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.accepted_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.accepted_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.created_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.created_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::OrganizationInvitation,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::OrganizationInvitation,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::OrganizationInvitation {
+                    id: self.id.to_string(),
+                    organization_id: self.organization_id.to_string(),
+                    organization_name: self.organization_name.to_string(),
+                    initial_project_id: self.initial_project_id.to_string(),
+                    initial_project_name: self.initial_project_name.to_string(),
+                    email: self.email.to_string(),
+                    email_hint: self.email_hint.to_string(),
+                    role: self.role,
+                    status: self.status,
+                    expires_at: match self.expires_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    accepted_at: match self.accepted_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    created_at: match self.created_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for OrganizationInvitationView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.organization_name.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_name)
+                                as u64;
+                }
+                if !self.initial_project_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(
+                                &self.initial_project_id,
+                            ) as u64;
+                }
+                if !self.initial_project_name.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(
+                                &self.initial_project_name,
+                            ) as u64;
+                }
+                if !self.email.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::string_encoded_len(&self.email) as u64;
+                }
+                if !self.email_hint.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.email_hint)
+                                as u64;
+                }
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if self.expires_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expires_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.accepted_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.accepted_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.created_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.created_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+                }
+                if !self.organization_name.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.organization_name, buf);
+                }
+                if !self.initial_project_id.is_empty() {
+                    ::buffa::types::put_string_field(
+                        4u32,
+                        &self.initial_project_id,
+                        buf,
+                    );
+                }
+                if !self.initial_project_name.is_empty() {
+                    ::buffa::types::put_string_field(
+                        5u32,
+                        &self.initial_project_name,
+                        buf,
+                    );
+                }
+                if !self.email.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.email, buf);
+                }
+                if !self.email_hint.is_empty() {
+                    ::buffa::types::put_string_field(7u32, &self.email_hint, buf);
+                }
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(8u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(9u32, val, buf);
+                    }
+                }
+                if self.expires_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.expires_at.write_to(__cache, buf);
+                }
+                if self.accepted_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        11u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.accepted_at.write_to(__cache, buf);
+                }
+                if self.created_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        12u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.created_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for OrganizationInvitationView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.organization_name,
+                ) {
+                    __map.serialize_entry("organizationName", self.organization_name)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.initial_project_id,
+                ) {
+                    __map.serialize_entry("initialProjectId", self.initial_project_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.initial_project_name,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "initialProjectName",
+                            self.initial_project_name,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.email) {
+                    __map.serialize_entry("email", self.email)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.email_hint) {
+                    __map.serialize_entry("emailHint", self.email_hint)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.role) {
+                    __map.serialize_entry("role", &self.role)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .expires_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("expiresAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .accepted_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("acceptedAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .created_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("createdAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for OrganizationInvitationView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "OrganizationInvitation";
+            const FULL_NAME: &'static str = "briar.app.v1.OrganizationInvitation";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.OrganizationInvitation";
+        }
+        ::buffa::impl_default_view_instance!(OrganizationInvitationView);
+        ::buffa::impl_view_reborrow!(OrganizationInvitationView);
+        /** Self-contained, `'static` owned view of a `OrganizationInvitation` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`OrganizationInvitationView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`OrganizationInvitationView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct OrganizationInvitationOwnedView(
+            ::buffa::OwnedView<OrganizationInvitationView<'static>>,
+        );
+        impl OrganizationInvitationOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrganizationInvitationOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrganizationInvitationOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::OrganizationInvitation,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrganizationInvitationOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`OrganizationInvitationView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &OrganizationInvitationView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::OrganizationInvitation {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 3: `organization_name`
+            #[must_use]
+            pub fn organization_name(&self) -> &'_ str {
+                self.0.reborrow().organization_name
+            }
+            /// Field 4: `initial_project_id`
+            #[must_use]
+            pub fn initial_project_id(&self) -> &'_ str {
+                self.0.reborrow().initial_project_id
+            }
+            /// Field 5: `initial_project_name`
+            #[must_use]
+            pub fn initial_project_name(&self) -> &'_ str {
+                self.0.reborrow().initial_project_name
+            }
+            /// Field 6: `email`
+            #[must_use]
+            pub fn email(&self) -> &'_ str {
+                self.0.reborrow().email
+            }
+            /// Field 7: `email_hint`
+            #[must_use]
+            pub fn email_hint(&self) -> &'_ str {
+                self.0.reborrow().email_hint
+            }
+            /// Field 8: `role`
+            #[must_use]
+            pub fn role(&self) -> ::buffa::EnumValue<super::super::ProjectRole> {
+                self.0.reborrow().role
+            }
+            /// Field 9: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::OrganizationInvitationStatus> {
+                self.0.reborrow().status
+            }
+            /// Field 10: `expires_at`
+            #[must_use]
+            pub fn expires_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expires_at
+            }
+            /// Field 11: `accepted_at`
+            #[must_use]
+            pub fn accepted_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().accepted_at
+            }
+            /// Field 12: `created_at`
+            #[must_use]
+            pub fn created_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().created_at
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<OrganizationInvitationView<'static>>,
+        > for OrganizationInvitationOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<OrganizationInvitationView<'static>>,
+            ) -> Self {
+                OrganizationInvitationOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<OrganizationInvitationOwnedView>
+        for ::buffa::OwnedView<OrganizationInvitationView<'static>> {
+            fn from(wrapper: OrganizationInvitationOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<OrganizationInvitationView<'static>>,
+        > for OrganizationInvitationOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<OrganizationInvitationView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::OrganizationInvitation {
+            type View<'a> = OrganizationInvitationView<'a>;
+            type ViewHandle = OrganizationInvitationOwnedView;
+        }
+        impl ::serde::Serialize for OrganizationInvitationOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Public invitation data deliberately has no email field. The server must never
+        /// expose the invited address to a caller that only possesses an invitation token.
+        #[derive(Clone, Debug, Default)]
+        pub struct OrganizationInvitationPreviewView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 3: `organization_name`
+            pub organization_name: &'a str,
+            /// Field 4: `initial_project_id`
+            pub initial_project_id: &'a str,
+            /// Field 5: `initial_project_name`
+            pub initial_project_name: &'a str,
+            /// Field 6: `email_hint`
+            pub email_hint: &'a str,
+            /// Field 7: `role`
+            pub role: ::buffa::EnumValue<super::super::ProjectRole>,
+            /// Field 8: `status`
+            pub status: ::buffa::EnumValue<super::super::OrganizationInvitationStatus>,
+            /// Field 9: `expires_at`
+            pub expires_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Field 10: `accepted_at`
+            pub accepted_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Field 11: `created_at`
+            pub created_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for OrganizationInvitationPreviewView<'a> {
+            type Owned = super::super::OrganizationInvitationPreview;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.initial_project_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.initial_project_name = ::buffa::types::borrow_str(
+                            &mut cur,
+                        )?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.email_hint = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.role = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expires_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expires_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.accepted_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.accepted_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.created_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.created_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::OrganizationInvitationPreview,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::OrganizationInvitationPreview,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::OrganizationInvitationPreview {
+                    id: self.id.to_string(),
+                    organization_id: self.organization_id.to_string(),
+                    organization_name: self.organization_name.to_string(),
+                    initial_project_id: self.initial_project_id.to_string(),
+                    initial_project_name: self.initial_project_name.to_string(),
+                    email_hint: self.email_hint.to_string(),
+                    role: self.role,
+                    status: self.status,
+                    expires_at: match self.expires_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    accepted_at: match self.accepted_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    created_at: match self.created_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for OrganizationInvitationPreviewView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.organization_name.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_name)
+                                as u64;
+                }
+                if !self.initial_project_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(
+                                &self.initial_project_id,
+                            ) as u64;
+                }
+                if !self.initial_project_name.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(
+                                &self.initial_project_name,
+                            ) as u64;
+                }
+                if !self.email_hint.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.email_hint)
+                                as u64;
+                }
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if self.expires_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expires_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.accepted_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.accepted_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.created_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.created_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+                }
+                if !self.organization_name.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.organization_name, buf);
+                }
+                if !self.initial_project_id.is_empty() {
+                    ::buffa::types::put_string_field(
+                        4u32,
+                        &self.initial_project_id,
+                        buf,
+                    );
+                }
+                if !self.initial_project_name.is_empty() {
+                    ::buffa::types::put_string_field(
+                        5u32,
+                        &self.initial_project_name,
+                        buf,
+                    );
+                }
+                if !self.email_hint.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.email_hint, buf);
+                }
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(7u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(8u32, val, buf);
+                    }
+                }
+                if self.expires_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        9u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.expires_at.write_to(__cache, buf);
+                }
+                if self.accepted_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.accepted_at.write_to(__cache, buf);
+                }
+                if self.created_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        11u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.created_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for OrganizationInvitationPreviewView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.organization_name,
+                ) {
+                    __map.serialize_entry("organizationName", self.organization_name)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.initial_project_id,
+                ) {
+                    __map.serialize_entry("initialProjectId", self.initial_project_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.initial_project_name,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "initialProjectName",
+                            self.initial_project_name,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.email_hint) {
+                    __map.serialize_entry("emailHint", self.email_hint)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.role) {
+                    __map.serialize_entry("role", &self.role)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .expires_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("expiresAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .accepted_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("acceptedAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .created_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("createdAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for OrganizationInvitationPreviewView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "OrganizationInvitationPreview";
+            const FULL_NAME: &'static str = "briar.app.v1.OrganizationInvitationPreview";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.OrganizationInvitationPreview";
+        }
+        ::buffa::impl_default_view_instance!(OrganizationInvitationPreviewView);
+        ::buffa::impl_view_reborrow!(OrganizationInvitationPreviewView);
+        /** Self-contained, `'static` owned view of a `OrganizationInvitationPreview` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`OrganizationInvitationPreviewView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`OrganizationInvitationPreviewView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct OrganizationInvitationPreviewOwnedView(
+            ::buffa::OwnedView<OrganizationInvitationPreviewView<'static>>,
+        );
+        impl OrganizationInvitationPreviewOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrganizationInvitationPreviewOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrganizationInvitationPreviewOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::OrganizationInvitationPreview,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrganizationInvitationPreviewOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`OrganizationInvitationPreviewView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &OrganizationInvitationPreviewView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::OrganizationInvitationPreview {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 3: `organization_name`
+            #[must_use]
+            pub fn organization_name(&self) -> &'_ str {
+                self.0.reborrow().organization_name
+            }
+            /// Field 4: `initial_project_id`
+            #[must_use]
+            pub fn initial_project_id(&self) -> &'_ str {
+                self.0.reborrow().initial_project_id
+            }
+            /// Field 5: `initial_project_name`
+            #[must_use]
+            pub fn initial_project_name(&self) -> &'_ str {
+                self.0.reborrow().initial_project_name
+            }
+            /// Field 6: `email_hint`
+            #[must_use]
+            pub fn email_hint(&self) -> &'_ str {
+                self.0.reborrow().email_hint
+            }
+            /// Field 7: `role`
+            #[must_use]
+            pub fn role(&self) -> ::buffa::EnumValue<super::super::ProjectRole> {
+                self.0.reborrow().role
+            }
+            /// Field 8: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::OrganizationInvitationStatus> {
+                self.0.reborrow().status
+            }
+            /// Field 9: `expires_at`
+            #[must_use]
+            pub fn expires_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expires_at
+            }
+            /// Field 10: `accepted_at`
+            #[must_use]
+            pub fn accepted_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().accepted_at
+            }
+            /// Field 11: `created_at`
+            #[must_use]
+            pub fn created_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().created_at
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<OrganizationInvitationPreviewView<'static>>,
+        > for OrganizationInvitationPreviewOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<OrganizationInvitationPreviewView<'static>>,
+            ) -> Self {
+                OrganizationInvitationPreviewOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<OrganizationInvitationPreviewOwnedView>
+        for ::buffa::OwnedView<OrganizationInvitationPreviewView<'static>> {
+            fn from(wrapper: OrganizationInvitationPreviewOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<OrganizationInvitationPreviewView<'static>>,
+        > for OrganizationInvitationPreviewOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<OrganizationInvitationPreviewView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::OrganizationInvitationPreview {
+            type View<'a> = OrganizationInvitationPreviewView<'a>;
+            type ViewHandle = OrganizationInvitationPreviewOwnedView;
+        }
+        impl ::serde::Serialize for OrganizationInvitationPreviewOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ListOrganizationsRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListOrganizationsRequestView<'a> {
+            type Owned = super::super::ListOrganizationsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListOrganizationsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListOrganizationsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListOrganizationsRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListOrganizationsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListOrganizationsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListOrganizationsRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ListOrganizationsRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationsRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListOrganizationsRequestView);
+        ::buffa::impl_view_reborrow!(ListOrganizationsRequestView);
+        /** Self-contained, `'static` owned view of a `ListOrganizationsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListOrganizationsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListOrganizationsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListOrganizationsRequestOwnedView(
+            ::buffa::OwnedView<ListOrganizationsRequestView<'static>>,
+        );
+        impl ListOrganizationsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationsRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListOrganizationsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListOrganizationsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListOrganizationsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ListOrganizationsRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListOrganizationsRequestView<'static>>,
+        > for ListOrganizationsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListOrganizationsRequestView<'static>>,
+            ) -> Self {
+                ListOrganizationsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListOrganizationsRequestOwnedView>
+        for ::buffa::OwnedView<ListOrganizationsRequestView<'static>> {
+            fn from(wrapper: ListOrganizationsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListOrganizationsRequestView<'static>>,
+        > for ListOrganizationsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListOrganizationsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListOrganizationsRequest {
+            type View<'a> = ListOrganizationsRequestView<'a>;
+            type ViewHandle = ListOrganizationsRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListOrganizationsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ListOrganizationsResponseView<'a> {
+            /// Field 1: `organizations`
+            pub organizations: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::OrganizationView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListOrganizationsResponseView<'a> {
+            type Owned = super::super::ListOrganizationsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::OrganizationView,
+                            >(),
+                        )?;
+                        view.organizations
+                            .push(
+                                <super::super::__buffa::view::OrganizationView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListOrganizationsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListOrganizationsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListOrganizationsResponse {
+                    organizations: self
+                        .organizations
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListOrganizationsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                for v in &self.organizations {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.organizations {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListOrganizationsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.organizations.is_empty() {
+                    __map.serialize_entry("organizations", &*self.organizations)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListOrganizationsResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ListOrganizationsResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationsResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListOrganizationsResponseView);
+        ::buffa::impl_view_reborrow!(ListOrganizationsResponseView);
+        /** Self-contained, `'static` owned view of a `ListOrganizationsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListOrganizationsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListOrganizationsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListOrganizationsResponseOwnedView(
+            ::buffa::OwnedView<ListOrganizationsResponseView<'static>>,
+        );
+        impl ListOrganizationsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationsResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListOrganizationsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListOrganizationsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListOrganizationsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ListOrganizationsResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organizations`
+            #[must_use]
+            pub fn organizations(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::OrganizationView<'_>,
+            > {
+                &self.0.reborrow().organizations
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListOrganizationsResponseView<'static>>,
+        > for ListOrganizationsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListOrganizationsResponseView<'static>>,
+            ) -> Self {
+                ListOrganizationsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListOrganizationsResponseOwnedView>
+        for ::buffa::OwnedView<ListOrganizationsResponseView<'static>> {
+            fn from(wrapper: ListOrganizationsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListOrganizationsResponseView<'static>>,
+        > for ListOrganizationsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListOrganizationsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListOrganizationsResponse {
+            type View<'a> = ListOrganizationsResponseView<'a>;
+            type ViewHandle = ListOrganizationsResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListOrganizationsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateOrganizationRequestView<'a> {
+            /// Field 1: `name`
+            pub name: &'a str,
+            /// Field 2: `handle`
+            pub handle: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CreateOrganizationRequestView<'a> {
+            type Owned = super::super::CreateOrganizationRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.handle = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateOrganizationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateOrganizationRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateOrganizationRequest {
+                    name: self.name.to_string(),
+                    handle: self.handle.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateOrganizationRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.name.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+                }
+                if !self.handle.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.handle) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.name.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.name, buf);
+                }
+                if !self.handle.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.handle, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateOrganizationRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+                    __map.serialize_entry("name", self.name)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.handle) {
+                    __map.serialize_entry("handle", self.handle)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateOrganizationRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "CreateOrganizationRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateOrganizationRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationRequest";
+        }
+        ::buffa::impl_default_view_instance!(CreateOrganizationRequestView);
+        ::buffa::impl_view_reborrow!(CreateOrganizationRequestView);
+        /** Self-contained, `'static` owned view of a `CreateOrganizationRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateOrganizationRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateOrganizationRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateOrganizationRequestOwnedView(
+            ::buffa::OwnedView<CreateOrganizationRequestView<'static>>,
+        );
+        impl CreateOrganizationRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOrganizationRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOrganizationRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateOrganizationRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOrganizationRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateOrganizationRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateOrganizationRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::CreateOrganizationRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `name`
+            #[must_use]
+            pub fn name(&self) -> &'_ str {
+                self.0.reborrow().name
+            }
+            /// Field 2: `handle`
+            #[must_use]
+            pub fn handle(&self) -> &'_ str {
+                self.0.reborrow().handle
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateOrganizationRequestView<'static>>,
+        > for CreateOrganizationRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CreateOrganizationRequestView<'static>>,
+            ) -> Self {
+                CreateOrganizationRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateOrganizationRequestOwnedView>
+        for ::buffa::OwnedView<CreateOrganizationRequestView<'static>> {
+            fn from(wrapper: CreateOrganizationRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateOrganizationRequestView<'static>>,
+        > for CreateOrganizationRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateOrganizationRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CreateOrganizationRequest {
+            type View<'a> = CreateOrganizationRequestView<'a>;
+            type ViewHandle = CreateOrganizationRequestOwnedView;
+        }
+        impl ::serde::Serialize for CreateOrganizationRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateOrganizationResponseView<'a> {
+            /// Field 1: `organization`
+            pub organization: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OrganizationView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CreateOrganizationResponseView<'a> {
+            type Owned = super::super::CreateOrganizationResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.organization.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.organization = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OrganizationView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateOrganizationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateOrganizationResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateOrganizationResponse {
+                    organization: match self.organization.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::Organization,
+                                ::buffa::Inline<super::super::Organization>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateOrganizationResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.organization.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.organization.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.organization.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.organization.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateOrganizationResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .organization
+                        .as_option()
+                    {
+                        __map.serialize_entry("organization", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateOrganizationResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "CreateOrganizationResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateOrganizationResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationResponse";
+        }
+        ::buffa::impl_default_view_instance!(CreateOrganizationResponseView);
+        ::buffa::impl_view_reborrow!(CreateOrganizationResponseView);
+        /** Self-contained, `'static` owned view of a `CreateOrganizationResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateOrganizationResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateOrganizationResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateOrganizationResponseOwnedView(
+            ::buffa::OwnedView<CreateOrganizationResponseView<'static>>,
+        );
+        impl CreateOrganizationResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOrganizationResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOrganizationResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateOrganizationResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOrganizationResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateOrganizationResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateOrganizationResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::CreateOrganizationResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization`
+            #[must_use]
+            pub fn organization(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OrganizationView<'_>,
+            > {
+                &self.0.reborrow().organization
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateOrganizationResponseView<'static>>,
+        > for CreateOrganizationResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CreateOrganizationResponseView<'static>>,
+            ) -> Self {
+                CreateOrganizationResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateOrganizationResponseOwnedView>
+        for ::buffa::OwnedView<CreateOrganizationResponseView<'static>> {
+            fn from(wrapper: CreateOrganizationResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateOrganizationResponseView<'static>>,
+        > for CreateOrganizationResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateOrganizationResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CreateOrganizationResponse {
+            type View<'a> = CreateOrganizationResponseView<'a>;
+            type ViewHandle = CreateOrganizationResponseOwnedView;
+        }
+        impl ::serde::Serialize for CreateOrganizationResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct CheckOrganizationHandleAvailabilityRequestView<'a> {
+            /// Field 1: `handle`
+            pub handle: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for CheckOrganizationHandleAvailabilityRequestView<'a> {
+            type Owned = super::super::CheckOrganizationHandleAvailabilityRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.handle = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CheckOrganizationHandleAvailabilityRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CheckOrganizationHandleAvailabilityRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CheckOrganizationHandleAvailabilityRequest {
+                    handle: self.handle.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for CheckOrganizationHandleAvailabilityRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.handle.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.handle) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.handle.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.handle, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for CheckOrganizationHandleAvailabilityRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.handle) {
+                    __map.serialize_entry("handle", self.handle)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for CheckOrganizationHandleAvailabilityRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "CheckOrganizationHandleAvailabilityRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.CheckOrganizationHandleAvailabilityRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CheckOrganizationHandleAvailabilityRequest";
+        }
+        ::buffa::impl_default_view_instance!(
+            CheckOrganizationHandleAvailabilityRequestView
+        );
+        ::buffa::impl_view_reborrow!(CheckOrganizationHandleAvailabilityRequestView);
+        /** Self-contained, `'static` owned view of a `CheckOrganizationHandleAvailabilityRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CheckOrganizationHandleAvailabilityRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CheckOrganizationHandleAvailabilityRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CheckOrganizationHandleAvailabilityRequestOwnedView(
+            ::buffa::OwnedView<CheckOrganizationHandleAvailabilityRequestView<'static>>,
+        );
+        impl CheckOrganizationHandleAvailabilityRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CheckOrganizationHandleAvailabilityRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CheckOrganizationHandleAvailabilityRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CheckOrganizationHandleAvailabilityRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CheckOrganizationHandleAvailabilityRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CheckOrganizationHandleAvailabilityRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CheckOrganizationHandleAvailabilityRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::CheckOrganizationHandleAvailabilityRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `handle`
+            #[must_use]
+            pub fn handle(&self) -> &'_ str {
+                self.0.reborrow().handle
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CheckOrganizationHandleAvailabilityRequestView<'static>>,
+        > for CheckOrganizationHandleAvailabilityRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    CheckOrganizationHandleAvailabilityRequestView<'static>,
+                >,
+            ) -> Self {
+                CheckOrganizationHandleAvailabilityRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CheckOrganizationHandleAvailabilityRequestOwnedView>
+        for ::buffa::OwnedView<CheckOrganizationHandleAvailabilityRequestView<'static>> {
+            fn from(
+                wrapper: CheckOrganizationHandleAvailabilityRequestOwnedView,
+            ) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CheckOrganizationHandleAvailabilityRequestView<'static>>,
+        > for CheckOrganizationHandleAvailabilityRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                CheckOrganizationHandleAvailabilityRequestView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::CheckOrganizationHandleAvailabilityRequest {
+            type View<'a> = CheckOrganizationHandleAvailabilityRequestView<'a>;
+            type ViewHandle = CheckOrganizationHandleAvailabilityRequestOwnedView;
+        }
+        impl ::serde::Serialize for CheckOrganizationHandleAvailabilityRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct CheckOrganizationHandleAvailabilityResponseView<'a> {
+            /// Field 1: `available`
+            pub available: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for CheckOrganizationHandleAvailabilityResponseView<'a> {
+            type Owned = super::super::CheckOrganizationHandleAvailabilityResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.available = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CheckOrganizationHandleAvailabilityResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CheckOrganizationHandleAvailabilityResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CheckOrganizationHandleAvailabilityResponse {
+                    available: self.available,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for CheckOrganizationHandleAvailabilityResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.available {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.available {
+                    ::buffa::types::put_bool_field(1u32, self.available, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for CheckOrganizationHandleAvailabilityResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if self.available {
+                    __map.serialize_entry("available", &self.available)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for CheckOrganizationHandleAvailabilityResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "CheckOrganizationHandleAvailabilityResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.CheckOrganizationHandleAvailabilityResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CheckOrganizationHandleAvailabilityResponse";
+        }
+        ::buffa::impl_default_view_instance!(
+            CheckOrganizationHandleAvailabilityResponseView
+        );
+        ::buffa::impl_view_reborrow!(CheckOrganizationHandleAvailabilityResponseView);
+        /** Self-contained, `'static` owned view of a `CheckOrganizationHandleAvailabilityResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CheckOrganizationHandleAvailabilityResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CheckOrganizationHandleAvailabilityResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CheckOrganizationHandleAvailabilityResponseOwnedView(
+            ::buffa::OwnedView<CheckOrganizationHandleAvailabilityResponseView<'static>>,
+        );
+        impl CheckOrganizationHandleAvailabilityResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CheckOrganizationHandleAvailabilityResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CheckOrganizationHandleAvailabilityResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CheckOrganizationHandleAvailabilityResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CheckOrganizationHandleAvailabilityResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CheckOrganizationHandleAvailabilityResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CheckOrganizationHandleAvailabilityResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::CheckOrganizationHandleAvailabilityResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `available`
+            #[must_use]
+            pub fn available(&self) -> bool {
+                self.0.reborrow().available
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CheckOrganizationHandleAvailabilityResponseView<'static>>,
+        > for CheckOrganizationHandleAvailabilityResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    CheckOrganizationHandleAvailabilityResponseView<'static>,
+                >,
+            ) -> Self {
+                CheckOrganizationHandleAvailabilityResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CheckOrganizationHandleAvailabilityResponseOwnedView>
+        for ::buffa::OwnedView<
+            CheckOrganizationHandleAvailabilityResponseView<'static>,
+        > {
+            fn from(
+                wrapper: CheckOrganizationHandleAvailabilityResponseOwnedView,
+            ) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CheckOrganizationHandleAvailabilityResponseView<'static>>,
+        > for CheckOrganizationHandleAvailabilityResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                CheckOrganizationHandleAvailabilityResponseView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::CheckOrganizationHandleAvailabilityResponse {
+            type View<'a> = CheckOrganizationHandleAvailabilityResponseView<'a>;
+            type ViewHandle = CheckOrganizationHandleAvailabilityResponseOwnedView;
+        }
+        impl ::serde::Serialize
+        for CheckOrganizationHandleAvailabilityResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct UpdateOrganizationRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `name`
+            pub name: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for UpdateOrganizationRequestView<'a> {
+            type Owned = super::super::UpdateOrganizationRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UpdateOrganizationRequest {
+                    organization_id: self.organization_id.to_string(),
+                    name: self.name.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateOrganizationRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.name.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.name.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.name, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UpdateOrganizationRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+                    __map.serialize_entry("name", self.name)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UpdateOrganizationRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "UpdateOrganizationRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationRequest";
+        }
+        ::buffa::impl_default_view_instance!(UpdateOrganizationRequestView);
+        ::buffa::impl_view_reborrow!(UpdateOrganizationRequestView);
+        /** Self-contained, `'static` owned view of a `UpdateOrganizationRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateOrganizationRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateOrganizationRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UpdateOrganizationRequestOwnedView(
+            ::buffa::OwnedView<UpdateOrganizationRequestView<'static>>,
+        );
+        impl UpdateOrganizationRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UpdateOrganizationRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UpdateOrganizationRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UpdateOrganizationRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::UpdateOrganizationRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `name`
+            #[must_use]
+            pub fn name(&self) -> &'_ str {
+                self.0.reborrow().name
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UpdateOrganizationRequestView<'static>>,
+        > for UpdateOrganizationRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<UpdateOrganizationRequestView<'static>>,
+            ) -> Self {
+                UpdateOrganizationRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UpdateOrganizationRequestOwnedView>
+        for ::buffa::OwnedView<UpdateOrganizationRequestView<'static>> {
+            fn from(wrapper: UpdateOrganizationRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UpdateOrganizationRequestView<'static>>,
+        > for UpdateOrganizationRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<UpdateOrganizationRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::UpdateOrganizationRequest {
+            type View<'a> = UpdateOrganizationRequestView<'a>;
+            type ViewHandle = UpdateOrganizationRequestOwnedView;
+        }
+        impl ::serde::Serialize for UpdateOrganizationRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct UpdateOrganizationResponseView<'a> {
+            /// Field 1: `organization`
+            pub organization: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OrganizationView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for UpdateOrganizationResponseView<'a> {
+            type Owned = super::super::UpdateOrganizationResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.organization.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.organization = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OrganizationView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UpdateOrganizationResponse {
+                    organization: match self.organization.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::Organization,
+                                ::buffa::Inline<super::super::Organization>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateOrganizationResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.organization.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.organization.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.organization.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.organization.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UpdateOrganizationResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .organization
+                        .as_option()
+                    {
+                        __map.serialize_entry("organization", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UpdateOrganizationResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "UpdateOrganizationResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationResponse";
+        }
+        ::buffa::impl_default_view_instance!(UpdateOrganizationResponseView);
+        ::buffa::impl_view_reborrow!(UpdateOrganizationResponseView);
+        /** Self-contained, `'static` owned view of a `UpdateOrganizationResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateOrganizationResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateOrganizationResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UpdateOrganizationResponseOwnedView(
+            ::buffa::OwnedView<UpdateOrganizationResponseView<'static>>,
+        );
+        impl UpdateOrganizationResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UpdateOrganizationResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UpdateOrganizationResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UpdateOrganizationResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::UpdateOrganizationResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization`
+            #[must_use]
+            pub fn organization(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OrganizationView<'_>,
+            > {
+                &self.0.reborrow().organization
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UpdateOrganizationResponseView<'static>>,
+        > for UpdateOrganizationResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<UpdateOrganizationResponseView<'static>>,
+            ) -> Self {
+                UpdateOrganizationResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UpdateOrganizationResponseOwnedView>
+        for ::buffa::OwnedView<UpdateOrganizationResponseView<'static>> {
+            fn from(wrapper: UpdateOrganizationResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UpdateOrganizationResponseView<'static>>,
+        > for UpdateOrganizationResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<UpdateOrganizationResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::UpdateOrganizationResponse {
+            type View<'a> = UpdateOrganizationResponseView<'a>;
+            type ViewHandle = UpdateOrganizationResponseOwnedView;
+        }
+        impl ::serde::Serialize for UpdateOrganizationResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct UpdateOrganizationLogoRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            pub logo_update: ::core::option::Option<
+                super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for UpdateOrganizationLogoRequestView<'a> {
+            type Owned = super::super::UpdateOrganizationLogoRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.logo_update = Some(
+                            super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate::Logo(
+                                ::buffa::types::borrow_str(&mut cur)?,
+                            ),
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate::ClearLogo(
+                                ref mut existing,
+                            ),
+                        ) = view.logo_update
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.logo_update = Some(
+                                super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate::ClearLogo(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <::buffa_types::google::protobuf::__buffa::view::EmptyView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationLogoRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationLogoRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UpdateOrganizationLogoRequest {
+                    organization_id: self.organization_id.to_string(),
+                    logo_update: match self.logo_update.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate::Logo(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::update_organization_logo_request::LogoUpdate::Logo(
+                                            v.to_string(),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate::ClearLogo(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::update_organization_logo_request::LogoUpdate::ClearLogo(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateOrganizationLogoRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if let ::core::option::Option::Some(ref v) = self.logo_update {
+                    match v {
+                        super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate::Logo(
+                            x,
+                        ) => {
+                            size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                        }
+                        super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate::ClearLogo(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if let ::core::option::Option::Some(ref v) = self.logo_update {
+                    match v {
+                        super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate::Logo(
+                            x,
+                        ) => {
+                            ::buffa::types::put_string_field(2u32, x, buf);
+                        }
+                        super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate::ClearLogo(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                3u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UpdateOrganizationLogoRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.logo_update {
+                    match __ov {
+                        super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate::Logo(
+                            v,
+                        ) => {
+                            __map.serialize_entry("logo", v)?;
+                        }
+                        super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate::ClearLogo(
+                            v,
+                        ) => {
+                            __map.serialize_entry("clearLogo", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UpdateOrganizationLogoRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "UpdateOrganizationLogoRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationLogoRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationLogoRequest";
+        }
+        ::buffa::impl_default_view_instance!(UpdateOrganizationLogoRequestView);
+        ::buffa::impl_view_reborrow!(UpdateOrganizationLogoRequestView);
+        /** Self-contained, `'static` owned view of a `UpdateOrganizationLogoRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateOrganizationLogoRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateOrganizationLogoRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UpdateOrganizationLogoRequestOwnedView(
+            ::buffa::OwnedView<UpdateOrganizationLogoRequestView<'static>>,
+        );
+        impl UpdateOrganizationLogoRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationLogoRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationLogoRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UpdateOrganizationLogoRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationLogoRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UpdateOrganizationLogoRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UpdateOrganizationLogoRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::UpdateOrganizationLogoRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Oneof `logo_update`.
+            #[must_use]
+            pub fn logo_update(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::update_organization_logo_request::LogoUpdate<
+                    '_,
+                >,
+            > {
+                self.0.reborrow().logo_update.as_ref()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UpdateOrganizationLogoRequestView<'static>>,
+        > for UpdateOrganizationLogoRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<UpdateOrganizationLogoRequestView<'static>>,
+            ) -> Self {
+                UpdateOrganizationLogoRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UpdateOrganizationLogoRequestOwnedView>
+        for ::buffa::OwnedView<UpdateOrganizationLogoRequestView<'static>> {
+            fn from(wrapper: UpdateOrganizationLogoRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UpdateOrganizationLogoRequestView<'static>>,
+        > for UpdateOrganizationLogoRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<UpdateOrganizationLogoRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::UpdateOrganizationLogoRequest {
+            type View<'a> = UpdateOrganizationLogoRequestView<'a>;
+            type ViewHandle = UpdateOrganizationLogoRequestOwnedView;
+        }
+        impl ::serde::Serialize for UpdateOrganizationLogoRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct UpdateOrganizationLogoResponseView<'a> {
+            /// Field 1: `organization`
+            pub organization: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OrganizationView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for UpdateOrganizationLogoResponseView<'a> {
+            type Owned = super::super::UpdateOrganizationLogoResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.organization.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.organization = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OrganizationView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationLogoResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationLogoResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UpdateOrganizationLogoResponse {
+                    organization: match self.organization.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::Organization,
+                                ::buffa::Inline<super::super::Organization>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateOrganizationLogoResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.organization.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.organization.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.organization.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.organization.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UpdateOrganizationLogoResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .organization
+                        .as_option()
+                    {
+                        __map.serialize_entry("organization", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UpdateOrganizationLogoResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "UpdateOrganizationLogoResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationLogoResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationLogoResponse";
+        }
+        ::buffa::impl_default_view_instance!(UpdateOrganizationLogoResponseView);
+        ::buffa::impl_view_reborrow!(UpdateOrganizationLogoResponseView);
+        /** Self-contained, `'static` owned view of a `UpdateOrganizationLogoResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateOrganizationLogoResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateOrganizationLogoResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UpdateOrganizationLogoResponseOwnedView(
+            ::buffa::OwnedView<UpdateOrganizationLogoResponseView<'static>>,
+        );
+        impl UpdateOrganizationLogoResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationLogoResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationLogoResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UpdateOrganizationLogoResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationLogoResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UpdateOrganizationLogoResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UpdateOrganizationLogoResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::UpdateOrganizationLogoResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization`
+            #[must_use]
+            pub fn organization(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OrganizationView<'_>,
+            > {
+                &self.0.reborrow().organization
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UpdateOrganizationLogoResponseView<'static>>,
+        > for UpdateOrganizationLogoResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<UpdateOrganizationLogoResponseView<'static>>,
+            ) -> Self {
+                UpdateOrganizationLogoResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UpdateOrganizationLogoResponseOwnedView>
+        for ::buffa::OwnedView<UpdateOrganizationLogoResponseView<'static>> {
+            fn from(wrapper: UpdateOrganizationLogoResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UpdateOrganizationLogoResponseView<'static>>,
+        > for UpdateOrganizationLogoResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<UpdateOrganizationLogoResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::UpdateOrganizationLogoResponse {
+            type View<'a> = UpdateOrganizationLogoResponseView<'a>;
+            type ViewHandle = UpdateOrganizationLogoResponseOwnedView;
+        }
+        impl ::serde::Serialize for UpdateOrganizationLogoResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ListOrganizationInvitationsRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for ListOrganizationInvitationsRequestView<'a> {
+            type Owned = super::super::ListOrganizationInvitationsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListOrganizationInvitationsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListOrganizationInvitationsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListOrganizationInvitationsRequest {
+                    organization_id: self.organization_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListOrganizationInvitationsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListOrganizationInvitationsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListOrganizationInvitationsRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ListOrganizationInvitationsRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationInvitationsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationInvitationsRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListOrganizationInvitationsRequestView);
+        ::buffa::impl_view_reborrow!(ListOrganizationInvitationsRequestView);
+        /** Self-contained, `'static` owned view of a `ListOrganizationInvitationsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListOrganizationInvitationsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListOrganizationInvitationsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListOrganizationInvitationsRequestOwnedView(
+            ::buffa::OwnedView<ListOrganizationInvitationsRequestView<'static>>,
+        );
+        impl ListOrganizationInvitationsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationInvitationsRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationInvitationsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListOrganizationInvitationsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationInvitationsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListOrganizationInvitationsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListOrganizationInvitationsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::ListOrganizationInvitationsRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListOrganizationInvitationsRequestView<'static>>,
+        > for ListOrganizationInvitationsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    ListOrganizationInvitationsRequestView<'static>,
+                >,
+            ) -> Self {
+                ListOrganizationInvitationsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListOrganizationInvitationsRequestOwnedView>
+        for ::buffa::OwnedView<ListOrganizationInvitationsRequestView<'static>> {
+            fn from(wrapper: ListOrganizationInvitationsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListOrganizationInvitationsRequestView<'static>>,
+        > for ListOrganizationInvitationsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListOrganizationInvitationsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::ListOrganizationInvitationsRequest {
+            type View<'a> = ListOrganizationInvitationsRequestView<'a>;
+            type ViewHandle = ListOrganizationInvitationsRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListOrganizationInvitationsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ListOrganizationInvitationsResponseView<'a> {
+            /// Field 1: `invitations`
+            pub invitations: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::OrganizationInvitationView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for ListOrganizationInvitationsResponseView<'a> {
+            type Owned = super::super::ListOrganizationInvitationsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::OrganizationInvitationView,
+                            >(),
+                        )?;
+                        view.invitations
+                            .push(
+                                <super::super::__buffa::view::OrganizationInvitationView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListOrganizationInvitationsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListOrganizationInvitationsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListOrganizationInvitationsResponse {
+                    invitations: self
+                        .invitations
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for ListOrganizationInvitationsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                for v in &self.invitations {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.invitations {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListOrganizationInvitationsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.invitations.is_empty() {
+                    __map.serialize_entry("invitations", &*self.invitations)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListOrganizationInvitationsResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ListOrganizationInvitationsResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationInvitationsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationInvitationsResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListOrganizationInvitationsResponseView);
+        ::buffa::impl_view_reborrow!(ListOrganizationInvitationsResponseView);
+        /** Self-contained, `'static` owned view of a `ListOrganizationInvitationsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListOrganizationInvitationsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListOrganizationInvitationsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListOrganizationInvitationsResponseOwnedView(
+            ::buffa::OwnedView<ListOrganizationInvitationsResponseView<'static>>,
+        );
+        impl ListOrganizationInvitationsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationInvitationsResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationInvitationsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListOrganizationInvitationsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationInvitationsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListOrganizationInvitationsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListOrganizationInvitationsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::ListOrganizationInvitationsResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `invitations`
+            #[must_use]
+            pub fn invitations(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::OrganizationInvitationView<'_>,
+            > {
+                &self.0.reborrow().invitations
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListOrganizationInvitationsResponseView<'static>>,
+        > for ListOrganizationInvitationsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    ListOrganizationInvitationsResponseView<'static>,
+                >,
+            ) -> Self {
+                ListOrganizationInvitationsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListOrganizationInvitationsResponseOwnedView>
+        for ::buffa::OwnedView<ListOrganizationInvitationsResponseView<'static>> {
+            fn from(wrapper: ListOrganizationInvitationsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListOrganizationInvitationsResponseView<'static>>,
+        > for ListOrganizationInvitationsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListOrganizationInvitationsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::ListOrganizationInvitationsResponse {
+            type View<'a> = ListOrganizationInvitationsResponseView<'a>;
+            type ViewHandle = ListOrganizationInvitationsResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListOrganizationInvitationsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateOrganizationInvitationRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `email`
+            pub email: &'a str,
+            /// Field 3: `role`
+            pub role: ::buffa::EnumValue<super::super::ProjectRole>,
+            /// Field 4: `initial_project_id`
+            pub initial_project_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for CreateOrganizationInvitationRequestView<'a> {
+            type Owned = super::super::CreateOrganizationInvitationRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.email = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.role = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.initial_project_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateOrganizationInvitationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateOrganizationInvitationRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateOrganizationInvitationRequest {
+                    organization_id: self.organization_id.to_string(),
+                    email: self.email.to_string(),
+                    role: self.role,
+                    initial_project_id: self.initial_project_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for CreateOrganizationInvitationRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.email.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::string_encoded_len(&self.email) as u64;
+                }
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if !self.initial_project_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(
+                                &self.initial_project_id,
+                            ) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.email.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.email, buf);
+                }
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                if !self.initial_project_id.is_empty() {
+                    ::buffa::types::put_string_field(
+                        4u32,
+                        &self.initial_project_id,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateOrganizationInvitationRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.email) {
+                    __map.serialize_entry("email", self.email)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.role) {
+                    __map.serialize_entry("role", &self.role)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.initial_project_id,
+                ) {
+                    __map.serialize_entry("initialProjectId", self.initial_project_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateOrganizationInvitationRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "CreateOrganizationInvitationRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateOrganizationInvitationRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationInvitationRequest";
+        }
+        ::buffa::impl_default_view_instance!(CreateOrganizationInvitationRequestView);
+        ::buffa::impl_view_reborrow!(CreateOrganizationInvitationRequestView);
+        /** Self-contained, `'static` owned view of a `CreateOrganizationInvitationRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateOrganizationInvitationRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateOrganizationInvitationRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateOrganizationInvitationRequestOwnedView(
+            ::buffa::OwnedView<CreateOrganizationInvitationRequestView<'static>>,
+        );
+        impl CreateOrganizationInvitationRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOrganizationInvitationRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOrganizationInvitationRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateOrganizationInvitationRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOrganizationInvitationRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateOrganizationInvitationRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateOrganizationInvitationRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::CreateOrganizationInvitationRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `email`
+            #[must_use]
+            pub fn email(&self) -> &'_ str {
+                self.0.reborrow().email
+            }
+            /// Field 3: `role`
+            #[must_use]
+            pub fn role(&self) -> ::buffa::EnumValue<super::super::ProjectRole> {
+                self.0.reborrow().role
+            }
+            /// Field 4: `initial_project_id`
+            #[must_use]
+            pub fn initial_project_id(&self) -> &'_ str {
+                self.0.reborrow().initial_project_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateOrganizationInvitationRequestView<'static>>,
+        > for CreateOrganizationInvitationRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    CreateOrganizationInvitationRequestView<'static>,
+                >,
+            ) -> Self {
+                CreateOrganizationInvitationRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateOrganizationInvitationRequestOwnedView>
+        for ::buffa::OwnedView<CreateOrganizationInvitationRequestView<'static>> {
+            fn from(wrapper: CreateOrganizationInvitationRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateOrganizationInvitationRequestView<'static>>,
+        > for CreateOrganizationInvitationRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateOrganizationInvitationRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::CreateOrganizationInvitationRequest {
+            type View<'a> = CreateOrganizationInvitationRequestView<'a>;
+            type ViewHandle = CreateOrganizationInvitationRequestOwnedView;
+        }
+        impl ::serde::Serialize for CreateOrganizationInvitationRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateOrganizationInvitationResponseView<'a> {
+            /// Field 1: `invitation`
+            pub invitation: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OrganizationInvitationView<'a>,
+            >,
+            /// Field 2: `invite_path`
+            pub invite_path: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for CreateOrganizationInvitationResponseView<'a> {
+            type Owned = super::super::CreateOrganizationInvitationResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.invitation.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.invitation = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OrganizationInvitationView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.invite_path = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateOrganizationInvitationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateOrganizationInvitationResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateOrganizationInvitationResponse {
+                    invitation: match self.invitation.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::OrganizationInvitation,
+                                ::buffa::Inline<super::super::OrganizationInvitation>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    invite_path: self.invite_path.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for CreateOrganizationInvitationResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.invitation.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.invitation.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if !self.invite_path.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.invite_path)
+                                as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.invitation.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.invitation.write_to(__cache, buf);
+                }
+                if !self.invite_path.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.invite_path, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for CreateOrganizationInvitationResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .invitation
+                        .as_option()
+                    {
+                        __map.serialize_entry("invitation", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.invite_path) {
+                    __map.serialize_entry("invitePath", self.invite_path)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateOrganizationInvitationResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "CreateOrganizationInvitationResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateOrganizationInvitationResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationInvitationResponse";
+        }
+        ::buffa::impl_default_view_instance!(CreateOrganizationInvitationResponseView);
+        ::buffa::impl_view_reborrow!(CreateOrganizationInvitationResponseView);
+        /** Self-contained, `'static` owned view of a `CreateOrganizationInvitationResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateOrganizationInvitationResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateOrganizationInvitationResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateOrganizationInvitationResponseOwnedView(
+            ::buffa::OwnedView<CreateOrganizationInvitationResponseView<'static>>,
+        );
+        impl CreateOrganizationInvitationResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOrganizationInvitationResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOrganizationInvitationResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateOrganizationInvitationResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOrganizationInvitationResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateOrganizationInvitationResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateOrganizationInvitationResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::CreateOrganizationInvitationResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `invitation`
+            #[must_use]
+            pub fn invitation(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OrganizationInvitationView<'_>,
+            > {
+                &self.0.reborrow().invitation
+            }
+            /// Field 2: `invite_path`
+            #[must_use]
+            pub fn invite_path(&self) -> &'_ str {
+                self.0.reborrow().invite_path
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateOrganizationInvitationResponseView<'static>>,
+        > for CreateOrganizationInvitationResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    CreateOrganizationInvitationResponseView<'static>,
+                >,
+            ) -> Self {
+                CreateOrganizationInvitationResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateOrganizationInvitationResponseOwnedView>
+        for ::buffa::OwnedView<CreateOrganizationInvitationResponseView<'static>> {
+            fn from(wrapper: CreateOrganizationInvitationResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateOrganizationInvitationResponseView<'static>>,
+        > for CreateOrganizationInvitationResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateOrganizationInvitationResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::CreateOrganizationInvitationResponse {
+            type View<'a> = CreateOrganizationInvitationResponseView<'a>;
+            type ViewHandle = CreateOrganizationInvitationResponseOwnedView;
+        }
+        impl ::serde::Serialize for CreateOrganizationInvitationResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct RevokeOrganizationInvitationRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `invitation_id`
+            pub invitation_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for RevokeOrganizationInvitationRequestView<'a> {
+            type Owned = super::super::RevokeOrganizationInvitationRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.invitation_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RevokeOrganizationInvitationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RevokeOrganizationInvitationRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RevokeOrganizationInvitationRequest {
+                    organization_id: self.organization_id.to_string(),
+                    invitation_id: self.invitation_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for RevokeOrganizationInvitationRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.invitation_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.invitation_id)
+                                as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.invitation_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.invitation_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RevokeOrganizationInvitationRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.invitation_id) {
+                    __map.serialize_entry("invitationId", self.invitation_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RevokeOrganizationInvitationRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "RevokeOrganizationInvitationRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.RevokeOrganizationInvitationRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RevokeOrganizationInvitationRequest";
+        }
+        ::buffa::impl_default_view_instance!(RevokeOrganizationInvitationRequestView);
+        ::buffa::impl_view_reborrow!(RevokeOrganizationInvitationRequestView);
+        /** Self-contained, `'static` owned view of a `RevokeOrganizationInvitationRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RevokeOrganizationInvitationRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RevokeOrganizationInvitationRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RevokeOrganizationInvitationRequestOwnedView(
+            ::buffa::OwnedView<RevokeOrganizationInvitationRequestView<'static>>,
+        );
+        impl RevokeOrganizationInvitationRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RevokeOrganizationInvitationRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RevokeOrganizationInvitationRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RevokeOrganizationInvitationRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RevokeOrganizationInvitationRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`RevokeOrganizationInvitationRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RevokeOrganizationInvitationRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::RevokeOrganizationInvitationRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `invitation_id`
+            #[must_use]
+            pub fn invitation_id(&self) -> &'_ str {
+                self.0.reborrow().invitation_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RevokeOrganizationInvitationRequestView<'static>>,
+        > for RevokeOrganizationInvitationRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    RevokeOrganizationInvitationRequestView<'static>,
+                >,
+            ) -> Self {
+                RevokeOrganizationInvitationRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RevokeOrganizationInvitationRequestOwnedView>
+        for ::buffa::OwnedView<RevokeOrganizationInvitationRequestView<'static>> {
+            fn from(wrapper: RevokeOrganizationInvitationRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RevokeOrganizationInvitationRequestView<'static>>,
+        > for RevokeOrganizationInvitationRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RevokeOrganizationInvitationRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::RevokeOrganizationInvitationRequest {
+            type View<'a> = RevokeOrganizationInvitationRequestView<'a>;
+            type ViewHandle = RevokeOrganizationInvitationRequestOwnedView;
+        }
+        impl ::serde::Serialize for RevokeOrganizationInvitationRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct RevokeOrganizationInvitationResponseView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for RevokeOrganizationInvitationResponseView<'a> {
+            type Owned = super::super::RevokeOrganizationInvitationResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RevokeOrganizationInvitationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RevokeOrganizationInvitationResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RevokeOrganizationInvitationResponse {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for RevokeOrganizationInvitationResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for RevokeOrganizationInvitationResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RevokeOrganizationInvitationResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "RevokeOrganizationInvitationResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.RevokeOrganizationInvitationResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RevokeOrganizationInvitationResponse";
+        }
+        ::buffa::impl_default_view_instance!(RevokeOrganizationInvitationResponseView);
+        ::buffa::impl_view_reborrow!(RevokeOrganizationInvitationResponseView);
+        /** Self-contained, `'static` owned view of a `RevokeOrganizationInvitationResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RevokeOrganizationInvitationResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RevokeOrganizationInvitationResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RevokeOrganizationInvitationResponseOwnedView(
+            ::buffa::OwnedView<RevokeOrganizationInvitationResponseView<'static>>,
+        );
+        impl RevokeOrganizationInvitationResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RevokeOrganizationInvitationResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RevokeOrganizationInvitationResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RevokeOrganizationInvitationResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RevokeOrganizationInvitationResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`RevokeOrganizationInvitationResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RevokeOrganizationInvitationResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::RevokeOrganizationInvitationResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RevokeOrganizationInvitationResponseView<'static>>,
+        > for RevokeOrganizationInvitationResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    RevokeOrganizationInvitationResponseView<'static>,
+                >,
+            ) -> Self {
+                RevokeOrganizationInvitationResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RevokeOrganizationInvitationResponseOwnedView>
+        for ::buffa::OwnedView<RevokeOrganizationInvitationResponseView<'static>> {
+            fn from(wrapper: RevokeOrganizationInvitationResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RevokeOrganizationInvitationResponseView<'static>>,
+        > for RevokeOrganizationInvitationResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RevokeOrganizationInvitationResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::RevokeOrganizationInvitationResponse {
+            type View<'a> = RevokeOrganizationInvitationResponseView<'a>;
+            type ViewHandle = RevokeOrganizationInvitationResponseOwnedView;
+        }
+        impl ::serde::Serialize for RevokeOrganizationInvitationResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct GetOrganizationInvitationRequestView<'a> {
+            /// Field 1: `token`
+            pub token: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetOrganizationInvitationRequestView<'a> {
+            type Owned = super::super::GetOrganizationInvitationRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetOrganizationInvitationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetOrganizationInvitationRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetOrganizationInvitationRequest {
+                    token: self.token.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetOrganizationInvitationRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.token.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::string_encoded_len(&self.token) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.token.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.token, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetOrganizationInvitationRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.token) {
+                    __map.serialize_entry("token", self.token)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetOrganizationInvitationRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "GetOrganizationInvitationRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.GetOrganizationInvitationRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetOrganizationInvitationRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetOrganizationInvitationRequestView);
+        ::buffa::impl_view_reborrow!(GetOrganizationInvitationRequestView);
+        /** Self-contained, `'static` owned view of a `GetOrganizationInvitationRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetOrganizationInvitationRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetOrganizationInvitationRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetOrganizationInvitationRequestOwnedView(
+            ::buffa::OwnedView<GetOrganizationInvitationRequestView<'static>>,
+        );
+        impl GetOrganizationInvitationRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetOrganizationInvitationRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetOrganizationInvitationRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetOrganizationInvitationRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetOrganizationInvitationRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetOrganizationInvitationRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetOrganizationInvitationRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::GetOrganizationInvitationRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `token`
+            #[must_use]
+            pub fn token(&self) -> &'_ str {
+                self.0.reborrow().token
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetOrganizationInvitationRequestView<'static>>,
+        > for GetOrganizationInvitationRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetOrganizationInvitationRequestView<'static>>,
+            ) -> Self {
+                GetOrganizationInvitationRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetOrganizationInvitationRequestOwnedView>
+        for ::buffa::OwnedView<GetOrganizationInvitationRequestView<'static>> {
+            fn from(wrapper: GetOrganizationInvitationRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetOrganizationInvitationRequestView<'static>>,
+        > for GetOrganizationInvitationRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetOrganizationInvitationRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetOrganizationInvitationRequest {
+            type View<'a> = GetOrganizationInvitationRequestView<'a>;
+            type ViewHandle = GetOrganizationInvitationRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetOrganizationInvitationRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct GetOrganizationInvitationResponseView<'a> {
+            /// Field 1: `invitation`
+            pub invitation: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OrganizationInvitationPreviewView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetOrganizationInvitationResponseView<'a> {
+            type Owned = super::super::GetOrganizationInvitationResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.invitation.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.invitation = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OrganizationInvitationPreviewView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetOrganizationInvitationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetOrganizationInvitationResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetOrganizationInvitationResponse {
+                    invitation: match self.invitation.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::OrganizationInvitationPreview,
+                                ::buffa::Inline<super::super::OrganizationInvitationPreview>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetOrganizationInvitationResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.invitation.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.invitation.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.invitation.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.invitation.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetOrganizationInvitationResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .invitation
+                        .as_option()
+                    {
+                        __map.serialize_entry("invitation", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetOrganizationInvitationResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "GetOrganizationInvitationResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.GetOrganizationInvitationResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetOrganizationInvitationResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetOrganizationInvitationResponseView);
+        ::buffa::impl_view_reborrow!(GetOrganizationInvitationResponseView);
+        /** Self-contained, `'static` owned view of a `GetOrganizationInvitationResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetOrganizationInvitationResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetOrganizationInvitationResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetOrganizationInvitationResponseOwnedView(
+            ::buffa::OwnedView<GetOrganizationInvitationResponseView<'static>>,
+        );
+        impl GetOrganizationInvitationResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetOrganizationInvitationResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetOrganizationInvitationResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetOrganizationInvitationResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetOrganizationInvitationResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetOrganizationInvitationResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetOrganizationInvitationResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::GetOrganizationInvitationResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `invitation`
+            #[must_use]
+            pub fn invitation(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OrganizationInvitationPreviewView<'_>,
+            > {
+                &self.0.reborrow().invitation
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetOrganizationInvitationResponseView<'static>>,
+        > for GetOrganizationInvitationResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetOrganizationInvitationResponseView<'static>>,
+            ) -> Self {
+                GetOrganizationInvitationResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetOrganizationInvitationResponseOwnedView>
+        for ::buffa::OwnedView<GetOrganizationInvitationResponseView<'static>> {
+            fn from(wrapper: GetOrganizationInvitationResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetOrganizationInvitationResponseView<'static>>,
+        > for GetOrganizationInvitationResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetOrganizationInvitationResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetOrganizationInvitationResponse {
+            type View<'a> = GetOrganizationInvitationResponseView<'a>;
+            type ViewHandle = GetOrganizationInvitationResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetOrganizationInvitationResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct AcceptOrganizationInvitationRequestView<'a> {
+            /// Field 1: `token`
+            pub token: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for AcceptOrganizationInvitationRequestView<'a> {
+            type Owned = super::super::AcceptOrganizationInvitationRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AcceptOrganizationInvitationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AcceptOrganizationInvitationRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AcceptOrganizationInvitationRequest {
+                    token: self.token.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for AcceptOrganizationInvitationRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.token.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::string_encoded_len(&self.token) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.token.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.token, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AcceptOrganizationInvitationRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.token) {
+                    __map.serialize_entry("token", self.token)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AcceptOrganizationInvitationRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "AcceptOrganizationInvitationRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.AcceptOrganizationInvitationRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.AcceptOrganizationInvitationRequest";
+        }
+        ::buffa::impl_default_view_instance!(AcceptOrganizationInvitationRequestView);
+        ::buffa::impl_view_reborrow!(AcceptOrganizationInvitationRequestView);
+        /** Self-contained, `'static` owned view of a `AcceptOrganizationInvitationRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AcceptOrganizationInvitationRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AcceptOrganizationInvitationRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AcceptOrganizationInvitationRequestOwnedView(
+            ::buffa::OwnedView<AcceptOrganizationInvitationRequestView<'static>>,
+        );
+        impl AcceptOrganizationInvitationRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcceptOrganizationInvitationRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcceptOrganizationInvitationRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AcceptOrganizationInvitationRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcceptOrganizationInvitationRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`AcceptOrganizationInvitationRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AcceptOrganizationInvitationRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::AcceptOrganizationInvitationRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `token`
+            #[must_use]
+            pub fn token(&self) -> &'_ str {
+                self.0.reborrow().token
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<AcceptOrganizationInvitationRequestView<'static>>,
+        > for AcceptOrganizationInvitationRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    AcceptOrganizationInvitationRequestView<'static>,
+                >,
+            ) -> Self {
+                AcceptOrganizationInvitationRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AcceptOrganizationInvitationRequestOwnedView>
+        for ::buffa::OwnedView<AcceptOrganizationInvitationRequestView<'static>> {
+            fn from(wrapper: AcceptOrganizationInvitationRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AcceptOrganizationInvitationRequestView<'static>>,
+        > for AcceptOrganizationInvitationRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<AcceptOrganizationInvitationRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::AcceptOrganizationInvitationRequest {
+            type View<'a> = AcceptOrganizationInvitationRequestView<'a>;
+            type ViewHandle = AcceptOrganizationInvitationRequestOwnedView;
+        }
+        impl ::serde::Serialize for AcceptOrganizationInvitationRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct AcceptOrganizationInvitationResponseView<'a> {
+            /// Field 1: `invitation`
+            pub invitation: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OrganizationInvitationPreviewView<'a>,
+            >,
+            /// Field 2: `already_accepted`
+            pub already_accepted: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for AcceptOrganizationInvitationResponseView<'a> {
+            type Owned = super::super::AcceptOrganizationInvitationResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.invitation.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.invitation = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OrganizationInvitationPreviewView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.already_accepted = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AcceptOrganizationInvitationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AcceptOrganizationInvitationResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AcceptOrganizationInvitationResponse {
+                    invitation: match self.invitation.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::OrganizationInvitationPreview,
+                                ::buffa::Inline<super::super::OrganizationInvitationPreview>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    already_accepted: self.already_accepted,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for AcceptOrganizationInvitationResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.invitation.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.invitation.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.already_accepted {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.invitation.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.invitation.write_to(__cache, buf);
+                }
+                if self.already_accepted {
+                    ::buffa::types::put_bool_field(2u32, self.already_accepted, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for AcceptOrganizationInvitationResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .invitation
+                        .as_option()
+                    {
+                        __map.serialize_entry("invitation", __v)?;
+                    }
+                }
+                if self.already_accepted {
+                    __map.serialize_entry("alreadyAccepted", &self.already_accepted)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AcceptOrganizationInvitationResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "AcceptOrganizationInvitationResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.AcceptOrganizationInvitationResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.AcceptOrganizationInvitationResponse";
+        }
+        ::buffa::impl_default_view_instance!(AcceptOrganizationInvitationResponseView);
+        ::buffa::impl_view_reborrow!(AcceptOrganizationInvitationResponseView);
+        /** Self-contained, `'static` owned view of a `AcceptOrganizationInvitationResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AcceptOrganizationInvitationResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AcceptOrganizationInvitationResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AcceptOrganizationInvitationResponseOwnedView(
+            ::buffa::OwnedView<AcceptOrganizationInvitationResponseView<'static>>,
+        );
+        impl AcceptOrganizationInvitationResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcceptOrganizationInvitationResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcceptOrganizationInvitationResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AcceptOrganizationInvitationResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcceptOrganizationInvitationResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`AcceptOrganizationInvitationResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AcceptOrganizationInvitationResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::AcceptOrganizationInvitationResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `invitation`
+            #[must_use]
+            pub fn invitation(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OrganizationInvitationPreviewView<'_>,
+            > {
+                &self.0.reborrow().invitation
+            }
+            /// Field 2: `already_accepted`
+            #[must_use]
+            pub fn already_accepted(&self) -> bool {
+                self.0.reborrow().already_accepted
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<AcceptOrganizationInvitationResponseView<'static>>,
+        > for AcceptOrganizationInvitationResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    AcceptOrganizationInvitationResponseView<'static>,
+                >,
+            ) -> Self {
+                AcceptOrganizationInvitationResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AcceptOrganizationInvitationResponseOwnedView>
+        for ::buffa::OwnedView<AcceptOrganizationInvitationResponseView<'static>> {
+            fn from(wrapper: AcceptOrganizationInvitationResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AcceptOrganizationInvitationResponseView<'static>>,
+        > for AcceptOrganizationInvitationResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<AcceptOrganizationInvitationResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::AcceptOrganizationInvitationResponse {
+            type View<'a> = AcceptOrganizationInvitationResponseView<'a>;
+            type ViewHandle = AcceptOrganizationInvitationResponseOwnedView;
+        }
+        impl ::serde::Serialize for AcceptOrganizationInvitationResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ListOrganizationMembersRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListOrganizationMembersRequestView<'a> {
+            type Owned = super::super::ListOrganizationMembersRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListOrganizationMembersRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListOrganizationMembersRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListOrganizationMembersRequest {
+                    organization_id: self.organization_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListOrganizationMembersRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListOrganizationMembersRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListOrganizationMembersRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ListOrganizationMembersRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationMembersRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationMembersRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListOrganizationMembersRequestView);
+        ::buffa::impl_view_reborrow!(ListOrganizationMembersRequestView);
+        /** Self-contained, `'static` owned view of a `ListOrganizationMembersRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListOrganizationMembersRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListOrganizationMembersRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListOrganizationMembersRequestOwnedView(
+            ::buffa::OwnedView<ListOrganizationMembersRequestView<'static>>,
+        );
+        impl ListOrganizationMembersRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationMembersRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationMembersRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListOrganizationMembersRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationMembersRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListOrganizationMembersRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListOrganizationMembersRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::ListOrganizationMembersRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListOrganizationMembersRequestView<'static>>,
+        > for ListOrganizationMembersRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListOrganizationMembersRequestView<'static>>,
+            ) -> Self {
+                ListOrganizationMembersRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListOrganizationMembersRequestOwnedView>
+        for ::buffa::OwnedView<ListOrganizationMembersRequestView<'static>> {
+            fn from(wrapper: ListOrganizationMembersRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListOrganizationMembersRequestView<'static>>,
+        > for ListOrganizationMembersRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListOrganizationMembersRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListOrganizationMembersRequest {
+            type View<'a> = ListOrganizationMembersRequestView<'a>;
+            type ViewHandle = ListOrganizationMembersRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListOrganizationMembersRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ListOrganizationMembersResponseView<'a> {
+            /// Field 1: `members`
+            pub members: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::OrganizationMemberView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListOrganizationMembersResponseView<'a> {
+            type Owned = super::super::ListOrganizationMembersResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::OrganizationMemberView,
+                            >(),
+                        )?;
+                        view.members
+                            .push(
+                                <super::super::__buffa::view::OrganizationMemberView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListOrganizationMembersResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListOrganizationMembersResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListOrganizationMembersResponse {
+                    members: self
+                        .members
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListOrganizationMembersResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                for v in &self.members {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.members {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListOrganizationMembersResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.members.is_empty() {
+                    __map.serialize_entry("members", &*self.members)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListOrganizationMembersResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ListOrganizationMembersResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationMembersResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationMembersResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListOrganizationMembersResponseView);
+        ::buffa::impl_view_reborrow!(ListOrganizationMembersResponseView);
+        /** Self-contained, `'static` owned view of a `ListOrganizationMembersResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListOrganizationMembersResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListOrganizationMembersResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListOrganizationMembersResponseOwnedView(
+            ::buffa::OwnedView<ListOrganizationMembersResponseView<'static>>,
+        );
+        impl ListOrganizationMembersResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationMembersResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationMembersResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListOrganizationMembersResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListOrganizationMembersResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListOrganizationMembersResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListOrganizationMembersResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::ListOrganizationMembersResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `members`
+            #[must_use]
+            pub fn members(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::OrganizationMemberView<'_>,
+            > {
+                &self.0.reborrow().members
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListOrganizationMembersResponseView<'static>>,
+        > for ListOrganizationMembersResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListOrganizationMembersResponseView<'static>>,
+            ) -> Self {
+                ListOrganizationMembersResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListOrganizationMembersResponseOwnedView>
+        for ::buffa::OwnedView<ListOrganizationMembersResponseView<'static>> {
+            fn from(wrapper: ListOrganizationMembersResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListOrganizationMembersResponseView<'static>>,
+        > for ListOrganizationMembersResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListOrganizationMembersResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListOrganizationMembersResponse {
+            type View<'a> = ListOrganizationMembersResponseView<'a>;
+            type ViewHandle = ListOrganizationMembersResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListOrganizationMembersResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct UpdateOrganizationMemberRoleRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `user_id`
+            pub user_id: &'a str,
+            /// Field 3: `role`
+            pub role: ::buffa::EnumValue<super::super::ProjectRole>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for UpdateOrganizationMemberRoleRequestView<'a> {
+            type Owned = super::super::UpdateOrganizationMemberRoleRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.user_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.role = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationMemberRoleRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationMemberRoleRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UpdateOrganizationMemberRoleRequest {
+                    organization_id: self.organization_id.to_string(),
+                    user_id: self.user_id.to_string(),
+                    role: self.role,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for UpdateOrganizationMemberRoleRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.user_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.user_id) as u64;
+                }
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.user_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.user_id, buf);
+                }
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UpdateOrganizationMemberRoleRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.user_id) {
+                    __map.serialize_entry("userId", self.user_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.role) {
+                    __map.serialize_entry("role", &self.role)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UpdateOrganizationMemberRoleRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "UpdateOrganizationMemberRoleRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationMemberRoleRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberRoleRequest";
+        }
+        ::buffa::impl_default_view_instance!(UpdateOrganizationMemberRoleRequestView);
+        ::buffa::impl_view_reborrow!(UpdateOrganizationMemberRoleRequestView);
+        /** Self-contained, `'static` owned view of a `UpdateOrganizationMemberRoleRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateOrganizationMemberRoleRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateOrganizationMemberRoleRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UpdateOrganizationMemberRoleRequestOwnedView(
+            ::buffa::OwnedView<UpdateOrganizationMemberRoleRequestView<'static>>,
+        );
+        impl UpdateOrganizationMemberRoleRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationMemberRoleRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationMemberRoleRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UpdateOrganizationMemberRoleRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationMemberRoleRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UpdateOrganizationMemberRoleRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UpdateOrganizationMemberRoleRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::UpdateOrganizationMemberRoleRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `user_id`
+            #[must_use]
+            pub fn user_id(&self) -> &'_ str {
+                self.0.reborrow().user_id
+            }
+            /// Field 3: `role`
+            #[must_use]
+            pub fn role(&self) -> ::buffa::EnumValue<super::super::ProjectRole> {
+                self.0.reborrow().role
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UpdateOrganizationMemberRoleRequestView<'static>>,
+        > for UpdateOrganizationMemberRoleRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    UpdateOrganizationMemberRoleRequestView<'static>,
+                >,
+            ) -> Self {
+                UpdateOrganizationMemberRoleRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UpdateOrganizationMemberRoleRequestOwnedView>
+        for ::buffa::OwnedView<UpdateOrganizationMemberRoleRequestView<'static>> {
+            fn from(wrapper: UpdateOrganizationMemberRoleRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UpdateOrganizationMemberRoleRequestView<'static>>,
+        > for UpdateOrganizationMemberRoleRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<UpdateOrganizationMemberRoleRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::UpdateOrganizationMemberRoleRequest {
+            type View<'a> = UpdateOrganizationMemberRoleRequestView<'a>;
+            type ViewHandle = UpdateOrganizationMemberRoleRequestOwnedView;
+        }
+        impl ::serde::Serialize for UpdateOrganizationMemberRoleRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct UpdateOrganizationMemberRoleResponseView<'a> {
+            /// Field 1: `members`
+            pub members: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::OrganizationMemberView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for UpdateOrganizationMemberRoleResponseView<'a> {
+            type Owned = super::super::UpdateOrganizationMemberRoleResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::OrganizationMemberView,
+                            >(),
+                        )?;
+                        view.members
+                            .push(
+                                <super::super::__buffa::view::OrganizationMemberView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationMemberRoleResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationMemberRoleResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UpdateOrganizationMemberRoleResponse {
+                    members: self
+                        .members
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for UpdateOrganizationMemberRoleResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                for v in &self.members {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.members {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for UpdateOrganizationMemberRoleResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.members.is_empty() {
+                    __map.serialize_entry("members", &*self.members)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UpdateOrganizationMemberRoleResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "UpdateOrganizationMemberRoleResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationMemberRoleResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberRoleResponse";
+        }
+        ::buffa::impl_default_view_instance!(UpdateOrganizationMemberRoleResponseView);
+        ::buffa::impl_view_reborrow!(UpdateOrganizationMemberRoleResponseView);
+        /** Self-contained, `'static` owned view of a `UpdateOrganizationMemberRoleResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateOrganizationMemberRoleResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateOrganizationMemberRoleResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UpdateOrganizationMemberRoleResponseOwnedView(
+            ::buffa::OwnedView<UpdateOrganizationMemberRoleResponseView<'static>>,
+        );
+        impl UpdateOrganizationMemberRoleResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationMemberRoleResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationMemberRoleResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UpdateOrganizationMemberRoleResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationMemberRoleResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UpdateOrganizationMemberRoleResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UpdateOrganizationMemberRoleResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::UpdateOrganizationMemberRoleResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `members`
+            #[must_use]
+            pub fn members(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::OrganizationMemberView<'_>,
+            > {
+                &self.0.reborrow().members
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UpdateOrganizationMemberRoleResponseView<'static>>,
+        > for UpdateOrganizationMemberRoleResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    UpdateOrganizationMemberRoleResponseView<'static>,
+                >,
+            ) -> Self {
+                UpdateOrganizationMemberRoleResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UpdateOrganizationMemberRoleResponseOwnedView>
+        for ::buffa::OwnedView<UpdateOrganizationMemberRoleResponseView<'static>> {
+            fn from(wrapper: UpdateOrganizationMemberRoleResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UpdateOrganizationMemberRoleResponseView<'static>>,
+        > for UpdateOrganizationMemberRoleResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<UpdateOrganizationMemberRoleResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::UpdateOrganizationMemberRoleResponse {
+            type View<'a> = UpdateOrganizationMemberRoleResponseView<'a>;
+            type ViewHandle = UpdateOrganizationMemberRoleResponseOwnedView;
+        }
+        impl ::serde::Serialize for UpdateOrganizationMemberRoleResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct UpdateOrganizationMemberProjectsRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `user_id`
+            pub user_id: &'a str,
+            /// Field 3: `project_ids`
+            pub project_ids: ::buffa::RepeatedView<'a, &'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for UpdateOrganizationMemberProjectsRequestView<'a> {
+            type Owned = super::super::UpdateOrganizationMemberProjectsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.user_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.project_ids.push(__elem);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationMemberProjectsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationMemberProjectsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UpdateOrganizationMemberProjectsRequest {
+                    organization_id: self.organization_id.to_string(),
+                    user_id: self.user_id.to_string(),
+                    project_ids: self
+                        .project_ids
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for UpdateOrganizationMemberProjectsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.user_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.user_id) as u64;
+                }
+                for v in &self.project_ids {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.user_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.user_id, buf);
+                }
+                for v in &self.project_ids {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for UpdateOrganizationMemberProjectsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.user_id) {
+                    __map.serialize_entry("userId", self.user_id)?;
+                }
+                if !self.project_ids.is_empty() {
+                    __map.serialize_entry("projectIds", &*self.project_ids)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for UpdateOrganizationMemberProjectsRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "UpdateOrganizationMemberProjectsRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationMemberProjectsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberProjectsRequest";
+        }
+        ::buffa::impl_default_view_instance!(
+            UpdateOrganizationMemberProjectsRequestView
+        );
+        ::buffa::impl_view_reborrow!(UpdateOrganizationMemberProjectsRequestView);
+        /** Self-contained, `'static` owned view of a `UpdateOrganizationMemberProjectsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateOrganizationMemberProjectsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateOrganizationMemberProjectsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UpdateOrganizationMemberProjectsRequestOwnedView(
+            ::buffa::OwnedView<UpdateOrganizationMemberProjectsRequestView<'static>>,
+        );
+        impl UpdateOrganizationMemberProjectsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationMemberProjectsRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationMemberProjectsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UpdateOrganizationMemberProjectsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationMemberProjectsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UpdateOrganizationMemberProjectsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UpdateOrganizationMemberProjectsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::UpdateOrganizationMemberProjectsRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `user_id`
+            #[must_use]
+            pub fn user_id(&self) -> &'_ str {
+                self.0.reborrow().user_id
+            }
+            /// Field 3: `project_ids`
+            #[must_use]
+            pub fn project_ids(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().project_ids
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UpdateOrganizationMemberProjectsRequestView<'static>>,
+        > for UpdateOrganizationMemberProjectsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    UpdateOrganizationMemberProjectsRequestView<'static>,
+                >,
+            ) -> Self {
+                UpdateOrganizationMemberProjectsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UpdateOrganizationMemberProjectsRequestOwnedView>
+        for ::buffa::OwnedView<UpdateOrganizationMemberProjectsRequestView<'static>> {
+            fn from(wrapper: UpdateOrganizationMemberProjectsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UpdateOrganizationMemberProjectsRequestView<'static>>,
+        > for UpdateOrganizationMemberProjectsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                UpdateOrganizationMemberProjectsRequestView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::UpdateOrganizationMemberProjectsRequest {
+            type View<'a> = UpdateOrganizationMemberProjectsRequestView<'a>;
+            type ViewHandle = UpdateOrganizationMemberProjectsRequestOwnedView;
+        }
+        impl ::serde::Serialize for UpdateOrganizationMemberProjectsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct UpdateOrganizationMemberProjectsResponseView<'a> {
+            /// Field 1: `members`
+            pub members: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::OrganizationMemberView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for UpdateOrganizationMemberProjectsResponseView<'a> {
+            type Owned = super::super::UpdateOrganizationMemberProjectsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::OrganizationMemberView,
+                            >(),
+                        )?;
+                        view.members
+                            .push(
+                                <super::super::__buffa::view::OrganizationMemberView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationMemberProjectsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UpdateOrganizationMemberProjectsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UpdateOrganizationMemberProjectsResponse {
+                    members: self
+                        .members
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for UpdateOrganizationMemberProjectsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                for v in &self.members {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.members {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for UpdateOrganizationMemberProjectsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.members.is_empty() {
+                    __map.serialize_entry("members", &*self.members)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for UpdateOrganizationMemberProjectsResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "UpdateOrganizationMemberProjectsResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationMemberProjectsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationMemberProjectsResponse";
+        }
+        ::buffa::impl_default_view_instance!(
+            UpdateOrganizationMemberProjectsResponseView
+        );
+        ::buffa::impl_view_reborrow!(UpdateOrganizationMemberProjectsResponseView);
+        /** Self-contained, `'static` owned view of a `UpdateOrganizationMemberProjectsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateOrganizationMemberProjectsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateOrganizationMemberProjectsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UpdateOrganizationMemberProjectsResponseOwnedView(
+            ::buffa::OwnedView<UpdateOrganizationMemberProjectsResponseView<'static>>,
+        );
+        impl UpdateOrganizationMemberProjectsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationMemberProjectsResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationMemberProjectsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UpdateOrganizationMemberProjectsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UpdateOrganizationMemberProjectsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UpdateOrganizationMemberProjectsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UpdateOrganizationMemberProjectsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::UpdateOrganizationMemberProjectsResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `members`
+            #[must_use]
+            pub fn members(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::OrganizationMemberView<'_>,
+            > {
+                &self.0.reborrow().members
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UpdateOrganizationMemberProjectsResponseView<'static>>,
+        > for UpdateOrganizationMemberProjectsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    UpdateOrganizationMemberProjectsResponseView<'static>,
+                >,
+            ) -> Self {
+                UpdateOrganizationMemberProjectsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UpdateOrganizationMemberProjectsResponseOwnedView>
+        for ::buffa::OwnedView<UpdateOrganizationMemberProjectsResponseView<'static>> {
+            fn from(wrapper: UpdateOrganizationMemberProjectsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UpdateOrganizationMemberProjectsResponseView<'static>>,
+        > for UpdateOrganizationMemberProjectsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                UpdateOrganizationMemberProjectsResponseView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::UpdateOrganizationMemberProjectsResponse {
+            type View<'a> = UpdateOrganizationMemberProjectsResponseView<'a>;
+            type ViewHandle = UpdateOrganizationMemberProjectsResponseOwnedView;
+        }
+        impl ::serde::Serialize for UpdateOrganizationMemberProjectsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct RemoveOrganizationMemberRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `user_id`
+            pub user_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for RemoveOrganizationMemberRequestView<'a> {
+            type Owned = super::super::RemoveOrganizationMemberRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.user_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RemoveOrganizationMemberRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RemoveOrganizationMemberRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RemoveOrganizationMemberRequest {
+                    organization_id: self.organization_id.to_string(),
+                    user_id: self.user_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RemoveOrganizationMemberRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.user_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.user_id) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.user_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.user_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RemoveOrganizationMemberRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.user_id) {
+                    __map.serialize_entry("userId", self.user_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RemoveOrganizationMemberRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "RemoveOrganizationMemberRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.RemoveOrganizationMemberRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RemoveOrganizationMemberRequest";
+        }
+        ::buffa::impl_default_view_instance!(RemoveOrganizationMemberRequestView);
+        ::buffa::impl_view_reborrow!(RemoveOrganizationMemberRequestView);
+        /** Self-contained, `'static` owned view of a `RemoveOrganizationMemberRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RemoveOrganizationMemberRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RemoveOrganizationMemberRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RemoveOrganizationMemberRequestOwnedView(
+            ::buffa::OwnedView<RemoveOrganizationMemberRequestView<'static>>,
+        );
+        impl RemoveOrganizationMemberRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RemoveOrganizationMemberRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RemoveOrganizationMemberRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RemoveOrganizationMemberRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RemoveOrganizationMemberRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`RemoveOrganizationMemberRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RemoveOrganizationMemberRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::RemoveOrganizationMemberRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `user_id`
+            #[must_use]
+            pub fn user_id(&self) -> &'_ str {
+                self.0.reborrow().user_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RemoveOrganizationMemberRequestView<'static>>,
+        > for RemoveOrganizationMemberRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<RemoveOrganizationMemberRequestView<'static>>,
+            ) -> Self {
+                RemoveOrganizationMemberRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RemoveOrganizationMemberRequestOwnedView>
+        for ::buffa::OwnedView<RemoveOrganizationMemberRequestView<'static>> {
+            fn from(wrapper: RemoveOrganizationMemberRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RemoveOrganizationMemberRequestView<'static>>,
+        > for RemoveOrganizationMemberRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RemoveOrganizationMemberRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::RemoveOrganizationMemberRequest {
+            type View<'a> = RemoveOrganizationMemberRequestView<'a>;
+            type ViewHandle = RemoveOrganizationMemberRequestOwnedView;
+        }
+        impl ::serde::Serialize for RemoveOrganizationMemberRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct RemoveOrganizationMemberResponseView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for RemoveOrganizationMemberResponseView<'a> {
+            type Owned = super::super::RemoveOrganizationMemberResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RemoveOrganizationMemberResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RemoveOrganizationMemberResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RemoveOrganizationMemberResponse {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RemoveOrganizationMemberResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RemoveOrganizationMemberResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RemoveOrganizationMemberResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "RemoveOrganizationMemberResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.RemoveOrganizationMemberResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.RemoveOrganizationMemberResponse";
+        }
+        ::buffa::impl_default_view_instance!(RemoveOrganizationMemberResponseView);
+        ::buffa::impl_view_reborrow!(RemoveOrganizationMemberResponseView);
+        /** Self-contained, `'static` owned view of a `RemoveOrganizationMemberResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RemoveOrganizationMemberResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RemoveOrganizationMemberResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RemoveOrganizationMemberResponseOwnedView(
+            ::buffa::OwnedView<RemoveOrganizationMemberResponseView<'static>>,
+        );
+        impl RemoveOrganizationMemberResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RemoveOrganizationMemberResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RemoveOrganizationMemberResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RemoveOrganizationMemberResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RemoveOrganizationMemberResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`RemoveOrganizationMemberResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RemoveOrganizationMemberResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::RemoveOrganizationMemberResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RemoveOrganizationMemberResponseView<'static>>,
+        > for RemoveOrganizationMemberResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<RemoveOrganizationMemberResponseView<'static>>,
+            ) -> Self {
+                RemoveOrganizationMemberResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RemoveOrganizationMemberResponseOwnedView>
+        for ::buffa::OwnedView<RemoveOrganizationMemberResponseView<'static>> {
+            fn from(wrapper: RemoveOrganizationMemberResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RemoveOrganizationMemberResponseView<'static>>,
+        > for RemoveOrganizationMemberResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RemoveOrganizationMemberResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::RemoveOrganizationMemberResponse {
+            type View<'a> = RemoveOrganizationMemberResponseView<'a>;
+            type ViewHandle = RemoveOrganizationMemberResponseOwnedView;
+        }
+        impl ::serde::Serialize for RemoveOrganizationMemberResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
         pub struct CreateRealtimeTicketRequestView<'a> {
             pub scope: ::core::option::Option<
                 super::super::__buffa::view::oneof::create_realtime_ticket_request::Scope<
@@ -185123,6 +200348,19 @@ pub mod __buffa {
                     ),
                 }
             }
+            pub mod update_organization_logo_request {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum LogoUpdate<'a> {
+                    Logo(&'a str),
+                    ClearLogo(
+                        ::buffa::alloc::boxed::Box<
+                            ::buffa_types::google::protobuf::__buffa::view::EmptyView<'a>,
+                        >,
+                    ),
+                }
+            }
             pub mod create_realtime_ticket_request {
                 #[allow(unused_imports)]
                 use super::*;
@@ -186093,6 +201331,41 @@ pub mod __buffa {
                 }
             }
         }
+        pub mod update_organization_logo_request {
+            #[allow(unused_imports)]
+            use super::*;
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum LogoUpdate {
+                Logo(::buffa::alloc::string::String),
+                ClearLogo(
+                    ::buffa::alloc::boxed::Box<::buffa_types::google::protobuf::Empty>,
+                ),
+            }
+            impl ::buffa::Oneof for LogoUpdate {}
+            impl From<::buffa_types::google::protobuf::Empty> for LogoUpdate {
+                fn from(v: ::buffa_types::google::protobuf::Empty) -> Self {
+                    Self::ClearLogo(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl serde::Serialize for LogoUpdate {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::Logo(v) => {
+                            map.serialize_entry("logo", v)?;
+                        }
+                        Self::ClearLogo(v) => {
+                            map.serialize_entry("clearLogo", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
         pub mod create_realtime_ticket_request {
             #[allow(unused_imports)]
             use super::*;
@@ -186220,8 +201493,6 @@ pub mod __buffa {
         reg.register_json_any(super::message_block::__RICH_TEXT_JSON_ANY);
         reg.register_json_any(super::__GET_CURRENT_USER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_CURRENT_USER_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__LIST_ORGANIZATION_MEMBERS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__LIST_ORGANIZATION_MEMBERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_ORGANIZATION_AGENTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_ORGANIZATION_AGENTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_ORGANIZATION_AGENT_REQUEST_JSON_ANY);
@@ -186509,6 +201780,47 @@ pub mod __buffa {
         reg.register_json_any(super::__INBOX_CHANNEL_MESSAGE_JSON_ANY);
         reg.register_json_any(super::__INBOX_SESSION_MESSAGE_JSON_ANY);
         reg.register_json_any(super::__INBOX_FEED_MESSAGE_JSON_ANY);
+        reg.register_json_any(super::__ORGANIZATION_JSON_ANY);
+        reg.register_json_any(super::__ORGANIZATION_INVITATION_JSON_ANY);
+        reg.register_json_any(super::__ORGANIZATION_INVITATION_PREVIEW_JSON_ANY);
+        reg.register_json_any(super::__LIST_ORGANIZATIONS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_ORGANIZATIONS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_ORGANIZATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_ORGANIZATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(
+            super::__CHECK_ORGANIZATION_HANDLE_AVAILABILITY_REQUEST_JSON_ANY,
+        );
+        reg.register_json_any(
+            super::__CHECK_ORGANIZATION_HANDLE_AVAILABILITY_RESPONSE_JSON_ANY,
+        );
+        reg.register_json_any(super::__UPDATE_ORGANIZATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_ORGANIZATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_ORGANIZATION_LOGO_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_ORGANIZATION_LOGO_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_ORGANIZATION_INVITATIONS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_ORGANIZATION_INVITATIONS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_ORGANIZATION_INVITATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_ORGANIZATION_INVITATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REVOKE_ORGANIZATION_INVITATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REVOKE_ORGANIZATION_INVITATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_ORGANIZATION_INVITATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_ORGANIZATION_INVITATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ACCEPT_ORGANIZATION_INVITATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ACCEPT_ORGANIZATION_INVITATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_ORGANIZATION_MEMBERS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_ORGANIZATION_MEMBERS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_ORGANIZATION_MEMBER_ROLE_REQUEST_JSON_ANY);
+        reg.register_json_any(
+            super::__UPDATE_ORGANIZATION_MEMBER_ROLE_RESPONSE_JSON_ANY,
+        );
+        reg.register_json_any(
+            super::__UPDATE_ORGANIZATION_MEMBER_PROJECTS_REQUEST_JSON_ANY,
+        );
+        reg.register_json_any(
+            super::__UPDATE_ORGANIZATION_MEMBER_PROJECTS_RESPONSE_JSON_ANY,
+        );
+        reg.register_json_any(super::__REMOVE_ORGANIZATION_MEMBER_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_ORGANIZATION_MEMBER_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_REALTIME_TICKET_REQUEST_JSON_ANY);
         reg.register_json_any(
             super::create_realtime_ticket_request::__ORGANIZATION_NOTIFICATIONS_JSON_ANY,
@@ -186586,14 +201898,6 @@ pub use self::__buffa::view::GetCurrentUserRequestOwnedView;
 pub use self::__buffa::view::GetCurrentUserResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetCurrentUserResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListOrganizationMembersRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::ListOrganizationMembersRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListOrganizationMembersResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::ListOrganizationMembersResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListOrganizationAgentsRequestView;
 #[doc(inline)]
@@ -187478,6 +202782,130 @@ pub use self::__buffa::view::InboxSessionMessageOwnedView;
 pub use self::__buffa::view::InboxFeedMessageView;
 #[doc(inline)]
 pub use self::__buffa::view::InboxFeedMessageOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::OrganizationView;
+#[doc(inline)]
+pub use self::__buffa::view::OrganizationOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::OrganizationInvitationView;
+#[doc(inline)]
+pub use self::__buffa::view::OrganizationInvitationOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::OrganizationInvitationPreviewView;
+#[doc(inline)]
+pub use self::__buffa::view::OrganizationInvitationPreviewOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListOrganizationsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListOrganizationsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListOrganizationsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListOrganizationsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateOrganizationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateOrganizationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateOrganizationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateOrganizationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CheckOrganizationHandleAvailabilityRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CheckOrganizationHandleAvailabilityRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CheckOrganizationHandleAvailabilityResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CheckOrganizationHandleAvailabilityResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationLogoRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationLogoRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationLogoResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationLogoResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListOrganizationInvitationsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListOrganizationInvitationsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListOrganizationInvitationsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListOrganizationInvitationsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateOrganizationInvitationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateOrganizationInvitationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateOrganizationInvitationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateOrganizationInvitationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RevokeOrganizationInvitationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RevokeOrganizationInvitationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RevokeOrganizationInvitationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RevokeOrganizationInvitationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetOrganizationInvitationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetOrganizationInvitationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetOrganizationInvitationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetOrganizationInvitationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AcceptOrganizationInvitationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::AcceptOrganizationInvitationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AcceptOrganizationInvitationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::AcceptOrganizationInvitationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListOrganizationMembersRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListOrganizationMembersRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListOrganizationMembersResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListOrganizationMembersResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationMemberRoleRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationMemberRoleRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationMemberRoleResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationMemberRoleResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationMemberProjectsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationMemberProjectsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationMemberProjectsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateOrganizationMemberProjectsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveOrganizationMemberRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveOrganizationMemberRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveOrganizationMemberResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveOrganizationMemberResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateRealtimeTicketRequestView;
 #[doc(inline)]
