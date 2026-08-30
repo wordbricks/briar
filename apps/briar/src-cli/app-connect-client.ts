@@ -30,10 +30,10 @@ import {
 } from "../src/lib/app-rpc/merge-queue-mappers";
 import { requiredMessage } from "../src/lib/app-rpc/mappers";
 
-const transport = (apiUrl: string) =>
+export const appConnectTransport = (apiUrl: string) =>
   createConnectTransport({ baseUrl: apiUrl.replace(/\/+$/u, "") });
 
-const callOptions = (token: string) => ({
+export const appConnectCallOptions = (token: string) => ({
   headers: { Authorization: `Bearer ${token}` },
 });
 
@@ -43,8 +43,8 @@ export async function fetchCurrentUser(
 ): Promise<NonNullable<GetCurrentUserResponse["user"]>> {
   const response = await createClient(
     AccountService,
-    transport(apiUrl),
-  ).getCurrentUser({}, callOptions(token));
+    appConnectTransport(apiUrl),
+  ).getCurrentUser({}, appConnectCallOptions(token));
   if (response.user === undefined) throw new Error("Current user is missing");
   return response.user;
 }
@@ -55,8 +55,8 @@ export async function fetchProjects(
 ): Promise<ListProjectsResponse["projects"]> {
   return (await createClient(
     ProjectService,
-    transport(apiUrl),
-  ).listProjects({}, callOptions(token))).projects;
+    appConnectTransport(apiUrl),
+  ).listProjects({}, appConnectCallOptions(token))).projects;
 }
 
 export async function fetchDashboard(
@@ -66,8 +66,8 @@ export async function fetchDashboard(
 ): Promise<GetDashboardResponse> {
   return createClient(
     DashboardService,
-    transport(apiUrl),
-  ).getDashboard({ projectId }, callOptions(token));
+    appConnectTransport(apiUrl),
+  ).getDashboard({ projectId }, appConnectCallOptions(token));
 }
 
 export async function updateRemoteProjectSettings(
@@ -77,8 +77,8 @@ export async function updateRemoteProjectSettings(
 ) {
   return createClient(
     ProjectService,
-    transport(apiUrl),
-  ).updateProjectSettings(input, callOptions(token));
+    appConnectTransport(apiUrl),
+  ).updateProjectSettings(input, appConnectCallOptions(token));
 }
 
 export async function fetchManagedComputer(
@@ -89,8 +89,11 @@ export async function fetchManagedComputer(
 ) {
   const response = await createClient(
     FleetService,
-    transport(apiUrl),
-  ).getManagedComputer({ organizationId, managedComputerId }, callOptions(token));
+    appConnectTransport(apiUrl),
+  ).getManagedComputer(
+    { organizationId, managedComputerId },
+    appConnectCallOptions(token),
+  );
   return managedComputerFromProto(
     requiredMessage(response.computer, "managedComputer"),
   );
@@ -106,10 +109,10 @@ export async function createManagedComputerSetupSession(
 ) {
   const response = await createClient(
     FleetService,
-    transport(apiUrl),
+    appConnectTransport(apiUrl),
   ).createManagedComputerSetupSession(
     { organizationId, managedComputerId, projectId, requestId },
-    callOptions(token),
+    appConnectCallOptions(token),
   );
   return managedComputerSetupSessionTicketFromProto(response);
 }
@@ -122,10 +125,10 @@ export async function fetchManagedComputerSetupStatus(
 ) {
   const response = await createClient(
     FleetService,
-    transport(apiUrl),
+    appConnectTransport(apiUrl),
   ).getManagedComputerSetupStatus(
     { organizationId, managedComputerId },
-    callOptions(token),
+    appConnectCallOptions(token),
   );
   return managedComputerSetupStatusFromProto(response);
 }
@@ -137,8 +140,8 @@ export async function fetchMergeQueueProfile(
 ) {
   const response = await createClient(
     MergeQueueService,
-    transport(apiUrl),
-  ).getMergeQueueProfile({ projectId }, callOptions(token));
+    appConnectTransport(apiUrl),
+  ).getMergeQueueProfile({ projectId }, appConnectCallOptions(token));
   return response.profile
     ? mergeQueueProfileFromProto(response.profile)
     : null;
@@ -157,7 +160,7 @@ export async function updateRemoteMergeQueueProfile(
 ) {
   const response = await createClient(
     MergeQueueService,
-    transport(apiUrl),
+    appConnectTransport(apiUrl),
   ).updateMergeQueueProfile(
     {
       projectId: input.projectId,
@@ -168,7 +171,7 @@ export async function updateRemoteMergeQueueProfile(
         : mergeQueueQuietWindowToProto(input.quietWindowMs),
       maxBatchSize: input.maxBatchSize,
     },
-    callOptions(token),
+    appConnectCallOptions(token),
   );
   return mergeQueueProfileFromProto(requiredMessage(
     response.profile,

@@ -1,5 +1,11 @@
-import * as Schema from "effect/Schema";
-import { request } from "./command-support";
+import { createClient } from "@connectrpc/connect";
+import { ProjectGitHubService } from "@briar/contracts/gen/briar/app/v1/github_pb";
+import { githubPullRequestFromProto } from "../src/lib/app-rpc/github-mappers";
+import { requiredMessage } from "../src/lib/app-rpc/mappers";
+import {
+  appConnectCallOptions,
+  appConnectTransport,
+} from "./app-connect-client";
 
 type GithubPullRequestTarget = {
   owner: string;
@@ -15,26 +21,21 @@ export type GithubPullRequestIdentity = {
   pullRequestNumber: number;
 };
 
-const GithubPullRequestInspectionResponse = Schema.Struct({
-  pullRequest: Schema.Struct({
-    repositoryId: Schema.Int.check(Schema.isGreaterThan(0)),
-    repository: Schema.String,
-    pullRequestId: Schema.Int.check(Schema.isGreaterThan(0)),
-    pullRequestNodeId: Schema.String.check(Schema.isMinLength(1)),
-    pullRequestNumber: Schema.Int.check(Schema.isGreaterThan(0)),
-    body: Schema.String,
-  }).annotate({ parseOptions: { onExcessProperty: "preserve" } }),
-}).annotate({ parseOptions: { onExcessProperty: "preserve" } });
+type GithubPullRequestInspection = GithubPullRequestIdentity & {
+  body: string;
+};
 
-const decodeInspectionResponse = Schema.decodeUnknownSync(
-  GithubPullRequestInspectionResponse,
-  { errors: "all" },
-);
-
-export type GithubApiRequest = (
-  path: string,
-  init?: RequestInit,
-) => Promise<unknown>;
+export type GithubPullRequestApi = {
+  getPullRequest(input: {
+    projectId: string;
+    pullRequestNumber: bigint;
+  }): Promise<GithubPullRequestInspection>;
+  updatePullRequest(input: {
+    projectId: string;
+    pullRequestNumber: bigint;
+    body: string;
+  }): Promise<void>;
+};
 
 export function briarIssueUrl(
   apiUrl: string,
@@ -75,7 +76,7 @@ export function appendBriarIssueLink(body: string, issueUrl: string) {
 }
 
 function validateGithubPullRequestInspection(
-  value: typeof GithubPullRequestInspectionResponse.Type["pullRequest"],
+  value: GithubPullRequestInspection,
   target: GithubPullRequestTarget,
 ) {
   const repository = value.repository.trim().toLowerCase();
@@ -97,6 +98,23 @@ function validateGithubPullRequestInspection(
   };
 }
 
+const connectGithubPullRequestApi = (
+  apiUrl: string,
+  token: string,
+): GithubPullRequestApi => {
+  const client = createClient(ProjectGitHubService, appConnectTransport(apiUrl));
+  const options = appConnectCallOptions(token);
+  return {
+    getPullRequest: async (input) => githubPullRequestFromProto(requiredMessage(
+      (await client.getGitHubPullRequest(input, options)).pullRequest,
+      "getGitHubPullRequest.pullRequest",
+    )),
+    updatePullRequest: async (input) => {
+      await client.updateGitHubPullRequest(input, options);
+    },
+  };
+};
+
 export async function ensureBriarIssueLinkInGithubPullRequest(
   input: {
     apiUrl: string;
@@ -105,16 +123,20 @@ export async function ensureBriarIssueLinkInGithubPullRequest(
     pullRequestUrl: string;
     issueUrl: string;
   },
-  send: GithubApiRequest = (path, init) =>
-    request(input.apiUrl, path, input.token, init),
+  api: GithubPullRequestApi = connectGithubPullRequestApi(
+    input.apiUrl,
+    input.token,
+  ),
 ) {
   const target = githubPullRequestTarget(input.pullRequestUrl);
   if (!target) return { updated: false, reason: "not_github" as const };
 
-  const endpoint = `/projects/${encodeURIComponent(input.projectId)}/github/pull-requests/${target.number}`;
-  const current = decodeInspectionResponse(await send(endpoint));
+  const pullRequestNumber = BigInt(target.number);
   const inspection = validateGithubPullRequestInspection(
-    current.pullRequest,
+    await api.getPullRequest({
+      projectId: input.projectId,
+      pullRequestNumber,
+    }),
     target,
   );
 
@@ -133,9 +155,10 @@ export async function ensureBriarIssueLinkInGithubPullRequest(
     };
   }
 
-  await send(endpoint, {
-    method: "PATCH",
-    body: JSON.stringify({ body }),
+  await api.updatePullRequest({
+    projectId: input.projectId,
+    pullRequestNumber,
+    body,
   });
   return {
     updated: true,
