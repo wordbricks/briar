@@ -983,16 +983,13 @@ final class ChannelsStore: ObservableObject {
             guard let rootMessageID = UUID(uuidString: wireResponse.rootMessageID) else {
                 throw MobileAPIError.invalidResponse
             }
-            let response = ChannelThreadSubscriptionResponse(
-                rootMessageId: rootMessageID,
-                subscribers: try wireResponse.subscribers.map(
-                    IssueSubscriber.init(connectMessage:)
-                )
+            let subscribers = try wireResponse.subscribers.map(
+                IssueSubscriber.init(connectMessage:)
             )
             let apply: (ChannelMessage) -> ChannelMessage = { candidate in
-                guard candidate.id == response.rootMessageId else { return candidate }
+                guard candidate.id == rootMessageID else { return candidate }
                 var updated = candidate
-                updated.subscribers = response.subscribers
+                updated.subscribers = subscribers
                 return updated
             }
             messages = messages.map(apply)
@@ -1019,18 +1016,16 @@ final class ChannelsStore: ObservableObject {
                 headers: [:]
             ).briarValue()
             guard wireResponse.hasMessage else { throw MobileAPIError.invalidResponse }
-            let response = ToggleChannelMessageReactionResponse(
-                message: try ChannelMessage(connectMessage: wireResponse.message)
-            )
-            guard response.message.channelId == channelID,
-                  response.message.id == messageID
+            let message = try ChannelMessage(connectMessage: wireResponse.message)
+            guard message.channelId == channelID,
+                  message.id == messageID
             else { throw MobileAPIError.invalidResponse }
             // A reaction request may have captured its message before a Skill
             // approval completed and arrive afterwards. Route the full-message
             // response through the same monotonic/tombstone reconciliation used
             // for channel deltas before replacing visible reaction state.
             guard let stabilized = preservingLocallyAcceptedExecutionProposals(
-                in: [response.message]
+                in: [message]
             ).first else { throw MobileAPIError.invalidResponse }
             recordProposalMessages([stabilized])
             let apply: (ChannelMessage) -> ChannelMessage = { candidate in
@@ -1364,7 +1359,12 @@ final class ChannelsStore: ObservableObject {
                 request: request,
                 headers: [:]
             )
-            _ = try DeclineChannelProposalResponse(connectMessage: response.briarValue())
+            switch try response.briarValue().outcome {
+            case .declined, .alreadyDeclined:
+                break
+            case .unspecified, .UNRECOGNIZED:
+                throw MobileAPIError.invalidResponse
+            }
             guard expectedGeneration == generation,
                   expectedFocusRevision == authoritativeLoadRevision,
                   expectedFocusedChannelID == focusedChannelID,

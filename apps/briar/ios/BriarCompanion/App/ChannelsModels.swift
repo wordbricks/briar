@@ -767,11 +767,6 @@ struct ChannelsResponse: Sendable {
     let cursor: Int?
 }
 
-struct DirectMessageRecipients: Sendable {
-    let members: [OrganizationMember]
-    let agents: [ChannelAgentSummary]
-}
-
 struct ChannelAgentReply: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let agentId: UUID
@@ -1046,10 +1041,6 @@ struct CreateChannelMessageResponse: Codable, Sendable {
     }
 }
 
-struct ToggleChannelMessageReactionResponse: Sendable {
-    let message: ChannelMessage
-}
-
 struct DeleteChannelMessageResponse: Sendable {
     let deleted: Bool
     let message: ChannelMessage?
@@ -1085,15 +1076,6 @@ struct AcceptChannelProposalResponse: Equatable, Sendable {
     enum Outcome: String, Codable, Equatable, Sendable {
         case accepted
         case alreadyAccepted = "already_accepted"
-    }
-}
-
-struct DeclineChannelProposalResponse: Equatable, Sendable {
-    let outcome: Outcome
-
-    enum Outcome: String, Codable, Equatable, Sendable {
-        case declined
-        case alreadyDeclined = "already_declined"
     }
 }
 

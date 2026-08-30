@@ -85,10 +85,6 @@ final class MobileAPIContractTests: XCTestCase {
         var invalid = message
         invalid.status = .UNRECOGNIZED(999)
         XCTAssertThrowsError(try ProjectAgentSession(connectMessage: invalid))
-
-        var overflow = BriarAPI_SyncProjectAgentSessionsResponse()
-        overflow.cursor = UInt64.max
-        XCTAssertThrowsError(try ProjectAgentSessionsSync(connectMessage: overflow))
     }
 
     func testChannelRealtimeProtobufOneofFrame() throws {

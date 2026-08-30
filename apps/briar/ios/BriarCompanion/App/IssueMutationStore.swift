@@ -102,7 +102,7 @@ final class IssueMutationStore: ObservableObject {
         }
     }
 
-    func updateIssue(runID: UUID, draft: IssueDraft) async throws -> UpdateIssueResponse {
+    func updateIssue(runID: UUID, draft: IssueDraft) async throws {
         try await perform("update-\(runID)") {
             let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
             if let titleError = IssueTitleLimits.validationError(for: title) {
@@ -123,7 +123,10 @@ final class IssueMutationStore: ObservableObject {
                 ),
                 headers: [:]
             )
-            return try UpdateIssueResponse(connectMessage: response.briarValue())
+            let message = try response.briarValue()
+            guard try issueUUID(message.runID) == runID else {
+                throw MobileAPIError.invalidResponse
+            }
         }
     }
 
@@ -156,7 +159,7 @@ final class IssueMutationStore: ObservableObject {
         }
     }
 
-    func transferIssue(runID: UUID, targetProjectID: UUID) async throws -> TransferIssueResponse {
+    func transferIssue(runID: UUID, targetProjectID: UUID) async throws {
         try await perform("transfer-\(runID)") {
             var request = BriarAPI_TransferIssueRequest()
             request.projectID = coreUUIDString(projectID)
@@ -166,14 +169,24 @@ final class IssueMutationStore: ObservableObject {
                 request: request,
                 headers: [:]
             )
-            return try TransferIssueResponse(connectMessage: response.briarValue())
+            let message = try response.briarValue()
+            guard try issueUUID(message.runID) == runID,
+                  try issueUUID(message.sourceProjectID) == projectID,
+                  try issueUUID(message.targetProjectID) == targetProjectID
+            else { throw MobileAPIError.invalidResponse }
+            switch message.outcome {
+            case .transferred, .alreadyTransferred:
+                break
+            case .unspecified, .UNRECOGNIZED:
+                throw MobileAPIError.invalidResponse
+            }
         }
     }
 
     func savePreferences(
         runID: UUID,
         preferences: IssueExecutionPreferences
-    ) async throws -> IssueExecutionPreferencesResponse {
+    ) async throws {
         try await perform("preferences-\(runID)") {
             guard preferences.isValid else { throw IssueMutationError.invalidPreferences }
             var request = BriarAPI_UpdateIssuePreferencesRequest()
@@ -188,7 +201,10 @@ final class IssueMutationStore: ObservableObject {
                 request: request,
                 headers: [:]
             )
-            return try IssueExecutionPreferencesResponse(connectMessage: response.briarValue())
+            let message = try response.briarValue()
+            guard try issueUUID(message.runID) == runID else {
+                throw MobileAPIError.invalidResponse
+            }
         }
     }
 

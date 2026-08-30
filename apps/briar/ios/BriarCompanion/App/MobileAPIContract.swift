@@ -97,23 +97,6 @@ struct DeviceTokenResponse: Codable, Equatable, Sendable {
     }
 }
 
-struct DeviceTokenErrorResponse: Codable, Equatable, Sendable {
-    let error: State
-    let errorDescription: String?
-
-    enum State: String, Codable, Sendable {
-        case authorizationPending = "authorization_pending"
-        case slowDown = "slow_down"
-        case accessDenied = "access_denied"
-        case expiredToken = "expired_token"
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case error
-        case errorDescription = "error_description"
-    }
-}
-
 struct Project: Codable, Equatable, Sendable {
     let id: UUID
     let name: String

@@ -88,53 +88,11 @@ extension CreateIssueResponse {
     }
 }
 
-extension UpdateIssueResponse {
-    init(connectMessage message: BriarAPI_UpdateIssueResponse) throws {
-        self.init(
-            runId: try issueUUID(message.runID),
-            title: message.title,
-            description: message.hasDescription_p ? message.description_p : nil,
-            priority: message.hasPriority ? try issueSafeInt(message.priority) : nil,
-            difficulty: message.hasDifficulty ? try issueDifficulty(message.difficulty) : nil,
-            assigneeUserId: message.hasAssigneeUserID ? message.assigneeUserID : nil,
-            attachments: try message.attachments.map { try .init(connectMessage: $0) }
-        )
-    }
-}
-
-extension TransferIssueResponse {
-    init(connectMessage message: BriarAPI_TransferIssueResponse) throws {
-        let outcome: String
-        switch message.outcome {
-        case .transferred: outcome = "transferred"
-        case .alreadyTransferred: outcome = "already_transferred"
-        case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
-        }
-        self.init(
-            runId: try issueUUID(message.runID),
-            sourceProjectId: try issueUUID(message.sourceProjectID),
-            targetProjectId: try issueUUID(message.targetProjectID),
-            outcome: outcome
-        )
-    }
-}
-
 extension IssueSubscriptionResponse {
     init(connectMessage message: BriarAPI_SetIssueSubscriptionResponse) throws {
         self.init(
             runId: try issueUUID(message.runID),
             subscribers: try message.subscribers.map { try .init(connectMessage: $0) }
-        )
-    }
-}
-
-extension IssueExecutionPreferencesResponse {
-    init(connectMessage message: BriarAPI_UpdateIssuePreferencesResponse) throws {
-        self.init(
-            runId: try issueUUID(message.runID),
-            provider: message.hasProvider ? try issueProvider(message.provider) : nil,
-            model: message.hasModel ? message.model : nil,
-            effort: message.hasEffort ? ModelEffort(rawValue: message.effort) : nil
         )
     }
 }
@@ -505,7 +463,7 @@ private func issueUUIDString(_ value: UUID) -> String {
     value.uuidString.lowercased()
 }
 
-private func issueUUID(_ value: String) throws -> UUID {
+func issueUUID(_ value: String) throws -> UUID {
     guard let value = UUID(uuidString: value) else { throw MobileAPIError.invalidResponse }
     return value
 }

@@ -3128,7 +3128,7 @@ struct RunDetailView: View {
         let payload = next ?? preferences
         guard payload.isValid else { return }
         do {
-            _ = try await mutations.savePreferences(runID: run.id, preferences: payload)
+            try await mutations.savePreferences(runID: run.id, preferences: payload)
             actionError = nil
             await refresh()
         } catch IssueMutationError.duplicateAction {
@@ -3273,7 +3273,7 @@ struct RunDetailView: View {
 
     private func transferIssue(to targetProjectID: UUID) async {
         do {
-            _ = try await mutations.transferIssue(
+            try await mutations.transferIssue(
                 runID: run.id,
                 targetProjectID: targetProjectID
             )

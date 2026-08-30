@@ -94,16 +94,6 @@ extension AcceptChannelExecutionProposalResponse {
     }
 }
 
-extension DeclineChannelProposalResponse {
-    init(connectMessage message: BriarAPI_DeclineChannelProposalResponse) throws {
-        switch message.outcome {
-        case .declined: outcome = .declined
-        case .alreadyDeclined: outcome = .alreadyDeclined
-        case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
-        }
-    }
-}
-
 extension AcceptAgentSkillExecutionProposalResponse {
     init(connectMessage message: BriarAPI_AcceptChannelSkillExecutionProposalResponse) throws {
         guard message.hasProposal else { throw MobileAPIError.invalidResponse }

@@ -304,31 +304,9 @@ struct CreateIssueResponse: Codable, Sendable {
     let difficulty: IssueDifficulty?
 }
 
-struct UpdateIssueResponse: Codable, Sendable {
-    let runId: UUID
-    let title: String
-    let description: String?
-    let priority: Int?
-    let difficulty: IssueDifficulty?
-    let assigneeUserId: String?
-    let attachments: [IssueAttachment]
-}
-
 struct IssueSubscriptionResponse: Codable, Equatable, Sendable {
     let runId: UUID
     let subscribers: [IssueSubscriber]
-}
-
-struct ChannelThreadSubscriptionResponse: Equatable, Sendable {
-    let rootMessageId: UUID
-    let subscribers: [IssueSubscriber]
-}
-
-struct TransferIssueResponse: Codable, Sendable {
-    let runId: UUID
-    let sourceProjectId: UUID
-    let targetProjectId: UUID
-    let outcome: String
 }
 
 struct IssueExecutionPreferences: Codable, Equatable, Sendable {
@@ -805,13 +783,6 @@ func agentSkillExecutionApprovalResponseMatches(
         session.request == expected.request &&
         session.requestedWorkerId == workerID &&
         session.workerId == workerID
-}
-
-struct IssueExecutionPreferencesResponse: Codable, Sendable {
-    let runId: UUID
-    let provider: AgentProvider?
-    let model: String?
-    let effort: ModelEffort?
 }
 
 struct DispatchRunRequest: Codable, Sendable {

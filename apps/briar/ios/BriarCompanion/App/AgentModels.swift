@@ -143,22 +143,6 @@ struct ProjectAgent: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-struct ProjectAgentSessionsSync: Equatable, Sendable {
-    let cursor: Int
-    let hasMore: Bool
-    let reset: Bool
-    let sessions: [ProjectAgentSession]
-    let deletedSessionIDs: [String]
-
-    init(connectMessage message: BriarAPI_SyncProjectAgentSessionsResponse) throws {
-        cursor = try agentSafeInt(message.cursor)
-        hasMore = message.hasMore_p
-        reset = message.reset
-        sessions = try message.sessions.map { try ProjectAgentSession(connectMessage: $0) }
-        deletedSessionIDs = message.deletedSessionIds
-    }
-}
-
 /// An Agent-authored request to run one immutable saved Skill. The Agent,
 /// Skill, natural-language request, and runtime are server snapshots; native
 /// clients only choose the exact Worker at the separate approval boundary.
