@@ -2569,8 +2569,7 @@ final class ChannelsStore: ObservableObject {
                             self.isForeground
                         else { return }
                         reconnectAttempt = 0
-                        if event.topic == "channels",
-                           let cursor = event.cursor,
+                        if case .channelsChanged(let cursor) = event,
                            cursor > (self.syncCursor ?? -1) {
                             await self.refreshChanges()
                         }
@@ -2594,8 +2593,7 @@ final class ChannelsStore: ObservableObject {
     func receiveRealtimeNotification(
         _ notification: ChannelRealtimeNotification
     ) async {
-        guard notification.topic == "channels",
-              let cursor = notification.cursor,
+        guard case .channelsChanged(let cursor) = notification,
               cursor > (syncCursor ?? -1),
               isForeground
         else { return }

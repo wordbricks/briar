@@ -9,21 +9,14 @@ import {
   verifyChannelActivitySocketTicket,
   verifyIssueActivitySocketTicket,
 } from "./channel-activity-ticket";
-import {
-  legacyChannelRealtimeResponse,
-  subscribeToOrganizationRealtime,
-} from "./channel-realtime";
+import { subscribeToOrganizationRealtime } from "./channel-realtime";
 import {
   createChannelRealtimeTicket,
   verifyChannelRealtimeTicket,
 } from "./channel-realtime-ticket";
 import { getChannel, getChannelSyncCursor } from "./channels";
 import { getHuntRunForProject } from "./hunt-run-repository";
-import {
-  corsHeaders,
-  HttpError,
-  privateNoStoreJson,
-} from "./http-response";
+import { HttpError, privateNoStoreJson } from "./http-response";
 import { getOrganizationInboxSyncVersion } from "./organization-inbox-outbox-repository";
 import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
@@ -87,36 +80,26 @@ export async function handleRealtimeRoute(
   }
   if (channelEventsMatch && request.method === "GET") {
     const organizationId = channelEventsMatch[1];
-    if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
-      const ticket = new URL(request.url).searchParams.get("ticket") ?? "";
-      if (
-        !(await verifyChannelRealtimeTicket(
-          env.BETTER_AUTH_SECRET,
-          ticket,
-          organizationId,
-        ))
-      ) {
-        throw new HttpError(401, "Invalid or expired realtime ticket");
-      }
-      const [channels, inbox] = await Promise.all([
-        getChannelSyncCursor(db, organizationId),
-        getOrganizationInboxSyncVersion(db, organizationId),
-      ]);
-      return subscribeToOrganizationRealtime(env, organizationId, {
-        channels,
-        inbox,
-      });
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+      throw new HttpError(426, "WebSocket transport required");
     }
-
-    const response = legacyChannelRealtimeResponse();
-    const headers = new Headers(response.headers);
-    for (const [name, value] of Object.entries(corsHeaders)) {
-      headers.set(name, value);
+    const ticket = new URL(request.url).searchParams.get("ticket") ?? "";
+    if (
+      !(await verifyChannelRealtimeTicket(
+        env.BETTER_AUTH_SECRET,
+        ticket,
+        organizationId,
+      ))
+    ) {
+      throw new HttpError(401, "Invalid or expired realtime ticket");
     }
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
+    const [channels, inbox] = await Promise.all([
+      getChannelSyncCursor(db, organizationId),
+      getOrganizationInboxSyncVersion(db, organizationId),
+    ]);
+    return subscribeToOrganizationRealtime(env, organizationId, {
+      channels,
+      inbox,
     });
   }
 

@@ -1,3 +1,5 @@
+import { OrganizationNotificationSchema } from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+import { fromBinary } from "@bufbuild/protobuf";
 import { describe, expect, it } from "vitest";
 import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
@@ -27,7 +29,20 @@ describe("organization Inbox realtime outbox", () => {
         CHANNEL_REALTIME: {
           getByName: () => ({
             fetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
-              published.push(JSON.parse(String(init?.body)));
+              if (!(init?.body instanceof Uint8Array)) {
+                throw new Error("Expected a protobuf Inbox notification");
+              }
+              const notification = fromBinary(
+                OrganizationNotificationSchema,
+                init.body,
+              ).notification;
+              if (notification.case !== "inboxChanged") {
+                throw new Error("Expected an Inbox notification oneof");
+              }
+              published.push({
+                topic: "inbox",
+                version: Number(notification.value.version),
+              });
               if (injectNewerRevision) {
                 injectNewerRevision = false;
                 await db.prepare(

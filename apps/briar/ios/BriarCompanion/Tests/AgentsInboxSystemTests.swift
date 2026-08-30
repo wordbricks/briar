@@ -69,24 +69,22 @@ final class AgentsInboxSystemTests: XCTestCase {
         }
 
         await tracker.receiveRealtimeNotification(
-            ChannelRealtimeNotification(
-                topic: "project",
-                cursor: 2,
-                projectId: "22222222-2222-4222-8222-222222222222"
+            .projectChanged(
+                projectID: "22222222-2222-4222-8222-222222222222",
+                cursor: 2
             )
         )
         XCTAssertEqual(refreshCount, 0)
 
         await tracker.receiveRealtimeNotification(
-            ChannelRealtimeNotification(
-                topic: "project",
-                cursor: 3,
-                projectId: visibleProjectID.uuidString.uppercased()
+            .projectChanged(
+                projectID: visibleProjectID.uuidString.uppercased(),
+                cursor: 3
             )
         )
         XCTAssertEqual(refreshCount, 1)
 
-        await tracker.receiveRealtimeNotification(ChannelRealtimeNotification(topic: "ready"))
+        await tracker.receiveRealtimeNotification(.ready)
         XCTAssertEqual(refreshCount, 2)
     }
 

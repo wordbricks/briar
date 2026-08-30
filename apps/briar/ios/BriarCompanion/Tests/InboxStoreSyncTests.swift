@@ -282,10 +282,10 @@ final class InboxStoreSyncTests: XCTestCase {
         XCTAssertEqual(initialRequestCount, 1)
 
         store.receiveRealtimeNotification(
-            ChannelRealtimeNotification(topic: "inbox", version: 4)
+            .inboxChanged(version: 4)
         )
         store.receiveRealtimeNotification(
-            ChannelRealtimeNotification(topic: "inbox", version: 5)
+            .inboxChanged(version: 5)
         )
         try await Task.sleep(for: .milliseconds(400))
 

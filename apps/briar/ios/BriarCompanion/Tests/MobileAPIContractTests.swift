@@ -1,8 +1,9 @@
 import XCTest
+import SwiftProtobuf
 @testable import BriarCompanion
 
 final class MobileAPIContractTests: XCTestCase {
-    func testChannelRealtimeEndpointAndSocketPayloadUseCursorNotifications() throws {
+    func testChannelRealtimeEndpointAndProtobufOneofFrame() throws {
         let organizationID = UUID(
             uuidString: "22222222-2222-4222-8222-222222222222"
         )!
@@ -21,19 +22,20 @@ final class MobileAPIContractTests: XCTestCase {
             )
         )
         XCTAssertEqual(ticket.url.hasPrefix("wss://"), true)
-        XCTAssertEqual(
-            try JSONDecoder.mobileContract.decode(
-                ChannelRealtimeNotification.self,
-                from: Data(#"{"topic":"channels","cursor":42}"#.utf8)
-            ),
-            ChannelRealtimeNotification(topic: "channels", cursor: 42)
+        var frame = BriarRealtime_OrganizationNotification()
+        var changed = BriarRealtime_ProjectAgentSessionsChanged()
+        changed.projectID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        changed.version = 43
+        frame.projectAgentSessionsChanged = changed
+        let decoded = try BriarRealtime_OrganizationNotification(
+            serializedBytes: frame.serializedData()
         )
         XCTAssertEqual(
-            try JSONDecoder.mobileContract.decode(
-                ChannelRealtimeNotification.self,
-                from: Data(#"{"topic":"inbox","version":43}"#.utf8)
-            ),
-            ChannelRealtimeNotification(topic: "inbox", version: 43)
+            try ChannelRealtimeNotification(protobuf: decoded),
+            .projectAgentSessionsChanged(
+                projectID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                version: 43
+            )
         )
     }
 
@@ -511,38 +513,6 @@ final class MobileAPIContractTests: XCTestCase {
             )
             XCTAssertNil(proposal.payload, "Malformed issue unexpectedly decoded: \(issue)")
         }
-    }
-
-    func testGeneratedProjectsContractRequiresCurrentFields() throws {
-        let projects = try JSONDecoder.mobileContract.decode(
-            ProjectsResponse.self,
-            from: Data(
-                #"{"projects":[{"id":"11111111-1111-4111-8111-111111111111","name":"Briar","issueKeyPrefix":"BR","scheduleTabEnabled":true,"icon":null,"organizationId":"22222222-2222-4222-8222-222222222222","organizationName":"Wordbricks","role":"owner","createdAt":"2026-08-20T00:00:00.000Z"}]}"#.utf8
-            )
-        )
-        let project = try XCTUnwrap(projects.projects.first)
-        XCTAssertEqual(project.issueKeyPrefix, "BR")
-        XCTAssertTrue(project.scheduleTabEnabled)
-        XCTAssertNil(project.icon)
-
-        for incompleteProject in [
-            #"{"id":"11111111-1111-4111-8111-111111111111","name":"Briar","scheduleTabEnabled":true,"icon":null,"organizationId":"22222222-2222-4222-8222-222222222222","organizationName":"Wordbricks","role":"owner","createdAt":"2026-08-20T00:00:00.000Z"}"#,
-            #"{"id":"11111111-1111-4111-8111-111111111111","name":"Briar","issueKeyPrefix":"BR","icon":null,"organizationId":"22222222-2222-4222-8222-222222222222","organizationName":"Wordbricks","role":"owner","createdAt":"2026-08-20T00:00:00.000Z"}"#,
-            #"{"id":"11111111-1111-4111-8111-111111111111","name":"Briar","issueKeyPrefix":"BR","scheduleTabEnabled":true,"organizationId":"22222222-2222-4222-8222-222222222222","organizationName":"Wordbricks","role":"owner","createdAt":"2026-08-20T00:00:00.000Z"}"#,
-        ] {
-            XCTAssertThrowsError(
-                try JSONDecoder.mobileContract.decode(
-                    ProjectsResponse.self,
-                    from: Data("{\"projects\":[\(incompleteProject)]}".utf8)
-                )
-            )
-        }
-
-        let operation: AuthenticatedMobileAPIOperation<ProjectsResponse> =
-            MobileAPIOperations.listProjects
-        XCTAssertEqual(operation.id, "listProjects")
-        XCTAssertEqual(MobileAPIOperations.listProjects.method, "GET")
-        XCTAssertEqual(MobileAPIOperations.listProjects.path, "/projects")
     }
 
 }

@@ -1,5 +1,6 @@
 import Connect
 import Foundation
+import SwiftProtobuf
 
 enum MobileAPIContract {
     static let iOSClientID = "briar-mobile"
@@ -369,6 +370,30 @@ struct CurrentUserResponse: Codable, Equatable, Sendable {
     }
 }
 
+struct Project: Codable, Equatable, Sendable {
+    let id: UUID
+    let name: String
+    let issueKeyPrefix: String
+    let scheduleTabEnabled: Bool
+    let icon: String?
+    let organizationId: UUID
+    let organizationName: String
+    let role: Role
+    let createdAt: Date
+
+    enum Role: String, Codable, Sendable {
+        case owner
+        case coOwner = "co-owner"
+        case developer
+        case editor
+        case viewer
+    }
+}
+
+struct ProjectsResponse: Codable, Equatable, Sendable {
+    let projects: [Project]
+}
+
 extension Project {
     init(connectMessage message: BriarAPI_Project) throws {
         guard
@@ -473,18 +498,6 @@ private extension MobileAPIError {
     }
 }
 
-struct AuthenticatedMobileAPIOperation<Response: Decodable & Sendable>: Sendable {
-    let id: String
-    let method: String
-    let path: String
-}
-
-struct PublicMobileAPIOperation<Response: Decodable & Sendable>: Sendable {
-    let id: String
-    let method: String
-    let path: String
-}
-
 protocol MobileAPIClientProtocol: Sendable {
     func listProjects(token: String) async throws -> ProjectsResponse
 
@@ -527,22 +540,42 @@ struct ConditionalGETResponse<Value: Sendable>: Sendable {
     let notModified: Bool
 }
 
-struct ChannelRealtimeNotification: Codable, Equatable, Sendable {
-    let topic: String
-    let cursor: Int?
-    let projectId: String?
-    let version: Int?
+enum ChannelRealtimeNotification: Equatable, Sendable {
+    case ready
+    case channelsChanged(cursor: Int)
+    case inboxChanged(version: Int)
+    case projectChanged(projectID: String, cursor: Int)
+    case projectAgentSessionsChanged(projectID: String, version: Int)
 
-    init(
-        topic: String,
-        cursor: Int? = nil,
-        projectId: String? = nil,
-        version: Int? = nil
-    ) {
-        self.topic = topic
-        self.cursor = cursor
-        self.projectId = projectId
-        self.version = version
+    init(protobuf message: BriarRealtime_OrganizationNotification) throws {
+        guard let notification = message.notification else {
+            throw MobileAPIError.invalidResponse
+        }
+        switch notification {
+        case .ready:
+            self = .ready
+        case .channelsChanged(let changed):
+            self = .channelsChanged(cursor: try Self.safeInt(changed.cursor))
+        case .inboxChanged(let changed):
+            self = .inboxChanged(version: try Self.safeInt(changed.version))
+        case .projectChanged(let changed):
+            guard !changed.projectID.isEmpty else { throw MobileAPIError.invalidResponse }
+            self = .projectChanged(
+                projectID: changed.projectID,
+                cursor: try Self.safeInt(changed.cursor)
+            )
+        case .projectAgentSessionsChanged(let changed):
+            guard !changed.projectID.isEmpty else { throw MobileAPIError.invalidResponse }
+            self = .projectAgentSessionsChanged(
+                projectID: changed.projectID,
+                version: try Self.safeInt(changed.version)
+            )
+        }
+    }
+
+    private static func safeInt(_ value: UInt64) throws -> Int {
+        guard value <= UInt64(Int.max) else { throw MobileAPIError.invalidResponse }
+        return Int(value)
     }
 }
 
@@ -586,32 +619,7 @@ extension MobileRealtimeClientProtocol {
 
 extension MobileAPIClientProtocol {
     func listProjects(token: String) async throws -> ProjectsResponse {
-        try await send(MobileAPIOperations.listProjects, token: token)
-    }
-
-    func send<Response: Decodable & Sendable>(
-        _ operation: AuthenticatedMobileAPIOperation<Response>,
-        token: String
-    ) async throws -> Response {
-        try await send(
-            operation.path,
-            method: operation.method,
-            token: token,
-            body: nil,
-            as: Response.self
-        )
-    }
-
-    func send<Response: Decodable & Sendable>(
-        _ operation: PublicMobileAPIOperation<Response>
-    ) async throws -> Response {
-        try await send(
-            operation.path,
-            method: operation.method,
-            token: nil,
-            body: nil,
-            as: Response.self
-        )
+        throw MobileAPIError.invalidRequest
     }
 
     func get<Response: Decodable & Sendable>(
@@ -848,27 +856,42 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
         _ path: String,
         token: String
     ) -> AsyncThrowingStream<ChannelRealtimeNotification, Error> {
-        webSocketEvents(path, token: token, as: ChannelRealtimeNotification.self)
+        webSocketEvents(path, token: token) { data in
+            let message = try BriarRealtime_OrganizationNotification(
+                serializedBytes: data
+            )
+            return try ChannelRealtimeNotification(protobuf: message)
+        }
     }
 
     func channelActivityEvents(
         _ path: String,
         token: String
     ) -> AsyncThrowingStream<ChannelAgentActivityFrame, Error> {
-        webSocketEvents(path, token: token, as: ChannelAgentActivityFrame.self)
+        webSocketEvents(path, token: token) { data in
+            try JSONDecoder.mobileContract.decode(
+                ChannelAgentActivityFrame.self,
+                from: data
+            )
+        }
     }
 
     func issueActivityEvents(
         _ path: String,
         token: String
     ) -> AsyncThrowingStream<IssueAgentActivityFrame, Error> {
-        webSocketEvents(path, token: token, as: IssueAgentActivityFrame.self)
+        webSocketEvents(path, token: token) { data in
+            try JSONDecoder.mobileContract.decode(
+                IssueAgentActivityFrame.self,
+                from: data
+            )
+        }
     }
 
-    private func webSocketEvents<Event: Decodable & Sendable>(
+    private func webSocketEvents<Event: Sendable>(
         _ path: String,
         token: String,
-        as eventType: Event.Type
+        decode: @escaping @Sendable (Data) throws -> Event
     ) -> AsyncThrowingStream<Event, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -901,12 +924,7 @@ struct MobileAPIClient: MobileAPIClientProtocol, MobileRealtimeClientProtocol, S
                             @unknown default:
                                 continue
                             }
-                            continuation.yield(
-                                try JSONDecoder.mobileContract.decode(
-                                    eventType,
-                                    from: data
-                                )
-                            )
+                            continuation.yield(try decode(data))
                         }
                     } onCancel: {
                         socket.cancel(with: .goingAway, reason: nil)

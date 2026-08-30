@@ -1,22 +1,13 @@
-export type OrganizationRealtimeNotification =
-  | {
-      topic: "channels";
-      cursor: number;
-    }
-  | {
-      topic: "inbox";
-      version: number;
-    }
-  | {
-      topic: "project";
-      projectId: string;
-      cursor: number;
-    }
-  | {
-      topic: "project-session";
-      projectId: string;
-      version: number;
-    };
+import {
+  ChannelsChangedSchema,
+  InboxChangedSchema,
+  type OrganizationNotification,
+  OrganizationNotificationSchema,
+  ProjectAgentSessionsChangedSchema,
+  ProjectChangedSchema,
+  ReadySchema,
+} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 
 type OrganizationRealtimeSocketAttachment = {
   cursors: Record<string, number>;
@@ -26,6 +17,109 @@ function parseCursor(value: string | null) {
   if (!value || !/^\d+$/u.test(value)) return null;
   const cursor = Number(value);
   return Number.isSafeInteger(cursor) ? cursor : null;
+}
+
+const PROJECT_ID_PATTERN = /^[0-9a-f-]+$/iu;
+
+type NotificationCursor = {
+  key: string;
+  version: number;
+};
+
+const encodeNotification = (notification: OrganizationNotification) =>
+  toBinary(OrganizationNotificationSchema, notification);
+
+const readyNotification = () => create(OrganizationNotificationSchema, {
+  notification: {
+    case: "ready",
+    value: create(ReadySchema),
+  },
+});
+
+const channelsNotification = (cursor: number) =>
+  create(OrganizationNotificationSchema, {
+    notification: {
+      case: "channelsChanged",
+      value: create(ChannelsChangedSchema, { cursor: BigInt(cursor) }),
+    },
+  });
+
+const inboxNotification = (version: number) =>
+  create(OrganizationNotificationSchema, {
+    notification: {
+      case: "inboxChanged",
+      value: create(InboxChangedSchema, { version: BigInt(version) }),
+    },
+  });
+
+const projectNotification = (
+  projectId: string,
+  cursor: number,
+) => create(OrganizationNotificationSchema, {
+  notification: {
+    case: "projectChanged",
+    value: create(ProjectChangedSchema, {
+      projectId,
+      cursor: BigInt(cursor),
+    }),
+  },
+});
+
+const projectAgentSessionsNotification = (
+  projectId: string,
+  version: number,
+) => create(OrganizationNotificationSchema, {
+  notification: {
+    case: "projectAgentSessionsChanged",
+    value: create(ProjectAgentSessionsChangedSchema, {
+      projectId,
+      version: BigInt(version),
+    }),
+  },
+});
+
+function notificationCursor(
+  message: OrganizationNotification,
+): NotificationCursor | null {
+  const notification = message.notification;
+  let key: string;
+  let revision: bigint;
+  switch (notification.case) {
+    case "channelsChanged":
+      key = "channels";
+      revision = notification.value.cursor;
+      break;
+    case "inboxChanged":
+      key = "inbox";
+      revision = notification.value.version;
+      break;
+    case "projectChanged":
+      if (!PROJECT_ID_PATTERN.test(notification.value.projectId)) return null;
+      key = `project:${notification.value.projectId}`;
+      revision = notification.value.cursor;
+      break;
+    case "projectAgentSessionsChanged":
+      if (!PROJECT_ID_PATTERN.test(notification.value.projectId)) return null;
+      key = `project-session:${notification.value.projectId}`;
+      revision = notification.value.version;
+      break;
+    case "ready":
+    case undefined:
+      return null;
+  }
+  if (revision > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return { key, version: Number(revision) };
+}
+
+async function decodeNotificationRequest(request: Request) {
+  try {
+    return fromBinary(
+      OrganizationNotificationSchema,
+      new Uint8Array(await request.arrayBuffer()),
+    );
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -53,25 +147,12 @@ export class ChannelRealtimeHub {
       });
     }
     if (url.pathname === "/notify" && request.method === "POST") {
-      const notification = await request.json<OrganizationRealtimeNotification>();
-      const valid = notification.topic === "channels"
-        ? Number.isSafeInteger(notification.cursor) && notification.cursor >= 0
-        : notification.topic === "inbox"
-          ? Number.isSafeInteger(notification.version) &&
-            notification.version >= 0
-          : notification.topic === "project"
-            ? /^[0-9a-f-]+$/iu.test(notification.projectId) &&
-              Number.isSafeInteger(notification.cursor) &&
-              notification.cursor >= 0
-            : notification.topic === "project-session"
-              ? /^[0-9a-f-]+$/iu.test(notification.projectId) &&
-                Number.isSafeInteger(notification.version) &&
-                notification.version >= 0
-              : false;
-      if (!valid) {
+      const notification = await decodeNotificationRequest(request);
+      const cursor = notification && notificationCursor(notification);
+      if (!notification || !cursor) {
         return new Response("Invalid realtime notification", { status: 400 });
       }
-      this.publish(notification);
+      this.publish(notification, cursor);
       return new Response(null, { status: 204 });
     }
     return new Response("Not found", { status: 404 });
@@ -86,29 +167,20 @@ export class ChannelRealtimeHub {
         cursors,
       } satisfies OrganizationRealtimeSocketAttachment,
     );
-    server.send(JSON.stringify({ topic: "ready" }));
-    server.send(JSON.stringify({ topic: "channels", cursor: cursors.channels }));
-    server.send(JSON.stringify({ topic: "inbox", version: cursors.inbox }));
+    server.send(encodeNotification(readyNotification()));
+    server.send(encodeNotification(channelsNotification(cursors.channels)));
+    server.send(encodeNotification(inboxNotification(cursors.inbox)));
     return new Response(null, {
       status: 101,
       webSocket: client,
     });
   }
 
-  private publish(notification: OrganizationRealtimeNotification) {
-    const payload = JSON.stringify(notification);
-    const cursorKey = notification.topic === "channels"
-      ? "channels"
-      : notification.topic === "inbox"
-        ? "inbox"
-        : notification.topic === "project"
-          ? `project:${notification.projectId}`
-          : `project-session:${notification.projectId}`;
-    const nextVersion = notification.topic === "inbox"
-      ? notification.version
-      : notification.topic === "project-session"
-        ? notification.version
-        : notification.cursor;
+  private publish(
+    notification: OrganizationNotification,
+    cursor: NotificationCursor,
+  ) {
+    const payload = encodeNotification(notification);
     for (const client of this.state.getWebSockets()) {
       const attachment = client.deserializeAttachment() as
         | OrganizationRealtimeSocketAttachment
@@ -117,11 +189,11 @@ export class ChannelRealtimeHub {
       const cursors = attachment && "cursors" in attachment
         ? attachment.cursors
         : { channels: attachment?.cursor ?? -1 };
-      if ((cursors[cursorKey] ?? -1) >= nextVersion) continue;
+      if ((cursors[cursor.key] ?? -1) >= cursor.version) continue;
       try {
         client.send(payload);
         client.serializeAttachment({
-          cursors: { ...cursors, [cursorKey]: nextVersion },
+          cursors: { ...cursors, [cursor.key]: cursor.version },
         } satisfies OrganizationRealtimeSocketAttachment);
       } catch {
         client.close(1011, "Realtime delivery failed");
@@ -148,19 +220,6 @@ export class ChannelRealtimeHub {
   }
 }
 
-export function legacyChannelRealtimeResponse() {
-  // Old clients retain their authoritative 60-second delta fallback. A 426
-  // makes their reconnect delay back off instead of opening a billable stream
-  // or resetting the SSE adapter's delay after every finite 200 response.
-  return new Response("WebSocket transport required", {
-    status: 426,
-    headers: {
-      "Cache-Control": "private, no-store",
-      "Retry-After": "60",
-    },
-  });
-}
-
 export async function subscribeToOrganizationRealtime(
   env: Env,
   organizationId: string,
@@ -179,11 +238,12 @@ export async function publishInboxRealtime(
   organizationId: string,
   version: number,
 ) {
+  const notification = inboxNotification(version);
   const hub = env.CHANNEL_REALTIME.getByName(organizationId);
   const response = await hub.fetch("https://channel-realtime.internal/notify", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic: "inbox", version }),
+    headers: { "Content-Type": "application/protobuf" },
+    body: encodeNotification(notification),
   });
   if (!response.ok) {
     throw new Error(`Inbox realtime notification failed (${response.status})`);
@@ -195,11 +255,12 @@ export async function publishChannelRealtime(
   organizationId: string,
   cursor: number,
 ) {
+  const notification = channelsNotification(cursor);
   const hub = env.CHANNEL_REALTIME.getByName(organizationId);
   const response = await hub.fetch("https://channel-realtime.internal/notify", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic: "channels", cursor }),
+    headers: { "Content-Type": "application/protobuf" },
+    body: encodeNotification(notification),
   });
   if (!response.ok) {
     throw new Error(`Channel realtime notification failed (${response.status})`);
@@ -212,11 +273,12 @@ export async function publishProjectRealtime(
   projectId: string,
   cursor: number,
 ) {
+  const notification = projectNotification(projectId, cursor);
   const hub = env.CHANNEL_REALTIME.getByName(organizationId);
   const response = await hub.fetch("https://channel-realtime.internal/notify", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic: "project", projectId, cursor }),
+    headers: { "Content-Type": "application/protobuf" },
+    body: encodeNotification(notification),
   });
   if (!response.ok) {
     throw new Error(`Project realtime notification failed (${response.status})`);
@@ -229,15 +291,12 @@ export async function publishProjectAgentSessionRealtime(
   projectId: string,
   version: number,
 ) {
+  const notification = projectAgentSessionsNotification(projectId, version);
   const hub = env.CHANNEL_REALTIME.getByName(organizationId);
   const response = await hub.fetch("https://channel-realtime.internal/notify", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      topic: "project-session",
-      projectId,
-      version,
-    }),
+    headers: { "Content-Type": "application/protobuf" },
+    body: encodeNotification(notification),
   });
   if (!response.ok) {
     throw new Error(

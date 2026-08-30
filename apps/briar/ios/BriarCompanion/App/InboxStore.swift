@@ -268,8 +268,7 @@ final class InboxStore: ObservableObject {
     func receiveRealtimeNotification(
         _ notification: ChannelRealtimeNotification
     ) {
-        guard notification.topic == "inbox",
-              let version = notification.version,
+        guard case .inboxChanged(let version) = notification,
               version > latestRealtimeVersion,
               organizationID != nil
         else { return }

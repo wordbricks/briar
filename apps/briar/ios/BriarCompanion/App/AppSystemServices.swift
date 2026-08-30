@@ -197,17 +197,21 @@ final class IssueConversationViewTracker: ObservableObject {
     func receiveRealtimeNotification(
         _ notification: ChannelRealtimeNotification
     ) async {
-        let matchesVisibleProject: Bool
-        if let projectID, let notificationProjectID = notification.projectId {
-            matchesVisibleProject = notificationProjectID
-                .caseInsensitiveCompare(projectID.uuidString) == .orderedSame
-        } else {
-            matchesVisibleProject = false
+        switch notification {
+        case .ready:
+            await refreshAction?()
+        case .projectChanged(let notificationProjectID, _):
+            guard let projectID,
+                  notificationProjectID.caseInsensitiveCompare(
+                    projectID.uuidString
+                  ) == .orderedSame
+            else { return }
+            await refreshAction?()
+        case .channelsChanged,
+             .inboxChanged,
+             .projectAgentSessionsChanged:
+            return
         }
-        guard notification.topic == "ready" ||
-            (notification.topic == "project" && matchesVisibleProject)
-        else { return }
-        await refreshAction?()
     }
 }
 
