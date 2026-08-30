@@ -1,4 +1,4 @@
-import { briarApiUrl, briarWebAppOrigin } from "./api-config";
+import { briarApiUrl } from "./api-config";
 export { briarApiUrl } from "./api-config";
 import { ApiError } from "./api/errors";
 export {
@@ -15,10 +15,6 @@ export {
   updateAccountProfile,
 } from "./api/account";
 import { decodeInboxReadVersions } from "./api/inbox-contract";
-import {
-  decodeOrganizationResponse,
-  decodeOrganizationsResponse,
-} from "./api/organization-contract";
 import { decodeProjectUsageSummaryResponse } from "./api/project-usage-contract";
 import { listProjects } from "./app-rpc/project";
 export {
@@ -33,7 +29,22 @@ export {
   updateProjectSettings,
   updateProjectTabs,
 } from "./app-rpc/project";
-import { listOrganizationMembers as listOrganizationMembersRpc } from "./app-rpc/account";
+export {
+  acceptOrganizationInvitation,
+  createOrganization,
+  createOrganizationInvitation,
+  isOrganizationHandleAvailable,
+  loadOrganizationInvitation,
+  loadOrganizationInvitations,
+  loadOrganizationMembers,
+  loadOrganizations,
+  removeOrganizationMember,
+  revokeOrganizationInvitation,
+  updateOrganization,
+  updateOrganizationLogo,
+  updateOrganizationMemberProjects,
+  updateOrganizationMemberRole,
+} from "./app-rpc/organization";
 import {
   deleteInboxReadStateRpc,
   getInboxFeed,
@@ -164,11 +175,6 @@ import type {
   IssueAttachment,
   IssueMessage,
   Project,
-  Organization,
-  OrganizationInvitation,
-  OrganizationInvitationPreview,
-  OrganizationMember,
-  OrganizationAssignableRole,
   ProjectSettings,
   ProjectUsageSummary,
   RunEvidenceImage,
@@ -326,145 +332,6 @@ export async function deleteInboxReadState(
 
 export async function loadProjects(token: string): Promise<Project[]> {
   return listProjects(token);
-}
-
-export async function loadOrganizations(
-  token: string,
-): Promise<Organization[]> {
-  const result = await request<{ organizations: unknown[] }>(
-    "/organizations",
-    token,
-  );
-  return decodeOrganizationsResponse(result.organizations);
-}
-
-export async function createOrganization(
-  token: string,
-  input: { name: string; handle: string },
-): Promise<{ organization: Organization }> {
-  const result = await request<{ organization: unknown }>(
-    "/organizations",
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-  return { organization: decodeOrganizationResponse(result.organization) };
-}
-
-export async function isOrganizationHandleAvailable(
-  token: string,
-  handle: string,
-) {
-  const result = await request<{ available: boolean }>(
-    `/organizations/handle-availability?handle=${encodeURIComponent(handle)}`,
-    token,
-  );
-  return result.available;
-}
-
-export async function updateOrganization(
-  token: string,
-  organizationId: string,
-  name: string,
-) {
-  return request<{ organization: Organization }>(
-    `/organizations/${organizationId}`,
-    token,
-    {
-      method: "PUT",
-      body: JSON.stringify({ name }),
-    },
-  );
-}
-
-export async function updateOrganizationLogo(
-  token: string,
-  organizationId: string,
-  logo: string | null,
-): Promise<{ organization: Organization }> {
-  const result = await request<{ organization: unknown }>(
-    `/organizations/${organizationId}/logo`,
-    token,
-    {
-      method: "PUT",
-      body: JSON.stringify({ logo }),
-    },
-  );
-  return { organization: decodeOrganizationResponse(result.organization) };
-}
-
-export async function loadOrganizationMembers(
-  token: string,
-  organizationId: string,
-) {
-  return listOrganizationMembersRpc(token, organizationId);
-}
-
-export async function loadOrganizationInvitations(
-  token: string,
-  organizationId: string,
-) {
-  const result = await request<{ invitations: OrganizationInvitation[] }>(
-    `/organizations/${organizationId}/invitations`,
-    token,
-  );
-  return result.invitations;
-}
-
-export async function createOrganizationInvitation(
-  token: string,
-  organizationId: string,
-  input: {
-    email: string;
-    role: OrganizationAssignableRole;
-    initialProjectId: string;
-  },
-) {
-  const result = await request<{
-    invitation: OrganizationInvitation;
-    invitePath: string;
-  }>(`/organizations/${organizationId}/invitations`, token, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-  const appOrigin = briarWebAppOrigin || "https://briar.wordbricks.ai";
-  return {
-    invitation: result.invitation,
-    inviteUrl: new URL(result.invitePath, appOrigin).toString(),
-  };
-}
-
-export async function revokeOrganizationInvitation(
-  token: string,
-  organizationId: string,
-  invitationId: string,
-) {
-  return request<void>(
-    `/organizations/${organizationId}/invitations/${invitationId}`,
-    token,
-    { method: "DELETE" },
-  );
-}
-
-export async function loadOrganizationInvitation(token: string) {
-  return request<{ invitation: OrganizationInvitationPreview }>(
-    `/invitations/${encodeURIComponent(token)}`,
-    null,
-  );
-}
-
-export async function acceptOrganizationInvitation(
-  sessionToken: string,
-  invitationToken: string,
-) {
-  return request<{
-    invitation: OrganizationInvitationPreview;
-    alreadyAccepted: boolean;
-  }>(`/invitations/${encodeURIComponent(invitationToken)}`, sessionToken, {
-    method: "POST",
-  });
 }
 
 export async function loadOrganizationExecutionWorkers(
@@ -674,62 +541,6 @@ export async function updateOrganizationExecutionWorkerIcon(
       method: "PATCH",
       body: JSON.stringify({ icon }),
     },
-  );
-}
-
-export async function addOrganizationMember(
-  token: string,
-  organizationId: string,
-  input: { email: string; role: OrganizationAssignableRole },
-) {
-  return request<{ members: OrganizationMember[] }>(
-    `/organizations/${organizationId}/members`,
-    token,
-    { method: "POST", body: JSON.stringify(input) },
-  );
-}
-
-export async function updateOrganizationMemberRole(
-  token: string,
-  organizationId: string,
-  userId: string,
-  role: OrganizationAssignableRole,
-) {
-  return request<{ members: OrganizationMember[] }>(
-    `/organizations/${organizationId}/members/${encodeURIComponent(userId)}`,
-    token,
-    {
-      method: "PATCH",
-      body: JSON.stringify({ role }),
-    },
-  );
-}
-
-export async function updateOrganizationMemberProjects(
-  token: string,
-  organizationId: string,
-  userId: string,
-  projectIds: string[],
-) {
-  return request<{ members: OrganizationMember[] }>(
-    `/organizations/${organizationId}/members/${encodeURIComponent(userId)}/projects`,
-    token,
-    {
-      method: "PUT",
-      body: JSON.stringify({ projectIds }),
-    },
-  );
-}
-
-export async function removeOrganizationMember(
-  token: string,
-  organizationId: string,
-  userId: string,
-) {
-  return request<void>(
-    `/organizations/${organizationId}/members/${encodeURIComponent(userId)}`,
-    token,
-    { method: "DELETE" },
   );
 }
 
