@@ -69,6 +69,12 @@ public protocol BriarAPI_ChannelServiceClientInterface: Sendable {
     func `deleteChannelMessage`(request: BriarAPI_DeleteChannelMessageRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DeleteChannelMessageResponse>
 
     @available(iOS 13, *)
+    func `getChannelMessageDocument`(request: BriarAPI_GetChannelMessageDocumentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_GetChannelMessageDocumentResponse>
+
+    @available(iOS 13, *)
+    func `getChannelLinkPreview`(request: BriarAPI_GetChannelLinkPreviewRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_GetChannelLinkPreviewResponse>
+
+    @available(iOS 13, *)
     func `toggleChannelMessageReaction`(request: BriarAPI_ToggleChannelMessageReactionRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ToggleChannelMessageReactionResponse>
 
     @available(iOS 13, *)
@@ -191,6 +197,16 @@ public final class BriarAPI_ChannelServiceClient: BriarAPI_ChannelServiceClientI
     }
 
     @available(iOS 13, *)
+    public func `getChannelMessageDocument`(request: BriarAPI_GetChannelMessageDocumentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetChannelMessageDocumentResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/GetChannelMessageDocument", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `getChannelLinkPreview`(request: BriarAPI_GetChannelLinkPreviewRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetChannelLinkPreviewResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/GetChannelLinkPreview", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `toggleChannelMessageReaction`(request: BriarAPI_ToggleChannelMessageReactionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ToggleChannelMessageReactionResponse> {
         return await self.client.unary(path: "/briar.app.v1.ChannelService/ToggleChannelMessageReaction", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -241,6 +257,8 @@ public final class BriarAPI_ChannelServiceClient: BriarAPI_ChannelServiceClientI
             public static let listChannelMessages = Connect.MethodSpec(name: "ListChannelMessages", service: "briar.app.v1.ChannelService", type: .unary)
             public static let createChannelMessage = Connect.MethodSpec(name: "CreateChannelMessage", service: "briar.app.v1.ChannelService", type: .unary)
             public static let deleteChannelMessage = Connect.MethodSpec(name: "DeleteChannelMessage", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let getChannelMessageDocument = Connect.MethodSpec(name: "GetChannelMessageDocument", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let getChannelLinkPreview = Connect.MethodSpec(name: "GetChannelLinkPreview", service: "briar.app.v1.ChannelService", type: .unary)
             public static let toggleChannelMessageReaction = Connect.MethodSpec(name: "ToggleChannelMessageReaction", service: "briar.app.v1.ChannelService", type: .unary)
             public static let setChannelThreadSubscription = Connect.MethodSpec(name: "SetChannelThreadSubscription", service: "briar.app.v1.ChannelService", type: .unary)
             public static let acceptChannelProposal = Connect.MethodSpec(name: "AcceptChannelProposal", service: "briar.app.v1.ChannelService", type: .unary)

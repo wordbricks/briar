@@ -1947,6 +1947,170 @@ public nonisolated struct BriarAPI_ChannelDocument: Sendable {
   fileprivate var _projectID: String? = nil
 }
 
+public nonisolated struct BriarAPI_GetChannelMessageDocumentRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var channelID: String = String()
+
+  public var messageID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ChannelDocumentContent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var messageID: String = String()
+
+  public var title: String = String()
+
+  public var markdown: String = String()
+
+  public var projectID: String {
+    get {_projectID ?? String()}
+    set {_projectID = newValue}
+  }
+  /// Returns true if `projectID` has been explicitly set.
+  public var hasProjectID: Bool {self._projectID != nil}
+  /// Clears the value of `projectID`. Subsequent reads from it will return its default value.
+  public mutating func clearProjectID() {self._projectID = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _projectID: String? = nil
+}
+
+public nonisolated struct BriarAPI_GetChannelMessageDocumentResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var document: BriarAPI_ChannelDocumentContent {
+    get {_document ?? BriarAPI_ChannelDocumentContent()}
+    set {_document = newValue}
+  }
+  /// Returns true if `document` has been explicitly set.
+  public var hasDocument: Bool {self._document != nil}
+  /// Clears the value of `document`. Subsequent reads from it will return its default value.
+  public mutating func clearDocument() {self._document = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _document: BriarAPI_ChannelDocumentContent? = nil
+}
+
+public nonisolated struct BriarAPI_GetChannelLinkPreviewRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var channelID: String = String()
+
+  public var url: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ChannelLinkPreview: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var url: String = String()
+
+  public var title: String {
+    get {_title ?? String()}
+    set {_title = newValue}
+  }
+  /// Returns true if `title` has been explicitly set.
+  public var hasTitle: Bool {self._title != nil}
+  /// Clears the value of `title`. Subsequent reads from it will return its default value.
+  public mutating func clearTitle() {self._title = nil}
+
+  public var description_p: String {
+    get {_description_p ?? String()}
+    set {_description_p = newValue}
+  }
+  /// Returns true if `description_p` has been explicitly set.
+  public var hasDescription_p: Bool {self._description_p != nil}
+  /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
+  public mutating func clearDescription_p() {self._description_p = nil}
+
+  public var imageURL: String {
+    get {_imageURL ?? String()}
+    set {_imageURL = newValue}
+  }
+  /// Returns true if `imageURL` has been explicitly set.
+  public var hasImageURL: Bool {self._imageURL != nil}
+  /// Clears the value of `imageURL`. Subsequent reads from it will return its default value.
+  public mutating func clearImageURL() {self._imageURL = nil}
+
+  public var faviconURL: String {
+    get {_faviconURL ?? String()}
+    set {_faviconURL = newValue}
+  }
+  /// Returns true if `faviconURL` has been explicitly set.
+  public var hasFaviconURL: Bool {self._faviconURL != nil}
+  /// Clears the value of `faviconURL`. Subsequent reads from it will return its default value.
+  public mutating func clearFaviconURL() {self._faviconURL = nil}
+
+  public var siteName: String {
+    get {_siteName ?? String()}
+    set {_siteName = newValue}
+  }
+  /// Returns true if `siteName` has been explicitly set.
+  public var hasSiteName: Bool {self._siteName != nil}
+  /// Clears the value of `siteName`. Subsequent reads from it will return its default value.
+  public mutating func clearSiteName() {self._siteName = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _title: String? = nil
+  fileprivate var _description_p: String? = nil
+  fileprivate var _imageURL: String? = nil
+  fileprivate var _faviconURL: String? = nil
+  fileprivate var _siteName: String? = nil
+}
+
+public nonisolated struct BriarAPI_GetChannelLinkPreviewResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var preview: BriarAPI_ChannelLinkPreview {
+    get {_preview ?? BriarAPI_ChannelLinkPreview()}
+    set {_preview = newValue}
+  }
+  /// Returns true if `preview` has been explicitly set.
+  public var hasPreview: Bool {self._preview != nil}
+  /// Clears the value of `preview`. Subsequent reads from it will return its default value.
+  public mutating func clearPreview() {self._preview = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _preview: BriarAPI_ChannelLinkPreview? = nil
+}
+
 public nonisolated struct BriarAPI_ChannelMessage: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -5358,6 +5522,262 @@ nonisolated extension BriarAPI_ChannelDocument: SwiftProtobuf.Message, SwiftProt
     if lhs.messageID != rhs.messageID {return false}
     if lhs.title != rhs.title {return false}
     if lhs._projectID != rhs._projectID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_GetChannelMessageDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetChannelMessageDocumentRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}message_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.messageID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.channelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
+    }
+    if !self.messageID.isEmpty {
+      try visitor.visitSingularStringField(value: self.messageID, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_GetChannelMessageDocumentRequest, rhs: BriarAPI_GetChannelMessageDocumentRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.channelID != rhs.channelID {return false}
+    if lhs.messageID != rhs.messageID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ChannelDocumentContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ChannelDocumentContent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}message_id\0\u{1}title\0\u{1}markdown\0\u{3}project_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.messageID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.title) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.markdown) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._projectID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.messageID.isEmpty {
+      try visitor.visitSingularStringField(value: self.messageID, fieldNumber: 1)
+    }
+    if !self.title.isEmpty {
+      try visitor.visitSingularStringField(value: self.title, fieldNumber: 2)
+    }
+    if !self.markdown.isEmpty {
+      try visitor.visitSingularStringField(value: self.markdown, fieldNumber: 3)
+    }
+    try { if let v = self._projectID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ChannelDocumentContent, rhs: BriarAPI_ChannelDocumentContent) -> Bool {
+    if lhs.messageID != rhs.messageID {return false}
+    if lhs.title != rhs.title {return false}
+    if lhs.markdown != rhs.markdown {return false}
+    if lhs._projectID != rhs._projectID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_GetChannelMessageDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetChannelMessageDocumentResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}document\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._document) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._document {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_GetChannelMessageDocumentResponse, rhs: BriarAPI_GetChannelMessageDocumentResponse) -> Bool {
+    if lhs._document != rhs._document {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_GetChannelLinkPreviewRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetChannelLinkPreviewRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{1}url\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.url) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.channelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
+    }
+    if !self.url.isEmpty {
+      try visitor.visitSingularStringField(value: self.url, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_GetChannelLinkPreviewRequest, rhs: BriarAPI_GetChannelLinkPreviewRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.channelID != rhs.channelID {return false}
+    if lhs.url != rhs.url {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ChannelLinkPreview: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ChannelLinkPreview"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}title\0\u{1}description\0\u{3}image_url\0\u{3}favicon_url\0\u{3}site_name\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.url) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._title) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._imageURL) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._faviconURL) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._siteName) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.url.isEmpty {
+      try visitor.visitSingularStringField(value: self.url, fieldNumber: 1)
+    }
+    try { if let v = self._title {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._description_p {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._imageURL {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._faviconURL {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._siteName {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ChannelLinkPreview, rhs: BriarAPI_ChannelLinkPreview) -> Bool {
+    if lhs.url != rhs.url {return false}
+    if lhs._title != rhs._title {return false}
+    if lhs._description_p != rhs._description_p {return false}
+    if lhs._imageURL != rhs._imageURL {return false}
+    if lhs._faviconURL != rhs._faviconURL {return false}
+    if lhs._siteName != rhs._siteName {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_GetChannelLinkPreviewResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetChannelLinkPreviewResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}preview\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._preview) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._preview {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_GetChannelLinkPreviewResponse, rhs: BriarAPI_GetChannelLinkPreviewResponse) -> Bool {
+    if lhs._preview != rhs._preview {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

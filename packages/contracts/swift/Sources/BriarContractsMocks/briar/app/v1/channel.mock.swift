@@ -60,6 +60,10 @@ open class BriarAPI_ChannelServiceClientMock: BriarAPI_ChannelServiceClientInter
     public var mockAsyncCreateChannelMessage = { (_: BriarAPI_CreateChannelMessageRequest) -> ResponseMessage<BriarAPI_CreateChannelMessageResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `deleteChannelMessage()`.
     public var mockAsyncDeleteChannelMessage = { (_: BriarAPI_DeleteChannelMessageRequest) -> ResponseMessage<BriarAPI_DeleteChannelMessageResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `getChannelMessageDocument()`.
+    public var mockAsyncGetChannelMessageDocument = { (_: BriarAPI_GetChannelMessageDocumentRequest) -> ResponseMessage<BriarAPI_GetChannelMessageDocumentResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `getChannelLinkPreview()`.
+    public var mockAsyncGetChannelLinkPreview = { (_: BriarAPI_GetChannelLinkPreviewRequest) -> ResponseMessage<BriarAPI_GetChannelLinkPreviewResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `toggleChannelMessageReaction()`.
     public var mockAsyncToggleChannelMessageReaction = { (_: BriarAPI_ToggleChannelMessageReactionRequest) -> ResponseMessage<BriarAPI_ToggleChannelMessageReactionResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `setChannelThreadSubscription()`.
@@ -149,6 +153,14 @@ open class BriarAPI_ChannelServiceClientMock: BriarAPI_ChannelServiceClientInter
 
     open func `deleteChannelMessage`(request: BriarAPI_DeleteChannelMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteChannelMessageResponse> {
         return self.mockAsyncDeleteChannelMessage(request)
+    }
+
+    open func `getChannelMessageDocument`(request: BriarAPI_GetChannelMessageDocumentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetChannelMessageDocumentResponse> {
+        return self.mockAsyncGetChannelMessageDocument(request)
+    }
+
+    open func `getChannelLinkPreview`(request: BriarAPI_GetChannelLinkPreviewRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetChannelLinkPreviewResponse> {
+        return self.mockAsyncGetChannelLinkPreview(request)
     }
 
     open func `toggleChannelMessageReaction`(request: BriarAPI_ToggleChannelMessageReactionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ToggleChannelMessageReactionResponse> {

@@ -10302,6 +10302,30 @@ pub type OwnedDeleteChannelMessageResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<GetChannelMessageDocumentRequestView<'static>>`.
+pub type OwnedGetChannelMessageDocumentRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetChannelMessageDocumentRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetChannelMessageDocumentResponseView<'static>>`.
+pub type OwnedGetChannelMessageDocumentResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetChannelMessageDocumentResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetChannelLinkPreviewRequestView<'static>>`.
+pub type OwnedGetChannelLinkPreviewRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetChannelLinkPreviewRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetChannelLinkPreviewResponseView<'static>>`.
+pub type OwnedGetChannelLinkPreviewResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetChannelLinkPreviewResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<ToggleChannelMessageReactionRequestView<'static>>`.
 pub type OwnedToggleChannelMessageReactionRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::ToggleChannelMessageReactionRequestView<
@@ -11041,6 +11065,84 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::GetChannelMessageDocumentResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::GetChannelMessageDocumentResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::GetChannelMessageDocumentResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetChannelMessageDocumentResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::GetChannelLinkPreviewResponse>
+for crate::proto::briar::app::v1::__buffa::view::GetChannelLinkPreviewResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::GetChannelLinkPreviewResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetChannelLinkPreviewResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
     crate::proto::briar::app::v1::ToggleChannelMessageReactionResponse,
 >
 for crate::proto::briar::app::v1::__buffa::view::ToggleChannelMessageReactionResponseView<
@@ -11397,6 +11499,18 @@ pub const CHANNEL_SERVICE_CREATE_CHANNEL_MESSAGE_SPEC: ::connectrpc::Spec = ::co
 /// Static [`Spec`](::connectrpc::Spec) for the `DeleteChannelMessage` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const CHANNEL_SERVICE_DELETE_CHANNEL_MESSAGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.ChannelService/DeleteChannelMessage",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `GetChannelMessageDocument` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHANNEL_SERVICE_GET_CHANNEL_MESSAGE_DOCUMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ChannelService/GetChannelMessageDocument",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `GetChannelLinkPreview` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHANNEL_SERVICE_GET_CHANNEL_LINK_PREVIEW_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ChannelService/GetChannelLinkPreview",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -11921,6 +12035,52 @@ pub trait ChannelService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::DeleteChannelMessageResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the GetChannelMessageDocument RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_channel_message_document<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::GetChannelMessageDocumentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::GetChannelMessageDocumentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the GetChannelLinkPreview RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_channel_link_preview<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::GetChannelLinkPreviewRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::GetChannelLinkPreviewResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -12647,6 +12807,64 @@ impl<S: ChannelService> ChannelServiceExt for S {
             .with_spec(CHANNEL_SERVICE_DELETE_CHANNEL_MESSAGE_SPEC)
             .route_view(
                 CHANNEL_SERVICE_SERVICE_NAME,
+                "GetChannelMessageDocument",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::GetChannelMessageDocumentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::GetChannelMessageDocumentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_channel_message_document(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::GetChannelMessageDocumentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHANNEL_SERVICE_GET_CHANNEL_MESSAGE_DOCUMENT_SPEC)
+            .route_view(
+                CHANNEL_SERVICE_SERVICE_NAME,
+                "GetChannelLinkPreview",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::GetChannelLinkPreviewRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::GetChannelLinkPreviewRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_channel_link_preview(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::GetChannelLinkPreviewResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHANNEL_SERVICE_GET_CHANNEL_LINK_PREVIEW_SPEC)
+            .route_view(
+                CHANNEL_SERVICE_SERVICE_NAME,
                 "ToggleChannelMessageReaction",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -12985,6 +13203,18 @@ impl<T: ChannelService> ::connectrpc::Dispatcher for ChannelServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(CHANNEL_SERVICE_DELETE_CHANNEL_MESSAGE_SPEC),
+                )
+            }
+            "GetChannelMessageDocument" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHANNEL_SERVICE_GET_CHANNEL_MESSAGE_DOCUMENT_SPEC),
+                )
+            }
+            "GetChannelLinkPreview" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHANNEL_SERVICE_GET_CHANNEL_LINK_PREVIEW_SPEC),
                 )
             }
             "ToggleChannelMessageReaction" => {
@@ -13457,6 +13687,50 @@ impl<T: ChannelService> ::connectrpc::Dispatcher for ChannelServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::DeleteChannelMessageResponse,
+                        >(format)
+                })
+            }
+            "GetChannelMessageDocument" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::GetChannelMessageDocumentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::GetChannelMessageDocumentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::GetChannelMessageDocumentRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_channel_message_document(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::GetChannelMessageDocumentResponse,
+                        >(format)
+                })
+            }
+            "GetChannelLinkPreview" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::GetChannelLinkPreviewRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::GetChannelLinkPreviewRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::GetChannelLinkPreviewRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_channel_link_preview(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::GetChannelLinkPreviewResponse,
                         >(format)
                 })
             }
@@ -14571,6 +14845,96 @@ where
                 &self.transport,
                 &self.config,
                 CHANNEL_SERVICE_DELETE_CHANNEL_MESSAGE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetChannelMessageDocument RPC. Sends a request to /briar.app.v1.ChannelService/GetChannelMessageDocument.
+    pub async fn get_channel_message_document(
+        &self,
+        request: crate::proto::briar::app::v1::GetChannelMessageDocumentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetChannelMessageDocumentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_channel_message_document_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetChannelMessageDocument RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_channel_message_document_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::GetChannelMessageDocumentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetChannelMessageDocumentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHANNEL_SERVICE_GET_CHANNEL_MESSAGE_DOCUMENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetChannelLinkPreview RPC. Sends a request to /briar.app.v1.ChannelService/GetChannelLinkPreview.
+    pub async fn get_channel_link_preview(
+        &self,
+        request: crate::proto::briar::app::v1::GetChannelLinkPreviewRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetChannelLinkPreviewResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_channel_link_preview_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetChannelLinkPreview RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_channel_link_preview_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::GetChannelLinkPreviewRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetChannelLinkPreviewResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHANNEL_SERVICE_GET_CHANNEL_LINK_PREVIEW_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

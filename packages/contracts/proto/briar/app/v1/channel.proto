@@ -30,6 +30,8 @@ service ChannelService {
   rpc ListChannelMessages(ListChannelMessagesRequest) returns (ListChannelMessagesResponse);
   rpc CreateChannelMessage(CreateChannelMessageRequest) returns (CreateChannelMessageResponse);
   rpc DeleteChannelMessage(DeleteChannelMessageRequest) returns (DeleteChannelMessageResponse);
+  rpc GetChannelMessageDocument(GetChannelMessageDocumentRequest) returns (GetChannelMessageDocumentResponse);
+  rpc GetChannelLinkPreview(GetChannelLinkPreviewRequest) returns (GetChannelLinkPreviewResponse);
   rpc ToggleChannelMessageReaction(ToggleChannelMessageReactionRequest) returns (ToggleChannelMessageReactionResponse);
   rpc SetChannelThreadSubscription(SetChannelThreadSubscriptionRequest) returns (SetChannelThreadSubscriptionResponse);
   rpc AcceptChannelProposal(AcceptChannelProposalRequest) returns (AcceptChannelProposalResponse);
@@ -491,6 +493,42 @@ message ChannelDocument {
   string message_id = 1;
   string title = 2;
   optional string project_id = 3;
+}
+
+message GetChannelMessageDocumentRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string message_id = 3;
+}
+
+message ChannelDocumentContent {
+  string message_id = 1;
+  string title = 2;
+  string markdown = 3;
+  optional string project_id = 4;
+}
+
+message GetChannelMessageDocumentResponse {
+  ChannelDocumentContent document = 1;
+}
+
+message GetChannelLinkPreviewRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string url = 3;
+}
+
+message ChannelLinkPreview {
+  string url = 1;
+  optional string title = 2;
+  optional string description = 3;
+  optional string image_url = 4;
+  optional string favicon_url = 5;
+  optional string site_name = 6;
+}
+
+message GetChannelLinkPreviewResponse {
+  optional ChannelLinkPreview preview = 1;
 }
 
 message ChannelMessage {
