@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   executeClaimedMergeBatch,
   inspectMergeQueueDoctor,
-  type MergeBatchApi,
+  type MergeBatchRpc,
   type MergeQueueCommandRunner,
 } from "./merge-queue";
 import type { ClaimedMergeBatch } from "./worker-queue-contract";
@@ -121,16 +121,26 @@ function pullRequestResponse() {
 
 const successful = (stdout = "{}") => ({ exitCode: 0, stdout, stderr: "" });
 
-function recordingApi() {
-  const calls: Array<{ path: string; body: Record<string, unknown> }> = [];
-  const api: MergeBatchApi = async <T>(path: string, init: {
-    method: "POST";
-    body: string;
-  }) => {
-    calls.push({ path, body: JSON.parse(init.body) as Record<string, unknown> });
-    return {} as T;
-  };
-  return { api, calls };
+function recordingRpc() {
+  const calls: Array<{
+    method: keyof MergeBatchRpc["client"];
+    request: Record<string, unknown>;
+  }> = [];
+  const record = (method: keyof MergeBatchRpc["client"]) =>
+    async (request: Record<string, unknown>) => {
+      calls.push({ method, request });
+      return {};
+    };
+  const client = {
+    recordMergeBatchCandidateEnqueued: record(
+      "recordMergeBatchCandidateEnqueued",
+    ),
+    recordMergeBatchAuthority: record("recordMergeBatchAuthority"),
+    recordMergeBatchValidation: record("recordMergeBatchValidation"),
+    completeMergeBatchPublication: record("completeMergeBatchPublication"),
+    blockMergeBatch: record("blockMergeBatch"),
+  } as unknown as MergeBatchRpc["client"];
+  return { rpc: { client, options: {} }, calls };
 }
 
 function recordingLeaseLifecycle() {
@@ -153,22 +163,22 @@ describe("local provider-independent merge-queue worker", () => {
       commands.push([...command]);
       return successful(pullRequestResponse());
     };
-    const api = recordingApi();
+    const rpc = recordingRpc();
     const lease = recordingLeaseLifecycle();
     await executeClaimedMergeBatch({
       claim: claimFixture("enqueue"),
       workerId: "worker-1",
       repositoryPath: "/repo",
       signal: new AbortController().signal,
-      api: api.api,
+      rpc: rpc.rpc,
       ...lease,
       runCommand: run,
     });
     expect(commands.join("\n")).not.toContain("enqueuePullRequest");
     expect(commands.join("\n")).not.toContain("mergeQueue");
-    expect(api.calls[0]).toMatchObject({
-      path: `/merge-batch-claims/${batchId}/enqueued`,
-      body: { queueEntryId: `briar:${batchId}:1`, expectedHeadSha: headSha },
+    expect(rpc.calls[0]).toMatchObject({
+      method: "recordMergeBatchCandidateEnqueued",
+      request: { queueEntryId: `briar:${batchId}:1`, expectedHeadSha: headSha },
     });
   });
 
@@ -188,14 +198,14 @@ describe("local provider-independent merge-queue worker", () => {
       }
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
-    const api = recordingApi();
+    const rpc = recordingRpc();
     const lease = recordingLeaseLifecycle();
     await executeClaimedMergeBatch({
       claim: claimFixture(),
       workerId: "worker-1",
       repositoryPath: "/repo",
       signal: new AbortController().signal,
-      api: api.api,
+      rpc: rpc.rpc,
       ...lease,
       runCommand: run,
     });
@@ -203,9 +213,9 @@ describe("local provider-independent merge-queue worker", () => {
     expect(commands.some((command) =>
       command[1] === "push" && command.includes(`${integrationSha}:${integrationRef}`)
     )).toBe(true);
-    expect(api.calls.at(-1)).toMatchObject({
-      path: `/merge-batch-claims/${batchId}/authority`,
-      body: { integrationRef, integrationSha, baseSha: liveBaseSha },
+    expect(rpc.calls.at(-1)).toMatchObject({
+      method: "recordMergeBatchAuthority",
+      request: { integrationRef, integrationSha, baseSha: liveBaseSha },
     });
   });
 
@@ -229,14 +239,14 @@ describe("local provider-independent merge-queue worker", () => {
       }
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
-    const api = recordingApi();
+    const rpc = recordingRpc();
     const lease = recordingLeaseLifecycle();
     await executeClaimedMergeBatch({
       claim: claimFixture("validate"),
       workerId: "worker-1",
       repositoryPath: "/repo",
       signal: new AbortController().signal,
-      api: api.api,
+      rpc: rpc.rpc,
       ...lease,
       runCommand: run,
     });
@@ -249,17 +259,21 @@ describe("local provider-independent merge-queue worker", () => {
     );
     expect(validation?.options.env).toMatchObject({ CI: "1" });
     expect(validation?.options.env).not.toHaveProperty("GITHUB_TOKEN");
-    expect(api.calls.find((call) => call.path.endsWith("/validation")))
+    expect(rpc.calls.find((call) =>
+      call.method === "recordMergeBatchValidation"
+    ))
       .toMatchObject({
-        path: `/merge-batch-claims/${batchId}/validation`,
-        body: {
+        method: "recordMergeBatchValidation",
+        request: {
           mergeGroupSha: integrationSha,
-          validationResults: [{
-            context: "merge-queue",
-            passed: true,
-            exitCode: 0,
-            log: "$ bun run ci:local\nrepository checks passed\n",
-          }],
+          validationResults: {
+            results: [{
+              context: "merge-queue",
+              passed: true,
+              exitCode: 0,
+              log: "$ bun run ci:local\nrepository checks passed\n",
+            }],
+          },
         },
       });
   });
@@ -305,14 +319,14 @@ describe("local provider-independent merge-queue worker", () => {
       }
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
-    const api = recordingApi();
+    const rpc = recordingRpc();
     const lease = recordingLeaseLifecycle();
     await executeClaimedMergeBatch({
       claim: claimFixture("publish"),
       workerId: "worker-1",
       repositoryPath: "/repo",
       signal: new AbortController().signal,
-      api: api.api,
+      rpc: rpc.rpc,
       ...lease,
       runCommand: run,
     });
@@ -334,7 +348,7 @@ describe("local provider-independent merge-queue worker", () => {
     expect(commands.some((command) =>
       command[1] === "push" && command.includes("refs/heads/main")
     )).toBe(false);
-    expect(api.calls.at(-1)?.path).toBe(`/merge-batch-claims/${batchId}/published`);
+    expect(rpc.calls.at(-1)?.method).toBe("completeMergeBatchPublication");
   });
 
   it("publishes a failed proof without updating main", async () => {
@@ -349,20 +363,20 @@ describe("local provider-independent merge-queue worker", () => {
       if (command[1] === "github") return successful();
       throw new Error(`failed publication must not run git: ${command.join(" ")}`);
     };
-    const api = recordingApi();
+    const rpc = recordingRpc();
     const lease = recordingLeaseLifecycle();
     await executeClaimedMergeBatch({
       claim: claimFixture("publish", failedProof),
       workerId: "worker-1",
       repositoryPath: "/repo",
       signal: new AbortController().signal,
-      api: api.api,
+      rpc: rpc.rpc,
       ...lease,
       runCommand: run,
     });
     expect(commands.every((command) => command[1] === "github")).toBe(true);
     expect(commands.filter((command) => command[1] === "github")).toHaveLength(1);
-    expect(api.calls.at(-1)?.path).toBe(`/merge-batch-claims/${batchId}/published`);
+    expect(rpc.calls.at(-1)?.method).toBe("completeMergeBatchPublication");
   });
 
   it("accepts a retry after signed member state and main tree match the batch", async () => {
@@ -392,21 +406,21 @@ describe("local provider-independent merge-queue worker", () => {
       }
       throw new Error(`unexpected command: ${command.join(" ")}`);
     };
-    const api = recordingApi();
+    const rpc = recordingRpc();
     const lease = recordingLeaseLifecycle();
     await executeClaimedMergeBatch({
       claim,
       workerId: "worker-1",
       repositoryPath: "/repo",
       signal: new AbortController().signal,
-      api: api.api,
+      rpc: rpc.rpc,
       ...lease,
       runCommand: run,
     });
     expect(commands.filter((command) => command[1] === "fetch")).toHaveLength(1);
     expect(commands.some((command) => command[1] === "push")).toBe(false);
     expect(commands.some((command) => command.includes("pulls/42/merge"))).toBe(false);
-    expect(api.calls.at(-1)?.path).toBe(`/merge-batch-claims/${batchId}/published`);
+    expect(rpc.calls.at(-1)?.method).toBe("completeMergeBatchPublication");
   });
 
   it("checks repository identity without inspecting or requiring rulesets", () => {

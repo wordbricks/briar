@@ -3,6 +3,11 @@ import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CallOptions, Client } from "@connectrpc/connect";
+import {
+  MergeBatchValidationFailureCode,
+  WorkerQueueService,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import * as Schema from "effect/Schema";
 import {
   MERGE_QUEUE_GITHUB_STATUS_CONTEXT,
@@ -13,6 +18,7 @@ import {
   MERGE_QUEUE_VALIDATION_SOURCE_REF_PREFIX,
 } from "../src/lib/merge-queue-validation-contract";
 import type { ClaimedMergeBatch } from "./worker-queue-contract";
+import { workClaimIdentityToProto } from "./worker-queue-client";
 import type { MergeQueueProfile } from "../src/types";
 
 export type MergeQueueCommandResult = {
@@ -33,10 +39,19 @@ export type MergeQueueCommandRunner = (
   options: MergeQueueCommandOptions,
 ) => MergeQueueCommandResult;
 
-export type MergeBatchApi = <T = unknown>(
-  path: string,
-  init: { method: "POST"; body: string },
-) => Promise<T>;
+type MergeBatchReportingClient = Pick<
+  Client<typeof WorkerQueueService>,
+  | "recordMergeBatchCandidateEnqueued"
+  | "recordMergeBatchAuthority"
+  | "recordMergeBatchValidation"
+  | "completeMergeBatchPublication"
+  | "blockMergeBatch"
+>;
+
+export type MergeBatchRpc = {
+  client: MergeBatchReportingClient;
+  options: CallOptions;
+};
 
 export class MergeQueueInfrastructureError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -303,27 +318,15 @@ function inspectPullRequest(
   return pullRequest;
 }
 
-function commonClaimBody(
+function commonClaimRequest(
   claim: ClaimedMergeBatch,
   workerId: string,
 ) {
   return {
     projectId: claim.projectId,
     workerId,
-    claimToken: claim.claimToken,
+    work: workClaimIdentityToProto(claim),
   };
-}
-
-async function postClaimAction<T>(
-  api: MergeBatchApi,
-  claim: ClaimedMergeBatch,
-  action: string,
-  body: Readonly<Record<string, unknown>>,
-) {
-  return api<T>(`/merge-batch-claims/${claim.workId}/${action}`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
 }
 
 async function enqueueMember(
@@ -337,17 +340,15 @@ async function enqueueMember(
     input.runCommand,
   );
   const queueEntryId = `briar:${input.claim.workId}:${member.ordinal}`;
-  await postClaimAction(
-    input.api,
-    input.claim,
-    "enqueued",
+  await input.rpc.client.recordMergeBatchCandidateEnqueued(
     {
-      ...commonClaimBody(input.claim, input.workerId),
+      ...commonClaimRequest(input.claim, input.workerId),
       candidateId: member.id,
       expectedHeadSha: member.headSha,
       expectedBaseSha: member.baseSha,
       queueEntryId,
     },
+    input.rpc.options,
   );
 }
 
@@ -502,16 +503,14 @@ async function establishTailAuthority(input: NormalizedMergeBatchExecutionInput)
       `${integrationSha}:${integrationRef}`,
     ], 120_000);
   }
-  await postClaimAction(
-    input.api,
-    input.claim,
-    "authority",
+  await input.rpc.client.recordMergeBatchAuthority(
     {
-      ...commonClaimBody(input.claim, input.workerId),
+      ...commonClaimRequest(input.claim, input.workerId),
       integrationRef,
       integrationSha,
       baseSha,
     },
+    input.rpc.options,
   );
 }
 
@@ -669,15 +668,22 @@ async function validateMergeBatch(input: NormalizedMergeBatchExecutionInput) {
     logSha256: createHash("sha256").update(combinedLog).digest("hex"),
     logTruncated: bounded.truncated,
   }];
-  await postClaimAction(
-    input.api,
-    input.claim,
-    "validation",
+  await input.rpc.client.recordMergeBatchValidation(
     {
-      ...commonClaimBody(input.claim, input.workerId),
+      ...commonClaimRequest(input.claim, input.workerId),
       mergeGroupSha: exact.headSha,
-      validationResults,
+      validationResults: {
+        results: validationResults.map((result) => ({
+          ...result,
+          failureCode: result.failureCode === "ci_failed"
+            ? MergeBatchValidationFailureCode.CI_FAILED
+            : result.failureCode === "output_limit"
+              ? MergeBatchValidationFailureCode.OUTPUT_LIMIT
+              : undefined,
+        })),
+      },
     },
+    input.rpc.options,
   );
 }
 
@@ -927,28 +933,24 @@ async function publishMergeBatch(input: NormalizedMergeBatchExecutionInput) {
     // can never merge a pull request. Keep the lease live before every status.
     const authority = assertPublishAuthorityValues(input.claim);
     await publishProofStatuses(authority, true);
-    await postClaimAction(
-      input.api,
-      input.claim,
-      "published",
+    await input.rpc.client.completeMergeBatchPublication(
       {
-        ...commonClaimBody(input.claim, input.workerId),
+        ...commonClaimRequest(input.claim, input.workerId),
         mergeGroupSha: authority.mergeGroupSha,
       },
+      input.rpc.options,
     );
     return;
   }
   const authority = await reFencePublication(input);
   await publishProofStatuses(authority, false);
   await mergeBatchPullRequests(input, authority);
-  await postClaimAction(
-    input.api,
-    input.claim,
-    "published",
+  await input.rpc.client.completeMergeBatchPublication(
     {
-      ...commonClaimBody(input.claim, input.workerId),
+      ...commonClaimRequest(input.claim, input.workerId),
       mergeGroupSha: authority.mergeGroupSha,
     },
+    input.rpc.options,
   );
 }
 
@@ -969,15 +971,13 @@ async function drainMergeBatch(
   input: NormalizedMergeBatchExecutionInput,
   failure?: { code: string; detail: string },
 ) {
-  await postClaimAction(
-    input.api,
-    input.claim,
-    "block",
+  await input.rpc.client.blockMergeBatch(
     {
-      ...commonClaimBody(input.claim, input.workerId),
+      ...commonClaimRequest(input.claim, input.workerId),
       code: failure?.code ?? blockCode(input.claim),
       detail: (failure?.detail ?? blockDetail(input.claim)).slice(0, 4_000),
     },
+    input.rpc.options,
   );
 }
 
@@ -986,7 +986,7 @@ export type MergeBatchExecutionInput = {
   workerId: string;
   repositoryPath: string;
   signal: AbortSignal;
-  api: MergeBatchApi;
+  rpc: MergeBatchRpc;
   renewLease: () => Promise<void>;
   releaseLease: () => Promise<void>;
   runCommand?: MergeQueueCommandRunner;

@@ -87,6 +87,8 @@ export function createWorkerQueueClient(apiUrl: string, token: string) {
   const options = { headers: { Authorization: `Bearer ${token}` } };
 
   return {
+    client,
+    options,
     claimWork: async (input: {
       projectId: string;
       workerId: string;

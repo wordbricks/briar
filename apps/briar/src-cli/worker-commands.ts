@@ -18,10 +18,7 @@ import {
   runWorkerLoop,
   type WorkerLoopUpdateDirective,
 } from "./worker";
-import {
-  executeClaimedMergeBatch,
-  type MergeBatchApi,
-} from "./merge-queue";
+import { executeClaimedMergeBatch } from "./merge-queue";
 import {
   supportsRemoteWorkerUpdates,
   workerUpdateLaunch,
@@ -56,7 +53,6 @@ import {
   has,
   loadConfig,
   saveConfig,
-  request,
   login,
   gitValueAt,
   runGit,
@@ -433,10 +429,6 @@ async function workerCommand() {
 
   const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
   const workerQueue = createWorkerQueueClient(config.apiUrl, workerToken);
-  const mergeBatchApi: MergeBatchApi = <T = unknown>(
-    path: string,
-    init: { method: "POST"; body: string },
-  ) => request<T>(config.apiUrl, path, workerToken, init);
   let lastWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastAnalysisWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastServerMaintenanceAt = Number.NEGATIVE_INFINITY;
@@ -695,7 +687,10 @@ async function workerCommand() {
             workerId,
             repositoryPath: project.repositoryPath,
             signal,
-            api: mergeBatchApi,
+            rpc: {
+              client: workerQueue.client,
+              options: workerQueue.options,
+            },
             renewLease: async () => {
               await workerQueue.renewWorkLease({
                 projectId: project.id,
