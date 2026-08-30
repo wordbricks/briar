@@ -6,6 +6,7 @@ import "briar/app/v1/dashboard.proto";
 import "briar/app/v1/fleet.proto";
 import "briar/app/v1/github.proto";
 import "briar/app/v1/project.proto";
+import "briar/types/v1/provider.proto";
 import "briar/types/v1/worker.proto";
 
 // Machine-authenticated unary setup operations. The EC2 enrollment bootstrap
@@ -45,4 +46,102 @@ message BindManagedComputerSetupResponse {
   string device_id = 4;
   briar.app.v1.DashboardWorker worker = 5;
   bool duplicate = 6;
+}
+
+// Browser/controller frames accepted by the managed-computer setup agent.
+// Field numbers intentionally do not overlap ManagedComputerSetupToController,
+// so decoding a frame in the wrong direction produces an empty oneof and can
+// be rejected before forwarding.
+message ManagedComputerSetupToAgent {
+  oneof payload {
+    ManagedComputerSetupStart start = 10;
+    ManagedComputerSetupSubmit submit = 11;
+    ManagedComputerSetupCancel cancel = 12;
+    ManagedComputerSetupControllerReady controller_ready = 13;
+    ManagedComputerSetupControllerEnded controller_ended = 14;
+  }
+}
+
+message ManagedComputerSetupStart {
+  string setup_token = 1;
+  briar.types.v1.AgentProvider provider = 2;
+}
+
+message ManagedComputerSetupSubmit {
+  string challenge_id = 1;
+  string value = 2;
+}
+
+message ManagedComputerSetupCancel {}
+
+message ManagedComputerSetupControllerReady {
+  string session_id = 1;
+}
+
+message ManagedComputerSetupControllerEnded {
+  string session_id = 1;
+}
+
+// Setup-agent frames accepted by the browser/controller.
+message ManagedComputerSetupToController {
+  oneof payload {
+    ManagedComputerSetupState state = 20;
+    ManagedComputerSetupChallenge challenge = 21;
+    ManagedComputerSetupComplete complete = 22;
+    ManagedComputerSetupError error = 23;
+  }
+}
+
+enum ManagedComputerSetupPhase {
+  MANAGED_COMPUTER_SETUP_PHASE_UNSPECIFIED = 0;
+  MANAGED_COMPUTER_SETUP_PHASE_GITHUB = 1;
+  MANAGED_COMPUTER_SETUP_PHASE_PROVIDER = 2;
+  MANAGED_COMPUTER_SETUP_PHASE_REPOSITORY = 3;
+  MANAGED_COMPUTER_SETUP_PHASE_WORKER = 4;
+}
+
+enum ManagedComputerSetupStateStatus {
+  MANAGED_COMPUTER_SETUP_STATE_STATUS_UNSPECIFIED = 0;
+  MANAGED_COMPUTER_SETUP_STATE_STATUS_WORKING = 1;
+  MANAGED_COMPUTER_SETUP_STATE_STATUS_COMPLETE = 2;
+}
+
+message ManagedComputerSetupState {
+  ManagedComputerSetupPhase phase = 1;
+  ManagedComputerSetupStateStatus status = 2;
+  optional briar.types.v1.AgentProvider provider = 3;
+}
+
+enum ManagedComputerSetupChallengeService {
+  MANAGED_COMPUTER_SETUP_CHALLENGE_SERVICE_UNSPECIFIED = 0;
+  MANAGED_COMPUTER_SETUP_CHALLENGE_SERVICE_GITHUB = 1;
+  MANAGED_COMPUTER_SETUP_CHALLENGE_SERVICE_PROVIDER = 2;
+}
+
+enum ManagedComputerSetupChallengeKind {
+  MANAGED_COMPUTER_SETUP_CHALLENGE_KIND_UNSPECIFIED = 0;
+  MANAGED_COMPUTER_SETUP_CHALLENGE_KIND_DEVICE_CODE = 1;
+  MANAGED_COMPUTER_SETUP_CHALLENGE_KIND_AUTHORIZATION_CODE = 2;
+  MANAGED_COMPUTER_SETUP_CHALLENGE_KIND_API_KEY = 3;
+}
+
+message ManagedComputerSetupChallenge {
+  string challenge_id = 1;
+  ManagedComputerSetupChallengeService service = 2;
+  ManagedComputerSetupChallengeKind kind = 3;
+  string verification_uri = 4;
+  optional string user_code = 5;
+  optional briar.types.v1.AgentProvider provider = 6;
+}
+
+message ManagedComputerSetupComplete {
+  string project_id = 1;
+  briar.types.v1.AgentProvider provider = 2;
+  string worker_id = 3;
+}
+
+message ManagedComputerSetupError {
+  string code = 1;
+  string message = 2;
+  bool retryable = 3;
 }

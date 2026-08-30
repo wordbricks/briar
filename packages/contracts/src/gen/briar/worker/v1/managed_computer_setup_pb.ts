@@ -2,8 +2,8 @@
 // @generated from file briar/worker/v1/managed_computer_setup.proto (package briar.worker.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { DashboardWorker } from "../../app/v1/dashboard_pb";
 import { file_briar_app_v1_dashboard } from "../../app/v1/dashboard_pb";
 import type { ManagedComputerSetupSession } from "../../app/v1/fleet_pb";
@@ -12,6 +12,8 @@ import type { ProjectGitHubCredential } from "../../app/v1/github_pb";
 import { file_briar_app_v1_github } from "../../app/v1/github_pb";
 import type { ProjectSettings } from "../../app/v1/project_pb";
 import { file_briar_app_v1_project } from "../../app/v1/project_pb";
+import type { AgentProvider } from "../../types/v1/provider_pb";
+import { file_briar_types_v1_provider } from "../../types/v1/provider_pb";
 import type { WorkerRuntimeAdvertisement } from "../../types/v1/worker_pb";
 import { file_briar_types_v1_worker } from "../../types/v1/worker_pb";
 import type { Message } from "@bufbuild/protobuf";
@@ -20,7 +22,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/worker/v1/managed_computer_setup.proto.
  */
 export const file_briar_worker_v1_managed_computer_setup: GenFile = /*@__PURE__*/
-  fileDesc("Cixicmlhci93b3JrZXIvdjEvbWFuYWdlZF9jb21wdXRlcl9zZXR1cC5wcm90bxIPYnJpYXIud29ya2VyLnYxIlkKJUdldE1hbmFnZWRDb21wdXRlclNldHVwQ29udGV4dFJlcXVlc3QSGwoTbWFuYWdlZF9jb21wdXRlcl9pZBgBIAEoCRITCgtzZXR1cF90b2tlbhgCIAEoCSI3ChtNYW5hZ2VkQ29tcHV0ZXJTZXR1cFByb2plY3QSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCSK5AgomR2V0TWFuYWdlZENvbXB1dGVyU2V0dXBDb250ZXh0UmVzcG9uc2USOgoHc2Vzc2lvbhgBIAEoCzIpLmJyaWFyLmFwcC52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cFNlc3Npb24SPQoHcHJvamVjdBgCIAEoCzIsLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cFByb2plY3QSLwoIc2V0dGluZ3MYAyABKAsyHS5icmlhci5hcHAudjEuUHJvamVjdFNldHRpbmdzEkkKFXJlcG9zaXRvcnlfY3JlZGVudGlhbBgEIAEoCzIlLmJyaWFyLmFwcC52MS5Qcm9qZWN0R2l0SHViQ3JlZGVudGlhbEgAiAEBQhgKFl9yZXBvc2l0b3J5X2NyZWRlbnRpYWwikAEKH0JpbmRNYW5hZ2VkQ29tcHV0ZXJTZXR1cFJlcXVlc3QSGwoTbWFuYWdlZF9jb21wdXRlcl9pZBgBIAEoCRITCgtzZXR1cF90b2tlbhgCIAEoCRI7CgdydW50aW1lGAMgASgLMiouYnJpYXIudHlwZXMudjEuV29ya2VyUnVudGltZUFkdmVydGlzZW1lbnQiwQEKIEJpbmRNYW5hZ2VkQ29tcHV0ZXJTZXR1cFJlc3BvbnNlEhsKE21hbmFnZWRfY29tcHV0ZXJfaWQYASABKAkSFwoPb3JnYW5pemF0aW9uX2lkGAIgASgJEhIKCnByb2plY3RfaWQYAyABKAkSEQoJZGV2aWNlX2lkGAQgASgJEi0KBndvcmtlchgFIAEoCzIdLmJyaWFyLmFwcC52MS5EYXNoYm9hcmRXb3JrZXISEQoJZHVwbGljYXRlGAYgASgIMrICChtNYW5hZ2VkQ29tcHV0ZXJTZXR1cFNlcnZpY2USkQEKHkdldE1hbmFnZWRDb21wdXRlclNldHVwQ29udGV4dBI2LmJyaWFyLndvcmtlci52MS5HZXRNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbnRleHRSZXF1ZXN0GjcuYnJpYXIud29ya2VyLnYxLkdldE1hbmFnZWRDb21wdXRlclNldHVwQ29udGV4dFJlc3BvbnNlEn8KGEJpbmRNYW5hZ2VkQ29tcHV0ZXJTZXR1cBIwLmJyaWFyLndvcmtlci52MS5CaW5kTWFuYWdlZENvbXB1dGVyU2V0dXBSZXF1ZXN0GjEuYnJpYXIud29ya2VyLnYxLkJpbmRNYW5hZ2VkQ29tcHV0ZXJTZXR1cFJlc3BvbnNlYgZwcm90bzM", [file_briar_app_v1_dashboard, file_briar_app_v1_fleet, file_briar_app_v1_github, file_briar_app_v1_project, file_briar_types_v1_worker]);
+  fileDesc("Cixicmlhci93b3JrZXIvdjEvbWFuYWdlZF9jb21wdXRlcl9zZXR1cC5wcm90bxIPYnJpYXIud29ya2VyLnYxIlkKJUdldE1hbmFnZWRDb21wdXRlclNldHVwQ29udGV4dFJlcXVlc3QSGwoTbWFuYWdlZF9jb21wdXRlcl9pZBgBIAEoCRITCgtzZXR1cF90b2tlbhgCIAEoCSI3ChtNYW5hZ2VkQ29tcHV0ZXJTZXR1cFByb2plY3QSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCSK5AgomR2V0TWFuYWdlZENvbXB1dGVyU2V0dXBDb250ZXh0UmVzcG9uc2USOgoHc2Vzc2lvbhgBIAEoCzIpLmJyaWFyLmFwcC52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cFNlc3Npb24SPQoHcHJvamVjdBgCIAEoCzIsLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cFByb2plY3QSLwoIc2V0dGluZ3MYAyABKAsyHS5icmlhci5hcHAudjEuUHJvamVjdFNldHRpbmdzEkkKFXJlcG9zaXRvcnlfY3JlZGVudGlhbBgEIAEoCzIlLmJyaWFyLmFwcC52MS5Qcm9qZWN0R2l0SHViQ3JlZGVudGlhbEgAiAEBQhgKFl9yZXBvc2l0b3J5X2NyZWRlbnRpYWwikAEKH0JpbmRNYW5hZ2VkQ29tcHV0ZXJTZXR1cFJlcXVlc3QSGwoTbWFuYWdlZF9jb21wdXRlcl9pZBgBIAEoCRITCgtzZXR1cF90b2tlbhgCIAEoCRI7CgdydW50aW1lGAMgASgLMiouYnJpYXIudHlwZXMudjEuV29ya2VyUnVudGltZUFkdmVydGlzZW1lbnQiwQEKIEJpbmRNYW5hZ2VkQ29tcHV0ZXJTZXR1cFJlc3BvbnNlEhsKE21hbmFnZWRfY29tcHV0ZXJfaWQYASABKAkSFwoPb3JnYW5pemF0aW9uX2lkGAIgASgJEhIKCnByb2plY3RfaWQYAyABKAkSEQoJZGV2aWNlX2lkGAQgASgJEi0KBndvcmtlchgFIAEoCzIdLmJyaWFyLmFwcC52MS5EYXNoYm9hcmRXb3JrZXISEQoJZHVwbGljYXRlGAYgASgIIocDChtNYW5hZ2VkQ29tcHV0ZXJTZXR1cFRvQWdlbnQSOwoFc3RhcnQYCiABKAsyKi5icmlhci53b3JrZXIudjEuTWFuYWdlZENvbXB1dGVyU2V0dXBTdGFydEgAEj0KBnN1Ym1pdBgLIAEoCzIrLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cFN1Ym1pdEgAEj0KBmNhbmNlbBgMIAEoCzIrLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cENhbmNlbEgAElAKEGNvbnRyb2xsZXJfcmVhZHkYDSABKAsyNC5icmlhci53b3JrZXIudjEuTWFuYWdlZENvbXB1dGVyU2V0dXBDb250cm9sbGVyUmVhZHlIABJQChBjb250cm9sbGVyX2VuZGVkGA4gASgLMjQuYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwQ29udHJvbGxlckVuZGVkSABCCQoHcGF5bG9hZCJhChlNYW5hZ2VkQ29tcHV0ZXJTZXR1cFN0YXJ0EhMKC3NldHVwX3Rva2VuGAEgASgJEi8KCHByb3ZpZGVyGAIgASgOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlciJBChpNYW5hZ2VkQ29tcHV0ZXJTZXR1cFN1Ym1pdBIUCgxjaGFsbGVuZ2VfaWQYASABKAkSDQoFdmFsdWUYAiABKAkiHAoaTWFuYWdlZENvbXB1dGVyU2V0dXBDYW5jZWwiOQojTWFuYWdlZENvbXB1dGVyU2V0dXBDb250cm9sbGVyUmVhZHkSEgoKc2Vzc2lvbl9pZBgBIAEoCSI5CiNNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbnRyb2xsZXJFbmRlZBISCgpzZXNzaW9uX2lkGAEgASgJIq8CCiBNYW5hZ2VkQ29tcHV0ZXJTZXR1cFRvQ29udHJvbGxlchI7CgVzdGF0ZRgUIAEoCzIqLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cFN0YXRlSAASQwoJY2hhbGxlbmdlGBUgASgLMi4uYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwQ2hhbGxlbmdlSAASQQoIY29tcGxldGUYFiABKAsyLS5icmlhci53b3JrZXIudjEuTWFuYWdlZENvbXB1dGVyU2V0dXBDb21wbGV0ZUgAEjsKBWVycm9yGBcgASgLMiouYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwRXJyb3JIAEIJCgdwYXlsb2FkItsBChlNYW5hZ2VkQ29tcHV0ZXJTZXR1cFN0YXRlEjkKBXBoYXNlGAEgASgOMiouYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwUGhhc2USQAoGc3RhdHVzGAIgASgOMjAuYnJpYXIud29ya2VyLnYxLk1hbmFnZWRDb21wdXRlclNldHVwU3RhdGVTdGF0dXMSNAoIcHJvdmlkZXIYAyABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVySACIAQFCCwoJX3Byb3ZpZGVyIsICCh1NYW5hZ2VkQ29tcHV0ZXJTZXR1cENoYWxsZW5nZRIUCgxjaGFsbGVuZ2VfaWQYASABKAkSRgoHc2VydmljZRgCIAEoDjI1LmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cENoYWxsZW5nZVNlcnZpY2USQAoEa2luZBgDIAEoDjIyLmJyaWFyLndvcmtlci52MS5NYW5hZ2VkQ29tcHV0ZXJTZXR1cENoYWxsZW5nZUtpbmQSGAoQdmVyaWZpY2F0aW9uX3VyaRgEIAEoCRIWCgl1c2VyX2NvZGUYBSABKAlIAIgBARI0Cghwcm92aWRlchgGIAEoDjIdLmJyaWFyLnR5cGVzLnYxLkFnZW50UHJvdmlkZXJIAYgBAUIMCgpfdXNlcl9jb2RlQgsKCV9wcm92aWRlciJ2ChxNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbXBsZXRlEhIKCnByb2plY3RfaWQYASABKAkSLwoIcHJvdmlkZXIYAiABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVyEhEKCXdvcmtlcl9pZBgDIAEoCSJNChlNYW5hZ2VkQ29tcHV0ZXJTZXR1cEVycm9yEgwKBGNvZGUYASABKAkSDwoHbWVzc2FnZRgCIAEoCRIRCglyZXRyeWFibGUYAyABKAgq8wEKGU1hbmFnZWRDb21wdXRlclNldHVwUGhhc2USLAooTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9QSEFTRV9VTlNQRUNJRklFRBAAEicKI01BTkFHRURfQ09NUFVURVJfU0VUVVBfUEhBU0VfR0lUSFVCEAESKQolTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9QSEFTRV9QUk9WSURFUhACEisKJ01BTkFHRURfQ09NUFVURVJfU0VUVVBfUEhBU0VfUkVQT1NJVE9SWRADEicKI01BTkFHRURfQ09NUFVURVJfU0VUVVBfUEhBU0VfV09SS0VSEAQquQEKH01hbmFnZWRDb21wdXRlclNldHVwU3RhdGVTdGF0dXMSMwovTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9TVEFURV9TVEFUVVNfVU5TUEVDSUZJRUQQABIvCitNQU5BR0VEX0NPTVBVVEVSX1NFVFVQX1NUQVRFX1NUQVRVU19XT1JLSU5HEAESMAosTUFOQUdFRF9DT01QVVRFUl9TRVRVUF9TVEFURV9TVEFUVVNfQ09NUExFVEUQAirMAQokTWFuYWdlZENvbXB1dGVyU2V0dXBDaGFsbGVuZ2VTZXJ2aWNlEjgKNE1BTkFHRURfQ09NUFVURVJfU0VUVVBfQ0hBTExFTkdFX1NFUlZJQ0VfVU5TUEVDSUZJRUQQABIzCi9NQU5BR0VEX0NPTVBVVEVSX1NFVFVQX0NIQUxMRU5HRV9TRVJWSUNFX0dJVEhVQhABEjUKMU1BTkFHRURfQ09NUFVURVJfU0VUVVBfQ0hBTExFTkdFX1NFUlZJQ0VfUFJPVklERVIQAiqCAgohTWFuYWdlZENvbXB1dGVyU2V0dXBDaGFsbGVuZ2VLaW5kEjUKMU1BTkFHRURfQ09NUFVURVJfU0VUVVBfQ0hBTExFTkdFX0tJTkRfVU5TUEVDSUZJRUQQABI1CjFNQU5BR0VEX0NPTVBVVEVSX1NFVFVQX0NIQUxMRU5HRV9LSU5EX0RFVklDRV9DT0RFEAESPAo4TUFOQUdFRF9DT01QVVRFUl9TRVRVUF9DSEFMTEVOR0VfS0lORF9BVVRIT1JJWkFUSU9OX0NPREUQAhIxCi1NQU5BR0VEX0NPTVBVVEVSX1NFVFVQX0NIQUxMRU5HRV9LSU5EX0FQSV9LRVkQAzKyAgobTWFuYWdlZENvbXB1dGVyU2V0dXBTZXJ2aWNlEpEBCh5HZXRNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbnRleHQSNi5icmlhci53b3JrZXIudjEuR2V0TWFuYWdlZENvbXB1dGVyU2V0dXBDb250ZXh0UmVxdWVzdBo3LmJyaWFyLndvcmtlci52MS5HZXRNYW5hZ2VkQ29tcHV0ZXJTZXR1cENvbnRleHRSZXNwb25zZRJ/ChhCaW5kTWFuYWdlZENvbXB1dGVyU2V0dXASMC5icmlhci53b3JrZXIudjEuQmluZE1hbmFnZWRDb21wdXRlclNldHVwUmVxdWVzdBoxLmJyaWFyLndvcmtlci52MS5CaW5kTWFuYWdlZENvbXB1dGVyU2V0dXBSZXNwb25zZWIGcHJvdG8z", [file_briar_app_v1_dashboard, file_briar_app_v1_fleet, file_briar_app_v1_github, file_briar_app_v1_project, file_briar_types_v1_provider, file_briar_types_v1_worker]);
 
 /**
  * @generated from message briar.worker.v1.GetManagedComputerSetupContextRequest
@@ -166,6 +168,434 @@ export type BindManagedComputerSetupResponse = Message<"briar.worker.v1.BindMana
  */
 export const BindManagedComputerSetupResponseSchema: GenMessage<BindManagedComputerSetupResponse> = /*@__PURE__*/
   messageDesc(file_briar_worker_v1_managed_computer_setup, 4);
+
+/**
+ * Browser/controller frames accepted by the managed-computer setup agent.
+ * Field numbers intentionally do not overlap ManagedComputerSetupToController,
+ * so decoding a frame in the wrong direction produces an empty oneof and can
+ * be rejected before forwarding.
+ *
+ * @generated from message briar.worker.v1.ManagedComputerSetupToAgent
+ */
+export type ManagedComputerSetupToAgent = Message<"briar.worker.v1.ManagedComputerSetupToAgent"> & {
+  /**
+   * @generated from oneof briar.worker.v1.ManagedComputerSetupToAgent.payload
+   */
+  payload: {
+    /**
+     * @generated from field: briar.worker.v1.ManagedComputerSetupStart start = 10;
+     */
+    value: ManagedComputerSetupStart;
+    case: "start";
+  } | {
+    /**
+     * @generated from field: briar.worker.v1.ManagedComputerSetupSubmit submit = 11;
+     */
+    value: ManagedComputerSetupSubmit;
+    case: "submit";
+  } | {
+    /**
+     * @generated from field: briar.worker.v1.ManagedComputerSetupCancel cancel = 12;
+     */
+    value: ManagedComputerSetupCancel;
+    case: "cancel";
+  } | {
+    /**
+     * @generated from field: briar.worker.v1.ManagedComputerSetupControllerReady controller_ready = 13;
+     */
+    value: ManagedComputerSetupControllerReady;
+    case: "controllerReady";
+  } | {
+    /**
+     * @generated from field: briar.worker.v1.ManagedComputerSetupControllerEnded controller_ended = 14;
+     */
+    value: ManagedComputerSetupControllerEnded;
+    case: "controllerEnded";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message briar.worker.v1.ManagedComputerSetupToAgent.
+ * Use `create(ManagedComputerSetupToAgentSchema)` to create a new message.
+ */
+export const ManagedComputerSetupToAgentSchema: GenMessage<ManagedComputerSetupToAgent> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 5);
+
+/**
+ * @generated from message briar.worker.v1.ManagedComputerSetupStart
+ */
+export type ManagedComputerSetupStart = Message<"briar.worker.v1.ManagedComputerSetupStart"> & {
+  /**
+   * @generated from field: string setup_token = 1;
+   */
+  setupToken: string;
+
+  /**
+   * @generated from field: briar.types.v1.AgentProvider provider = 2;
+   */
+  provider: AgentProvider;
+};
+
+/**
+ * Describes the message briar.worker.v1.ManagedComputerSetupStart.
+ * Use `create(ManagedComputerSetupStartSchema)` to create a new message.
+ */
+export const ManagedComputerSetupStartSchema: GenMessage<ManagedComputerSetupStart> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 6);
+
+/**
+ * @generated from message briar.worker.v1.ManagedComputerSetupSubmit
+ */
+export type ManagedComputerSetupSubmit = Message<"briar.worker.v1.ManagedComputerSetupSubmit"> & {
+  /**
+   * @generated from field: string challenge_id = 1;
+   */
+  challengeId: string;
+
+  /**
+   * @generated from field: string value = 2;
+   */
+  value: string;
+};
+
+/**
+ * Describes the message briar.worker.v1.ManagedComputerSetupSubmit.
+ * Use `create(ManagedComputerSetupSubmitSchema)` to create a new message.
+ */
+export const ManagedComputerSetupSubmitSchema: GenMessage<ManagedComputerSetupSubmit> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 7);
+
+/**
+ * @generated from message briar.worker.v1.ManagedComputerSetupCancel
+ */
+export type ManagedComputerSetupCancel = Message<"briar.worker.v1.ManagedComputerSetupCancel"> & {
+};
+
+/**
+ * Describes the message briar.worker.v1.ManagedComputerSetupCancel.
+ * Use `create(ManagedComputerSetupCancelSchema)` to create a new message.
+ */
+export const ManagedComputerSetupCancelSchema: GenMessage<ManagedComputerSetupCancel> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 8);
+
+/**
+ * @generated from message briar.worker.v1.ManagedComputerSetupControllerReady
+ */
+export type ManagedComputerSetupControllerReady = Message<"briar.worker.v1.ManagedComputerSetupControllerReady"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+};
+
+/**
+ * Describes the message briar.worker.v1.ManagedComputerSetupControllerReady.
+ * Use `create(ManagedComputerSetupControllerReadySchema)` to create a new message.
+ */
+export const ManagedComputerSetupControllerReadySchema: GenMessage<ManagedComputerSetupControllerReady> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 9);
+
+/**
+ * @generated from message briar.worker.v1.ManagedComputerSetupControllerEnded
+ */
+export type ManagedComputerSetupControllerEnded = Message<"briar.worker.v1.ManagedComputerSetupControllerEnded"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+};
+
+/**
+ * Describes the message briar.worker.v1.ManagedComputerSetupControllerEnded.
+ * Use `create(ManagedComputerSetupControllerEndedSchema)` to create a new message.
+ */
+export const ManagedComputerSetupControllerEndedSchema: GenMessage<ManagedComputerSetupControllerEnded> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 10);
+
+/**
+ * Setup-agent frames accepted by the browser/controller.
+ *
+ * @generated from message briar.worker.v1.ManagedComputerSetupToController
+ */
+export type ManagedComputerSetupToController = Message<"briar.worker.v1.ManagedComputerSetupToController"> & {
+  /**
+   * @generated from oneof briar.worker.v1.ManagedComputerSetupToController.payload
+   */
+  payload: {
+    /**
+     * @generated from field: briar.worker.v1.ManagedComputerSetupState state = 20;
+     */
+    value: ManagedComputerSetupState;
+    case: "state";
+  } | {
+    /**
+     * @generated from field: briar.worker.v1.ManagedComputerSetupChallenge challenge = 21;
+     */
+    value: ManagedComputerSetupChallenge;
+    case: "challenge";
+  } | {
+    /**
+     * @generated from field: briar.worker.v1.ManagedComputerSetupComplete complete = 22;
+     */
+    value: ManagedComputerSetupComplete;
+    case: "complete";
+  } | {
+    /**
+     * @generated from field: briar.worker.v1.ManagedComputerSetupError error = 23;
+     */
+    value: ManagedComputerSetupError;
+    case: "error";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message briar.worker.v1.ManagedComputerSetupToController.
+ * Use `create(ManagedComputerSetupToControllerSchema)` to create a new message.
+ */
+export const ManagedComputerSetupToControllerSchema: GenMessage<ManagedComputerSetupToController> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 11);
+
+/**
+ * @generated from message briar.worker.v1.ManagedComputerSetupState
+ */
+export type ManagedComputerSetupState = Message<"briar.worker.v1.ManagedComputerSetupState"> & {
+  /**
+   * @generated from field: briar.worker.v1.ManagedComputerSetupPhase phase = 1;
+   */
+  phase: ManagedComputerSetupPhase;
+
+  /**
+   * @generated from field: briar.worker.v1.ManagedComputerSetupStateStatus status = 2;
+   */
+  status: ManagedComputerSetupStateStatus;
+
+  /**
+   * @generated from field: optional briar.types.v1.AgentProvider provider = 3;
+   */
+  provider?: AgentProvider | undefined;
+};
+
+/**
+ * Describes the message briar.worker.v1.ManagedComputerSetupState.
+ * Use `create(ManagedComputerSetupStateSchema)` to create a new message.
+ */
+export const ManagedComputerSetupStateSchema: GenMessage<ManagedComputerSetupState> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 12);
+
+/**
+ * @generated from message briar.worker.v1.ManagedComputerSetupChallenge
+ */
+export type ManagedComputerSetupChallenge = Message<"briar.worker.v1.ManagedComputerSetupChallenge"> & {
+  /**
+   * @generated from field: string challenge_id = 1;
+   */
+  challengeId: string;
+
+  /**
+   * @generated from field: briar.worker.v1.ManagedComputerSetupChallengeService service = 2;
+   */
+  service: ManagedComputerSetupChallengeService;
+
+  /**
+   * @generated from field: briar.worker.v1.ManagedComputerSetupChallengeKind kind = 3;
+   */
+  kind: ManagedComputerSetupChallengeKind;
+
+  /**
+   * @generated from field: string verification_uri = 4;
+   */
+  verificationUri: string;
+
+  /**
+   * @generated from field: optional string user_code = 5;
+   */
+  userCode?: string | undefined;
+
+  /**
+   * @generated from field: optional briar.types.v1.AgentProvider provider = 6;
+   */
+  provider?: AgentProvider | undefined;
+};
+
+/**
+ * Describes the message briar.worker.v1.ManagedComputerSetupChallenge.
+ * Use `create(ManagedComputerSetupChallengeSchema)` to create a new message.
+ */
+export const ManagedComputerSetupChallengeSchema: GenMessage<ManagedComputerSetupChallenge> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 13);
+
+/**
+ * @generated from message briar.worker.v1.ManagedComputerSetupComplete
+ */
+export type ManagedComputerSetupComplete = Message<"briar.worker.v1.ManagedComputerSetupComplete"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+
+  /**
+   * @generated from field: briar.types.v1.AgentProvider provider = 2;
+   */
+  provider: AgentProvider;
+
+  /**
+   * @generated from field: string worker_id = 3;
+   */
+  workerId: string;
+};
+
+/**
+ * Describes the message briar.worker.v1.ManagedComputerSetupComplete.
+ * Use `create(ManagedComputerSetupCompleteSchema)` to create a new message.
+ */
+export const ManagedComputerSetupCompleteSchema: GenMessage<ManagedComputerSetupComplete> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 14);
+
+/**
+ * @generated from message briar.worker.v1.ManagedComputerSetupError
+ */
+export type ManagedComputerSetupError = Message<"briar.worker.v1.ManagedComputerSetupError"> & {
+  /**
+   * @generated from field: string code = 1;
+   */
+  code: string;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * @generated from field: bool retryable = 3;
+   */
+  retryable: boolean;
+};
+
+/**
+ * Describes the message briar.worker.v1.ManagedComputerSetupError.
+ * Use `create(ManagedComputerSetupErrorSchema)` to create a new message.
+ */
+export const ManagedComputerSetupErrorSchema: GenMessage<ManagedComputerSetupError> = /*@__PURE__*/
+  messageDesc(file_briar_worker_v1_managed_computer_setup, 15);
+
+/**
+ * @generated from enum briar.worker.v1.ManagedComputerSetupPhase
+ */
+export enum ManagedComputerSetupPhase {
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_PHASE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_PHASE_GITHUB = 1;
+   */
+  GITHUB = 1,
+
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_PHASE_PROVIDER = 2;
+   */
+  PROVIDER = 2,
+
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_PHASE_REPOSITORY = 3;
+   */
+  REPOSITORY = 3,
+
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_PHASE_WORKER = 4;
+   */
+  WORKER = 4,
+}
+
+/**
+ * Describes the enum briar.worker.v1.ManagedComputerSetupPhase.
+ */
+export const ManagedComputerSetupPhaseSchema: GenEnum<ManagedComputerSetupPhase> = /*@__PURE__*/
+  enumDesc(file_briar_worker_v1_managed_computer_setup, 0);
+
+/**
+ * @generated from enum briar.worker.v1.ManagedComputerSetupStateStatus
+ */
+export enum ManagedComputerSetupStateStatus {
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_STATE_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_STATE_STATUS_WORKING = 1;
+   */
+  WORKING = 1,
+
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_STATE_STATUS_COMPLETE = 2;
+   */
+  COMPLETE = 2,
+}
+
+/**
+ * Describes the enum briar.worker.v1.ManagedComputerSetupStateStatus.
+ */
+export const ManagedComputerSetupStateStatusSchema: GenEnum<ManagedComputerSetupStateStatus> = /*@__PURE__*/
+  enumDesc(file_briar_worker_v1_managed_computer_setup, 1);
+
+/**
+ * @generated from enum briar.worker.v1.ManagedComputerSetupChallengeService
+ */
+export enum ManagedComputerSetupChallengeService {
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_CHALLENGE_SERVICE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_CHALLENGE_SERVICE_GITHUB = 1;
+   */
+  GITHUB = 1,
+
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_CHALLENGE_SERVICE_PROVIDER = 2;
+   */
+  PROVIDER = 2,
+}
+
+/**
+ * Describes the enum briar.worker.v1.ManagedComputerSetupChallengeService.
+ */
+export const ManagedComputerSetupChallengeServiceSchema: GenEnum<ManagedComputerSetupChallengeService> = /*@__PURE__*/
+  enumDesc(file_briar_worker_v1_managed_computer_setup, 2);
+
+/**
+ * @generated from enum briar.worker.v1.ManagedComputerSetupChallengeKind
+ */
+export enum ManagedComputerSetupChallengeKind {
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_CHALLENGE_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_CHALLENGE_KIND_DEVICE_CODE = 1;
+   */
+  DEVICE_CODE = 1,
+
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_CHALLENGE_KIND_AUTHORIZATION_CODE = 2;
+   */
+  AUTHORIZATION_CODE = 2,
+
+  /**
+   * @generated from enum value: MANAGED_COMPUTER_SETUP_CHALLENGE_KIND_API_KEY = 3;
+   */
+  API_KEY = 3,
+}
+
+/**
+ * Describes the enum briar.worker.v1.ManagedComputerSetupChallengeKind.
+ */
+export const ManagedComputerSetupChallengeKindSchema: GenEnum<ManagedComputerSetupChallengeKind> = /*@__PURE__*/
+  enumDesc(file_briar_worker_v1_managed_computer_setup, 3);
 
 /**
  * Machine-authenticated unary setup operations. The EC2 enrollment bootstrap
