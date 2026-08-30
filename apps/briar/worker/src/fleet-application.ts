@@ -165,6 +165,12 @@ export async function unbindProjectExecutionWorkerApplication(input: {
   reason: "explicit_user_unlink" | "managed_deprovision";
   observedAt: string;
 }) {
+  if (input.requestId !== `worker-unlink:${input.projectId}:${input.workerId}`) {
+    return applicationError(
+      "worker_request_id_mismatch",
+      "requestId must match the Worker lifecycle target",
+    );
+  }
   const project = await projectManagement(input);
   const device = await executionWorkerDeviceForBinding(input.db, input.workerId);
   if (!device || device.organization_id !== project.organization_id) {

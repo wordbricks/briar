@@ -47,7 +47,6 @@ import {
 } from "./run-request-contract";
 import {
   decodeProjectAgentScheduleRunCompletion,
-  decodeWorkerRegister,
   decodeWorkerSettings,
 } from "./worker-request-contract";
 import { slackCreateIssueShortcutCallbackId } from "./slack";
@@ -652,103 +651,6 @@ describe("Worker HTTP contract", () => {
       }),
     ).toThrow(/one emoji/u);
     expect(decodeWorkerSettings({ icon: null })).toEqual({ icon: null });
-  });
-
-  it("accepts Worker provider usage health and all supported providers during registration", () => {
-    expect(
-      decodeWorkerRegister({
-        label: "janet",
-        deviceIdentity: `briar_device_${"a".repeat(64)}`,
-        agentProvider: "codex",
-        providers: [
-          "codex",
-          "claude",
-          "cursor",
-          "grok",
-          "agy",
-          "opencode",
-          "openrouter",
-        ],
-        providerHealth: {
-          codex: {
-            installed: true,
-            authenticated: true,
-            healthy: true,
-            reason: null,
-            usageExhausted: false,
-            maxUsedPercent: 3,
-          },
-          claude: {
-            installed: true,
-            authenticated: true,
-            healthy: true,
-            reason: null,
-            usageExhausted: false,
-            maxUsedPercent: null,
-          },
-          cursor: {
-            installed: true,
-            authenticated: true,
-            healthy: true,
-            reason: null,
-            usageExhausted: false,
-            maxUsedPercent: null,
-          },
-          grok: {
-            installed: true,
-            authenticated: true,
-            healthy: false,
-            reason: "usage_exhausted",
-            usageExhausted: true,
-            maxUsedPercent: 100,
-          },
-          agy: {
-            installed: true,
-            authenticated: true,
-            healthy: true,
-            reason: null,
-            usageExhausted: false,
-            maxUsedPercent: null,
-          },
-          opencode: {
-            installed: true,
-            authenticated: true,
-            healthy: true,
-            reason: null,
-            usageExhausted: false,
-            maxUsedPercent: null,
-          },
-          openrouter: {
-            installed: true,
-            authenticated: true,
-            healthy: true,
-            reason: null,
-            usageExhausted: false,
-            maxUsedPercent: null,
-          },
-        },
-        versions: { briar: "1.2.116" },
-      }),
-    ).toMatchObject({
-      providers: [
-        "codex",
-        "claude",
-        "cursor",
-        "grok",
-        "agy",
-        "opencode",
-        "openrouter",
-      ],
-      providerHealth: {
-        codex: { usageExhausted: false, maxUsedPercent: 3 },
-        claude: { usageExhausted: false, maxUsedPercent: null },
-        cursor: { usageExhausted: false, maxUsedPercent: null },
-        grok: { usageExhausted: true, maxUsedPercent: 100 },
-        agy: { usageExhausted: false, maxUsedPercent: null },
-        opencode: { usageExhausted: false, maxUsedPercent: null },
-        openrouter: { usageExhausted: false, maxUsedPercent: null },
-      },
-    });
   });
 
   it("requires an actionable structured handoff for blocked work", () => {

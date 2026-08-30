@@ -503,7 +503,8 @@ for (const required of [
   "wait_for_health",
   "rollback_release",
   "Refusing to downgrade the managed runtime",
-  "update-handoff/fail",
+  "managed-computer worker-update-fail",
+  "managed-computer worker-update-status",
 ]) {
   if (!updater.includes(required)) fail(`runtime updater omits ${required}`);
 }

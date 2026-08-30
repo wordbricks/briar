@@ -58,6 +58,8 @@ import {
   managedComputerSetupCommand,
   managedComputerStatusCommand,
   managedComputerSyncCommand,
+  managedComputerWorkerUpdateFailCommand,
+  managedComputerWorkerUpdateStatusCommand,
   managedComputerWorkerSupervisor,
 } from "./managed-computer-commands";
 import {
@@ -542,6 +544,24 @@ const managedComputerCommand = Command.make("managed-computer").pipe(
       {},
       managedComputerWorkerSupervisor,
       "Run managed project workers",
+    ).pipe(Command.unlisted),
+    leaf(
+      "worker-update-status",
+      {
+        ...requiredStrings("worker", "request-id", "target-version"),
+        ...optionalStrings("credential-file"),
+      },
+      managedComputerWorkerUpdateStatusCommand,
+      "Read a managed Worker update handoff",
+    ).pipe(Command.unlisted),
+    leaf(
+      "worker-update-fail",
+      {
+        ...requiredStrings("worker", "request-id", "error"),
+        ...optionalStrings("credential-file"),
+      },
+      managedComputerWorkerUpdateFailCommand,
+      "Report a managed Worker update failure",
     ).pipe(Command.unlisted),
   ]),
 );

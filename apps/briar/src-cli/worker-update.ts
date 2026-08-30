@@ -1,17 +1,10 @@
 import { platform } from "node:os";
 import { isAbsolute } from "node:path";
+import type { WorkerLoopUpdateDirective } from "./worker";
 
 const updateRequestIdPattern = /^[0-9a-f-]{36}$/iu;
 const versionPattern = /^\d+\.\d+\.\d+$/u;
 const workerIdPattern = /^[0-9a-zA-Z-]{1,128}$/u;
-
-export type WorkerUpdateDirective = {
-  id: string;
-  targetVersion: string;
-  status: "requested";
-  requestedAt: string;
-  handoffState?: "idle" | "draining" | "ready" | "failed";
-};
 
 export type WorkerUpdateLaunch = {
   command: string;
@@ -28,7 +21,7 @@ export function supportsRemoteWorkerUpdates(
 }
 
 export function workerUpdateDeepLink(
-  directive: Pick<WorkerUpdateDirective, "id" | "targetVersion">,
+  directive: Pick<WorkerLoopUpdateDirective, "id" | "targetVersion">,
 ): string {
   if (
     !updateRequestIdPattern.test(directive.id) ||
@@ -40,7 +33,7 @@ export function workerUpdateDeepLink(
 }
 
 export function workerUpdateLaunch(
-  directive: Pick<WorkerUpdateDirective, "id" | "targetVersion">,
+  directive: Pick<WorkerLoopUpdateDirective, "id" | "targetVersion">,
   workerId: string,
   operatingSystem: ReturnType<typeof platform> = platform(),
   environment: NodeJS.ProcessEnv = process.env,

@@ -192,7 +192,7 @@ const withFleetErrors = async <A>(operation: Promise<A>): Promise<A> => {
 export const createAppFleetService = (
   { request, auth, db, env, context }: AppConnectFleetInput,
 ): ServiceImpl<typeof FleetService> => ({
-  registerProjectExecutionWorker: (input) => withConnectErrors(async () => {
+  registerProjectExecutionWorker: (input, context) => withConnectErrors(async () => {
     const session = await requireSession(auth, request);
     const observedAt = new Date().toISOString();
     const result = await withFleetErrors(
@@ -207,6 +207,7 @@ export const createAppFleetService = (
         observedAt,
       }),
     );
+    context.responseHeader.set("Cache-Control", "no-store");
     return {
       organizationId: result.organizationId,
       deviceId: result.device.id,

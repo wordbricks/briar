@@ -11,9 +11,9 @@ import {
   value,
   has,
   loadConfig,
-  request,
   currentProject,
 } from "./command-support";
+import { createWorkerControlClient } from "./worker-control-client";
 
 async function workerStatus() {
   const config = await loadConfig();
@@ -70,25 +70,17 @@ async function workerRestartServices() {
     if (!token) {
       throw new Error("Worker machine credential is unavailable");
     }
-    const prepared = await request<{
-      requestId: string;
-      targetVersion: string;
-      handoffState: string;
-      activeWorkCount: number;
-      ready: boolean;
-    }>(
+    const prepared = await createWorkerControlClient(
       config.apiUrl,
-      `/workers/${registered.workerId}/update-handoff/prepare`,
       token,
-      {
-        method: "POST",
-        body: JSON.stringify({ targetVersion: cliVersion }),
-      },
+    ).prepareUpdateHandoff(
+      registered.workerId,
+      cliVersion,
     );
     handoffs.set(registered.workerId, {
       workerId: registered.workerId,
       token,
-      requestId: prepared.requestId,
+      requestId: prepared.update.id,
     });
   }
 
@@ -96,19 +88,16 @@ async function workerRestartServices() {
   while (true) {
     let ready = true;
     for (const handoff of handoffs.values()) {
-      const status = await request<{
-        handoffState: string;
-        activeWorkCount: number;
-        ready: boolean;
-        handoffError?: string | null;
-      }>(
+      const status = await createWorkerControlClient(
         config.apiUrl,
-        `/workers/${handoff.workerId}/update-handoff/status?requestId=${encodeURIComponent(handoff.requestId)}`,
         handoff.token,
+      ).getUpdateHandoff(
+        handoff.workerId,
+        handoff.requestId,
       );
-      if (status.handoffState === "failed") {
+      if (status.update?.handoffState === "failed") {
         throw new Error(
-          `Worker update handoff failed: ${status.handoffError ?? "unknown reason"}`,
+          `Worker update handoff failed: ${status.update.handoffError ?? "unknown reason"}`,
         );
       }
       if (!status.ready || status.activeWorkCount > 0) ready = false;

@@ -7,7 +7,9 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import {
   FleetService,
   ManagedComputerState,
+  UnbindProjectExecutionWorkerRequest_Reason,
 } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import {
@@ -16,6 +18,7 @@ import {
 } from "./test-helpers/d1";
 
 const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const projectId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const ownerId = "fleet-connect-owner";
 const memberId = "fleet-connect-member";
 const ownerToken = "fleet-connect-owner-token";
@@ -56,6 +59,12 @@ describe("FleetService", () => {
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'Fleet Connect', 'fleet-connect', ?, ?)`,
       ).bind(organizationId, now, now),
+      db.prepare(
+        `insert into briar_projects (
+           id, owner_user_id, organization_id, name, agent_token_hash,
+           created_at, updated_at
+         ) values (?, ?, ?, 'Fleet Project', ?, ?, ?)`,
+      ).bind(projectId, ownerId, organizationId, "f".repeat(64), now, now),
     ]);
     await db.batch([
       db.prepare(
@@ -111,12 +120,18 @@ describe("FleetService", () => {
     };
   };
 
-  const client = (context?: ExecutionContext) => createClient(
+  const client = (
+    context?: ExecutionContext,
+    onResponse?: (response: Response) => void,
+  ) => createClient(
     FleetService,
     createConnectTransport({
       baseUrl: "https://briar.example",
-      fetch: async (input, init) =>
-        worker.fetch(new Request(input, init), env(), context),
+      fetch: async (input, init) => {
+        const response = await worker.fetch(new Request(input, init), env(), context);
+        onResponse?.(response);
+        return response;
+      },
     }),
   );
 
@@ -178,6 +193,53 @@ describe("FleetService", () => {
       ),
     ]);
   };
+
+  it("enrolls and idempotently unbinds a project Worker through FleetService", async () => {
+    let cacheControl: string | null = null;
+    const fleet = client(undefined, (response) => {
+      cacheControl = response.headers.get("cache-control");
+    });
+    const registration = await fleet.registerProjectExecutionWorker({
+      projectId,
+      label: "Connect Worker",
+      deviceIdentity: `briar_device_${"a".repeat(64)}`,
+      runtime: {
+        agentProvider: AgentProvider.CODEX,
+        providers: [],
+        providerHealth: [],
+        capabilities: {
+          providerCapabilities: [],
+          worktrees: true,
+          workflowRequirements: [],
+        },
+        versions: { briar: "2.0.0" },
+      },
+      maxConcurrentSessions: 2,
+    }, options(ownerToken));
+    expect(registration.workerToken).toMatch(/^briar_worker_/u);
+    expect(registration.worker?.maxConcurrentSessions).toBe(2);
+    expect(cacheControl).toBe("no-store");
+
+    const requestId = `worker-unlink:${projectId}:${registration.worker!.id}`;
+    await expect(fleet.unbindProjectExecutionWorker({
+      projectId,
+      workerId: registration.worker!.id,
+      requestId: "wrong-request-id",
+      reason: UnbindProjectExecutionWorkerRequest_Reason.EXPLICIT_USER_UNLINK,
+    }, options(ownerToken))).rejects.toMatchObject({ code: Code.InvalidArgument });
+    await expect(fleet.unbindProjectExecutionWorker({
+      projectId,
+      workerId: registration.worker!.id,
+      requestId,
+      reason: UnbindProjectExecutionWorkerRequest_Reason.EXPLICIT_USER_UNLINK,
+    }, options(ownerToken))).resolves.toMatchObject({ alreadyUnbound: false });
+    await expect(fleet.unbindProjectExecutionWorker({
+      projectId,
+      workerId: registration.worker!.id,
+      requestId,
+      reason: UnbindProjectExecutionWorkerRequest_Reason.EXPLICIT_USER_UNLINK,
+    }, options(ownerToken))).resolves.toMatchObject({ alreadyUnbound: true });
+  });
 
   it("enforces capability and validates promotion input at the Connect boundary", async () => {
     const fleet = client();

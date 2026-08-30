@@ -146,9 +146,6 @@ export const workerRuntimeMetadataFromProto = (
     invalid("Worker providers must be unique");
   }
   if (providers.length > 7) invalid("Worker has too many providers");
-  if (!providers.includes(agentProvider)) {
-    invalid("Primary agent provider must be advertised as available");
-  }
   const versions = { ...runtime.versions };
   for (const [key, value] of Object.entries(versions)) {
     if (key.length > 64 || value.length > 64) {

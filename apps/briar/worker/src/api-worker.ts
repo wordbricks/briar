@@ -22,13 +22,11 @@ import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
 import { handleRealtimeRoute } from "./realtime-routes";
 import {
   requireAgentProject,
-  requireWorkerCredential,
   requireWorkerProjectBinding,
 } from "./worker-route-auth";
 import { handleMergeBatchRoute } from "./merge-batch-routes";
 import { handleRunAgentRoute } from "./run-agent-routes";
 import { handleRunEvidenceRoute } from "./run-evidence-routes";
-import { handleExecutionWorkerRoute } from "./execution-worker-routes";
 import { handleGithubPublicRoute } from "./github-integration-routes";
 import {
   getProject,
@@ -233,16 +231,6 @@ async function route(
     attachmentsBucket,
   });
   if (issueCoreResponse !== undefined) return issueCoreResponse;
-
-  const executionWorkerResponse = await handleExecutionWorkerRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-    requireWorkerCredential: () => requireWorkerCredential(db, request),
-  });
-  if (executionWorkerResponse !== undefined) return executionWorkerResponse;
 
   const mergeBatchResponse = await handleMergeBatchRoute({
     request,

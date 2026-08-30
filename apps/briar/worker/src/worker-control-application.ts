@@ -202,7 +202,7 @@ export async function heartbeatWorkerApplication(input: {
       ? "원격 런타임 업데이트에 실패했습니다."
       : updateIsPending
         ? "계획된 업데이트 handoff를 진행 중입니다."
-        : input.readinessDetail,
+        : input.readinessDetail ?? null,
     capabilities: input.runtime.capabilities,
     observedAt: input.observedAt,
   });

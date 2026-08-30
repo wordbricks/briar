@@ -1,4 +1,15 @@
 import { createHash } from "node:crypto";
+import { createClient } from "@connectrpc/connect";
+import { createConnectTransport } from "@connectrpc/connect-web";
+import {
+  DashboardWorker_Readiness,
+} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+import { ExecutionWorkerHandoffState } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import {
+  WorkerControlService,
+  WorkerReadinessState,
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { Miniflare } from "miniflare";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { AgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
@@ -75,6 +86,29 @@ const fingerprint = (seed: string) =>
     .map((character) => character.charCodeAt(0).toString(16).padStart(2, "0"))
     .join("")
     .padEnd(64, "0");
+
+const workerControlClient = (env: Env, credential: string) => ({
+  client: createClient(
+    WorkerControlService,
+    createConnectTransport({
+      baseUrl: "https://briar-api.example",
+      fetch: (input, init) => apiWorker.fetch(new Request(input, init), env),
+    }),
+  ),
+  options: { headers: { authorization: `Bearer ${credential}` } },
+});
+
+const workerRuntime = (version = "1.2.95") => ({
+  agentProvider: AgentProvider.CODEX,
+  providers: [AgentProvider.CODEX],
+  providerHealth: [],
+  capabilities: {
+    providerCapabilities: [],
+    worktrees: true,
+    workflowRequirements: [],
+  },
+  versions: { briar: version },
+});
 
 const instrumentD1 = (database: D1Database) => {
   const cost = { rowsRead: 0, rowsWritten: 0 };
@@ -544,26 +578,45 @@ describe("detached execution workers", () => {
       GOOGLE_CLIENT_ID: "google-client-test",
       GOOGLE_CLIENT_SECRET: "google-secret-test",
     } as unknown as Env;
+    const control = workerControlClient(env, credential);
+    let acceptingWork = true;
+    let readinessState = WorkerReadinessState.READY;
+    let readinessDetail: string | undefined;
     const heartbeat = async (
       body: Record<string, unknown>,
       routeDatabase: D1Database = db,
     ) => {
-      const response = await apiWorker.fetch(
-        new Request(
-          `https://briar-api.example/workers/${registered.worker.id}/heartbeat`,
-          {
-            method: "POST",
-            headers: {
-              authorization: `Bearer ${credential}`,
-              "content-type": "application/json",
-            },
-            body: JSON.stringify(body),
-          },
+      if (typeof body.acceptingWork === "boolean") {
+        acceptingWork = body.acceptingWork;
+      }
+      if (body.readinessState === "busy") {
+        readinessState = WorkerReadinessState.BUSY;
+      } else if (body.readinessState === "needs_attention") {
+        readinessState = WorkerReadinessState.NEEDS_ATTENTION;
+      } else if (body.readinessState === "ready") {
+        readinessState = WorkerReadinessState.READY;
+      }
+      if ("readinessDetail" in body) {
+        readinessDetail = typeof body.readinessDetail === "string"
+          ? body.readinessDetail
+          : undefined;
+      }
+      const routed = routeDatabase === db
+        ? control
+        : workerControlClient({ ...env, DB: routeDatabase }, credential);
+      return await routed.client.heartbeatWorker({
+        workerId: registered.worker.id,
+        runtime: workerRuntime(
+          typeof (body.versions as { briar?: unknown } | undefined)?.briar ===
+              "string"
+            ? (body.versions as { briar: string }).briar
+            : undefined,
         ),
-        { ...env, DB: routeDatabase },
-      );
-      expect(response.status).toBe(200);
-      return response;
+        refreshMaintenance: body.refreshMaintenance === true,
+        acceptingWork,
+        readinessState,
+        readinessDetail,
+      }, routed.options);
     };
     const auditCount = async () => {
       const row = await db
@@ -646,13 +699,13 @@ describe("detached execution workers", () => {
       { refreshMaintenance: false },
       lightweightCost.database,
     );
-    expect(await lightweight.json()).not.toHaveProperty("workflowRequirements");
+    expect(lightweight.workflowRequirements).toEqual([]);
     const maintenanceCost = instrumentD1(db);
     const maintenance = await heartbeat(
       { refreshMaintenance: true },
       maintenanceCost.database,
     );
-    expect(await maintenance.json()).toHaveProperty("workflowRequirements");
+    expect(maintenance.workflowRequirements).toEqual([]);
     expect(lightweightCost.cost.rowsWritten).toBeGreaterThan(0);
     expect(maintenanceCost.cost.rowsWritten).toBe(
       lightweightCost.cost.rowsWritten,
@@ -748,35 +801,25 @@ describe("detached execution workers", () => {
       targetVersion: "2.0.0",
       requestedAt: atMinute(2),
     });
-    const response = await apiWorker.fetch(
-      new Request(
-        `https://briar-api.example/workers/${worker.worker.id}/heartbeat`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${credential}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            versions: { briar: "2.0.0" },
-            acceptingWork: true,
-            readinessState: "ready",
-          }),
-        },
-      ),
-      {
-        DB: db,
-        ARCHIVES: archives,
-        BETTER_AUTH_SECRET: "update-reconnect-secret-update-reconnect-secret",
-        GOOGLE_CLIENT_ID: "google-client-test",
-        GOOGLE_CLIENT_SECRET: "google-secret-test",
-      } as unknown as Env,
-    );
+    const env = {
+      DB: db,
+      ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "update-reconnect-secret-update-reconnect-secret",
+      GOOGLE_CLIENT_ID: "google-client-test",
+      GOOGLE_CLIENT_SECRET: "google-secret-test",
+    } as unknown as Env;
+    const control = workerControlClient(env, credential);
+    const response = await control.client.heartbeatWorker({
+      workerId: worker.worker.id,
+      runtime: workerRuntime("2.0.0"),
+      acceptingWork: true,
+      readinessState: WorkerReadinessState.READY,
+    }, control.options);
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      updateDirective: null,
-      worker: { acceptingWork: true, readiness: "available" },
+    expect(response.updateDirective).toBeUndefined();
+    expect(response.worker).toMatchObject({
+      acceptingWork: true,
+      readiness: DashboardWorker_Readiness.AVAILABLE,
     });
     expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toBeNull();
   });
@@ -983,55 +1026,35 @@ describe("detached execution workers", () => {
       GOOGLE_CLIENT_ID: "google-client-test",
       GOOGLE_CLIENT_SECRET: "google-secret-test",
     } as unknown as Env;
-    const headers = {
-      authorization: `Bearer ${credential}`,
-      "content-type": "application/json",
-    };
-    const failure = await apiWorker.fetch(
-      new Request(
-        `https://briar-api.example/workers/${worker.worker.id}/update-handoff/fail`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            requestId: request.id,
-            error: "signed runtime failed its health check",
-          }),
-        },
-      ),
-      env,
+    const control = workerControlClient(env, credential);
+    await control.client.failWorkerUpdateHandoff(
+      {
+        workerId: worker.worker.id,
+        requestId: request.id,
+        error: "signed runtime failed its health check",
+      },
+      control.options,
     );
-    expect(failure.status).toBe(204);
 
     expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toMatchObject({
       id: request.id,
       handoffState: "failed",
       handoffError: "signed runtime failed its health check",
     });
-    const heartbeat = await apiWorker.fetch(
-      new Request(
-        `https://briar-api.example/workers/${worker.worker.id}/heartbeat`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            versions: { briar: "1.0.0" },
-            acceptingWork: true,
-            readinessState: "ready",
-          }),
-        },
-      ),
-      env,
-    );
-    expect(heartbeat.status).toBe(200);
-    expect(await heartbeat.json()).toMatchObject({
+    const heartbeat = await control.client.heartbeatWorker({
+      workerId: worker.worker.id,
+      runtime: workerRuntime("1.0.0"),
+      acceptingWork: true,
+      readinessState: WorkerReadinessState.READY,
+    }, control.options);
+    expect(heartbeat).toMatchObject({
       updateDirective: {
         id: request.id,
-        handoffState: "failed",
+        handoffState: ExecutionWorkerHandoffState.FAILED,
       },
       worker: {
         acceptingWork: false,
-        readiness: "needs_attention",
+        readiness: DashboardWorker_Readiness.NEEDS_ATTENTION,
       },
     });
     expect((await listOrganizationExecutionWorkers(

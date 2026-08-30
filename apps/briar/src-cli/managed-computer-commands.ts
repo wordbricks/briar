@@ -35,6 +35,7 @@ import {
   fetchManagedComputer,
   fetchManagedComputerSetupStatus,
 } from "./app-connect-client";
+import { createWorkerControlClient } from "./worker-control-client";
 export { managedComputerWorkerSupervisor } from "./managed-computer-supervisor";
 
 type SetupBindResponse = {
@@ -324,4 +325,54 @@ export async function managedComputerStatusCommand() {
     credential.managedComputerId,
   );
   console.log(JSON.stringify(status));
+}
+
+export async function managedComputerWorkerUpdateStatusCommand() {
+  const credential = await loadManagedComputerCredential(
+    credentialPathFromFlag(),
+  );
+  const workerId = value("--worker")?.trim();
+  const requestId = value("--request-id")?.trim();
+  const targetVersion = value("--target-version")?.trim();
+  if (!workerId || !requestId || !targetVersion) {
+    throw new Error("Worker update status requires worker, request ID, and target version");
+  }
+  const status = await createWorkerControlClient(
+    credential.apiOrigin,
+    credential.credential,
+  ).getUpdateHandoff(workerId, requestId);
+  if (
+    !status.update || status.update.id !== requestId ||
+    status.update.targetVersion !== targetVersion
+  ) {
+    throw new Error("Worker update status did not match the requested update");
+  }
+  if (status.update.status === "completed") {
+    console.log("completed");
+  } else if (
+    status.update.status === "cancelled" ||
+    status.update.handoffState === "failed"
+  ) {
+    console.log("failed");
+  } else if (status.ready && status.activeWorkCount === 0) {
+    console.log("ready");
+  } else {
+    console.log("pending");
+  }
+}
+
+export async function managedComputerWorkerUpdateFailCommand() {
+  const credential = await loadManagedComputerCredential(
+    credentialPathFromFlag(),
+  );
+  const workerId = value("--worker")?.trim();
+  const requestId = value("--request-id")?.trim();
+  const error = value("--error")?.trim();
+  if (!workerId || !requestId || !error) {
+    throw new Error("Worker update failure requires worker, request ID, and error");
+  }
+  await createWorkerControlClient(
+    credential.apiOrigin,
+    credential.credential,
+  ).failUpdateHandoff(workerId, requestId, error);
 }

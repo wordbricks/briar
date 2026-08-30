@@ -50,7 +50,6 @@
       "/invitations*",
       "/organizations*",
       "/projects*",
-      "/workers*",
       "/managed-computers*",
       "/worker-claims",
       "/merge-batch-claims*",

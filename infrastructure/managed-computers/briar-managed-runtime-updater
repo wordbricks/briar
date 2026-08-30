@@ -7,6 +7,7 @@ state_directory="${BRIAR_RUNTIME_UPDATE_STATE_DIR:-/var/lib/briar-runtime-update
 credential_file="${BRIAR_RUNTIME_CREDENTIAL_FILE:-/var/lib/briar/worker-credential.json}"
 public_key="${BRIAR_RUNTIME_UPDATE_PUBLIC_KEY:-$runtime_root/etc/runtime-updater.pub}"
 curl_binary="${BRIAR_RUNTIME_CURL:-/usr/bin/curl}"
+briar_binary="${BRIAR_RUNTIME_BRIAR:-$runtime_root/bin/briar}"
 minisign_binary="${BRIAR_RUNTIME_MINISIGN:-/usr/bin/minisign}"
 systemctl_binary="${BRIAR_RUNTIME_SYSTEMCTL:-/usr/bin/systemctl}"
 poll_seconds="${BRIAR_RUNTIME_UPDATE_POLL_SECONDS:-5}"
@@ -34,7 +35,7 @@ for directory in "$runtime_root" "$request_directory" "$state_directory"; do
     exit 1
   fi
 done
-for binary in "$curl_binary" "$minisign_binary" "$systemctl_binary"; do
+for binary in "$curl_binary" "$briar_binary" "$minisign_binary" "$systemctl_binary"; do
   if [[ "$binary" != /* || ! -x "$binary" ]]; then
     echo "runtime updater dependency is unavailable: $binary" >&2
     exit 1
@@ -87,55 +88,31 @@ write_result() {
   mv -f -- "$temporary" "$state_directory/last-result.json"
 }
 
-api_json() {
-  local method="$1"
-  local path="$2"
-  local output="$3"
-  local body_file="${4:-}"
-  local args=(
-    --fail --silent --show-error --location
-    --retry 3 --retry-all-errors --connect-timeout 20
-    --request "$method"
-    --header "Accept: application/json"
-    --header "Authorization: Bearer $credential"
-    --output "$output"
-  )
-  if [[ -n "$body_file" ]]; then
-    args+=(--header "Content-Type: application/json" --data-binary "@$body_file")
-  fi
-  "$curl_binary" "${args[@]}" "$api_origin$path"
-}
-
 update_status() {
-  local output="$1"
-  api_json GET \
-    "/workers/$worker_id/update-handoff/status?requestId=$request_id" \
-    "$output"
+  HOME=/root "$briar_binary" managed-computer worker-update-status \
+    --worker "$worker_id" \
+    --request-id "$request_id" \
+    --target-version "$target_version" \
+    --credential-file "$credential_file"
 }
 
 wait_for_handoff() {
   local deadline=$((SECONDS + handoff_timeout_seconds))
-  local response
-  response="$(mktemp "$state_directory/.handoff.XXXXXX")" || return 1
+  local status
   while (( SECONDS < deadline )); do
-    if update_status "$response" && jq -e \
-      --arg requestId "$request_id" \
-      --arg targetVersion "$target_version" \
-      '.requestId == $requestId and .targetVersion == $targetVersion and
-       .status == "requested" and .ready == true and .activeWorkCount == 0' \
-      "$response" >/dev/null; then
-      rm -f -- "$response"
-      return 0
-    fi
-    if jq -e '.handoffState == "failed" or .status == "cancelled"' \
-      "$response" >/dev/null 2>&1; then
-      rm -f -- "$response"
-      fail_update "Worker handoff did not reach a safe update boundary"
-      return 1
+    if status="$(update_status 2>/dev/null)"; then
+      case "$status" in
+        ready)
+          return 0
+          ;;
+        failed)
+          fail_update "Worker handoff did not reach a safe update boundary"
+          return 1
+          ;;
+      esac
     fi
     sleep "$poll_seconds"
   done
-  rm -f -- "$response"
   fail_update "Timed out waiting for active Worker sessions to hand off"
 }
 
@@ -260,19 +237,21 @@ activate_release() {
 
 wait_for_health() {
   local deadline=$((SECONDS + health_timeout_seconds))
-  local response
-  response="$(mktemp "$state_directory/.health.XXXXXX")" || return 1
+  local status
   while (( SECONDS < deadline )); do
-    if update_status "$response" && jq -e \
-      --arg requestId "$request_id" \
-      '.requestId == $requestId and .status == "completed"' \
-      "$response" >/dev/null; then
-      rm -f -- "$response"
-      return 0
+    if status="$(update_status 2>/dev/null)"; then
+      case "$status" in
+        completed)
+          return 0
+          ;;
+        failed)
+          fail_update "Updated Worker reported a failed handoff"
+          return 1
+          ;;
+      esac
     fi
     sleep "$poll_seconds"
   done
-  rm -f -- "$response"
   fail_update "Updated Worker did not report the target version in time"
 }
 
@@ -291,17 +270,11 @@ rollback_release() {
 
 report_failure() {
   local error="$1"
-  local body response
-  body="$(mktemp "$state_directory/.failure-body.XXXXXX")" || return 1
-  response="$(mktemp "$state_directory/.failure-response.XXXXXX")" || {
-    rm -f -- "$body"
-    return 1
-  }
-  jq -n --arg requestId "$request_id" --arg error "$error" \
-    '{requestId: $requestId, error: $error}' > "$body"
-  api_json POST "/workers/$worker_id/update-handoff/fail" "$response" "$body" \
-    >/dev/null 2>&1 || true
-  rm -f -- "$body" "$response"
+  HOME=/root "$briar_binary" managed-computer worker-update-fail \
+    --worker "$worker_id" \
+    --request-id "$request_id" \
+    --error "$error" \
+    --credential-file "$credential_file" >/dev/null 2>&1 || true
 }
 
 process_request() {
