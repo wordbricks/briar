@@ -7,7 +7,7 @@ use tauri_specta::Event as _;
 
 #[derive(Debug)]
 pub(super) enum AutoHuntClaimOutcome {
-    Claimed(AutoHuntClaimedRun),
+    Claimed(Box<AutoHuntClaimedRun>),
     NoWork,
 }
 
@@ -163,7 +163,7 @@ fn claimed_run(value: local_proto::LocalClaimedRun) -> Result<AutoHuntClaimedRun
 fn claim_outcome(value: local_proto::LocalClaimResult) -> Result<AutoHuntClaimOutcome, String> {
     match value.outcome {
         Some(local_proto::local_claim_result::Outcome::Claimed(value)) => {
-            claimed_run(*value).map(AutoHuntClaimOutcome::Claimed)
+            claimed_run(*value).map(|run| AutoHuntClaimOutcome::Claimed(Box::new(run)))
         }
         Some(local_proto::local_claim_result::Outcome::NoWork(_)) => {
             Ok(AutoHuntClaimOutcome::NoWork)
@@ -790,7 +790,7 @@ pub(super) async fn start_project_auto_hunt(
                 workspace_path,
                 workspace_error,
             } = match claim {
-                AutoHuntClaimOutcome::Claimed(claimed) => claimed,
+                AutoHuntClaimOutcome::Claimed(claimed) => *claimed,
                 AutoHuntClaimOutcome::NoWork => {
                     return Err(format!(
                         "요청한 이슈 {}을 claim할 수 없습니다. 대기 상태와 기존 실행 여부를 확인해 주세요.",
