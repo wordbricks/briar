@@ -469,11 +469,11 @@ fn agent_event(event: types_proto::NormalizedAgentEvent) -> Result<AgentEvent, S
 }
 
 fn event_direction(
-    direction: buffa::EnumValue<sidecar_proto::EventDirection>,
+    direction: buffa::EnumValue<types_proto::AgentEventDirection>,
 ) -> Result<AgentEventDirection, String> {
     match direction.as_known() {
-        Some(sidecar_proto::EventDirection::Client) => Ok(AgentEventDirection::Client),
-        Some(sidecar_proto::EventDirection::Server) => Ok(AgentEventDirection::Server),
+        Some(types_proto::AgentEventDirection::Client) => Ok(AgentEventDirection::Client),
+        Some(types_proto::AgentEventDirection::Server) => Ok(AgentEventDirection::Server),
         _ => Err("Runner가 알 수 없는 event direction을 보냈습니다.".to_string()),
     }
 }

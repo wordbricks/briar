@@ -20,6 +20,44 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+public nonisolated enum BriarTypes_AgentEventDirection: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case client // = 1
+  case server // = 2
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .client
+    case 2: self = .server
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .client: return 1
+    case .server: return 2
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarTypes_AgentEventDirection] = [
+    .unspecified,
+    .client,
+    .server,
+  ]
+
+}
+
 public nonisolated enum BriarTypes_AgentActivityKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -345,6 +383,10 @@ public nonisolated struct BriarTypes_TurnCompleted: Sendable {
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "briar.types.v1"
+
+nonisolated extension BriarTypes_AgentEventDirection: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AGENT_EVENT_DIRECTION_UNSPECIFIED\0\u{1}AGENT_EVENT_DIRECTION_CLIENT\0\u{1}AGENT_EVENT_DIRECTION_SERVER\0")
+}
 
 nonisolated extension BriarTypes_AgentActivityKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AGENT_ACTIVITY_KIND_UNSPECIFIED\0\u{1}AGENT_ACTIVITY_KIND_MESSAGE\0\u{1}AGENT_ACTIVITY_KIND_COMMAND\0\u{1}AGENT_ACTIVITY_KIND_FILE_CHANGE\0\u{1}AGENT_ACTIVITY_KIND_WEB_SEARCH\0\u{1}AGENT_ACTIVITY_KIND_TOOL\0")

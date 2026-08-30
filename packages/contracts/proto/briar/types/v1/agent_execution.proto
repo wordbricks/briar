@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package briar.types.v1;
+
+import "briar/types/v1/provider.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarTypes_";
+
+// How Briar identified the model associated with an execution observation.
+enum AgentExecutionModelSource {
+  AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED = 0;
+  AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED = 1;
+  AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG = 2;
+  AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK = 3;
+  AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN = 4;
+}
+
+// Provider-neutral totals for one completed execution attempt.
+message AgentExecutionMetrics {
+  optional uint64 input_tokens = 1;
+  optional uint64 output_tokens = 2;
+  optional uint64 cache_read_tokens = 3;
+  optional uint64 cache_write_tokens = 4;
+  optional uint64 reasoning_output_tokens = 5;
+  optional uint64 total_tokens = 6;
+  uint64 duration_ms = 7;
+}
+
+// An immutable, deduplicated provider usage observation. Cross-field token
+// invariants remain application-domain validation.
+message AgentUsageObservation {
+  string usage_key = 1;
+  optional string session_id = 2;
+  optional string scope_id = 3;
+  optional string turn_id = 4;
+  AgentProvider agent_provider = 5;
+  optional string model_provider = 6;
+  optional string model = 7;
+  optional string canonical_model = 8;
+  AgentExecutionModelSource model_source = 9;
+  string source = 10;
+  optional uint64 uncached_input_tokens = 11;
+  optional uint64 cache_read_tokens = 12;
+  optional uint64 cache_write_tokens = 13;
+  optional uint64 output_tokens = 14;
+  optional uint64 reasoning_output_tokens = 15;
+  optional uint64 total_tokens = 16;
+  google.protobuf.Timestamp observed_at = 17;
+}
+
+// An immutable provider-reported cost observation. amount_usd_ticks uses the
+// Briar fixed-point scale of 10^10 ticks per US dollar.
+message AgentCostObservation {
+  string cost_key = 1;
+  optional string usage_key = 2;
+  optional string session_id = 3;
+  optional string scope_id = 4;
+  optional string turn_id = 5;
+  AgentProvider agent_provider = 6;
+  optional string model_provider = 7;
+  optional string model = 8;
+  optional string canonical_model = 9;
+  AgentExecutionModelSource model_source = 10;
+  string source = 11;
+  uint64 amount_usd_ticks = 12;
+  google.protobuf.Timestamp observed_at = 13;
+}

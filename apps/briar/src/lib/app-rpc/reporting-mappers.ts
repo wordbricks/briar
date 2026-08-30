@@ -1,7 +1,6 @@
 import {
   AgentExecutionCostEstimateReason,
   AgentExecutionCostEstimateStatus,
-  AgentExecutionModelSource,
   AgentUsagePricingStatus,
   OrganizationUsageRange,
   ProjectUsagePeriod as ProtoProjectUsagePeriod,
@@ -17,6 +16,7 @@ import {
   type ListOrganizationUsageRunsResponse,
   type ListStatusTrayRunsResponse,
 } from "@briar/contracts/gen/briar/app/v1/reporting_pb";
+import { AgentExecutionModelSource } from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
 import type { UsageRangeDays } from "../agent-usage-overview";
 import type {
   AgentExecutionCostEstimate,

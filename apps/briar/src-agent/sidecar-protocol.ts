@@ -19,7 +19,6 @@ import {
   ApprovalRequestSchema,
   ApprovalResponseSchema,
   BlockReason,
-  EventDirection,
   ParentToRunnerSchema,
   ProviderEventSchema,
   RunBlockedSchema,
@@ -33,6 +32,7 @@ import {
   type RunnerToParent,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import {
+  AgentEventDirection,
   AgentActivityKind as ProtoAgentActivityKind,
   AgentActivityStatus as ProtoAgentActivityStatus,
   NormalizedAgentEventSchema,
@@ -118,12 +118,12 @@ const activityStatusFromProto = (
 };
 
 const eventDirectionFromProto = (
-  value: EventDirection,
+  value: AgentEventDirection,
 ): "client" | "server" => {
   switch (value) {
-    case EventDirection.CLIENT:
+    case AgentEventDirection.CLIENT:
       return "client";
-    case EventDirection.SERVER:
+    case AgentEventDirection.SERVER:
       return "server";
     default:
       throw new Error(`Unsupported sidecar event direction: ${value}`);
@@ -349,8 +349,8 @@ export function encodeSidecarRunnerOutput(
             : undefined,
           direction:
             output.direction === "client"
-              ? EventDirection.CLIENT
-              : EventDirection.SERVER,
+              ? AgentEventDirection.CLIENT
+              : AgentEventDirection.SERVER,
         }),
       };
       break;

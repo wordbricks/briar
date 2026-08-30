@@ -20,7 +20,7 @@ import {
 import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import type {
   AgentExecutionMetrics as AgentExecutionMetricsMessage,
-} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+} from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
 import type { StructuredAgentResult } from "../agent-result";
 import type {
   AgentExecutionMetrics,

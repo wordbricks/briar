@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package briar.app.v1;
 
+import "briar/app/v1/agent_transcript.proto";
 import "briar/app/v1/common.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/workflow.proto";
@@ -31,6 +32,7 @@ service AgentService {
   rpc GetProjectAgentSession(GetProjectAgentSessionRequest) returns (GetProjectAgentSessionResponse);
   rpc PutProjectAgentSession(PutProjectAgentSessionRequest) returns (PutProjectAgentSessionResponse);
   rpc RunProjectAgentTask(RunProjectAgentTaskRequest) returns (RunProjectAgentTaskResponse);
+  rpc GetProjectAgentTranscript(GetProjectAgentTranscriptRequest) returns (GetProjectAgentTranscriptResponse);
 }
 
 message ListOrganizationAgentsRequest {

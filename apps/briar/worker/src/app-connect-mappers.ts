@@ -28,7 +28,6 @@ import {
   InboxSessionMessageSchema,
 } from "@briar/contracts/gen/briar/app/v1/inbox_pb";
 import {
-  AgentExecutionMetricsSchema,
   ChannelNotificationSchema,
   ConversationNotificationSchema,
   DashboardRun_DispatchMode,
@@ -46,6 +45,7 @@ import {
   WorkerIcon_Kind,
   WorkerIconSchema,
 } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+import { AgentExecutionMetricsSchema } from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
 import {
   LinearSettingsSchema,
   ProjectExecutionWorkerPolicy_SelectionMode,

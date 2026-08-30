@@ -10245,6 +10245,2013 @@ pub const __UNREGISTER_MOBILE_PUSH_DEVICE_RESPONSE_JSON_ANY: ::buffa::type_regis
 };
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
+pub enum ProjectAgentWorkLogEntryStatus {
+    PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_UNSPECIFIED = 0i32,
+    PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_WRITING = 1i32,
+    PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_COMPLETED = 2i32,
+    PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_FAILED = 3i32,
+    PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_CANCELLED = 4i32,
+    PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_INTERRUPTED = 5i32,
+}
+impl ProjectAgentWorkLogEntryStatus {
+    ///Idiomatic alias for [`Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_WRITING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Writing: Self = Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_WRITING;
+    ///Idiomatic alias for [`Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_COMPLETED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Completed: Self = Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_COMPLETED;
+    ///Idiomatic alias for [`Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_FAILED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Failed: Self = Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_FAILED;
+    ///Idiomatic alias for [`Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_CANCELLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Cancelled: Self = Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_CANCELLED;
+    ///Idiomatic alias for [`Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_INTERRUPTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Interrupted: Self = Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_INTERRUPTED;
+}
+impl ::core::default::Default for ProjectAgentWorkLogEntryStatus {
+    fn default() -> Self {
+        Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for ProjectAgentWorkLogEntryStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ProjectAgentWorkLogEntryStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = ProjectAgentWorkLogEntryStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(ProjectAgentWorkLogEntryStatus)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<ProjectAgentWorkLogEntryStatus, E> {
+                <ProjectAgentWorkLogEntryStatus as ::buffa::Enumeration>::from_proto_name(
+                        v,
+                    )
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<ProjectAgentWorkLogEntryStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ProjectAgentWorkLogEntryStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<ProjectAgentWorkLogEntryStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ProjectAgentWorkLogEntryStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<ProjectAgentWorkLogEntryStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ProjectAgentWorkLogEntryStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for ProjectAgentWorkLogEntryStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(
+                    Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_UNSPECIFIED,
+                )
+            }
+            1i32 => {
+                ::core::option::Option::Some(
+                    Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_WRITING,
+                )
+            }
+            2i32 => {
+                ::core::option::Option::Some(
+                    Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_COMPLETED,
+                )
+            }
+            3i32 => {
+                ::core::option::Option::Some(
+                    Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_FAILED,
+                )
+            }
+            4i32 => {
+                ::core::option::Option::Some(
+                    Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_CANCELLED,
+                )
+            }
+            5i32 => {
+                ::core::option::Option::Some(
+                    Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_INTERRUPTED,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_UNSPECIFIED => {
+                "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_UNSPECIFIED"
+            }
+            Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_WRITING => {
+                "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_WRITING"
+            }
+            Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_COMPLETED => {
+                "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_COMPLETED"
+            }
+            Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_FAILED => {
+                "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_FAILED"
+            }
+            Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_CANCELLED => {
+                "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_CANCELLED"
+            }
+            Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_INTERRUPTED => {
+                "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_INTERRUPTED"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(
+                    Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_UNSPECIFIED,
+                )
+            }
+            "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_WRITING" => {
+                ::core::option::Option::Some(
+                    Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_WRITING,
+                )
+            }
+            "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_COMPLETED" => {
+                ::core::option::Option::Some(
+                    Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_COMPLETED,
+                )
+            }
+            "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_FAILED" => {
+                ::core::option::Option::Some(
+                    Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_FAILED,
+                )
+            }
+            "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_CANCELLED" => {
+                ::core::option::Option::Some(
+                    Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_CANCELLED,
+                )
+            }
+            "PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_INTERRUPTED" => {
+                ::core::option::Option::Some(
+                    Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_INTERRUPTED,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_UNSPECIFIED,
+            Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_WRITING,
+            Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_COMPLETED,
+            Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_FAILED,
+            Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_CANCELLED,
+            Self::PROJECT_AGENT_WORK_LOG_ENTRY_STATUS_INTERRUPTED,
+        ]
+    }
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct GetProjectAgentTranscriptRequest {
+    /// Field 1: `project_id`
+    #[serde(
+        rename = "projectId",
+        alias = "project_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub project_id: ::buffa::alloc::string::String,
+    #[serde(flatten)]
+    pub selector: ::core::option::Option<
+        __buffa::oneof::get_project_agent_transcript_request::Selector,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetProjectAgentTranscriptRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetProjectAgentTranscriptRequest")
+            .field("project_id", &self.project_id)
+            .field("selector", &self.selector)
+            .finish()
+    }
+}
+impl GetProjectAgentTranscriptRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetProjectAgentTranscriptRequest";
+}
+::buffa::impl_default_instance!(GetProjectAgentTranscriptRequest);
+impl ::buffa::MessageName for GetProjectAgentTranscriptRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "GetProjectAgentTranscriptRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.GetProjectAgentTranscriptRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetProjectAgentTranscriptRequest";
+}
+impl ::buffa::Message for GetProjectAgentTranscriptRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.project_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        }
+        if let ::core::option::Option::Some(ref v) = self.selector {
+            match v {
+                __buffa::oneof::get_project_agent_transcript_request::Selector::SessionId(
+                    x,
+                ) => {
+                    size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                }
+                __buffa::oneof::get_project_agent_transcript_request::Selector::LatestForRunId(
+                    x,
+                ) => {
+                    size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.project_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.selector {
+            match v {
+                __buffa::oneof::get_project_agent_transcript_request::Selector::SessionId(
+                    x,
+                ) => {
+                    ::buffa::types::put_string_field(2u32, x, buf);
+                }
+                __buffa::oneof::get_project_agent_transcript_request::Selector::LatestForRunId(
+                    x,
+                ) => {
+                    ::buffa::types::put_string_field(3u32, x, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.selector = ::core::option::Option::Some(
+                    __buffa::oneof::get_project_agent_transcript_request::Selector::SessionId(
+                        ::buffa::types::decode_string(buf)?,
+                    ),
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.selector = ::core::option::Option::Some(
+                    __buffa::oneof::get_project_agent_transcript_request::Selector::LatestForRunId(
+                        ::buffa::types::decode_string(buf)?,
+                    ),
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.project_id.clear();
+        self.selector = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetProjectAgentTranscriptRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.GetProjectAgentTranscriptRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for GetProjectAgentTranscriptRequest {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = GetProjectAgentTranscriptRequest;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct GetProjectAgentTranscriptRequest")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<GetProjectAgentTranscriptRequest, A::Error> {
+                let mut __f_project_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __oneof_selector: ::core::option::Option<
+                    __buffa::oneof::get_project_agent_transcript_request::Selector,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "projectId" | "project_id" => {
+                            __f_project_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "sessionId" | "session_id" => {
+                            let v: ::core::option::Option<
+                                ::buffa::alloc::string::String,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::alloc::string::String,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_selector.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'selector'",
+                                        ),
+                                    );
+                                }
+                                __oneof_selector = Some(
+                                    __buffa::oneof::get_project_agent_transcript_request::Selector::SessionId(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "latestForRunId" | "latest_for_run_id" => {
+                            let v: ::core::option::Option<
+                                ::buffa::alloc::string::String,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::alloc::string::String,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_selector.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'selector'",
+                                        ),
+                                    );
+                                }
+                                __oneof_selector = Some(
+                                    __buffa::oneof::get_project_agent_transcript_request::Selector::LatestForRunId(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <GetProjectAgentTranscriptRequest as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_project_id {
+                    __r.project_id = v;
+                }
+                __r.selector = __oneof_selector;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetProjectAgentTranscriptRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_PROJECT_AGENT_TRANSCRIPT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.GetProjectAgentTranscriptRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetProjectAgentTranscriptRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetProjectAgentTranscriptRequest>,
+    is_wkt: false,
+};
+pub mod get_project_agent_transcript_request {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::get_project_agent_transcript_request::Selector;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::get_project_agent_transcript_request::Selector as SelectorView;
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetProjectAgentTranscriptResponse {
+    /// Field 1: `session`
+    #[serde(
+        rename = "session",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub session: ::buffa::MessageField<
+        ProjectAgentTranscriptSession,
+        ::buffa::Inline<ProjectAgentTranscriptSession>,
+    >,
+    /// Field 2: `entries`
+    #[serde(
+        rename = "entries",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub entries: ::buffa::alloc::vec::Vec<ProjectAgentWorkLogEntry>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetProjectAgentTranscriptResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetProjectAgentTranscriptResponse")
+            .field("session", &self.session)
+            .field("entries", &self.entries)
+            .finish()
+    }
+}
+impl GetProjectAgentTranscriptResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetProjectAgentTranscriptResponse";
+}
+::buffa::impl_default_instance!(GetProjectAgentTranscriptResponse);
+impl ::buffa::MessageName for GetProjectAgentTranscriptResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "GetProjectAgentTranscriptResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.GetProjectAgentTranscriptResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetProjectAgentTranscriptResponse";
+}
+impl ::buffa::Message for GetProjectAgentTranscriptResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.session.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.session.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.entries {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.session.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.session.write_to(__cache, buf);
+        }
+        for v in &self.entries {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.session.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.entries.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.session = ::buffa::MessageField::none();
+        self.entries.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetProjectAgentTranscriptResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.GetProjectAgentTranscriptResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetProjectAgentTranscriptResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_PROJECT_AGENT_TRANSCRIPT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.GetProjectAgentTranscriptResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetProjectAgentTranscriptResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetProjectAgentTranscriptResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ProjectAgentTranscriptSession {
+    /// Field 1: `session_id`
+    #[serde(
+        rename = "sessionId",
+        alias = "session_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub session_id: ::buffa::alloc::string::String,
+    /// Field 2: `run_id`
+    #[serde(
+        rename = "runId",
+        alias = "run_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub run_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 3: `worker_id`
+    #[serde(
+        rename = "workerId",
+        alias = "worker_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub worker_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 4: `agent_provider`
+    #[serde(
+        rename = "agentProvider",
+        alias = "agent_provider",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub agent_provider: ::buffa::EnumValue<super::super::types::v1::AgentProvider>,
+    /// Field 5: `started_at`
+    #[serde(
+        rename = "startedAt",
+        alias = "started_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub started_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    /// Field 6: `last_event_at`
+    #[serde(
+        rename = "lastEventAt",
+        alias = "last_event_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub last_event_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ProjectAgentTranscriptSession {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ProjectAgentTranscriptSession")
+            .field("session_id", &self.session_id)
+            .field("run_id", &self.run_id)
+            .field("worker_id", &self.worker_id)
+            .field("agent_provider", &self.agent_provider)
+            .field("started_at", &self.started_at)
+            .field("last_event_at", &self.last_event_at)
+            .finish()
+    }
+}
+impl ProjectAgentTranscriptSession {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectAgentTranscriptSession";
+}
+impl ProjectAgentTranscriptSession {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::run_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_run_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.run_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::worker_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_worker_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.worker_id = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(ProjectAgentTranscriptSession);
+impl ::buffa::MessageName for ProjectAgentTranscriptSession {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ProjectAgentTranscriptSession";
+    const FULL_NAME: &'static str = "briar.app.v1.ProjectAgentTranscriptSession";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectAgentTranscriptSession";
+}
+impl ::buffa::Message for ProjectAgentTranscriptSession {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.session_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.session_id) as u64;
+        }
+        if let Some(ref v) = self.run_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.worker_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        {
+            let val = self.agent_provider.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.started_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.started_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.last_event_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.last_event_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.session_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.session_id, buf);
+        }
+        if let Some(ref v) = self.run_id {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        if let Some(ref v) = self.worker_id {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        {
+            let val = self.agent_provider.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        if self.started_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.started_at.write_to(__cache, buf);
+        }
+        if self.last_event_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.last_event_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.session_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.run_id.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .worker_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.agent_provider = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.started_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.last_event_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.session_id.clear();
+        self.run_id = ::core::option::Option::None;
+        self.worker_id = ::core::option::Option::None;
+        self.agent_provider = ::buffa::EnumValue::from(0);
+        self.started_at = ::buffa::MessageField::none();
+        self.last_event_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ProjectAgentTranscriptSession {
+    const PROTO_FQN: &'static str = "briar.app.v1.ProjectAgentTranscriptSession";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ProjectAgentTranscriptSession {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PROJECT_AGENT_TRANSCRIPT_SESSION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ProjectAgentTranscriptSession",
+    to_json: ::buffa::type_registry::any_to_json::<ProjectAgentTranscriptSession>,
+    from_json: ::buffa::type_registry::any_from_json::<ProjectAgentTranscriptSession>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct ProjectAgentWorkLogEntry {
+    /// Field 1: `entry_id`
+    #[serde(
+        rename = "entryId",
+        alias = "entry_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub entry_id: ::buffa::alloc::string::String,
+    /// Field 2: `sequence`
+    #[serde(
+        rename = "sequence",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub sequence: u64,
+    /// Field 3: `updated_sequence`
+    #[serde(
+        rename = "updatedSequence",
+        alias = "updated_sequence",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub updated_sequence: u64,
+    /// Field 4: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<ProjectAgentWorkLogEntryStatus>,
+    /// Field 5: `started_at`
+    #[serde(
+        rename = "startedAt",
+        alias = "started_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub started_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    /// Field 6: `updated_at`
+    #[serde(
+        rename = "updatedAt",
+        alias = "updated_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub updated_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    /// Field 7: `completed_at`
+    #[serde(
+        rename = "completedAt",
+        alias = "completed_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub completed_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    #[serde(flatten)]
+    pub entry: ::core::option::Option<
+        __buffa::oneof::project_agent_work_log_entry::Entry,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ProjectAgentWorkLogEntry {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ProjectAgentWorkLogEntry")
+            .field("entry_id", &self.entry_id)
+            .field("sequence", &self.sequence)
+            .field("updated_sequence", &self.updated_sequence)
+            .field("status", &self.status)
+            .field("started_at", &self.started_at)
+            .field("updated_at", &self.updated_at)
+            .field("completed_at", &self.completed_at)
+            .field("entry", &self.entry)
+            .finish()
+    }
+}
+impl ProjectAgentWorkLogEntry {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectAgentWorkLogEntry";
+}
+::buffa::impl_default_instance!(ProjectAgentWorkLogEntry);
+impl ::buffa::MessageName for ProjectAgentWorkLogEntry {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ProjectAgentWorkLogEntry";
+    const FULL_NAME: &'static str = "briar.app.v1.ProjectAgentWorkLogEntry";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectAgentWorkLogEntry";
+}
+impl ::buffa::Message for ProjectAgentWorkLogEntry {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.entry_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.entry_id) as u64;
+        }
+        if self.sequence != 0u64 {
+            size += 1u64 + ::buffa::types::uint64_encoded_len(self.sequence) as u64;
+        }
+        if self.updated_sequence != 0u64 {
+            size
+                += 1u64
+                    + ::buffa::types::uint64_encoded_len(self.updated_sequence) as u64;
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.started_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.started_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.updated_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.updated_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.completed_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.completed_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let ::core::option::Option::Some(ref v) = self.entry {
+            match v {
+                __buffa::oneof::project_agent_work_log_entry::Entry::Message(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::project_agent_work_log_entry::Entry::Activity(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.entry_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.entry_id, buf);
+        }
+        if self.sequence != 0u64 {
+            ::buffa::types::put_uint64_field(2u32, self.sequence, buf);
+        }
+        if self.updated_sequence != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.updated_sequence, buf);
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        if self.started_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.started_at.write_to(__cache, buf);
+        }
+        if self.updated_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.updated_at.write_to(__cache, buf);
+        }
+        if self.completed_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                7u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.completed_at.write_to(__cache, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.entry {
+            match v {
+                __buffa::oneof::project_agent_work_log_entry::Entry::Message(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::project_agent_work_log_entry::Entry::Activity(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        11u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.entry_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.sequence = ::buffa::types::decode_uint64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.updated_sequence = ::buffa::types::decode_uint64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.started_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.updated_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.completed_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::project_agent_work_log_entry::Entry::Message(
+                        ref mut existing,
+                    ),
+                ) = self.entry
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.entry = ::core::option::Option::Some(
+                        __buffa::oneof::project_agent_work_log_entry::Entry::Message(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::project_agent_work_log_entry::Entry::Activity(
+                        ref mut existing,
+                    ),
+                ) = self.entry
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.entry = ::core::option::Option::Some(
+                        __buffa::oneof::project_agent_work_log_entry::Entry::Activity(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.entry_id.clear();
+        self.sequence = 0u64;
+        self.updated_sequence = 0u64;
+        self.status = ::buffa::EnumValue::from(0);
+        self.started_at = ::buffa::MessageField::none();
+        self.updated_at = ::buffa::MessageField::none();
+        self.completed_at = ::buffa::MessageField::none();
+        self.entry = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ProjectAgentWorkLogEntry {
+    const PROTO_FQN: &'static str = "briar.app.v1.ProjectAgentWorkLogEntry";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for ProjectAgentWorkLogEntry {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = ProjectAgentWorkLogEntry;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct ProjectAgentWorkLogEntry")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<ProjectAgentWorkLogEntry, A::Error> {
+                let mut __f_entry_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_sequence: ::core::option::Option<u64> = None;
+                let mut __f_updated_sequence: ::core::option::Option<u64> = None;
+                let mut __f_status: ::core::option::Option<
+                    ::buffa::EnumValue<ProjectAgentWorkLogEntryStatus>,
+                > = None;
+                let mut __f_started_at: ::core::option::Option<
+                    ::buffa::MessageField<
+                        ::buffa_types::google::protobuf::Timestamp,
+                        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                    >,
+                > = None;
+                let mut __f_updated_at: ::core::option::Option<
+                    ::buffa::MessageField<
+                        ::buffa_types::google::protobuf::Timestamp,
+                        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                    >,
+                > = None;
+                let mut __f_completed_at: ::core::option::Option<
+                    ::buffa::MessageField<
+                        ::buffa_types::google::protobuf::Timestamp,
+                        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                    >,
+                > = None;
+                let mut __oneof_entry: ::core::option::Option<
+                    __buffa::oneof::project_agent_work_log_entry::Entry,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "entryId" | "entry_id" => {
+                            __f_entry_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "sequence" => {
+                            __f_sequence = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u64, D::Error> {
+                                        ::buffa::json_helpers::uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "updatedSequence" | "updated_sequence" => {
+                            __f_updated_sequence = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u64, D::Error> {
+                                        ::buffa::json_helpers::uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "status" => {
+                            __f_status = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::EnumValue<
+                                        ProjectAgentWorkLogEntryStatus,
+                                    >;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::EnumValue<ProjectAgentWorkLogEntryStatus>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_enum::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "startedAt" | "started_at" => {
+                            __f_started_at = Some(
+                                map
+                                    .next_value::<
+                                        ::buffa::MessageField<
+                                            ::buffa_types::google::protobuf::Timestamp,
+                                            ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                                        >,
+                                    >()?,
+                            );
+                        }
+                        "updatedAt" | "updated_at" => {
+                            __f_updated_at = Some(
+                                map
+                                    .next_value::<
+                                        ::buffa::MessageField<
+                                            ::buffa_types::google::protobuf::Timestamp,
+                                            ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                                        >,
+                                    >()?,
+                            );
+                        }
+                        "completedAt" | "completed_at" => {
+                            __f_completed_at = Some(
+                                map
+                                    .next_value::<
+                                        ::buffa::MessageField<
+                                            ::buffa_types::google::protobuf::Timestamp,
+                                            ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                                        >,
+                                    >()?,
+                            );
+                        }
+                        "message" => {
+                            let v: ::core::option::Option<ProjectAgentWorkLogMessage> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ProjectAgentWorkLogMessage,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_entry.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'entry'",
+                                        ),
+                                    );
+                                }
+                                __oneof_entry = Some(
+                                    __buffa::oneof::project_agent_work_log_entry::Entry::Message(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "activity" => {
+                            let v: ::core::option::Option<ProjectAgentWorkLogActivity> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ProjectAgentWorkLogActivity,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_entry.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'entry'",
+                                        ),
+                                    );
+                                }
+                                __oneof_entry = Some(
+                                    __buffa::oneof::project_agent_work_log_entry::Entry::Activity(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <ProjectAgentWorkLogEntry as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_entry_id {
+                    __r.entry_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_sequence {
+                    __r.sequence = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_updated_sequence {
+                    __r.updated_sequence = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_status {
+                    __r.status = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_started_at {
+                    __r.started_at = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_updated_at {
+                    __r.updated_at = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_completed_at {
+                    __r.completed_at = v;
+                }
+                __r.entry = __oneof_entry;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ProjectAgentWorkLogEntry {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PROJECT_AGENT_WORK_LOG_ENTRY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ProjectAgentWorkLogEntry",
+    to_json: ::buffa::type_registry::any_to_json::<ProjectAgentWorkLogEntry>,
+    from_json: ::buffa::type_registry::any_from_json::<ProjectAgentWorkLogEntry>,
+    is_wkt: false,
+};
+pub mod project_agent_work_log_entry {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::project_agent_work_log_entry::Entry;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::project_agent_work_log_entry::Entry as EntryView;
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ProjectAgentWorkLogMessage {
+    /// Field 1: `phase`
+    #[serde(rename = "phase", skip_serializing_if = "::core::option::Option::is_none")]
+    pub phase: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 2: `text`
+    #[serde(
+        rename = "text",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub text: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ProjectAgentWorkLogMessage {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ProjectAgentWorkLogMessage")
+            .field("phase", &self.phase)
+            .field("text", &self.text)
+            .finish()
+    }
+}
+impl ProjectAgentWorkLogMessage {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectAgentWorkLogMessage";
+}
+impl ProjectAgentWorkLogMessage {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::phase`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_phase(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.phase = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(ProjectAgentWorkLogMessage);
+impl ::buffa::MessageName for ProjectAgentWorkLogMessage {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ProjectAgentWorkLogMessage";
+    const FULL_NAME: &'static str = "briar.app.v1.ProjectAgentWorkLogMessage";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectAgentWorkLogMessage";
+}
+impl ::buffa::Message for ProjectAgentWorkLogMessage {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if let Some(ref v) = self.phase {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if !self.text.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.text) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(ref v) = self.phase {
+            ::buffa::types::put_string_field(1u32, v, buf);
+        }
+        if !self.text.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.text, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.phase.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.text, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.phase = ::core::option::Option::None;
+        self.text.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ProjectAgentWorkLogMessage {
+    const PROTO_FQN: &'static str = "briar.app.v1.ProjectAgentWorkLogMessage";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ProjectAgentWorkLogMessage {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PROJECT_AGENT_WORK_LOG_MESSAGE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ProjectAgentWorkLogMessage",
+    to_json: ::buffa::type_registry::any_to_json::<ProjectAgentWorkLogMessage>,
+    from_json: ::buffa::type_registry::any_from_json::<ProjectAgentWorkLogMessage>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ProjectAgentWorkLogActivity {
+    /// Field 1: `kind`
+    #[serde(
+        rename = "kind",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub kind: ::buffa::EnumValue<super::super::types::v1::AgentActivityKind>,
+    /// Field 2: `title`
+    #[serde(
+        rename = "title",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub title: ::buffa::alloc::string::String,
+    /// Field 3: `text`
+    #[serde(
+        rename = "text",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub text: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ProjectAgentWorkLogActivity {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ProjectAgentWorkLogActivity")
+            .field("kind", &self.kind)
+            .field("title", &self.title)
+            .field("text", &self.text)
+            .finish()
+    }
+}
+impl ProjectAgentWorkLogActivity {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectAgentWorkLogActivity";
+}
+::buffa::impl_default_instance!(ProjectAgentWorkLogActivity);
+impl ::buffa::MessageName for ProjectAgentWorkLogActivity {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ProjectAgentWorkLogActivity";
+    const FULL_NAME: &'static str = "briar.app.v1.ProjectAgentWorkLogActivity";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectAgentWorkLogActivity";
+}
+impl ::buffa::Message for ProjectAgentWorkLogActivity {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        {
+            let val = self.kind.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if !self.title.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.title) as u64;
+        }
+        if !self.text.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.text) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.kind.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.title.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.title, buf);
+        }
+        if !self.text.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.text, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.kind = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.title, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.text, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.kind = ::buffa::EnumValue::from(0);
+        self.title.clear();
+        self.text.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ProjectAgentWorkLogActivity {
+    const PROTO_FQN: &'static str = "briar.app.v1.ProjectAgentWorkLogActivity";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ProjectAgentWorkLogActivity {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PROJECT_AGENT_WORK_LOG_ACTIVITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ProjectAgentWorkLogActivity",
+    to_json: ::buffa::type_registry::any_to_json::<ProjectAgentWorkLogActivity>,
+    from_json: ::buffa::type_registry::any_from_json::<ProjectAgentWorkLogActivity>,
+    is_wkt: false,
+};
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
 pub enum ProjectAgentScheduleRecurrence {
     PROJECT_AGENT_SCHEDULE_RECURRENCE_UNSPECIFIED = 0i32,
     PROJECT_AGENT_SCHEDULE_RECURRENCE_DAILY = 1i32,
@@ -75084,8 +77091,8 @@ pub struct DashboardRun {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub execution_metrics: ::buffa::MessageField<
-        AgentExecutionMetrics,
-        ::buffa::Inline<AgentExecutionMetrics>,
+        super::super::types::v1::AgentExecutionMetrics,
+        ::buffa::Inline<super::super::types::v1::AgentExecutionMetrics>,
     >,
     /// Field 59: `target_sha`
     #[serde(
@@ -78038,327 +80045,6 @@ pub const __WAITING_CHECKPOINT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
     type_url: "type.googleapis.com/briar.app.v1.WaitingCheckpoint",
     to_json: ::buffa::type_registry::any_to_json::<WaitingCheckpoint>,
     from_json: ::buffa::type_registry::any_from_json::<WaitingCheckpoint>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct AgentExecutionMetrics {
-    /// Field 1: `input_tokens`
-    #[serde(
-        rename = "inputTokens",
-        alias = "input_tokens",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub input_tokens: ::core::option::Option<u64>,
-    /// Field 2: `output_tokens`
-    #[serde(
-        rename = "outputTokens",
-        alias = "output_tokens",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub output_tokens: ::core::option::Option<u64>,
-    /// Field 3: `cache_read_tokens`
-    #[serde(
-        rename = "cacheReadTokens",
-        alias = "cache_read_tokens",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub cache_read_tokens: ::core::option::Option<u64>,
-    /// Field 4: `cache_write_tokens`
-    #[serde(
-        rename = "cacheWriteTokens",
-        alias = "cache_write_tokens",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub cache_write_tokens: ::core::option::Option<u64>,
-    /// Field 5: `reasoning_output_tokens`
-    #[serde(
-        rename = "reasoningOutputTokens",
-        alias = "reasoning_output_tokens",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub reasoning_output_tokens: ::core::option::Option<u64>,
-    /// Field 6: `total_tokens`
-    #[serde(
-        rename = "totalTokens",
-        alias = "total_tokens",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub total_tokens: ::core::option::Option<u64>,
-    /// Field 7: `duration_ms`
-    #[serde(
-        rename = "durationMs",
-        alias = "duration_ms",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub duration_ms: u64,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for AgentExecutionMetrics {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("AgentExecutionMetrics")
-            .field("input_tokens", &self.input_tokens)
-            .field("output_tokens", &self.output_tokens)
-            .field("cache_read_tokens", &self.cache_read_tokens)
-            .field("cache_write_tokens", &self.cache_write_tokens)
-            .field("reasoning_output_tokens", &self.reasoning_output_tokens)
-            .field("total_tokens", &self.total_tokens)
-            .field("duration_ms", &self.duration_ms)
-            .finish()
-    }
-}
-impl AgentExecutionMetrics {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.AgentExecutionMetrics";
-}
-impl AgentExecutionMetrics {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::input_tokens`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_input_tokens(mut self, value: u64) -> Self {
-        self.input_tokens = Some(value);
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::output_tokens`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_output_tokens(mut self, value: u64) -> Self {
-        self.output_tokens = Some(value);
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::cache_read_tokens`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_cache_read_tokens(mut self, value: u64) -> Self {
-        self.cache_read_tokens = Some(value);
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::cache_write_tokens`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_cache_write_tokens(mut self, value: u64) -> Self {
-        self.cache_write_tokens = Some(value);
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::reasoning_output_tokens`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_reasoning_output_tokens(mut self, value: u64) -> Self {
-        self.reasoning_output_tokens = Some(value);
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::total_tokens`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_total_tokens(mut self, value: u64) -> Self {
-        self.total_tokens = Some(value);
-        self
-    }
-}
-::buffa::impl_default_instance!(AgentExecutionMetrics);
-impl ::buffa::MessageName for AgentExecutionMetrics {
-    const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "AgentExecutionMetrics";
-    const FULL_NAME: &'static str = "briar.app.v1.AgentExecutionMetrics";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.AgentExecutionMetrics";
-}
-impl ::buffa::Message for AgentExecutionMetrics {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if let Some(v) = self.input_tokens {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(v) as u64;
-        }
-        if let Some(v) = self.output_tokens {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(v) as u64;
-        }
-        if let Some(v) = self.cache_read_tokens {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(v) as u64;
-        }
-        if let Some(v) = self.cache_write_tokens {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(v) as u64;
-        }
-        if let Some(v) = self.reasoning_output_tokens {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(v) as u64;
-        }
-        if let Some(v) = self.total_tokens {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(v) as u64;
-        }
-        if self.duration_ms != 0u64 {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(self.duration_ms) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if let Some(v) = self.input_tokens {
-            ::buffa::types::put_uint64_field(1u32, v, buf);
-        }
-        if let Some(v) = self.output_tokens {
-            ::buffa::types::put_uint64_field(2u32, v, buf);
-        }
-        if let Some(v) = self.cache_read_tokens {
-            ::buffa::types::put_uint64_field(3u32, v, buf);
-        }
-        if let Some(v) = self.cache_write_tokens {
-            ::buffa::types::put_uint64_field(4u32, v, buf);
-        }
-        if let Some(v) = self.reasoning_output_tokens {
-            ::buffa::types::put_uint64_field(5u32, v, buf);
-        }
-        if let Some(v) = self.total_tokens {
-            ::buffa::types::put_uint64_field(6u32, v, buf);
-        }
-        if self.duration_ms != 0u64 {
-            ::buffa::types::put_uint64_field(7u32, self.duration_ms, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.input_tokens = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint64(buf)?,
-                );
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.output_tokens = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint64(buf)?,
-                );
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.cache_read_tokens = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint64(buf)?,
-                );
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.cache_write_tokens = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint64(buf)?,
-                );
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.reasoning_output_tokens = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint64(buf)?,
-                );
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.total_tokens = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint64(buf)?,
-                );
-            }
-            7u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.duration_ms = ::buffa::types::decode_uint64(buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.input_tokens = ::core::option::Option::None;
-        self.output_tokens = ::core::option::Option::None;
-        self.cache_read_tokens = ::core::option::Option::None;
-        self.cache_write_tokens = ::core::option::Option::None;
-        self.reasoning_output_tokens = ::core::option::Option::None;
-        self.total_tokens = ::core::option::Option::None;
-        self.duration_ms = 0u64;
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for AgentExecutionMetrics {
-    const PROTO_FQN: &'static str = "briar.app.v1.AgentExecutionMetrics";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for AgentExecutionMetrics {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __AGENT_EXECUTION_METRICS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.AgentExecutionMetrics",
-    to_json: ::buffa::type_registry::any_to_json::<AgentExecutionMetrics>,
-    from_json: ::buffa::type_registry::any_from_json::<AgentExecutionMetrics>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -112975,215 +114661,6 @@ impl ::buffa::Enumeration for ProjectUsagePeriod {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
-pub enum AgentExecutionModelSource {
-    AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED = 0i32,
-    AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED = 1i32,
-    AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG = 2i32,
-    AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK = 3i32,
-    AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN = 4i32,
-}
-impl AgentExecutionModelSource {
-    ///Idiomatic alias for [`Self::AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Unspecified: Self = Self::AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED;
-    ///Idiomatic alias for [`Self::AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const ProviderReported: Self = Self::AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED;
-    ///Idiomatic alias for [`Self::AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const ProviderConfig: Self = Self::AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG;
-    ///Idiomatic alias for [`Self::AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const ConfiguredFallback: Self = Self::AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK;
-    ///Idiomatic alias for [`Self::AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Unknown: Self = Self::AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN;
-}
-impl ::core::default::Default for AgentExecutionModelSource {
-    fn default() -> Self {
-        Self::AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED
-    }
-}
-impl ::serde::Serialize for AgentExecutionModelSource {
-    fn serialize<S: ::serde::Serializer>(
-        &self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        s.serialize_str(::buffa::Enumeration::proto_name(self))
-    }
-}
-impl<'de> ::serde::Deserialize<'de> for AgentExecutionModelSource {
-    fn deserialize<D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        struct _V;
-        impl ::serde::de::Visitor<'_> for _V {
-            type Value = AgentExecutionModelSource;
-            fn expecting(
-                &self,
-                f: &mut ::core::fmt::Formatter<'_>,
-            ) -> ::core::fmt::Result {
-                f.write_str(
-                    concat!(
-                        "a string, integer, or null for ",
-                        stringify!(AgentExecutionModelSource)
-                    ),
-                )
-            }
-            fn visit_str<E: ::serde::de::Error>(
-                self,
-                v: &str,
-            ) -> ::core::result::Result<AgentExecutionModelSource, E> {
-                <AgentExecutionModelSource as ::buffa::Enumeration>::from_proto_name(v)
-                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
-            }
-            fn visit_i64<E: ::serde::de::Error>(
-                self,
-                v: i64,
-            ) -> ::core::result::Result<AgentExecutionModelSource, E> {
-                let v32 = i32::try_from(v)
-                    .map_err(|_| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
-                        )
-                    })?;
-                <AgentExecutionModelSource as ::buffa::Enumeration>::from_i32(v32)
-                    .ok_or_else(|| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("unknown enum value {v32}"),
-                        )
-                    })
-            }
-            fn visit_u64<E: ::serde::de::Error>(
-                self,
-                v: u64,
-            ) -> ::core::result::Result<AgentExecutionModelSource, E> {
-                let v32 = i32::try_from(v)
-                    .map_err(|_| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
-                        )
-                    })?;
-                <AgentExecutionModelSource as ::buffa::Enumeration>::from_i32(v32)
-                    .ok_or_else(|| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("unknown enum value {v32}"),
-                        )
-                    })
-            }
-            fn visit_unit<E: ::serde::de::Error>(
-                self,
-            ) -> ::core::result::Result<AgentExecutionModelSource, E> {
-                ::core::result::Result::Ok(::core::default::Default::default())
-            }
-        }
-        d.deserialize_any(_V)
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for AgentExecutionModelSource {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-impl ::buffa::Enumeration for AgentExecutionModelSource {
-    fn from_i32(value: i32) -> ::core::option::Option<Self> {
-        match value {
-            0i32 => {
-                ::core::option::Option::Some(
-                    Self::AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED,
-                )
-            }
-            1i32 => {
-                ::core::option::Option::Some(
-                    Self::AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED,
-                )
-            }
-            2i32 => {
-                ::core::option::Option::Some(
-                    Self::AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG,
-                )
-            }
-            3i32 => {
-                ::core::option::Option::Some(
-                    Self::AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK,
-                )
-            }
-            4i32 => {
-                ::core::option::Option::Some(Self::AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN)
-            }
-            _ => ::core::option::Option::None,
-        }
-    }
-    fn to_i32(&self) -> i32 {
-        *self as i32
-    }
-    fn proto_name(&self) -> &'static str {
-        match self {
-            Self::AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED => {
-                "AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED"
-            }
-            Self::AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED => {
-                "AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED"
-            }
-            Self::AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG => {
-                "AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG"
-            }
-            Self::AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK => {
-                "AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK"
-            }
-            Self::AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN => {
-                "AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN"
-            }
-        }
-    }
-    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
-        match name {
-            "AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED" => {
-                ::core::option::Option::Some(
-                    Self::AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED,
-                )
-            }
-            "AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED" => {
-                ::core::option::Option::Some(
-                    Self::AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED,
-                )
-            }
-            "AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG" => {
-                ::core::option::Option::Some(
-                    Self::AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG,
-                )
-            }
-            "AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK" => {
-                ::core::option::Option::Some(
-                    Self::AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK,
-                )
-            }
-            "AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN" => {
-                ::core::option::Option::Some(Self::AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN)
-            }
-            _ => ::core::option::Option::None,
-        }
-    }
-    fn values() -> &'static [Self] {
-        &[
-            Self::AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED,
-            Self::AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED,
-            Self::AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG,
-            Self::AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK,
-            Self::AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN,
-        ]
-    }
-}
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(i32)]
 pub enum AgentUsagePricingStatus {
     AGENT_USAGE_PRICING_STATUS_UNSPECIFIED = 0i32,
     AGENT_USAGE_PRICING_STATUS_LIVE = 1i32,
@@ -114457,7 +115934,9 @@ pub struct AgentUsageRecord {
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub model_source: ::buffa::EnumValue<AgentExecutionModelSource>,
+    pub model_source: ::buffa::EnumValue<
+        super::super::types::v1::AgentExecutionModelSource,
+    >,
     /// Field 16: `source`
     #[serde(
         rename = "source",
@@ -115329,7 +116808,9 @@ pub struct AgentUsageCostRecord {
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub model_source: ::buffa::EnumValue<AgentExecutionModelSource>,
+    pub model_source: ::buffa::EnumValue<
+        super::super::types::v1::AgentExecutionModelSource,
+    >,
     /// Field 17: `source`
     #[serde(
         rename = "source",
@@ -116057,7 +117538,9 @@ pub struct AgentUsageEstimatedCostRecord {
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub model_source: ::buffa::EnumValue<AgentExecutionModelSource>,
+    pub model_source: ::buffa::EnumValue<
+        super::super::types::v1::AgentExecutionModelSource,
+    >,
     /// Field 16: `observed_at`
     #[serde(
         rename = "observedAt",
@@ -116659,8 +118142,8 @@ pub struct AgentUsageRun {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub execution_metrics: ::buffa::MessageField<
-        AgentExecutionMetrics,
-        ::buffa::Inline<AgentExecutionMetrics>,
+        super::super::types::v1::AgentExecutionMetrics,
+        ::buffa::Inline<super::super::types::v1::AgentExecutionMetrics>,
     >,
     /// Field 5: `claimed_by`
     #[serde(
@@ -133721,6 +135204,2639 @@ pub mod __buffa {
             type ViewHandle = UnregisterMobilePushDeviceResponseOwnedView;
         }
         impl ::serde::Serialize for UnregisterMobilePushDeviceResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct GetProjectAgentTranscriptRequestView<'a> {
+            /// Field 1: `project_id`
+            pub project_id: &'a str,
+            pub selector: ::core::option::Option<
+                super::super::__buffa::view::oneof::get_project_agent_transcript_request::Selector<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetProjectAgentTranscriptRequestView<'a> {
+            type Owned = super::super::GetProjectAgentTranscriptRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.selector = Some(
+                            super::super::__buffa::view::oneof::get_project_agent_transcript_request::Selector::SessionId(
+                                ::buffa::types::borrow_str(&mut cur)?,
+                            ),
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.selector = Some(
+                            super::super::__buffa::view::oneof::get_project_agent_transcript_request::Selector::LatestForRunId(
+                                ::buffa::types::borrow_str(&mut cur)?,
+                            ),
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetProjectAgentTranscriptRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetProjectAgentTranscriptRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetProjectAgentTranscriptRequest {
+                    project_id: self.project_id.to_string(),
+                    selector: self
+                        .selector
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::get_project_agent_transcript_request::Selector::SessionId(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::get_project_agent_transcript_request::Selector::SessionId(
+                                    v.to_string(),
+                                )
+                            }
+                            super::super::__buffa::view::oneof::get_project_agent_transcript_request::Selector::LatestForRunId(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::get_project_agent_transcript_request::Selector::LatestForRunId(
+                                    v.to_string(),
+                                )
+                            }
+                        }),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetProjectAgentTranscriptRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.project_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.project_id)
+                                as u64;
+                }
+                if let ::core::option::Option::Some(ref v) = self.selector {
+                    match v {
+                        super::super::__buffa::view::oneof::get_project_agent_transcript_request::Selector::SessionId(
+                            x,
+                        ) => {
+                            size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                        }
+                        super::super::__buffa::view::oneof::get_project_agent_transcript_request::Selector::LatestForRunId(
+                            x,
+                        ) => {
+                            size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.project_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                }
+                if let ::core::option::Option::Some(ref v) = self.selector {
+                    match v {
+                        super::super::__buffa::view::oneof::get_project_agent_transcript_request::Selector::SessionId(
+                            x,
+                        ) => {
+                            ::buffa::types::put_string_field(2u32, x, buf);
+                        }
+                        super::super::__buffa::view::oneof::get_project_agent_transcript_request::Selector::LatestForRunId(
+                            x,
+                        ) => {
+                            ::buffa::types::put_string_field(3u32, x, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetProjectAgentTranscriptRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
+                    __map.serialize_entry("projectId", self.project_id)?;
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.selector {
+                    match __ov {
+                        super::super::__buffa::view::oneof::get_project_agent_transcript_request::Selector::SessionId(
+                            v,
+                        ) => {
+                            __map.serialize_entry("sessionId", v)?;
+                        }
+                        super::super::__buffa::view::oneof::get_project_agent_transcript_request::Selector::LatestForRunId(
+                            v,
+                        ) => {
+                            __map.serialize_entry("latestForRunId", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetProjectAgentTranscriptRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "GetProjectAgentTranscriptRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.GetProjectAgentTranscriptRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetProjectAgentTranscriptRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetProjectAgentTranscriptRequestView);
+        ::buffa::impl_view_reborrow!(GetProjectAgentTranscriptRequestView);
+        /** Self-contained, `'static` owned view of a `GetProjectAgentTranscriptRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetProjectAgentTranscriptRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetProjectAgentTranscriptRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetProjectAgentTranscriptRequestOwnedView(
+            ::buffa::OwnedView<GetProjectAgentTranscriptRequestView<'static>>,
+        );
+        impl GetProjectAgentTranscriptRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetProjectAgentTranscriptRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetProjectAgentTranscriptRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetProjectAgentTranscriptRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetProjectAgentTranscriptRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetProjectAgentTranscriptRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetProjectAgentTranscriptRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::GetProjectAgentTranscriptRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `project_id`
+            #[must_use]
+            pub fn project_id(&self) -> &'_ str {
+                self.0.reborrow().project_id
+            }
+            /// Oneof `selector`.
+            #[must_use]
+            pub fn selector(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::get_project_agent_transcript_request::Selector<
+                    '_,
+                >,
+            > {
+                self.0.reborrow().selector.as_ref()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetProjectAgentTranscriptRequestView<'static>>,
+        > for GetProjectAgentTranscriptRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetProjectAgentTranscriptRequestView<'static>>,
+            ) -> Self {
+                GetProjectAgentTranscriptRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetProjectAgentTranscriptRequestOwnedView>
+        for ::buffa::OwnedView<GetProjectAgentTranscriptRequestView<'static>> {
+            fn from(wrapper: GetProjectAgentTranscriptRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetProjectAgentTranscriptRequestView<'static>>,
+        > for GetProjectAgentTranscriptRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetProjectAgentTranscriptRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetProjectAgentTranscriptRequest {
+            type View<'a> = GetProjectAgentTranscriptRequestView<'a>;
+            type ViewHandle = GetProjectAgentTranscriptRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetProjectAgentTranscriptRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct GetProjectAgentTranscriptResponseView<'a> {
+            /// Field 1: `session`
+            pub session: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ProjectAgentTranscriptSessionView<'a>,
+            >,
+            /// Field 2: `entries`
+            pub entries: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::ProjectAgentWorkLogEntryView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetProjectAgentTranscriptResponseView<'a> {
+            type Owned = super::super::GetProjectAgentTranscriptResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.session.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.session = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ProjectAgentTranscriptSessionView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::ProjectAgentWorkLogEntryView,
+                            >(),
+                        )?;
+                        view.entries
+                            .push(
+                                <super::super::__buffa::view::ProjectAgentWorkLogEntryView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetProjectAgentTranscriptResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetProjectAgentTranscriptResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetProjectAgentTranscriptResponse {
+                    session: match self.session.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ProjectAgentTranscriptSession,
+                                ::buffa::Inline<super::super::ProjectAgentTranscriptSession>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    entries: self
+                        .entries
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetProjectAgentTranscriptResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.session.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.session.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                for v in &self.entries {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.session.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.session.write_to(__cache, buf);
+                }
+                for v in &self.entries {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetProjectAgentTranscriptResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.session.as_option() {
+                        __map.serialize_entry("session", __v)?;
+                    }
+                }
+                if !self.entries.is_empty() {
+                    __map.serialize_entry("entries", &*self.entries)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetProjectAgentTranscriptResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "GetProjectAgentTranscriptResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.GetProjectAgentTranscriptResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.GetProjectAgentTranscriptResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetProjectAgentTranscriptResponseView);
+        ::buffa::impl_view_reborrow!(GetProjectAgentTranscriptResponseView);
+        /** Self-contained, `'static` owned view of a `GetProjectAgentTranscriptResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetProjectAgentTranscriptResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetProjectAgentTranscriptResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetProjectAgentTranscriptResponseOwnedView(
+            ::buffa::OwnedView<GetProjectAgentTranscriptResponseView<'static>>,
+        );
+        impl GetProjectAgentTranscriptResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetProjectAgentTranscriptResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetProjectAgentTranscriptResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetProjectAgentTranscriptResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetProjectAgentTranscriptResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetProjectAgentTranscriptResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetProjectAgentTranscriptResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::GetProjectAgentTranscriptResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `session`
+            #[must_use]
+            pub fn session(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ProjectAgentTranscriptSessionView<'_>,
+            > {
+                &self.0.reborrow().session
+            }
+            /// Field 2: `entries`
+            #[must_use]
+            pub fn entries(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::ProjectAgentWorkLogEntryView<'_>,
+            > {
+                &self.0.reborrow().entries
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetProjectAgentTranscriptResponseView<'static>>,
+        > for GetProjectAgentTranscriptResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetProjectAgentTranscriptResponseView<'static>>,
+            ) -> Self {
+                GetProjectAgentTranscriptResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetProjectAgentTranscriptResponseOwnedView>
+        for ::buffa::OwnedView<GetProjectAgentTranscriptResponseView<'static>> {
+            fn from(wrapper: GetProjectAgentTranscriptResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetProjectAgentTranscriptResponseView<'static>>,
+        > for GetProjectAgentTranscriptResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetProjectAgentTranscriptResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetProjectAgentTranscriptResponse {
+            type View<'a> = GetProjectAgentTranscriptResponseView<'a>;
+            type ViewHandle = GetProjectAgentTranscriptResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetProjectAgentTranscriptResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ProjectAgentTranscriptSessionView<'a> {
+            /// Field 1: `session_id`
+            pub session_id: &'a str,
+            /// Field 2: `run_id`
+            pub run_id: ::core::option::Option<&'a str>,
+            /// Field 3: `worker_id`
+            pub worker_id: ::core::option::Option<&'a str>,
+            /// Field 4: `agent_provider`
+            pub agent_provider: ::buffa::EnumValue<
+                super::super::super::super::types::v1::AgentProvider,
+            >,
+            /// Field 5: `started_at`
+            pub started_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Field 6: `last_event_at`
+            pub last_event_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ProjectAgentTranscriptSessionView<'a> {
+            type Owned = super::super::ProjectAgentTranscriptSession;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.session_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.run_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.worker_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.agent_provider = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.started_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.started_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.last_event_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.last_event_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ProjectAgentTranscriptSession,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ProjectAgentTranscriptSession,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ProjectAgentTranscriptSession {
+                    session_id: self.session_id.to_string(),
+                    run_id: self.run_id.map(|s| s.to_string()),
+                    worker_id: self.worker_id.map(|s| s.to_string()),
+                    agent_provider: self.agent_provider,
+                    started_at: match self.started_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    last_event_at: match self.last_event_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ProjectAgentTranscriptSessionView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.session_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.session_id)
+                                as u64;
+                }
+                if let Some(ref v) = self.run_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.worker_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                {
+                    let val = self.agent_provider.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if self.started_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.started_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.last_event_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.last_event_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.session_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.session_id, buf);
+                }
+                if let Some(ref v) = self.run_id {
+                    ::buffa::types::put_string_field(2u32, v, buf);
+                }
+                if let Some(ref v) = self.worker_id {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                {
+                    let val = self.agent_provider.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
+                }
+                if self.started_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.started_at.write_to(__cache, buf);
+                }
+                if self.last_event_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.last_event_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ProjectAgentTranscriptSessionView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.session_id) {
+                    __map.serialize_entry("sessionId", self.session_id)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.run_id {
+                    __map.serialize_entry("runId", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.worker_id {
+                    __map.serialize_entry("workerId", __v)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.agent_provider,
+                ) {
+                    __map.serialize_entry("agentProvider", &self.agent_provider)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .started_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("startedAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .last_event_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("lastEventAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ProjectAgentTranscriptSessionView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ProjectAgentTranscriptSession";
+            const FULL_NAME: &'static str = "briar.app.v1.ProjectAgentTranscriptSession";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectAgentTranscriptSession";
+        }
+        ::buffa::impl_default_view_instance!(ProjectAgentTranscriptSessionView);
+        ::buffa::impl_view_reborrow!(ProjectAgentTranscriptSessionView);
+        /** Self-contained, `'static` owned view of a `ProjectAgentTranscriptSession` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ProjectAgentTranscriptSessionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ProjectAgentTranscriptSessionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ProjectAgentTranscriptSessionOwnedView(
+            ::buffa::OwnedView<ProjectAgentTranscriptSessionView<'static>>,
+        );
+        impl ProjectAgentTranscriptSessionOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProjectAgentTranscriptSessionOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProjectAgentTranscriptSessionOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ProjectAgentTranscriptSession,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProjectAgentTranscriptSessionOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ProjectAgentTranscriptSessionView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ProjectAgentTranscriptSessionView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::ProjectAgentTranscriptSession {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `session_id`
+            #[must_use]
+            pub fn session_id(&self) -> &'_ str {
+                self.0.reborrow().session_id
+            }
+            /// Field 2: `run_id`
+            #[must_use]
+            pub fn run_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().run_id
+            }
+            /// Field 3: `worker_id`
+            #[must_use]
+            pub fn worker_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().worker_id
+            }
+            /// Field 4: `agent_provider`
+            #[must_use]
+            pub fn agent_provider(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::types::v1::AgentProvider,
+            > {
+                self.0.reborrow().agent_provider
+            }
+            /// Field 5: `started_at`
+            #[must_use]
+            pub fn started_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().started_at
+            }
+            /// Field 6: `last_event_at`
+            #[must_use]
+            pub fn last_event_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().last_event_at
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ProjectAgentTranscriptSessionView<'static>>,
+        > for ProjectAgentTranscriptSessionOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ProjectAgentTranscriptSessionView<'static>>,
+            ) -> Self {
+                ProjectAgentTranscriptSessionOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ProjectAgentTranscriptSessionOwnedView>
+        for ::buffa::OwnedView<ProjectAgentTranscriptSessionView<'static>> {
+            fn from(wrapper: ProjectAgentTranscriptSessionOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ProjectAgentTranscriptSessionView<'static>>,
+        > for ProjectAgentTranscriptSessionOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ProjectAgentTranscriptSessionView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ProjectAgentTranscriptSession {
+            type View<'a> = ProjectAgentTranscriptSessionView<'a>;
+            type ViewHandle = ProjectAgentTranscriptSessionOwnedView;
+        }
+        impl ::serde::Serialize for ProjectAgentTranscriptSessionOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ProjectAgentWorkLogEntryView<'a> {
+            /// Field 1: `entry_id`
+            pub entry_id: &'a str,
+            /// Field 2: `sequence`
+            pub sequence: u64,
+            /// Field 3: `updated_sequence`
+            pub updated_sequence: u64,
+            /// Field 4: `status`
+            pub status: ::buffa::EnumValue<super::super::ProjectAgentWorkLogEntryStatus>,
+            /// Field 5: `started_at`
+            pub started_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Field 6: `updated_at`
+            pub updated_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Field 7: `completed_at`
+            pub completed_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub entry: ::core::option::Option<
+                super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ProjectAgentWorkLogEntryView<'a> {
+            type Owned = super::super::ProjectAgentWorkLogEntry;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.entry_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.sequence = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.updated_sequence = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.started_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.started_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.updated_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.updated_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.completed_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.completed_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry::Message(
+                                ref mut existing,
+                            ),
+                        ) = view.entry
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.entry = Some(
+                                super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry::Message(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::ProjectAgentWorkLogMessageView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry::Activity(
+                                ref mut existing,
+                            ),
+                        ) = view.entry
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.entry = Some(
+                                super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry::Activity(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::ProjectAgentWorkLogActivityView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ProjectAgentWorkLogEntry,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ProjectAgentWorkLogEntry,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ProjectAgentWorkLogEntry {
+                    entry_id: self.entry_id.to_string(),
+                    sequence: self.sequence,
+                    updated_sequence: self.updated_sequence,
+                    status: self.status,
+                    started_at: match self.started_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    updated_at: match self.updated_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    completed_at: match self.completed_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    entry: match self.entry.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry::Message(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::project_agent_work_log_entry::Entry::Message(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry::Activity(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::project_agent_work_log_entry::Entry::Activity(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ProjectAgentWorkLogEntryView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.entry_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.entry_id) as u64;
+                }
+                if self.sequence != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(self.sequence) as u64;
+                }
+                if self.updated_sequence != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(self.updated_sequence)
+                                as u64;
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if self.started_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.started_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.updated_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.updated_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.completed_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.completed_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if let ::core::option::Option::Some(ref v) = self.entry {
+                    match v {
+                        super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry::Message(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                        super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry::Activity(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.entry_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.entry_id, buf);
+                }
+                if self.sequence != 0u64 {
+                    ::buffa::types::put_uint64_field(2u32, self.sequence, buf);
+                }
+                if self.updated_sequence != 0u64 {
+                    ::buffa::types::put_uint64_field(3u32, self.updated_sequence, buf);
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
+                }
+                if self.started_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.started_at.write_to(__cache, buf);
+                }
+                if self.updated_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.updated_at.write_to(__cache, buf);
+                }
+                if self.completed_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.completed_at.write_to(__cache, buf);
+                }
+                if let ::core::option::Option::Some(ref v) = self.entry {
+                    match v {
+                        super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry::Message(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                10u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry::Activity(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                11u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ProjectAgentWorkLogEntryView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.entry_id) {
+                    __map.serialize_entry("entryId", self.entry_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.sequence) {
+                    __map
+                        .serialize_entry(
+                            "sequence",
+                            &::buffa::json_helpers::ProtoJson(&self.sequence),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.updated_sequence) {
+                    __map
+                        .serialize_entry(
+                            "updatedSequence",
+                            &::buffa::json_helpers::ProtoJson(&self.updated_sequence),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .started_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("startedAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .updated_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("updatedAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .completed_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("completedAt", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.entry {
+                    match __ov {
+                        super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry::Message(
+                            v,
+                        ) => {
+                            __map.serialize_entry("message", v)?;
+                        }
+                        super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry::Activity(
+                            v,
+                        ) => {
+                            __map.serialize_entry("activity", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ProjectAgentWorkLogEntryView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ProjectAgentWorkLogEntry";
+            const FULL_NAME: &'static str = "briar.app.v1.ProjectAgentWorkLogEntry";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectAgentWorkLogEntry";
+        }
+        ::buffa::impl_default_view_instance!(ProjectAgentWorkLogEntryView);
+        ::buffa::impl_view_reborrow!(ProjectAgentWorkLogEntryView);
+        /** Self-contained, `'static` owned view of a `ProjectAgentWorkLogEntry` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ProjectAgentWorkLogEntryView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ProjectAgentWorkLogEntryView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ProjectAgentWorkLogEntryOwnedView(
+            ::buffa::OwnedView<ProjectAgentWorkLogEntryView<'static>>,
+        );
+        impl ProjectAgentWorkLogEntryOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProjectAgentWorkLogEntryOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProjectAgentWorkLogEntryOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ProjectAgentWorkLogEntry,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProjectAgentWorkLogEntryOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ProjectAgentWorkLogEntryView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ProjectAgentWorkLogEntryView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ProjectAgentWorkLogEntry {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `entry_id`
+            #[must_use]
+            pub fn entry_id(&self) -> &'_ str {
+                self.0.reborrow().entry_id
+            }
+            /// Field 2: `sequence`
+            #[must_use]
+            pub fn sequence(&self) -> u64 {
+                self.0.reborrow().sequence
+            }
+            /// Field 3: `updated_sequence`
+            #[must_use]
+            pub fn updated_sequence(&self) -> u64 {
+                self.0.reborrow().updated_sequence
+            }
+            /// Field 4: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::ProjectAgentWorkLogEntryStatus> {
+                self.0.reborrow().status
+            }
+            /// Field 5: `started_at`
+            #[must_use]
+            pub fn started_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().started_at
+            }
+            /// Field 6: `updated_at`
+            #[must_use]
+            pub fn updated_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().updated_at
+            }
+            /// Field 7: `completed_at`
+            #[must_use]
+            pub fn completed_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().completed_at
+            }
+            /// Oneof `entry`.
+            #[must_use]
+            pub fn entry(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::project_agent_work_log_entry::Entry<
+                    '_,
+                >,
+            > {
+                self.0.reborrow().entry.as_ref()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ProjectAgentWorkLogEntryView<'static>>,
+        > for ProjectAgentWorkLogEntryOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ProjectAgentWorkLogEntryView<'static>>,
+            ) -> Self {
+                ProjectAgentWorkLogEntryOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ProjectAgentWorkLogEntryOwnedView>
+        for ::buffa::OwnedView<ProjectAgentWorkLogEntryView<'static>> {
+            fn from(wrapper: ProjectAgentWorkLogEntryOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ProjectAgentWorkLogEntryView<'static>>,
+        > for ProjectAgentWorkLogEntryOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ProjectAgentWorkLogEntryView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ProjectAgentWorkLogEntry {
+            type View<'a> = ProjectAgentWorkLogEntryView<'a>;
+            type ViewHandle = ProjectAgentWorkLogEntryOwnedView;
+        }
+        impl ::serde::Serialize for ProjectAgentWorkLogEntryOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ProjectAgentWorkLogMessageView<'a> {
+            /// Field 1: `phase`
+            pub phase: ::core::option::Option<&'a str>,
+            /// Field 2: `text`
+            pub text: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ProjectAgentWorkLogMessageView<'a> {
+            type Owned = super::super::ProjectAgentWorkLogMessage;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.phase = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.text = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ProjectAgentWorkLogMessage,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ProjectAgentWorkLogMessage,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ProjectAgentWorkLogMessage {
+                    phase: self.phase.map(|s| s.to_string()),
+                    text: self.text.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ProjectAgentWorkLogMessageView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if let Some(ref v) = self.phase {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if !self.text.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.text) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(ref v) = self.phase {
+                    ::buffa::types::put_string_field(1u32, v, buf);
+                }
+                if !self.text.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.text, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ProjectAgentWorkLogMessageView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.phase {
+                    __map.serialize_entry("phase", __v)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.text) {
+                    __map.serialize_entry("text", self.text)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ProjectAgentWorkLogMessageView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ProjectAgentWorkLogMessage";
+            const FULL_NAME: &'static str = "briar.app.v1.ProjectAgentWorkLogMessage";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectAgentWorkLogMessage";
+        }
+        ::buffa::impl_default_view_instance!(ProjectAgentWorkLogMessageView);
+        ::buffa::impl_view_reborrow!(ProjectAgentWorkLogMessageView);
+        /** Self-contained, `'static` owned view of a `ProjectAgentWorkLogMessage` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ProjectAgentWorkLogMessageView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ProjectAgentWorkLogMessageView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ProjectAgentWorkLogMessageOwnedView(
+            ::buffa::OwnedView<ProjectAgentWorkLogMessageView<'static>>,
+        );
+        impl ProjectAgentWorkLogMessageOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProjectAgentWorkLogMessageOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProjectAgentWorkLogMessageOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ProjectAgentWorkLogMessage,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProjectAgentWorkLogMessageOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ProjectAgentWorkLogMessageView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ProjectAgentWorkLogMessageView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ProjectAgentWorkLogMessage {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `phase`
+            #[must_use]
+            pub fn phase(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().phase
+            }
+            /// Field 2: `text`
+            #[must_use]
+            pub fn text(&self) -> &'_ str {
+                self.0.reborrow().text
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ProjectAgentWorkLogMessageView<'static>>,
+        > for ProjectAgentWorkLogMessageOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ProjectAgentWorkLogMessageView<'static>>,
+            ) -> Self {
+                ProjectAgentWorkLogMessageOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ProjectAgentWorkLogMessageOwnedView>
+        for ::buffa::OwnedView<ProjectAgentWorkLogMessageView<'static>> {
+            fn from(wrapper: ProjectAgentWorkLogMessageOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ProjectAgentWorkLogMessageView<'static>>,
+        > for ProjectAgentWorkLogMessageOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ProjectAgentWorkLogMessageView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ProjectAgentWorkLogMessage {
+            type View<'a> = ProjectAgentWorkLogMessageView<'a>;
+            type ViewHandle = ProjectAgentWorkLogMessageOwnedView;
+        }
+        impl ::serde::Serialize for ProjectAgentWorkLogMessageOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ProjectAgentWorkLogActivityView<'a> {
+            /// Field 1: `kind`
+            pub kind: ::buffa::EnumValue<
+                super::super::super::super::types::v1::AgentActivityKind,
+            >,
+            /// Field 2: `title`
+            pub title: &'a str,
+            /// Field 3: `text`
+            pub text: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ProjectAgentWorkLogActivityView<'a> {
+            type Owned = super::super::ProjectAgentWorkLogActivity;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.kind = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.title = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.text = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ProjectAgentWorkLogActivity,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ProjectAgentWorkLogActivity,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ProjectAgentWorkLogActivity {
+                    kind: self.kind,
+                    title: self.title.to_string(),
+                    text: self.text.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ProjectAgentWorkLogActivityView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                {
+                    let val = self.kind.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if !self.title.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::string_encoded_len(&self.title) as u64;
+                }
+                if !self.text.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.text) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.kind.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.title.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.title, buf);
+                }
+                if !self.text.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.text, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ProjectAgentWorkLogActivityView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.kind) {
+                    __map.serialize_entry("kind", &self.kind)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.title) {
+                    __map.serialize_entry("title", self.title)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.text) {
+                    __map.serialize_entry("text", self.text)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ProjectAgentWorkLogActivityView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ProjectAgentWorkLogActivity";
+            const FULL_NAME: &'static str = "briar.app.v1.ProjectAgentWorkLogActivity";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ProjectAgentWorkLogActivity";
+        }
+        ::buffa::impl_default_view_instance!(ProjectAgentWorkLogActivityView);
+        ::buffa::impl_view_reborrow!(ProjectAgentWorkLogActivityView);
+        /** Self-contained, `'static` owned view of a `ProjectAgentWorkLogActivity` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ProjectAgentWorkLogActivityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ProjectAgentWorkLogActivityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ProjectAgentWorkLogActivityOwnedView(
+            ::buffa::OwnedView<ProjectAgentWorkLogActivityView<'static>>,
+        );
+        impl ProjectAgentWorkLogActivityOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProjectAgentWorkLogActivityOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProjectAgentWorkLogActivityOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ProjectAgentWorkLogActivity,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ProjectAgentWorkLogActivityOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ProjectAgentWorkLogActivityView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ProjectAgentWorkLogActivityView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ProjectAgentWorkLogActivity {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `kind`
+            #[must_use]
+            pub fn kind(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::types::v1::AgentActivityKind,
+            > {
+                self.0.reborrow().kind
+            }
+            /// Field 2: `title`
+            #[must_use]
+            pub fn title(&self) -> &'_ str {
+                self.0.reborrow().title
+            }
+            /// Field 3: `text`
+            #[must_use]
+            pub fn text(&self) -> &'_ str {
+                self.0.reborrow().text
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ProjectAgentWorkLogActivityView<'static>>,
+        > for ProjectAgentWorkLogActivityOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ProjectAgentWorkLogActivityView<'static>>,
+            ) -> Self {
+                ProjectAgentWorkLogActivityOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ProjectAgentWorkLogActivityOwnedView>
+        for ::buffa::OwnedView<ProjectAgentWorkLogActivityView<'static>> {
+            fn from(wrapper: ProjectAgentWorkLogActivityOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ProjectAgentWorkLogActivityView<'static>>,
+        > for ProjectAgentWorkLogActivityOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ProjectAgentWorkLogActivityView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ProjectAgentWorkLogActivity {
+            type View<'a> = ProjectAgentWorkLogActivityView<'a>;
+            type ViewHandle = ProjectAgentWorkLogActivityOwnedView;
+        }
+        impl ::serde::Serialize for ProjectAgentWorkLogActivityOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -233563,7 +237679,9 @@ pub mod __buffa {
             >,
             /// Field 58: `execution_metrics`
             pub execution_metrics: ::buffa::MessageFieldView<
-                super::super::__buffa::view::AgentExecutionMetricsView<'a>,
+                super::super::super::super::types::v1::__buffa::view::AgentExecutionMetricsView<
+                    'a,
+                >,
             >,
             /// Field 59: `target_sha`
             pub target_sha: ::core::option::Option<&'a str>,
@@ -234306,7 +238424,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.execution_metrics = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::AgentExecutionMetricsView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::super::super::types::v1::__buffa::view::AgentExecutionMetricsView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -234774,8 +238892,10 @@ pub mod __buffa {
                     execution_metrics: match self.execution_metrics.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::AgentExecutionMetrics,
-                                ::buffa::Inline<super::super::AgentExecutionMetrics>,
+                                super::super::super::super::types::v1::AgentExecutionMetrics,
+                                ::buffa::Inline<
+                                    super::super::super::super::types::v1::AgentExecutionMetrics,
+                                >,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -236315,7 +240435,9 @@ pub mod __buffa {
             pub fn execution_metrics(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::AgentExecutionMetricsView<'_>,
+                super::super::super::super::types::v1::__buffa::view::AgentExecutionMetricsView<
+                    '_,
+                >,
             > {
                 &self.0.reborrow().execution_metrics
             }
@@ -237045,458 +241167,6 @@ pub mod __buffa {
             type ViewHandle = WaitingCheckpointOwnedView;
         }
         impl ::serde::Serialize for WaitingCheckpointOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        #[derive(Clone, Debug, Default)]
-        pub struct AgentExecutionMetricsView<'a> {
-            /// Field 1: `input_tokens`
-            pub input_tokens: ::core::option::Option<u64>,
-            /// Field 2: `output_tokens`
-            pub output_tokens: ::core::option::Option<u64>,
-            /// Field 3: `cache_read_tokens`
-            pub cache_read_tokens: ::core::option::Option<u64>,
-            /// Field 4: `cache_write_tokens`
-            pub cache_write_tokens: ::core::option::Option<u64>,
-            /// Field 5: `reasoning_output_tokens`
-            pub reasoning_output_tokens: ::core::option::Option<u64>,
-            /// Field 6: `total_tokens`
-            pub total_tokens: ::core::option::Option<u64>,
-            /// Field 7: `duration_ms`
-            pub duration_ms: u64,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for AgentExecutionMetricsView<'a> {
-            type Owned = super::super::AgentExecutionMetrics;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            #[inline]
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.input_tokens = Some(
-                            ::buffa::types::decode_uint64(&mut cur)?,
-                        );
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.output_tokens = Some(
-                            ::buffa::types::decode_uint64(&mut cur)?,
-                        );
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.cache_read_tokens = Some(
-                            ::buffa::types::decode_uint64(&mut cur)?,
-                        );
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.cache_write_tokens = Some(
-                            ::buffa::types::decode_uint64(&mut cur)?,
-                        );
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.reasoning_output_tokens = Some(
-                            ::buffa::types::decode_uint64(&mut cur)?,
-                        );
-                    }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.total_tokens = Some(
-                            ::buffa::types::decode_uint64(&mut cur)?,
-                        );
-                    }
-                    7u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.duration_ms = ::buffa::types::decode_uint64(&mut cur)?;
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::AgentExecutionMetrics,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::AgentExecutionMetrics,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::AgentExecutionMetrics {
-                    input_tokens: self.input_tokens,
-                    output_tokens: self.output_tokens,
-                    cache_read_tokens: self.cache_read_tokens,
-                    cache_write_tokens: self.cache_write_tokens,
-                    reasoning_output_tokens: self.reasoning_output_tokens,
-                    total_tokens: self.total_tokens,
-                    duration_ms: self.duration_ms,
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for AgentExecutionMetricsView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u64;
-                if let Some(v) = self.input_tokens {
-                    size += 1u64 + ::buffa::types::uint64_encoded_len(v) as u64;
-                }
-                if let Some(v) = self.output_tokens {
-                    size += 1u64 + ::buffa::types::uint64_encoded_len(v) as u64;
-                }
-                if let Some(v) = self.cache_read_tokens {
-                    size += 1u64 + ::buffa::types::uint64_encoded_len(v) as u64;
-                }
-                if let Some(v) = self.cache_write_tokens {
-                    size += 1u64 + ::buffa::types::uint64_encoded_len(v) as u64;
-                }
-                if let Some(v) = self.reasoning_output_tokens {
-                    size += 1u64 + ::buffa::types::uint64_encoded_len(v) as u64;
-                }
-                if let Some(v) = self.total_tokens {
-                    size += 1u64 + ::buffa::types::uint64_encoded_len(v) as u64;
-                }
-                if self.duration_ms != 0u64 {
-                    size
-                        += 1u64
-                            + ::buffa::types::uint64_encoded_len(self.duration_ms)
-                                as u64;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u64;
-                ::buffa::saturate_size(size)
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                _cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::EncodeSink,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                if let Some(v) = self.input_tokens {
-                    ::buffa::types::put_uint64_field(1u32, v, buf);
-                }
-                if let Some(v) = self.output_tokens {
-                    ::buffa::types::put_uint64_field(2u32, v, buf);
-                }
-                if let Some(v) = self.cache_read_tokens {
-                    ::buffa::types::put_uint64_field(3u32, v, buf);
-                }
-                if let Some(v) = self.cache_write_tokens {
-                    ::buffa::types::put_uint64_field(4u32, v, buf);
-                }
-                if let Some(v) = self.reasoning_output_tokens {
-                    ::buffa::types::put_uint64_field(5u32, v, buf);
-                }
-                if let Some(v) = self.total_tokens {
-                    ::buffa::types::put_uint64_field(6u32, v, buf);
-                }
-                if self.duration_ms != 0u64 {
-                    ::buffa::types::put_uint64_field(7u32, self.duration_ms, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for AgentExecutionMetricsView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if let ::core::option::Option::Some(__v) = self.input_tokens {
-                    __map
-                        .serialize_entry(
-                            "inputTokens",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
-                if let ::core::option::Option::Some(__v) = self.output_tokens {
-                    __map
-                        .serialize_entry(
-                            "outputTokens",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
-                if let ::core::option::Option::Some(__v) = self.cache_read_tokens {
-                    __map
-                        .serialize_entry(
-                            "cacheReadTokens",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
-                if let ::core::option::Option::Some(__v) = self.cache_write_tokens {
-                    __map
-                        .serialize_entry(
-                            "cacheWriteTokens",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
-                if let ::core::option::Option::Some(__v) = self.reasoning_output_tokens {
-                    __map
-                        .serialize_entry(
-                            "reasoningOutputTokens",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
-                if let ::core::option::Option::Some(__v) = self.total_tokens {
-                    __map
-                        .serialize_entry(
-                            "totalTokens",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.duration_ms) {
-                    __map
-                        .serialize_entry(
-                            "durationMs",
-                            &::buffa::json_helpers::ProtoJson(&self.duration_ms),
-                        )?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for AgentExecutionMetricsView<'a> {
-            const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "AgentExecutionMetrics";
-            const FULL_NAME: &'static str = "briar.app.v1.AgentExecutionMetrics";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.AgentExecutionMetrics";
-        }
-        ::buffa::impl_default_view_instance!(AgentExecutionMetricsView);
-        ::buffa::impl_view_reborrow!(AgentExecutionMetricsView);
-        /** Self-contained, `'static` owned view of a `AgentExecutionMetrics` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`AgentExecutionMetricsView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AgentExecutionMetricsView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct AgentExecutionMetricsOwnedView(
-            ::buffa::OwnedView<AgentExecutionMetricsView<'static>>,
-        );
-        impl AgentExecutionMetricsOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    AgentExecutionMetricsOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    AgentExecutionMetricsOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
-            /// message's encoded size exceeds the 2 GiB protobuf limit, or
-            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::AgentExecutionMetrics,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    AgentExecutionMetricsOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`AgentExecutionMetricsView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &AgentExecutionMetricsView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// Infallible: this type's constructors wire-decode their
-            /// buffer, and a view produced by wire decoding always
-            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
-            /// whose contract also governs handles converted from a raw
-            /// [`::buffa::OwnedView`].
-            #[must_use]
-            pub fn to_owned_message(&self) -> super::super::AgentExecutionMetrics {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Field 1: `input_tokens`
-            #[must_use]
-            pub fn input_tokens(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().input_tokens
-            }
-            /// Field 2: `output_tokens`
-            #[must_use]
-            pub fn output_tokens(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().output_tokens
-            }
-            /// Field 3: `cache_read_tokens`
-            #[must_use]
-            pub fn cache_read_tokens(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().cache_read_tokens
-            }
-            /// Field 4: `cache_write_tokens`
-            #[must_use]
-            pub fn cache_write_tokens(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().cache_write_tokens
-            }
-            /// Field 5: `reasoning_output_tokens`
-            #[must_use]
-            pub fn reasoning_output_tokens(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().reasoning_output_tokens
-            }
-            /// Field 6: `total_tokens`
-            #[must_use]
-            pub fn total_tokens(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().total_tokens
-            }
-            /// Field 7: `duration_ms`
-            #[must_use]
-            pub fn duration_ms(&self) -> u64 {
-                self.0.reborrow().duration_ms
-            }
-        }
-        impl ::core::convert::From<
-            ::buffa::OwnedView<AgentExecutionMetricsView<'static>>,
-        > for AgentExecutionMetricsOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<AgentExecutionMetricsView<'static>>,
-            ) -> Self {
-                AgentExecutionMetricsOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<AgentExecutionMetricsOwnedView>
-        for ::buffa::OwnedView<AgentExecutionMetricsView<'static>> {
-            fn from(wrapper: AgentExecutionMetricsOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<AgentExecutionMetricsView<'static>>,
-        > for AgentExecutionMetricsOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<AgentExecutionMetricsView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::AgentExecutionMetrics {
-            type View<'a> = AgentExecutionMetricsView<'a>;
-            type ViewHandle = AgentExecutionMetricsOwnedView;
-        }
-        impl ::serde::Serialize for AgentExecutionMetricsOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -293659,7 +297329,7 @@ pub mod __buffa {
             pub canonical_model: ::core::option::Option<&'a str>,
             /// Field 15: `model_source`
             pub model_source: ::buffa::EnumValue<
-                super::super::AgentExecutionModelSource,
+                super::super::super::super::types::v1::AgentExecutionModelSource,
             >,
             /// Field 16: `source`
             pub source: &'a str,
@@ -294584,7 +298254,9 @@ pub mod __buffa {
             #[must_use]
             pub fn model_source(
                 &self,
-            ) -> ::buffa::EnumValue<super::super::AgentExecutionModelSource> {
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::types::v1::AgentExecutionModelSource,
+            > {
                 self.0.reborrow().model_source
             }
             /// Field 16: `source`
@@ -294709,7 +298381,7 @@ pub mod __buffa {
             pub canonical_model: ::core::option::Option<&'a str>,
             /// Field 16: `model_source`
             pub model_source: ::buffa::EnumValue<
-                super::super::AgentExecutionModelSource,
+                super::super::super::super::types::v1::AgentExecutionModelSource,
             >,
             /// Field 17: `source`
             pub source: &'a str,
@@ -295532,7 +299204,9 @@ pub mod __buffa {
             #[must_use]
             pub fn model_source(
                 &self,
-            ) -> ::buffa::EnumValue<super::super::AgentExecutionModelSource> {
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::types::v1::AgentExecutionModelSource,
+            > {
                 self.0.reborrow().model_source
             }
             /// Field 17: `source`
@@ -295633,7 +299307,7 @@ pub mod __buffa {
             pub canonical_model: ::core::option::Option<&'a str>,
             /// Field 15: `model_source`
             pub model_source: ::buffa::EnumValue<
-                super::super::AgentExecutionModelSource,
+                super::super::super::super::types::v1::AgentExecutionModelSource,
             >,
             /// Field 16: `observed_at`
             pub observed_at: ::buffa::MessageFieldView<
@@ -296401,7 +300075,9 @@ pub mod __buffa {
             #[must_use]
             pub fn model_source(
                 &self,
-            ) -> ::buffa::EnumValue<super::super::AgentExecutionModelSource> {
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::types::v1::AgentExecutionModelSource,
+            > {
                 self.0.reborrow().model_source
             }
             /// Field 16: `observed_at`
@@ -296475,7 +300151,9 @@ pub mod __buffa {
             pub status: ::buffa::EnumValue<super::super::RunStatus>,
             /// Field 4: `execution_metrics`
             pub execution_metrics: ::buffa::MessageFieldView<
-                super::super::__buffa::view::AgentExecutionMetricsView<'a>,
+                super::super::super::super::types::v1::__buffa::view::AgentExecutionMetricsView<
+                    'a,
+                >,
             >,
             /// Field 5: `claimed_by`
             pub claimed_by: ::core::option::Option<&'a str>,
@@ -296611,7 +300289,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.execution_metrics = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::AgentExecutionMetricsView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::super::super::types::v1::__buffa::view::AgentExecutionMetricsView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -296915,8 +300593,10 @@ pub mod __buffa {
                     execution_metrics: match self.execution_metrics.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::AgentExecutionMetrics,
-                                ::buffa::Inline<super::super::AgentExecutionMetrics>,
+                                super::super::super::super::types::v1::AgentExecutionMetrics,
+                                ::buffa::Inline<
+                                    super::super::super::super::types::v1::AgentExecutionMetrics,
+                                >,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -297475,7 +301155,9 @@ pub mod __buffa {
             pub fn execution_metrics(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::AgentExecutionMetricsView<'_>,
+                super::super::super::super::types::v1::__buffa::view::AgentExecutionMetricsView<
+                    '_,
+                >,
             > {
                 &self.0.reborrow().execution_metrics
             }
@@ -303160,6 +306842,36 @@ pub mod __buffa {
                     ),
                 }
             }
+            pub mod get_project_agent_transcript_request {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Selector<'a> {
+                    SessionId(&'a str),
+                    LatestForRunId(&'a str),
+                }
+            }
+            pub mod project_agent_work_log_entry {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Entry<'a> {
+                    Message(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::ProjectAgentWorkLogMessageView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    Activity(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::ProjectAgentWorkLogActivityView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                }
+            }
             pub mod update_project_agent_request {
                 #[allow(unused_imports)]
                 use super::*;
@@ -303910,6 +307622,92 @@ pub mod __buffa {
                         }
                         Self::ClearImage(v) => {
                             map.serialize_entry("clearImage", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
+        pub mod get_project_agent_transcript_request {
+            #[allow(unused_imports)]
+            use super::*;
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Selector {
+                SessionId(::buffa::alloc::string::String),
+                LatestForRunId(::buffa::alloc::string::String),
+            }
+            impl ::buffa::Oneof for Selector {}
+            impl serde::Serialize for Selector {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::SessionId(v) => {
+                            map.serialize_entry("sessionId", v)?;
+                        }
+                        Self::LatestForRunId(v) => {
+                            map.serialize_entry("latestForRunId", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
+        pub mod project_agent_work_log_entry {
+            #[allow(unused_imports)]
+            use super::*;
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Entry {
+                Message(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::ProjectAgentWorkLogMessage,
+                    >,
+                ),
+                Activity(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::ProjectAgentWorkLogActivity,
+                    >,
+                ),
+            }
+            impl ::buffa::Oneof for Entry {}
+            impl From<super::super::super::ProjectAgentWorkLogMessage> for Entry {
+                fn from(v: super::super::super::ProjectAgentWorkLogMessage) -> Self {
+                    Self::Message(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::ProjectAgentWorkLogMessage>
+            for ::core::option::Option<Entry> {
+                fn from(v: super::super::super::ProjectAgentWorkLogMessage) -> Self {
+                    Self::Some(Entry::from(v))
+                }
+            }
+            impl From<super::super::super::ProjectAgentWorkLogActivity> for Entry {
+                fn from(v: super::super::super::ProjectAgentWorkLogActivity) -> Self {
+                    Self::Activity(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::ProjectAgentWorkLogActivity>
+            for ::core::option::Option<Entry> {
+                fn from(v: super::super::super::ProjectAgentWorkLogActivity) -> Self {
+                    Self::Some(Entry::from(v))
+                }
+            }
+            impl serde::Serialize for Entry {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::Message(v) => {
+                            map.serialize_entry("message", v)?;
+                        }
+                        Self::Activity(v) => {
+                            map.serialize_entry("activity", v)?;
                         }
                     }
                     map.end()
@@ -305104,6 +308902,12 @@ pub mod __buffa {
         reg.register_json_any(super::__REGISTER_MOBILE_PUSH_DEVICE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__UNREGISTER_MOBILE_PUSH_DEVICE_REQUEST_JSON_ANY);
         reg.register_json_any(super::__UNREGISTER_MOBILE_PUSH_DEVICE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_PROJECT_AGENT_TRANSCRIPT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_PROJECT_AGENT_TRANSCRIPT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__PROJECT_AGENT_TRANSCRIPT_SESSION_JSON_ANY);
+        reg.register_json_any(super::__PROJECT_AGENT_WORK_LOG_ENTRY_JSON_ANY);
+        reg.register_json_any(super::__PROJECT_AGENT_WORK_LOG_MESSAGE_JSON_ANY);
+        reg.register_json_any(super::__PROJECT_AGENT_WORK_LOG_ACTIVITY_JSON_ANY);
         reg.register_json_any(super::__LIST_ORGANIZATION_AGENTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_ORGANIZATION_AGENTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_ORGANIZATION_AGENT_REQUEST_JSON_ANY);
@@ -305417,7 +309221,6 @@ pub mod __buffa {
         reg.register_json_any(super::__DASHBOARD_RUN_JSON_ANY);
         reg.register_json_any(super::__TRACKER_REFERENCE_JSON_ANY);
         reg.register_json_any(super::__WAITING_CHECKPOINT_JSON_ANY);
-        reg.register_json_any(super::__AGENT_EXECUTION_METRICS_JSON_ANY);
         reg.register_json_any(super::__WORKER_ICON_JSON_ANY);
         reg.register_json_any(super::__DASHBOARD_WORKER_JSON_ANY);
         reg.register_json_any(super::__CONVERSATION_NOTIFICATION_JSON_ANY);
@@ -305725,6 +309528,30 @@ pub use self::__buffa::view::UnregisterMobilePushDeviceRequestOwnedView;
 pub use self::__buffa::view::UnregisterMobilePushDeviceResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::UnregisterMobilePushDeviceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetProjectAgentTranscriptRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetProjectAgentTranscriptRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetProjectAgentTranscriptResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetProjectAgentTranscriptResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ProjectAgentTranscriptSessionView;
+#[doc(inline)]
+pub use self::__buffa::view::ProjectAgentTranscriptSessionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ProjectAgentWorkLogEntryView;
+#[doc(inline)]
+pub use self::__buffa::view::ProjectAgentWorkLogEntryOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ProjectAgentWorkLogMessageView;
+#[doc(inline)]
+pub use self::__buffa::view::ProjectAgentWorkLogMessageOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ProjectAgentWorkLogActivityView;
+#[doc(inline)]
+pub use self::__buffa::view::ProjectAgentWorkLogActivityOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListOrganizationAgentsRequestView;
 #[doc(inline)]
@@ -306681,10 +310508,6 @@ pub use self::__buffa::view::TrackerReferenceOwnedView;
 pub use self::__buffa::view::WaitingCheckpointView;
 #[doc(inline)]
 pub use self::__buffa::view::WaitingCheckpointOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::AgentExecutionMetricsView;
-#[doc(inline)]
-pub use self::__buffa::view::AgentExecutionMetricsOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::WorkerIconView;
 #[doc(inline)]

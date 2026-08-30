@@ -1411,6 +1411,18 @@ pub type OwnedRunProjectAgentTaskRequestView = ::buffa::view::OwnedView<
 pub type OwnedRunProjectAgentTaskResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::RunProjectAgentTaskResponseView<'static>,
 >;
+///Shorthand for `OwnedView<GetProjectAgentTranscriptRequestView<'static>>`.
+pub type OwnedGetProjectAgentTranscriptRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetProjectAgentTranscriptRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetProjectAgentTranscriptResponseView<'static>>`.
+pub type OwnedGetProjectAgentTranscriptResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetProjectAgentTranscriptResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<
     crate::proto::briar::app::v1::ListOrganizationAgentsResponse,
 >
@@ -2247,6 +2259,48 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::GetProjectAgentTranscriptResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::GetProjectAgentTranscriptResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::GetProjectAgentTranscriptResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::GetProjectAgentTranscriptResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const AGENT_SERVICE_SERVICE_NAME: &str = "briar.app.v1.AgentService";
 /// Static [`Spec`](::connectrpc::Spec) for the `ListOrganizationAgents` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
@@ -2372,6 +2426,12 @@ pub const AGENT_SERVICE_PUT_PROJECT_AGENT_SESSION_SPEC: ::connectrpc::Spec = ::c
 /// Static [`Spec`](::connectrpc::Spec) for the `RunProjectAgentTask` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const AGENT_SERVICE_RUN_PROJECT_AGENT_TASK_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.AgentService/RunProjectAgentTask",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `GetProjectAgentTranscript` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_GET_PROJECT_AGENT_TRANSCRIPT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/GetProjectAgentTranscript",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -2906,6 +2966,29 @@ pub trait AgentService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::RunProjectAgentTaskResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the GetProjectAgentTranscript RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_project_agent_transcript<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::GetProjectAgentTranscriptRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::GetProjectAgentTranscriptResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -3550,6 +3633,35 @@ impl<S: AgentService> AgentServiceExt for S {
                 },
             )
             .with_spec(AGENT_SERVICE_RUN_PROJECT_AGENT_TASK_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "GetProjectAgentTranscript",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::GetProjectAgentTranscriptRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::GetProjectAgentTranscriptRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_project_agent_transcript(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::GetProjectAgentTranscriptResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_GET_PROJECT_AGENT_TRANSCRIPT_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -3730,6 +3842,12 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(AGENT_SERVICE_RUN_PROJECT_AGENT_TASK_SPEC),
+                )
+            }
+            "GetProjectAgentTranscript" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_GET_PROJECT_AGENT_TRANSCRIPT_SPEC),
                 )
             }
             _ => None,
@@ -4206,6 +4324,28 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::RunProjectAgentTaskResponse,
+                        >(format)
+                })
+            }
+            "GetProjectAgentTranscript" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::GetProjectAgentTranscriptRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::GetProjectAgentTranscriptRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::GetProjectAgentTranscriptRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_project_agent_transcript(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::GetProjectAgentTranscriptResponse,
                         >(format)
                 })
             }
@@ -5278,6 +5418,51 @@ where
                 &self.transport,
                 &self.config,
                 AGENT_SERVICE_RUN_PROJECT_AGENT_TASK_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetProjectAgentTranscript RPC. Sends a request to /briar.app.v1.AgentService/GetProjectAgentTranscript.
+    pub async fn get_project_agent_transcript(
+        &self,
+        request: crate::proto::briar::app::v1::GetProjectAgentTranscriptRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetProjectAgentTranscriptResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_project_agent_transcript_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetProjectAgentTranscript RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_project_agent_transcript_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::GetProjectAgentTranscriptRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::GetProjectAgentTranscriptResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_GET_PROJECT_AGENT_TRANSCRIPT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

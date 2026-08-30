@@ -1,12 +1,10 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
-import { AgentExecutionMetricsSchema } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import {
   AgentExecutionCostEstimateModelSchema,
   AgentExecutionCostEstimateReason,
   AgentExecutionCostEstimateStatus,
-  AgentExecutionModelSource,
   AgentUsageCostRecordSchema,
   AgentUsageEstimatedCostRecordSchema,
   AgentUsageExecutionAttemptSchema,
@@ -23,6 +21,10 @@ import {
   ProjectUsageTimelinePointSchema,
   StatusTrayRunSchema,
 } from "@briar/contracts/gen/briar/app/v1/reporting_pb";
+import {
+  AgentExecutionMetricsSchema,
+  AgentExecutionModelSource,
+} from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
 import type { AutoHuntRunStatus } from "../../src/lib/auto-hunt-contract";
 import type { AgentExecutionMetrics } from "../../src/lib/agent-execution-metrics";
 import type {

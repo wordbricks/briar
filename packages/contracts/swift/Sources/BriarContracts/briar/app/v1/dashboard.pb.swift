@@ -749,8 +749,8 @@ public nonisolated struct BriarAPI_DashboardRun: @unchecked Sendable {
     set {_uniqueStorage()._issueCheckpoints = newValue}
   }
 
-  public var executionMetrics: BriarAPI_AgentExecutionMetrics {
-    get {_storage._executionMetrics ?? BriarAPI_AgentExecutionMetrics()}
+  public var executionMetrics: BriarTypes_AgentExecutionMetrics {
+    get {_storage._executionMetrics ?? BriarTypes_AgentExecutionMetrics()}
     set {_uniqueStorage()._executionMetrics = newValue}
   }
   /// Returns true if `executionMetrics` has been explicitly set.
@@ -1058,79 +1058,6 @@ public nonisolated struct BriarAPI_WaitingCheckpoint: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
-}
-
-public nonisolated struct BriarAPI_AgentExecutionMetrics: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var inputTokens: UInt64 {
-    get {_inputTokens ?? 0}
-    set {_inputTokens = newValue}
-  }
-  /// Returns true if `inputTokens` has been explicitly set.
-  public var hasInputTokens: Bool {self._inputTokens != nil}
-  /// Clears the value of `inputTokens`. Subsequent reads from it will return its default value.
-  public mutating func clearInputTokens() {self._inputTokens = nil}
-
-  public var outputTokens: UInt64 {
-    get {_outputTokens ?? 0}
-    set {_outputTokens = newValue}
-  }
-  /// Returns true if `outputTokens` has been explicitly set.
-  public var hasOutputTokens: Bool {self._outputTokens != nil}
-  /// Clears the value of `outputTokens`. Subsequent reads from it will return its default value.
-  public mutating func clearOutputTokens() {self._outputTokens = nil}
-
-  public var cacheReadTokens: UInt64 {
-    get {_cacheReadTokens ?? 0}
-    set {_cacheReadTokens = newValue}
-  }
-  /// Returns true if `cacheReadTokens` has been explicitly set.
-  public var hasCacheReadTokens: Bool {self._cacheReadTokens != nil}
-  /// Clears the value of `cacheReadTokens`. Subsequent reads from it will return its default value.
-  public mutating func clearCacheReadTokens() {self._cacheReadTokens = nil}
-
-  public var cacheWriteTokens: UInt64 {
-    get {_cacheWriteTokens ?? 0}
-    set {_cacheWriteTokens = newValue}
-  }
-  /// Returns true if `cacheWriteTokens` has been explicitly set.
-  public var hasCacheWriteTokens: Bool {self._cacheWriteTokens != nil}
-  /// Clears the value of `cacheWriteTokens`. Subsequent reads from it will return its default value.
-  public mutating func clearCacheWriteTokens() {self._cacheWriteTokens = nil}
-
-  public var reasoningOutputTokens: UInt64 {
-    get {_reasoningOutputTokens ?? 0}
-    set {_reasoningOutputTokens = newValue}
-  }
-  /// Returns true if `reasoningOutputTokens` has been explicitly set.
-  public var hasReasoningOutputTokens: Bool {self._reasoningOutputTokens != nil}
-  /// Clears the value of `reasoningOutputTokens`. Subsequent reads from it will return its default value.
-  public mutating func clearReasoningOutputTokens() {self._reasoningOutputTokens = nil}
-
-  public var totalTokens: UInt64 {
-    get {_totalTokens ?? 0}
-    set {_totalTokens = newValue}
-  }
-  /// Returns true if `totalTokens` has been explicitly set.
-  public var hasTotalTokens: Bool {self._totalTokens != nil}
-  /// Clears the value of `totalTokens`. Subsequent reads from it will return its default value.
-  public mutating func clearTotalTokens() {self._totalTokens = nil}
-
-  public var durationMs: UInt64 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _inputTokens: UInt64? = nil
-  fileprivate var _outputTokens: UInt64? = nil
-  fileprivate var _cacheReadTokens: UInt64? = nil
-  fileprivate var _cacheWriteTokens: UInt64? = nil
-  fileprivate var _reasoningOutputTokens: UInt64? = nil
-  fileprivate var _totalTokens: UInt64? = nil
 }
 
 public nonisolated struct BriarAPI_WorkerIcon: Sendable {
@@ -2192,7 +2119,7 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
     var _tracker: BriarAPI_TrackerReference? = nil
     var _waitingCheckpoint: BriarAPI_WaitingCheckpoint? = nil
     var _issueCheckpoints: [BriarTypes_WorkflowCheckpointSpec] = []
-    var _executionMetrics: BriarAPI_AgentExecutionMetrics? = nil
+    var _executionMetrics: BriarTypes_AgentExecutionMetrics? = nil
     var _targetSha: String? = nil
     var _stagingQaStatus: BriarAPI_DashboardRun.QaStatus? = nil
     var _productionQaStatus: BriarAPI_DashboardRun.QaStatus? = nil
@@ -2755,70 +2682,6 @@ nonisolated extension BriarAPI_WaitingCheckpoint: SwiftProtobuf.Message, SwiftPr
   public static func ==(lhs: BriarAPI_WaitingCheckpoint, rhs: BriarAPI_WaitingCheckpoint) -> Bool {
     if lhs.key != rhs.key {return false}
     if lhs.revision != rhs.revision {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension BriarAPI_AgentExecutionMetrics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".AgentExecutionMetrics"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}input_tokens\0\u{3}output_tokens\0\u{3}cache_read_tokens\0\u{3}cache_write_tokens\0\u{3}reasoning_output_tokens\0\u{3}total_tokens\0\u{3}duration_ms\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self._inputTokens) }()
-      case 2: try { try decoder.decodeSingularUInt64Field(value: &self._outputTokens) }()
-      case 3: try { try decoder.decodeSingularUInt64Field(value: &self._cacheReadTokens) }()
-      case 4: try { try decoder.decodeSingularUInt64Field(value: &self._cacheWriteTokens) }()
-      case 5: try { try decoder.decodeSingularUInt64Field(value: &self._reasoningOutputTokens) }()
-      case 6: try { try decoder.decodeSingularUInt64Field(value: &self._totalTokens) }()
-      case 7: try { try decoder.decodeSingularUInt64Field(value: &self.durationMs) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._inputTokens {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._outputTokens {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._cacheReadTokens {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._cacheWriteTokens {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._reasoningOutputTokens {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._totalTokens {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 6)
-    } }()
-    if self.durationMs != 0 {
-      try visitor.visitSingularUInt64Field(value: self.durationMs, fieldNumber: 7)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: BriarAPI_AgentExecutionMetrics, rhs: BriarAPI_AgentExecutionMetrics) -> Bool {
-    if lhs._inputTokens != rhs._inputTokens {return false}
-    if lhs._outputTokens != rhs._outputTokens {return false}
-    if lhs._cacheReadTokens != rhs._cacheReadTokens {return false}
-    if lhs._cacheWriteTokens != rhs._cacheWriteTokens {return false}
-    if lhs._reasoningOutputTokens != rhs._reasoningOutputTokens {return false}
-    if lhs._totalTokens != rhs._totalTokens {return false}
-    if lhs.durationMs != rhs.durationMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

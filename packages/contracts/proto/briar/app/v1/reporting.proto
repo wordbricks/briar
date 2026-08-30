@@ -3,7 +3,7 @@ syntax = "proto3";
 package briar.app.v1;
 
 import "briar/app/v1/common.proto";
-import "briar/app/v1/dashboard.proto";
+import "briar/types/v1/agent_execution.proto";
 import "briar/types/v1/provider.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -31,14 +31,6 @@ enum ProjectUsagePeriod {
   PROJECT_USAGE_PERIOD_DAY = 1;
   PROJECT_USAGE_PERIOD_WEEK = 2;
   PROJECT_USAGE_PERIOD_MONTH = 3;
-}
-
-enum AgentExecutionModelSource {
-  AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED = 0;
-  AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED = 1;
-  AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG = 2;
-  AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK = 3;
-  AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN = 4;
 }
 
 enum AgentUsagePricingStatus {
@@ -96,7 +88,7 @@ message AgentUsageRecord {
   optional string model_provider = 12;
   optional string model = 13;
   optional string canonical_model = 14;
-  AgentExecutionModelSource model_source = 15;
+  briar.types.v1.AgentExecutionModelSource model_source = 15;
   string source = 16;
   optional uint64 uncached_input_tokens = 17;
   optional uint64 cache_read_tokens = 18;
@@ -124,7 +116,7 @@ message AgentUsageCostRecord {
   optional string model_provider = 13;
   optional string model = 14;
   optional string canonical_model = 15;
-  AgentExecutionModelSource model_source = 16;
+  briar.types.v1.AgentExecutionModelSource model_source = 16;
   string source = 17;
   uint64 amount_usd_ticks = 18;
   google.protobuf.Timestamp observed_at = 19;
@@ -146,7 +138,7 @@ message AgentUsageEstimatedCostRecord {
   optional string model_provider = 12;
   optional string model = 13;
   optional string canonical_model = 14;
-  AgentExecutionModelSource model_source = 15;
+  briar.types.v1.AgentExecutionModelSource model_source = 15;
   google.protobuf.Timestamp observed_at = 16;
   string usage_source = 17;
   string pricing_key = 18;
@@ -157,7 +149,7 @@ message AgentUsageRun {
   string id = 1;
   string project_id = 2;
   RunStatus status = 3;
-  optional AgentExecutionMetrics execution_metrics = 4;
+  optional briar.types.v1.AgentExecutionMetrics execution_metrics = 4;
   optional string claimed_by = 5;
   optional google.protobuf.Timestamp claimed_at = 6;
   uint32 claim_attempts = 7;

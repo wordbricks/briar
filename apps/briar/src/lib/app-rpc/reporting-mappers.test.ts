@@ -2,7 +2,6 @@ import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
-  AgentExecutionModelSource,
   AgentUsageCostRecordSchema,
   AgentUsageEstimatedCostRecordSchema,
   AgentUsagePricingSchema,
@@ -14,6 +13,7 @@ import {
   ProjectUsagePeriod,
   StatusTrayRunSchema,
 } from "@briar/contracts/gen/briar/app/v1/reporting_pb";
+import { AgentExecutionModelSource } from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { describe, expect, it } from "vitest";
 import {

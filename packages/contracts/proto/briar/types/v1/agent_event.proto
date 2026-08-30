@@ -4,6 +4,12 @@ package briar.types.v1;
 
 option swift_prefix = "BriarTypes_";
 
+enum AgentEventDirection {
+  AGENT_EVENT_DIRECTION_UNSPECIFIED = 0;
+  AGENT_EVENT_DIRECTION_CLIENT = 1;
+  AGENT_EVENT_DIRECTION_SERVER = 2;
+}
+
 enum AgentActivityKind {
   AGENT_ACTIVITY_KIND_UNSPECIFIED = 0;
   AGENT_ACTIVITY_KIND_MESSAGE = 1;

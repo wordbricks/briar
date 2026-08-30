@@ -28,12 +28,6 @@ enum SandboxMode {
   SANDBOX_MODE_DANGER_FULL_ACCESS = 3;
 }
 
-enum EventDirection {
-  EVENT_DIRECTION_UNSPECIFIED = 0;
-  EVENT_DIRECTION_CLIENT = 1;
-  EVENT_DIRECTION_SERVER = 2;
-}
-
 enum BlockReason {
   BLOCK_REASON_UNSPECIFIED = 0;
   BLOCK_REASON_MCP_AUTH_REQUIRED = 1;
@@ -123,7 +117,7 @@ message ProviderEvent {
   // escape hatch while the normalized event beside them is fully typed.
   google.protobuf.Value raw = 1;
   optional briar.types.v1.NormalizedAgentEvent normalized = 2;
-  EventDirection direction = 3;
+  briar.types.v1.AgentEventDirection direction = 3;
 }
 
 message ApprovalRequest {

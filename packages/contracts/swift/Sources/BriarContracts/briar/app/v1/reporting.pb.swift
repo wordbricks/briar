@@ -104,52 +104,6 @@ public nonisolated enum BriarAPI_ProjectUsagePeriod: SwiftProtobuf.Enum, Swift.C
 
 }
 
-public nonisolated enum BriarAPI_AgentExecutionModelSource: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case providerReported // = 1
-  case providerConfig // = 2
-  case configuredFallback // = 3
-  case unknown // = 4
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .providerReported
-    case 2: self = .providerConfig
-    case 3: self = .configuredFallback
-    case 4: self = .unknown
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .providerReported: return 1
-    case .providerConfig: return 2
-    case .configuredFallback: return 3
-    case .unknown: return 4
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [BriarAPI_AgentExecutionModelSource] = [
-    .unspecified,
-    .providerReported,
-    .providerConfig,
-    .configuredFallback,
-    .unknown,
-  ]
-
-}
-
 public nonisolated enum BriarAPI_AgentUsagePricingStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -473,7 +427,7 @@ public nonisolated struct BriarAPI_AgentUsageRecord: @unchecked Sendable {
   /// Clears the value of `canonicalModel`. Subsequent reads from it will return its default value.
   public mutating func clearCanonicalModel() {_uniqueStorage()._canonicalModel = nil}
 
-  public var modelSource: BriarAPI_AgentExecutionModelSource {
+  public var modelSource: BriarTypes_AgentExecutionModelSource {
     get {_storage._modelSource}
     set {_uniqueStorage()._modelSource = newValue}
   }
@@ -678,7 +632,7 @@ public nonisolated struct BriarAPI_AgentUsageCostRecord: @unchecked Sendable {
   /// Clears the value of `canonicalModel`. Subsequent reads from it will return its default value.
   public mutating func clearCanonicalModel() {_uniqueStorage()._canonicalModel = nil}
 
-  public var modelSource: BriarAPI_AgentExecutionModelSource {
+  public var modelSource: BriarTypes_AgentExecutionModelSource {
     get {_storage._modelSource}
     set {_uniqueStorage()._modelSource = newValue}
   }
@@ -825,7 +779,7 @@ public nonisolated struct BriarAPI_AgentUsageEstimatedCostRecord: @unchecked Sen
   /// Clears the value of `canonicalModel`. Subsequent reads from it will return its default value.
   public mutating func clearCanonicalModel() {_uniqueStorage()._canonicalModel = nil}
 
-  public var modelSource: BriarAPI_AgentExecutionModelSource {
+  public var modelSource: BriarTypes_AgentExecutionModelSource {
     get {_storage._modelSource}
     set {_uniqueStorage()._modelSource = newValue}
   }
@@ -881,8 +835,8 @@ public nonisolated struct BriarAPI_AgentUsageRun: @unchecked Sendable {
     set {_uniqueStorage()._status = newValue}
   }
 
-  public var executionMetrics: BriarAPI_AgentExecutionMetrics {
-    get {_storage._executionMetrics ?? BriarAPI_AgentExecutionMetrics()}
+  public var executionMetrics: BriarTypes_AgentExecutionMetrics {
+    get {_storage._executionMetrics ?? BriarTypes_AgentExecutionMetrics()}
     set {_uniqueStorage()._executionMetrics = newValue}
   }
   /// Returns true if `executionMetrics` has been explicitly set.
@@ -1451,10 +1405,6 @@ nonisolated extension BriarAPI_ProjectUsagePeriod: SwiftProtobuf._ProtoNameProvi
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PROJECT_USAGE_PERIOD_UNSPECIFIED\0\u{1}PROJECT_USAGE_PERIOD_DAY\0\u{1}PROJECT_USAGE_PERIOD_WEEK\0\u{1}PROJECT_USAGE_PERIOD_MONTH\0")
 }
 
-nonisolated extension BriarAPI_AgentExecutionModelSource: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AGENT_EXECUTION_MODEL_SOURCE_UNSPECIFIED\0\u{1}AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_REPORTED\0\u{1}AGENT_EXECUTION_MODEL_SOURCE_PROVIDER_CONFIG\0\u{1}AGENT_EXECUTION_MODEL_SOURCE_CONFIGURED_FALLBACK\0\u{1}AGENT_EXECUTION_MODEL_SOURCE_UNKNOWN\0")
-}
-
 nonisolated extension BriarAPI_AgentUsagePricingStatus: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AGENT_USAGE_PRICING_STATUS_UNSPECIFIED\0\u{1}AGENT_USAGE_PRICING_STATUS_LIVE\0\u{1}AGENT_USAGE_PRICING_STATUS_CACHED\0\u{1}AGENT_USAGE_PRICING_STATUS_UNAVAILABLE\0")
 }
@@ -1604,7 +1554,7 @@ nonisolated extension BriarAPI_AgentUsageRecord: SwiftProtobuf.Message, SwiftPro
     var _modelProvider: String? = nil
     var _model: String? = nil
     var _canonicalModel: String? = nil
-    var _modelSource: BriarAPI_AgentExecutionModelSource = .unspecified
+    var _modelSource: BriarTypes_AgentExecutionModelSource = .unspecified
     var _source: String = String()
     var _uncachedInputTokens: UInt64? = nil
     var _cacheReadTokens: UInt64? = nil
@@ -1836,7 +1786,7 @@ nonisolated extension BriarAPI_AgentUsageCostRecord: SwiftProtobuf.Message, Swif
     var _modelProvider: String? = nil
     var _model: String? = nil
     var _canonicalModel: String? = nil
-    var _modelSource: BriarAPI_AgentExecutionModelSource = .unspecified
+    var _modelSource: BriarTypes_AgentExecutionModelSource = .unspecified
     var _source: String = String()
     var _amountUsdTicks: UInt64 = 0
     var _observedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
@@ -2038,7 +1988,7 @@ nonisolated extension BriarAPI_AgentUsageEstimatedCostRecord: SwiftProtobuf.Mess
     var _modelProvider: String? = nil
     var _model: String? = nil
     var _canonicalModel: String? = nil
-    var _modelSource: BriarAPI_AgentExecutionModelSource = .unspecified
+    var _modelSource: BriarTypes_AgentExecutionModelSource = .unspecified
     var _observedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _usageSource: String = String()
     var _pricingKey: String = String()
@@ -2223,7 +2173,7 @@ nonisolated extension BriarAPI_AgentUsageRun: SwiftProtobuf.Message, SwiftProtob
     var _id: String = String()
     var _projectID: String = String()
     var _status: BriarAPI_RunStatus = .unspecified
-    var _executionMetrics: BriarAPI_AgentExecutionMetrics? = nil
+    var _executionMetrics: BriarTypes_AgentExecutionMetrics? = nil
     var _claimedBy: String? = nil
     var _claimedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _claimAttempts: UInt32 = 0

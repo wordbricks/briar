@@ -3,6 +3,8 @@ syntax = "proto3";
 package briar.worker.v1;
 
 import "briar/app/v1/issue.proto";
+import "briar/types/v1/agent_event.proto";
+import "briar/types/v1/agent_execution.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/workflow.proto";
 import "google/protobuf/struct.proto";
@@ -19,13 +21,14 @@ service WorkerQueueService {
 }
 
 // Execution-credential operations shared by the interactive CLI and the
-// desktop-hosted Auto Hunt runtime. Result mutation and uploads remain on
-// their dedicated transports.
+// desktop-hosted Auto Hunt runtime.
 service WorkerExecutionService {
   rpc ClaimIssue(ClaimIssueRequest) returns (ClaimIssueResponse);
   // Shared intentionally with IssueService so evidence has one DTO.
   // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
   rpc ListRunEvidence(briar.app.v1.ListRunEvidenceRequest) returns (briar.app.v1.ListRunEvidenceResponse);
+  rpc AppendTranscriptEvents(AppendTranscriptEventsRequest) returns (AppendTranscriptEventsResponse);
+  rpc ReportIssueExecutionTelemetry(ReportIssueExecutionTelemetryRequest) returns (ReportIssueExecutionTelemetryResponse);
 }
 
 message ClaimIssueRequest {
@@ -36,6 +39,51 @@ message ClaimIssueRequest {
 
 message ClaimIssueResponse {
   optional ClaimedIssue issue = 1;
+}
+
+message AppendTranscriptEventsRequest {
+  string project_id = 1;
+  WorkClaimIdentity work = 2;
+  string session_id = 3;
+  briar.types.v1.AgentProvider agent_provider = 4;
+  repeated AgentTranscriptEvent events = 5;
+}
+
+message AgentTranscriptEvent {
+  uint64 sequence = 1;
+  briar.types.v1.AgentEventDirection direction = 2;
+  google.protobuf.Value raw_payload = 3;
+  optional briar.types.v1.NormalizedAgentEvent normalized = 4;
+  optional TranscriptArchiveCompaction archive_compaction = 5;
+}
+
+message TranscriptArchiveCompaction {
+  uint64 first_sequence = 1;
+  uint32 represented_event_count = 2;
+}
+
+message AppendTranscriptEventsResponse {
+  string session_id = 1;
+  uint32 archived_event_count = 2;
+  uint64 archived_uncompressed_bytes = 3;
+  uint64 archived_compressed_bytes = 4;
+  uint32 projected_entry_count = 5;
+}
+
+message ReportIssueExecutionTelemetryRequest {
+  string project_id = 1;
+  WorkClaimIdentity work = 2;
+  optional string execution_id = 3;
+  briar.types.v1.AgentProvider agent_provider = 4;
+  briar.types.v1.AgentExecutionMetrics execution_metrics = 5;
+  repeated briar.types.v1.AgentUsageObservation usage_observations = 6;
+  repeated briar.types.v1.AgentCostObservation cost_observations = 7;
+}
+
+message ReportIssueExecutionTelemetryResponse {
+  bool execution_metrics_updated = 1;
+  uint32 usage_observations_stored = 2;
+  uint32 cost_observations_stored = 3;
 }
 
 message ClaimWorkRequest {

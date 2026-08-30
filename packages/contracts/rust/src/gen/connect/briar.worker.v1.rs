@@ -40,6 +40,30 @@ pub type OwnedListRunEvidenceRequestView = ::buffa::view::OwnedView<
 pub type OwnedListRunEvidenceResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::ListRunEvidenceResponseView<'static>,
 >;
+///Shorthand for `OwnedView<AppendTranscriptEventsRequestView<'static>>`.
+pub type OwnedAppendTranscriptEventsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AppendTranscriptEventsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<AppendTranscriptEventsResponseView<'static>>`.
+pub type OwnedAppendTranscriptEventsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AppendTranscriptEventsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ReportIssueExecutionTelemetryRequestView<'static>>`.
+pub type OwnedReportIssueExecutionTelemetryRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ReportIssueExecutionTelemetryRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ReportIssueExecutionTelemetryResponseView<'static>>`.
+pub type OwnedReportIssueExecutionTelemetryResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ReportIssueExecutionTelemetryResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ClaimWorkResponse>
 for crate::proto::briar::worker::v1::__buffa::view::ClaimWorkResponseView<'_> {
     fn encode(
@@ -154,6 +178,90 @@ for crate::proto::briar::worker::v1::__buffa::view::ClaimIssueResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ClaimIssueResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ClaimIssueResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::AppendTranscriptEventsResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::AppendTranscriptEventsResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::AppendTranscriptEventsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AppendTranscriptEventsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::ReportIssueExecutionTelemetryResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ReportIssueExecutionTelemetryResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -873,9 +981,20 @@ pub const WORKER_EXECUTION_SERVICE_LIST_RUN_EVIDENCE_SPEC: ::connectrpc::Spec = 
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `AppendTranscriptEvents` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_EXECUTION_SERVICE_APPEND_TRANSCRIPT_EVENTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerExecutionService/AppendTranscriptEvents",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ReportIssueExecutionTelemetry` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_EXECUTION_SERVICE_REPORT_ISSUE_EXECUTION_TELEMETRY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerExecutionService/ReportIssueExecutionTelemetry",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Execution-credential operations shared by the interactive CLI and the
-/// desktop-hosted Auto Hunt runtime. Result mutation and uploads remain on
-/// their dedicated transports.
+/// desktop-hosted Auto Hunt runtime.
 ///
 /// # Implementing handlers
 ///
@@ -973,6 +1092,52 @@ pub trait WorkerExecutionService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Handle the AppendTranscriptEvents RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn append_transcript_events<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::AppendTranscriptEventsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::AppendTranscriptEventsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ReportIssueExecutionTelemetry RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn report_issue_execution_telemetry<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -1063,6 +1228,64 @@ impl<S: WorkerExecutionService> WorkerExecutionServiceExt for S {
                 },
             )
             .with_spec(WORKER_EXECUTION_SERVICE_LIST_RUN_EVIDENCE_SPEC)
+            .route_view(
+                WORKER_EXECUTION_SERVICE_SERVICE_NAME,
+                "AppendTranscriptEvents",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::AppendTranscriptEventsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::AppendTranscriptEventsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.append_transcript_events(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::AppendTranscriptEventsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_EXECUTION_SERVICE_APPEND_TRANSCRIPT_EVENTS_SPEC)
+            .route_view(
+                WORKER_EXECUTION_SERVICE_SERVICE_NAME,
+                "ReportIssueExecutionTelemetry",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::ReportIssueExecutionTelemetryRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.report_issue_execution_telemetry(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_EXECUTION_SERVICE_REPORT_ISSUE_EXECUTION_TELEMETRY_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -1132,6 +1355,22 @@ for WorkerExecutionServiceServer<T> {
                         .with_spec(WORKER_EXECUTION_SERVICE_LIST_RUN_EVIDENCE_SPEC),
                 )
             }
+            "AppendTranscriptEvents" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_EXECUTION_SERVICE_APPEND_TRANSCRIPT_EVENTS_SPEC,
+                        ),
+                )
+            }
+            "ReportIssueExecutionTelemetry" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_EXECUTION_SERVICE_REPORT_ISSUE_EXECUTION_TELEMETRY_SPEC,
+                        ),
+                )
+            }
             _ => None,
         }
     }
@@ -1189,6 +1428,50 @@ for WorkerExecutionServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::ListRunEvidenceResponse,
+                        >(format)
+                })
+            }
+            "AppendTranscriptEvents" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::AppendTranscriptEventsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::AppendTranscriptEventsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::AppendTranscriptEventsRequest,
+                    >::from_parts(&req, &body);
+                    svc.append_transcript_events(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::AppendTranscriptEventsResponse,
+                        >(format)
+                })
+            }
+            "ReportIssueExecutionTelemetry" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::ReportIssueExecutionTelemetryRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryRequest,
+                    >::from_parts(&req, &body);
+                    svc.report_issue_execution_telemetry(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryResponse,
                         >(format)
                 })
             }
@@ -1409,6 +1692,96 @@ where
                 &self.transport,
                 &self.config,
                 WORKER_EXECUTION_SERVICE_LIST_RUN_EVIDENCE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AppendTranscriptEvents RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/AppendTranscriptEvents.
+    pub async fn append_transcript_events(
+        &self,
+        request: crate::proto::briar::worker::v1::AppendTranscriptEventsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AppendTranscriptEventsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.append_transcript_events_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AppendTranscriptEvents RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn append_transcript_events_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::AppendTranscriptEventsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AppendTranscriptEventsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_EXECUTION_SERVICE_APPEND_TRANSCRIPT_EVENTS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ReportIssueExecutionTelemetry RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/ReportIssueExecutionTelemetry.
+    pub async fn report_issue_execution_telemetry(
+        &self,
+        request: crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ReportIssueExecutionTelemetryResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.report_issue_execution_telemetry_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ReportIssueExecutionTelemetry RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn report_issue_execution_telemetry_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::ReportIssueExecutionTelemetryRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ReportIssueExecutionTelemetryResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_EXECUTION_SERVICE_REPORT_ISSUE_EXECUTION_TELEMETRY_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

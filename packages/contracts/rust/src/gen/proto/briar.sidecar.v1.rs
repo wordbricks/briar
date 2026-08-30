@@ -331,158 +331,6 @@ impl ::buffa::Enumeration for SandboxMode {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
-pub enum EventDirection {
-    EVENT_DIRECTION_UNSPECIFIED = 0i32,
-    EVENT_DIRECTION_CLIENT = 1i32,
-    EVENT_DIRECTION_SERVER = 2i32,
-}
-impl EventDirection {
-    ///Idiomatic alias for [`Self::EVENT_DIRECTION_UNSPECIFIED`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Unspecified: Self = Self::EVENT_DIRECTION_UNSPECIFIED;
-    ///Idiomatic alias for [`Self::EVENT_DIRECTION_CLIENT`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Client: Self = Self::EVENT_DIRECTION_CLIENT;
-    ///Idiomatic alias for [`Self::EVENT_DIRECTION_SERVER`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Server: Self = Self::EVENT_DIRECTION_SERVER;
-}
-impl ::core::default::Default for EventDirection {
-    fn default() -> Self {
-        Self::EVENT_DIRECTION_UNSPECIFIED
-    }
-}
-impl ::serde::Serialize for EventDirection {
-    fn serialize<S: ::serde::Serializer>(
-        &self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        s.serialize_str(::buffa::Enumeration::proto_name(self))
-    }
-}
-impl<'de> ::serde::Deserialize<'de> for EventDirection {
-    fn deserialize<D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        struct _V;
-        impl ::serde::de::Visitor<'_> for _V {
-            type Value = EventDirection;
-            fn expecting(
-                &self,
-                f: &mut ::core::fmt::Formatter<'_>,
-            ) -> ::core::fmt::Result {
-                f.write_str(
-                    concat!(
-                        "a string, integer, or null for ", stringify!(EventDirection)
-                    ),
-                )
-            }
-            fn visit_str<E: ::serde::de::Error>(
-                self,
-                v: &str,
-            ) -> ::core::result::Result<EventDirection, E> {
-                <EventDirection as ::buffa::Enumeration>::from_proto_name(v)
-                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
-            }
-            fn visit_i64<E: ::serde::de::Error>(
-                self,
-                v: i64,
-            ) -> ::core::result::Result<EventDirection, E> {
-                let v32 = i32::try_from(v)
-                    .map_err(|_| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
-                        )
-                    })?;
-                <EventDirection as ::buffa::Enumeration>::from_i32(v32)
-                    .ok_or_else(|| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("unknown enum value {v32}"),
-                        )
-                    })
-            }
-            fn visit_u64<E: ::serde::de::Error>(
-                self,
-                v: u64,
-            ) -> ::core::result::Result<EventDirection, E> {
-                let v32 = i32::try_from(v)
-                    .map_err(|_| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
-                        )
-                    })?;
-                <EventDirection as ::buffa::Enumeration>::from_i32(v32)
-                    .ok_or_else(|| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("unknown enum value {v32}"),
-                        )
-                    })
-            }
-            fn visit_unit<E: ::serde::de::Error>(
-                self,
-            ) -> ::core::result::Result<EventDirection, E> {
-                ::core::result::Result::Ok(::core::default::Default::default())
-            }
-        }
-        d.deserialize_any(_V)
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for EventDirection {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-impl ::buffa::Enumeration for EventDirection {
-    fn from_i32(value: i32) -> ::core::option::Option<Self> {
-        match value {
-            0i32 => ::core::option::Option::Some(Self::EVENT_DIRECTION_UNSPECIFIED),
-            1i32 => ::core::option::Option::Some(Self::EVENT_DIRECTION_CLIENT),
-            2i32 => ::core::option::Option::Some(Self::EVENT_DIRECTION_SERVER),
-            _ => ::core::option::Option::None,
-        }
-    }
-    fn to_i32(&self) -> i32 {
-        *self as i32
-    }
-    fn proto_name(&self) -> &'static str {
-        match self {
-            Self::EVENT_DIRECTION_UNSPECIFIED => "EVENT_DIRECTION_UNSPECIFIED",
-            Self::EVENT_DIRECTION_CLIENT => "EVENT_DIRECTION_CLIENT",
-            Self::EVENT_DIRECTION_SERVER => "EVENT_DIRECTION_SERVER",
-        }
-    }
-    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
-        match name {
-            "EVENT_DIRECTION_UNSPECIFIED" => {
-                ::core::option::Option::Some(Self::EVENT_DIRECTION_UNSPECIFIED)
-            }
-            "EVENT_DIRECTION_CLIENT" => {
-                ::core::option::Option::Some(Self::EVENT_DIRECTION_CLIENT)
-            }
-            "EVENT_DIRECTION_SERVER" => {
-                ::core::option::Option::Some(Self::EVENT_DIRECTION_SERVER)
-            }
-            _ => ::core::option::Option::None,
-        }
-    }
-    fn values() -> &'static [Self] {
-        &[
-            Self::EVENT_DIRECTION_UNSPECIFIED,
-            Self::EVENT_DIRECTION_CLIENT,
-            Self::EVENT_DIRECTION_SERVER,
-        ]
-    }
-}
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(i32)]
 pub enum BlockReason {
     BLOCK_REASON_UNSPECIFIED = 0i32,
     BLOCK_REASON_MCP_AUTH_REQUIRED = 1i32,
@@ -2936,7 +2784,7 @@ pub struct ProviderEvent {
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub direction: ::buffa::EnumValue<EventDirection>,
+    pub direction: ::buffa::EnumValue<super::super::types::v1::AgentEventDirection>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -7013,7 +6861,9 @@ pub mod __buffa {
                 >,
             >,
             /// Field 3: `direction`
-            pub direction: ::buffa::EnumValue<super::super::EventDirection>,
+            pub direction: ::buffa::EnumValue<
+                super::super::super::super::types::v1::AgentEventDirection,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ProviderEventView<'a> {
@@ -7385,7 +7235,11 @@ pub mod __buffa {
             }
             /// Field 3: `direction`
             #[must_use]
-            pub fn direction(&self) -> ::buffa::EnumValue<super::super::EventDirection> {
+            pub fn direction(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::types::v1::AgentEventDirection,
+            > {
                 self.0.reborrow().direction
             }
         }
