@@ -9,16 +9,8 @@ import {
   decodeOrganizationMemberRoleInput,
   decodeOrganizationUpdateInput,
 } from "./account-organization-request-contract";
-import { buildInboxFeedMessages } from "./inbox-feed";
 import { sha256 } from "./crypto-digest";
-import { listDashboardRuns } from "./hunt-run-read-repository";
 import { HttpError, corsHeaders, json } from "./http-response";
-import {
-  listChannelConversationNotifications,
-  listIssueConversationNotifications,
-  listOrganizationIssueSubscriptionRunIds,
-} from "./issue-notification-repository";
-import { issueSubscribers } from "./issue-subscribers";
 import { hasOrganizationCapability } from "./organization-access";
 import {
   createOrganizationAgent,
@@ -40,11 +32,6 @@ import {
   updateOrganizationMemberProjects,
 } from "./organization-command-repository";
 import {
-  loadOrganizationInboxConditionalSnapshot,
-  organizationInboxSyncJson,
-} from "./organization-inbox-sync";
-import { getOrganizationInboxSyncVersion } from "./organization-inbox-outbox-repository";
-import {
   organizationInvitationJson,
   organizationJson,
   organizationMemberJson,
@@ -59,8 +46,6 @@ import {
   listOrganizations,
   type OrganizationRow,
 } from "./organization-repository";
-import { listProjectAgentSessionSummaries } from "./project-agent-session-repository";
-import { listOrganizationInboxProjects } from "./project-repository";
 import { decodeOrganizationAgentWrite } from "./project-request-contract";
 import { readJson } from "./request-readers";
 import { decodeUsageRangeDays } from "./run-request-contract";
@@ -84,14 +69,6 @@ import {
 } from "./usage-json";
 
 const organizationInvitationTtlMs = 7 * 24 * 60 * 60 * 1_000;
-
-const occurredAtOrAfter = (occurredAt: string, subscribedAt: string) => {
-  const occurredTime = Date.parse(occurredAt);
-  const subscribedTime = Date.parse(subscribedAt);
-  return Number.isFinite(occurredTime) &&
-    Number.isFinite(subscribedTime) &&
-    occurredTime >= subscribedTime;
-};
 
 export type OrganizationRouteInput = {
   request: Request;
@@ -124,98 +101,6 @@ export async function handleOrganizationRoute(
 ): Promise<Response | undefined> {
   const { request, url, auth, db } = routeInput;
   const { pathname } = url;
-
-  const organizationInboxMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/inbox$/u,
-  );
-  if (organizationInboxMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const organizationId = organizationInboxMatch[1];
-    const role = await getOrganizationRole(db, organizationId, session.user.id);
-    if (!hasOrganizationCapability(role, "organization:read")) {
-      throw new HttpError(404, "Organization not found");
-    }
-    const result = await loadOrganizationInboxConditionalSnapshot({
-      organizationId,
-      ifNoneMatch: request.headers.get("if-none-match"),
-      readVersion: () => getOrganizationInboxSyncVersion(db, organizationId),
-      loadSnapshot: async () => {
-        const projects = await listOrganizationInboxProjects(
-          db,
-          organizationId,
-          session.user.id,
-        );
-        const [projectData, channelNotifications, subscribedIssueIds] =
-          await Promise.all([
-            Promise.all(
-              projects.map(async (project) => {
-                const [runs, conversationNotifications, sessionSummaries] =
-                  await Promise.all([
-                    listDashboardRuns(db, project.id),
-                    listIssueConversationNotifications(
-                      db,
-                      project.id,
-                      session.user.id,
-                    ),
-                    listProjectAgentSessionSummaries(
-                      db,
-                      project.id,
-                      undefined,
-                      session.user.id,
-                    ),
-                  ]);
-                return {
-                  project,
-                  runs: runs.filter((run) => {
-                    const subscription = issueSubscribers(run).find(
-                      (subscriber) => subscriber.userId === session.user.id,
-                    );
-                    return Boolean(
-                      subscription && occurredAtOrAfter(
-                        run.last_event_at,
-                        subscription.subscribedAt,
-                      ),
-                    );
-                  }),
-                  conversationNotifications,
-                  sessionSummaries,
-                };
-              }),
-            ),
-            listChannelConversationNotifications(
-              db,
-              organizationId,
-              session.user.id,
-            ),
-            listOrganizationIssueSubscriptionRunIds(
-              db,
-              organizationId,
-              session.user.id,
-            ),
-          ]);
-        return {
-          messages: buildInboxFeedMessages(
-            projectData,
-            channelNotifications,
-            session.user.id,
-          ),
-          subscribedIssueIds,
-          generatedAt: new Date().toISOString(),
-        };
-      },
-    });
-    if (result.snapshot === null) {
-      return new Response(null, {
-        status: 304,
-        headers: {
-          ...corsHeaders,
-          "Cache-Control": "private, no-cache",
-          ETag: result.etag,
-        },
-      });
-    }
-    return organizationInboxSyncJson(result.snapshot, result.etag);
-  }
 
   const publicInvitationMatch = pathname.match(
     /^\/invitations\/(briar_invite_[0-9a-f]{64})$/u,

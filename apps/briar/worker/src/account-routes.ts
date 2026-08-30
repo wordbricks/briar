@@ -8,20 +8,12 @@ import { processArchiveCleanupQueue } from "./archive";
 import {
   decodeAccountDeletionInput,
   decodeAccountProfileInput,
-  decodeCurrentUserResponse,
-  decodeInboxReadStatesInput,
-  decodeInboxUnreadStateInput,
 } from "./account-organization-request-contract";
 import {
   deleteAccountData,
   getProjectRunChildMismatch,
   planAccountDeletion,
 } from "./db";
-import {
-  deleteInboxReadState,
-  listInboxReadStates,
-  upsertInboxReadStates,
-} from "./inbox-read-state-repository";
 import { corsHeaders, HttpError, json } from "./http-response";
 import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
 import { readJson } from "./request-readers";
@@ -61,54 +53,6 @@ export async function handleAccountRoute(
       headers.set(name, value);
     }
     return new Response(response.body, { status: response.status, headers });
-  }
-
-  if (pathname === "/me" && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    return json(decodeCurrentUserResponse({ user: session.user }));
-  }
-
-  if (pathname === "/inbox/read-states" && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const rows = await listInboxReadStates(db, session.user.id);
-    return json({
-      readVersions: Object.fromEntries(
-        rows.map((row) => [row.message_id, row.version]),
-      ),
-    });
-  }
-
-  if (pathname === "/inbox/read-states" && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    const input = decodeInboxReadStatesInput(await readJson(request));
-    const entries = Object.entries(input.readVersions).map(
-      ([messageId, version]) => ({ messageId, version }),
-    );
-    const rows = await upsertInboxReadStates(
-      db,
-      session.user.id,
-      entries,
-      new Date().toISOString(),
-    );
-    return json({
-      readVersions: Object.fromEntries(
-        rows.map((row) => [row.message_id, row.version]),
-      ),
-    });
-  }
-  if (pathname === "/inbox/read-states" && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    const input = decodeInboxUnreadStateInput(await readJson(request));
-    const rows = await deleteInboxReadState(
-      db,
-      session.user.id,
-      input.messageId,
-    );
-    return json({
-      readVersions: Object.fromEntries(
-        rows.map((row) => [row.message_id, row.version]),
-      ),
-    });
   }
 
   if (pathname === "/me" && request.method === "PATCH") {

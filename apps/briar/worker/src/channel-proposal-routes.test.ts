@@ -16,6 +16,11 @@ import {
 } from "./channel-proposal-routes";
 import { listOrganizationChannelMessages } from "./channel-message-routes";
 import { HttpError } from "./http-response";
+import {
+  moveProjectIssueRun,
+  recoverProjectIssueRun,
+} from "./issue-control-routes";
+import { acceptProjectIssueActionProposal } from "./issue-proposal-routes";
 import { createOrganizationAgent } from "./organization-agents";
 import {
   claimNextQueuedHuntRun,
@@ -385,6 +390,32 @@ describe("channel issue proposal approval route", () => {
     }
   };
 
+  const invokeIssueApplication = async (
+    token: string,
+    invoke: (userId: string) => Promise<unknown>,
+  ) => {
+    const session = await db.prepare(
+      `select "userId" as user_id from "session" where token = ?`,
+    ).bind(token).first<{ user_id: string }>();
+    if (!session) {
+      return Response.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    try {
+      return Response.json(await invoke(session.user_id));
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return Response.json({ message: error.message }, { status: error.status });
+      }
+      if (error instanceof RequestDecodeError) {
+        return Response.json({ message: "Invalid request" }, { status: 400 });
+      }
+      if (error instanceof WorkerConflictError) {
+        return Response.json({ message: error.message }, { status: 409 });
+      }
+      return Response.json({ message: "Internal server error" }, { status: 500 });
+    }
+  };
+
   const worker = {
     fetch: (input: Request | ChannelProposalApplicationCall, runtimeEnv: Env) =>
       input instanceof Request
@@ -639,9 +670,18 @@ describe("channel issue proposal approval route", () => {
     });
 
     const dashboard = await worker.fetch(
-      new Request(`https://briar.example/projects/${projectAId}/dashboard`, {
-        headers: { authorization: `Bearer ${ownerToken}` },
-      }),
+      new Request(
+        "https://briar.example/briar.app.v1.DashboardService/GetDashboard",
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${ownerToken}`,
+            "connect-protocol-version": "1",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ projectId: projectAId }),
+        },
+      ),
       env(),
     );
     expect(dashboard.status).toBe(200);
@@ -959,15 +999,16 @@ describe("channel issue proposal approval route", () => {
   it("binds conversation approval to an opaque payload and keeps execution in backlog", async () => {
     const { conversationRunId, proposalId } =
       await seedConversationProposal(101);
-    const response = await worker.fetch(
-      new Request(
-        `https://briar.example/projects/${projectAId}/runs/${conversationRunId}/issue-action-proposals/${proposalId}/accept`,
-        {
-          method: "POST",
-          headers: { authorization: `Bearer ${ownerToken}` },
-        },
-      ),
-      env(),
+    const response = await invokeIssueApplication(ownerToken, (userId) =>
+      acceptProjectIssueActionProposal({
+        db,
+        attachmentsBucket: attachments,
+        archivesBucket: attachments,
+        projectId: projectAId,
+        conversationRunId,
+        proposalId,
+        userId,
+      })
     );
     expect(response.status).toBe(200);
     const body = await response.json() as {
@@ -1062,23 +1103,18 @@ describe("channel issue proposal approval route", () => {
       body.resultRunId,
     ).run();
 
-    const moveResponse = await worker.fetch(
-      new Request(
-        `https://briar.example/projects/${projectAId}/runs/${body.resultRunId}/status`,
-        {
-          method: "PUT",
-          headers: {
-            authorization: `Bearer ${ownerToken}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            requestId: "81000000-0000-4000-8000-000000000101",
-            status: "queued",
-            workflowStage: null,
-          }),
+    const moveResponse = await invokeIssueApplication(ownerToken, (userId) =>
+      moveProjectIssueRun({
+        db,
+        projectId: projectAId,
+        runId: body.resultRunId,
+        userId,
+        request: {
+          requestId: "81000000-0000-4000-8000-000000000101",
+          status: "queued",
+          workflowStage: null,
         },
-      ),
-      env(),
+      })
     );
     expect(moveResponse.status).toBe(409);
     await expect(reworkHuntRun(db, projectAId, {
@@ -1108,15 +1144,16 @@ describe("channel issue proposal approval route", () => {
   it("resets conversation-approved execution on unassign and transfer", async () => {
     const { conversationRunId, proposalId } =
       await seedConversationProposal(103);
-    const accepted = await worker.fetch(
-      new Request(
-        `https://briar.example/projects/${projectAId}/runs/${conversationRunId}/issue-action-proposals/${proposalId}/accept`,
-        {
-          method: "POST",
-          headers: { authorization: `Bearer ${ownerToken}` },
-        },
-      ),
-      env(),
+    const accepted = await invokeIssueApplication(ownerToken, (userId) =>
+      acceptProjectIssueActionProposal({
+        db,
+        attachmentsBucket: attachments,
+        archivesBucket: attachments,
+        projectId: projectAId,
+        conversationRunId,
+        proposalId,
+        userId,
+      })
     );
     expect(accepted.status).toBe(200);
     const acceptedBody = await accepted.json() as { resultRunId: string };
@@ -1666,20 +1703,19 @@ describe("channel issue proposal approval route", () => {
       ), env());
       expect(agentRetry.status).toBe(409);
 
-      const userRetry = await worker.fetch(new Request(
-        `https://briar.example/projects/${projectBId}/runs/${acceptedBody.resultRunId}/retry`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${memberToken}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
+      const userRetry = await invokeIssueApplication(memberToken, (userId) =>
+        recoverProjectIssueRun({
+          db,
+          projectId: projectBId,
+          runId: acceptedBody.resultRunId,
+          action: "retry",
+          userId,
+          request: {
             requestId: `82000000-0000-4000-8000-${suffix}`,
             reason: "Retry after transfer",
-          }),
-        },
-      ), env());
+          },
+        })
+      );
       expect(userRetry.status).toBe(409);
       await expect(claimNextQueuedHuntRun(db, projectBId, {
         claimTokenHash: createHash("sha256")
