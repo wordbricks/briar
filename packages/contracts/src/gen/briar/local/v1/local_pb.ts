@@ -4,8 +4,6 @@
 
 import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
-import type { RunEvidence } from "../../app/v1/issue_pb";
-import { file_briar_app_v1_issue } from "../../app/v1/issue_pb";
 import type { ClaimedIssuePayload, QueuedAttachment } from "../../worker/v1/worker_queue_pb";
 import { file_briar_worker_v1_worker_queue } from "../../worker/v1/worker_queue_pb";
 import type { Message } from "@bufbuild/protobuf";
@@ -14,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/local/v1/local.proto.
  */
 export const file_briar_local_v1_local: GenFile = /*@__PURE__*/
-  fileDesc("Chpicmlhci9sb2NhbC92MS9sb2NhbC5wcm90bxIOYnJpYXIubG9jYWwudjEigQEKEExvY2FsQ2xhaW1SZXN1bHQSMgoHY2xhaW1lZBgBIAEoCzIfLmJyaWFyLmxvY2FsLnYxLkxvY2FsQ2xhaW1lZFJ1bkgAEi4KB25vX3dvcmsYAiABKAsyGy5icmlhci5sb2NhbC52MS5Mb2NhbE5vV29ya0gAQgkKB291dGNvbWUiDQoLTG9jYWxOb1dvcmsilQIKD0xvY2FsQ2xhaW1lZFJ1bhI1CgdwYXlsb2FkGAEgASgLMiQuYnJpYXIud29ya2VyLnYxLkNsYWltZWRJc3N1ZVBheWxvYWQSOgoLYXR0YWNobWVudHMYAiADKAsyJS5icmlhci5sb2NhbC52MS5Mb2NhbFF1ZXVlZEF0dGFjaG1lbnQSFwoPYnJpYXJfaXNzdWVfdXJsGAMgASgJEjYKCXdvcmtzcGFjZRgEIAEoCzIeLmJyaWFyLmxvY2FsLnYxLkxvY2FsV29ya3NwYWNlSACIAQESHAoPd29ya3NwYWNlX2Vycm9yGAUgASgJSAGIAQFCDAoKX3dvcmtzcGFjZUISChBfd29ya3NwYWNlX2Vycm9yIqYBChVMb2NhbFF1ZXVlZEF0dGFjaG1lbnQSNQoKYXR0YWNobWVudBgBIAEoCzIhLmJyaWFyLndvcmtlci52MS5RdWV1ZWRBdHRhY2htZW50EhcKCmxvY2FsX3BhdGgYAiABKAlIAIgBARIbCg5kb3dubG9hZF9lcnJvchgDIAEoCUgBiAEBQg0KC19sb2NhbF9wYXRoQhEKD19kb3dubG9hZF9lcnJvciL8AgoOTG9jYWxXb3Jrc3BhY2USMQoEa2luZBgBIAEoDjIjLmJyaWFyLmxvY2FsLnYxLkxvY2FsV29ya3NwYWNlLktpbmQSDAoEcGF0aBgCIAEoCRITCgZicmFuY2gYAyABKAlIAIgBARIVCghiYXNlX3JlZhgEIAEoCUgBiAEBEh4KEWJhc2VfcmVmX3Jlc29sdmVkGAUgASgJSAKIAQESFQoIYmFzZV9zaGEYBiABKAlIA4gBARIOCgZyZXVzZWQYByABKAgSFgoOaW5jbHVkZWRfcGF0aHMYCCADKAkSFAoHd2FybmluZxgJIAEoCUgEiAEBIkEKBEtpbmQSFAoQS0lORF9VTlNQRUNJRklFRBAAEhAKDEtJTkRfQ1VSUkVOVBABEhEKDUtJTkRfV09SS1RSRUUQAkIJCgdfYnJhbmNoQgsKCV9iYXNlX3JlZkIUChJfYmFzZV9yZWZfcmVzb2x2ZWRCCwoJX2Jhc2Vfc2hhQgoKCF93YXJuaW5nIngKFkxvY2FsUnVuRXZpZGVuY2VSZXN1bHQSKwoIZXZpZGVuY2UYASADKAsyGS5icmlhci5hcHAudjEuUnVuRXZpZGVuY2USDgoGcnVuX2lkGAIgASgJEg8KB2F0dGVtcHQYAyABKA0SEAoIcmV2aXNpb24YBCABKA1CDroCC0JyaWFyTG9jYWxfYgZwcm90bzM", [file_briar_app_v1_issue, file_briar_worker_v1_worker_queue]);
+  fileDesc("Chpicmlhci9sb2NhbC92MS9sb2NhbC5wcm90bxIOYnJpYXIubG9jYWwudjEigQEKEExvY2FsQ2xhaW1SZXN1bHQSMgoHY2xhaW1lZBgBIAEoCzIfLmJyaWFyLmxvY2FsLnYxLkxvY2FsQ2xhaW1lZFJ1bkgAEi4KB25vX3dvcmsYAiABKAsyGy5icmlhci5sb2NhbC52MS5Mb2NhbE5vV29ya0gAQgkKB291dGNvbWUiDQoLTG9jYWxOb1dvcmsilQIKD0xvY2FsQ2xhaW1lZFJ1bhI1CgdwYXlsb2FkGAEgASgLMiQuYnJpYXIud29ya2VyLnYxLkNsYWltZWRJc3N1ZVBheWxvYWQSOgoLYXR0YWNobWVudHMYAiADKAsyJS5icmlhci5sb2NhbC52MS5Mb2NhbFF1ZXVlZEF0dGFjaG1lbnQSFwoPYnJpYXJfaXNzdWVfdXJsGAMgASgJEjYKCXdvcmtzcGFjZRgEIAEoCzIeLmJyaWFyLmxvY2FsLnYxLkxvY2FsV29ya3NwYWNlSACIAQESHAoPd29ya3NwYWNlX2Vycm9yGAUgASgJSAGIAQFCDAoKX3dvcmtzcGFjZUISChBfd29ya3NwYWNlX2Vycm9yIqYBChVMb2NhbFF1ZXVlZEF0dGFjaG1lbnQSNQoKYXR0YWNobWVudBgBIAEoCzIhLmJyaWFyLndvcmtlci52MS5RdWV1ZWRBdHRhY2htZW50EhcKCmxvY2FsX3BhdGgYAiABKAlIAIgBARIbCg5kb3dubG9hZF9lcnJvchgDIAEoCUgBiAEBQg0KC19sb2NhbF9wYXRoQhEKD19kb3dubG9hZF9lcnJvciL8AgoOTG9jYWxXb3Jrc3BhY2USMQoEa2luZBgBIAEoDjIjLmJyaWFyLmxvY2FsLnYxLkxvY2FsV29ya3NwYWNlLktpbmQSDAoEcGF0aBgCIAEoCRITCgZicmFuY2gYAyABKAlIAIgBARIVCghiYXNlX3JlZhgEIAEoCUgBiAEBEh4KEWJhc2VfcmVmX3Jlc29sdmVkGAUgASgJSAKIAQESFQoIYmFzZV9zaGEYBiABKAlIA4gBARIOCgZyZXVzZWQYByABKAgSFgoOaW5jbHVkZWRfcGF0aHMYCCADKAkSFAoHd2FybmluZxgJIAEoCUgEiAEBIkEKBEtpbmQSFAoQS0lORF9VTlNQRUNJRklFRBAAEhAKDEtJTkRfQ1VSUkVOVBABEhEKDUtJTkRfV09SS1RSRUUQAkIJCgdfYnJhbmNoQgsKCV9iYXNlX3JlZkIUChJfYmFzZV9yZWZfcmVzb2x2ZWRCCwoJX2Jhc2Vfc2hhQgoKCF93YXJuaW5nQg66AgtCcmlhckxvY2FsX2IGcHJvdG8z", [file_briar_worker_v1_worker_queue]);
 
 /**
  * Stable ProtoJSON written by `briar queue claim` for local process consumers.
@@ -208,38 +206,4 @@ export enum LocalWorkspace_Kind {
  */
 export const LocalWorkspace_KindSchema: GenEnum<LocalWorkspace_Kind> = /*@__PURE__*/
   enumDesc(file_briar_local_v1_local, 4, 0);
-
-/**
- * Stable ProtoJSON written by `briar run evidence list`.
- *
- * @generated from message briar.local.v1.LocalRunEvidenceResult
- */
-export type LocalRunEvidenceResult = Message<"briar.local.v1.LocalRunEvidenceResult"> & {
-  /**
-   * @generated from field: repeated briar.app.v1.RunEvidence evidence = 1;
-   */
-  evidence: RunEvidence[];
-
-  /**
-   * @generated from field: string run_id = 2;
-   */
-  runId: string;
-
-  /**
-   * @generated from field: uint32 attempt = 3;
-   */
-  attempt: number;
-
-  /**
-   * @generated from field: uint32 revision = 4;
-   */
-  revision: number;
-};
-
-/**
- * Describes the message briar.local.v1.LocalRunEvidenceResult.
- * Use `create(LocalRunEvidenceResultSchema)` to create a new message.
- */
-export const LocalRunEvidenceResultSchema: GenMessage<LocalRunEvidenceResult> = /*@__PURE__*/
-  messageDesc(file_briar_local_v1_local, 5);
 

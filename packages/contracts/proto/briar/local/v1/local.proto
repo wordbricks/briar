@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package briar.local.v1;
 
-import "briar/app/v1/issue.proto";
 import "briar/worker/v1/worker_queue.proto";
 
 option swift_prefix = "BriarLocal_";
@@ -49,12 +48,4 @@ message LocalWorkspace {
   bool reused = 7;
   repeated string included_paths = 8;
   optional string warning = 9;
-}
-
-// Stable ProtoJSON written by `briar run evidence list`.
-message LocalRunEvidenceResult {
-  repeated briar.app.v1.RunEvidence evidence = 1;
-  string run_id = 2;
-  uint32 attempt = 3;
-  uint32 revision = 4;
 }
