@@ -53,7 +53,7 @@
       "/managed-computers*",
       "/worker-claims",
       "/runs*",
-      "/issue-reply-claims*",
+      "/reply-attachment-uploads*",
       "/agent-schedule-runs/claim",
       "/channel-reply-claims*",
       "/queue*",
