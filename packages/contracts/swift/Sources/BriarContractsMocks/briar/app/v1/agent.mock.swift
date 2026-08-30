@@ -24,8 +24,36 @@ import SwiftProtobuf
 open class BriarAPI_AgentServiceClientMock: BriarAPI_AgentServiceClientInterface, @unchecked Sendable {
     /// Mocked for async calls to `listOrganizationAgents()`.
     public var mockAsyncListOrganizationAgents = { (_: BriarAPI_ListOrganizationAgentsRequest) -> ResponseMessage<BriarAPI_ListOrganizationAgentsResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `createOrganizationAgent()`.
+    public var mockAsyncCreateOrganizationAgent = { (_: BriarAPI_CreateOrganizationAgentRequest) -> ResponseMessage<BriarAPI_CreateOrganizationAgentResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateOrganizationAgent()`.
+    public var mockAsyncUpdateOrganizationAgent = { (_: BriarAPI_UpdateOrganizationAgentRequest) -> ResponseMessage<BriarAPI_UpdateOrganizationAgentResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `deleteOrganizationAgent()`.
+    public var mockAsyncDeleteOrganizationAgent = { (_: BriarAPI_DeleteOrganizationAgentRequest) -> ResponseMessage<BriarAPI_DeleteOrganizationAgentResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `listProjectAgents()`.
     public var mockAsyncListProjectAgents = { (_: BriarAPI_ListProjectAgentsRequest) -> ResponseMessage<BriarAPI_ListProjectAgentsResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `createProjectAgent()`.
+    public var mockAsyncCreateProjectAgent = { (_: BriarAPI_CreateProjectAgentRequest) -> ResponseMessage<BriarAPI_CreateProjectAgentResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateProjectAgent()`.
+    public var mockAsyncUpdateProjectAgent = { (_: BriarAPI_UpdateProjectAgentRequest) -> ResponseMessage<BriarAPI_UpdateProjectAgentResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `deleteProjectAgent()`.
+    public var mockAsyncDeleteProjectAgent = { (_: BriarAPI_DeleteProjectAgentRequest) -> ResponseMessage<BriarAPI_DeleteProjectAgentResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `listProjectAgentSchedules()`.
+    public var mockAsyncListProjectAgentSchedules = { (_: BriarAPI_ListProjectAgentSchedulesRequest) -> ResponseMessage<BriarAPI_ListProjectAgentSchedulesResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `createProjectAgentSchedule()`.
+    public var mockAsyncCreateProjectAgentSchedule = { (_: BriarAPI_CreateProjectAgentScheduleRequest) -> ResponseMessage<BriarAPI_CreateProjectAgentScheduleResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateProjectAgentSchedule()`.
+    public var mockAsyncUpdateProjectAgentSchedule = { (_: BriarAPI_UpdateProjectAgentScheduleRequest) -> ResponseMessage<BriarAPI_UpdateProjectAgentScheduleResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `deleteProjectAgentSchedule()`.
+    public var mockAsyncDeleteProjectAgentSchedule = { (_: BriarAPI_DeleteProjectAgentScheduleRequest) -> ResponseMessage<BriarAPI_DeleteProjectAgentScheduleResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `listProjectAgentScheduleRuns()`.
+    public var mockAsyncListProjectAgentScheduleRuns = { (_: BriarAPI_ListProjectAgentScheduleRunsRequest) -> ResponseMessage<BriarAPI_ListProjectAgentScheduleRunsResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `claimProjectAgentScheduleRun()`.
+    public var mockAsyncClaimProjectAgentScheduleRun = { (_: BriarAPI_ClaimProjectAgentScheduleRunRequest) -> ResponseMessage<BriarAPI_ClaimProjectAgentScheduleRunResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `completeProjectAgentScheduleRun()`.
+    public var mockAsyncCompleteProjectAgentScheduleRun = { (_: BriarAPI_CompleteProjectAgentScheduleRunRequest) -> ResponseMessage<BriarAPI_CompleteProjectAgentScheduleRunResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `renewProjectAgentScheduleRun()`.
+    public var mockAsyncRenewProjectAgentScheduleRun = { (_: BriarAPI_RenewProjectAgentScheduleRunRequest) -> ResponseMessage<BriarAPI_RenewProjectAgentScheduleRunResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `listProjectAgentSessions()`.
     public var mockAsyncListProjectAgentSessions = { (_: BriarAPI_ListProjectAgentSessionsRequest) -> ResponseMessage<BriarAPI_ListProjectAgentSessionsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `syncProjectAgentSessions()`.
@@ -43,8 +71,64 @@ open class BriarAPI_AgentServiceClientMock: BriarAPI_AgentServiceClientInterface
         return self.mockAsyncListOrganizationAgents(request)
     }
 
+    open func `createOrganizationAgent`(request: BriarAPI_CreateOrganizationAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateOrganizationAgentResponse> {
+        return self.mockAsyncCreateOrganizationAgent(request)
+    }
+
+    open func `updateOrganizationAgent`(request: BriarAPI_UpdateOrganizationAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateOrganizationAgentResponse> {
+        return self.mockAsyncUpdateOrganizationAgent(request)
+    }
+
+    open func `deleteOrganizationAgent`(request: BriarAPI_DeleteOrganizationAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteOrganizationAgentResponse> {
+        return self.mockAsyncDeleteOrganizationAgent(request)
+    }
+
     open func `listProjectAgents`(request: BriarAPI_ListProjectAgentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListProjectAgentsResponse> {
         return self.mockAsyncListProjectAgents(request)
+    }
+
+    open func `createProjectAgent`(request: BriarAPI_CreateProjectAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateProjectAgentResponse> {
+        return self.mockAsyncCreateProjectAgent(request)
+    }
+
+    open func `updateProjectAgent`(request: BriarAPI_UpdateProjectAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectAgentResponse> {
+        return self.mockAsyncUpdateProjectAgent(request)
+    }
+
+    open func `deleteProjectAgent`(request: BriarAPI_DeleteProjectAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteProjectAgentResponse> {
+        return self.mockAsyncDeleteProjectAgent(request)
+    }
+
+    open func `listProjectAgentSchedules`(request: BriarAPI_ListProjectAgentSchedulesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListProjectAgentSchedulesResponse> {
+        return self.mockAsyncListProjectAgentSchedules(request)
+    }
+
+    open func `createProjectAgentSchedule`(request: BriarAPI_CreateProjectAgentScheduleRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateProjectAgentScheduleResponse> {
+        return self.mockAsyncCreateProjectAgentSchedule(request)
+    }
+
+    open func `updateProjectAgentSchedule`(request: BriarAPI_UpdateProjectAgentScheduleRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectAgentScheduleResponse> {
+        return self.mockAsyncUpdateProjectAgentSchedule(request)
+    }
+
+    open func `deleteProjectAgentSchedule`(request: BriarAPI_DeleteProjectAgentScheduleRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteProjectAgentScheduleResponse> {
+        return self.mockAsyncDeleteProjectAgentSchedule(request)
+    }
+
+    open func `listProjectAgentScheduleRuns`(request: BriarAPI_ListProjectAgentScheduleRunsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListProjectAgentScheduleRunsResponse> {
+        return self.mockAsyncListProjectAgentScheduleRuns(request)
+    }
+
+    open func `claimProjectAgentScheduleRun`(request: BriarAPI_ClaimProjectAgentScheduleRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ClaimProjectAgentScheduleRunResponse> {
+        return self.mockAsyncClaimProjectAgentScheduleRun(request)
+    }
+
+    open func `completeProjectAgentScheduleRun`(request: BriarAPI_CompleteProjectAgentScheduleRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CompleteProjectAgentScheduleRunResponse> {
+        return self.mockAsyncCompleteProjectAgentScheduleRun(request)
+    }
+
+    open func `renewProjectAgentScheduleRun`(request: BriarAPI_RenewProjectAgentScheduleRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RenewProjectAgentScheduleRunResponse> {
+        return self.mockAsyncRenewProjectAgentScheduleRun(request)
     }
 
     open func `listProjectAgentSessions`(request: BriarAPI_ListProjectAgentSessionsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListProjectAgentSessionsResponse> {

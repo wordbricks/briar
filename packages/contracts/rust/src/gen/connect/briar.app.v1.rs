@@ -656,6 +656,42 @@ pub type OwnedListOrganizationAgentsResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<CreateOrganizationAgentRequestView<'static>>`.
+pub type OwnedCreateOrganizationAgentRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateOrganizationAgentResponseView<'static>>`.
+pub type OwnedCreateOrganizationAgentResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateOrganizationAgentRequestView<'static>>`.
+pub type OwnedUpdateOrganizationAgentRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateOrganizationAgentResponseView<'static>>`.
+pub type OwnedUpdateOrganizationAgentResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteOrganizationAgentRequestView<'static>>`.
+pub type OwnedDeleteOrganizationAgentRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteOrganizationAgentResponseView<'static>>`.
+pub type OwnedDeleteOrganizationAgentResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<ListProjectAgentsRequestView<'static>>`.
 pub type OwnedListProjectAgentsRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::ListProjectAgentsRequestView<'static>,
@@ -663,6 +699,126 @@ pub type OwnedListProjectAgentsRequestView = ::buffa::view::OwnedView<
 ///Shorthand for `OwnedView<ListProjectAgentsResponseView<'static>>`.
 pub type OwnedListProjectAgentsResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::ListProjectAgentsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<CreateProjectAgentRequestView<'static>>`.
+pub type OwnedCreateProjectAgentRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CreateProjectAgentResponseView<'static>>`.
+pub type OwnedCreateProjectAgentResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentResponseView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateProjectAgentRequestView<'static>>`.
+pub type OwnedUpdateProjectAgentRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentRequestView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateProjectAgentResponseView<'static>>`.
+pub type OwnedUpdateProjectAgentResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentResponseView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteProjectAgentRequestView<'static>>`.
+pub type OwnedDeleteProjectAgentRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentRequestView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteProjectAgentResponseView<'static>>`.
+pub type OwnedDeleteProjectAgentResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ListProjectAgentSchedulesRequestView<'static>>`.
+pub type OwnedListProjectAgentSchedulesRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListProjectAgentSchedulesRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListProjectAgentSchedulesResponseView<'static>>`.
+pub type OwnedListProjectAgentSchedulesResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListProjectAgentSchedulesResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateProjectAgentScheduleRequestView<'static>>`.
+pub type OwnedCreateProjectAgentScheduleRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentScheduleRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateProjectAgentScheduleResponseView<'static>>`.
+pub type OwnedCreateProjectAgentScheduleResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentScheduleResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateProjectAgentScheduleRequestView<'static>>`.
+pub type OwnedUpdateProjectAgentScheduleRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentScheduleRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UpdateProjectAgentScheduleResponseView<'static>>`.
+pub type OwnedUpdateProjectAgentScheduleResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentScheduleResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteProjectAgentScheduleRequestView<'static>>`.
+pub type OwnedDeleteProjectAgentScheduleRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentScheduleRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteProjectAgentScheduleResponseView<'static>>`.
+pub type OwnedDeleteProjectAgentScheduleResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentScheduleResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListProjectAgentScheduleRunsRequestView<'static>>`.
+pub type OwnedListProjectAgentScheduleRunsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListProjectAgentScheduleRunsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListProjectAgentScheduleRunsResponseView<'static>>`.
+pub type OwnedListProjectAgentScheduleRunsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListProjectAgentScheduleRunsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ClaimProjectAgentScheduleRunRequestView<'static>>`.
+pub type OwnedClaimProjectAgentScheduleRunRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ClaimProjectAgentScheduleRunRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ClaimProjectAgentScheduleRunResponseView<'static>>`.
+pub type OwnedClaimProjectAgentScheduleRunResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ClaimProjectAgentScheduleRunResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CompleteProjectAgentScheduleRunRequestView<'static>>`.
+pub type OwnedCompleteProjectAgentScheduleRunRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CompleteProjectAgentScheduleRunRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CompleteProjectAgentScheduleRunResponseView<'static>>`.
+pub type OwnedCompleteProjectAgentScheduleRunResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CompleteProjectAgentScheduleRunResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RenewProjectAgentScheduleRunRequestView<'static>>`.
+pub type OwnedRenewProjectAgentScheduleRunRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RenewProjectAgentScheduleRunRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RenewProjectAgentScheduleRunResponseView<'static>>`.
+pub type OwnedRenewProjectAgentScheduleRunResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RenewProjectAgentScheduleRunResponseView<
+        'static,
+    >,
 >;
 ///Shorthand for `OwnedView<ListProjectAgentSessionsRequestView<'static>>`.
 pub type OwnedListProjectAgentSessionsRequestView = ::buffa::view::OwnedView<
@@ -760,6 +916,132 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateOrganizationAgentResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateOrganizationAgentResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateOrganizationAgentResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateOrganizationAgentResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::DeleteOrganizationAgentResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::DeleteOrganizationAgentResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListProjectAgentsResponse>
 for crate::proto::briar::app::v1::__buffa::view::ListProjectAgentsResponseView<'_> {
     fn encode(
@@ -772,6 +1054,444 @@ for crate::proto::briar::app::v1::__buffa::view::ListProjectAgentsResponseView<'
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListProjectAgentsResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::ListProjectAgentsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateProjectAgentResponse>
+for crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateProjectAgentResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateProjectAgentResponse>
+for crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateProjectAgentResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteProjectAgentResponse>
+for crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteProjectAgentResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListProjectAgentSchedulesResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::ListProjectAgentSchedulesResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListProjectAgentSchedulesResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListProjectAgentSchedulesResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateProjectAgentScheduleResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentScheduleResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CreateProjectAgentScheduleResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentScheduleResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateProjectAgentScheduleResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentScheduleResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UpdateProjectAgentScheduleResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentScheduleResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::DeleteProjectAgentScheduleResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentScheduleResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::DeleteProjectAgentScheduleResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentScheduleResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListProjectAgentScheduleRunsResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::ListProjectAgentScheduleRunsResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListProjectAgentScheduleRunsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListProjectAgentScheduleRunsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ClaimProjectAgentScheduleRunResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::ClaimProjectAgentScheduleRunResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ClaimProjectAgentScheduleRunResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ClaimProjectAgentScheduleRunResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CompleteProjectAgentScheduleRunResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::CompleteProjectAgentScheduleRunResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::CompleteProjectAgentScheduleRunResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CompleteProjectAgentScheduleRunResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RenewProjectAgentScheduleRunResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::RenewProjectAgentScheduleRunResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RenewProjectAgentScheduleRunResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RenewProjectAgentScheduleRunResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -1000,9 +1720,93 @@ pub const AGENT_SERVICE_LIST_ORGANIZATION_AGENTS_SPEC: ::connectrpc::Spec = ::co
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateOrganizationAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_CREATE_ORGANIZATION_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/CreateOrganizationAgent",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateOrganizationAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_UPDATE_ORGANIZATION_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/UpdateOrganizationAgent",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `DeleteOrganizationAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_DELETE_ORGANIZATION_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/DeleteOrganizationAgent",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `ListProjectAgents` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const AGENT_SERVICE_LIST_PROJECT_AGENTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.AgentService/ListProjectAgents",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateProjectAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_CREATE_PROJECT_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/CreateProjectAgent",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateProjectAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_UPDATE_PROJECT_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/UpdateProjectAgent",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `DeleteProjectAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_DELETE_PROJECT_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/DeleteProjectAgent",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListProjectAgentSchedules` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_LIST_PROJECT_AGENT_SCHEDULES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/ListProjectAgentSchedules",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateProjectAgentSchedule` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_CREATE_PROJECT_AGENT_SCHEDULE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/CreateProjectAgentSchedule",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateProjectAgentSchedule` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_UPDATE_PROJECT_AGENT_SCHEDULE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/UpdateProjectAgentSchedule",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `DeleteProjectAgentSchedule` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_DELETE_PROJECT_AGENT_SCHEDULE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/DeleteProjectAgentSchedule",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListProjectAgentScheduleRuns` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_LIST_PROJECT_AGENT_SCHEDULE_RUNS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/ListProjectAgentScheduleRuns",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ClaimProjectAgentScheduleRun` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_CLAIM_PROJECT_AGENT_SCHEDULE_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/ClaimProjectAgentScheduleRun",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CompleteProjectAgentScheduleRun` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_COMPLETE_PROJECT_AGENT_SCHEDULE_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/CompleteProjectAgentScheduleRun",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RenewProjectAgentScheduleRun` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_RENEW_PROJECT_AGENT_SCHEDULE_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/RenewProjectAgentScheduleRun",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -1110,6 +1914,75 @@ pub trait AgentService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Handle the CreateOrganizationAgent RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_organization_agent<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CreateOrganizationAgentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CreateOrganizationAgentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateOrganizationAgent RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_organization_agent<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateOrganizationAgentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateOrganizationAgentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the DeleteOrganizationAgent RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_organization_agent<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::DeleteOrganizationAgentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::DeleteOrganizationAgentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Handle the ListProjectAgents RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -1130,6 +2003,259 @@ pub trait AgentService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::ListProjectAgentsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CreateProjectAgent RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_project_agent<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CreateProjectAgentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CreateProjectAgentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateProjectAgent RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_project_agent<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateProjectAgentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateProjectAgentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the DeleteProjectAgent RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_project_agent<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::DeleteProjectAgentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::DeleteProjectAgentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ListProjectAgentSchedules RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_project_agent_schedules<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ListProjectAgentSchedulesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ListProjectAgentSchedulesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CreateProjectAgentSchedule RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_project_agent_schedule<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CreateProjectAgentScheduleRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CreateProjectAgentScheduleResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UpdateProjectAgentSchedule RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn update_project_agent_schedule<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UpdateProjectAgentScheduleRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UpdateProjectAgentScheduleResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the DeleteProjectAgentSchedule RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_project_agent_schedule<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::DeleteProjectAgentScheduleRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::DeleteProjectAgentScheduleResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ListProjectAgentScheduleRuns RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_project_agent_schedule_runs<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ListProjectAgentScheduleRunsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ListProjectAgentScheduleRunsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ClaimProjectAgentScheduleRun RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn claim_project_agent_schedule_run<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ClaimProjectAgentScheduleRunRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ClaimProjectAgentScheduleRunResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the CompleteProjectAgentScheduleRun RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn complete_project_agent_schedule_run<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::CompleteProjectAgentScheduleRunRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::CompleteProjectAgentScheduleRunResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RenewProjectAgentScheduleRun RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn renew_project_agent_schedule_run<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::RenewProjectAgentScheduleRunRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::RenewProjectAgentScheduleRunResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1311,6 +2437,93 @@ impl<S: AgentService> AgentServiceExt for S {
             .with_spec(AGENT_SERVICE_LIST_ORGANIZATION_AGENTS_SPEC)
             .route_view(
                 AGENT_SERVICE_SERVICE_NAME,
+                "CreateOrganizationAgent",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CreateOrganizationAgentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_organization_agent(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CreateOrganizationAgentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_CREATE_ORGANIZATION_AGENT_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "UpdateOrganizationAgent",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateOrganizationAgentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_organization_agent(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateOrganizationAgentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_UPDATE_ORGANIZATION_AGENT_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "DeleteOrganizationAgent",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::DeleteOrganizationAgentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_organization_agent(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::DeleteOrganizationAgentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_DELETE_ORGANIZATION_AGENT_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
                 "ListProjectAgents",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -1338,6 +2551,325 @@ impl<S: AgentService> AgentServiceExt for S {
                 },
             )
             .with_spec(AGENT_SERVICE_LIST_PROJECT_AGENTS_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "CreateProjectAgent",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CreateProjectAgentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_project_agent(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CreateProjectAgentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_CREATE_PROJECT_AGENT_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "UpdateProjectAgent",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateProjectAgentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_project_agent(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateProjectAgentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_UPDATE_PROJECT_AGENT_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "DeleteProjectAgent",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::DeleteProjectAgentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_project_agent(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::DeleteProjectAgentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_DELETE_PROJECT_AGENT_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "ListProjectAgentSchedules",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ListProjectAgentSchedulesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ListProjectAgentSchedulesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_project_agent_schedules(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ListProjectAgentSchedulesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_LIST_PROJECT_AGENT_SCHEDULES_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "CreateProjectAgentSchedule",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentScheduleRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CreateProjectAgentScheduleRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_project_agent_schedule(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CreateProjectAgentScheduleResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_CREATE_PROJECT_AGENT_SCHEDULE_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "UpdateProjectAgentSchedule",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentScheduleRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UpdateProjectAgentScheduleRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.update_project_agent_schedule(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UpdateProjectAgentScheduleResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_UPDATE_PROJECT_AGENT_SCHEDULE_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "DeleteProjectAgentSchedule",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentScheduleRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::DeleteProjectAgentScheduleRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_project_agent_schedule(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::DeleteProjectAgentScheduleResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_DELETE_PROJECT_AGENT_SCHEDULE_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "ListProjectAgentScheduleRuns",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ListProjectAgentScheduleRunsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ListProjectAgentScheduleRunsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_project_agent_schedule_runs(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ListProjectAgentScheduleRunsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_LIST_PROJECT_AGENT_SCHEDULE_RUNS_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "ClaimProjectAgentScheduleRun",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ClaimProjectAgentScheduleRunRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ClaimProjectAgentScheduleRunRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.claim_project_agent_schedule_run(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ClaimProjectAgentScheduleRunResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_CLAIM_PROJECT_AGENT_SCHEDULE_RUN_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "CompleteProjectAgentScheduleRun",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::CompleteProjectAgentScheduleRunRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::CompleteProjectAgentScheduleRunRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.complete_project_agent_schedule_run(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::CompleteProjectAgentScheduleRunResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_COMPLETE_PROJECT_AGENT_SCHEDULE_RUN_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "RenewProjectAgentScheduleRun",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::RenewProjectAgentScheduleRunRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::RenewProjectAgentScheduleRunRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.renew_project_agent_schedule_run(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::RenewProjectAgentScheduleRunResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_RENEW_PROJECT_AGENT_SCHEDULE_RUN_SPEC)
             .route_view(
                 AGENT_SERVICE_SERVICE_NAME,
                 "ListProjectAgentSessions",
@@ -1543,10 +3075,96 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
                         .with_spec(AGENT_SERVICE_LIST_ORGANIZATION_AGENTS_SPEC),
                 )
             }
+            "CreateOrganizationAgent" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_CREATE_ORGANIZATION_AGENT_SPEC),
+                )
+            }
+            "UpdateOrganizationAgent" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_UPDATE_ORGANIZATION_AGENT_SPEC),
+                )
+            }
+            "DeleteOrganizationAgent" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_DELETE_ORGANIZATION_AGENT_SPEC),
+                )
+            }
             "ListProjectAgents" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(AGENT_SERVICE_LIST_PROJECT_AGENTS_SPEC),
+                )
+            }
+            "CreateProjectAgent" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_CREATE_PROJECT_AGENT_SPEC),
+                )
+            }
+            "UpdateProjectAgent" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_UPDATE_PROJECT_AGENT_SPEC),
+                )
+            }
+            "DeleteProjectAgent" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_DELETE_PROJECT_AGENT_SPEC),
+                )
+            }
+            "ListProjectAgentSchedules" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_LIST_PROJECT_AGENT_SCHEDULES_SPEC),
+                )
+            }
+            "CreateProjectAgentSchedule" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_CREATE_PROJECT_AGENT_SCHEDULE_SPEC),
+                )
+            }
+            "UpdateProjectAgentSchedule" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_UPDATE_PROJECT_AGENT_SCHEDULE_SPEC),
+                )
+            }
+            "DeleteProjectAgentSchedule" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_DELETE_PROJECT_AGENT_SCHEDULE_SPEC),
+                )
+            }
+            "ListProjectAgentScheduleRuns" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_LIST_PROJECT_AGENT_SCHEDULE_RUNS_SPEC),
+                )
+            }
+            "ClaimProjectAgentScheduleRun" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_CLAIM_PROJECT_AGENT_SCHEDULE_RUN_SPEC),
+                )
+            }
+            "CompleteProjectAgentScheduleRun" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            AGENT_SERVICE_COMPLETE_PROJECT_AGENT_SCHEDULE_RUN_SPEC,
+                        ),
+                )
+            }
+            "RenewProjectAgentScheduleRun" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_RENEW_PROJECT_AGENT_SCHEDULE_RUN_SPEC),
                 )
             }
             "ListProjectAgentSessions" => {
@@ -1616,6 +3234,72 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
                         >(format)
                 })
             }
+            "CreateOrganizationAgent" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CreateOrganizationAgentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CreateOrganizationAgentRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_organization_agent(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CreateOrganizationAgentResponse,
+                        >(format)
+                })
+            }
+            "UpdateOrganizationAgent" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateOrganizationAgentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateOrganizationAgentRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_organization_agent(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateOrganizationAgentResponse,
+                        >(format)
+                })
+            }
+            "DeleteOrganizationAgent" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::DeleteOrganizationAgentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::DeleteOrganizationAgentRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_organization_agent(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::DeleteOrganizationAgentResponse,
+                        >(format)
+                })
+            }
             "ListProjectAgents" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -1635,6 +3319,248 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::ListProjectAgentsResponse,
+                        >(format)
+                })
+            }
+            "CreateProjectAgent" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CreateProjectAgentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CreateProjectAgentRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_project_agent(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CreateProjectAgentResponse,
+                        >(format)
+                })
+            }
+            "UpdateProjectAgent" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateProjectAgentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateProjectAgentRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_project_agent(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateProjectAgentResponse,
+                        >(format)
+                })
+            }
+            "DeleteProjectAgent" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::DeleteProjectAgentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::DeleteProjectAgentRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_project_agent(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::DeleteProjectAgentResponse,
+                        >(format)
+                })
+            }
+            "ListProjectAgentSchedules" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ListProjectAgentSchedulesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListProjectAgentSchedulesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ListProjectAgentSchedulesRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_project_agent_schedules(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ListProjectAgentSchedulesResponse,
+                        >(format)
+                })
+            }
+            "CreateProjectAgentSchedule" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CreateProjectAgentScheduleRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentScheduleRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CreateProjectAgentScheduleRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_project_agent_schedule(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CreateProjectAgentScheduleResponse,
+                        >(format)
+                })
+            }
+            "UpdateProjectAgentSchedule" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UpdateProjectAgentScheduleRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentScheduleRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UpdateProjectAgentScheduleRequest,
+                    >::from_parts(&req, &body);
+                    svc.update_project_agent_schedule(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UpdateProjectAgentScheduleResponse,
+                        >(format)
+                })
+            }
+            "DeleteProjectAgentSchedule" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::DeleteProjectAgentScheduleRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentScheduleRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::DeleteProjectAgentScheduleRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_project_agent_schedule(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::DeleteProjectAgentScheduleResponse,
+                        >(format)
+                })
+            }
+            "ListProjectAgentScheduleRuns" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ListProjectAgentScheduleRunsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListProjectAgentScheduleRunsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ListProjectAgentScheduleRunsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_project_agent_schedule_runs(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ListProjectAgentScheduleRunsResponse,
+                        >(format)
+                })
+            }
+            "ClaimProjectAgentScheduleRun" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ClaimProjectAgentScheduleRunRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ClaimProjectAgentScheduleRunRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ClaimProjectAgentScheduleRunRequest,
+                    >::from_parts(&req, &body);
+                    svc.claim_project_agent_schedule_run(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ClaimProjectAgentScheduleRunResponse,
+                        >(format)
+                })
+            }
+            "CompleteProjectAgentScheduleRun" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::CompleteProjectAgentScheduleRunRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::CompleteProjectAgentScheduleRunRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::CompleteProjectAgentScheduleRunRequest,
+                    >::from_parts(&req, &body);
+                    svc.complete_project_agent_schedule_run(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::CompleteProjectAgentScheduleRunResponse,
+                        >(format)
+                })
+            }
+            "RenewProjectAgentScheduleRun" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::RenewProjectAgentScheduleRunRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::RenewProjectAgentScheduleRunRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::RenewProjectAgentScheduleRunRequest,
+                    >::from_parts(&req, &body);
+                    svc.renew_project_agent_schedule_run(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::RenewProjectAgentScheduleRunResponse,
                         >(format)
                 })
             }
@@ -1923,6 +3849,141 @@ where
             )
             .await
     }
+    /// Call the CreateOrganizationAgent RPC. Sends a request to /briar.app.v1.AgentService/CreateOrganizationAgent.
+    pub async fn create_organization_agent(
+        &self,
+        request: crate::proto::briar::app::v1::CreateOrganizationAgentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_organization_agent_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateOrganizationAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_organization_agent_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CreateOrganizationAgentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_CREATE_ORGANIZATION_AGENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateOrganizationAgent RPC. Sends a request to /briar.app.v1.AgentService/UpdateOrganizationAgent.
+    pub async fn update_organization_agent(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateOrganizationAgentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_organization_agent_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateOrganizationAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_organization_agent_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateOrganizationAgentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_UPDATE_ORGANIZATION_AGENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteOrganizationAgent RPC. Sends a request to /briar.app.v1.AgentService/DeleteOrganizationAgent.
+    pub async fn delete_organization_agent(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteOrganizationAgentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_organization_agent_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteOrganizationAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_organization_agent_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteOrganizationAgentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_DELETE_ORGANIZATION_AGENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
     /// Call the ListProjectAgents RPC. Sends a request to /briar.app.v1.AgentService/ListProjectAgents.
     pub async fn list_project_agents(
         &self,
@@ -1962,6 +4023,501 @@ where
                 &self.transport,
                 &self.config,
                 AGENT_SERVICE_LIST_PROJECT_AGENTS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateProjectAgent RPC. Sends a request to /briar.app.v1.AgentService/CreateProjectAgent.
+    pub async fn create_project_agent(
+        &self,
+        request: crate::proto::briar::app::v1::CreateProjectAgentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_project_agent_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateProjectAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_project_agent_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CreateProjectAgentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_CREATE_PROJECT_AGENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateProjectAgent RPC. Sends a request to /briar.app.v1.AgentService/UpdateProjectAgent.
+    pub async fn update_project_agent(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateProjectAgentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_project_agent_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateProjectAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_project_agent_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateProjectAgentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_UPDATE_PROJECT_AGENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteProjectAgent RPC. Sends a request to /briar.app.v1.AgentService/DeleteProjectAgent.
+    pub async fn delete_project_agent(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteProjectAgentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_project_agent_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteProjectAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_project_agent_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteProjectAgentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_DELETE_PROJECT_AGENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListProjectAgentSchedules RPC. Sends a request to /briar.app.v1.AgentService/ListProjectAgentSchedules.
+    pub async fn list_project_agent_schedules(
+        &self,
+        request: crate::proto::briar::app::v1::ListProjectAgentSchedulesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListProjectAgentSchedulesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_project_agent_schedules_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListProjectAgentSchedules RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_project_agent_schedules_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ListProjectAgentSchedulesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListProjectAgentSchedulesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_LIST_PROJECT_AGENT_SCHEDULES_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateProjectAgentSchedule RPC. Sends a request to /briar.app.v1.AgentService/CreateProjectAgentSchedule.
+    pub async fn create_project_agent_schedule(
+        &self,
+        request: crate::proto::briar::app::v1::CreateProjectAgentScheduleRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentScheduleResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_project_agent_schedule_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateProjectAgentSchedule RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_project_agent_schedule_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CreateProjectAgentScheduleRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CreateProjectAgentScheduleResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_CREATE_PROJECT_AGENT_SCHEDULE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UpdateProjectAgentSchedule RPC. Sends a request to /briar.app.v1.AgentService/UpdateProjectAgentSchedule.
+    pub async fn update_project_agent_schedule(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateProjectAgentScheduleRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentScheduleResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.update_project_agent_schedule_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UpdateProjectAgentSchedule RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_project_agent_schedule_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UpdateProjectAgentScheduleRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateProjectAgentScheduleResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_UPDATE_PROJECT_AGENT_SCHEDULE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteProjectAgentSchedule RPC. Sends a request to /briar.app.v1.AgentService/DeleteProjectAgentSchedule.
+    pub async fn delete_project_agent_schedule(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteProjectAgentScheduleRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentScheduleResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_project_agent_schedule_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteProjectAgentSchedule RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_project_agent_schedule_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::DeleteProjectAgentScheduleRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteProjectAgentScheduleResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_DELETE_PROJECT_AGENT_SCHEDULE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListProjectAgentScheduleRuns RPC. Sends a request to /briar.app.v1.AgentService/ListProjectAgentScheduleRuns.
+    pub async fn list_project_agent_schedule_runs(
+        &self,
+        request: crate::proto::briar::app::v1::ListProjectAgentScheduleRunsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListProjectAgentScheduleRunsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_project_agent_schedule_runs_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListProjectAgentScheduleRuns RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_project_agent_schedule_runs_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ListProjectAgentScheduleRunsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListProjectAgentScheduleRunsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_LIST_PROJECT_AGENT_SCHEDULE_RUNS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ClaimProjectAgentScheduleRun RPC. Sends a request to /briar.app.v1.AgentService/ClaimProjectAgentScheduleRun.
+    pub async fn claim_project_agent_schedule_run(
+        &self,
+        request: crate::proto::briar::app::v1::ClaimProjectAgentScheduleRunRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ClaimProjectAgentScheduleRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.claim_project_agent_schedule_run_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ClaimProjectAgentScheduleRun RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn claim_project_agent_schedule_run_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ClaimProjectAgentScheduleRunRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ClaimProjectAgentScheduleRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_CLAIM_PROJECT_AGENT_SCHEDULE_RUN_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CompleteProjectAgentScheduleRun RPC. Sends a request to /briar.app.v1.AgentService/CompleteProjectAgentScheduleRun.
+    pub async fn complete_project_agent_schedule_run(
+        &self,
+        request: crate::proto::briar::app::v1::CompleteProjectAgentScheduleRunRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CompleteProjectAgentScheduleRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.complete_project_agent_schedule_run_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CompleteProjectAgentScheduleRun RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn complete_project_agent_schedule_run_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::CompleteProjectAgentScheduleRunRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::CompleteProjectAgentScheduleRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_COMPLETE_PROJECT_AGENT_SCHEDULE_RUN_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RenewProjectAgentScheduleRun RPC. Sends a request to /briar.app.v1.AgentService/RenewProjectAgentScheduleRun.
+    pub async fn renew_project_agent_schedule_run(
+        &self,
+        request: crate::proto::briar::app::v1::RenewProjectAgentScheduleRunRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RenewProjectAgentScheduleRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.renew_project_agent_schedule_run_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RenewProjectAgentScheduleRun RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn renew_project_agent_schedule_run_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::RenewProjectAgentScheduleRunRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RenewProjectAgentScheduleRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_RENEW_PROJECT_AGENT_SCHEDULE_RUN_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

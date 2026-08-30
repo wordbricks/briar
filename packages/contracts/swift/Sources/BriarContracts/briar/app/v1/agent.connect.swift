@@ -15,7 +15,49 @@ public protocol BriarAPI_AgentServiceClientInterface: Sendable {
     func `listOrganizationAgents`(request: BriarAPI_ListOrganizationAgentsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListOrganizationAgentsResponse>
 
     @available(iOS 13, *)
+    func `createOrganizationAgent`(request: BriarAPI_CreateOrganizationAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateOrganizationAgentResponse>
+
+    @available(iOS 13, *)
+    func `updateOrganizationAgent`(request: BriarAPI_UpdateOrganizationAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateOrganizationAgentResponse>
+
+    @available(iOS 13, *)
+    func `deleteOrganizationAgent`(request: BriarAPI_DeleteOrganizationAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DeleteOrganizationAgentResponse>
+
+    @available(iOS 13, *)
     func `listProjectAgents`(request: BriarAPI_ListProjectAgentsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListProjectAgentsResponse>
+
+    @available(iOS 13, *)
+    func `createProjectAgent`(request: BriarAPI_CreateProjectAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateProjectAgentResponse>
+
+    @available(iOS 13, *)
+    func `updateProjectAgent`(request: BriarAPI_UpdateProjectAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateProjectAgentResponse>
+
+    @available(iOS 13, *)
+    func `deleteProjectAgent`(request: BriarAPI_DeleteProjectAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DeleteProjectAgentResponse>
+
+    @available(iOS 13, *)
+    func `listProjectAgentSchedules`(request: BriarAPI_ListProjectAgentSchedulesRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListProjectAgentSchedulesResponse>
+
+    @available(iOS 13, *)
+    func `createProjectAgentSchedule`(request: BriarAPI_CreateProjectAgentScheduleRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateProjectAgentScheduleResponse>
+
+    @available(iOS 13, *)
+    func `updateProjectAgentSchedule`(request: BriarAPI_UpdateProjectAgentScheduleRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateProjectAgentScheduleResponse>
+
+    @available(iOS 13, *)
+    func `deleteProjectAgentSchedule`(request: BriarAPI_DeleteProjectAgentScheduleRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DeleteProjectAgentScheduleResponse>
+
+    @available(iOS 13, *)
+    func `listProjectAgentScheduleRuns`(request: BriarAPI_ListProjectAgentScheduleRunsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListProjectAgentScheduleRunsResponse>
+
+    @available(iOS 13, *)
+    func `claimProjectAgentScheduleRun`(request: BriarAPI_ClaimProjectAgentScheduleRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ClaimProjectAgentScheduleRunResponse>
+
+    @available(iOS 13, *)
+    func `completeProjectAgentScheduleRun`(request: BriarAPI_CompleteProjectAgentScheduleRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CompleteProjectAgentScheduleRunResponse>
+
+    @available(iOS 13, *)
+    func `renewProjectAgentScheduleRun`(request: BriarAPI_RenewProjectAgentScheduleRunRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_RenewProjectAgentScheduleRunResponse>
 
     @available(iOS 13, *)
     func `listProjectAgentSessions`(request: BriarAPI_ListProjectAgentSessionsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListProjectAgentSessionsResponse>
@@ -47,8 +89,78 @@ public final class BriarAPI_AgentServiceClient: BriarAPI_AgentServiceClientInter
     }
 
     @available(iOS 13, *)
+    public func `createOrganizationAgent`(request: BriarAPI_CreateOrganizationAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateOrganizationAgentResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/CreateOrganizationAgent", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updateOrganizationAgent`(request: BriarAPI_UpdateOrganizationAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateOrganizationAgentResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/UpdateOrganizationAgent", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `deleteOrganizationAgent`(request: BriarAPI_DeleteOrganizationAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteOrganizationAgentResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/DeleteOrganizationAgent", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `listProjectAgents`(request: BriarAPI_ListProjectAgentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListProjectAgentsResponse> {
         return await self.client.unary(path: "/briar.app.v1.AgentService/ListProjectAgents", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `createProjectAgent`(request: BriarAPI_CreateProjectAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateProjectAgentResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/CreateProjectAgent", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updateProjectAgent`(request: BriarAPI_UpdateProjectAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectAgentResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/UpdateProjectAgent", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `deleteProjectAgent`(request: BriarAPI_DeleteProjectAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteProjectAgentResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/DeleteProjectAgent", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `listProjectAgentSchedules`(request: BriarAPI_ListProjectAgentSchedulesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListProjectAgentSchedulesResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/ListProjectAgentSchedules", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `createProjectAgentSchedule`(request: BriarAPI_CreateProjectAgentScheduleRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateProjectAgentScheduleResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/CreateProjectAgentSchedule", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updateProjectAgentSchedule`(request: BriarAPI_UpdateProjectAgentScheduleRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateProjectAgentScheduleResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/UpdateProjectAgentSchedule", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `deleteProjectAgentSchedule`(request: BriarAPI_DeleteProjectAgentScheduleRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteProjectAgentScheduleResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/DeleteProjectAgentSchedule", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `listProjectAgentScheduleRuns`(request: BriarAPI_ListProjectAgentScheduleRunsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListProjectAgentScheduleRunsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/ListProjectAgentScheduleRuns", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `claimProjectAgentScheduleRun`(request: BriarAPI_ClaimProjectAgentScheduleRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ClaimProjectAgentScheduleRunResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/ClaimProjectAgentScheduleRun", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `completeProjectAgentScheduleRun`(request: BriarAPI_CompleteProjectAgentScheduleRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CompleteProjectAgentScheduleRunResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/CompleteProjectAgentScheduleRun", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `renewProjectAgentScheduleRun`(request: BriarAPI_RenewProjectAgentScheduleRunRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RenewProjectAgentScheduleRunResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/RenewProjectAgentScheduleRun", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -79,7 +191,21 @@ public final class BriarAPI_AgentServiceClient: BriarAPI_AgentServiceClientInter
     public enum Metadata {
         public enum Methods {
             public static let listOrganizationAgents = Connect.MethodSpec(name: "ListOrganizationAgents", service: "briar.app.v1.AgentService", type: .unary)
+            public static let createOrganizationAgent = Connect.MethodSpec(name: "CreateOrganizationAgent", service: "briar.app.v1.AgentService", type: .unary)
+            public static let updateOrganizationAgent = Connect.MethodSpec(name: "UpdateOrganizationAgent", service: "briar.app.v1.AgentService", type: .unary)
+            public static let deleteOrganizationAgent = Connect.MethodSpec(name: "DeleteOrganizationAgent", service: "briar.app.v1.AgentService", type: .unary)
             public static let listProjectAgents = Connect.MethodSpec(name: "ListProjectAgents", service: "briar.app.v1.AgentService", type: .unary)
+            public static let createProjectAgent = Connect.MethodSpec(name: "CreateProjectAgent", service: "briar.app.v1.AgentService", type: .unary)
+            public static let updateProjectAgent = Connect.MethodSpec(name: "UpdateProjectAgent", service: "briar.app.v1.AgentService", type: .unary)
+            public static let deleteProjectAgent = Connect.MethodSpec(name: "DeleteProjectAgent", service: "briar.app.v1.AgentService", type: .unary)
+            public static let listProjectAgentSchedules = Connect.MethodSpec(name: "ListProjectAgentSchedules", service: "briar.app.v1.AgentService", type: .unary)
+            public static let createProjectAgentSchedule = Connect.MethodSpec(name: "CreateProjectAgentSchedule", service: "briar.app.v1.AgentService", type: .unary)
+            public static let updateProjectAgentSchedule = Connect.MethodSpec(name: "UpdateProjectAgentSchedule", service: "briar.app.v1.AgentService", type: .unary)
+            public static let deleteProjectAgentSchedule = Connect.MethodSpec(name: "DeleteProjectAgentSchedule", service: "briar.app.v1.AgentService", type: .unary)
+            public static let listProjectAgentScheduleRuns = Connect.MethodSpec(name: "ListProjectAgentScheduleRuns", service: "briar.app.v1.AgentService", type: .unary)
+            public static let claimProjectAgentScheduleRun = Connect.MethodSpec(name: "ClaimProjectAgentScheduleRun", service: "briar.app.v1.AgentService", type: .unary)
+            public static let completeProjectAgentScheduleRun = Connect.MethodSpec(name: "CompleteProjectAgentScheduleRun", service: "briar.app.v1.AgentService", type: .unary)
+            public static let renewProjectAgentScheduleRun = Connect.MethodSpec(name: "RenewProjectAgentScheduleRun", service: "briar.app.v1.AgentService", type: .unary)
             public static let listProjectAgentSessions = Connect.MethodSpec(name: "ListProjectAgentSessions", service: "briar.app.v1.AgentService", type: .unary)
             public static let syncProjectAgentSessions = Connect.MethodSpec(name: "SyncProjectAgentSessions", service: "briar.app.v1.AgentService", type: .unary)
             public static let getProjectAgentSession = Connect.MethodSpec(name: "GetProjectAgentSession", service: "briar.app.v1.AgentService", type: .unary)

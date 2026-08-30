@@ -20,6 +20,182 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+public nonisolated enum BriarAPI_ProjectAgentScheduleRecurrence: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case daily // = 1
+  case weekdays // = 2
+  case weekly // = 3
+  case interval // = 4
+  case custom // = 5
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .daily
+    case 2: self = .weekdays
+    case 3: self = .weekly
+    case 4: self = .interval
+    case 5: self = .custom
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .daily: return 1
+    case .weekdays: return 2
+    case .weekly: return 3
+    case .interval: return 4
+    case .custom: return 5
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_ProjectAgentScheduleRecurrence] = [
+    .unspecified,
+    .daily,
+    .weekdays,
+    .weekly,
+    .interval,
+    .custom,
+  ]
+
+}
+
+public nonisolated enum BriarAPI_ProjectAgentScheduleIntervalUnit: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case minute // = 1
+  case hour // = 2
+  case day // = 3
+  case week // = 4
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .minute
+    case 2: self = .hour
+    case 3: self = .day
+    case 4: self = .week
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .minute: return 1
+    case .hour: return 2
+    case .day: return 3
+    case .week: return 4
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_ProjectAgentScheduleIntervalUnit] = [
+    .unspecified,
+    .minute,
+    .hour,
+    .day,
+    .week,
+  ]
+
+}
+
+public nonisolated enum BriarAPI_ProjectAgentScheduleNotificationLevel: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case importantUpdates // = 1
+  case none // = 2
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .importantUpdates
+    case 2: self = .none
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .importantUpdates: return 1
+    case .none: return 2
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_ProjectAgentScheduleNotificationLevel] = [
+    .unspecified,
+    .importantUpdates,
+    .none,
+  ]
+
+}
+
+public nonisolated enum BriarAPI_ProjectAgentScheduleRunStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case running // = 1
+  case completed // = 2
+  case failed // = 3
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .running
+    case 2: self = .completed
+    case 3: self = .failed
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .running: return 1
+    case .completed: return 2
+    case .failed: return 3
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_ProjectAgentScheduleRunStatus] = [
+    .unspecified,
+    .running,
+    .completed,
+    .failed,
+  ]
+
+}
+
 public nonisolated enum BriarAPI_AgentSkillKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -436,6 +612,178 @@ public nonisolated struct BriarAPI_ListOrganizationAgentsResponse: Sendable {
   public init() {}
 }
 
+public nonisolated struct BriarAPI_CreateOrganizationAgentRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var name: String = String()
+
+  public var provider: BriarTypes_AgentProvider = .unspecified
+
+  public var model: String {
+    get {_model ?? String()}
+    set {_model = newValue}
+  }
+  /// Returns true if `model` has been explicitly set.
+  public var hasModel: Bool {self._model != nil}
+  /// Clears the value of `model`. Subsequent reads from it will return its default value.
+  public mutating func clearModel() {self._model = nil}
+
+  public var description_p: String {
+    get {_description_p ?? String()}
+    set {_description_p = newValue}
+  }
+  /// Returns true if `description_p` has been explicitly set.
+  public var hasDescription_p: Bool {self._description_p != nil}
+  /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
+  public mutating func clearDescription_p() {self._description_p = nil}
+
+  public var responsibility: String = String()
+
+  public var effort: String {
+    get {_effort ?? String()}
+    set {_effort = newValue}
+  }
+  /// Returns true if `effort` has been explicitly set.
+  public var hasEffort: Bool {self._effort != nil}
+  /// Clears the value of `effort`. Subsequent reads from it will return its default value.
+  public mutating func clearEffort() {self._effort = nil}
+
+  public var skills: [BriarAPI_ProjectAgentSkillInput] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _model: String? = nil
+  fileprivate var _description_p: String? = nil
+  fileprivate var _effort: String? = nil
+}
+
+public nonisolated struct BriarAPI_CreateOrganizationAgentResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var agent: BriarAPI_OrganizationAgent {
+    get {_agent ?? BriarAPI_OrganizationAgent()}
+    set {_agent = newValue}
+  }
+  /// Returns true if `agent` has been explicitly set.
+  public var hasAgent: Bool {self._agent != nil}
+  /// Clears the value of `agent`. Subsequent reads from it will return its default value.
+  public mutating func clearAgent() {self._agent = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _agent: BriarAPI_OrganizationAgent? = nil
+}
+
+public nonisolated struct BriarAPI_UpdateOrganizationAgentRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var agentID: String = String()
+
+  public var name: String = String()
+
+  public var provider: BriarTypes_AgentProvider = .unspecified
+
+  public var model: String {
+    get {_model ?? String()}
+    set {_model = newValue}
+  }
+  /// Returns true if `model` has been explicitly set.
+  public var hasModel: Bool {self._model != nil}
+  /// Clears the value of `model`. Subsequent reads from it will return its default value.
+  public mutating func clearModel() {self._model = nil}
+
+  public var description_p: String {
+    get {_description_p ?? String()}
+    set {_description_p = newValue}
+  }
+  /// Returns true if `description_p` has been explicitly set.
+  public var hasDescription_p: Bool {self._description_p != nil}
+  /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
+  public mutating func clearDescription_p() {self._description_p = nil}
+
+  public var responsibility: String = String()
+
+  public var effort: String {
+    get {_effort ?? String()}
+    set {_effort = newValue}
+  }
+  /// Returns true if `effort` has been explicitly set.
+  public var hasEffort: Bool {self._effort != nil}
+  /// Clears the value of `effort`. Subsequent reads from it will return its default value.
+  public mutating func clearEffort() {self._effort = nil}
+
+  public var skills: [BriarAPI_ProjectAgentSkillInput] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _model: String? = nil
+  fileprivate var _description_p: String? = nil
+  fileprivate var _effort: String? = nil
+}
+
+public nonisolated struct BriarAPI_UpdateOrganizationAgentResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var agent: BriarAPI_OrganizationAgent {
+    get {_agent ?? BriarAPI_OrganizationAgent()}
+    set {_agent = newValue}
+  }
+  /// Returns true if `agent` has been explicitly set.
+  public var hasAgent: Bool {self._agent != nil}
+  /// Clears the value of `agent`. Subsequent reads from it will return its default value.
+  public mutating func clearAgent() {self._agent = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _agent: BriarAPI_OrganizationAgent? = nil
+}
+
+public nonisolated struct BriarAPI_DeleteOrganizationAgentRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var agentID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_DeleteOrganizationAgentResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var deleted: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public nonisolated struct BriarAPI_ListProjectAgentsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -458,6 +806,748 @@ public nonisolated struct BriarAPI_ListProjectAgentsResponse: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+}
+
+public nonisolated struct BriarAPI_CreateProjectAgentRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var name: String {
+    get {_name ?? String()}
+    set {_name = newValue}
+  }
+  /// Returns true if `name` has been explicitly set.
+  public var hasName: Bool {self._name != nil}
+  /// Clears the value of `name`. Subsequent reads from it will return its default value.
+  public mutating func clearName() {self._name = nil}
+
+  public var avatar: String {
+    get {_avatar ?? String()}
+    set {_avatar = newValue}
+  }
+  /// Returns true if `avatar` has been explicitly set.
+  public var hasAvatar: Bool {self._avatar != nil}
+  /// Clears the value of `avatar`. Subsequent reads from it will return its default value.
+  public mutating func clearAvatar() {self._avatar = nil}
+
+  public var provider: BriarTypes_AgentProvider = .unspecified
+
+  public var model: String {
+    get {_model ?? String()}
+    set {_model = newValue}
+  }
+  /// Returns true if `model` has been explicitly set.
+  public var hasModel: Bool {self._model != nil}
+  /// Clears the value of `model`. Subsequent reads from it will return its default value.
+  public mutating func clearModel() {self._model = nil}
+
+  public var effort: String {
+    get {_effort ?? String()}
+    set {_effort = newValue}
+  }
+  /// Returns true if `effort` has been explicitly set.
+  public var hasEffort: Bool {self._effort != nil}
+  /// Clears the value of `effort`. Subsequent reads from it will return its default value.
+  public mutating func clearEffort() {self._effort = nil}
+
+  public var designatedWorkerID: String {
+    get {_designatedWorkerID ?? String()}
+    set {_designatedWorkerID = newValue}
+  }
+  /// Returns true if `designatedWorkerID` has been explicitly set.
+  public var hasDesignatedWorkerID: Bool {self._designatedWorkerID != nil}
+  /// Clears the value of `designatedWorkerID`. Subsequent reads from it will return its default value.
+  public mutating func clearDesignatedWorkerID() {self._designatedWorkerID = nil}
+
+  public var description_p: String {
+    get {_description_p ?? String()}
+    set {_description_p = newValue}
+  }
+  /// Returns true if `description_p` has been explicitly set.
+  public var hasDescription_p: Bool {self._description_p != nil}
+  /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
+  public mutating func clearDescription_p() {self._description_p = nil}
+
+  public var responsibility: String = String()
+
+  public var skills: [BriarAPI_ProjectAgentSkillInput] = []
+
+  public var calendarColor: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _name: String? = nil
+  fileprivate var _avatar: String? = nil
+  fileprivate var _model: String? = nil
+  fileprivate var _effort: String? = nil
+  fileprivate var _designatedWorkerID: String? = nil
+  fileprivate var _description_p: String? = nil
+}
+
+public nonisolated struct BriarAPI_CreateProjectAgentResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var agent: BriarAPI_ProjectAgent {
+    get {_agent ?? BriarAPI_ProjectAgent()}
+    set {_agent = newValue}
+  }
+  /// Returns true if `agent` has been explicitly set.
+  public var hasAgent: Bool {self._agent != nil}
+  /// Clears the value of `agent`. Subsequent reads from it will return its default value.
+  public mutating func clearAgent() {self._agent = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _agent: BriarAPI_ProjectAgent? = nil
+}
+
+public nonisolated struct BriarAPI_UpdateProjectAgentRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var agentID: String = String()
+
+  public var name: String {
+    get {_name ?? String()}
+    set {_name = newValue}
+  }
+  /// Returns true if `name` has been explicitly set.
+  public var hasName: Bool {self._name != nil}
+  /// Clears the value of `name`. Subsequent reads from it will return its default value.
+  public mutating func clearName() {self._name = nil}
+
+  public var avatarUpdate: BriarAPI_UpdateProjectAgentRequest.OneOf_AvatarUpdate? = nil
+
+  public var avatar: String {
+    get {
+      if case .avatar(let v)? = avatarUpdate {return v}
+      return String()
+    }
+    set {avatarUpdate = .avatar(newValue)}
+  }
+
+  public var clearAvatar_p: BriarAPI_UpdateProjectAgentRequest.ClearAvatar {
+    get {
+      if case .clearAvatar_p(let v)? = avatarUpdate {return v}
+      return BriarAPI_UpdateProjectAgentRequest.ClearAvatar()
+    }
+    set {avatarUpdate = .clearAvatar_p(newValue)}
+  }
+
+  public var codexPetUpdate: BriarAPI_UpdateProjectAgentRequest.OneOf_CodexPetUpdate? = nil
+
+  public var codexPet: BriarAPI_CodexPetSelection {
+    get {
+      if case .codexPet(let v)? = codexPetUpdate {return v}
+      return BriarAPI_CodexPetSelection()
+    }
+    set {codexPetUpdate = .codexPet(newValue)}
+  }
+
+  public var clearCodexPet_p: BriarAPI_UpdateProjectAgentRequest.ClearCodexPet {
+    get {
+      if case .clearCodexPet_p(let v)? = codexPetUpdate {return v}
+      return BriarAPI_UpdateProjectAgentRequest.ClearCodexPet()
+    }
+    set {codexPetUpdate = .clearCodexPet_p(newValue)}
+  }
+
+  public var provider: BriarTypes_AgentProvider = .unspecified
+
+  public var model: String {
+    get {_model ?? String()}
+    set {_model = newValue}
+  }
+  /// Returns true if `model` has been explicitly set.
+  public var hasModel: Bool {self._model != nil}
+  /// Clears the value of `model`. Subsequent reads from it will return its default value.
+  public mutating func clearModel() {self._model = nil}
+
+  public var effortUpdate: BriarAPI_UpdateProjectAgentRequest.OneOf_EffortUpdate? = nil
+
+  public var effort: String {
+    get {
+      if case .effort(let v)? = effortUpdate {return v}
+      return String()
+    }
+    set {effortUpdate = .effort(newValue)}
+  }
+
+  public var clearEffort_p: BriarAPI_UpdateProjectAgentRequest.ClearEffort {
+    get {
+      if case .clearEffort_p(let v)? = effortUpdate {return v}
+      return BriarAPI_UpdateProjectAgentRequest.ClearEffort()
+    }
+    set {effortUpdate = .clearEffort_p(newValue)}
+  }
+
+  public var designatedWorkerUpdate: BriarAPI_UpdateProjectAgentRequest.OneOf_DesignatedWorkerUpdate? = nil
+
+  public var designatedWorkerID: String {
+    get {
+      if case .designatedWorkerID(let v)? = designatedWorkerUpdate {return v}
+      return String()
+    }
+    set {designatedWorkerUpdate = .designatedWorkerID(newValue)}
+  }
+
+  public var clearDesignatedWorker_p: BriarAPI_UpdateProjectAgentRequest.ClearDesignatedWorker {
+    get {
+      if case .clearDesignatedWorker_p(let v)? = designatedWorkerUpdate {return v}
+      return BriarAPI_UpdateProjectAgentRequest.ClearDesignatedWorker()
+    }
+    set {designatedWorkerUpdate = .clearDesignatedWorker_p(newValue)}
+  }
+
+  public var description_p: String {
+    get {_description_p ?? String()}
+    set {_description_p = newValue}
+  }
+  /// Returns true if `description_p` has been explicitly set.
+  public var hasDescription_p: Bool {self._description_p != nil}
+  /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
+  public mutating func clearDescription_p() {self._description_p = nil}
+
+  public var responsibility: String = String()
+
+  public var skills: [BriarAPI_ProjectAgentSkillInput] = []
+
+  public var calendarColor: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum OneOf_AvatarUpdate: Equatable, Sendable {
+    case avatar(String)
+    case clearAvatar_p(BriarAPI_UpdateProjectAgentRequest.ClearAvatar)
+
+  }
+
+  public nonisolated enum OneOf_CodexPetUpdate: Equatable, Sendable {
+    case codexPet(BriarAPI_CodexPetSelection)
+    case clearCodexPet_p(BriarAPI_UpdateProjectAgentRequest.ClearCodexPet)
+
+  }
+
+  public nonisolated enum OneOf_EffortUpdate: Equatable, Sendable {
+    case effort(String)
+    case clearEffort_p(BriarAPI_UpdateProjectAgentRequest.ClearEffort)
+
+  }
+
+  public nonisolated enum OneOf_DesignatedWorkerUpdate: Equatable, Sendable {
+    case designatedWorkerID(String)
+    case clearDesignatedWorker_p(BriarAPI_UpdateProjectAgentRequest.ClearDesignatedWorker)
+
+  }
+
+  public nonisolated struct ClearAvatar: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public nonisolated struct ClearCodexPet: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public nonisolated struct ClearEffort: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public nonisolated struct ClearDesignatedWorker: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+
+  fileprivate var _name: String? = nil
+  fileprivate var _model: String? = nil
+  fileprivate var _description_p: String? = nil
+}
+
+public nonisolated struct BriarAPI_UpdateProjectAgentResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var agent: BriarAPI_ProjectAgent {
+    get {_agent ?? BriarAPI_ProjectAgent()}
+    set {_agent = newValue}
+  }
+  /// Returns true if `agent` has been explicitly set.
+  public var hasAgent: Bool {self._agent != nil}
+  /// Clears the value of `agent`. Subsequent reads from it will return its default value.
+  public mutating func clearAgent() {self._agent = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _agent: BriarAPI_ProjectAgent? = nil
+}
+
+public nonisolated struct BriarAPI_DeleteProjectAgentRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var agentID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_DeleteProjectAgentResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var deleted: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ListProjectAgentSchedulesRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ListProjectAgentSchedulesResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var schedules: [BriarAPI_ProjectAgentSchedule] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ProjectAgentScheduleWrite: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var agentID: String = String()
+
+  public var name: String = String()
+
+  public var recurrence: BriarAPI_ProjectAgentScheduleRecurrence = .unspecified
+
+  public var timeOfDay: String = String()
+
+  public var dayOfWeek: UInt32 {
+    get {_dayOfWeek ?? 0}
+    set {_dayOfWeek = newValue}
+  }
+  /// Returns true if `dayOfWeek` has been explicitly set.
+  public var hasDayOfWeek: Bool {self._dayOfWeek != nil}
+  /// Clears the value of `dayOfWeek`. Subsequent reads from it will return its default value.
+  public mutating func clearDayOfWeek() {self._dayOfWeek = nil}
+
+  public var intervalValue: UInt32 {
+    get {_intervalValue ?? 0}
+    set {_intervalValue = newValue}
+  }
+  /// Returns true if `intervalValue` has been explicitly set.
+  public var hasIntervalValue: Bool {self._intervalValue != nil}
+  /// Clears the value of `intervalValue`. Subsequent reads from it will return its default value.
+  public mutating func clearIntervalValue() {self._intervalValue = nil}
+
+  public var intervalUnit: BriarAPI_ProjectAgentScheduleIntervalUnit {
+    get {_intervalUnit ?? .unspecified}
+    set {_intervalUnit = newValue}
+  }
+  /// Returns true if `intervalUnit` has been explicitly set.
+  public var hasIntervalUnit: Bool {self._intervalUnit != nil}
+  /// Clears the value of `intervalUnit`. Subsequent reads from it will return its default value.
+  public mutating func clearIntervalUnit() {self._intervalUnit = nil}
+
+  public var daysOfWeek: [UInt32] = []
+
+  public var notificationLevel: BriarAPI_ProjectAgentScheduleNotificationLevel {
+    get {_notificationLevel ?? .unspecified}
+    set {_notificationLevel = newValue}
+  }
+  /// Returns true if `notificationLevel` has been explicitly set.
+  public var hasNotificationLevel: Bool {self._notificationLevel != nil}
+  /// Clears the value of `notificationLevel`. Subsequent reads from it will return its default value.
+  public mutating func clearNotificationLevel() {self._notificationLevel = nil}
+
+  public var timeZone: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _dayOfWeek: UInt32? = nil
+  fileprivate var _intervalValue: UInt32? = nil
+  fileprivate var _intervalUnit: BriarAPI_ProjectAgentScheduleIntervalUnit? = nil
+  fileprivate var _notificationLevel: BriarAPI_ProjectAgentScheduleNotificationLevel? = nil
+}
+
+public nonisolated struct BriarAPI_CreateProjectAgentScheduleRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var schedule: BriarAPI_ProjectAgentScheduleWrite {
+    get {_schedule ?? BriarAPI_ProjectAgentScheduleWrite()}
+    set {_schedule = newValue}
+  }
+  /// Returns true if `schedule` has been explicitly set.
+  public var hasSchedule: Bool {self._schedule != nil}
+  /// Clears the value of `schedule`. Subsequent reads from it will return its default value.
+  public mutating func clearSchedule() {self._schedule = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _schedule: BriarAPI_ProjectAgentScheduleWrite? = nil
+}
+
+public nonisolated struct BriarAPI_CreateProjectAgentScheduleResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var schedule: BriarAPI_ProjectAgentSchedule {
+    get {_schedule ?? BriarAPI_ProjectAgentSchedule()}
+    set {_schedule = newValue}
+  }
+  /// Returns true if `schedule` has been explicitly set.
+  public var hasSchedule: Bool {self._schedule != nil}
+  /// Clears the value of `schedule`. Subsequent reads from it will return its default value.
+  public mutating func clearSchedule() {self._schedule = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _schedule: BriarAPI_ProjectAgentSchedule? = nil
+}
+
+public nonisolated struct BriarAPI_UpdateProjectAgentScheduleRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var scheduleID: String = String()
+
+  public var schedule: BriarAPI_ProjectAgentScheduleWrite {
+    get {_schedule ?? BriarAPI_ProjectAgentScheduleWrite()}
+    set {_schedule = newValue}
+  }
+  /// Returns true if `schedule` has been explicitly set.
+  public var hasSchedule: Bool {self._schedule != nil}
+  /// Clears the value of `schedule`. Subsequent reads from it will return its default value.
+  public mutating func clearSchedule() {self._schedule = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _schedule: BriarAPI_ProjectAgentScheduleWrite? = nil
+}
+
+public nonisolated struct BriarAPI_UpdateProjectAgentScheduleResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var schedule: BriarAPI_ProjectAgentSchedule {
+    get {_schedule ?? BriarAPI_ProjectAgentSchedule()}
+    set {_schedule = newValue}
+  }
+  /// Returns true if `schedule` has been explicitly set.
+  public var hasSchedule: Bool {self._schedule != nil}
+  /// Clears the value of `schedule`. Subsequent reads from it will return its default value.
+  public mutating func clearSchedule() {self._schedule = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _schedule: BriarAPI_ProjectAgentSchedule? = nil
+}
+
+public nonisolated struct BriarAPI_DeleteProjectAgentScheduleRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var scheduleID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_DeleteProjectAgentScheduleResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var deleted: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ListProjectAgentScheduleRunsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ListProjectAgentScheduleRunsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var runs: [BriarAPI_ProjectAgentScheduleRun] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ClaimProjectAgentScheduleRunRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectIds: [String] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ClaimProjectAgentScheduleRunResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var claimedRun: BriarAPI_ClaimedProjectAgentScheduleRun {
+    get {_claimedRun ?? BriarAPI_ClaimedProjectAgentScheduleRun()}
+    set {_claimedRun = newValue}
+  }
+  /// Returns true if `claimedRun` has been explicitly set.
+  public var hasClaimedRun: Bool {self._claimedRun != nil}
+  /// Clears the value of `claimedRun`. Subsequent reads from it will return its default value.
+  public mutating func clearClaimedRun() {self._claimedRun = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _claimedRun: BriarAPI_ClaimedProjectAgentScheduleRun? = nil
+}
+
+public nonisolated struct BriarAPI_CompleteProjectAgentScheduleRunRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var runID: String = String()
+
+  public var claimToken: String = String()
+
+  public var outcome: BriarAPI_CompleteProjectAgentScheduleRunRequest.OneOf_Outcome? = nil
+
+  public var completed: BriarAPI_CompleteProjectAgentScheduleRunRequest.Completed {
+    get {
+      if case .completed(let v)? = outcome {return v}
+      return BriarAPI_CompleteProjectAgentScheduleRunRequest.Completed()
+    }
+    set {outcome = .completed(newValue)}
+  }
+
+  public var failed: BriarAPI_CompleteProjectAgentScheduleRunRequest.Failed {
+    get {
+      if case .failed(let v)? = outcome {return v}
+      return BriarAPI_CompleteProjectAgentScheduleRunRequest.Failed()
+    }
+    set {outcome = .failed(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum OneOf_Outcome: Equatable, Sendable {
+    case completed(BriarAPI_CompleteProjectAgentScheduleRunRequest.Completed)
+    case failed(BriarAPI_CompleteProjectAgentScheduleRunRequest.Failed)
+
+  }
+
+  public nonisolated struct Completed: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var resultSummary: String = String()
+
+    public var structuredResult: BriarAPI_StructuredRunResult {
+      get {_structuredResult ?? BriarAPI_StructuredRunResult()}
+      set {_structuredResult = newValue}
+    }
+    /// Returns true if `structuredResult` has been explicitly set.
+    public var hasStructuredResult: Bool {self._structuredResult != nil}
+    /// Clears the value of `structuredResult`. Subsequent reads from it will return its default value.
+    public mutating func clearStructuredResult() {self._structuredResult = nil}
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+
+    fileprivate var _structuredResult: BriarAPI_StructuredRunResult? = nil
+  }
+
+  public nonisolated struct Failed: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var error: String = String()
+
+    public var structuredResult: BriarAPI_StructuredRunResult {
+      get {_structuredResult ?? BriarAPI_StructuredRunResult()}
+      set {_structuredResult = newValue}
+    }
+    /// Returns true if `structuredResult` has been explicitly set.
+    public var hasStructuredResult: Bool {self._structuredResult != nil}
+    /// Clears the value of `structuredResult`. Subsequent reads from it will return its default value.
+    public mutating func clearStructuredResult() {self._structuredResult = nil}
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+
+    fileprivate var _structuredResult: BriarAPI_StructuredRunResult? = nil
+  }
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_CompleteProjectAgentScheduleRunResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var run: BriarAPI_ProjectAgentScheduleRun {
+    get {_run ?? BriarAPI_ProjectAgentScheduleRun()}
+    set {_run = newValue}
+  }
+  /// Returns true if `run` has been explicitly set.
+  public var hasRun: Bool {self._run != nil}
+  /// Clears the value of `run`. Subsequent reads from it will return its default value.
+  public mutating func clearRun() {self._run = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _run: BriarAPI_ProjectAgentScheduleRun? = nil
+}
+
+public nonisolated struct BriarAPI_RenewProjectAgentScheduleRunRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var projectID: String = String()
+
+  public var runID: String = String()
+
+  public var claimToken: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_RenewProjectAgentScheduleRunResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var leaseExpiresAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_leaseExpiresAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_leaseExpiresAt = newValue}
+  }
+  /// Returns true if `leaseExpiresAt` has been explicitly set.
+  public var hasLeaseExpiresAt: Bool {self._leaseExpiresAt != nil}
+  /// Clears the value of `leaseExpiresAt`. Subsequent reads from it will return its default value.
+  public mutating func clearLeaseExpiresAt() {self._leaseExpiresAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _leaseExpiresAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
 public nonisolated struct BriarAPI_ListProjectAgentSessionsRequest: Sendable {
@@ -893,6 +1983,91 @@ public nonisolated struct BriarAPI_ProjectAgentSkill: Sendable {
   fileprivate var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
+public nonisolated struct BriarAPI_ProjectAgentSkillInput: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String {
+    get {_id ?? String()}
+    set {_id = newValue}
+  }
+  /// Returns true if `id` has been explicitly set.
+  public var hasID: Bool {self._id != nil}
+  /// Clears the value of `id`. Subsequent reads from it will return its default value.
+  public mutating func clearID() {self._id = nil}
+
+  public var name: String = String()
+
+  public var description_p: String = String()
+
+  public var body: String = String()
+
+  public var provider: BriarTypes_AgentProvider = .unspecified
+
+  public var model: String {
+    get {_model ?? String()}
+    set {_model = newValue}
+  }
+  /// Returns true if `model` has been explicitly set.
+  public var hasModel: Bool {self._model != nil}
+  /// Clears the value of `model`. Subsequent reads from it will return its default value.
+  public mutating func clearModel() {self._model = nil}
+
+  public var effort: String {
+    get {_effort ?? String()}
+    set {_effort = newValue}
+  }
+  /// Returns true if `effort` has been explicitly set.
+  public var hasEffort: Bool {self._effort != nil}
+  /// Clears the value of `effort`. Subsequent reads from it will return its default value.
+  public mutating func clearEffort() {self._effort = nil}
+
+  public var kind: BriarAPI_AgentSkillKind = .unspecified
+
+  public var executionMode: BriarAPI_AgentSkillExecutionMode {
+    get {_executionMode ?? .unspecified}
+    set {_executionMode = newValue}
+  }
+  /// Returns true if `executionMode` has been explicitly set.
+  public var hasExecutionMode: Bool {self._executionMode != nil}
+  /// Clears the value of `executionMode`. Subsequent reads from it will return its default value.
+  public mutating func clearExecutionMode() {self._executionMode = nil}
+
+  public var approvalPolicy: BriarAPI_AgentSkillApprovalPolicy {
+    get {_approvalPolicy ?? .unspecified}
+    set {_approvalPolicy = newValue}
+  }
+  /// Returns true if `approvalPolicy` has been explicitly set.
+  public var hasApprovalPolicy: Bool {self._approvalPolicy != nil}
+  /// Clears the value of `approvalPolicy`. Subsequent reads from it will return its default value.
+  public mutating func clearApprovalPolicy() {self._approvalPolicy = nil}
+
+  public var position: UInt32 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _id: String? = nil
+  fileprivate var _model: String? = nil
+  fileprivate var _effort: String? = nil
+  fileprivate var _executionMode: BriarAPI_AgentSkillExecutionMode? = nil
+  fileprivate var _approvalPolicy: BriarAPI_AgentSkillApprovalPolicy? = nil
+}
+
+public nonisolated struct BriarAPI_CodexPetSelection: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var slug: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public nonisolated struct BriarAPI_CodexPet: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1170,6 +2345,309 @@ public nonisolated struct BriarAPI_OrganizationAgent: Sendable {
   fileprivate var _projectName: String? = nil
   fileprivate var _description_p: String? = nil
   fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public nonisolated struct BriarAPI_ProjectAgentSchedule: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String {
+    get {_storage._id}
+    set {_uniqueStorage()._id = newValue}
+  }
+
+  public var projectID: String {
+    get {_storage._projectID}
+    set {_uniqueStorage()._projectID = newValue}
+  }
+
+  public var agentID: String {
+    get {_storage._agentID}
+    set {_uniqueStorage()._agentID = newValue}
+  }
+
+  public var agentName: String {
+    get {_storage._agentName}
+    set {_uniqueStorage()._agentName = newValue}
+  }
+
+  public var agentProvider: BriarTypes_AgentProvider {
+    get {_storage._agentProvider}
+    set {_uniqueStorage()._agentProvider = newValue}
+  }
+
+  public var name: String {
+    get {_storage._name}
+    set {_uniqueStorage()._name = newValue}
+  }
+
+  public var recurrence: BriarAPI_ProjectAgentScheduleRecurrence {
+    get {_storage._recurrence}
+    set {_uniqueStorage()._recurrence = newValue}
+  }
+
+  public var timeOfDay: String {
+    get {_storage._timeOfDay}
+    set {_uniqueStorage()._timeOfDay = newValue}
+  }
+
+  public var dayOfWeek: UInt32 {
+    get {_storage._dayOfWeek ?? 0}
+    set {_uniqueStorage()._dayOfWeek = newValue}
+  }
+  /// Returns true if `dayOfWeek` has been explicitly set.
+  public var hasDayOfWeek: Bool {_storage._dayOfWeek != nil}
+  /// Clears the value of `dayOfWeek`. Subsequent reads from it will return its default value.
+  public mutating func clearDayOfWeek() {_uniqueStorage()._dayOfWeek = nil}
+
+  public var intervalValue: UInt32 {
+    get {_storage._intervalValue}
+    set {_uniqueStorage()._intervalValue = newValue}
+  }
+
+  public var intervalUnit: BriarAPI_ProjectAgentScheduleIntervalUnit {
+    get {_storage._intervalUnit}
+    set {_uniqueStorage()._intervalUnit = newValue}
+  }
+
+  public var daysOfWeek: [UInt32] {
+    get {_storage._daysOfWeek}
+    set {_uniqueStorage()._daysOfWeek = newValue}
+  }
+
+  public var notificationLevel: BriarAPI_ProjectAgentScheduleNotificationLevel {
+    get {_storage._notificationLevel}
+    set {_uniqueStorage()._notificationLevel = newValue}
+  }
+
+  public var timeZone: String {
+    get {_storage._timeZone}
+    set {_uniqueStorage()._timeZone = newValue}
+  }
+
+  public var enabled: Bool {
+    get {_storage._enabled}
+    set {_uniqueStorage()._enabled = newValue}
+  }
+
+  public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._createdAt = newValue}
+  }
+  /// Returns true if `createdAt` has been explicitly set.
+  public var hasCreatedAt: Bool {_storage._createdAt != nil}
+  /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedAt() {_uniqueStorage()._createdAt = nil}
+
+  public var updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._updatedAt = newValue}
+  }
+  /// Returns true if `updatedAt` has been explicitly set.
+  public var hasUpdatedAt: Bool {_storage._updatedAt != nil}
+  /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedAt() {_uniqueStorage()._updatedAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public nonisolated struct BriarAPI_ProjectAgentScheduleRunAgent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var name: String = String()
+
+  public var provider: BriarTypes_AgentProvider = .unspecified
+
+  public var model: String {
+    get {_model ?? String()}
+    set {_model = newValue}
+  }
+  /// Returns true if `model` has been explicitly set.
+  public var hasModel: Bool {self._model != nil}
+  /// Clears the value of `model`. Subsequent reads from it will return its default value.
+  public mutating func clearModel() {self._model = nil}
+
+  public var effort: String {
+    get {_effort ?? String()}
+    set {_effort = newValue}
+  }
+  /// Returns true if `effort` has been explicitly set.
+  public var hasEffort: Bool {self._effort != nil}
+  /// Clears the value of `effort`. Subsequent reads from it will return its default value.
+  public mutating func clearEffort() {self._effort = nil}
+
+  public var description_p: String {
+    get {_description_p ?? String()}
+    set {_description_p = newValue}
+  }
+  /// Returns true if `description_p` has been explicitly set.
+  public var hasDescription_p: Bool {self._description_p != nil}
+  /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
+  public mutating func clearDescription_p() {self._description_p = nil}
+
+  public var responsibility: String = String()
+
+  public var skill: String = String()
+
+  public var skills: [BriarAPI_ProjectAgentSkill] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _model: String? = nil
+  fileprivate var _effort: String? = nil
+  fileprivate var _description_p: String? = nil
+}
+
+public nonisolated struct BriarAPI_ProjectAgentScheduleRun: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String {
+    get {_storage._id}
+    set {_uniqueStorage()._id = newValue}
+  }
+
+  public var projectID: String {
+    get {_storage._projectID}
+    set {_uniqueStorage()._projectID = newValue}
+  }
+
+  public var scheduleID: String {
+    get {_storage._scheduleID}
+    set {_uniqueStorage()._scheduleID = newValue}
+  }
+
+  public var scheduleName: String {
+    get {_storage._scheduleName}
+    set {_uniqueStorage()._scheduleName = newValue}
+  }
+
+  public var agent: BriarAPI_ProjectAgentScheduleRunAgent {
+    get {_storage._agent ?? BriarAPI_ProjectAgentScheduleRunAgent()}
+    set {_uniqueStorage()._agent = newValue}
+  }
+  /// Returns true if `agent` has been explicitly set.
+  public var hasAgent: Bool {_storage._agent != nil}
+  /// Clears the value of `agent`. Subsequent reads from it will return its default value.
+  public mutating func clearAgent() {_uniqueStorage()._agent = nil}
+
+  public var workflow: BriarTypes_AutoHuntWorkflow {
+    get {_storage._workflow ?? BriarTypes_AutoHuntWorkflow()}
+    set {_uniqueStorage()._workflow = newValue}
+  }
+  /// Returns true if `workflow` has been explicitly set.
+  public var hasWorkflow: Bool {_storage._workflow != nil}
+  /// Clears the value of `workflow`. Subsequent reads from it will return its default value.
+  public mutating func clearWorkflow() {_uniqueStorage()._workflow = nil}
+
+  public var status: BriarAPI_ProjectAgentScheduleRunStatus {
+    get {_storage._status}
+    set {_uniqueStorage()._status = newValue}
+  }
+
+  public var scheduledFor: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._scheduledFor ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._scheduledFor = newValue}
+  }
+  /// Returns true if `scheduledFor` has been explicitly set.
+  public var hasScheduledFor: Bool {_storage._scheduledFor != nil}
+  /// Clears the value of `scheduledFor`. Subsequent reads from it will return its default value.
+  public mutating func clearScheduledFor() {_uniqueStorage()._scheduledFor = nil}
+
+  public var leaseExpiresAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._leaseExpiresAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._leaseExpiresAt = newValue}
+  }
+  /// Returns true if `leaseExpiresAt` has been explicitly set.
+  public var hasLeaseExpiresAt: Bool {_storage._leaseExpiresAt != nil}
+  /// Clears the value of `leaseExpiresAt`. Subsequent reads from it will return its default value.
+  public mutating func clearLeaseExpiresAt() {_uniqueStorage()._leaseExpiresAt = nil}
+
+  public var startedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._startedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._startedAt = newValue}
+  }
+  /// Returns true if `startedAt` has been explicitly set.
+  public var hasStartedAt: Bool {_storage._startedAt != nil}
+  /// Clears the value of `startedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearStartedAt() {_uniqueStorage()._startedAt = nil}
+
+  public var completedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._completedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._completedAt = newValue}
+  }
+  /// Returns true if `completedAt` has been explicitly set.
+  public var hasCompletedAt: Bool {_storage._completedAt != nil}
+  /// Clears the value of `completedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCompletedAt() {_uniqueStorage()._completedAt = nil}
+
+  public var resultSummary: String {
+    get {_storage._resultSummary ?? String()}
+    set {_uniqueStorage()._resultSummary = newValue}
+  }
+  /// Returns true if `resultSummary` has been explicitly set.
+  public var hasResultSummary: Bool {_storage._resultSummary != nil}
+  /// Clears the value of `resultSummary`. Subsequent reads from it will return its default value.
+  public mutating func clearResultSummary() {_uniqueStorage()._resultSummary = nil}
+
+  public var structuredResult: BriarAPI_StructuredRunResult {
+    get {_storage._structuredResult ?? BriarAPI_StructuredRunResult()}
+    set {_uniqueStorage()._structuredResult = newValue}
+  }
+  /// Returns true if `structuredResult` has been explicitly set.
+  public var hasStructuredResult: Bool {_storage._structuredResult != nil}
+  /// Clears the value of `structuredResult`. Subsequent reads from it will return its default value.
+  public mutating func clearStructuredResult() {_uniqueStorage()._structuredResult = nil}
+
+  public var error: String {
+    get {_storage._error ?? String()}
+    set {_uniqueStorage()._error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public nonisolated struct BriarAPI_ClaimedProjectAgentScheduleRun: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var run: BriarAPI_ProjectAgentScheduleRun {
+    get {_run ?? BriarAPI_ProjectAgentScheduleRun()}
+    set {_run = newValue}
+  }
+  /// Returns true if `run` has been explicitly set.
+  public var hasRun: Bool {self._run != nil}
+  /// Clears the value of `run`. Subsequent reads from it will return its default value.
+  public mutating func clearRun() {self._run = nil}
+
+  public var claimToken: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _run: BriarAPI_ProjectAgentScheduleRun? = nil
 }
 
 public nonisolated struct BriarAPI_ProjectAgentSessionIssue: Sendable {
@@ -1646,6 +3124,22 @@ public nonisolated struct BriarAPI_AgentSkillExecutionProposal: @unchecked Senda
 
 fileprivate nonisolated let _protobuf_package = "briar.app.v1"
 
+nonisolated extension BriarAPI_ProjectAgentScheduleRecurrence: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PROJECT_AGENT_SCHEDULE_RECURRENCE_UNSPECIFIED\0\u{1}PROJECT_AGENT_SCHEDULE_RECURRENCE_DAILY\0\u{1}PROJECT_AGENT_SCHEDULE_RECURRENCE_WEEKDAYS\0\u{1}PROJECT_AGENT_SCHEDULE_RECURRENCE_WEEKLY\0\u{1}PROJECT_AGENT_SCHEDULE_RECURRENCE_INTERVAL\0\u{1}PROJECT_AGENT_SCHEDULE_RECURRENCE_CUSTOM\0")
+}
+
+nonisolated extension BriarAPI_ProjectAgentScheduleIntervalUnit: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PROJECT_AGENT_SCHEDULE_INTERVAL_UNIT_UNSPECIFIED\0\u{1}PROJECT_AGENT_SCHEDULE_INTERVAL_UNIT_MINUTE\0\u{1}PROJECT_AGENT_SCHEDULE_INTERVAL_UNIT_HOUR\0\u{1}PROJECT_AGENT_SCHEDULE_INTERVAL_UNIT_DAY\0\u{1}PROJECT_AGENT_SCHEDULE_INTERVAL_UNIT_WEEK\0")
+}
+
+nonisolated extension BriarAPI_ProjectAgentScheduleNotificationLevel: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PROJECT_AGENT_SCHEDULE_NOTIFICATION_LEVEL_UNSPECIFIED\0\u{1}PROJECT_AGENT_SCHEDULE_NOTIFICATION_LEVEL_IMPORTANT_UPDATES\0\u{1}PROJECT_AGENT_SCHEDULE_NOTIFICATION_LEVEL_NONE\0")
+}
+
+nonisolated extension BriarAPI_ProjectAgentScheduleRunStatus: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PROJECT_AGENT_SCHEDULE_RUN_STATUS_UNSPECIFIED\0\u{1}PROJECT_AGENT_SCHEDULE_RUN_STATUS_RUNNING\0\u{1}PROJECT_AGENT_SCHEDULE_RUN_STATUS_COMPLETED\0\u{1}PROJECT_AGENT_SCHEDULE_RUN_STATUS_FAILED\0")
+}
+
 nonisolated extension BriarAPI_AgentSkillKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AGENT_SKILL_KIND_UNSPECIFIED\0\u{1}AGENT_SKILL_KIND_ISSUE_PROCESSING\0\u{1}AGENT_SKILL_KIND_CUSTOM\0")
 }
@@ -1747,6 +3241,282 @@ nonisolated extension BriarAPI_ListOrganizationAgentsResponse: SwiftProtobuf.Mes
   }
 }
 
+nonisolated extension BriarAPI_CreateOrganizationAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateOrganizationAgentRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}description\0\u{1}responsibility\0\u{1}effort\0\u{1}skills\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._model) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.responsibility) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self._effort) }()
+      case 8: try { try decoder.decodeRepeatedMessageField(value: &self.skills) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 3)
+    }
+    try { if let v = self._model {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._description_p {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    if !self.responsibility.isEmpty {
+      try visitor.visitSingularStringField(value: self.responsibility, fieldNumber: 6)
+    }
+    try { if let v = self._effort {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+    } }()
+    if !self.skills.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.skills, fieldNumber: 8)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CreateOrganizationAgentRequest, rhs: BriarAPI_CreateOrganizationAgentRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.provider != rhs.provider {return false}
+    if lhs._model != rhs._model {return false}
+    if lhs._description_p != rhs._description_p {return false}
+    if lhs.responsibility != rhs.responsibility {return false}
+    if lhs._effort != rhs._effort {return false}
+    if lhs.skills != rhs.skills {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CreateOrganizationAgentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateOrganizationAgentResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}agent\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._agent) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._agent {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CreateOrganizationAgentResponse, rhs: BriarAPI_CreateOrganizationAgentResponse) -> Bool {
+    if lhs._agent != rhs._agent {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateOrganizationAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateOrganizationAgentRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}agent_id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}description\0\u{1}responsibility\0\u{1}effort\0\u{1}skills\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.agentID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._model) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.responsibility) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self._effort) }()
+      case 9: try { try decoder.decodeRepeatedMessageField(value: &self.skills) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.agentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.agentID, fieldNumber: 2)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 3)
+    }
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 4)
+    }
+    try { if let v = self._model {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._description_p {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    if !self.responsibility.isEmpty {
+      try visitor.visitSingularStringField(value: self.responsibility, fieldNumber: 7)
+    }
+    try { if let v = self._effort {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+    } }()
+    if !self.skills.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.skills, fieldNumber: 9)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateOrganizationAgentRequest, rhs: BriarAPI_UpdateOrganizationAgentRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.agentID != rhs.agentID {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.provider != rhs.provider {return false}
+    if lhs._model != rhs._model {return false}
+    if lhs._description_p != rhs._description_p {return false}
+    if lhs.responsibility != rhs.responsibility {return false}
+    if lhs._effort != rhs._effort {return false}
+    if lhs.skills != rhs.skills {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateOrganizationAgentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateOrganizationAgentResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}agent\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._agent) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._agent {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateOrganizationAgentResponse, rhs: BriarAPI_UpdateOrganizationAgentResponse) -> Bool {
+    if lhs._agent != rhs._agent {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DeleteOrganizationAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteOrganizationAgentRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}agent_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.agentID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.agentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.agentID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DeleteOrganizationAgentRequest, rhs: BriarAPI_DeleteOrganizationAgentRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.agentID != rhs.agentID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DeleteOrganizationAgentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteOrganizationAgentResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}deleted\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.deleted) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.deleted != false {
+      try visitor.visitSingularBoolField(value: self.deleted, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DeleteOrganizationAgentResponse, rhs: BriarAPI_DeleteOrganizationAgentResponse) -> Bool {
+    if lhs.deleted != rhs.deleted {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 nonisolated extension BriarAPI_ListProjectAgentsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListProjectAgentsRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{c}\u{2}\u{1}")
@@ -1802,6 +3572,1257 @@ nonisolated extension BriarAPI_ListProjectAgentsResponse: SwiftProtobuf.Message,
 
   public static func ==(lhs: BriarAPI_ListProjectAgentsResponse, rhs: BriarAPI_ListProjectAgentsResponse) -> Bool {
     if lhs.agents != rhs.agents {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CreateProjectAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateProjectAgentRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{1}name\0\u{1}avatar\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}designated_worker_id\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}calendar_color\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._name) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._avatar) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._model) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._effort) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self._designatedWorkerID) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.responsibility) }()
+      case 10: try { try decoder.decodeRepeatedMessageField(value: &self.skills) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self.calendarColor) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    try { if let v = self._name {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._avatar {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 4)
+    }
+    try { if let v = self._model {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._effort {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._designatedWorkerID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._description_p {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+    } }()
+    if !self.responsibility.isEmpty {
+      try visitor.visitSingularStringField(value: self.responsibility, fieldNumber: 9)
+    }
+    if !self.skills.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.skills, fieldNumber: 10)
+    }
+    if !self.calendarColor.isEmpty {
+      try visitor.visitSingularStringField(value: self.calendarColor, fieldNumber: 11)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CreateProjectAgentRequest, rhs: BriarAPI_CreateProjectAgentRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs._name != rhs._name {return false}
+    if lhs._avatar != rhs._avatar {return false}
+    if lhs.provider != rhs.provider {return false}
+    if lhs._model != rhs._model {return false}
+    if lhs._effort != rhs._effort {return false}
+    if lhs._designatedWorkerID != rhs._designatedWorkerID {return false}
+    if lhs._description_p != rhs._description_p {return false}
+    if lhs.responsibility != rhs.responsibility {return false}
+    if lhs.skills != rhs.skills {return false}
+    if lhs.calendarColor != rhs.calendarColor {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CreateProjectAgentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateProjectAgentResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}agent\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._agent) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._agent {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CreateProjectAgentResponse, rhs: BriarAPI_CreateProjectAgentResponse) -> Bool {
+    if lhs._agent != rhs._agent {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateProjectAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateProjectAgentRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}agent_id\0\u{1}name\0\u{1}avatar\0\u{3}clear_avatar\0\u{3}codex_pet\0\u{3}clear_codex_pet\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}clear_effort\0\u{3}designated_worker_id\0\u{3}clear_designated_worker\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}calendar_color\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.agentID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._name) }()
+      case 4: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.avatarUpdate != nil {try decoder.handleConflictingOneOf()}
+          self.avatarUpdate = .avatar(v)
+        }
+      }()
+      case 5: try {
+        var v: BriarAPI_UpdateProjectAgentRequest.ClearAvatar?
+        var hadOneofValue = false
+        if let current = self.avatarUpdate {
+          hadOneofValue = true
+          if case .clearAvatar_p(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.avatarUpdate = .clearAvatar_p(v)
+        }
+      }()
+      case 6: try {
+        var v: BriarAPI_CodexPetSelection?
+        var hadOneofValue = false
+        if let current = self.codexPetUpdate {
+          hadOneofValue = true
+          if case .codexPet(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.codexPetUpdate = .codexPet(v)
+        }
+      }()
+      case 7: try {
+        var v: BriarAPI_UpdateProjectAgentRequest.ClearCodexPet?
+        var hadOneofValue = false
+        if let current = self.codexPetUpdate {
+          hadOneofValue = true
+          if case .clearCodexPet_p(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.codexPetUpdate = .clearCodexPet_p(v)
+        }
+      }()
+      case 8: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self._model) }()
+      case 10: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.effortUpdate != nil {try decoder.handleConflictingOneOf()}
+          self.effortUpdate = .effort(v)
+        }
+      }()
+      case 11: try {
+        var v: BriarAPI_UpdateProjectAgentRequest.ClearEffort?
+        var hadOneofValue = false
+        if let current = self.effortUpdate {
+          hadOneofValue = true
+          if case .clearEffort_p(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.effortUpdate = .clearEffort_p(v)
+        }
+      }()
+      case 12: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.designatedWorkerUpdate != nil {try decoder.handleConflictingOneOf()}
+          self.designatedWorkerUpdate = .designatedWorkerID(v)
+        }
+      }()
+      case 13: try {
+        var v: BriarAPI_UpdateProjectAgentRequest.ClearDesignatedWorker?
+        var hadOneofValue = false
+        if let current = self.designatedWorkerUpdate {
+          hadOneofValue = true
+          if case .clearDesignatedWorker_p(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.designatedWorkerUpdate = .clearDesignatedWorker_p(v)
+        }
+      }()
+      case 14: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
+      case 15: try { try decoder.decodeSingularStringField(value: &self.responsibility) }()
+      case 16: try { try decoder.decodeRepeatedMessageField(value: &self.skills) }()
+      case 17: try { try decoder.decodeSingularStringField(value: &self.calendarColor) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    if !self.agentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.agentID, fieldNumber: 2)
+    }
+    try { if let v = self._name {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    switch self.avatarUpdate {
+    case .avatar?: try {
+      guard case .avatar(let v)? = self.avatarUpdate else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    }()
+    case .clearAvatar_p?: try {
+      guard case .clearAvatar_p(let v)? = self.avatarUpdate else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    }()
+    case nil: break
+    }
+    switch self.codexPetUpdate {
+    case .codexPet?: try {
+      guard case .codexPet(let v)? = self.codexPetUpdate else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    }()
+    case .clearCodexPet_p?: try {
+      guard case .clearCodexPet_p(let v)? = self.codexPetUpdate else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    }()
+    case nil: break
+    }
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 8)
+    }
+    try { if let v = self._model {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 9)
+    } }()
+    switch self.effortUpdate {
+    case .effort?: try {
+      guard case .effort(let v)? = self.effortUpdate else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+    }()
+    case .clearEffort_p?: try {
+      guard case .clearEffort_p(let v)? = self.effortUpdate else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+    }()
+    case nil: break
+    }
+    switch self.designatedWorkerUpdate {
+    case .designatedWorkerID?: try {
+      guard case .designatedWorkerID(let v)? = self.designatedWorkerUpdate else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 12)
+    }()
+    case .clearDesignatedWorker_p?: try {
+      guard case .clearDesignatedWorker_p(let v)? = self.designatedWorkerUpdate else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
+    }()
+    case nil: break
+    }
+    try { if let v = self._description_p {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 14)
+    } }()
+    if !self.responsibility.isEmpty {
+      try visitor.visitSingularStringField(value: self.responsibility, fieldNumber: 15)
+    }
+    if !self.skills.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.skills, fieldNumber: 16)
+    }
+    if !self.calendarColor.isEmpty {
+      try visitor.visitSingularStringField(value: self.calendarColor, fieldNumber: 17)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateProjectAgentRequest, rhs: BriarAPI_UpdateProjectAgentRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.agentID != rhs.agentID {return false}
+    if lhs._name != rhs._name {return false}
+    if lhs.avatarUpdate != rhs.avatarUpdate {return false}
+    if lhs.codexPetUpdate != rhs.codexPetUpdate {return false}
+    if lhs.provider != rhs.provider {return false}
+    if lhs._model != rhs._model {return false}
+    if lhs.effortUpdate != rhs.effortUpdate {return false}
+    if lhs.designatedWorkerUpdate != rhs.designatedWorkerUpdate {return false}
+    if lhs._description_p != rhs._description_p {return false}
+    if lhs.responsibility != rhs.responsibility {return false}
+    if lhs.skills != rhs.skills {return false}
+    if lhs.calendarColor != rhs.calendarColor {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateProjectAgentRequest.ClearAvatar: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = BriarAPI_UpdateProjectAgentRequest.protoMessageName + ".ClearAvatar"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateProjectAgentRequest.ClearAvatar, rhs: BriarAPI_UpdateProjectAgentRequest.ClearAvatar) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateProjectAgentRequest.ClearCodexPet: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = BriarAPI_UpdateProjectAgentRequest.protoMessageName + ".ClearCodexPet"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateProjectAgentRequest.ClearCodexPet, rhs: BriarAPI_UpdateProjectAgentRequest.ClearCodexPet) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateProjectAgentRequest.ClearEffort: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = BriarAPI_UpdateProjectAgentRequest.protoMessageName + ".ClearEffort"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateProjectAgentRequest.ClearEffort, rhs: BriarAPI_UpdateProjectAgentRequest.ClearEffort) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateProjectAgentRequest.ClearDesignatedWorker: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = BriarAPI_UpdateProjectAgentRequest.protoMessageName + ".ClearDesignatedWorker"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateProjectAgentRequest.ClearDesignatedWorker, rhs: BriarAPI_UpdateProjectAgentRequest.ClearDesignatedWorker) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateProjectAgentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateProjectAgentResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}agent\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._agent) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._agent {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateProjectAgentResponse, rhs: BriarAPI_UpdateProjectAgentResponse) -> Bool {
+    if lhs._agent != rhs._agent {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DeleteProjectAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteProjectAgentRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}agent_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.agentID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    if !self.agentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.agentID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DeleteProjectAgentRequest, rhs: BriarAPI_DeleteProjectAgentRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.agentID != rhs.agentID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DeleteProjectAgentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteProjectAgentResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}deleted\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.deleted) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.deleted != false {
+      try visitor.visitSingularBoolField(value: self.deleted, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DeleteProjectAgentResponse, rhs: BriarAPI_DeleteProjectAgentResponse) -> Bool {
+    if lhs.deleted != rhs.deleted {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListProjectAgentSchedulesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListProjectAgentSchedulesRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListProjectAgentSchedulesRequest, rhs: BriarAPI_ListProjectAgentSchedulesRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListProjectAgentSchedulesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListProjectAgentSchedulesResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}schedules\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.schedules) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.schedules.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.schedules, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListProjectAgentSchedulesResponse, rhs: BriarAPI_ListProjectAgentSchedulesResponse) -> Bool {
+    if lhs.schedules != rhs.schedules {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ProjectAgentScheduleWrite: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ProjectAgentScheduleWrite"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}agent_id\0\u{1}name\0\u{1}recurrence\0\u{3}time_of_day\0\u{3}day_of_week\0\u{3}interval_value\0\u{3}interval_unit\0\u{3}days_of_week\0\u{3}notification_level\0\u{3}time_zone\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.agentID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.recurrence) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.timeOfDay) }()
+      case 5: try { try decoder.decodeSingularUInt32Field(value: &self._dayOfWeek) }()
+      case 6: try { try decoder.decodeSingularUInt32Field(value: &self._intervalValue) }()
+      case 7: try { try decoder.decodeSingularEnumField(value: &self._intervalUnit) }()
+      case 8: try { try decoder.decodeRepeatedUInt32Field(value: &self.daysOfWeek) }()
+      case 9: try { try decoder.decodeSingularEnumField(value: &self._notificationLevel) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self.timeZone) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.agentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.agentID, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    if self.recurrence != .unspecified {
+      try visitor.visitSingularEnumField(value: self.recurrence, fieldNumber: 3)
+    }
+    if !self.timeOfDay.isEmpty {
+      try visitor.visitSingularStringField(value: self.timeOfDay, fieldNumber: 4)
+    }
+    try { if let v = self._dayOfWeek {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._intervalValue {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._intervalUnit {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 7)
+    } }()
+    if !self.daysOfWeek.isEmpty {
+      try visitor.visitPackedUInt32Field(value: self.daysOfWeek, fieldNumber: 8)
+    }
+    try { if let v = self._notificationLevel {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 9)
+    } }()
+    if !self.timeZone.isEmpty {
+      try visitor.visitSingularStringField(value: self.timeZone, fieldNumber: 10)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ProjectAgentScheduleWrite, rhs: BriarAPI_ProjectAgentScheduleWrite) -> Bool {
+    if lhs.agentID != rhs.agentID {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.recurrence != rhs.recurrence {return false}
+    if lhs.timeOfDay != rhs.timeOfDay {return false}
+    if lhs._dayOfWeek != rhs._dayOfWeek {return false}
+    if lhs._intervalValue != rhs._intervalValue {return false}
+    if lhs._intervalUnit != rhs._intervalUnit {return false}
+    if lhs.daysOfWeek != rhs.daysOfWeek {return false}
+    if lhs._notificationLevel != rhs._notificationLevel {return false}
+    if lhs.timeZone != rhs.timeZone {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CreateProjectAgentScheduleRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateProjectAgentScheduleRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{1}schedule\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._schedule) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    try { if let v = self._schedule {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CreateProjectAgentScheduleRequest, rhs: BriarAPI_CreateProjectAgentScheduleRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs._schedule != rhs._schedule {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CreateProjectAgentScheduleResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateProjectAgentScheduleResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}schedule\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._schedule) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._schedule {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CreateProjectAgentScheduleResponse, rhs: BriarAPI_CreateProjectAgentScheduleResponse) -> Bool {
+    if lhs._schedule != rhs._schedule {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateProjectAgentScheduleRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateProjectAgentScheduleRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}schedule_id\0\u{1}schedule\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.scheduleID) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._schedule) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    if !self.scheduleID.isEmpty {
+      try visitor.visitSingularStringField(value: self.scheduleID, fieldNumber: 2)
+    }
+    try { if let v = self._schedule {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateProjectAgentScheduleRequest, rhs: BriarAPI_UpdateProjectAgentScheduleRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.scheduleID != rhs.scheduleID {return false}
+    if lhs._schedule != rhs._schedule {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_UpdateProjectAgentScheduleResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateProjectAgentScheduleResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}schedule\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._schedule) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._schedule {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_UpdateProjectAgentScheduleResponse, rhs: BriarAPI_UpdateProjectAgentScheduleResponse) -> Bool {
+    if lhs._schedule != rhs._schedule {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DeleteProjectAgentScheduleRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteProjectAgentScheduleRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}schedule_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.scheduleID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    if !self.scheduleID.isEmpty {
+      try visitor.visitSingularStringField(value: self.scheduleID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DeleteProjectAgentScheduleRequest, rhs: BriarAPI_DeleteProjectAgentScheduleRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.scheduleID != rhs.scheduleID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DeleteProjectAgentScheduleResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteProjectAgentScheduleResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}deleted\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.deleted) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.deleted != false {
+      try visitor.visitSingularBoolField(value: self.deleted, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DeleteProjectAgentScheduleResponse, rhs: BriarAPI_DeleteProjectAgentScheduleResponse) -> Bool {
+    if lhs.deleted != rhs.deleted {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListProjectAgentScheduleRunsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListProjectAgentScheduleRunsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListProjectAgentScheduleRunsRequest, rhs: BriarAPI_ListProjectAgentScheduleRunsRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListProjectAgentScheduleRunsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListProjectAgentScheduleRunsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}runs\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.runs) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.runs.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.runs, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListProjectAgentScheduleRunsResponse, rhs: BriarAPI_ListProjectAgentScheduleRunsResponse) -> Bool {
+    if lhs.runs != rhs.runs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ClaimProjectAgentScheduleRunRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ClaimProjectAgentScheduleRunRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_ids\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.projectIds) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.projectIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.projectIds, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ClaimProjectAgentScheduleRunRequest, rhs: BriarAPI_ClaimProjectAgentScheduleRunRequest) -> Bool {
+    if lhs.projectIds != rhs.projectIds {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ClaimProjectAgentScheduleRunResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ClaimProjectAgentScheduleRunResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}claimed_run\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._claimedRun) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._claimedRun {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ClaimProjectAgentScheduleRunResponse, rhs: BriarAPI_ClaimProjectAgentScheduleRunResponse) -> Bool {
+    if lhs._claimedRun != rhs._claimedRun {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CompleteProjectAgentScheduleRunRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CompleteProjectAgentScheduleRunRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}claim_token\0\u{1}completed\0\u{1}failed\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.claimToken) }()
+      case 4: try {
+        var v: BriarAPI_CompleteProjectAgentScheduleRunRequest.Completed?
+        var hadOneofValue = false
+        if let current = self.outcome {
+          hadOneofValue = true
+          if case .completed(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.outcome = .completed(v)
+        }
+      }()
+      case 5: try {
+        var v: BriarAPI_CompleteProjectAgentScheduleRunRequest.Failed?
+        var hadOneofValue = false
+        if let current = self.outcome {
+          hadOneofValue = true
+          if case .failed(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.outcome = .failed(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    if !self.runID.isEmpty {
+      try visitor.visitSingularStringField(value: self.runID, fieldNumber: 2)
+    }
+    if !self.claimToken.isEmpty {
+      try visitor.visitSingularStringField(value: self.claimToken, fieldNumber: 3)
+    }
+    switch self.outcome {
+    case .completed?: try {
+      guard case .completed(let v)? = self.outcome else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    }()
+    case .failed?: try {
+      guard case .failed(let v)? = self.outcome else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    }()
+    case nil: break
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CompleteProjectAgentScheduleRunRequest, rhs: BriarAPI_CompleteProjectAgentScheduleRunRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.runID != rhs.runID {return false}
+    if lhs.claimToken != rhs.claimToken {return false}
+    if lhs.outcome != rhs.outcome {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CompleteProjectAgentScheduleRunRequest.Completed: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = BriarAPI_CompleteProjectAgentScheduleRunRequest.protoMessageName + ".Completed"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}result_summary\0\u{3}structured_result\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.resultSummary) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._structuredResult) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.resultSummary.isEmpty {
+      try visitor.visitSingularStringField(value: self.resultSummary, fieldNumber: 1)
+    }
+    try { if let v = self._structuredResult {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CompleteProjectAgentScheduleRunRequest.Completed, rhs: BriarAPI_CompleteProjectAgentScheduleRunRequest.Completed) -> Bool {
+    if lhs.resultSummary != rhs.resultSummary {return false}
+    if lhs._structuredResult != rhs._structuredResult {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CompleteProjectAgentScheduleRunRequest.Failed: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = BriarAPI_CompleteProjectAgentScheduleRunRequest.protoMessageName + ".Failed"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}error\0\u{3}structured_result\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.error) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._structuredResult) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.error.isEmpty {
+      try visitor.visitSingularStringField(value: self.error, fieldNumber: 1)
+    }
+    try { if let v = self._structuredResult {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CompleteProjectAgentScheduleRunRequest.Failed, rhs: BriarAPI_CompleteProjectAgentScheduleRunRequest.Failed) -> Bool {
+    if lhs.error != rhs.error {return false}
+    if lhs._structuredResult != rhs._structuredResult {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CompleteProjectAgentScheduleRunResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CompleteProjectAgentScheduleRunResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}run\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._run) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._run {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CompleteProjectAgentScheduleRunResponse, rhs: BriarAPI_CompleteProjectAgentScheduleRunResponse) -> Bool {
+    if lhs._run != rhs._run {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_RenewProjectAgentScheduleRunRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RenewProjectAgentScheduleRunRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}run_id\0\u{3}claim_token\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.claimToken) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    }
+    if !self.runID.isEmpty {
+      try visitor.visitSingularStringField(value: self.runID, fieldNumber: 2)
+    }
+    if !self.claimToken.isEmpty {
+      try visitor.visitSingularStringField(value: self.claimToken, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_RenewProjectAgentScheduleRunRequest, rhs: BriarAPI_RenewProjectAgentScheduleRunRequest) -> Bool {
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.runID != rhs.runID {return false}
+    if lhs.claimToken != rhs.claimToken {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_RenewProjectAgentScheduleRunResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RenewProjectAgentScheduleRunResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}lease_expires_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._leaseExpiresAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._leaseExpiresAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_RenewProjectAgentScheduleRunResponse, rhs: BriarAPI_RenewProjectAgentScheduleRunResponse) -> Bool {
+    if lhs._leaseExpiresAt != rhs._leaseExpiresAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2478,6 +5499,120 @@ nonisolated extension BriarAPI_ProjectAgentSkill: SwiftProtobuf.Message, SwiftPr
   }
 }
 
+nonisolated extension BriarAPI_ProjectAgentSkillInput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ProjectAgentSkillInput"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}description\0\u{1}body\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{1}kind\0\u{3}execution_mode\0\u{3}approval_policy\0\u{1}position\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self._id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.body) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._model) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self._effort) }()
+      case 8: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 9: try { try decoder.decodeSingularEnumField(value: &self._executionMode) }()
+      case 10: try { try decoder.decodeSingularEnumField(value: &self._approvalPolicy) }()
+      case 11: try { try decoder.decodeSingularUInt32Field(value: &self.position) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._id {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    } }()
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    if !self.description_p.isEmpty {
+      try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 3)
+    }
+    if !self.body.isEmpty {
+      try visitor.visitSingularStringField(value: self.body, fieldNumber: 4)
+    }
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 5)
+    }
+    try { if let v = self._model {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._effort {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+    } }()
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 8)
+    }
+    try { if let v = self._executionMode {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 9)
+    } }()
+    try { if let v = self._approvalPolicy {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 10)
+    } }()
+    if self.position != 0 {
+      try visitor.visitSingularUInt32Field(value: self.position, fieldNumber: 11)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ProjectAgentSkillInput, rhs: BriarAPI_ProjectAgentSkillInput) -> Bool {
+    if lhs._id != rhs._id {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.description_p != rhs.description_p {return false}
+    if lhs.body != rhs.body {return false}
+    if lhs.provider != rhs.provider {return false}
+    if lhs._model != rhs._model {return false}
+    if lhs._effort != rhs._effort {return false}
+    if lhs.kind != rhs.kind {return false}
+    if lhs._executionMode != rhs._executionMode {return false}
+    if lhs._approvalPolicy != rhs._approvalPolicy {return false}
+    if lhs.position != rhs.position {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_CodexPetSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CodexPetSelection"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}slug\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.slug) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.slug.isEmpty {
+      try visitor.visitSingularStringField(value: self.slug, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_CodexPetSelection, rhs: BriarAPI_CodexPetSelection) -> Bool {
+    if lhs.slug != rhs.slug {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 nonisolated extension BriarAPI_CodexPet: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CodexPet"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}slug\0\u{1}name\0\u{1}author\0\u{1}license\0\u{3}sprite_version\0\u{3}sprite_sheet_url\0")
@@ -2803,6 +5938,462 @@ nonisolated extension BriarAPI_OrganizationAgent: SwiftProtobuf.Message, SwiftPr
     if lhs.responsibility != rhs.responsibility {return false}
     if lhs.skills != rhs.skills {return false}
     if lhs._createdAt != rhs._createdAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ProjectAgentSchedule: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ProjectAgentSchedule"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}project_id\0\u{3}agent_id\0\u{3}agent_name\0\u{3}agent_provider\0\u{1}name\0\u{1}recurrence\0\u{3}time_of_day\0\u{3}day_of_week\0\u{3}interval_value\0\u{3}interval_unit\0\u{3}days_of_week\0\u{3}notification_level\0\u{3}time_zone\0\u{1}enabled\0\u{3}created_at\0\u{3}updated_at\0")
+
+  fileprivate class _StorageClass {
+    var _id: String = String()
+    var _projectID: String = String()
+    var _agentID: String = String()
+    var _agentName: String = String()
+    var _agentProvider: BriarTypes_AgentProvider = .unspecified
+    var _name: String = String()
+    var _recurrence: BriarAPI_ProjectAgentScheduleRecurrence = .unspecified
+    var _timeOfDay: String = String()
+    var _dayOfWeek: UInt32? = nil
+    var _intervalValue: UInt32 = 0
+    var _intervalUnit: BriarAPI_ProjectAgentScheduleIntervalUnit = .unspecified
+    var _daysOfWeek: [UInt32] = []
+    var _notificationLevel: BriarAPI_ProjectAgentScheduleNotificationLevel = .unspecified
+    var _timeZone: String = String()
+    var _enabled: Bool = false
+    var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _id = source._id
+      _projectID = source._projectID
+      _agentID = source._agentID
+      _agentName = source._agentName
+      _agentProvider = source._agentProvider
+      _name = source._name
+      _recurrence = source._recurrence
+      _timeOfDay = source._timeOfDay
+      _dayOfWeek = source._dayOfWeek
+      _intervalValue = source._intervalValue
+      _intervalUnit = source._intervalUnit
+      _daysOfWeek = source._daysOfWeek
+      _notificationLevel = source._notificationLevel
+      _timeZone = source._timeZone
+      _enabled = source._enabled
+      _createdAt = source._createdAt
+      _updatedAt = source._updatedAt
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._id) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._projectID) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._agentID) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._agentName) }()
+        case 5: try { try decoder.decodeSingularEnumField(value: &_storage._agentProvider) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
+        case 7: try { try decoder.decodeSingularEnumField(value: &_storage._recurrence) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._timeOfDay) }()
+        case 9: try { try decoder.decodeSingularUInt32Field(value: &_storage._dayOfWeek) }()
+        case 10: try { try decoder.decodeSingularUInt32Field(value: &_storage._intervalValue) }()
+        case 11: try { try decoder.decodeSingularEnumField(value: &_storage._intervalUnit) }()
+        case 12: try { try decoder.decodeRepeatedUInt32Field(value: &_storage._daysOfWeek) }()
+        case 13: try { try decoder.decodeSingularEnumField(value: &_storage._notificationLevel) }()
+        case 14: try { try decoder.decodeSingularStringField(value: &_storage._timeZone) }()
+        case 15: try { try decoder.decodeSingularBoolField(value: &_storage._enabled) }()
+        case 16: try { try decoder.decodeSingularMessageField(value: &_storage._createdAt) }()
+        case 17: try { try decoder.decodeSingularMessageField(value: &_storage._updatedAt) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._id.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._id, fieldNumber: 1)
+      }
+      if !_storage._projectID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._projectID, fieldNumber: 2)
+      }
+      if !_storage._agentID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._agentID, fieldNumber: 3)
+      }
+      if !_storage._agentName.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._agentName, fieldNumber: 4)
+      }
+      if _storage._agentProvider != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._agentProvider, fieldNumber: 5)
+      }
+      if !_storage._name.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._name, fieldNumber: 6)
+      }
+      if _storage._recurrence != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._recurrence, fieldNumber: 7)
+      }
+      if !_storage._timeOfDay.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._timeOfDay, fieldNumber: 8)
+      }
+      try { if let v = _storage._dayOfWeek {
+        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 9)
+      } }()
+      if _storage._intervalValue != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._intervalValue, fieldNumber: 10)
+      }
+      if _storage._intervalUnit != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._intervalUnit, fieldNumber: 11)
+      }
+      if !_storage._daysOfWeek.isEmpty {
+        try visitor.visitPackedUInt32Field(value: _storage._daysOfWeek, fieldNumber: 12)
+      }
+      if _storage._notificationLevel != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._notificationLevel, fieldNumber: 13)
+      }
+      if !_storage._timeZone.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._timeZone, fieldNumber: 14)
+      }
+      if _storage._enabled != false {
+        try visitor.visitSingularBoolField(value: _storage._enabled, fieldNumber: 15)
+      }
+      try { if let v = _storage._createdAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 16)
+      } }()
+      try { if let v = _storage._updatedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 17)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ProjectAgentSchedule, rhs: BriarAPI_ProjectAgentSchedule) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._id != rhs_storage._id {return false}
+        if _storage._projectID != rhs_storage._projectID {return false}
+        if _storage._agentID != rhs_storage._agentID {return false}
+        if _storage._agentName != rhs_storage._agentName {return false}
+        if _storage._agentProvider != rhs_storage._agentProvider {return false}
+        if _storage._name != rhs_storage._name {return false}
+        if _storage._recurrence != rhs_storage._recurrence {return false}
+        if _storage._timeOfDay != rhs_storage._timeOfDay {return false}
+        if _storage._dayOfWeek != rhs_storage._dayOfWeek {return false}
+        if _storage._intervalValue != rhs_storage._intervalValue {return false}
+        if _storage._intervalUnit != rhs_storage._intervalUnit {return false}
+        if _storage._daysOfWeek != rhs_storage._daysOfWeek {return false}
+        if _storage._notificationLevel != rhs_storage._notificationLevel {return false}
+        if _storage._timeZone != rhs_storage._timeZone {return false}
+        if _storage._enabled != rhs_storage._enabled {return false}
+        if _storage._createdAt != rhs_storage._createdAt {return false}
+        if _storage._updatedAt != rhs_storage._updatedAt {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ProjectAgentScheduleRunAgent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ProjectAgentScheduleRunAgent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{1}description\0\u{1}responsibility\0\u{1}skill\0\u{1}skills\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._model) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._effort) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.responsibility) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.skill) }()
+      case 9: try { try decoder.decodeRepeatedMessageField(value: &self.skills) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 3)
+    }
+    try { if let v = self._model {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._effort {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._description_p {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    if !self.responsibility.isEmpty {
+      try visitor.visitSingularStringField(value: self.responsibility, fieldNumber: 7)
+    }
+    if !self.skill.isEmpty {
+      try visitor.visitSingularStringField(value: self.skill, fieldNumber: 8)
+    }
+    if !self.skills.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.skills, fieldNumber: 9)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ProjectAgentScheduleRunAgent, rhs: BriarAPI_ProjectAgentScheduleRunAgent) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.provider != rhs.provider {return false}
+    if lhs._model != rhs._model {return false}
+    if lhs._effort != rhs._effort {return false}
+    if lhs._description_p != rhs._description_p {return false}
+    if lhs.responsibility != rhs.responsibility {return false}
+    if lhs.skill != rhs.skill {return false}
+    if lhs.skills != rhs.skills {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ProjectAgentScheduleRun: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ProjectAgentScheduleRun"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}project_id\0\u{3}schedule_id\0\u{3}schedule_name\0\u{1}agent\0\u{1}workflow\0\u{1}status\0\u{3}scheduled_for\0\u{3}lease_expires_at\0\u{3}started_at\0\u{3}completed_at\0\u{3}result_summary\0\u{3}structured_result\0\u{1}error\0")
+
+  fileprivate class _StorageClass {
+    var _id: String = String()
+    var _projectID: String = String()
+    var _scheduleID: String = String()
+    var _scheduleName: String = String()
+    var _agent: BriarAPI_ProjectAgentScheduleRunAgent? = nil
+    var _workflow: BriarTypes_AutoHuntWorkflow? = nil
+    var _status: BriarAPI_ProjectAgentScheduleRunStatus = .unspecified
+    var _scheduledFor: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _leaseExpiresAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _startedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _completedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _resultSummary: String? = nil
+    var _structuredResult: BriarAPI_StructuredRunResult? = nil
+    var _error: String? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _id = source._id
+      _projectID = source._projectID
+      _scheduleID = source._scheduleID
+      _scheduleName = source._scheduleName
+      _agent = source._agent
+      _workflow = source._workflow
+      _status = source._status
+      _scheduledFor = source._scheduledFor
+      _leaseExpiresAt = source._leaseExpiresAt
+      _startedAt = source._startedAt
+      _completedAt = source._completedAt
+      _resultSummary = source._resultSummary
+      _structuredResult = source._structuredResult
+      _error = source._error
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._id) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._projectID) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._scheduleID) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._scheduleName) }()
+        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._agent) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._workflow) }()
+        case 7: try { try decoder.decodeSingularEnumField(value: &_storage._status) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._scheduledFor) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._leaseExpiresAt) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._startedAt) }()
+        case 11: try { try decoder.decodeSingularMessageField(value: &_storage._completedAt) }()
+        case 12: try { try decoder.decodeSingularStringField(value: &_storage._resultSummary) }()
+        case 13: try { try decoder.decodeSingularMessageField(value: &_storage._structuredResult) }()
+        case 14: try { try decoder.decodeSingularStringField(value: &_storage._error) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._id.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._id, fieldNumber: 1)
+      }
+      if !_storage._projectID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._projectID, fieldNumber: 2)
+      }
+      if !_storage._scheduleID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._scheduleID, fieldNumber: 3)
+      }
+      if !_storage._scheduleName.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._scheduleName, fieldNumber: 4)
+      }
+      try { if let v = _storage._agent {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._workflow {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+      if _storage._status != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._status, fieldNumber: 7)
+      }
+      try { if let v = _storage._scheduledFor {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._leaseExpiresAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
+      try { if let v = _storage._startedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
+      try { if let v = _storage._completedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+      } }()
+      try { if let v = _storage._resultSummary {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 12)
+      } }()
+      try { if let v = _storage._structuredResult {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
+      } }()
+      try { if let v = _storage._error {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 14)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ProjectAgentScheduleRun, rhs: BriarAPI_ProjectAgentScheduleRun) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._id != rhs_storage._id {return false}
+        if _storage._projectID != rhs_storage._projectID {return false}
+        if _storage._scheduleID != rhs_storage._scheduleID {return false}
+        if _storage._scheduleName != rhs_storage._scheduleName {return false}
+        if _storage._agent != rhs_storage._agent {return false}
+        if _storage._workflow != rhs_storage._workflow {return false}
+        if _storage._status != rhs_storage._status {return false}
+        if _storage._scheduledFor != rhs_storage._scheduledFor {return false}
+        if _storage._leaseExpiresAt != rhs_storage._leaseExpiresAt {return false}
+        if _storage._startedAt != rhs_storage._startedAt {return false}
+        if _storage._completedAt != rhs_storage._completedAt {return false}
+        if _storage._resultSummary != rhs_storage._resultSummary {return false}
+        if _storage._structuredResult != rhs_storage._structuredResult {return false}
+        if _storage._error != rhs_storage._error {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ClaimedProjectAgentScheduleRun: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ClaimedProjectAgentScheduleRun"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}run\0\u{3}claim_token\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._run) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.claimToken) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._run {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if !self.claimToken.isEmpty {
+      try visitor.visitSingularStringField(value: self.claimToken, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ClaimedProjectAgentScheduleRun, rhs: BriarAPI_ClaimedProjectAgentScheduleRun) -> Bool {
+    if lhs._run != rhs._run {return false}
+    if lhs.claimToken != rhs.claimToken {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
