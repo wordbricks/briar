@@ -1276,6 +1276,11 @@ pub enum MergeBatchState {
     MERGE_BATCH_STATE_VALIDATING = 4i32,
     MERGE_BATCH_STATE_PUBLISHING = 5i32,
     MERGE_BATCH_STATE_DRAINING = 6i32,
+    MERGE_BATCH_STATE_COLLECTING = 7i32,
+    MERGE_BATCH_STATE_AWAITING_MERGE = 8i32,
+    MERGE_BATCH_STATE_BLOCKED = 9i32,
+    MERGE_BATCH_STATE_COMPLETED = 10i32,
+    MERGE_BATCH_STATE_FAILED = 11i32,
 }
 impl MergeBatchState {
     ///Idiomatic alias for [`Self::MERGE_BATCH_STATE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1299,6 +1304,21 @@ impl MergeBatchState {
     ///Idiomatic alias for [`Self::MERGE_BATCH_STATE_DRAINING`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Draining: Self = Self::MERGE_BATCH_STATE_DRAINING;
+    ///Idiomatic alias for [`Self::MERGE_BATCH_STATE_COLLECTING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Collecting: Self = Self::MERGE_BATCH_STATE_COLLECTING;
+    ///Idiomatic alias for [`Self::MERGE_BATCH_STATE_AWAITING_MERGE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AwaitingMerge: Self = Self::MERGE_BATCH_STATE_AWAITING_MERGE;
+    ///Idiomatic alias for [`Self::MERGE_BATCH_STATE_BLOCKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Blocked: Self = Self::MERGE_BATCH_STATE_BLOCKED;
+    ///Idiomatic alias for [`Self::MERGE_BATCH_STATE_COMPLETED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Completed: Self = Self::MERGE_BATCH_STATE_COMPLETED;
+    ///Idiomatic alias for [`Self::MERGE_BATCH_STATE_FAILED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Failed: Self = Self::MERGE_BATCH_STATE_FAILED;
 }
 impl ::core::default::Default for MergeBatchState {
     fn default() -> Self {
@@ -1403,6 +1423,11 @@ impl ::buffa::Enumeration for MergeBatchState {
             4i32 => ::core::option::Option::Some(Self::MERGE_BATCH_STATE_VALIDATING),
             5i32 => ::core::option::Option::Some(Self::MERGE_BATCH_STATE_PUBLISHING),
             6i32 => ::core::option::Option::Some(Self::MERGE_BATCH_STATE_DRAINING),
+            7i32 => ::core::option::Option::Some(Self::MERGE_BATCH_STATE_COLLECTING),
+            8i32 => ::core::option::Option::Some(Self::MERGE_BATCH_STATE_AWAITING_MERGE),
+            9i32 => ::core::option::Option::Some(Self::MERGE_BATCH_STATE_BLOCKED),
+            10i32 => ::core::option::Option::Some(Self::MERGE_BATCH_STATE_COMPLETED),
+            11i32 => ::core::option::Option::Some(Self::MERGE_BATCH_STATE_FAILED),
             _ => ::core::option::Option::None,
         }
     }
@@ -1418,6 +1443,11 @@ impl ::buffa::Enumeration for MergeBatchState {
             Self::MERGE_BATCH_STATE_VALIDATING => "MERGE_BATCH_STATE_VALIDATING",
             Self::MERGE_BATCH_STATE_PUBLISHING => "MERGE_BATCH_STATE_PUBLISHING",
             Self::MERGE_BATCH_STATE_DRAINING => "MERGE_BATCH_STATE_DRAINING",
+            Self::MERGE_BATCH_STATE_COLLECTING => "MERGE_BATCH_STATE_COLLECTING",
+            Self::MERGE_BATCH_STATE_AWAITING_MERGE => "MERGE_BATCH_STATE_AWAITING_MERGE",
+            Self::MERGE_BATCH_STATE_BLOCKED => "MERGE_BATCH_STATE_BLOCKED",
+            Self::MERGE_BATCH_STATE_COMPLETED => "MERGE_BATCH_STATE_COMPLETED",
+            Self::MERGE_BATCH_STATE_FAILED => "MERGE_BATCH_STATE_FAILED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -1443,6 +1473,21 @@ impl ::buffa::Enumeration for MergeBatchState {
             "MERGE_BATCH_STATE_DRAINING" => {
                 ::core::option::Option::Some(Self::MERGE_BATCH_STATE_DRAINING)
             }
+            "MERGE_BATCH_STATE_COLLECTING" => {
+                ::core::option::Option::Some(Self::MERGE_BATCH_STATE_COLLECTING)
+            }
+            "MERGE_BATCH_STATE_AWAITING_MERGE" => {
+                ::core::option::Option::Some(Self::MERGE_BATCH_STATE_AWAITING_MERGE)
+            }
+            "MERGE_BATCH_STATE_BLOCKED" => {
+                ::core::option::Option::Some(Self::MERGE_BATCH_STATE_BLOCKED)
+            }
+            "MERGE_BATCH_STATE_COMPLETED" => {
+                ::core::option::Option::Some(Self::MERGE_BATCH_STATE_COMPLETED)
+            }
+            "MERGE_BATCH_STATE_FAILED" => {
+                ::core::option::Option::Some(Self::MERGE_BATCH_STATE_FAILED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1455,6 +1500,11 @@ impl ::buffa::Enumeration for MergeBatchState {
             Self::MERGE_BATCH_STATE_VALIDATING,
             Self::MERGE_BATCH_STATE_PUBLISHING,
             Self::MERGE_BATCH_STATE_DRAINING,
+            Self::MERGE_BATCH_STATE_COLLECTING,
+            Self::MERGE_BATCH_STATE_AWAITING_MERGE,
+            Self::MERGE_BATCH_STATE_BLOCKED,
+            Self::MERGE_BATCH_STATE_COMPLETED,
+            Self::MERGE_BATCH_STATE_FAILED,
         ]
     }
 }
