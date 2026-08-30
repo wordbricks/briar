@@ -1,28 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   decodeInstanceIdentityDocument,
-  decodeManagedComputerApplication,
   decodeManagedComputerEnrollment,
 } from "./managed-computer-request-contract";
 
 describe("managed computer request contract", () => {
-  it("accepts only a promotion code and idempotent request ID", () => {
-    expect(decodeManagedComputerApplication({
-      code: " GETBRIAR ",
-      requestId: "11111111-1111-4111-8111-111111111111",
-    })).toEqual({
-      code: "GETBRIAR",
-      requestId: "11111111-1111-4111-8111-111111111111",
-    });
-    expect(() => decodeManagedComputerApplication({
-      code: "GETBRIAR",
-      requestId: "11111111-1111-4111-8111-111111111111",
-      region: "us-west-2",
-      instanceType: "m8i.48xlarge",
-      diskGiB: 16_000,
-    })).toThrow();
-  });
-
   it("rejects malformed EC2 identity and enrollment nonce inputs", () => {
     expect(() => decodeManagedComputerEnrollment({
       nonce: "not-a-valid-nonce",

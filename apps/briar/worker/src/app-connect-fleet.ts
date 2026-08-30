@@ -77,12 +77,12 @@ const decodeDeviceId = decodeRequestSync(trimmedText(1, 128));
 
 const workerIconFromMessage = (
   icon: WorkerIcon,
-): { type: "emoji" | "image"; value: string } => {
+) => {
   switch (icon.kind) {
     case WorkerIcon_Kind.EMOJI:
-      return { type: "emoji", value: icon.value };
+      return { type: "emoji", value: icon.value } as const;
     case WorkerIcon_Kind.IMAGE:
-      return { type: "image", value: icon.value };
+      return { type: "image", value: icon.value } as const;
     case WorkerIcon_Kind.UNSPECIFIED:
       throw new ConnectError("Worker icon kind is required", Code.InvalidArgument);
     default:

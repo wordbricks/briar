@@ -16,7 +16,6 @@ import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleChannelOrganizationContextRoute } from "./channel-organization-context-routes";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
-import { handleOrganizationWorkerRoute } from "./organization-worker-routes";
 import { handleOrganizationUsageRoute } from "./organization-usage-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
 import { handleProjectAgentTaskWorkerRoute } from "./project-agent-task-worker-routes";
@@ -179,10 +178,8 @@ async function route(
 
   const managedComputerResponse = await handleManagedComputerRoute({
     request,
-    auth,
     db,
     env,
-    context,
   });
   if (managedComputerResponse !== undefined) return managedComputerResponse;
 
@@ -211,17 +208,6 @@ async function route(
     context,
   });
   if (channelMessageResponse !== undefined) return channelMessageResponse;
-
-  const organizationWorkerResponse = await handleOrganizationWorkerRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-  });
-  if (organizationWorkerResponse !== undefined) {
-    return organizationWorkerResponse;
-  }
 
   const organizationGithubResponse = await handleOrganizationGithubRoute({
     request,

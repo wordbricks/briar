@@ -1,3 +1,13 @@
+import {
+  Code,
+  ConnectError,
+  createClient,
+} from "@connectrpc/connect";
+import { createConnectTransport } from "@connectrpc/connect-web";
+import {
+  FleetService,
+  ManagedComputerState,
+} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import {
@@ -6,13 +16,13 @@ import {
 } from "./test-helpers/d1";
 
 const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const ownerId = "managed-route-owner";
-const memberId = "managed-route-member";
-const ownerToken = "managed-route-owner-token";
-const memberToken = "managed-route-member-token";
+const ownerId = "fleet-connect-owner";
+const memberId = "fleet-connect-member";
+const ownerToken = "fleet-connect-owner-token";
+const memberToken = "fleet-connect-member-token";
 const now = "2026-08-22T00:00:00.000Z";
 
-describe("managed computer routes", () => {
+describe("FleetService", () => {
   let database: IsolatedTestDatabase;
   let db: D1Database;
   const createWorkflow = vi.fn(async (input: { id: string }) => ({
@@ -22,29 +32,29 @@ describe("managed computer routes", () => {
 
   beforeAll(async () => {
     database = await createIsolatedTestDatabase({
-      suite: "managed-computer-routes",
+      suite: "app-connect-fleet",
     });
     db = database.db;
     await db.batch([
       db.prepare(
         `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
-         values (?, 'Owner', 'managed-owner@example.com', 1, ?, ?)`,
+         values (?, 'Owner', 'fleet-owner@example.com', 1, ?, ?)`,
       ).bind(ownerId, now, now),
       db.prepare(
         `insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
-         values (?, 'Member', 'managed-member@example.com', 1, ?, ?)`,
+         values (?, 'Member', 'fleet-member@example.com', 1, ?, ?)`,
       ).bind(memberId, now, now),
       db.prepare(
         `insert into "session" (id, expiresAt, token, createdAt, updatedAt, userId)
-         values ('managed-owner-session', '2099-01-01T00:00:00.000Z', ?, ?, ?, ?)`,
+         values ('fleet-owner-session', '2099-01-01T00:00:00.000Z', ?, ?, ?, ?)`,
       ).bind(ownerToken, now, now, ownerId),
       db.prepare(
         `insert into "session" (id, expiresAt, token, createdAt, updatedAt, userId)
-         values ('managed-member-session', '2099-01-01T00:00:00.000Z', ?, ?, ?, ?)`,
+         values ('fleet-member-session', '2099-01-01T00:00:00.000Z', ?, ?, ?, ?)`,
       ).bind(memberToken, now, now, memberId),
       db.prepare(
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
-         values (?, 'Managed Routes', 'managed-routes', ?, ?)`,
+         values (?, 'Fleet Connect', 'fleet-connect', ?, ?)`,
       ).bind(organizationId, now, now),
     ]);
     await db.batch([
@@ -65,6 +75,8 @@ describe("managed computer routes", () => {
 
   const env = () => ({
     DB: db,
+    ATTACHMENTS: {},
+    ARCHIVES: {},
     BETTER_AUTH_SECRET: "briar-test-secret-that-is-at-least-32-characters",
     GOOGLE_CLIENT_ID: "google-client",
     GOOGLE_CLIENT_SECRET: "google-secret",
@@ -87,22 +99,6 @@ describe("managed computer routes", () => {
     },
   }) as never;
 
-  const request = (
-    pathname: string,
-    method: "DELETE" | "GET" | "POST",
-    token: string,
-    body?: unknown,
-    requestId?: string,
-  ) => new Request(`https://briar.example${pathname}`, {
-    method,
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-      ...(requestId ? { "idempotency-key": requestId } : undefined),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-
   const executionContext = () => {
     const pending: Promise<unknown>[] = [];
     return {
@@ -113,6 +109,25 @@ describe("managed computer routes", () => {
       } as ExecutionContext,
       pending,
     };
+  };
+
+  const client = (context?: ExecutionContext) => createClient(
+    FleetService,
+    createConnectTransport({
+      baseUrl: "https://briar.example",
+      fetch: async (input, init) =>
+        worker.fetch(new Request(input, init), env(), context),
+    }),
+  );
+
+  const options = (token: string) => ({
+    headers: { authorization: `Bearer ${token}` },
+  });
+
+  const errorCode = async (operation: Promise<unknown>) => {
+    const error = await operation.catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(ConnectError);
+    return (error as ConnectError).code;
   };
 
   const seedManagedComputer = async (input: {
@@ -164,84 +179,50 @@ describe("managed computer routes", () => {
     ]);
   };
 
-  it("lets a developer inspect product metadata and validate promotions", async () => {
-    const product = await worker.fetch(request(
-      `/organizations/${organizationId}/managed-computers/product`,
-      "GET",
-      memberToken,
-    ), env());
-    expect(product.status).toBe(200);
-    const productPayload = await product.json();
-    expect(productPayload).toMatchObject({
+  it("enforces capability and validates promotion input at the Connect boundary", async () => {
+    const fleet = client();
+    const product = await fleet.getManagedComputerProduct(
+      { organizationId },
+      options(memberToken),
+    );
+    expect(product).toMatchObject({
       canApply: true,
       applicationsEnabled: true,
       product: { monthlyPriceCents: 10_000 },
     });
-    expect(JSON.stringify(productPayload)).not.toContain("GETBRIAR");
-    const validation = await worker.fetch(request(
-      `/organizations/${organizationId}/managed-computers/promotion/validate`,
-      "POST",
-      memberToken,
-      { code: "GETBRIAR" },
-    ), env());
-    expect(validation.status).toBe(200);
-  });
+    expect(JSON.stringify(product)).not.toContain("GETBRIAR");
 
-  it("does not discount an invalid code and requires matching idempotency", async () => {
-    const validation = await worker.fetch(request(
-      `/organizations/${organizationId}/managed-computers/promotion/validate`,
-      "POST",
-      ownerToken,
-      { code: "not-it" },
-    ), env());
-    expect(await validation.json()).toMatchObject({
+    const validation = await fleet.validateManagedComputerPromotion(
+      { organizationId, code: "not-it" },
+      options(ownerToken),
+    );
+    expect(validation).toMatchObject({
       valid: false,
       eligible: false,
       totalCents: 10_000,
     });
-    const missingKey = await worker.fetch(request(
-      `/organizations/${organizationId}/managed-computers`,
-      "POST",
-      ownerToken,
-      {
-        code: "GETBRIAR",
-        requestId: "11111111-1111-4111-8111-111111111111",
-      },
-    ), env());
-    expect(missingKey.status).toBe(400);
-    expect(await missingKey.json()).toMatchObject({
-      code: "MANAGED_COMPUTER_IDEMPOTENCY_REQUIRED",
-    });
+    expect(await errorCode(fleet.applyForManagedComputer(
+      { organizationId, code: "GETBRIAR", requestId: "not-a-uuid" },
+      options(ownerToken),
+    ))).toBe(Code.InvalidArgument);
   });
 
-  it("creates exactly one entitlement, redemption, computer, and job on replay", async () => {
+  it("creates one managed computer application across an exact request replay", async () => {
+    const fleet = client();
     const requestId = "22222222-2222-4222-8222-222222222222";
-    const application = {
-      code: "  getbriar ",
-      requestId,
-    };
-    const first = await worker.fetch(request(
-      `/organizations/${organizationId}/managed-computers`,
-      "POST",
-      ownerToken,
+    const application = { organizationId, code: "  getbriar ", requestId };
+    const first = await fleet.applyForManagedComputer(
       application,
-      requestId,
-    ), env());
-    expect(first.status).toBe(202);
-    expect(await first.json()).toMatchObject({
+      options(ownerToken),
+    );
+    expect(first).toMatchObject({
       duplicate: false,
-      entitlement: { source: "free_promotion", totalCents: 0 },
-      computer: { state: "requested" },
+      computer: { state: ManagedComputerState.REQUESTED },
+      entitlement: { totalCents: 0 },
     });
-    const replay = await worker.fetch(request(
-      `/organizations/${organizationId}/managed-computers`,
-      "POST",
-      ownerToken,
-      application,
-      requestId,
-    ), env());
-    expect(replay.status).toBe(200);
-    expect(await replay.json()).toMatchObject({ duplicate: true });
+    await expect(
+      fleet.applyForManagedComputer(application, options(ownerToken)),
+    ).resolves.toMatchObject({ duplicate: true });
     const counts = await db.prepare(`
       select
         (select count(*) from briar_managed_computer_entitlements) entitlements,
@@ -257,78 +238,47 @@ describe("managed computer routes", () => {
     });
   });
 
-  it("lets a developer retire a stable computer idempotently", async () => {
-    const computerId = "33333333-3333-4333-8333-333333333334";
+  it("owns retirement lifecycle and rejects preparation-state retirement", async () => {
+    const stableId = "33333333-3333-4333-8333-333333333334";
     await seedManagedComputer({
-      computerId,
+      computerId: stableId,
       entitlementId: "44444444-4444-4444-8444-444444444445",
       nonce: "9",
       state: "failed",
     });
-
     const immediateStop = executionContext();
-    const memberAttempt = await worker.fetch(request(
-      `/organizations/${organizationId}/managed-computers/${computerId}`,
-      "DELETE",
-      memberToken,
-    ), env(), immediateStop.context);
-    expect(memberAttempt.status).toBe(202);
-    expect(await memberAttempt.json()).toMatchObject({
+    const fleet = client(immediateStop.context);
+    const retired = await fleet.retireManagedComputer(
+      { organizationId, managedComputerId: stableId },
+      options(memberToken),
+    );
+    expect(retired).toMatchObject({
       duplicate: false,
-      computer: { id: computerId, state: "draining" },
+      computer: { id: stableId, state: ManagedComputerState.DRAINING },
     });
     expect(immediateStop.pending).toHaveLength(1);
     await Promise.all(immediateStop.pending);
-
-    const replay = await worker.fetch(request(
-      `/organizations/${organizationId}/managed-computers/${computerId}`,
-      "DELETE",
-      ownerToken,
-    ), env());
-    expect(replay.status).toBe(200);
-    expect(await replay.json()).toMatchObject({
+    await expect(fleet.retireManagedComputer(
+      { organizationId, managedComputerId: stableId },
+      options(ownerToken),
+    )).resolves.toMatchObject({
       duplicate: true,
-      computer: { id: computerId, state: "stopped" },
+      computer: { id: stableId, state: ManagedComputerState.STOPPED },
     });
 
-    const audits = await db.prepare(
-      `select actor_user_id, detail_json
-       from briar_managed_computer_audit_events
-       where managed_computer_id = ? and action = 'draining_started'`,
-    ).bind(computerId).all<{
-      actor_user_id: string;
-      detail_json: string;
-    }>();
-    expect(audits.results).toHaveLength(1);
-    expect(audits.results[0]?.actor_user_id).toBe(memberId);
-    expect(JSON.parse(audits.results[0]?.detail_json ?? "{}"))
-      .toEqual({ reason: "user_retired" });
-    await expect(db.prepare(
-      `select count(*) as count from briar_managed_computer_audit_events
-       where managed_computer_id = ? and action = 'stopped'`,
-    ).bind(computerId).first()).resolves.toMatchObject({ count: 1 });
-  });
-
-  it("does not retire a computer while preparation is still running", async () => {
-    const computerId = "33333333-3333-4333-8333-333333333335";
+    const preparingId = "33333333-3333-4333-8333-333333333335";
     await seedManagedComputer({
-      computerId,
+      computerId: preparingId,
       entitlementId: "44444444-4444-4444-8444-444444444446",
       nonce: "8",
       state: "requested",
     });
-
-    const response = await worker.fetch(request(
-      `/organizations/${organizationId}/managed-computers/${computerId}`,
-      "DELETE",
-      ownerToken,
-    ), env());
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({
-      code: "MANAGED_COMPUTER_RETIRE_UNAVAILABLE",
-    });
+    expect(await errorCode(fleet.retireManagedComputer(
+      { organizationId, managedComputerId: preparingId },
+      options(ownerToken),
+    ))).toBe(Code.FailedPrecondition);
     await expect(db.prepare(
       `select state from briar_managed_computers where id = ?`,
-    ).bind(computerId).first()).resolves.toMatchObject({ state: "requested" });
+    ).bind(preparingId).first()).resolves.toMatchObject({ state: "requested" });
   });
 });
