@@ -12,6 +12,7 @@ readonly swift_project="apps/briar/ios/BriarCompanion/BriarCompanion.xcodeproj"
 readonly swift_dev_scheme="BriarCompanion-Dev"
 readonly swift_production_scheme="BriarCompanion-Production"
 readonly ios_runtime_version="${BRIAR_IOS_RUNTIME_VERSION:-26.5}"
+readonly ios_runtime_name="iOS $ios_runtime_version"
 readonly ios_runtime_identifier="com.apple.CoreSimulator.SimRuntime.iOS-${ios_runtime_version//./-}"
 readonly iphone_name="${BRIAR_IOS_SIMULATOR_NAME:-Briar iPhone 17 Pro}"
 readonly iphone_type="com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"
@@ -86,7 +87,7 @@ device_is_available() {
   local device_name="$1"
   local devices
 
-  devices="$("$xcrun_bin" simctl list devices "$ios_runtime_identifier")"
+  devices="$("$xcrun_bin" simctl list devices "$ios_runtime_name")"
   [[ "$devices" == *"$device_name ("* ]]
 }
 
