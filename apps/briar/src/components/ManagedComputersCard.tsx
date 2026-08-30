@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Check,
   Cloud,
+  FolderPlus,
   HardDrive,
   KeyRound,
   MonitorUp,
@@ -97,14 +98,32 @@ function managedComputerDescriptionKey(state: ManagedComputer["state"]) {
         : "managedComputer.preparingDescription";
 }
 
+export function managedComputerSetupProjects(
+  computer: ManagedComputer,
+  projects: Project[],
+  boundProjectIdsByDeviceId: Record<string, string[]>,
+) {
+  if (computer.state !== "ready" || !computer.deviceId) return projects;
+  const boundProjectIds = new Set(
+    boundProjectIdsByDeviceId[computer.deviceId] ?? [],
+  );
+  return projects.filter((project) => !boundProjectIds.has(project.id));
+}
+
 export function ManagedComputersCard({
+  boundProjectIdsByDeviceId,
   organizationId,
+  onProjectConnected,
   projects,
   token,
+  workerBindingsLoaded,
 }: {
+  boundProjectIdsByDeviceId: Record<string, string[]>;
   organizationId: string;
+  onProjectConnected: () => void;
   projects: Project[];
   token: string;
+  workerBindingsLoaded: boolean;
 }) {
   const { t } = useI18n();
   const [product, setProduct] = useState<ManagedComputerProduct | null>(null);
@@ -255,6 +274,13 @@ export function ManagedComputersCard({
   const purchaseDisabled =
     !product?.applicationsEnabled || !product.canApply || submitting;
   const remoteDesktopSupported = supportsManagedComputerRemoteDesktop();
+  const setupProjects = setupComputer
+    ? managedComputerSetupProjects(
+      setupComputer,
+      projects,
+      boundProjectIdsByDeviceId,
+    )
+    : projects;
 
   return (
     <section className="mb-8 w-full max-w-[820px] overflow-hidden rounded-xl border border-border bg-card shadow-xs">
@@ -322,8 +348,14 @@ export function ManagedComputersCard({
 
       {computers.length > 0 ? (
         <div className="divide-y divide-border border-t border-border">
-          {computers.map((computer) => (
-            <article className="px-5 py-4" key={computer.id}>
+          {computers.map((computer) => {
+            const addableProjects = managedComputerSetupProjects(
+              computer,
+              projects,
+              boundProjectIdsByDeviceId,
+            );
+            return (
+              <article className="px-5 py-4" key={computer.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
                   <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary text-muted-foreground">
@@ -360,6 +392,26 @@ export function ManagedComputersCard({
                     >
                       <ServerCog size={14} />
                       {t("managedComputer.setupAction")}
+                    </Button>
+                  ) : null}
+                  {computer.state === "ready" ? (
+                    <Button
+                      disabled={
+                        !workerBindingsLoaded || addableProjects.length === 0
+                      }
+                      onClick={() => setSetupComputer(computer)}
+                      size="sm"
+                      title={
+                        workerBindingsLoaded && addableProjects.length === 0
+                          ? t(projects.length === 0
+                            ? "managedComputer.setup.noProjects"
+                            : "managedComputer.addProject.allConnected")
+                          : undefined
+                      }
+                      type="button"
+                    >
+                      <FolderPlus size={14} />
+                      {t("managedComputer.addProjectAction")}
                     </Button>
                   ) : null}
                   {product?.remoteDesktopEnabled && remoteDesktopSupported &&
@@ -413,8 +465,9 @@ export function ManagedComputersCard({
                   ) : null}
                 </div>
               </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       ) : null}
 
@@ -593,13 +646,17 @@ export function ManagedComputersCard({
       {setupComputer ? (
         <ManagedComputerSetupWizard
           computer={setupComputer}
-          onComplete={() => void refresh()}
+          mode={setupComputer.state === "ready" ? "add_project" : "setup"}
+          onComplete={() => {
+            void refresh();
+            onProjectConnected();
+          }}
           onOpenChange={(open) => {
             if (!open) setSetupComputer(null);
           }}
           open
           organizationId={organizationId}
-          projects={projects}
+          projects={setupProjects}
           token={token}
         />
       ) : null}

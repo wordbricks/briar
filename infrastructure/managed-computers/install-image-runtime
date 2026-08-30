@@ -31,6 +31,7 @@ for required in \
   SSM_AGENT_VERSION SSM_AGENT_PACKAGE_VERSION \
   SSM_AGENT_DEBIAN_AMD64_SHA256 \
   CODEX_CLI_VERSION CLAUDE_CODE_VERSION AGENT_BROWSER_VERSION \
+  VELEN_CLI_VERSION \
   OPENCODE_CLI_VERSION OPENCODE_CLI_LINUX_X64_SHA256 \
   GROK_CLI_VERSION GROK_CLI_LINUX_X64_SHA256 \
   CURSOR_AGENT_VERSION CURSOR_AGENT_LINUX_X64_SHA256 \
@@ -203,7 +204,7 @@ install -o root -g root -m 0644 \
   /opt/briar/provider/
 HOME=/root /opt/briar/bin/bun install \
   --cwd /opt/briar/provider --frozen-lockfile --production --ignore-scripts
-for binary in codex claude; do
+for binary in codex claude velen; do
   test -x "/opt/briar/provider/node_modules/.bin/$binary"
   ln -sfn "/opt/briar/provider/node_modules/.bin/$binary" \
     "/opt/briar/bin/$binary"
@@ -339,6 +340,14 @@ ln -s /opt/briar/current/lib /opt/briar/lib
 ln -s /opt/briar/current/briar-version /opt/briar/briar-version
 ln -s /opt/briar/current/source-commit /opt/briar/source-commit
 
+# Codex writes authentication, login logs, and temporary helper aliases below
+# ~/.codex. Create the provider roots explicitly because `install -d` only
+# guarantees the ownership of the final nested skill directory.
+install -d -o briar -g briar -m 0700 \
+  /home/briar/.codex /home/briar/.codex/log \
+  /home/briar/.claude /home/briar/.cursor /home/briar/.grok \
+  /home/briar/.gemini /home/briar/.config/opencode
+
 for skill_root in \
   /home/briar/.codex/skills \
   /home/briar/.claude/skills \
@@ -375,6 +384,7 @@ jq -n \
   --arg codexVersion "$CODEX_CLI_VERSION" \
   --arg claudeVersion "$CLAUDE_CODE_VERSION" \
   --arg agentBrowserVersion "$AGENT_BROWSER_VERSION" \
+  --arg velenVersion "$VELEN_CLI_VERSION" \
   --arg opencodeVersion "$OPENCODE_CLI_VERSION" \
   --arg grokVersion "$GROK_CLI_VERSION" \
   --arg cursorVersion "$CURSOR_AGENT_VERSION" \
@@ -396,6 +406,7 @@ jq -n \
       gitleaks: $gitleaksVersion,
       googleChrome: $chromeVersion,
       amazonSsmAgent: $ssmAgentVersion,
+      velen: $velenVersion,
       providers: {
         codex: $codexVersion,
         claude: $claudeVersion,

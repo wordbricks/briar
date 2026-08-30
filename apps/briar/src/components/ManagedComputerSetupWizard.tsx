@@ -42,6 +42,7 @@ import type {
 } from "../types";
 
 type WizardScreen = "start" | "running" | "complete" | "error";
+type ManagedComputerSetupMode = "setup" | "add_project";
 type SetupPhase = Extract<
   ManagedComputerSetupAgentMessage,
   { type: "state" }
@@ -56,6 +57,7 @@ const initialPhaseState = (): Partial<Record<SetupPhase, "working" | "complete">
 
 export function ManagedComputerSetupWizard({
   computer,
+  mode = "setup",
   onComplete,
   onOpenChange,
   open,
@@ -64,6 +66,7 @@ export function ManagedComputerSetupWizard({
   token,
 }: {
   computer: ManagedComputer;
+  mode?: ManagedComputerSetupMode;
   onComplete: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
@@ -72,6 +75,7 @@ export function ManagedComputerSetupWizard({
   token: string;
 }) {
   const { t } = useI18n();
+  const addingProject = mode === "add_project";
   const [screen, setScreen] = useState<WizardScreen>("start");
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const [provider, setProvider] = useState<ManagedComputerSetupProvider>(
@@ -290,18 +294,23 @@ export function ManagedComputerSetupWizard({
     t("managedComputer.setup.step.provider"),
     t("managedComputer.setup.step.complete"),
   ];
+  const dialogTitle = t(addingProject
+    ? "managedComputer.addProject.title"
+    : "managedComputer.setup.title");
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{t("managedComputer.setup.title")}</DialogTitle>
+          <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>
-            {t("managedComputer.setup.description")}
+            {t(addingProject
+              ? "managedComputer.addProject.description"
+              : "managedComputer.setup.description")}
           </DialogDescription>
         </DialogHeader>
 
-        <ol className="grid grid-cols-4 gap-2" aria-label={t("managedComputer.setup.title")}>
+        <ol className="grid grid-cols-4 gap-2" aria-label={dialogTitle}>
           {stepLabels.map((label, index) => (
             <li className="grid min-w-0 gap-1.5" key={label}>
               <span
@@ -468,10 +477,14 @@ export function ManagedComputerSetupWizard({
               <CheckCircle2 size={28} />
             </span>
             <Typography as="h3" variant="bodyLg">
-              {t("managedComputer.setup.completeTitle")}
+              {t(addingProject
+                ? "managedComputer.addProject.completeTitle"
+                : "managedComputer.setup.completeTitle")}
             </Typography>
             <Typography tone="muted" variant="bodySm">
-              {t("managedComputer.setup.completeDescription")}
+              {t(addingProject
+                ? "managedComputer.addProject.completeDescription"
+                : "managedComputer.setup.completeDescription")}
             </Typography>
           </div>
         ) : null}
@@ -502,7 +515,9 @@ export function ManagedComputerSetupWizard({
                 type="button"
               >
                 <Laptop size={15} />
-                {t("managedComputer.setup.start")}
+                {t(addingProject
+                  ? "managedComputer.addProject.start"
+                  : "managedComputer.setup.start")}
               </Button>
             </>
           ) : screen === "complete" ? (

@@ -6,6 +6,7 @@
   "dependencies": {
     "@anthropic-ai/claude-code": "2.1.243",
     "@openai/codex": "0.149.1",
+    "@wordbricks/velen": "0.2.44",
     "agent-browser": "0.34.0"
   }
 }
