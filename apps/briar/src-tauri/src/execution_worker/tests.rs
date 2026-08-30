@@ -19,21 +19,22 @@ fn worker_enable_does_not_deprovision_after_registration_fails() {
 }
 
 #[test]
-fn worker_enable_rolls_back_after_an_unreadable_status() {
+fn worker_enable_rolls_back_after_status_command_fails() {
     let commands = RefCell::new(Vec::<String>::new());
     let run = |arguments: &[&str]| {
         commands.borrow_mut().push(arguments[1].to_string());
         if arguments[1] == "status" {
-            Ok("not-json".to_string())
+            Err("status failed".to_string())
         } else {
             Ok("{}".to_string())
         }
     };
 
     let error = enable_execution_worker(&run, "project-1", "/bun", "/briar.js")
-        .expect_err("invalid status should fail");
+        .expect_err("status failure should roll back the Worker");
 
     assert!(!error.starts_with(WORKER_CLEANUP_INCOMPLETE_PREFIX));
+    assert_eq!(error, "status failed");
     assert_eq!(
         commands.into_inner(),
         [

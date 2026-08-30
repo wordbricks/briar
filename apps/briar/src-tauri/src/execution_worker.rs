@@ -36,7 +36,7 @@ fn enable_execution_worker(
     project_id: &str,
     bun_path: &str,
     cli_path: &str,
-) -> Result<ipc::JsonValue, String> {
+) -> Result<(), String> {
     // A failed registration has not produced a local binding that can be
     // unregistered reliably. Cleanup begins only after the CLI confirms that
     // registration completed.
@@ -52,15 +52,9 @@ fn enable_execution_worker(
         cli_path,
     ])
     .map_err(|cause| rollback_enabled_worker_failure(run, project_id, cause))?;
-    let status = run(&["worker", "status", "--project", project_id])
+    run(&["worker", "status", "--project", project_id])
         .map_err(|cause| rollback_enabled_worker_failure(run, project_id, cause))?;
-    serde_json::from_str(&status).map_err(|error| {
-        rollback_enabled_worker_failure(
-            run,
-            project_id,
-            format!("Worker 상태를 읽지 못했습니다: {error}"),
-        )
-    })
+    Ok(())
 }
 
 #[tauri::command]
@@ -70,7 +64,7 @@ pub(super) fn configure_execution_worker(
     project_id: String,
     user_token: String,
     enabled: bool,
-) -> Result<ipc::JsonValue, String> {
+) -> Result<(), String> {
     if project_id.trim().is_empty() || user_token.trim().is_empty() {
         return Err("프로젝트와 로그인 정보가 필요합니다.".to_string());
     }
@@ -120,8 +114,8 @@ pub(super) fn configure_execution_worker(
     run(&["worker", "uninstall-service", "--project", &project_id])?;
     run(&["worker", "unregister", "--project", &project_id])?;
 
-    let status = run(&["worker", "status", "--project", &project_id])?;
-    serde_json::from_str(&status).map_err(|error| format!("Worker 상태를 읽지 못했습니다: {error}"))
+    run(&["worker", "status", "--project", &project_id])?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -144,7 +138,7 @@ pub(super) fn current_execution_worker_device_id(
 
 #[tauri::command]
 #[specta::specta]
-pub(super) fn sync_execution_worker_labels(app: AppHandle) -> Result<ipc::JsonValue, String> {
+pub(super) fn sync_execution_worker_labels(app: AppHandle) -> Result<(), String> {
     let resource_directory = app
         .path()
         .resource_dir()
@@ -169,8 +163,7 @@ pub(super) fn sync_execution_worker_labels(app: AppHandle) -> Result<ipc::JsonVa
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         return Err(if stderr.is_empty() { stdout } else { stderr });
     }
-    serde_json::from_slice(&output.stdout)
-        .map_err(|error| format!("Worker 이름 동기화 결과를 읽지 못했습니다: {error}"))
+    Ok(())
 }
 
 #[tauri::command]
