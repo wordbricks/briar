@@ -780,55 +780,6 @@ func agentSkillExecutionApprovalResponseMatches(
         session.workerId == workerID
 }
 
-struct DispatchRunRequest: Codable, Sendable {
-    let agentId: UUID?
-    let provider: AgentProvider
-    let model: String?
-    let effort: ModelEffort?
-    let persistPreferences: Bool
-    let workerId: String?
-    let requestId: UUID
-
-    private enum CodingKeys: String, CodingKey {
-        case agentId
-        case provider
-        case model
-        case effort
-        case persistPreferences
-        case workerId
-        case requestId
-    }
-
-    init(
-        agentId: UUID? = nil,
-        provider: AgentProvider,
-        model: String?,
-        effort: ModelEffort?,
-        persistPreferences: Bool,
-        workerId: String?,
-        requestId: UUID
-    ) {
-        self.agentId = agentId
-        self.provider = provider
-        self.model = model
-        self.effort = effort
-        self.persistPreferences = persistPreferences
-        self.workerId = workerId
-        self.requestId = requestId
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(agentId?.uuidString.lowercased(), forKey: .agentId)
-        try container.encode(provider, forKey: .provider)
-        try container.encodeIfPresent(model, forKey: .model)
-        try container.encodeIfPresent(effort, forKey: .effort)
-        try container.encode(persistPreferences, forKey: .persistPreferences)
-        try container.encodeIfPresent(workerId, forKey: .workerId)
-        try container.encode(requestId.uuidString.lowercased(), forKey: .requestId)
-    }
-}
-
 struct DispatchRunResponse: Codable, Equatable, Sendable {
     let runId: UUID
     let agentId: UUID?

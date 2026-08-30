@@ -418,18 +418,6 @@ private extension AcceptAgentSkillExecutionProposalResponse.Outcome {
     }
 }
 
-func issueDispatchMessage(_ request: DispatchRunRequest) -> BriarAPI_DispatchRunInput {
-    var message = BriarAPI_DispatchRunInput()
-    message.requestID = issueUUIDString(request.requestId)
-    if let agentID = request.agentId { message.agentID = issueUUIDString(agentID) }
-    message.provider = issueProviderMessage(request.provider)
-    if let model = request.model { message.model = model }
-    if let effort = request.effort { message.effort = effort.rawValue }
-    message.persistPreferences = request.persistPreferences
-    if let workerID = request.workerId { message.workerID = workerID }
-    return message
-}
-
 func issueExecutionApprovalMessage(
     _ approval: AcceptIssueExecutionProposalRequest
 ) -> BriarAPI_IssueExecutionApproval {

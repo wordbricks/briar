@@ -249,15 +249,13 @@ final class AgentsStore: ObservableObject {
                 let effort = run.preferredModel != nil
                     ? run.preferredEffort
                     : (run.preferredProvider == nil ? agent.effort : nil)
-                let dispatch = issueDispatchMessage(DispatchRunRequest(
-                        agentId: agent.id,
-                        provider: provider,
-                        model: model,
-                        effort: effort,
-                        persistPreferences: true,
-                        workerId: nil,
-                        requestId: UUID()
-                    ))
+                var dispatch = BriarAPI_DispatchRunInput()
+                dispatch.requestID = UUID().uuidString.lowercased()
+                dispatch.agentID = agent.id.uuidString.lowercased()
+                dispatch.provider = issueProviderMessage(provider)
+                if let model { dispatch.model = model }
+                if let effort { dispatch.effort = effort.rawValue }
+                dispatch.persistPreferences = true
                 let response: BriarAPI_IssueExecutionDispatch
                 if run.dispatchedAt != nil || run.workerId != nil {
                     var request = BriarAPI_ReassignRunRequest()

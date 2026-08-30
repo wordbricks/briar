@@ -255,14 +255,13 @@ final class IssueMutationStore: ObservableObject {
             }
             guard preferences.isValid else { throw IssueMutationError.invalidPreferences }
             let idempotencyKey = "dispatch-\(runID)-\(reassign)-\(provider.rawValue)-\(preferences.model ?? "none")-\(preferences.effort?.rawValue ?? "none")-\(workerID ?? "any")"
-            let dispatch = issueDispatchMessage(DispatchRunRequest(
-                provider: provider,
-                model: preferences.model,
-                effort: preferences.effort,
-                persistPreferences: true,
-                workerId: workerID,
-                requestId: idempotencyID(for: idempotencyKey)
-            ))
+            var dispatch = BriarAPI_DispatchRunInput()
+            dispatch.requestID = coreUUIDString(idempotencyID(for: idempotencyKey))
+            dispatch.provider = issueProviderMessage(provider)
+            if let model = preferences.model { dispatch.model = model }
+            if let effort = preferences.effort { dispatch.effort = effort.rawValue }
+            dispatch.persistPreferences = true
+            if let workerID { dispatch.workerID = workerID }
             let result: DispatchRunResponse
             if reassign {
                 var request = BriarAPI_ReassignRunRequest()
