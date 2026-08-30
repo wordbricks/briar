@@ -2042,7 +2042,7 @@ export function App({
 
     let cancelled = false;
     const agents = briar.token
-      ? loadProjectAgents(briar.token, activeProject.id, locale)
+      ? loadProjectAgents(briar.token, activeProject.id)
       : Promise.resolve(demoProjectAgents(activeProject.id, locale));
     void agents
       .then((loadedAgents) => {

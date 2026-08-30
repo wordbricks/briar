@@ -204,16 +204,6 @@ export const ProjectAgentSessionResponse = Schema.Struct({
 export type ProjectAgentSessionResponse =
   typeof ProjectAgentSessionResponse.Type;
 
-export const ProjectAgentSessionSyncResponse = Schema.Struct({
-  cursor: NonNegativeInteger,
-  hasMore: Schema.Boolean,
-  reset: Schema.Boolean,
-  sessions: mutableArray(ProjectAgentSessionResponse),
-  deletedSessionIds: mutableArray(Schema.String),
-});
-export type ProjectAgentSessionSyncResponse =
-  typeof ProjectAgentSessionSyncResponse.Type;
-
 export const ProjectAgentScheduleResponse = Schema.Struct({
   id: UuidString,
   projectId: UuidString,
@@ -342,8 +332,6 @@ const ClaimedProjectAgentScheduleRunSourceResponse = Schema.Struct({
 type ClaimedProjectAgentScheduleRunSourceResponse =
   typeof ClaimedProjectAgentScheduleRunSourceResponse.Type;
 
-const ProjectAgentsResponse = mutableArray(ProjectAgentResponse);
-const ProjectAgentSessionsResponse = mutableArray(ProjectAgentSessionResponse);
 const ProjectAgentSchedulesResponse = mutableArray(ProjectAgentScheduleResponse);
 const ProjectAgentScheduleRunSourcesResponse = mutableArray(
   ProjectAgentScheduleRunSourceResponse,
@@ -376,17 +364,8 @@ const normalizeClaimedProjectAgentScheduleRun = (
 export const decodeProjectAgentResponse = Schema.decodeUnknownSync(
   ProjectAgentResponse,
 );
-export const decodeProjectAgentsResponse = Schema.decodeUnknownSync(
-  ProjectAgentsResponse,
-);
 export const decodeProjectAgentSessionResponse = Schema.decodeUnknownSync(
   ProjectAgentSessionResponse,
-);
-export const decodeProjectAgentSessionsResponse = Schema.decodeUnknownSync(
-  ProjectAgentSessionsResponse,
-);
-export const decodeProjectAgentSessionSyncResponse = Schema.decodeUnknownSync(
-  ProjectAgentSessionSyncResponse,
 );
 export const decodeProjectAgentScheduleResponse = Schema.decodeUnknownSync(
   ProjectAgentScheduleResponse,

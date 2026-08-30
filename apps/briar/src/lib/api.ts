@@ -28,8 +28,6 @@ import {
   decodeProjectAgentScheduleRunsResponse,
   decodeProjectAgentSchedulesResponse,
   decodeProjectAgentSessionResponse,
-  decodeProjectAgentSessionSyncResponse,
-  decodeProjectAgentsResponse,
 } from "./api/project-agent-contract";
 import {
   decodeProjectResponse,
@@ -48,6 +46,16 @@ import {
   listRunEventsRpc,
   syncDashboard,
 } from "./app-rpc/dashboard";
+export {
+  listOrganizationAgents,
+  loadProjectAgents,
+  loadProjectAgentSession,
+  loadProjectAgentSessionChanges,
+  runProjectAgentTaskOnWorker,
+  type ProjectAgentSessionSyncResult,
+  type ProjectAgentSessionSyncState,
+  upsertProjectAgentSession,
+} from "./app-rpc/agent";
 import type { StructuredAgentResult } from "./agent-result";
 import { validateIssueAttachments } from "./issue-attachments";
 import {
@@ -55,7 +63,6 @@ import {
   type AutoHuntWorkflow,
   type AutoHuntWorkflowCheckpoint,
 } from "./auto-hunt-contract";
-import type { ProjectAgentLocale } from "./project-agent";
 import type { ModelEffort } from "./agent-provider-contract";
 import type { AgentProvider } from "./agent-provider";
 import type { UsageRangeDays } from "./agent-usage-overview";
@@ -974,180 +981,6 @@ export async function updateProjectTabs(
   return { project: decodeProjectResponse(result.project) };
 }
 
-export async function loadProjectAgents(
-  token: string,
-  projectId: string,
-  locale: ProjectAgentLocale,
-): Promise<ProjectAgent[]> {
-  const result = await request<{ agents: unknown[] }>(
-    `/projects/${projectId}/agents?locale=${encodeURIComponent(locale)}`,
-    token,
-  );
-  return decodeProjectAgentsResponse(result.agents);
-}
-
-export type ProjectAgentSessionSyncState = {
-  cursor: number;
-  etag: string | null;
-};
-
-export type ProjectAgentSessionSyncResult = {
-  state: ProjectAgentSessionSyncState;
-  hasMore: boolean;
-  reset: boolean;
-  notModified: boolean;
-  sessions: AutoHuntSession[];
-  deletedSessionIds: string[];
-};
-
-export async function loadProjectAgentSessionChanges(
-  token: string,
-  projectId: string,
-  state: ProjectAgentSessionSyncState | null,
-): Promise<ProjectAgentSessionSyncResult> {
-  if (!apiUrl) throw new Error("Briar API URL이 설정되지 않았습니다.");
-  const query = state ? `?cursor=${state.cursor}` : "";
-  const headers = new Headers({
-    Accept: "application/json",
-    Authorization: `Bearer ${token}`,
-  });
-  if (state?.etag) headers.set("If-None-Match", state.etag);
-  const response = await fetch(
-    `${apiUrl}/projects/${projectId}/agent-sessions/changes${query}`,
-    { headers },
-  );
-  if (response.status === 304 && state) {
-    return {
-      state: {
-        cursor: state.cursor,
-        etag: response.headers.get("ETag") ?? state.etag,
-      },
-      hasMore: false,
-      reset: false,
-      notModified: true,
-      sessions: [],
-      deletedSessionIds: [],
-    };
-  }
-  if (response.status === 410 && state) {
-    return loadProjectAgentSessionChanges(token, projectId, null);
-  }
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new ApiError(
-      response.status,
-      body?.message ?? `Briar API 요청 실패 (${response.status})`,
-      body?.code,
-      Array.isArray(body?.issues) ? body.issues : undefined,
-    );
-  }
-  const result = decodeProjectAgentSessionSyncResponse(await response.json());
-  return {
-    state: {
-      cursor: result.cursor,
-      etag: response.headers.get("ETag"),
-    },
-    hasMore: result.hasMore,
-    reset: result.reset,
-    notModified: false,
-    sessions: result.sessions.map((session) => ({
-      ...session,
-      localOwner: false,
-    } as AutoHuntSession)),
-    deletedSessionIds: result.deletedSessionIds,
-  };
-}
-
-export async function loadProjectAgentSession(
-  token: string,
-  projectId: string,
-  sessionId: string,
-): Promise<AutoHuntSession> {
-  const result = await request<{ session: unknown }>(
-    `/projects/${projectId}/agent-sessions/${encodeURIComponent(sessionId)}`,
-    token,
-  );
-  return {
-    ...decodeProjectAgentSessionResponse(result.session),
-    localOwner: false,
-  } as AutoHuntSession;
-}
-
-export async function runProjectAgentTaskOnWorker(
-  token: string,
-  projectId: string,
-  input: {
-    agentId: string;
-    request: string;
-    workerId: string;
-    skillId: string;
-  },
-): Promise<AutoHuntSession> {
-  const result = await request<{ session: unknown }>(
-    `/projects/${projectId}/agent-tasks`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        ...input,
-        // Project Agent IDs are persisted as lowercase UUID strings and the
-        // Worker uses case-sensitive lookups. Keep shared clients canonical.
-        agentId: input.agentId.toLowerCase(),
-        requestId: crypto.randomUUID(),
-      }),
-    },
-  );
-  return {
-    ...decodeProjectAgentSessionResponse(result.session),
-    localOwner: false,
-  } as AutoHuntSession;
-}
-
-export async function upsertProjectAgentSession(
-  token: string,
-  session: AutoHuntSession,
-): Promise<AutoHuntSession> {
-  const result = await request<{ session: unknown }>(
-    `/projects/${session.projectId}/agent-sessions/${encodeURIComponent(session.id)}`,
-    token,
-    {
-      method: "PUT",
-      body: JSON.stringify({
-        dispatchGroupId: session.dispatchGroupId,
-        agentId: session.agentId ?? null,
-        agentName: session.agentName ?? null,
-        skillId: session.skillId ?? null,
-        sessionType: session.sessionType ?? "dispatch",
-        trigger: session.trigger ?? null,
-        scheduleId: session.scheduleId ?? null,
-        scheduleRunId: session.scheduleRunId ?? null,
-        parentSessionId: session.parentSessionId ?? null,
-        request: session.request ?? null,
-        followUps: session.followUps ?? [],
-        status: session.status,
-        issues: session.issues,
-        startedAt: session.startedAt,
-        completedAt: session.completedAt,
-        conversationId: session.conversationId,
-        requestedWorkerId: session.requestedWorkerId ?? null,
-        workerId: session.workerId ?? null,
-        summary: session.summary,
-        error: session.error,
-        events: session.events,
-        updatedAt:
-          session.updatedAt ?? session.completedAt ?? session.startedAt,
-      }),
-    },
-  );
-  return {
-    ...decodeProjectAgentSessionResponse(result.session),
-    localOwner: session.localOwner,
-    workspaceRoot: session.workspaceRoot,
-    dispatchEvents: session.dispatchEvents,
-    workers: session.workers,
-  } as AutoHuntSession;
-}
-
 export async function createProjectAgent(
   token: string,
   projectId: string,
@@ -1970,16 +1803,6 @@ export async function loadChannelDelta(
     `/organizations/${organizationId}/channel-changes?since=${since}`,
     token,
     { signal },
-  );
-}
-
-export async function listOrganizationAgents(
-  token: string,
-  organizationId: string,
-) {
-  return request<{ agents: ChannelAgentSummary[]; canManage: boolean }>(
-    `/organizations/${organizationId}/agents`,
-    token,
   );
 }
 

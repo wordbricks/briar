@@ -275,7 +275,7 @@ export function ProjectSchedule({
     setScheduleError(null);
     const load = token
       ? Promise.all([
-          loadProjectAgents(token, project.id, locale),
+          loadProjectAgents(token, project.id),
           loadProjectAgentSchedules(token, project.id),
           loadProjectAgentScheduleRuns(token, project.id),
         ])
