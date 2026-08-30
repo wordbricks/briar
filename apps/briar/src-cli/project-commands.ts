@@ -4,11 +4,12 @@ import {
   join,
   resolve,
 } from "node:path";
-import * as Schema from "effect/Schema";
+import type { Project as ProjectMessage } from "@briar/contracts/gen/briar/app/v1/project_pb";
 import {
   isRepositoryWorkflowPending,
   repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
+import { projectRoleFromProto } from "../src/lib/app-rpc/mappers";
 import {
   projectWorktreeRoot,
   resolveBaseRef,
@@ -34,6 +35,10 @@ import {
   worktreesEnabled,
   currentProject,
 } from "./command-support";
+import {
+  fetchProjects,
+  isUnauthenticatedConnectError,
+} from "./app-connect-client";
 import { HttpRequestError } from "./execution-metrics-upload";
 import {
   configWithRemoteProjectSettings,
@@ -43,33 +48,16 @@ import {
   remoteWorkflowState,
 } from "./project-settings-sync";
 
-const ProjectListResponse = Schema.Struct({
-  projects: Schema.Array(Schema.Struct({
-    id: Schema.String,
-    name: Schema.String,
-    organizationId: Schema.String,
-    organizationName: Schema.String,
-    role: Schema.Literals([
-      "owner",
-      "co-owner",
-      "developer",
-      "editor",
-      "viewer",
-    ]),
-  })),
-}).annotate({
-  parseOptions: { onExcessProperty: "preserve" },
-});
-
-const decodeProjectListResponse = Schema.decodeUnknownSync(ProjectListResponse);
-
 export type ProjectListDependencies = {
   loadAuthentication: () => Promise<{
     apiUrl: string;
     userToken?: string;
   }>;
   environmentToken: () => string | undefined;
-  fetchProjects: (apiUrl: string, userToken: string) => Promise<unknown>;
+  fetchProjects: (
+    apiUrl: string,
+    userToken: string,
+  ) => Promise<ProjectMessage[]>;
   jsonOutput: () => boolean;
   writeOutput: (output: string) => void;
 };
@@ -77,8 +65,7 @@ export type ProjectListDependencies = {
 const defaultProjectListDependencies: ProjectListDependencies = {
   loadAuthentication: loadConfig,
   environmentToken: () => process.env.BRIAR_USER_TOKEN,
-  fetchProjects: (apiUrl, userToken) =>
-    request<unknown>(apiUrl, "/projects", userToken),
+  fetchProjects,
   jsonOutput: () => has("--json"),
   writeOutput: console.log,
 };
@@ -96,11 +83,11 @@ async function listProjectsCommand(
     );
   }
 
-  let response: unknown;
+  let response: ProjectMessage[];
   try {
     response = await resolved.fetchProjects(authentication.apiUrl, userToken);
   } catch (error) {
-    if (error instanceof HttpRequestError && error.status === 401) {
+    if (isUnauthenticatedConnectError(error)) {
       throw new Error(
         "Briar 로그인이 만료되었거나 유효하지 않습니다. `briar login`을 다시 실행하세요.",
       );
@@ -108,12 +95,12 @@ async function listProjectsCommand(
     throw error;
   }
 
-  const projects = decodeProjectListResponse(response).projects.map((project) => ({
+  const projects = response.map((project) => ({
     id: project.id,
     name: project.name,
     organizationId: project.organizationId,
     organizationName: project.organizationName,
-    role: project.role,
+    role: projectRoleFromProto(project.role),
   }));
   if (resolved.jsonOutput()) {
     resolved.writeOutput(JSON.stringify({ projects }, null, 2));

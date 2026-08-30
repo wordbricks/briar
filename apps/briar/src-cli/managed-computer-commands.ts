@@ -29,6 +29,7 @@ import {
   projectWithRemoteSettings,
   remoteWorkflowState,
 } from "./project-settings-sync";
+import { fetchCurrentUser } from "./app-connect-client";
 export { managedComputerWorkerSupervisor } from "./managed-computer-supervisor";
 
 type SetupSessionResponse = {
@@ -192,9 +193,8 @@ export async function managedComputerSetupCommand() {
   const { config, userToken } = await configForManagedComputer(
     credential.apiOrigin,
   );
-  const me = await request<{ user: { id: string; name: string; email: string } }>(
+  const user = await fetchCurrentUser(
     credential.apiOrigin,
-    "/me",
     userToken,
   );
   const computer = await request<{
@@ -204,7 +204,7 @@ export async function managedComputerSetupCommand() {
     `/organizations/${credential.organizationId}/managed-computers/${credential.managedComputerId}`,
     userToken,
   );
-  if (computer.computer.requesterUserId !== me.user.id) {
+  if (computer.computer.requesterUserId !== user.id) {
     throw new Error(
       "Briar must be logged in as the user who owns this managed computer",
     );
@@ -317,7 +317,7 @@ export async function managedComputerSetupCommand() {
     deviceId: credential.deviceId,
     workerId: binding.worker.id,
     provider,
-    signedInAs: { name: me.user.name, email: me.user.email },
+    signedInAs: { name: user.name, email: user.email },
     readiness: binding.worker.readiness,
     duplicate: setup.duplicate || binding.duplicate,
   }));

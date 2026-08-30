@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { HttpRequestError } from "./execution-metrics-upload";
+import { Code, ConnectError } from "@connectrpc/connect";
+import { ProjectRole } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   listProjectsCommand,
   type ProjectListDependencies,
@@ -8,26 +9,28 @@ import {
 const projectsResponse = {
   projects: [
     {
+      $typeName: "briar.app.v1.Project" as const,
       id: "11111111-1111-4111-8111-111111111111",
       name: "Briar",
       issueKeyPrefix: "BRI",
       scheduleTabEnabled: true,
-      icon: null,
+      icon: undefined,
       organizationId: "22222222-2222-4222-8222-222222222222",
       organizationName: "Wordbricks",
-      role: "owner",
-      createdAt: "2026-08-26T00:00:00.000Z",
+      role: ProjectRole.OWNER,
+      createdAt: undefined,
     },
     {
+      $typeName: "briar.app.v1.Project" as const,
       id: "33333333-3333-4333-8333-333333333333",
       name: "Velen",
       issueKeyPrefix: "VEL",
       scheduleTabEnabled: true,
-      icon: null,
+      icon: undefined,
       organizationId: "22222222-2222-4222-8222-222222222222",
       organizationName: "Wordbricks",
-      role: "co-owner",
-      createdAt: "2026-08-26T00:01:00.000Z",
+      role: ProjectRole.CO_OWNER,
+      createdAt: undefined,
     },
   ],
 };
@@ -40,7 +43,7 @@ const dependencies = (
     userToken: "stored-token",
   }),
   environmentToken: () => undefined,
-  fetchProjects: async () => projectsResponse,
+  fetchProjects: async () => projectsResponse.projects,
   jsonOutput: () => false,
   writeOutput: vi.fn(),
   ...overrides,
@@ -48,7 +51,7 @@ const dependencies = (
 
 describe("project list", () => {
   it("prints project IDs with their organization and role", async () => {
-    const fetchProjects = vi.fn(async () => projectsResponse);
+    const fetchProjects = vi.fn(async () => projectsResponse.projects);
     const writeOutput = vi.fn();
 
     await listProjectsCommand(dependencies({ fetchProjects, writeOutput }));
@@ -101,7 +104,7 @@ describe("project list", () => {
   });
 
   it("uses the environment token when configured", async () => {
-    const fetchProjects = vi.fn(async () => ({ projects: [] }));
+    const fetchProjects = vi.fn(async () => []);
 
     await listProjectsCommand(dependencies({
       environmentToken: () => "environment-token",
@@ -125,7 +128,7 @@ describe("project list", () => {
   it("explains how to recover from an expired login", async () => {
     await expect(listProjectsCommand(dependencies({
       fetchProjects: async () => {
-        throw new HttpRequestError("Unauthorized", 401, null);
+        throw new ConnectError("Unauthorized", Code.Unauthenticated);
       },
     }))).rejects.toThrow(
       "Briar 로그인이 만료되었거나 유효하지 않습니다. `briar login`을 다시 실행하세요.",

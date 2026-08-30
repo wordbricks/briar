@@ -62,15 +62,6 @@ export const decodeIsoDateTimeWithOffset = Schema.decodeUnknownSync(
 );
 export const decodeWorkflowStageId = Schema.decodeUnknownSync(WorkflowStageId);
 
-const DashboardRun = Schema.Struct({
-  id: Uuid,
-  status: Schema.String,
-  branch: Schema.NullOr(Schema.String),
-  completedAt: Schema.NullOr(IsoDateTimeWithOffset),
-});
-const DashboardRuns = mutableArray(DashboardRun);
-export const decodeDashboardRuns = Schema.decodeUnknownSync(DashboardRuns);
-
 const IssueTitle = Schema.Trim.check(
   Schema.isLengthBetween(1, issueTitleAbsoluteMaxLength),
   Schema.makeFilter((title) => issueTitleOverLimitMessage(title) ?? undefined),

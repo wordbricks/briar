@@ -39,6 +39,7 @@ import {
   configuredManagedComputerCredentialPath,
   loadOptionalManagedComputerCredential,
 } from "./managed-computer-credential";
+import { fetchCurrentUser } from "./app-connect-client";
 
 const openRouterOpenCodeConfig = JSON.stringify({
   provider: {
@@ -283,6 +284,7 @@ function openBrowser(url: string, dependencies: OpenBrowserDependencies = {}) {
 }
 
 type LoginDependencies = {
+  fetchCurrentUser: typeof fetchCurrentUser;
   loadConfig: typeof loadConfig;
   openBrowser: (url: string) => void;
   request: typeof request;
@@ -296,6 +298,7 @@ async function login(
   dependencyOverrides: Partial<LoginDependencies> = {},
 ) {
   const dependencies: LoginDependencies = {
+    fetchCurrentUser,
     loadConfig,
     openBrowser,
     request,
@@ -350,15 +353,12 @@ async function login(
       if (!token.access_token) continue;
       config.userToken = token.access_token;
       await dependencies.saveConfig(config);
-      const me = await dependencies.request<{
-        user: { name: string; email: string };
-      }>(
+      const user = await dependencies.fetchCurrentUser(
         config.apiUrl,
-        "/me",
         token.access_token,
       );
       dependencies.writeLine(
-        `${me.user.name} (${me.user.email}) 계정으로 로그인했습니다.`,
+        `${user.name} (${user.email}) 계정으로 로그인했습니다.`,
       );
       return;
     } catch (error) {

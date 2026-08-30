@@ -25,11 +25,13 @@ import {
   type ProjectConfig,
 } from "./config-contract";
 import {
-  decodeDashboardRuns,
   decodeIsoDateTimeWithOffset,
   decodeUuid,
   decodeWorkspaceMode,
 } from "./command-contract";
+import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
+import { timestampDate } from "@bufbuild/protobuf/wkt";
+import { fetchDashboard } from "./app-connect-client";
 import {
   decodeQueuedIssue,
   type QueuedAttachment,
@@ -361,16 +363,25 @@ async function syncCompletedWorktreeRecordsFromDashboard(
   project: ProjectConfig,
 ): Promise<number> {
   if (!config.userToken) return 0;
-  const dashboard = await request<{ runs: unknown[] }>(
+  const dashboard = await fetchDashboard(
     config.apiUrl,
-    `/projects/${encodeURIComponent(project.id)}/dashboard`,
     config.userToken,
+    project.id,
   );
-  const completedRuns = decodeDashboardRuns(dashboard.runs)
+  const completedRuns = dashboard.runs
     .filter(
-      (run): run is typeof run & { branch: string; completedAt: string } =>
-        run.status === "completed" && Boolean(run.branch && run.completedAt),
-    );
+      (run): run is typeof run & {
+        branch: string;
+        completedAt: NonNullable<typeof run.completedAt>;
+      } =>
+        run.status === RunStatus.COMPLETED &&
+        run.branch !== undefined &&
+        run.completedAt !== undefined,
+    )
+    .map((run) => ({
+      ...run,
+      completedAt: timestampDate(run.completedAt).toISOString(),
+    }));
   const root = projectWorktreeRoot(worktreeSettings(project).root, project.id);
   const existingRunIds = new Set(
     (await listCompletedWorktrees(root)).map((record) => record.runId),

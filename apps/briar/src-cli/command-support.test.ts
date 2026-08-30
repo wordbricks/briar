@@ -45,11 +45,6 @@ const loginDependencies = (
     if (path === "/api/auth/device/token") {
       return { access_token: "access-token" } as T;
     }
-    if (path === "/me") {
-      return {
-        user: { name: "Jay Nam", email: "jay@example.com" },
-      } as T;
-    }
     throw new Error(`Unexpected request: ${path}`);
   }) as LoginDependencies["request"];
   const saveConfig = vi.fn(async () => undefined);
@@ -57,6 +52,12 @@ const loginDependencies = (
 
   return {
     dependencies: {
+      fetchCurrentUser: async () => ({
+        $typeName: "briar.app.v1.User",
+        id: "user-id",
+        name: "Jay Nam",
+        email: "jay@example.com",
+      }),
       loadConfig: async () => config(),
       openBrowser: openVerificationPage,
       request,
@@ -115,7 +116,6 @@ describe("login browser launch", () => {
     expect(state.requestedPaths).toEqual([
       "/api/auth/device/code",
       "/api/auth/device/token",
-      "/me",
     ]);
     expect(unref).toHaveBeenCalledOnce();
     expect(state.saveConfig).toHaveBeenCalledOnce();
