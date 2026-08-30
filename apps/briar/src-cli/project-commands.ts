@@ -5,15 +5,20 @@ import {
   resolve,
 } from "node:path";
 import { create } from "@bufbuild/protobuf";
+import { createClient } from "@connectrpc/connect";
 import {
   type Project as ProjectMessage,
+  ProjectService,
   UpdateProjectSettingsRequestSchema,
 } from "@briar/contracts/gen/briar/app/v1/project_pb";
 import {
   isRepositoryWorkflowPending,
   repositoryWorkflowPendingStageId,
 } from "../src/lib/auto-hunt-contract";
-import { projectRoleFromProto } from "../src/lib/app-rpc/mappers";
+import {
+  projectRoleFromProto,
+  requiredMessage,
+} from "../src/lib/app-rpc/mappers";
 import { workflowToProto } from "../src/lib/app-rpc/project-configuration-mappers";
 import {
   projectWorktreeRoot,
@@ -31,7 +36,6 @@ import {
   required,
   loadConfig,
   saveConfig,
-  request,
   login,
   gitValue,
   currentRepositoryPath,
@@ -41,6 +45,8 @@ import {
   currentProject,
 } from "./command-support";
 import {
+  appConnectCallOptions,
+  appConnectTransport,
   fetchProjects,
   isUnauthenticatedConnectError,
   updateRemoteProjectSettings,
@@ -133,17 +139,18 @@ async function createProject() {
   if (!config.userToken) throw new Error("먼저 `briar login`을 실행하세요.");
   const repositoryPath = await currentRepositoryPath();
   const name = value("--name") ?? basename(repositoryPath);
-  const result = await request<{
-    project: { id: string; name: string };
-    agentToken: string;
-  }>(config.apiUrl, "/projects", config.userToken, {
-    method: "POST",
-    body: JSON.stringify({ name }),
-  });
+  const result = await createClient(
+    ProjectService,
+    appConnectTransport(config.apiUrl),
+  ).createProject(
+    { name },
+    appConnectCallOptions(config.userToken),
+  );
+  const createdProject = requiredMessage(result.project, "createProject.project");
   config.projects = [
-    ...config.projects.filter((project) => project.id !== result.project.id),
+    ...config.projects.filter((project) => project.id !== createdProject.id),
     {
-      id: result.project.id,
+      id: createdProject.id,
       repositoryPath,
       repositoryRemote: gitValue(["remote", "get-url", "origin"]) ?? undefined,
       agentToken: result.agentToken,
@@ -151,8 +158,8 @@ async function createProject() {
     },
   ];
   await saveConfig(config);
-  console.log(`프로젝트 ${result.project.name}을 연결했습니다.`);
-  console.log(`Project ID: ${result.project.id}`);
+  console.log(`프로젝트 ${createdProject.name}을 연결했습니다.`);
+  console.log(`Project ID: ${createdProject.id}`);
 }
 
 async function connectProject() {
