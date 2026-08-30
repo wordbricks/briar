@@ -106,6 +106,45 @@ export const mobileDeviceTokenErrorSchema = mutableStruct({
   error_description: optional(Schema.String),
 });
 
+export const mobilePushPlatformSchema = Schema.Literals(["apns", "fcm"]);
+export const mobilePushRegistrationRequestSchema = strict(mutableStruct({
+  platform: mobilePushPlatformSchema,
+  token: Schema.Trim.check(Schema.isLengthBetween(32, 4_096)),
+  environment: Schema.Literals(["development", "production"]),
+  topic: Schema.Trim.check(
+    Schema.isLengthBetween(3, 255),
+    Schema.isPattern(/^[A-Za-z0-9.-]+$/u),
+  ),
+  locale: Schema.Literals(["ko", "en", "zh"]),
+  preferences: strict(mutableStruct({
+    playSound: Schema.Boolean,
+    urgent: Schema.Boolean,
+    actionRequired: Schema.Boolean,
+    important: Schema.Boolean,
+    activity: Schema.Boolean,
+  })),
+})).check(Schema.makeFilter((registration) => {
+  const canonical = registration.platform === "fcm"
+    ? registration.environment === "production" &&
+      registration.topic === "app.briar.companion"
+    : registration.environment === "development"
+    ? registration.topic === "app.briar.companion.native.dev"
+    : registration.topic === "app.briar.companion";
+  return canonical
+    ? undefined
+    : "Push registration topic does not match its platform and environment";
+}));
+export const mobilePushRegistrationDeleteRequestSchema = strict(mutableStruct({
+  platform: mobilePushPlatformSchema,
+  token: Schema.Trim.check(Schema.isLengthBetween(32, 4_096)),
+}));
+export const mobilePushRegistrationResponseSchema = mutableStruct({
+  registered: Schema.Boolean,
+});
+export const mobilePushRegistrationDeleteResponseSchema = mutableStruct({
+  deleted: Schema.Boolean,
+});
+
 export const mobileCurrentUserResponseSchema = mutableStruct({
   user: mutableStruct({
     id: Schema.String,
@@ -1337,6 +1376,14 @@ export const mobileOperationSchemas = {
     response: mobileDeviceTokenResponseSchema,
     errorResponse: mobileDeviceTokenErrorSchema,
   },
+  putMobilePushRegistration: {
+    request: mobilePushRegistrationRequestSchema,
+    response: mobilePushRegistrationResponseSchema,
+  },
+  deleteMobilePushRegistration: {
+    request: mobilePushRegistrationDeleteRequestSchema,
+    response: mobilePushRegistrationDeleteResponseSchema,
+  },
   getCurrentUser: { response: mobileCurrentUserResponseSchema },
   listProjects: { response: mobileProjectsResponseSchema },
   getInboxFeed: { response: mobileInboxFeedResponseSchema },
@@ -1470,6 +1517,14 @@ export const decodeMobileHealthResponse = Schema.decodeUnknownSync(
 );
 export const decodeMobileCurrentUserResponse = Schema.decodeUnknownSync(
   mobileCurrentUserResponseSchema,
+  mobileSchemaDecodeOptions,
+);
+export const decodeMobilePushRegistrationRequest = Schema.decodeUnknownSync(
+  mobilePushRegistrationRequestSchema,
+  mobileSchemaDecodeOptions,
+);
+export const decodeMobilePushRegistrationDeleteRequest = Schema.decodeUnknownSync(
+  mobilePushRegistrationDeleteRequestSchema,
   mobileSchemaDecodeOptions,
 );
 export const decodeMobileProjectsResponse = Schema.decodeUnknownSync(

@@ -12,6 +12,7 @@ import {
   mobileHealthResponseSchema,
   mobileInboxReadStatesSchema,
   mobileProjectsResponseSchema,
+  mobilePushRegistrationRequestSchema,
   mobileUpdateIssueRequestSchema,
 } from "./mobile-contract";
 import {
@@ -146,6 +147,25 @@ describe("Effect mobile contract behavior", () => {
         ...createIssueRequest,
         preferredProvider: null,
         preferredModel: "gpt-5.6-sol",
+      },
+    ))).toBe(true);
+
+    const pushRegistration = fixture.operations.putMobilePushRegistration
+      .request as Record<string, unknown>;
+    expect(() => decodeMobileSchema(
+      mobilePushRegistrationRequestSchema,
+      pushRegistration,
+    )).not.toThrow();
+    expect(Option.isNone(decodeMobileSchemaOption(
+      mobilePushRegistrationRequestSchema,
+      { ...pushRegistration, topic: "app.unrelated.product" },
+    ))).toBe(true);
+    expect(Option.isNone(decodeMobileSchemaOption(
+      mobilePushRegistrationRequestSchema,
+      {
+        ...pushRegistration,
+        environment: "development",
+        topic: "app.briar.companion",
       },
     ))).toBe(true);
 

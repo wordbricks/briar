@@ -13,6 +13,7 @@ struct CompanionRootView: View {
     @StateObject private var agents: AgentsStore
     @StateObject private var inbox: InboxStore
     @StateObject private var notifications: LocalNotificationService
+    @StateObject private var remotePush: RemotePushRegistrationService
     @StateObject private var issueConversationView = IssueConversationViewTracker()
     @StateObject private var navigation = CompanionNavigationModel()
     @State private var signingIn = false
@@ -53,6 +54,7 @@ struct CompanionRootView: View {
             wrappedValue: InboxStore(api: api, pollInterval: .seconds(60))
         )
         _notifications = StateObject(wrappedValue: LocalNotificationService())
+        _remotePush = StateObject(wrappedValue: RemotePushRegistrationService(api: api))
         authorization = DeviceAuthorizationService(api: api)
         self.presenter = presenter
     }
@@ -61,32 +63,46 @@ struct CompanionRootView: View {
         CompanionLocale(rawValue: localeRaw) ?? .ko
     }
 
-    var body: some View {
-        Group {
-            if session.token == nil {
-                CompanionLoginView(signingIn: signingIn, errorMessage: authError) {
-                    Task { await signIn() }
+    private var linkErrorIsPresented: Binding<Bool> {
+        Binding(
+            get: { navigation.linkErrorMessage != nil },
+            set: { presented in
+                if !presented {
+                    navigation.linkErrorMessage = nil
                 }
-            } else if companion.loading && companion.user == nil {
-                ProgressView(L10n.text("계정을 불러오는 중…", locale: locale))
-            } else if companion.user != nil, !projectSelectionComplete {
-                ProjectSelectionView(
-                    projects: companion.projects,
-                    selectedProjectID: $companion.selectedProjectID,
-                    continueAction: {
-                        projectSelectionComplete = true
-                        applyPendingProjectIfNeeded()
-                    },
-                    signOut: signOut
-                )
-            } else if let token = session.token,
-                      let projectID = companion.selectedProjectID,
-                      let project = companion.projects.first(where: { $0.id == projectID }) {
-                authenticatedContent(token: token, project: project)
-            } else {
-                recoveryView
             }
+        )
+    }
+
+    @ViewBuilder
+    private var sessionContent: some View {
+        if session.token == nil {
+            CompanionLoginView(signingIn: signingIn, errorMessage: authError) {
+                Task { await signIn() }
+            }
+        } else if companion.loading && companion.user == nil {
+            ProgressView(L10n.text("계정을 불러오는 중…", locale: locale))
+        } else if companion.user != nil, !projectSelectionComplete {
+            ProjectSelectionView(
+                projects: companion.projects,
+                selectedProjectID: $companion.selectedProjectID,
+                continueAction: {
+                    projectSelectionComplete = true
+                    applyPendingProjectIfNeeded()
+                },
+                signOut: signOut
+            )
+        } else if let token = session.token,
+                  let projectID = companion.selectedProjectID,
+                  let project = companion.projects.first(where: { $0.id == projectID }) {
+            authenticatedContent(token: token, project: project)
+        } else {
+            recoveryView
         }
+    }
+
+    private var accountObservedContent: some View {
+        sessionContent
         .preferredColorScheme(CompanionAppearance(rawValue: appearance)?.colorScheme)
         .environment(\.openURL, OpenURLAction { url in
             if url.scheme == "briar-mention" { return .handled }
@@ -94,12 +110,7 @@ struct CompanionRootView: View {
         })
         .alert(
             L10n.text("링크를 열 수 없음", locale: locale),
-            isPresented: Binding(
-                get: { navigation.linkErrorMessage != nil },
-                set: { presented in
-                    if !presented { navigation.linkErrorMessage = nil }
-                }
-            )
+            isPresented: linkErrorIsPresented
         ) {
             Button(L10n.text("확인", locale: locale), role: .cancel) {
                 navigation.linkErrorMessage = nil
@@ -110,34 +121,7 @@ struct CompanionRootView: View {
             }
         }
         .task(id: session.token) {
-            guard let token = session.token else {
-                companion.clear()
-                dashboard.select(projectID: nil, token: nil)
-                realtime.select(organizationID: nil, token: nil)
-                channels.select(organizationID: nil, token: nil)
-                agents.select(projectID: nil, token: nil, locale: locale.rawValue)
-                inbox.configure(token: nil, userID: nil)
-                projectSelectionComplete = false
-                return
-            }
-            do {
-                try await companion.load(token: token)
-                inbox.configure(
-                    token: token,
-                    userID: companion.user?.id,
-                    organizationID: currentProject?.organizationId
-                )
-                applyPendingProjectIfNeeded()
-                // Auto-select a project after load: CompanionStore restores the
-                // last used project, or the first project of the first
-                // organization on first use. The selection screen only appears
-                // when the account has no projects at all.
-                projectSelectionComplete = companion.selectedProjectID != nil
-            } catch let MobileAPIError.httpStatus(status, _) where status == 401 {
-                try? session.signOut()
-            } catch {
-                // The recovery screen owns transport retries.
-            }
+            await synchronizeSession()
         }
         .onChange(of: companion.user?.id) { _, userID in
             inbox.configure(
@@ -145,6 +129,12 @@ struct CompanionRootView: View {
                 userID: userID,
                 organizationID: currentProject?.organizationId
             )
+        }
+        .onChange(of: notifications.preferences, initial: true) { _, _ in
+            configureRemotePush()
+        }
+        .onChange(of: localeRaw) { _, _ in
+            configureRemotePush()
         }
         .onChange(of: projectSelectionComplete, initial: true) { _, complete in
             updateProjectScopedStores(active: complete)
@@ -157,98 +147,27 @@ struct CompanionRootView: View {
             guard projectSelectionComplete else { return }
             updateProjectScopedStores(active: true)
         }
+    }
+
+    var body: some View {
+        accountObservedContent
         .onChange(of: dashboard.snapshot) { _, snapshot in
-            guard let project = currentProject else { return }
-            inbox.update(snapshot: snapshot, sessions: agents.sessions, project: project)
+            updateInbox(snapshot: snapshot)
         }
         .onChange(of: agents.sessions) { _, sessions in
-            guard let project = currentProject else { return }
-            inbox.update(snapshot: dashboard.snapshot, sessions: sessions, project: project)
+            updateInbox(sessions: sessions)
         }
         .onChange(of: inbox.messages) { _, messages in
-            // Empty lists are produced while account/organization scope is
-            // being reset. Let the first populated snapshot establish that
-            // scope's notification baseline instead of treating it as new.
-            guard !messages.isEmpty else { return }
-            let baselineID = inbox.notificationBaselineID
-            Task {
-                let viewingChannelID = scenePhase == .active
-                    ? channels.viewingChannelID
-                    : nil
-                let viewingChannelThreadID = scenePhase == .active
-                    ? channels.viewingThreadParentID
-                    : nil
-                let viewingIssueConversationID = scenePhase == .active
-                    ? issueConversationView.runID
-                    : nil
-                if viewingChannelID != nil {
-                    await channels.refreshChanges()
-                }
-                if viewingIssueConversationID != nil {
-                    await issueConversationView.refreshChanges()
-                }
-                await notifications.process(
-                    messages: messages,
-                    baselineID: baselineID,
-                    viewingChannelID: viewingChannelID,
-                    viewingChannelThreadID: viewingChannelThreadID,
-                    viewingIssueConversationID: viewingIssueConversationID
-                )
-            }
+            processInboxMessages(messages)
         }
         .onChange(of: inbox.feedReady) { _, ready in
-            guard ready else { return }
-            let baselineID = inbox.notificationBaselineID
-            let messages = inbox.messages
-            Task {
-                let viewingChannelID = scenePhase == .active
-                    ? channels.viewingChannelID
-                    : nil
-                let viewingChannelThreadID = scenePhase == .active
-                    ? channels.viewingThreadParentID
-                    : nil
-                let viewingIssueConversationID = scenePhase == .active
-                    ? issueConversationView.runID
-                    : nil
-                if viewingChannelID != nil {
-                    await channels.refreshChanges()
-                }
-                if viewingIssueConversationID != nil {
-                    await issueConversationView.refreshChanges()
-                }
-                await notifications.process(
-                    messages: messages,
-                    baselineID: baselineID,
-                    viewingChannelID: viewingChannelID,
-                    viewingChannelThreadID: viewingChannelThreadID,
-                    viewingIssueConversationID: viewingIssueConversationID
-                )
-            }
+            processInboxWhenReady(ready)
         }
         .onChange(of: realtime.notificationSequence) { _, _ in
-            guard let notification = realtime.latestNotification else { return }
-            inbox.receiveRealtimeNotification(notification)
-            Task {
-                await channels.receiveRealtimeNotification(notification)
-                await issueConversationView.receiveRealtimeNotification(notification)
-            }
+            receiveLatestRealtimeNotification()
         }
         .onChange(of: scenePhase) { _, phase in
-            switch phase {
-            case .active:
-                dashboard.applicationDidBecomeActive()
-                realtime.applicationDidBecomeActive()
-                channels.applicationDidBecomeActive()
-                agents.applicationDidBecomeActive()
-                inbox.applicationDidBecomeActive()
-            case .background:
-                dashboard.applicationDidEnterBackground()
-                realtime.applicationDidEnterBackground()
-                channels.applicationDidEnterBackground()
-                agents.applicationDidEnterBackground()
-                inbox.applicationDidEnterBackground()
-            default: break
-            }
+            scenePhaseChanged(phase)
         }
         .onReceive(
             NotificationCenter.default.publisher(
@@ -260,6 +179,19 @@ struct CompanionRootView: View {
             SelectableTextRendering.clearCaches()
             AuthenticatedImageMemoryCache.removeAll()
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .briarRemotePushTokenChanged)
+        ) { _ in
+            remotePush.deviceTokenChanged()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .briarRemoteNotificationOpened)
+        ) { notification in
+            guard let target = notification.object as? RemotePushNotificationTarget else {
+                return
+            }
+            handleRemoteNotificationTarget(target)
+        }
         .onChange(of: navigation.pendingProjectID) { _, projectID in
             guard projectID != nil else { return }
             Task {
@@ -268,6 +200,119 @@ struct CompanionRootView: View {
         }
         .onOpenURL { url in
             _ = handleIncomingURL(url)
+        }
+    }
+
+    private func synchronizeSession() async {
+        guard let token = session.token else {
+            companion.clear()
+            dashboard.select(projectID: nil, token: nil)
+            realtime.select(organizationID: nil, token: nil)
+            channels.select(organizationID: nil, token: nil)
+            agents.select(projectID: nil, token: nil, locale: locale.rawValue)
+            inbox.configure(token: nil, userID: nil)
+            projectSelectionComplete = false
+            return
+        }
+        do {
+            try await companion.load(token: token)
+            inbox.configure(
+                token: token,
+                userID: companion.user?.id,
+                organizationID: currentProject?.organizationId
+            )
+            applyPendingProjectIfNeeded()
+            // Auto-select a project after load: CompanionStore restores the
+            // last used project, or the first project of the first
+            // organization on first use. The selection screen only appears
+            // when the account has no projects at all.
+            projectSelectionComplete = companion.selectedProjectID != nil
+            configureRemotePush()
+            applyPendingRemoteNotificationIfNeeded()
+        } catch let MobileAPIError.httpStatus(status, _) where status == 401 {
+            try? session.signOut()
+        } catch {
+            // The recovery screen owns transport retries.
+        }
+    }
+
+    private func updateInbox(snapshot: DashboardSnapshot?) {
+        guard let project = currentProject else { return }
+        inbox.update(snapshot: snapshot, sessions: agents.sessions, project: project)
+    }
+
+    private func updateInbox(sessions: [ProjectAgentSession]) {
+        guard let project = currentProject else { return }
+        inbox.update(snapshot: dashboard.snapshot, sessions: sessions, project: project)
+    }
+
+    private func processInboxMessages(_ messages: [InboxMessage]) {
+        // Empty lists are produced while account/organization scope is being
+        // reset. Let the first populated snapshot establish that scope's
+        // notification baseline instead of treating it as new.
+        guard !messages.isEmpty else { return }
+        scheduleLocalNotifications(for: messages)
+    }
+
+    private func processInboxWhenReady(_ ready: Bool) {
+        guard ready else { return }
+        scheduleLocalNotifications(for: inbox.messages)
+    }
+
+    private func scheduleLocalNotifications(for messages: [InboxMessage]) {
+        let baselineID = inbox.notificationBaselineID
+        Task {
+            let viewingChannelID = scenePhase == .active
+                ? channels.viewingChannelID
+                : nil
+            let viewingChannelThreadID = scenePhase == .active
+                ? channels.viewingThreadParentID
+                : nil
+            let viewingIssueConversationID = scenePhase == .active
+                ? issueConversationView.runID
+                : nil
+            if viewingChannelID != nil {
+                await channels.refreshChanges()
+            }
+            if viewingIssueConversationID != nil {
+                await issueConversationView.refreshChanges()
+            }
+            await notifications.process(
+                messages: messages,
+                baselineID: baselineID,
+                viewingChannelID: viewingChannelID,
+                viewingChannelThreadID: viewingChannelThreadID,
+                viewingIssueConversationID: viewingIssueConversationID
+            )
+        }
+    }
+
+    private func receiveLatestRealtimeNotification() {
+        guard let notification = realtime.latestNotification else { return }
+        inbox.receiveRealtimeNotification(notification)
+        Task {
+            await channels.receiveRealtimeNotification(notification)
+            await issueConversationView.receiveRealtimeNotification(notification)
+        }
+    }
+
+    private func scenePhaseChanged(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            configureRemotePush()
+            dashboard.applicationDidBecomeActive()
+            realtime.applicationDidBecomeActive()
+            channels.applicationDidBecomeActive()
+            agents.applicationDidBecomeActive()
+            inbox.applicationDidBecomeActive()
+        case .background:
+            dashboard.applicationDidEnterBackground()
+            realtime.applicationDidEnterBackground()
+            channels.applicationDidEnterBackground()
+            agents.applicationDidEnterBackground()
+            inbox.applicationDidEnterBackground()
+        default:
+            break
         }
     }
 
@@ -430,6 +475,8 @@ struct CompanionRootView: View {
     }
 
     private func signOut() {
+        let currentToken = session.token
+        Task { await remotePush.unregister(sessionToken: currentToken) }
         dashboard.select(projectID: nil, token: nil)
         channels.select(organizationID: nil, token: nil)
         agents.select(projectID: nil, token: nil, locale: locale.rawValue)
@@ -438,6 +485,27 @@ struct CompanionRootView: View {
         projectSelectionComplete = false
         Task { await AppBadgeService.sync(count: 0) }
         try? session.signOut()
+    }
+
+    private func configureRemotePush() {
+        remotePush.configure(
+            sessionToken: session.token,
+            preferences: notifications.preferences,
+            locale: locale
+        )
+    }
+
+    private func applyPendingRemoteNotificationIfNeeded() {
+        guard let target = RemotePushNotificationBridge.drainPendingTarget() else {
+            return
+        }
+        handleRemoteNotificationTarget(target)
+    }
+
+    private func handleRemoteNotificationTarget(_ target: RemotePushNotificationTarget) {
+        guard session.token != nil else { return }
+        navigation.openRemoteNotification(target)
+        applyPendingProjectIfNeeded()
     }
 }
 

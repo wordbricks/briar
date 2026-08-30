@@ -95,6 +95,62 @@
         }
       }
     },
+    "/inbox/push-registration": {
+      "put": {
+        "operationId": "putMobilePushRegistration",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobilePushRegistrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Push registration and preferences saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobilePushRegistrationResponse"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteMobilePushRegistration",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobilePushRegistrationDeleteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Push registration removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobilePushRegistrationDeleteResponse"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
     "/me": {
       "get": {
         "operationId": "getCurrentUser",
@@ -2295,6 +2351,77 @@
             "type": "string"
           }
         },
+        "additionalProperties": true
+      },
+      "MobilePushPreferences": {
+        "type": "object",
+        "required": [
+          "playSound",
+          "urgent",
+          "actionRequired",
+          "important",
+          "activity"
+        ],
+        "properties": {
+          "playSound": { "type": "boolean" },
+          "urgent": { "type": "boolean" },
+          "actionRequired": { "type": "boolean" },
+          "important": { "type": "boolean" },
+          "activity": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "MobilePushRegistrationRequest": {
+        "type": "object",
+        "required": [
+          "platform",
+          "token",
+          "environment",
+          "topic",
+          "locale",
+          "preferences"
+        ],
+        "properties": {
+          "platform": { "type": "string", "enum": ["apns", "fcm"] },
+          "token": { "type": "string", "minLength": 32, "maxLength": 4096 },
+          "environment": {
+            "type": "string",
+            "enum": ["development", "production"]
+          },
+          "topic": {
+            "type": "string",
+            "enum": [
+              "app.briar.companion",
+              "app.briar.companion.native.dev"
+            ],
+            "description": "Must match the selected platform and environment: the native.dev topic is APNs development only; all Production and FCM registrations use app.briar.companion."
+          },
+          "locale": { "type": "string", "enum": ["ko", "en", "zh"] },
+          "preferences": {
+            "$ref": "#/components/schemas/MobilePushPreferences"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MobilePushRegistrationDeleteRequest": {
+        "type": "object",
+        "required": ["platform", "token"],
+        "properties": {
+          "platform": { "type": "string", "enum": ["apns", "fcm"] },
+          "token": { "type": "string", "minLength": 32, "maxLength": 4096 }
+        },
+        "additionalProperties": false
+      },
+      "MobilePushRegistrationResponse": {
+        "type": "object",
+        "required": ["registered"],
+        "properties": { "registered": { "type": "boolean" } },
+        "additionalProperties": true
+      },
+      "MobilePushRegistrationDeleteResponse": {
+        "type": "object",
+        "required": ["deleted"],
+        "properties": { "deleted": { "type": "boolean" } },
         "additionalProperties": true
       },
       "User": {

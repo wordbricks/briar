@@ -9,6 +9,7 @@ import {
   issueActivityCredential,
   issueActivityFrame,
   scheduleChannelActivityClear,
+  scheduleInboxRealtimeFlush,
   scheduleIssueActivityClear,
 } from "./realtime-scheduling";
 import {
@@ -158,5 +159,15 @@ describe("activity scheduling adapters", () => {
       issueActivityCredential(env, organizationId, issueJob(null), worker),
     )
       .rejects.toThrow("Reply claim has no active lease");
+  });
+
+  it("does not schedule an Inbox flush without realtime or push providers", () => {
+    const waitUntil = vi.fn();
+    scheduleInboxRealtimeFlush(
+      {} as Env,
+      {} as D1Database,
+      { waitUntil } as unknown as ExecutionContext,
+    );
+    expect(waitUntil).not.toHaveBeenCalled();
   });
 });
