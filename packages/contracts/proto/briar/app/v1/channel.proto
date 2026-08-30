@@ -15,6 +15,16 @@ service ChannelService {
   rpc SyncChannels(SyncChannelsRequest) returns (SyncChannelsResponse);
   rpc ListDirectMessageRecipients(ListDirectMessageRecipientsRequest) returns (ListDirectMessageRecipientsResponse);
   rpc CreateDirectMessage(CreateDirectMessageRequest) returns (CreateDirectMessageResponse);
+  rpc CreateChannel(CreateChannelRequest) returns (CreateChannelResponse);
+  rpc UpdateChannel(UpdateChannelRequest) returns (UpdateChannelResponse);
+  rpc DeleteChannel(DeleteChannelRequest) returns (DeleteChannelResponse);
+  rpc SetChannelAgent(SetChannelAgentRequest) returns (SetChannelAgentResponse);
+  rpc SetChannelMember(SetChannelMemberRequest) returns (SetChannelMemberResponse);
+  rpc ListChannelWebhooks(ListChannelWebhooksRequest) returns (ListChannelWebhooksResponse);
+  rpc CreateChannelWebhook(CreateChannelWebhookRequest) returns (CreateChannelWebhookResponse);
+  rpc UpdateChannelWebhook(UpdateChannelWebhookRequest) returns (UpdateChannelWebhookResponse);
+  rpc RotateChannelWebhook(RotateChannelWebhookRequest) returns (RotateChannelWebhookResponse);
+  rpc RevokeChannelWebhook(RevokeChannelWebhookRequest) returns (RevokeChannelWebhookResponse);
   rpc GetChannel(GetChannelRequest) returns (GetChannelResponse);
   rpc MarkChannelRead(MarkChannelReadRequest) returns (MarkChannelReadResponse);
   rpc ListChannelMessages(ListChannelMessagesRequest) returns (ListChannelMessagesResponse);
@@ -72,6 +82,137 @@ message CreateDirectMessageRequest {
 
 message CreateDirectMessageResponse {
   ChannelSummary channel = 1;
+}
+
+message CreateChannelRequest {
+  string organization_id = 1;
+  string name = 2;
+  optional string slug = 3;
+  optional string topic = 4;
+  optional ChannelVisibility visibility = 5;
+  optional string default_project_id = 6;
+}
+
+message UpdateChannelRequest {
+  message ClearTopic {}
+  message ClearDefaultProject {}
+
+  string organization_id = 1;
+  string channel_id = 2;
+  optional string name = 3;
+  oneof topic_update {
+    string topic = 4;
+    ClearTopic clear_topic = 5;
+  }
+  optional ChannelVisibility visibility = 6;
+  oneof default_project_update {
+    string default_project_id = 7;
+    ClearDefaultProject clear_default_project = 8;
+  }
+  optional bool archived = 9;
+}
+
+message CreateChannelResponse {
+  ChannelSummary channel = 1;
+}
+
+message UpdateChannelResponse {
+  ChannelSummary channel = 1;
+}
+
+message DeleteChannelRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+}
+
+message DeleteChannelResponse {
+  bool deleted = 1;
+}
+
+message SetChannelAgentRequest {
+  message Add {}
+  message Remove {}
+
+  string organization_id = 1;
+  string channel_id = 2;
+  string agent_id = 3;
+  oneof membership {
+    Add add = 4;
+    Remove remove = 5;
+  }
+}
+
+message SetChannelAgentResponse {
+  repeated OrganizationAgent agents = 1;
+}
+
+message SetChannelMemberRequest {
+  message Add {}
+  message Remove {}
+
+  string organization_id = 1;
+  string channel_id = 2;
+  string user_id = 3;
+  oneof membership {
+    Add add = 4;
+    Remove remove = 5;
+  }
+}
+
+message SetChannelMemberResponse {
+  repeated ChannelMember members = 1;
+}
+
+message ListChannelWebhooksRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+}
+
+message ListChannelWebhooksResponse {
+  repeated ChannelWebhook webhooks = 1;
+}
+
+message CreateChannelWebhookRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string name = 3;
+}
+
+message UpdateChannelWebhookRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string webhook_id = 3;
+  string name = 4;
+}
+
+message RotateChannelWebhookRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string webhook_id = 3;
+}
+
+message RevokeChannelWebhookRequest {
+  string organization_id = 1;
+  string channel_id = 2;
+  string webhook_id = 3;
+}
+
+message CreateChannelWebhookResponse {
+  ChannelWebhook webhook = 1;
+  string url = 2;
+}
+
+message UpdateChannelWebhookResponse {
+  ChannelWebhook webhook = 1;
+}
+
+message RotateChannelWebhookResponse {
+  ChannelWebhook webhook = 1;
+  string url = 2;
+}
+
+message RevokeChannelWebhookResponse {
+  ChannelWebhook webhook = 1;
 }
 
 message GetChannelRequest {
@@ -257,6 +398,12 @@ enum ChannelKind {
   CHANNEL_KIND_DIRECT_MESSAGE = 2;
 }
 
+enum ChannelMemberRole {
+  CHANNEL_MEMBER_ROLE_UNSPECIFIED = 0;
+  CHANNEL_MEMBER_ROLE_OWNER = 1;
+  CHANNEL_MEMBER_ROLE_MEMBER = 2;
+}
+
 message DirectMessageParticipant {
   enum Kind {
     KIND_UNSPECIFIED = 0;
@@ -297,8 +444,18 @@ message ChannelMember {
   string name = 2;
   string email = 3;
   optional string image = 4;
-  string role = 5;
+  ChannelMemberRole role = 5;
   google.protobuf.Timestamp created_at = 6;
+}
+
+message ChannelWebhook {
+  string id = 1;
+  string channel_id = 2;
+  string name = 3;
+  bool active = 4;
+  optional google.protobuf.Timestamp last_used_at = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
 }
 
 message ChannelMessageAuthor {

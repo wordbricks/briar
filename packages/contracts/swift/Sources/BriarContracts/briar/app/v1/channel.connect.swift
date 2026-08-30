@@ -24,6 +24,36 @@ public protocol BriarAPI_ChannelServiceClientInterface: Sendable {
     func `createDirectMessage`(request: BriarAPI_CreateDirectMessageRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateDirectMessageResponse>
 
     @available(iOS 13, *)
+    func `createChannel`(request: BriarAPI_CreateChannelRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateChannelResponse>
+
+    @available(iOS 13, *)
+    func `updateChannel`(request: BriarAPI_UpdateChannelRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateChannelResponse>
+
+    @available(iOS 13, *)
+    func `deleteChannel`(request: BriarAPI_DeleteChannelRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DeleteChannelResponse>
+
+    @available(iOS 13, *)
+    func `setChannelAgent`(request: BriarAPI_SetChannelAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_SetChannelAgentResponse>
+
+    @available(iOS 13, *)
+    func `setChannelMember`(request: BriarAPI_SetChannelMemberRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_SetChannelMemberResponse>
+
+    @available(iOS 13, *)
+    func `listChannelWebhooks`(request: BriarAPI_ListChannelWebhooksRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListChannelWebhooksResponse>
+
+    @available(iOS 13, *)
+    func `createChannelWebhook`(request: BriarAPI_CreateChannelWebhookRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateChannelWebhookResponse>
+
+    @available(iOS 13, *)
+    func `updateChannelWebhook`(request: BriarAPI_UpdateChannelWebhookRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateChannelWebhookResponse>
+
+    @available(iOS 13, *)
+    func `rotateChannelWebhook`(request: BriarAPI_RotateChannelWebhookRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_RotateChannelWebhookResponse>
+
+    @available(iOS 13, *)
+    func `revokeChannelWebhook`(request: BriarAPI_RevokeChannelWebhookRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_RevokeChannelWebhookResponse>
+
+    @available(iOS 13, *)
     func `getChannel`(request: BriarAPI_GetChannelRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_GetChannelResponse>
 
     @available(iOS 13, *)
@@ -83,6 +113,56 @@ public final class BriarAPI_ChannelServiceClient: BriarAPI_ChannelServiceClientI
     @available(iOS 13, *)
     public func `createDirectMessage`(request: BriarAPI_CreateDirectMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateDirectMessageResponse> {
         return await self.client.unary(path: "/briar.app.v1.ChannelService/CreateDirectMessage", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `createChannel`(request: BriarAPI_CreateChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateChannelResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/CreateChannel", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updateChannel`(request: BriarAPI_UpdateChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateChannelResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/UpdateChannel", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `deleteChannel`(request: BriarAPI_DeleteChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteChannelResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/DeleteChannel", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `setChannelAgent`(request: BriarAPI_SetChannelAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SetChannelAgentResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/SetChannelAgent", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `setChannelMember`(request: BriarAPI_SetChannelMemberRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SetChannelMemberResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/SetChannelMember", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `listChannelWebhooks`(request: BriarAPI_ListChannelWebhooksRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListChannelWebhooksResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/ListChannelWebhooks", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `createChannelWebhook`(request: BriarAPI_CreateChannelWebhookRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateChannelWebhookResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/CreateChannelWebhook", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `updateChannelWebhook`(request: BriarAPI_UpdateChannelWebhookRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateChannelWebhookResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/UpdateChannelWebhook", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `rotateChannelWebhook`(request: BriarAPI_RotateChannelWebhookRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RotateChannelWebhookResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/RotateChannelWebhook", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `revokeChannelWebhook`(request: BriarAPI_RevokeChannelWebhookRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RevokeChannelWebhookResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/RevokeChannelWebhook", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -146,6 +226,16 @@ public final class BriarAPI_ChannelServiceClient: BriarAPI_ChannelServiceClientI
             public static let syncChannels = Connect.MethodSpec(name: "SyncChannels", service: "briar.app.v1.ChannelService", type: .unary)
             public static let listDirectMessageRecipients = Connect.MethodSpec(name: "ListDirectMessageRecipients", service: "briar.app.v1.ChannelService", type: .unary)
             public static let createDirectMessage = Connect.MethodSpec(name: "CreateDirectMessage", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let createChannel = Connect.MethodSpec(name: "CreateChannel", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let updateChannel = Connect.MethodSpec(name: "UpdateChannel", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let deleteChannel = Connect.MethodSpec(name: "DeleteChannel", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let setChannelAgent = Connect.MethodSpec(name: "SetChannelAgent", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let setChannelMember = Connect.MethodSpec(name: "SetChannelMember", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let listChannelWebhooks = Connect.MethodSpec(name: "ListChannelWebhooks", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let createChannelWebhook = Connect.MethodSpec(name: "CreateChannelWebhook", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let updateChannelWebhook = Connect.MethodSpec(name: "UpdateChannelWebhook", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let rotateChannelWebhook = Connect.MethodSpec(name: "RotateChannelWebhook", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let revokeChannelWebhook = Connect.MethodSpec(name: "RevokeChannelWebhook", service: "briar.app.v1.ChannelService", type: .unary)
             public static let getChannel = Connect.MethodSpec(name: "GetChannel", service: "briar.app.v1.ChannelService", type: .unary)
             public static let markChannelRead = Connect.MethodSpec(name: "MarkChannelRead", service: "briar.app.v1.ChannelService", type: .unary)
             public static let listChannelMessages = Connect.MethodSpec(name: "ListChannelMessages", service: "briar.app.v1.ChannelService", type: .unary)

@@ -30,6 +30,26 @@ open class BriarAPI_ChannelServiceClientMock: BriarAPI_ChannelServiceClientInter
     public var mockAsyncListDirectMessageRecipients = { (_: BriarAPI_ListDirectMessageRecipientsRequest) -> ResponseMessage<BriarAPI_ListDirectMessageRecipientsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createDirectMessage()`.
     public var mockAsyncCreateDirectMessage = { (_: BriarAPI_CreateDirectMessageRequest) -> ResponseMessage<BriarAPI_CreateDirectMessageResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `createChannel()`.
+    public var mockAsyncCreateChannel = { (_: BriarAPI_CreateChannelRequest) -> ResponseMessage<BriarAPI_CreateChannelResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateChannel()`.
+    public var mockAsyncUpdateChannel = { (_: BriarAPI_UpdateChannelRequest) -> ResponseMessage<BriarAPI_UpdateChannelResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `deleteChannel()`.
+    public var mockAsyncDeleteChannel = { (_: BriarAPI_DeleteChannelRequest) -> ResponseMessage<BriarAPI_DeleteChannelResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `setChannelAgent()`.
+    public var mockAsyncSetChannelAgent = { (_: BriarAPI_SetChannelAgentRequest) -> ResponseMessage<BriarAPI_SetChannelAgentResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `setChannelMember()`.
+    public var mockAsyncSetChannelMember = { (_: BriarAPI_SetChannelMemberRequest) -> ResponseMessage<BriarAPI_SetChannelMemberResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `listChannelWebhooks()`.
+    public var mockAsyncListChannelWebhooks = { (_: BriarAPI_ListChannelWebhooksRequest) -> ResponseMessage<BriarAPI_ListChannelWebhooksResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `createChannelWebhook()`.
+    public var mockAsyncCreateChannelWebhook = { (_: BriarAPI_CreateChannelWebhookRequest) -> ResponseMessage<BriarAPI_CreateChannelWebhookResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateChannelWebhook()`.
+    public var mockAsyncUpdateChannelWebhook = { (_: BriarAPI_UpdateChannelWebhookRequest) -> ResponseMessage<BriarAPI_UpdateChannelWebhookResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `rotateChannelWebhook()`.
+    public var mockAsyncRotateChannelWebhook = { (_: BriarAPI_RotateChannelWebhookRequest) -> ResponseMessage<BriarAPI_RotateChannelWebhookResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `revokeChannelWebhook()`.
+    public var mockAsyncRevokeChannelWebhook = { (_: BriarAPI_RevokeChannelWebhookRequest) -> ResponseMessage<BriarAPI_RevokeChannelWebhookResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `getChannel()`.
     public var mockAsyncGetChannel = { (_: BriarAPI_GetChannelRequest) -> ResponseMessage<BriarAPI_GetChannelResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `markChannelRead()`.
@@ -69,6 +89,46 @@ open class BriarAPI_ChannelServiceClientMock: BriarAPI_ChannelServiceClientInter
 
     open func `createDirectMessage`(request: BriarAPI_CreateDirectMessageRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateDirectMessageResponse> {
         return self.mockAsyncCreateDirectMessage(request)
+    }
+
+    open func `createChannel`(request: BriarAPI_CreateChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateChannelResponse> {
+        return self.mockAsyncCreateChannel(request)
+    }
+
+    open func `updateChannel`(request: BriarAPI_UpdateChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateChannelResponse> {
+        return self.mockAsyncUpdateChannel(request)
+    }
+
+    open func `deleteChannel`(request: BriarAPI_DeleteChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteChannelResponse> {
+        return self.mockAsyncDeleteChannel(request)
+    }
+
+    open func `setChannelAgent`(request: BriarAPI_SetChannelAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SetChannelAgentResponse> {
+        return self.mockAsyncSetChannelAgent(request)
+    }
+
+    open func `setChannelMember`(request: BriarAPI_SetChannelMemberRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SetChannelMemberResponse> {
+        return self.mockAsyncSetChannelMember(request)
+    }
+
+    open func `listChannelWebhooks`(request: BriarAPI_ListChannelWebhooksRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListChannelWebhooksResponse> {
+        return self.mockAsyncListChannelWebhooks(request)
+    }
+
+    open func `createChannelWebhook`(request: BriarAPI_CreateChannelWebhookRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateChannelWebhookResponse> {
+        return self.mockAsyncCreateChannelWebhook(request)
+    }
+
+    open func `updateChannelWebhook`(request: BriarAPI_UpdateChannelWebhookRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateChannelWebhookResponse> {
+        return self.mockAsyncUpdateChannelWebhook(request)
+    }
+
+    open func `rotateChannelWebhook`(request: BriarAPI_RotateChannelWebhookRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RotateChannelWebhookResponse> {
+        return self.mockAsyncRotateChannelWebhook(request)
+    }
+
+    open func `revokeChannelWebhook`(request: BriarAPI_RevokeChannelWebhookRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RevokeChannelWebhookResponse> {
+        return self.mockAsyncRevokeChannelWebhook(request)
     }
 
     open func `getChannel`(request: BriarAPI_GetChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetChannelResponse> {
