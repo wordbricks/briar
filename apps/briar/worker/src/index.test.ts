@@ -12,7 +12,6 @@ import {
   readChannelReplyCompleteRequest,
   readIssueReplyCompleteRequest,
   readRunEvidenceRequest,
-  readTranscriptRequest,
 } from "./request-readers";
 import {
   handleScheduledTask,
@@ -51,7 +50,6 @@ import {
   decodeWorkerRegister,
   decodeWorkerSettings,
 } from "./worker-request-contract";
-import { decodeTranscriptRequest } from "./transcript-request";
 import { slackCreateIssueShortcutCallbackId } from "./slack";
 
 const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
@@ -533,76 +531,6 @@ describe("Worker HTTP contract", () => {
     ).toThrow();
   });
 
-  it("accepts Worker execution metrics only with a run attempt", () => {
-    const metrics = {
-      inputTokens: 1_000,
-      outputTokens: 250,
-      cacheReadTokens: 800,
-      cacheWriteTokens: null,
-      reasoningOutputTokens: 100,
-      totalTokens: 1_250,
-      durationMs: 90_000,
-    };
-    expect(
-      decodeTranscriptRequest({
-        sessionId: "detached-run",
-        runId: "11111111-1111-4111-8111-111111111111",
-        runAttempt: 2,
-        projectId: "22222222-2222-4222-8222-222222222222",
-        workerId: "worker-1",
-        agentProvider: "codex",
-        executionMetrics: metrics,
-        events: [{ sequence: 1, direction: "server", payload: {} }],
-      }).executionMetrics,
-    ).toEqual(metrics);
-    expect(() =>
-      decodeTranscriptRequest({
-        sessionId: "detached-run",
-        runId: "11111111-1111-4111-8111-111111111111",
-        agentProvider: "codex",
-        executionMetrics: metrics,
-        events: [{ sequence: 1, direction: "server", payload: {} }],
-      }),
-    ).toThrow(/runId and runAttempt/iu);
-  });
-
-  it("accepts provider costs only for an exact execution attempt", () => {
-    const costRecord = {
-      costKey: "codex:turn:turn-1:cost",
-      usageKey: null,
-      sessionId: "session-1",
-      scopeId: "turn-1",
-      turnId: "turn-1",
-      agentProvider: "codex" as const,
-      modelProvider: "openai",
-      model: "gpt-5.6-sol",
-      canonicalModel: null,
-      modelSource: "providerReported" as const,
-      source: "codex.turn.completed.cost",
-      amountUsdTicks: 12_345_678,
-      observedAt: "2026-08-10T00:00:00.000Z",
-    };
-    const input = {
-      sessionId: "detached-run",
-      runId: "11111111-1111-4111-8111-111111111111",
-      runAttempt: 2,
-      executionId: "33333333-3333-4333-8333-333333333333",
-      projectId: "22222222-2222-4222-8222-222222222222",
-      workerId: "worker-1",
-      agentProvider: "codex" as const,
-      costRecords: [costRecord],
-      events: [{ sequence: 1, direction: "server" as const, payload: {} }],
-    };
-
-    expect(decodeTranscriptRequest(input).costRecords).toEqual([costRecord]);
-    expect(() =>
-      decodeTranscriptRequest({ ...input, executionId: undefined }),
-    ).toThrow(/executionId is required with costRecords/iu);
-    expect(() =>
-      decodeTranscriptRequest({ ...input, runAttempt: undefined }),
-    ).toThrow(/runAttempt is required with costRecords/iu);
-  });
-
   it("requires an email confirmation for account deletion", () => {
     expect(
       decodeAccountDeletionInput({
@@ -984,78 +912,6 @@ describe("Worker HTTP contract", () => {
     expect(parsed.images).toHaveLength(1);
     expect(parsed.images[0]?.name).toBe("dashboard.png");
     expect(parsed.images[0]?.type).toBe("image/png");
-  });
-
-  it("accepts transcript batches above the generic JSON body limit", async () => {
-    const payload = {
-      sessionId: "large-transcript-session",
-      agentProvider: "codex" as const,
-      events: Array.from({ length: 20 }, (_, index) => ({
-        sequence: index + 1,
-        direction: "server" as const,
-        payload: { text: "x".repeat(16 * 1024) },
-      })),
-    };
-    const body = JSON.stringify(payload);
-    expect(new TextEncoder().encode(body).byteLength).toBeGreaterThan(262_144);
-
-    await expect(readTranscriptRequest(new Request(
-      "https://briar-api.example/transcripts",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body,
-      },
-    ))).resolves.toEqual(payload);
-  });
-
-  it("keeps the transcript-specific JSON body limit bounded", async () => {
-    const body = JSON.stringify({
-      sessionId: "oversized-transcript-session",
-      agentProvider: "codex",
-      events: Array.from({ length: 70 }, (_, index) => ({
-        sequence: index + 1,
-        direction: "server",
-        payload: { text: "x".repeat(16 * 1024) },
-      })),
-    });
-
-    await expect(readTranscriptRequest(new Request(
-      "https://briar-api.example/transcripts",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body,
-      },
-    ))).rejects.toThrow("Request body too large");
-  });
-
-  it("maps Effect transcript schema failures to an HTTP 400 response", async () => {
-    const response = await worker.fetch(
-      new Request("https://briar-api.example/transcripts", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          sessionId: "invalid-transcript",
-          agentProvider: "codex",
-          events: [],
-        }),
-      }),
-      {
-        BETTER_AUTH_SECRET: "test-secret-at-least-thirty-two-characters",
-        GOOGLE_CLIENT_ID: "test-client",
-        GOOGLE_CLIENT_SECRET: "test-secret",
-      } as never,
-    );
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({
-      message: "Invalid request",
-      issues: [{
-        path: ["events"],
-        message: expect.any(String),
-      }],
-    });
   });
 
   it("parses channel reply images from multipart Worker complete requests", async () => {

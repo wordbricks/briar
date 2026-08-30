@@ -1,4 +1,3 @@
-import * as Effect from "effect/Effect";
 import {
   type AutoHuntRunStatus,
   type AutoHuntWorkflowStageId,
@@ -35,8 +34,6 @@ import {
 } from "./issue-request-contract";
 import { decodeRequestSync } from "./request-schema";
 import { decodeRunEvidenceInput } from "./run-request-contract";
-import { MAX_TRANSCRIPT_HTTP_BODY_BYTES } from "./transcript-limits";
-import { decodeTranscriptRequestEffect } from "./transcript-request";
 
 const decodeChannelReplyCompleteInput = decodeRequestSync(
   channelReplyCompleteInputSchema,
@@ -559,12 +556,4 @@ export async function readJson(
   } catch {
     throw new HttpError(400, "Invalid JSON");
   }
-}
-
-export async function readTranscriptRequest(request: Request) {
-  return Effect.runPromise(
-    decodeTranscriptRequestEffect(
-      await readJson(request, MAX_TRANSCRIPT_HTTP_BODY_BYTES),
-    ),
-  );
 }

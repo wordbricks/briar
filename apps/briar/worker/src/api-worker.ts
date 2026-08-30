@@ -29,18 +29,13 @@ import {
 import { handleMergeBatchRoute } from "./merge-batch-routes";
 import { handleRunAgentRoute } from "./run-agent-routes";
 import { handleRunEvidenceRoute } from "./run-evidence-routes";
-import { handleTranscriptRoute } from "./transcript-routes";
 import { handleExecutionWorkerRoute } from "./execution-worker-routes";
 import { handleGithubPublicRoute } from "./github-integration-routes";
 import {
   getProject,
 } from "./db";
-import {
-  TranscriptLimitError,
-  WorkerConflictError,
-} from "./workers";
+import { WorkerConflictError } from "./workers";
 import { WorkerLifecycleConflictError } from "./worker-lifecycle-repository";
-import { TranscriptRequestDecodeError } from "./transcript-request";
 import {
   RequestDecodeError,
 } from "./request-schema";
@@ -250,21 +245,6 @@ async function route(
   });
   if (executionWorkerResponse !== undefined) return executionWorkerResponse;
 
-  const transcriptResponse = await handleTranscriptRoute({
-    request,
-    url,
-    db,
-    env,
-    requireAgentProject: () => requireAgentProject(db, request),
-    requireWorkerProjectBinding: (projectId, workerId) =>
-      requireWorkerProjectBinding(db, request, projectId, workerId),
-    requireRunExecutionProject: (runId) =>
-      requireRunExecutionProject(db, request, runId),
-    requireProjectAccess: (projectId) =>
-      requireProjectAccess(auth, db, request, projectId),
-  });
-  if (transcriptResponse !== undefined) return transcriptResponse;
-
   const mergeBatchResponse = await handleMergeBatchRoute({
     request,
     url,
@@ -456,20 +436,11 @@ export default {
       if (error instanceof WorkerLifecycleConflictError) {
         return json({ message: error.message }, 409);
       }
-      if (error instanceof TranscriptLimitError) {
-        return json({ message: error.message }, 413);
-      }
       if (error instanceof OrganizationAgentContextCursorError) {
         return json({ message: error.message }, 400);
       }
       if (error instanceof OrganizationAgentContextPageTooLargeError) {
         return json({ message: error.message }, 413);
-      }
-      if (error instanceof TranscriptRequestDecodeError) {
-        return json({
-          message: "Invalid request",
-          issues: formatSchemaIssue(error.cause.issue).issues,
-        }, 400);
       }
       if (error instanceof RequestDecodeError) {
         return json({

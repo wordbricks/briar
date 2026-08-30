@@ -508,15 +508,20 @@ describe("conversational Agent Skill execution approval", () => {
     token = ownerToken,
     selectedWorkerId = workerId,
   ) => apiWorker.fetch(new Request(
-    `https://briar.example/projects/${projectId}/runs/${runId}` +
-      `/skill-execution-proposals/${proposalId}/accept`,
+    "https://briar.example/briar.app.v1.IssueService/AcceptIssueSkillExecutionProposal",
     {
       method: "POST",
       headers: {
         authorization: `Bearer ${token}`,
+        "connect-protocol-version": "1",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ workerId: selectedWorkerId }),
+      body: JSON.stringify({
+        projectId,
+        conversationRunId: runId,
+        proposalId,
+        workerId: selectedWorkerId,
+      }),
     },
   ), env());
 
@@ -578,9 +583,9 @@ describe("conversational Agent Skill execution approval", () => {
       ownerToken,
       nonMemberWorkerId,
     );
-    expect(unauthorizedWorker.status).toBe(409);
+    expect(unauthorizedWorker.status).toBe(400);
     expect(await unauthorizedWorker.json()).toMatchObject({
-      code: "ISSUE_SKILL_EXECUTION_PROPOSAL_CONFLICT",
+      code: "failed_precondition",
       message: "Worker owner is not a member of this organization",
     });
     expect({
@@ -608,9 +613,9 @@ describe("conversational Agent Skill execution approval", () => {
       ownerToken,
       staleDeviceWorkerId,
     );
-    expect(staleDeviceWorker.status).toBe(409);
+    expect(staleDeviceWorker.status).toBe(400);
     expect(await staleDeviceWorker.json()).toMatchObject({
-      code: "ISSUE_SKILL_EXECUTION_PROPOSAL_CONFLICT",
+      code: "failed_precondition",
       message: "Worker device is not online",
     });
     await expect(acceptAgentSkillExecutionProposal(db, {
@@ -649,7 +654,7 @@ describe("conversational Agent Skill execution approval", () => {
       session: Record<string, unknown>;
     };
     expect(acceptedBody).toMatchObject({
-      outcome: "accepted",
+      outcome: "APPROVAL_OUTCOME_ACCEPTED",
       proposal: { requestedWorkerId: workerId },
       session: {
         id: acceptedBody.proposal.resultSessionId,
@@ -658,8 +663,8 @@ describe("conversational Agent Skill execution approval", () => {
         agentName: seeded.agent.name,
         skillId: seeded.agent.skills[0].id,
         request: seeded.request,
-        sessionType: "task",
-        trigger: "manual",
+        sessionType: "PROJECT_AGENT_SESSION_TYPE_TASK",
+        trigger: "PROJECT_AGENT_SESSION_TRIGGER_MANUAL",
         requestedWorkerId: workerId,
         workerId,
         requestedByUserId: ownerId,
@@ -671,18 +676,20 @@ describe("conversational Agent Skill execution approval", () => {
 
     const retry = await acceptIssue(seeded.runId, seeded.proposal.id);
     expect(retry.status).toBe(200);
-    expect(await retry.json()).toMatchObject({ outcome: "already_accepted" });
+    expect(await retry.json()).toMatchObject({
+      outcome: "APPROVAL_OUTCOME_ALREADY_ACCEPTED",
+    });
     expect((await acceptIssue(
       seeded.runId,
       seeded.proposal.id,
       memberToken,
-    )).status).toBe(409);
+    )).status).toBe(400);
     expect((await acceptIssue(
       seeded.runId,
       seeded.proposal.id,
       ownerToken,
       otherWorkerId,
-    )).status).toBe(409);
+    )).status).toBe(400);
 
     const wrongWorkerClaim = await claimNextProjectAgentTask(db, projectId, {
       workerId: otherWorkerId,
@@ -825,10 +832,10 @@ describe("conversational Agent Skill execution approval", () => {
     const archivedRetry = await acceptIssue(seeded.runId, seeded.proposal.id);
     expect(archivedRetry.status).toBe(200);
     expect(await archivedRetry.json()).toMatchObject({
-      outcome: "already_accepted",
+      outcome: "APPROVAL_OUTCOME_ALREADY_ACCEPTED",
       session: {
         id: claimed!.id,
-        status: "completed",
+        status: "PROJECT_AGENT_SESSION_STATUS_COMPLETED",
         workerId,
         requestedByUserId: ownerId,
       },
@@ -1115,19 +1122,20 @@ describe("conversational Agent Skill execution approval", () => {
       approved_skill_execution_proposal_id: proposal!.id,
     });
     const continuedClaimResponse = await apiWorker.fetch(new Request(
-      "https://briar.example/channel-reply-claims",
+      "https://briar.example/briar.worker.v1.WorkerQueueService/ClaimWork",
       {
         method: "POST",
         headers: {
           authorization: "Bearer briar_worker_skill_credential_one",
+          "connect-protocol-version": "1",
           "content-type": "application/json",
         },
-        body: JSON.stringify({ organizationId, workerId }),
+        body: JSON.stringify({ projectId, workerId, claimedBy: "test-worker" }),
       },
     ), env());
     expect(continuedClaimResponse.status).toBe(200);
     const continuedClaim = await continuedClaimResponse.json() as {
-      work: {
+      work: { channelReply: {
         workId: string;
         claimToken: string;
         triggerMessageId: string;
@@ -1147,30 +1155,35 @@ describe("conversational Agent Skill execution approval", () => {
           approved: boolean;
         };
         snapshot: { messages: Array<{ id: string; body: string }> };
-      };
+      } };
     };
-    expect(continuedClaim.work).toMatchObject({
+    expect(continuedClaim.work.channelReply).toMatchObject({
       workId: continuedJob!.id,
       triggerMessageId: source.reply_message_id,
       parentMessageId: triggerMessageId,
       session: {
         id: source.session_id,
-        conversationId: null,
-        claimReason: "ttl_expired_reactivated",
+        claimReason: "CHANNEL_REPLY_SESSION_CLAIM_REASON_TTL_EXPIRED_REACTIVATED",
       },
-      provider: "codex",
+      provider: "AGENT_PROVIDER_CODEX",
       model: "gpt-5.6-sol",
       effort: "high",
       skillExecutionTarget: {
         request,
-        executionMode: "conversation",
-        approvalPolicy: "explicit",
+        executionMode: "AGENT_SKILL_EXECUTION_MODE_CONVERSATION",
+        approvalPolicy: "AGENT_SKILL_APPROVAL_POLICY_EXPLICIT",
         approved: true,
       },
     });
-    expect(continuedClaim.work.snapshot.messages.map((message) => message.id))
+    expect(
+      continuedClaim.work.channelReply.snapshot.messages.map((message) =>
+        message.id
+      ),
+    )
       .toEqual([triggerMessageId, source.reply_message_id]);
-    const continuedClaimHash = sha256(continuedClaim.work.claimToken);
+    const continuedClaimHash = sha256(
+      continuedClaim.work.channelReply.claimToken,
+    );
     expect(await completeChannelReply(db, continuedJob!, {
       jobId: continuedJob!.id,
       deviceId: workerDeviceId,
@@ -1481,7 +1494,7 @@ describe("conversational Agent Skill execution approval", () => {
         occurredAt: new Date().toISOString(),
       })).toMatchObject({ runId: capacityRunId, requestedWorkerId: workerId });
       const claimHunt = () => apiWorker.fetch(new Request(
-        "https://briar.example/briar.worker.v1.WorkerQueueService/ClaimWork",
+        "https://briar.example/briar.worker.v1.WorkerExecutionService/ClaimIssue",
         {
           method: "POST",
           headers: {
@@ -1491,7 +1504,6 @@ describe("conversational Agent Skill execution approval", () => {
           },
           body: JSON.stringify({
             projectId,
-            workerId,
             claimedBy: "capacity-test",
           }),
         },
@@ -1507,7 +1519,7 @@ describe("conversational Agent Skill execution approval", () => {
       const huntClaim = await claimHunt();
       expect(huntClaim.status).toBe(200);
       expect(await huntClaim.json()).toMatchObject({
-        work: { issue: { payload: { runId: capacityRunId } } },
+        issue: { payload: { runId: capacityRunId } },
       });
       await expect(countExecutionWorkerDeviceSessions(
         db,
@@ -1516,7 +1528,7 @@ describe("conversational Agent Skill execution approval", () => {
       )).resolves.toBe(1);
       const huntBlocksTask = await claimTask();
       expect(huntBlocksTask.status).toBe(200);
-      expect(await huntBlocksTask.json()).toEqual({});
+      expect(await huntBlocksTask.json()).toEqual({ retryAfterMs: 15_000 });
 
       await db.prepare(`delete from briar_hunt_runs where id = ?`)
         .bind(capacityRunId).run();
