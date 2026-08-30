@@ -37,18 +37,29 @@ parallel before publishing any status. Do not precede it with a separate
 `bun run check`; that check is already part of `signoff/app-worker`.
 
 Mobile contract validation is separate from the required pull request
-signoffs. On a macOS worker with Xcode, JDK 17, Android SDK 36, and a
-`Briar iPhone 17 Pro` simulator, `bun run mobile:ci`:
+signoffs. On a macOS worker with Xcode, JDK 17, and Android SDK 36, install the
+repository-pinned tools and explicitly provision the required iOS runtime and
+simulators before running mobile CI:
+
+```sh
+mise install
+bun run ios:bootstrap
+bun run mobile:ci
+```
+
+The bootstrap installs the configured iOS Simulator runtime only when it is
+missing, then idempotently creates the default iPhone and iPad destinations.
+`bun run mobile:ci` then:
 
 - checks generated Companion OpenAPI/Swift artifacts and exercises the canonical Worker route and client decoders;
 - builds and runs the independent SwiftUI App, Unit Test, and UI Test targets;
 - analyzes and builds the SwiftUI Production configuration without signing; and
 - builds the retained Tauri Android debug APK.
 
-Set `BRIAR_IOS_DESTINATION` to an equivalent Xcode destination when the worker
-uses a differently named simulator. The command verifies the native-only iOS
-release contract and never changes the Android Tauri application identifier or
-release scheme.
+Set `BRIAR_IOS_DESTINATION` and `BRIAR_IPAD_DESTINATION` to equivalent Xcode
+destinations when the worker uses differently named simulators. The command
+verifies the native-only iOS release contract and never changes the Android
+Tauri application identifier or release scheme.
 
 The security phase uses `bun audit`, `cargo-audit`, and Gitleaks. Rust
 vulnerabilities and any warning not in the dated advisory allowlist fail the

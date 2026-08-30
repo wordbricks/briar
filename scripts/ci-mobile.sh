@@ -4,10 +4,6 @@ set -euo pipefail
 workspace_root="$(cd "$(dirname "$0")/.." && pwd -P)"
 cd "$workspace_root"
 
-readonly swift_project="apps/briar/ios/BriarCompanion/BriarCompanion.xcodeproj"
-readonly swift_scheme="BriarCompanion-Dev"
-readonly simulator_destination="${BRIAR_IOS_DESTINATION:-platform=iOS Simulator,name=Briar iPhone 17 Pro}"
-readonly ipad_destination="${BRIAR_IPAD_DESTINATION:-platform=iOS Simulator,name=iPad Pro 13-inch (M5)}"
 mobile_temp_base="${TMPDIR:-/tmp}"
 mobile_temp_base="${mobile_temp_base%/}"
 mobile_ci_temp="$(mktemp -d "$mobile_temp_base/briar-mobile-ci.XXXXXX")"
@@ -52,33 +48,16 @@ bun run ios:release:verify
 bun run ios:native:project
 
 echo "[mobile-ci] Building and testing the independent SwiftUI app on iPhone."
-xcodebuild \
-  -project "$swift_project" \
-  -scheme "$swift_scheme" \
-  -destination "$simulator_destination" \
-  -derivedDataPath "$mobile_ci_temp/swift-derived-data" \
-  CODE_SIGNING_ALLOWED=NO \
-  test
+BRIAR_IOS_DERIVED_DATA_PATH="$mobile_ci_temp/swift-derived-data" \
+  bash scripts/ios-simulator.sh test
 
 echo "[mobile-ci] Exercising VoiceOver/Dynamic Type and layout UI tests on iPad."
-xcodebuild \
-  -project "$swift_project" \
-  -scheme "$swift_scheme" \
-  -destination "$ipad_destination" \
-  -derivedDataPath "$mobile_ci_temp/ipad-derived-data" \
-  -only-testing:BriarCompanionUITests/BriarCompanionUITests/testAccessibilityAndLargestDynamicTypeLayout \
-  CODE_SIGNING_ALLOWED=NO \
-  test
+BRIAR_IOS_DERIVED_DATA_PATH="$mobile_ci_temp/ipad-derived-data" \
+  bash scripts/ios-simulator.sh test-ipad-accessibility
 
 echo "[mobile-ci] Analyzing and building the Production native configuration without signing."
-xcodebuild \
-  -project "$swift_project" \
-  -scheme BriarCompanion-Production \
-  -configuration Production \
-  -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath "$mobile_ci_temp/production-derived-data" \
-  CODE_SIGNING_ALLOWED=NO \
-  analyze build
+BRIAR_IOS_DERIVED_DATA_PATH="$mobile_ci_temp/production-derived-data" \
+  bash scripts/ios-simulator.sh build-production
 
 echo "[mobile-ci] Checking session, download-memory, and log security invariants."
 rg -F 'kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly' apps/briar/ios/BriarCompanion/App/SessionStore.swift >/dev/null

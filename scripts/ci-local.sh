@@ -76,6 +76,8 @@ run_app_worker() {
   bun run test
   bash -n \
     scripts/import-apple-signing-assets.sh \
+    scripts/ci-mobile.sh \
+    scripts/ios-simulator.sh \
     scripts/release-ios.sh \
     scripts/verify-ios-archive.sh \
     scripts/package-macos-release.sh \

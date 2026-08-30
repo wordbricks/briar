@@ -18,7 +18,7 @@
     "test": "bun run test:d1:prepare && vitest run --exclude worker/src/migrations.test.ts --exclude worker/src/db.test.ts",
     "mobile:contract": "bun run ../../scripts/generate-mobile-contracts.ts --check && bun run typecheck && vitest run worker/src/mobile-contract-response.test.ts worker/src/project-core-routes.contract.test.ts src/lib/api/request-operation-contract.test.ts src/lib/api/response-contracts.test.ts",
     "ios:native:project": "xcodegen generate --spec ios/BriarCompanion/project.yml --project ios/BriarCompanion",
-    "ios:native:test": "xcodebuild -project ios/BriarCompanion/BriarCompanion.xcodeproj -scheme BriarCompanion-Dev -destination 'platform=iOS Simulator,name=Briar iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO test",
+    "ios:native:test": "bash ../../scripts/ios-simulator.sh test",
     "ios:release:verify": "bun run ../../scripts/ios-release-config.ts verify",
     "qa:release-updater": "bash ../../scripts/qa-production-updater-build.sh",
     "tauri": "tauri",
