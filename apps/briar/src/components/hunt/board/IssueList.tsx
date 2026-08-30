@@ -1,15 +1,16 @@
 import { Bot, ChevronRight } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 import { useAppCollectionKeyboardCommandScope } from "@/hooks/useAppCollectionKeyboardCommandScope";
 import { useControlledCollectionNavigation } from "@/hooks/useControlledCollectionNavigation";
 import { runMeta } from "@/lib/stages";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { formatIssueKey } from "@/lib/issue-key";
-import type { HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember } from "@/types";
+import type { HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember, Project } from "@/types";
 import { type AgentProvider } from "@/lib/project-llm";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
 import { IssueContextMenu } from "./IssueContextMenu";
+import { ProjectIcon } from "../../ProjectIcon";
 import { PullRequestIconLink } from "./PullRequestIconLink";
 import { RunStatusPill } from "../detail/RunStatusPill";
 import { localizeStatus, relativeTime } from "../model/formatters";
@@ -31,7 +32,10 @@ export function IssueList({
   members,
   runs,
   processingIssueIds,
-  updatingIssueId
+  updatingIssueId,
+  issueKeyPrefixForRun,
+  projectForRun,
+  readOnly = false,
 }: {
   availableProviders: AgentProvider[];
   issueKeyPrefix?: string;
@@ -49,6 +53,9 @@ export function IssueList({
   runs: HuntRun[];
   processingIssueIds: ReadonlySet<string>;
   updatingIssueId: string | null;
+  issueKeyPrefixForRun?: (run: HuntRun) => string | undefined;
+  projectForRun?: (run: HuntRun) => Pick<Project, "icon" | "name"> | undefined;
+  readOnly?: boolean;
 }) {
   const {
     t
@@ -92,11 +99,11 @@ export function IssueList({
             <span>{t("dashboard.emptyDescription")}</span>
           </div> : runs.map(run => {
         const assignee = members.find(member => member.userId === run.assigneeUserId);
+        const project = projectForRun?.(run);
         const meta = runMeta(run.status, run.workflowStage, run.workflow);
         const label = localizeStatus(t, run.status, run.workflowStage, meta.label);
         const isClaimed = run.status === "queued" && Boolean(run.leaseExpiresAt) && Date.parse(run.leaseExpiresAt!) > Date.now();
-        return <IssueContextMenu availableProviders={availableProviders} disabled={deletingIssueId === run.id || updatingIssueId === run.id} key={run.id} onDelete={() => onDelete(run.id)} onTransfer={onTransfer ? () => onTransfer(run.id) : undefined} onEdit={() => onEdit(run.id)} onMove={placement => onMove(run, placement)} onOpen={() => onOpen(run.id)} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(run) : undefined} onPriorityChange={priority => onPriorityChange(run, priority)} onPreferencesChange={preferences => onPreferencesChange(run, preferences)} onCheckpointsChange={checkpoints => onCheckpointsChange(run, checkpoints)} run={run} isProcessing={processingIssueIds.has(run.id)}>
-              <div aria-label={t("run.details", {
+        const row = <div aria-label={t("run.details", {
             title: run.title
           })} className="issue-list-grid issue-list-row" data-keyboard-list-current={cursorId === run.id ? "" : undefined} data-keyboard-list-item="" data-run-id={run.id} onClick={() => {
             setCursorId(run.id);
@@ -112,8 +119,9 @@ export function IssueList({
           }} onPointerDown={() => setCursorId(run.id)} ref={navigation.getItemRef(run.id)} role="row" tabIndex={0}>
                 <span className="issue-list-task" role="cell">
                   <span className="issue-list-task-kicker">
+                    {project ? <ProjectIcon className="issue-list-project-icon" project={project} /> : null}
                     <small>
-                      {formatIssueKey(issueKeyPrefix, run.runNumber)} · {run.sourceKey}
+                      {formatIssueKey(issueKeyPrefixForRun?.(run) ?? issueKeyPrefix, run.runNumber)} · {run.sourceKey}
                       {assignee ? ` · ${assignee.name}` : ""}
                     </small>
                     <PullRequestIconLink urls={run.pullRequestUrls} />
@@ -138,8 +146,10 @@ export function IssueList({
               }) : relativeTime(run.updatedAt, t)}
                 </span>
                 <ChevronRight aria-hidden="true" size={15} />
-              </div>
-            </IssueContextMenu>;
+              </div>;
+        return readOnly ? <Fragment key={run.id}>{row}</Fragment> : <IssueContextMenu availableProviders={availableProviders} disabled={deletingIssueId === run.id || updatingIssueId === run.id} key={run.id} onDelete={() => onDelete(run.id)} onTransfer={onTransfer ? () => onTransfer(run.id) : undefined} onEdit={() => onEdit(run.id)} onMove={placement => onMove(run, placement)} onOpen={() => onOpen(run.id)} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(run) : undefined} onPriorityChange={priority => onPriorityChange(run, priority)} onPreferencesChange={preferences => onPreferencesChange(run, preferences)} onCheckpointsChange={checkpoints => onCheckpointsChange(run, checkpoints)} run={run} isProcessing={processingIssueIds.has(run.id)}>
+            {row}
+          </IssueContextMenu>;
       })}
       </div>
     </div>;

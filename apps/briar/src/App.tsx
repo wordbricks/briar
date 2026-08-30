@@ -13,6 +13,7 @@ import {
   House,
   Inbox as InboxIcon,
   Keyboard as KeyboardIcon,
+  ListTodo,
   MessageCircle,
   MessagesSquare,
   PanelLeft,
@@ -34,6 +35,7 @@ import { HuntDashboard } from "./components/hunt/HuntDashboard";
 import { RunPage } from "./components/hunt/detail/RunPage";
 import { WorkerDispatchDialog } from "./components/WorkerDispatchDialog";
 import { Inbox } from "./components/Inbox";
+import { MyIssues } from "./components/MyIssues";
 import { InboxDetailPanel } from "./components/InboxDetailPanel";
 import {
   InboxDetailTargetBoundary,
@@ -833,8 +835,9 @@ export function App({
       projectId = navigationActiveProjectIdRef.current,
     ) =>
       navigateToLocation(
-        page === "inbox" && briar.activeOrganizationId
-          ? organizationNavigationLocation(briar.activeOrganizationId)
+        (page === "inbox" || page === "my-issues") &&
+        briar.activeOrganizationId
+          ? organizationNavigationLocation(briar.activeOrganizationId, page)
           : (page === "channels" || page === "dms") &&
           briar.activeOrganizationId
           ? channelPageNavigationLocation(
@@ -1140,9 +1143,9 @@ export function App({
             fallbackProject?.id,
           ),
         );
-      } else if (activePage === "inbox") {
+      } else if (activePage === "inbox" || activePage === "my-issues") {
         replaceNavigationLocation(
-          organizationNavigationLocation(fallbackOrganization.id),
+          organizationNavigationLocation(fallbackOrganization.id, activePage),
         );
       } else {
         replaceNavigationLocation(
@@ -1764,6 +1767,44 @@ export function App({
           project.organizationId === briar.activeOrganizationId ||
           project.id === briar.activeProjectId,
       );
+  const activeDashboardRef = useRef(briar.dashboard);
+  activeDashboardRef.current = briar.dashboard;
+  const loadOrganizationProjectDashboard = useCallback(
+    (projectId: string, signal: AbortSignal) => {
+      const activeDashboard = activeDashboardRef.current;
+      if (activeDashboard?.project.id === projectId) {
+        return Promise.resolve(activeDashboard);
+      }
+      if (!briar.token) return Promise.resolve(null);
+      return loadDashboard(briar.token, projectId, signal);
+    },
+    [briar.token],
+  );
+  const openOrganizationIssue = useCallback(
+    (projectId: string, runId: string) => {
+      void (async () => {
+        setRequestedSessionId(null);
+        setRequestedRunMessageId(null);
+        setRequestedRunInitialTab(null);
+        setRequestedRunId(runId);
+        setIssueListRequestKey((key) => key + 1);
+        if (projectId !== briar.activeProjectId) {
+          await briar.ensureProjectSelected(projectId);
+        }
+        navigateToIssue(runId, projectId);
+      })().catch((caught) => {
+        toast(caught instanceof Error ? caught.message : String(caught), {
+          tone: "error",
+        });
+      });
+    },
+    [
+      briar.activeProjectId,
+      briar.ensureProjectSelected,
+      navigateToIssue,
+      toast,
+    ],
+  );
   const visibleOrganizationChannels = projectWindowProjectId
     ? organizationChannels.filter(
         (channel) =>
@@ -1791,6 +1832,7 @@ export function App({
       channels: t("sidebar.channels"),
       dms: t("sidebar.dms"),
       inbox: t("sidebar.inbox"),
+      "my-issues": t("sidebar.myIssues"),
       "organization-create": t("sidebar.addOrganization"),
       issues: t("sidebar.issues"),
       lobby: t("lobby.eyebrow"),
@@ -1824,6 +1866,7 @@ export function App({
       if (page === "agents") return <Bot aria-hidden="true" size={16} />;
       if (page === "schedule") return <CalendarDays aria-hidden="true" size={16} />;
       if (page === "inbox") return <InboxIcon aria-hidden="true" size={16} />;
+      if (page === "my-issues") return <ListTodo aria-hidden="true" size={16} />;
       if (page === "channels") return <Hash aria-hidden="true" size={16} />;
       if (page === "dms") return <MessageCircle aria-hidden="true" size={16} />;
       if (page === "organization-create") {
@@ -1922,12 +1965,12 @@ export function App({
         });
       }
 
-      if (page === "inbox") {
+      if (page === "inbox" || page === "my-issues") {
         return createItem(index, location, {
           context: null,
-          eyebrow: organization?.name ?? t("sidebar.inbox"),
-          icon: <InboxIcon aria-hidden="true" size={16} />,
-          label: t("sidebar.inbox"),
+          eyebrow: organization?.name ?? t("sidebar.myIssues"),
+          icon: pageIcon(page),
+          label: pageLabels[page],
         });
       }
 
@@ -2761,6 +2804,19 @@ export function App({
       priority: 180 + visibleInboxUnreadCount,
       scope: "navigation",
     }, paletteSections.continue);
+  }
+  if (!projectWindowProjectId && briar.activeOrganizationId) {
+    addPaletteItem({
+      active: activePage === "my-issues",
+      description: activeOrganization?.name,
+      icon: <ListTodo />,
+      id: `navigation:my-issues:${briar.activeOrganizationId}`,
+      keywords: ["my issues", "issues", "내 이슈", "我的问题"],
+      label: t("sidebar.myIssues"),
+      onSelect: () => navigateToPage("my-issues"),
+      priority: activePage === "my-issues" ? 120 : 50,
+      scope: "navigation",
+    }, paletteSections.navigation);
   }
 
   const paletteProjectIds = new Set(
@@ -3665,6 +3721,11 @@ export function App({
             onLobbyOpen={() => navigateToPage("lobby")}
             onScheduleOpen={() => navigateToPage("schedule")}
             onInboxOpen={() => navigateToPage("inbox")}
+            onMyIssuesOpen={
+              briar.activeOrganizationId
+                ? () => navigateToPage("my-issues")
+                : undefined
+            }
             onDmsOpen={() => {
               const directMessage = organizationDirectMessages.find(
                 (channel) => channel.id === activeChannelId,
@@ -3908,6 +3969,16 @@ export function App({
               title={t("dm.empty")}
             />
           </MainContent>
+        ) : activePage === "my-issues" && briar.activeOrganizationId ? (
+          <MyIssues
+            currentUserId={briar.user?.id ?? null}
+            isSidebarOpen={isSidebarOpen}
+            loadProjectDashboard={loadOrganizationProjectDashboard}
+            onOpenIssue={openOrganizationIssue}
+            organizationId={briar.activeOrganizationId}
+            organizationName={activeOrganization?.name}
+            projects={activeOrganizationProjects}
+          />
         ) : activePage === "inbox" ? (
           <main
             aria-label={`${t("inbox.title")} · ${t("inbox.messages")}`}
