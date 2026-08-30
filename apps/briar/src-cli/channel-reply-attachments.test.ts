@@ -9,6 +9,14 @@ import {
 import { parseDetachedJsonResult } from "./agent-runner";
 
 const temporaryDirectories: string[] = [];
+const noChannelReplyActions = {
+  document: null,
+  issueProposal: null,
+  issueBatchProposal: null,
+  executionProposal: null,
+  skillExecutionProposal: null,
+  delegation: null,
+} as const;
 
 async function temporaryWorkspace() {
   const directory = await mkdtemp(join(tmpdir(), "briar-channel-reply-out-"));
@@ -25,11 +33,10 @@ afterEach(async () => {
 });
 
 describe("channel reply agent attachments", () => {
-  it("strips workspace paths before the worker JSON contract is applied", () => {
+  it("strips workspace paths before reply domain validation", () => {
     expect(parseChannelReplyAgentResult({
       body: "Here is the screen.",
-      document: null,
-      issueProposal: null,
+      ...noChannelReplyActions,
       attachments: ["  screenshot.png  ", "modal.webp"],
     })).toEqual({
       result: {
@@ -45,11 +52,10 @@ describe("channel reply agent attachments", () => {
     });
   });
 
-  it("keeps ordinary replies compatible when attachments are omitted", () => {
+  it("parses ordinary replies when attachments are omitted", () => {
     expect(parseChannelReplyAgentResult({
       body: "Answer",
-      document: null,
-      issueProposal: null,
+      ...noChannelReplyActions,
     })).toMatchObject({
       result: { body: "Answer", delegation: null },
       attachmentPaths: [],
@@ -59,8 +65,7 @@ describe("channel reply agent attachments", () => {
   it("rejects invalid attachment path lists", () => {
     const reply = {
       body: "Answer",
-      document: null,
-      issueProposal: null,
+      ...noChannelReplyActions,
     };
     for (const attachments of [
       ["   "],
@@ -88,6 +93,7 @@ describe("channel reply agent attachments", () => {
           status: "backlog",
         },
       },
+      issueBatchProposal: null,
       executionProposal: null,
       skillExecutionProposal: null,
       delegation: null,
@@ -123,6 +129,7 @@ describe("channel reply agent attachments", () => {
           status: "backlog",
         },
       },
+      issueBatchProposal: null,
       executionProposal: null,
       skillExecutionProposal: null,
       delegation: null,
@@ -137,6 +144,7 @@ describe("channel reply agent attachments", () => {
       attachments: [],
       document: null,
       issueProposal: null,
+      issueBatchProposal: null,
       executionProposal: null,
       skillExecutionProposal: null,
       delegation: null,
@@ -161,6 +169,7 @@ describe("channel reply agent attachments", () => {
         attachments: [],
         document: null,
         issueProposal: null,
+        issueBatchProposal: null,
         executionProposal: null,
         skillExecutionProposal: null,
         delegation: null,
@@ -179,8 +188,7 @@ describe("channel reply agent attachments", () => {
     expect(() =>
       parseChannelReplyAgentResult({
         body: "Answer",
-        document: null,
-        issueProposal: null,
+        ...noChannelReplyActions,
         attachments: [{ path: "screenshot.png" }],
       }),
     ).toThrow();
