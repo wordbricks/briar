@@ -11,4 +11,11 @@ relative_executable="$2"
 shift 2
 
 tool_root="$(mise where "$tool_spec")"
-exec "$tool_root/$relative_executable" "$@"
+generator="$tool_root/$relative_executable"
+
+if [[ "${1:-}" == "--bun" ]]; then
+  shift
+  exec bun "$generator" "$@"
+fi
+
+exec "$generator" "$@"

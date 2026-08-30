@@ -5,7 +5,8 @@ plugins:
       - bash
       - scripts/run-contract-generator.sh
       - npm:@bufbuild/protoc-gen-es@2.14.0
-      - node_modules/.bin/protoc-gen-es
+      - node_modules/@bufbuild/protoc-gen-es/bin/protoc-gen-es
+      - --bun
     out: packages/contracts/src/gen
     opt:
       - target=ts
