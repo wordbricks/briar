@@ -11,6 +11,15 @@ pub use descriptor_fingerprint::CONTRACTS_DESCRIPTOR_FINGERPRINT;
 
 pub mod proto {
     pub mod briar {
+        pub mod local {
+            pub mod v1 {
+                include!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/src/gen/proto/briar.local.v1.rs"
+                ));
+            }
+        }
+
         pub mod app {
             pub mod v1 {
                 include!(concat!(

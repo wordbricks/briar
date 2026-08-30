@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package briar.local.v1;
+
+import "briar/app/v1/issue.proto";
+import "briar/types/v1/workflow.proto";
+import "briar/worker/v1/worker_queue.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarLocal_";
+
+// Stable ProtoJSON written by `briar queue claim` for local process consumers.
+// Claim credentials deliberately do not exist in this descriptor; they remain
+// in the CLI's private config and can never be serialized by this message.
+message LocalClaimResult {
+  oneof outcome {
+    LocalClaimedRun claimed = 1;
+    LocalNoWork no_work = 2;
+  }
+}
+
+message LocalNoWork {}
+
+message LocalClaimedRun {
+  optional string execution_id = 1;
+  string run_id = 2;
+  uint32 run_number = 3;
+  uint32 current_attempt = 4;
+  uint32 current_revision = 5;
+  briar.worker.v1.AutoHuntSource source = 6;
+  string source_key = 7;
+  string title = 8;
+  optional string description = 9;
+  optional uint32 priority = 10;
+  string repository = 11;
+  optional google.protobuf.Timestamp source_created_at = 12;
+  optional string created_by_user_id = 13;
+  optional google.protobuf.Struct context = 14;
+  optional string review_feedback = 15;
+  briar.types.v1.AutoHuntWorkflow workflow = 16;
+  optional string workflow_stage = 17;
+  optional string start_stage = 18;
+  optional briar.worker.v1.ResumeContext resume_context = 19;
+  repeated LocalQueuedAttachment attachments = 20;
+  repeated briar.worker.v1.QueuedIssueMessage messages = 21;
+  string claimed_by = 22;
+  google.protobuf.Timestamp claimed_at = 23;
+  google.protobuf.Timestamp lease_expires_at = 24;
+  uint32 claim_attempts = 25;
+  optional briar.worker.v1.DetachedExecution execution = 26;
+  string briar_issue_url = 27;
+  optional LocalWorkspace workspace = 28;
+  optional string workspace_error = 29;
+}
+
+message LocalQueuedAttachment {
+  briar.worker.v1.QueuedAttachment attachment = 1;
+  optional string local_path = 2;
+  optional string download_error = 3;
+}
+
+message LocalWorkspace {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_CURRENT = 1;
+    KIND_WORKTREE = 2;
+  }
+
+  Kind kind = 1;
+  string path = 2;
+  optional string branch = 3;
+  optional string base_ref = 4;
+  optional string base_ref_resolved = 5;
+  optional string base_sha = 6;
+  bool reused = 7;
+  repeated string included_paths = 8;
+  optional string warning = 9;
+}
+
+// Stable ProtoJSON written by `briar run evidence list`.
+message LocalRunEvidenceResult {
+  repeated briar.app.v1.RunEvidence evidence = 1;
+  string run_id = 2;
+  uint32 attempt = 3;
+  uint32 revision = 4;
+}
