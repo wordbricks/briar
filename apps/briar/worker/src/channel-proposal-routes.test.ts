@@ -24,10 +24,6 @@ import {
 } from "./db";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
-  mobileAcceptIssueActionProposalResponseSchema,
-} from "./mobile-contract";
-import { decodeMobileSchema } from "./mobile-contract-schema";
-import {
   dispatchHuntRun,
   leaseExpiryFrom,
   registerExecutionWorker,

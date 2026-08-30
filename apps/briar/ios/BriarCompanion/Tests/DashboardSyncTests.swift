@@ -2,6 +2,8 @@ import Foundation
 import XCTest
 @testable import BriarCompanion
 
+private let listProjectsRPCTestRoute = "ListProjectsRPC"
+
 final class DashboardSyncTests: XCTestCase {
     private let project = Project(
         id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
@@ -212,7 +214,7 @@ final class DashboardSyncTests: XCTestCase {
                 expiresIn: 3_600
             )],
             MobileAPIContract.Endpoint.currentUser: [user],
-            MobileAPIOperations.listProjects.path: [ProjectsResponse(projects: [project])],
+            listProjectsRPCTestRoute: [ProjectsResponse(projects: [project])],
             MobileAPIContract.Endpoint.dashboard(projectID: project.id): [
                 snapshot(cursor: 7, title: "Loaded after login"),
             ],
@@ -327,7 +329,7 @@ final class DashboardSyncTests: XCTestCase {
         ))
         let api = RoutingAPIClient(routes: [
             MobileAPIContract.Endpoint.currentUser: [user],
-            MobileAPIOperations.listProjects.path: [
+            listProjectsRPCTestRoute: [
                 ProjectsResponse(projects: [project, otherProject]),
             ],
         ])
@@ -360,7 +362,7 @@ final class DashboardSyncTests: XCTestCase {
         ))
         let api = RoutingAPIClient(routes: [
             MobileAPIContract.Endpoint.currentUser: [user],
-            MobileAPIOperations.listProjects.path: [
+            listProjectsRPCTestRoute: [
                 ProjectsResponse(projects: [project, otherProject]),
             ],
         ])
@@ -387,7 +389,7 @@ final class DashboardSyncTests: XCTestCase {
         ))
         let api = RoutingAPIClient(routes: [
             MobileAPIContract.Endpoint.currentUser: [user],
-            MobileAPIOperations.listProjects.path: [
+            listProjectsRPCTestRoute: [
                 ProjectsResponse(projects: [project]),
             ],
         ])
@@ -425,7 +427,7 @@ final class DashboardSyncTests: XCTestCase {
         ))
         let api = RoutingAPIClient(routes: [
             MobileAPIContract.Endpoint.currentUser: [user],
-            MobileAPIOperations.listProjects.path: [
+            listProjectsRPCTestRoute: [
                 ProjectsResponse(projects: [project]),
                 ProjectsResponse(projects: [project, newProject]),
             ],
@@ -470,11 +472,11 @@ final class DashboardSyncTests: XCTestCase {
         let api = TokenRoutingAPIClient(
             routes: [
                 "previous:\(MobileAPIContract.Endpoint.currentUser)": previousUser,
-                "previous:\(MobileAPIOperations.listProjects.path)": ProjectsResponse(
+                "previous:\(listProjectsRPCTestRoute)": ProjectsResponse(
                     projects: [previousProject]
                 ),
                 "next:\(MobileAPIContract.Endpoint.currentUser)": nextUser,
-                "next:\(MobileAPIOperations.listProjects.path)": ProjectsResponse(
+                "next:\(listProjectsRPCTestRoute)": ProjectsResponse(
                     projects: [nextProject]
                 ),
             ],
@@ -577,6 +579,16 @@ private actor RoutingAPIClient: MobileAPIClientProtocol {
         self.delays = delays
     }
 
+    func listProjects(token: String) async throws -> ProjectsResponse {
+        try await send(
+            listProjectsRPCTestRoute,
+            method: "RPC",
+            token: token,
+            body: nil,
+            as: ProjectsResponse.self
+        )
+    }
+
     func send<Response: Decodable & Sendable>(
         _ path: String,
         method: String,
@@ -611,6 +623,16 @@ private actor TokenRoutingAPIClient: MobileAPIClientProtocol {
 
     func requestCount(token: String) -> Int {
         requests.filter { $0 == token }.count
+    }
+
+    func listProjects(token: String) async throws -> ProjectsResponse {
+        try await send(
+            listProjectsRPCTestRoute,
+            method: "RPC",
+            token: token,
+            body: nil,
+            as: ProjectsResponse.self
+        )
     }
 
     func send<Response: Decodable & Sendable>(

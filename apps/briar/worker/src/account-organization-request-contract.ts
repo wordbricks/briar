@@ -23,6 +23,22 @@ const LowercaseEmail = Email.pipe(
   }),
 );
 
+const CurrentUserResponse = Schema.Struct({
+  user: Schema.Struct({
+    id: Schema.String,
+    username: Schema.optional(Schema.NullOr(Schema.String)),
+    name: Schema.String,
+    email: Email,
+    image: Schema.optional(Schema.NullOr(Schema.String)),
+  }),
+});
+
+/** Keep Better Auth's wider user record out of the public account response. */
+export const decodeCurrentUserResponse = Schema.decodeUnknownSync(
+  CurrentUserResponse,
+  { errors: "all" },
+);
+
 const LowercaseUsername = Schema.Trim.pipe(
   Schema.decode({
     decode: SchemaGetter.transform((value) => value.toLowerCase()),

@@ -8,6 +8,7 @@ import { processArchiveCleanupQueue } from "./archive";
 import {
   decodeAccountDeletionInput,
   decodeAccountProfileInput,
+  decodeCurrentUserResponse,
   decodeInboxReadStatesInput,
   decodeInboxUnreadStateInput,
 } from "./account-organization-request-contract";
@@ -16,9 +17,6 @@ import {
   getProjectRunChildMismatch,
   planAccountDeletion,
 } from "./db";
-import {
-  decodeMobileCurrentUserResponse,
-} from "./mobile-contract";
 import {
   deleteInboxReadState,
   listInboxReadStates,
@@ -67,7 +65,7 @@ export async function handleAccountRoute(
 
   if (pathname === "/me" && request.method === "GET") {
     const session = await requireSession(auth, request);
-    return json(decodeMobileCurrentUserResponse({ user: session.user }));
+    return json(decodeCurrentUserResponse({ user: session.user }));
   }
 
   if (pathname === "/inbox/read-states" && request.method === "GET") {

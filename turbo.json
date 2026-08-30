@@ -77,7 +77,6 @@
     },
     "web:build": { "cache": false },
     "build:release": { "cache": false },
-    "mobile:contract": { "cache": false },
     "ios:native:project": { "cache": false },
     "ios:native:test": {
       "cache": false,

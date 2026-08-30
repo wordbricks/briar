@@ -1,4 +1,3 @@
-import type { MobileProject } from "@briar/contracts";
 import {
   type AutoHuntQaStatus,
   type AutoHuntRunStatus,
@@ -7,6 +6,7 @@ import {
   type AutoHuntWorkflowCheckpoint,
   type AutoHuntWorkflowStageId,
 } from "./lib/auto-hunt-contract";
+import type { ProjectResponse } from "./lib/api/project-contract";
 import type { StructuredAgentResult } from "./lib/agent-result";
 import type { AgentExecutionCostRecord } from "./lib/agent-execution-cost";
 import type { AgentUsagePricing } from "./lib/agent-usage-pricing";
@@ -706,7 +706,7 @@ export type HuntRunPlacement = {
   workflowStage: AutoHuntWorkflowStageId | null;
 };
 
-export type Project = MobileProject;
+export type Project = ProjectResponse;
 
 export type ProjectAgent = {
   id: string;

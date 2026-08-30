@@ -9,7 +9,6 @@ import {
 } from "./project-agent-contract";
 import {
   decodeProjectResponse,
-  decodeProjectsResponse,
 } from "./project-contract";
 
 const projectId = "22222222-2222-4222-8222-222222222222";
@@ -43,9 +42,6 @@ describe("API response contracts", () => {
       role: "owner",
       createdAt: "2026-08-20T00:00:00.000Z",
     });
-    expect(
-      decodeProjectsResponse({ projects: [project], futureEnvelopeField: true }),
-    ).toEqual([decodeProjectResponse(project)]);
     expect(decodeProjectResponse({
       ...project,
       icon: "https://example.com/future-icon.png",

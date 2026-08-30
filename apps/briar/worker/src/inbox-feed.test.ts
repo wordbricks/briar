@@ -3,10 +3,6 @@ import {
   buildInboxFeedMessages,
   type InboxFeedProjectData,
 } from "./inbox-feed";
-import {
-  mobileInboxFeedResponseSchema,
-} from "./mobile-contract";
-import { decodeMobileSchema } from "./mobile-contract-schema";
 
 const occurredAt = "2026-08-11T13:00:00.000Z";
 const currentUserId = "inbox-user-a";
@@ -73,12 +69,6 @@ describe("organization Inbox feed", () => {
       currentUserId,
     );
 
-    expect(() => decodeMobileSchema(mobileInboxFeedResponseSchema, {
-      messages,
-      subscribedIssueIds: [],
-      generatedAt: "2026-08-11T13:02:00.000Z",
-    })).not.toThrow();
-
     expect(messages).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: "issue:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -119,12 +109,6 @@ describe("organization Inbox feed", () => {
       notification_reason: "mention",
       created_at: occurredAt,
     }], currentUserId);
-
-    expect(() => decodeMobileSchema(mobileInboxFeedResponseSchema, {
-      messages,
-      subscribedIssueIds: [],
-      generatedAt: "2026-08-11T13:02:00.000Z",
-    })).not.toThrow();
 
     expect(messages).toContainEqual(expect.objectContaining({
       id: "channel:cccccccc-cccc-4ccc-8ccc-cccccccccccc",
@@ -205,12 +189,6 @@ describe("organization Inbox feed", () => {
     }];
 
     const messages = buildInboxFeedMessages([second], [], currentUserId);
-
-    expect(() => decodeMobileSchema(mobileInboxFeedResponseSchema, {
-      messages,
-      subscribedIssueIds: [],
-      generatedAt: "2026-08-11T13:02:00.000Z",
-    })).not.toThrow();
 
     expect(messages).toContainEqual(expect.objectContaining({
       id: "conversation:cccccccc-cccc-4ccc-8ccc-cccccccccccc",

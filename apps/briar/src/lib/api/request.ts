@@ -1,6 +1,5 @@
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import type { AnyMobileOperation } from "@briar/contracts";
 import { briarApiUrl } from "../api-config";
 import { captureErrorDiagnostics } from "../error-diagnostics";
 import { ApiError } from "./errors";
@@ -93,36 +92,6 @@ async function requestUnknown(
     });
     throw caught;
   }
-}
-
-export type MobileOperationAuthentication<Operation extends AnyMobileOperation> =
-  [Operation["security"]] extends ["bearer"]
-    ? readonly [token: string]
-    : [Operation["security"]] extends ["public"]
-      ? readonly []
-      : readonly [operationSecurityMustBeNarrowed: never];
-
-/** Execute a no-input operation with the authentication mode from its descriptor. */
-export async function requestMobileOperationUnknown<
-  Operation extends AnyMobileOperation,
->(
-  operation: Operation,
-  ...authentication: MobileOperationAuthentication<Operation>
-): Promise<unknown> {
-  if (operation.request !== undefined) {
-    throw new Error(
-      `${operation.id} declares request input; use an input-aware operation client`,
-    );
-  }
-  let token: string | null = null;
-  if (operation.security === "bearer") {
-    const bearerToken = authentication[0];
-    if (bearerToken === undefined) {
-      throw new Error(`${operation.id} requires a bearer token`);
-    }
-    token = bearerToken;
-  }
-  return requestUnknown(operation.path, token, { method: operation.method });
 }
 
 export async function request<T>(

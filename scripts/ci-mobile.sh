@@ -40,8 +40,8 @@ if ! java -version >/dev/null 2>&1; then
   export PATH="$JAVA_HOME/bin:$PATH"
 fi
 
-echo "[mobile-ci] Validating the shared Companion API contract."
-bun run mobile:contract
+echo "[mobile-ci] Validating the shared protobuf contract graph."
+bun run contracts:check
 
 echo "[mobile-ci] Validating the native-only iOS release contract and regenerating Xcode inputs."
 bun run ios:release:verify
