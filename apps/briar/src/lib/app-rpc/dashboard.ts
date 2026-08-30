@@ -5,32 +5,19 @@ import {
   DashboardRun_QaStatus,
   DashboardRun_Source,
   DashboardService,
-  DashboardWorker_Readiness,
-  DashboardWorker_State,
-  WorkerIcon_Kind,
   type ChannelNotification as ChannelNotificationMessage,
   type ConversationNotification as ConversationNotificationMessage,
   type DashboardRun as DashboardRunMessage,
-  type DashboardWorker as DashboardWorkerMessage,
   type RunEvent as RunEventMessage,
 } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
-import type {
-  WorkerCapabilities as WorkerCapabilitiesMessage,
-} from "@briar/contracts/gen/briar/types/v1/worker_pb";
 import type {
   AutoHuntQaStatus,
   AutoHuntSource,
 } from "../auto-hunt-contract";
-import {
-  emptyAgentProviderCapabilityCatalog,
-  type AgentEffortCapability,
-  type AgentModelCapability,
-} from "../agent-provider-contract";
 import type {
   ChannelConversationNotification,
   DashboardDeltaPayload,
   DashboardPayload,
-  ExecutionWorker,
   HuntEvent,
   HuntRun,
   IssueConversationNotification,
@@ -40,6 +27,7 @@ import {
   appRpc,
   appTransport,
 } from "./core";
+import { dashboardWorkerFromProto } from "./fleet-mappers";
 import {
   agentProviderFromProto,
   issueAttachmentFromProto,
@@ -285,140 +273,6 @@ const dashboardRunFromProto = (run: DashboardRunMessage): HuntRun => ({
   completedAt: optionalTimestamp(run.completedAt),
   lastEventAt: requiredTimestamp(run.lastEventAt, "run.lastEventAt"),
   eventCount: run.eventCount,
-});
-
-const workerState = (
-  value: DashboardWorker_State,
-): ExecutionWorker["state"] => {
-  switch (value) {
-    case DashboardWorker_State.ONLINE:
-      return "online";
-    case DashboardWorker_State.STALE:
-      return "stale";
-    case DashboardWorker_State.DISABLED:
-      return "disabled";
-    default:
-      throw new Error(`Unknown worker state: ${value}`);
-  }
-};
-
-const workerReadiness = (
-  value: DashboardWorker_Readiness,
-): ExecutionWorker["readiness"] => {
-  switch (value) {
-    case DashboardWorker_Readiness.AVAILABLE:
-      return "available";
-    case DashboardWorker_Readiness.BUSY:
-      return "busy";
-    case DashboardWorker_Readiness.OFFLINE:
-      return "offline";
-    case DashboardWorker_Readiness.NEEDS_ATTENTION:
-      return "needs_attention";
-    case DashboardWorker_Readiness.DISABLED:
-      return "disabled";
-    default:
-      throw new Error(`Unknown worker readiness: ${value}`);
-  }
-};
-
-const effortCapabilityFromProto = (
-  effort: WorkerCapabilitiesMessage["providerCapabilities"][number]["defaultEfforts"][number],
-): AgentEffortCapability => ({
-  id: effort.id,
-  label: effort.label,
-  ...(effort.description !== undefined
-    ? { description: effort.description }
-    : {}),
-  ...(effort.isDefault !== undefined ? { isDefault: effort.isDefault } : {}),
-});
-
-const modelCapabilityFromProto = (
-  model: WorkerCapabilitiesMessage["providerCapabilities"][number]["models"][number],
-): AgentModelCapability => ({
-  id: model.id,
-  label: model.label,
-  ...(model.isDefault !== undefined ? { isDefault: model.isDefault } : {}),
-  ...(model.defaultEffortId !== undefined
-    ? { defaultEffortId: model.defaultEffortId }
-    : {}),
-  ...(model.efforts.length > 0
-    ? { efforts: model.efforts.map(effortCapabilityFromProto) }
-    : {}),
-});
-
-const workerCapabilitiesFromProto = (
-  value: WorkerCapabilitiesMessage,
-): ExecutionWorker["capabilities"] => {
-  const providerCapabilities = emptyAgentProviderCapabilityCatalog();
-  for (const capability of value.providerCapabilities) {
-    const provider = agentProviderFromProto(capability.provider);
-    providerCapabilities[provider] = {
-      models: capability.models.map(modelCapabilityFromProto),
-      ...(capability.defaultEfforts.length > 0
-        ? {
-            defaultEfforts: capability.defaultEfforts.map(
-              effortCapabilityFromProto,
-            ),
-          }
-        : {}),
-      ...(capability.allowCustomModels !== undefined
-        ? { allowCustomModels: capability.allowCustomModels }
-        : {}),
-      error: capability.error ?? null,
-    };
-  }
-  return {
-    providerCapabilities,
-    ...(value.remoteUpdates
-      ? {
-          remoteUpdates: {
-            supported: value.remoteUpdates.supported,
-            ...(value.remoteUpdates.protocol !== undefined
-              ? { protocol: value.remoteUpdates.protocol }
-              : {}),
-          },
-        }
-      : {}),
-  };
-};
-
-const dashboardWorkerFromProto = (
-  worker: DashboardWorkerMessage,
-): ExecutionWorker => ({
-  id: worker.id,
-  deviceId: worker.deviceId,
-  ownerUserId: worker.ownerUserId,
-  label: worker.label,
-  icon: worker.icon === undefined
-    ? null
-    : {
-        type: worker.icon.kind === WorkerIcon_Kind.EMOJI
-          ? "emoji"
-          : worker.icon.kind === WorkerIcon_Kind.IMAGE
-            ? "image"
-            : (() => {
-                throw new Error(`Unknown worker icon kind: ${worker.icon.kind}`);
-              })(),
-        value: worker.icon.value,
-      },
-  agentProvider: agentProviderFromProto(worker.agentProvider),
-  providers: worker.providers.map(agentProviderFromProto),
-  versions: worker.versions,
-  state: workerState(worker.state),
-  readiness: workerReadiness(worker.readiness),
-  acceptingWork: worker.acceptingWork,
-  readinessDetail: worker.readinessDetail ?? null,
-  capabilities: workerCapabilitiesFromProto(
-    requiredMessage(worker.capabilities, "worker.capabilities"),
-  ),
-  maxConcurrentSessions: worker.maxConcurrentSessions,
-  activeSessions: worker.activeSessions,
-  availableSessions: worker.availableSessions,
-  lastHeartbeatAt: requiredTimestamp(
-    worker.lastHeartbeatAt,
-    "worker.lastHeartbeatAt",
-  ),
-  createdAt: requiredTimestamp(worker.createdAt, "worker.createdAt"),
 });
 
 const conversationNotificationFromProto = (

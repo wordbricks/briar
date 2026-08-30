@@ -139,6 +139,22 @@ export {
   updateIssueExecutionPreferences,
   updateIssueSubscription,
 } from "./app-rpc/issue";
+export {
+  applyForManagedComputer,
+  createManagedComputerRemoteSession,
+  createManagedComputerSetupSession,
+  deleteOrganizationExecutionWorker,
+  endManagedComputerRemoteSession,
+  loadManagedComputerProduct,
+  loadManagedComputers,
+  loadOrganizationExecutionWorkers,
+  requestOrganizationExecutionWorkerUpdate,
+  retireManagedComputer,
+  retryManagedComputer,
+  updateOrganizationExecutionWorkerConcurrency,
+  updateOrganizationExecutionWorkerIcon,
+  validateManagedComputerPromotion,
+} from "./app-rpc/fleet";
 import {
   normalizeAutoHuntWorkflow,
   type AutoHuntWorkflow,
@@ -167,11 +183,6 @@ import type {
   AgentExecutionCostEstimate,
   DashboardPayload,
   DashboardDeltaPayload,
-  OrganizationExecutionWorker,
-  ManagedComputer,
-  ManagedComputerProduct,
-  ManagedComputerRemoteSessionTicket,
-  ManagedComputerSetupSessionTicket,
   MergeQueueProfile,
   MergeQueueStatus,
   ProjectExecutionWorkerPolicy,
@@ -183,7 +194,6 @@ import type {
   ProjectUsageSummary,
   RunEvidenceImage,
   StatusTrayRunsPayload,
-  WorkerIcon,
 } from "../types";
 
 const apiUrl = briarApiUrl;
@@ -336,216 +346,6 @@ export async function deleteInboxReadState(
 
 export async function loadProjects(token: string): Promise<Project[]> {
   return listProjects(token);
-}
-
-export async function loadOrganizationExecutionWorkers(
-  token: string,
-  organizationId: string,
-) {
-  return request<{
-    workers: OrganizationExecutionWorker[];
-    latestVersion?: string | null;
-    canManage: boolean;
-    generatedAt: string;
-  }>(`/organizations/${organizationId}/workers`, token);
-}
-
-export async function loadManagedComputerProduct(
-  token: string,
-  organizationId: string,
-) {
-  return request<ManagedComputerProduct>(
-    `/organizations/${organizationId}/managed-computers/product`,
-    token,
-  );
-}
-
-export async function loadManagedComputers(
-  token: string,
-  organizationId: string,
-) {
-  return request<{ computers: ManagedComputer[]; generatedAt: string }>(
-    `/organizations/${organizationId}/managed-computers`,
-    token,
-  );
-}
-
-export async function validateManagedComputerPromotion(
-  token: string,
-  organizationId: string,
-  code: string,
-) {
-  return request<{
-    valid: boolean;
-    eligible: boolean;
-    totalCents: number;
-    currency: "USD";
-    applicationsEnabled: boolean;
-    limitReason: "user" | "organization" | "fleet" | null;
-  }>(
-    `/organizations/${organizationId}/managed-computers/promotion/validate`,
-    token,
-    { method: "POST", body: JSON.stringify({ code }) },
-  );
-}
-
-export async function applyForManagedComputer(
-  token: string,
-  organizationId: string,
-  input: { code: string; requestId: string },
-) {
-  return request<{
-    computer: ManagedComputer;
-    duplicate: boolean;
-    entitlement: {
-      source: "free_promotion";
-      totalCents: 0;
-      currency: "USD";
-    };
-  }>(`/organizations/${organizationId}/managed-computers`, token, {
-    method: "POST",
-    headers: { "Idempotency-Key": input.requestId },
-    body: JSON.stringify(input),
-  });
-}
-
-export async function retryManagedComputer(
-  token: string,
-  organizationId: string,
-  managedComputerId: string,
-  requestId: string,
-) {
-  return request<{ computer: ManagedComputer; duplicate: boolean }>(
-    `/organizations/${organizationId}/managed-computers/${managedComputerId}/retry`,
-    token,
-    {
-      method: "POST",
-      headers: { "Idempotency-Key": requestId },
-      body: JSON.stringify({ requestId }),
-    },
-  );
-}
-
-export async function retireManagedComputer(
-  token: string,
-  organizationId: string,
-  managedComputerId: string,
-) {
-  return request<{ computer: ManagedComputer; duplicate: boolean }>(
-    `/organizations/${organizationId}/managed-computers/${managedComputerId}`,
-    token,
-    { method: "DELETE" },
-  );
-}
-
-export async function createManagedComputerRemoteSession(
-  token: string,
-  organizationId: string,
-  managedComputerId: string,
-  input: { requestId: string; reconnectSessionId?: string },
-) {
-  return request<ManagedComputerRemoteSessionTicket>(
-    `/organizations/${organizationId}/managed-computers/${managedComputerId}/remote-sessions`,
-    token,
-    {
-      method: "POST",
-      headers: { "Idempotency-Key": input.requestId },
-      body: JSON.stringify(input),
-    },
-  );
-}
-
-export async function createManagedComputerSetupSession(
-  token: string,
-  organizationId: string,
-  managedComputerId: string,
-  input: { projectId: string; requestId: string },
-) {
-  return request<ManagedComputerSetupSessionTicket>(
-    `/organizations/${organizationId}/managed-computers/${managedComputerId}/setup-sessions`,
-    token,
-    {
-      method: "POST",
-      headers: { "Idempotency-Key": input.requestId },
-      body: JSON.stringify(input),
-    },
-  );
-}
-
-export async function endManagedComputerRemoteSession(
-  token: string,
-  organizationId: string,
-  managedComputerId: string,
-  remoteSessionId: string,
-) {
-  return request<void>(
-    `/organizations/${organizationId}/managed-computers/${managedComputerId}/remote-sessions/${remoteSessionId}`,
-    token,
-    { method: "DELETE" },
-  );
-}
-
-export async function requestOrganizationExecutionWorkerUpdate(
-  token: string,
-  organizationId: string,
-  deviceId: string,
-) {
-  return request<{
-    outcome: "requested" | "already_current";
-    requestId?: string;
-    targetVersion: string;
-  }>(
-    `/organizations/${organizationId}/workers/${encodeURIComponent(deviceId)}/updates`,
-    token,
-    { method: "POST" },
-  );
-}
-
-export async function deleteOrganizationExecutionWorker(
-  token: string,
-  organizationId: string,
-  deviceId: string,
-) {
-  return request<void>(
-    `/organizations/${organizationId}/workers/${encodeURIComponent(deviceId)}`,
-    token,
-    {
-      method: "DELETE",
-      headers: { "Idempotency-Key": `worker-deprovision:${deviceId}` },
-    },
-  );
-}
-
-export async function updateOrganizationExecutionWorkerConcurrency(
-  token: string,
-  organizationId: string,
-  deviceId: string,
-  maxConcurrentSessions: number,
-) {
-  return request<{ deviceId: string; maxConcurrentSessions: number }>(
-    `/organizations/${organizationId}/workers/${encodeURIComponent(deviceId)}`,
-    token,
-    {
-      method: "PATCH",
-      body: JSON.stringify({ maxConcurrentSessions }),
-    },
-  );
-}
-
-export async function updateOrganizationExecutionWorkerIcon(
-  token: string,
-  organizationId: string,
-  deviceId: string,
-  icon: WorkerIcon | null,
-) {
-  return request<{ deviceId: string; icon: WorkerIcon | null }>(
-    `/organizations/${organizationId}/workers/${encodeURIComponent(deviceId)}`,
-    token,
-    {
-      method: "PATCH",
-      body: JSON.stringify({ icon }),
-    },
-  );
 }
 
 export type GithubIntegrationRepository = {
