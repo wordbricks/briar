@@ -653,84 +653,8 @@ pub(super) fn inspect_repository_readiness_on(
     if requires_github && github_repository.is_none() {
         issues.push("PR 단계에는 GitHub origin 저장소가 필요합니다.".to_string());
     }
-    let gh = if requires_github {
-        runner.resolve_binary("gh")
-    } else {
-        Err("현재 워크플로우에는 GitHub CLI가 필요하지 않습니다.".to_string())
-    };
-    let gh_installed = gh.is_ok();
-    let gh_version = gh
-        .as_ref()
-        .ok()
-        .and_then(|binary| {
-            runner
-                .run(&host::CommandSpec::new(binary).args(["--version"]))
-                .ok()
-        })
-        .filter(host::CommandOutput::success)
-        .and_then(|output| parse_cli_version(output.stdout.as_bytes()));
-    let gh_authenticated = gh
-        .as_ref()
-        .ok()
-        .and_then(|binary| {
-            runner
-                .run(&host::CommandSpec::new(binary).args([
-                    "auth",
-                    "status",
-                    "--hostname",
-                    "github.com",
-                ]))
-                .ok()
-        })
-        .is_some_and(|output| output.success());
-    let gh_account = gh
-        .as_ref()
-        .ok()
-        .filter(|_| gh_authenticated)
-        .and_then(|binary| {
-            runner
-                .run(&host::CommandSpec::new(binary).args(["api", "user", "--jq", ".login"]))
-                .ok()
-        })
-        .filter(host::CommandOutput::success)
-        .map(|output| output.stdout_trimmed())
-        .filter(|account| !account.is_empty());
-    let github_write_access = gh
-        .as_ref()
-        .ok()
-        .filter(|_| gh_authenticated)
-        .zip(github_repository.as_ref())
-        .and_then(|(binary, repository)| {
-            runner
-                .run(&host::CommandSpec::new(binary).args([
-                    "repo",
-                    "view",
-                    repository,
-                    "--json",
-                    "viewerPermission",
-                    "--jq",
-                    ".viewerPermission",
-                ]))
-                .ok()
-        })
-        .filter(host::CommandOutput::success)
-        .is_some_and(|output| matches!(output.stdout.trim(), "WRITE" | "MAINTAIN" | "ADMIN"));
-    if requires_github && !gh_installed {
-        issues.push("PR 단계 실행에 필요한 GitHub CLI가 설치되지 않았습니다.".to_string());
-    } else if requires_github && !gh_authenticated {
-        issues.push("GitHub CLI 로그인이 필요합니다.".to_string());
-    } else if requires_github && !github_write_access {
-        issues.push("GitHub 저장소 쓰기 권한을 확인하지 못했습니다.".to_string());
-    }
-
     let git_ready = git_installed && repository_healthy;
-    let pr_ready = git_ready
-        && remote_reachable
-        && push_access
-        && github_repository.is_some()
-        && gh_installed
-        && gh_authenticated
-        && github_write_access;
+    let pr_ready = git_ready && remote_reachable && push_access && github_repository.is_some();
 
     RepositoryReadiness {
         repository_path: resolved_path.to_string_lossy().into_owned(),
@@ -742,11 +666,11 @@ pub(super) fn inspect_repository_readiness_on(
         push_access,
         requires_github,
         github_repository,
-        gh_installed,
-        gh_version,
-        gh_authenticated,
-        gh_account,
-        github_write_access,
+        gh_installed: false,
+        gh_version: None,
+        gh_authenticated: false,
+        gh_account: None,
+        github_write_access: push_access,
         git_ready,
         pr_ready,
         issues,
@@ -809,108 +733,6 @@ pub(super) async fn project_repository_readiness(
     let home = app.path().home_dir().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         project_repository_readiness_at(&config_path, &project_id, &home)
-    })
-    .await
-    .map_err(|error| error.to_string())?
-}
-
-#[tauri::command]
-pub(super) async fn install_project_github_cli(
-    app: tauri::AppHandle,
-    project_id: String,
-) -> Result<RepositoryReadiness, String> {
-    let config_path = cli_config_path(&app)?;
-    let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
-        if gh_binary(&home).is_err() {
-            install_brew_package(&home, "gh")?;
-        }
-        let readiness = project_repository_readiness_at(&config_path, &project_id, &home)?;
-        if !readiness.gh_installed {
-            return Err(
-                "설치는 완료됐지만 GitHub CLI를 찾지 못했습니다. Briar를 다시 열어 주세요."
-                    .to_string(),
-            );
-        }
-        Ok(readiness)
-    })
-    .await
-    .map_err(|error| error.to_string())?
-}
-
-#[tauri::command]
-pub(super) async fn login_project_github(
-    app: tauri::AppHandle,
-    project_id: String,
-) -> Result<RepositoryReadiness, String> {
-    let config_path = cli_config_path(&app)?;
-    let home = app.path().home_dir().map_err(|error| error.to_string())?;
-    let app_handle = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let binary = gh_binary(&home)?;
-        let execution_path = cli_execution_path(&home)?;
-        let authenticated = Command::new(&binary)
-            .env("PATH", &execution_path)
-            .args(["auth", "status", "--hostname", "github.com"])
-            .output()
-            .is_ok_and(|output| output.status.success());
-        if !authenticated {
-            let help = Command::new(&binary)
-                .env("PATH", &execution_path)
-                .args(["auth", "login", "--help"])
-                .output()
-                .ok();
-            let supports_clipboard = help.as_ref().is_some_and(|output| {
-                String::from_utf8_lossy(&output.stdout).contains("--clipboard")
-            });
-            app_handle
-                .opener()
-                .open_url(GITHUB_DEVICE_LOGIN_URL, None::<&str>)
-                .map_err(|error| format!("GitHub 로그인 페이지를 열지 못했습니다: {error}"))?;
-            let mut command = Command::new(&binary);
-            command
-                .env("PATH", &execution_path)
-                // Briar opens the device page itself so a GUI launch never
-                // depends on the CLI process inheriting a usable browser.
-                .env("GH_BROWSER", GITHUB_CLI_NOOP_BROWSER)
-                .args([
-                    "auth",
-                    "login",
-                    "--hostname",
-                    "github.com",
-                    "--git-protocol",
-                    "https",
-                    "--web",
-                ]);
-            if supports_clipboard {
-                command.arg("--clipboard");
-            }
-            let output = command
-                .output()
-                .map_err(|error| format!("GitHub 로그인을 시작하지 못했습니다: {error}"))?;
-            if !output.status.success() {
-                return Err(format!(
-                    "GitHub 로그인에 실패했습니다: {}",
-                    command_failure(&output)
-                ));
-            }
-        }
-        let setup = Command::new(&binary)
-            .env("PATH", &execution_path)
-            .args(["auth", "setup-git", "--hostname", "github.com"])
-            .output()
-            .map_err(|error| format!("Git push 인증을 설정하지 못했습니다: {error}"))?;
-        if !setup.status.success() {
-            return Err(format!(
-                "Git push 인증을 설정하지 못했습니다: {}",
-                command_failure(&setup)
-            ));
-        }
-        let readiness = project_repository_readiness_at(&config_path, &project_id, &home)?;
-        if !readiness.gh_authenticated {
-            return Err("GitHub 로그인은 완료됐지만 인증 상태를 확인하지 못했습니다.".to_string());
-        }
-        Ok(readiness)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -1071,6 +893,298 @@ pub(super) fn briar_workspace_root(home: &Path) -> PathBuf {
 /// Folder that holds repositories imported from external GitHub-backed tools.
 pub(super) fn briar_git_root(home: &Path) -> PathBuf {
     home.join("briar").join("git")
+}
+
+fn managed_project_repository_root(
+    home: &Path,
+    organization_id: &str,
+    project_id: &str,
+) -> PathBuf {
+    home.join("Briar")
+        .join("projects")
+        .join(organization_id)
+        .join(project_id)
+}
+
+fn safe_server_identifier(value: &str) -> bool {
+    value.len() == 36
+        && value
+            .chars()
+            .all(|character| character.is_ascii_hexdigit() || character == '-')
+}
+
+fn github_repository_parts(value: &str) -> Result<(&str, &str), String> {
+    let mut parts = value.split('/');
+    let owner = parts.next().unwrap_or_default();
+    let repository = parts.next().unwrap_or_default();
+    let valid = |segment: &str| {
+        !segment.is_empty()
+            && segment != "."
+            && segment != ".."
+            && segment
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || "-_.".contains(character))
+    };
+    if !valid(owner) || !valid(repository) || parts.next().is_some() {
+        return Err("프로젝트의 GitHub 저장소 정보가 올바르지 않습니다.".to_string());
+    }
+    Ok((owner, repository))
+}
+
+fn ensure_repository_disk_space(path: &Path) -> Result<(), String> {
+    let output = Command::new("df")
+        .arg("-Pk")
+        .arg(path)
+        .output()
+        .map_err(|error| format!("디스크 여유 공간을 확인하지 못했습니다: {error}"))?;
+    if !output.status.success() {
+        return Err("디스크 여유 공간을 확인하지 못했습니다.".to_string());
+    }
+    let available_kib = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .last()
+        .and_then(|line| line.split_whitespace().nth(3))
+        .and_then(|value| value.parse::<u64>().ok())
+        .ok_or_else(|| "디스크 여유 공간 결과를 읽지 못했습니다.".to_string())?;
+    if available_kib < 1_048_576 {
+        return Err(
+            "저장소를 준비하려면 디스크 여유 공간이 1GB 이상 필요합니다. 공간을 확보한 뒤 다시 시도해 주세요."
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
+fn project_git_credential_helper() -> &'static str {
+    "!\"${BRIAR_CLI:-briar}\" github credential"
+}
+
+fn configure_project_git_credentials(
+    git: &Path,
+    repository_path: &Path,
+    repository_id: u64,
+) -> Result<(), String> {
+    let repository_id = repository_id.to_string();
+    let settings = [
+        ("briar.githubRepositoryId", repository_id.as_str()),
+        ("credential.useHttpPath", "true"),
+        (
+            "credential.https://github.com.helper",
+            project_git_credential_helper(),
+        ),
+    ];
+    for (key, value) in settings {
+        let output = Command::new(git)
+            .args(["config", "--local", key, value])
+            .current_dir(repository_path)
+            .output()
+            .map_err(|error| format!("Git 인증 설정을 저장하지 못했습니다: {error}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "Git 인증 설정을 저장하지 못했습니다: {}",
+                command_failure(&output)
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn with_temporary_git_credential(
+    command: &mut Command,
+    credential: &ProjectGithubCredential,
+    temporary_directory: &Path,
+) -> Result<(), String> {
+    let askpass = temporary_directory.join("briar-git-askpass.sh");
+    fs::write(
+        &askpass,
+        "#!/bin/sh\ncase \"$1\" in\n  *Username*) printf '%s\\n' \"$BRIAR_GIT_USERNAME\" ;;\n  *) printf '%s\\n' \"$BRIAR_GIT_PASSWORD\" ;;\nesac\n",
+    )
+    .map_err(|error| format!("임시 Git 인증 도우미를 만들지 못했습니다: {error}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&askpass, fs::Permissions::from_mode(0o700))
+            .map_err(|error| format!("임시 Git 인증 도우미를 보호하지 못했습니다: {error}"))?;
+    }
+    command
+        .env("GIT_ASKPASS", askpass)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GCM_INTERACTIVE", "Never")
+        .env("BRIAR_GIT_USERNAME", &credential.username)
+        .env("BRIAR_GIT_PASSWORD", &credential.password);
+    Ok(())
+}
+
+pub(super) fn prepare_project_repository_in(
+    git: &Path,
+    home: &Path,
+    credential: &ProjectGithubCredential,
+) -> Result<PreparedProjectRepository, String> {
+    if !safe_server_identifier(&credential.project.id)
+        || !safe_server_identifier(&credential.project.organization_id)
+    {
+        return Err("서버가 반환한 프로젝트 식별자가 올바르지 않습니다.".to_string());
+    }
+    let (_, repository_name) = github_repository_parts(&credential.repository.full_name)?;
+    let expected_clone_url = format!("https://github.com/{}.git", credential.repository.full_name);
+    if credential.repository.clone_url != expected_clone_url || credential.repository.id == 0 {
+        return Err("서버가 반환한 GitHub 저장소 식별자가 일치하지 않습니다.".to_string());
+    }
+    let expires_at = chrono::DateTime::parse_from_rfc3339(&credential.expires_at)
+        .map_err(|_| "GitHub 자격 증명의 만료 시간을 확인하지 못했습니다.".to_string())?;
+    if expires_at <= chrono::Utc::now() + chrono::Duration::seconds(30) {
+        return Err(
+            "GitHub 자격 증명이 만료되었습니다. 다시 시도해 새 자격 증명을 받아 주세요."
+                .to_string(),
+        );
+    }
+
+    let project_root = managed_project_repository_root(
+        home,
+        &credential.project.organization_id,
+        &credential.project.id,
+    );
+    fs::create_dir_all(&project_root)
+        .map_err(|error| format!("Briar 관리 폴더를 만들지 못했습니다: {error}"))?;
+    ensure_repository_disk_space(&project_root)?;
+    let repository_path = project_root.join(repository_name);
+    let credential_directory = tempfile::tempdir()
+        .map_err(|error| format!("임시 Git 인증 공간을 만들지 못했습니다: {error}"))?;
+    let mut reused = false;
+
+    if repository_path.exists() {
+        let root = Command::new(git)
+            .args(["rev-parse", "--show-toplevel"])
+            .current_dir(&repository_path)
+            .output()
+            .map_err(|error| format!("기존 저장소를 확인하지 못했습니다: {error}"))?;
+        let remote = Command::new(git)
+            .args(["remote", "get-url", "origin"])
+            .current_dir(&repository_path)
+            .output()
+            .map_err(|error| format!("기존 저장소 origin을 확인하지 못했습니다: {error}"))?;
+        let root_matches = root.status.success()
+            && canonical_directory(Path::new(String::from_utf8_lossy(&root.stdout).trim()))?
+                == canonical_directory(&repository_path)?;
+        let remote_repository = remote
+            .status
+            .success()
+            .then(|| github_repository_from_remote(String::from_utf8_lossy(&remote.stdout).trim()))
+            .flatten();
+        if !root_matches
+            || remote_repository.as_deref().is_none_or(|repository| {
+                !repository.eq_ignore_ascii_case(&credential.repository.full_name)
+            })
+        {
+            return Err(format!(
+                "{} 폴더에 다른 저장소가 있어 덮어쓰지 않았습니다. 폴더를 옮기거나 프로젝트 연결을 확인한 뒤 다시 시도해 주세요.",
+                repository_path.display()
+            ));
+        }
+        let marker = Command::new(git)
+            .args(["config", "--local", "--get", "briar.githubRepositoryId"])
+            .current_dir(&repository_path)
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .and_then(|value| value.trim().parse::<u64>().ok());
+        if marker.is_some_and(|value| value != credential.repository.id) {
+            return Err("기존 clone의 GitHub 저장소 ID가 프로젝트와 다릅니다.".to_string());
+        }
+        let mut verify = Command::new(git);
+        verify
+            .args([
+                "-c",
+                "credential.helper=",
+                "ls-remote",
+                "--exit-code",
+                &expected_clone_url,
+                "HEAD",
+            ])
+            .current_dir(&repository_path);
+        with_temporary_git_credential(&mut verify, credential, credential_directory.path())?;
+        let verified = verify
+            .output()
+            .map_err(|error| format!("기존 clone 접근 권한을 확인하지 못했습니다: {error}"))?;
+        if !verified.status.success() {
+            return Err("기존 clone에 대한 GitHub App 접근 권한을 확인하지 못했습니다. 권한을 갱신한 뒤 다시 시도해 주세요.".to_string());
+        }
+        reused = true;
+    } else {
+        let staging = tempfile::Builder::new()
+            .prefix(".briar-clone-")
+            .tempdir_in(&project_root)
+            .map_err(|error| format!("임시 clone 폴더를 만들지 못했습니다: {error}"))?;
+        let checkout = staging.path().join("repository");
+        let mut clone = Command::new(git);
+        clone
+            .args([
+                "-c",
+                "credential.helper=",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "clone",
+                "--origin",
+                "origin",
+                "--",
+                &expected_clone_url,
+            ])
+            .arg(&checkout);
+        with_temporary_git_credential(&mut clone, credential, credential_directory.path())?;
+        let cloned = clone
+            .output()
+            .map_err(|error| format!("Git 저장소 clone을 시작하지 못했습니다: {error}"))?;
+        if !cloned.status.success() {
+            return Err("GitHub 저장소를 가져오지 못했습니다. 저장소 권한이나 토큰 만료를 확인한 뒤 다시 시도해 주세요.".to_string());
+        }
+        fs::rename(&checkout, &repository_path)
+            .map_err(|error| format!("준비한 저장소를 관리 폴더로 옮기지 못했습니다: {error}"))?;
+    }
+
+    let set_remote = Command::new(git)
+        .args(["remote", "set-url", "origin", &expected_clone_url])
+        .current_dir(&repository_path)
+        .output()
+        .map_err(|error| format!("origin 주소를 보호된 HTTPS 주소로 바꾸지 못했습니다: {error}"))?;
+    if !set_remote.status.success() {
+        return Err(format!(
+            "origin 주소를 보호된 HTTPS 주소로 바꾸지 못했습니다: {}",
+            command_failure(&set_remote)
+        ));
+    }
+    configure_project_git_credentials(git, &repository_path, credential.repository.id)?;
+    Ok(PreparedProjectRepository {
+        repository_path: path_display_string(canonical_directory(&repository_path)?)?,
+        repository_id: credential.repository.id,
+        repository: credential.repository.full_name.clone(),
+        reused,
+        completed_steps: vec![
+            "git".to_string(),
+            "disk".to_string(),
+            "clone".to_string(),
+            "verify".to_string(),
+            "credential-helper".to_string(),
+        ],
+    })
+}
+
+#[tauri::command]
+pub(super) async fn prepare_project_repository(
+    app: tauri::AppHandle,
+    project_id: String,
+    credential: ProjectGithubCredential,
+) -> Result<PreparedProjectRepository, String> {
+    if project_id != credential.project.id {
+        return Err("요청한 프로젝트와 GitHub 자격 증명의 프로젝트가 다릅니다.".to_string());
+    }
+    let home = app.path().home_dir().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let git = git_binary(&home)?;
+        prepare_project_repository_in(&git, &home, &credential)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 pub(super) fn github_ssh_repository_name(repository_url: &str) -> Result<String, String> {

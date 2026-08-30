@@ -2838,6 +2838,25 @@ export async function updateProjectSettings(
   };
 }
 
+export type ProjectGithubCredential = {
+  project: { id: string; organizationId: string };
+  repository: { id: number; fullName: string; cloneUrl: string };
+  username: string;
+  password: string;
+  expiresAt: string;
+};
+
+export async function createProjectGithubCredential(
+  token: string,
+  projectId: string,
+) {
+  return request<ProjectGithubCredential>(
+    `/projects/${projectId}/github/credentials`,
+    token,
+    { method: "POST" },
+  );
+}
+
 export async function loadMergeQueueProfile(
   token: string,
   projectId: string,

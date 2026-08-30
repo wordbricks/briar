@@ -1,12 +1,5 @@
-export type GithubCommandResult = {
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-};
-
-export type GithubCommandRunner = (
-  command: string[],
-) => GithubCommandResult;
+import * as Schema from "effect/Schema";
+import { request } from "./command-support";
 
 type GithubPullRequestTarget = {
   owner: string;
@@ -22,9 +15,26 @@ export type GithubPullRequestIdentity = {
   pullRequestNumber: number;
 };
 
-type GithubPullRequestInspection = GithubPullRequestIdentity & {
-  body: string;
-};
+const GithubPullRequestInspectionResponse = Schema.Struct({
+  pullRequest: Schema.Struct({
+    repositoryId: Schema.Int.check(Schema.isGreaterThan(0)),
+    repository: Schema.String,
+    pullRequestId: Schema.Int.check(Schema.isGreaterThan(0)),
+    pullRequestNodeId: Schema.String.check(Schema.isMinLength(1)),
+    pullRequestNumber: Schema.Int.check(Schema.isGreaterThan(0)),
+    body: Schema.String,
+  }).annotate({ parseOptions: { onExcessProperty: "preserve" } }),
+}).annotate({ parseOptions: { onExcessProperty: "preserve" } });
+
+const decodeInspectionResponse = Schema.decodeUnknownSync(
+  GithubPullRequestInspectionResponse,
+  { errors: "all" },
+);
+
+export type GithubApiRequest = (
+  path: string,
+  init?: RequestInit,
+) => Promise<unknown>;
 
 export function briarIssueUrl(
   apiUrl: string,
@@ -64,87 +74,49 @@ export function appendBriarIssueLink(body: string, issueUrl: string) {
   return `${existing}${existing ? "\n\n" : ""}[Briar issue](${issueUrl})\n`;
 }
 
-const runGithubCommand: GithubCommandRunner = (command) => {
-  const result = Bun.spawnSync({
-    cmd: command,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  return {
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  };
-};
-
-function parseGithubPullRequestInspection(
-  stdout: string,
+function validateGithubPullRequestInspection(
+  value: typeof GithubPullRequestInspectionResponse.Type["pullRequest"],
   target: GithubPullRequestTarget,
-): GithubPullRequestInspection {
-  let value: unknown;
-  try {
-    value = JSON.parse(stdout);
-  } catch {
-    throw new Error("GitHub PR metadata response was not valid JSON");
-  }
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("GitHub PR metadata response was invalid");
-  }
-  const record = value as Record<string, unknown>;
-  const repository = typeof record.repository === "string"
-    ? record.repository.trim().toLowerCase()
-    : "";
+) {
+  const repository = value.repository.trim().toLowerCase();
   const expectedRepository =
     `${target.owner}/${target.repository}`.toLowerCase();
   if (
-    typeof record.body !== "string" ||
-    !Number.isSafeInteger(record.repositoryId) ||
-    Number(record.repositoryId) <= 0 ||
     repository !== expectedRepository ||
-    !Number.isSafeInteger(record.pullRequestId) ||
-    Number(record.pullRequestId) <= 0 ||
-    typeof record.pullRequestNodeId !== "string" ||
-    record.pullRequestNodeId.trim().length === 0 ||
-    !Number.isSafeInteger(record.pullRequestNumber) ||
-    Number(record.pullRequestNumber) !== Number(target.number)
+    value.pullRequestNumber !== Number(target.number)
   ) {
     throw new Error("GitHub PR metadata response did not match the requested PR");
   }
   return {
-    body: record.body,
-    repositoryId: Number(record.repositoryId),
+    body: value.body,
+    repositoryId: value.repositoryId,
     repository,
-    pullRequestId: Number(record.pullRequestId),
-    pullRequestNodeId: record.pullRequestNodeId.trim(),
-    pullRequestNumber: Number(record.pullRequestNumber),
+    pullRequestId: value.pullRequestId,
+    pullRequestNodeId: value.pullRequestNodeId.trim(),
+    pullRequestNumber: value.pullRequestNumber,
   };
 }
 
-export function ensureBriarIssueLinkInGithubPullRequest(
+export async function ensureBriarIssueLinkInGithubPullRequest(
   input: {
+    apiUrl: string;
+    projectId: string;
+    token: string;
     pullRequestUrl: string;
     issueUrl: string;
   },
-  run: GithubCommandRunner = runGithubCommand,
+  send: GithubApiRequest = (path, init) =>
+    request(input.apiUrl, path, input.token, init),
 ) {
   const target = githubPullRequestTarget(input.pullRequestUrl);
   if (!target) return { updated: false, reason: "not_github" as const };
 
-  const endpoint =
-    `repos/${target.owner}/${target.repository}/pulls/${target.number}`;
-  const current = run([
-    "gh",
-    "api",
-    endpoint,
-    "--jq",
-    "{body: (.body // \"\"), repositoryId: .base.repo.id, repository: .base.repo.full_name, pullRequestId: .id, pullRequestNodeId: .node_id, pullRequestNumber: .number}",
-  ]);
-  if (current.exitCode !== 0) {
-    throw new Error(
-      `GitHub PR description could not be read: ${current.stderr.trim() || "gh api failed"}`,
-    );
-  }
-  const inspection = parseGithubPullRequestInspection(current.stdout, target);
+  const endpoint = `/projects/${encodeURIComponent(input.projectId)}/github/pull-requests/${target.number}`;
+  const current = decodeInspectionResponse(await send(endpoint));
+  const inspection = validateGithubPullRequestInspection(
+    current.pullRequest,
+    target,
+  );
 
   const body = appendBriarIssueLink(inspection.body, input.issueUrl);
   if (body === inspection.body) {
@@ -161,22 +133,10 @@ export function ensureBriarIssueLinkInGithubPullRequest(
     };
   }
 
-  const updated = run([
-    "gh",
-    "api",
-    "--method",
-    "PATCH",
-    endpoint,
-    "--raw-field",
-    `body=${body}`,
-  ]);
-  if (updated.exitCode !== 0) {
-    throw new Error(
-      `Briar issue link could not be added to the GitHub PR description: ${
-        updated.stderr.trim() || "gh api failed"
-      }`,
-    );
-  }
+  await send(endpoint, {
+    method: "PATCH",
+    body: JSON.stringify({ body }),
+  });
   return {
     updated: true,
     reason: "linked" as const,

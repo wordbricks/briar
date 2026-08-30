@@ -298,7 +298,10 @@ async function addRunEvidence() {
     parsed.url &&
     (parsed.status === "passed" || parsed.status === "pending")
   ) {
-    const github = ensureBriarIssueLinkInGithubPullRequest({
+    const github = await ensureBriarIssueLinkInGithubPullRequest({
+      apiUrl: config.apiUrl,
+      projectId: project.id,
+      token: executionToken(project),
       pullRequestUrl: parsed.url,
       issueUrl: briarIssueUrl(config.apiUrl, project.id, runId),
     });

@@ -60,6 +60,16 @@ import {
   managedComputerSyncCommand,
   managedComputerWorkerSupervisor,
 } from "./managed-computer-commands";
+import {
+  githubCommitStatusCommand,
+  githubCredentialCommand,
+  githubGraphqlCommand,
+  githubPullRequestCreateCommand,
+  githubPullRequestEditCommand,
+  githubPullRequestMergeCommand,
+  githubPullRequestViewCommand,
+  githubRepositoryCommand,
+} from "./github-commands";
 
 type CommandHandler = () => void | Promise<void>;
 
@@ -561,6 +571,82 @@ const mergeQueueCommand = Command.make("merge-queue").pipe(
   ]),
 );
 
+const githubCommand = Command.make("github").pipe(
+  Command.withDescription("Use the project's GitHub App connection"),
+  Command.withSubcommands([
+    Command.make("pr").pipe(
+      Command.withSubcommands([
+        leaf(
+          "create",
+          {
+            ...requiredStrings("title", "head"),
+            ...optionalStrings("base", "body", "body-file"),
+            ...switches("draft"),
+          },
+          githubPullRequestCreateCommand,
+          "Create a pull request with the GitHub App",
+        ),
+        leaf(
+          "view",
+          requiredStrings("number"),
+          githubPullRequestViewCommand,
+          "Read a pull request with the GitHub App",
+        ),
+        leaf(
+          "edit",
+          {
+            ...requiredStrings("number"),
+            ...optionalStrings("title", "body", "body-file", "base", "state"),
+          },
+          githubPullRequestEditCommand,
+          "Update a pull request with the GitHub App",
+        ),
+        leaf(
+          "merge",
+          {
+            ...requiredStrings("number"),
+            ...optionalStrings("method", "head-sha"),
+          },
+          githubPullRequestMergeCommand,
+          "Merge a pull request without bypassing repository rules",
+        ),
+      ]),
+    ),
+    leaf(
+      "status",
+      {
+        ...requiredStrings("sha", "state", "context"),
+        ...optionalStrings("description", "target-url"),
+      },
+      githubCommitStatusCommand,
+      "Publish a commit status with the GitHub App",
+    ),
+    leaf(
+      "repository",
+      {},
+      githubRepositoryCommand,
+      "Inspect the project's authoritative GitHub repository",
+    ),
+    leaf(
+      "graphql",
+      {
+        ...requiredStrings("query"),
+        ...optionalStrings("variables-json"),
+      },
+      githubGraphqlCommand,
+      "Run a project-scoped GitHub GraphQL request",
+    ).pipe(Command.unlisted),
+    Command.make(
+      "credential",
+      { operation: Argument.string("operation") },
+      () => runHandler(githubCredentialCommand),
+    ).pipe(
+      Command.withDescription("Provide a scoped token to Git credential"),
+      Command.unlisted,
+    ),
+  ]),
+);
+
 export const briarCommand = Command.make("briar").pipe(
   Command.withDescription("Briar project and worker command-line interface"),
   Command.withSubcommands([
@@ -579,5 +665,6 @@ export const briarCommand = Command.make("briar").pipe(
     workerCommandTree,
     managedComputerCommand,
     mergeQueueCommand,
+    githubCommand,
   ]),
 );

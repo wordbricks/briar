@@ -1108,6 +1108,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
     await executeSql(
       db,
+      await readFile(
+        resolve("migrations/0147_project_github_repository_identity.sql"),
+        "utf8",
+      ),
+    );
+    await executeSql(
+      db,
       `drop trigger briar_issue_execution_org_member_remove_invalidate;`,
     );
     // The lifecycle suite intentionally uses a compact migration history, so

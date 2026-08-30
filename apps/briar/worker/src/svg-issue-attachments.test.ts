@@ -31,7 +31,11 @@ describe("SVG issue attachment lifecycle", () => {
       through: "0119_execution_worker_update_handoffs.sql",
     });
     await applyD1Migrations(db, {
-      files: ["0136_issue_difficulty.sql", "0140_issue_difficulty_optional.sql"],
+      files: [
+        "0136_issue_difficulty.sql",
+        "0140_issue_difficulty_optional.sql",
+        "0147_project_github_repository_identity.sql",
+      ],
     });
     await db.batch([
       db

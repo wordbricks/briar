@@ -30,7 +30,7 @@ describe("local project connection state", () => {
       connectionState: "disconnected",
       readiness: { gitReady: true, prReady: true, requiresGithub: true },
       requiresLocalReadiness: true,
-    })).toBe("reconnect");
+    })).toBe("readiness");
     expect(projectRepositoryDestination({
       connectionState: "unknown",
       readiness: { gitReady: true, prReady: true, requiresGithub: true },

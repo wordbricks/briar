@@ -157,6 +157,7 @@ fn reports_health_drift_and_repairs_bundled_assets() {
                 linear_source: None,
                 linear_team: None,
                 github_repository: Some("wordbricks/briar".to_string()),
+                github_repository_id: Some(701),
                 workflow: repository_workflow_bootstrap(),
             },
         },

@@ -915,6 +915,7 @@ export type ProjectSettings = {
     source: string | null;
     teamKey: string | null;
   };
+  githubRepositoryId: number | null;
   githubRepository: string | null;
   workflow: AutoHuntWorkflow;
   checkpointPolicy?: {

@@ -56,7 +56,7 @@ export function projectRepositoryDestination(input: {
   requiresLocalReadiness: boolean;
 }): ProjectRepositoryDestination {
   if (!input.requiresLocalReadiness) return "settings";
-  if (input.connectionState === "disconnected") return "reconnect";
+  if (input.connectionState === "disconnected") return "readiness";
   if (input.connectionState === "unknown") return "unavailable";
   return isLocalProjectRepositoryReady(input.readiness)
     ? "settings"

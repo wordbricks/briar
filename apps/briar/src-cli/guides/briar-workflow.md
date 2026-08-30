@@ -253,10 +253,14 @@ Only perform stages present in the run snapshot. The claim's `startStage` and `r
 Read applicable manifests, CI workflows,
 deployment configuration, and repository scripts to map a stage to a real action.
 
-For a GitHub `pr_open` stage, verify `gh --version`,
-`gh auth status --hostname github.com`, the `origin` remote, and authenticated push access
-before depending on PR delivery. Record the exact missing install, login, remote, or
-permission action as a blocker.
+For a GitHub `pr_open` stage, verify `briar github repository`, the `origin`
+remote, and authenticated push access before depending on PR delivery. Briar uses the
+project's GitHub App installation; a local GitHub CLI install or login is not required.
+Record the exact missing App installation, repository selection, remote, or permission
+action as a blocker.
+Create, inspect, update, or merge a pull request through `briar github pr`; publish
+commit statuses through `briar github status`. These commands use the project-scoped
+GitHub App identity and preserve repository rules. Do not require a personal GitHub login.
 When creating a GitHub pull request, include `work.briarIssueUrl` in the pull request
 description and preserve it in later description edits. Recording passed or pending
 `pull_request` evidence also verifies the GitHub PR description and appends the Briar issue

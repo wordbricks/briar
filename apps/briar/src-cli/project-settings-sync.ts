@@ -19,6 +19,9 @@ const ProjectSettingsResponse = Schema.Struct({
       teamKey: nullableString,
     }),
     githubRepository: nullableString,
+    githubRepositoryId: Schema.optional(Schema.NullOr(
+      Schema.Int.check(Schema.isGreaterThan(0)),
+    )),
     workflow: WorkflowConfig,
   }).annotate({ parseOptions: { onExcessProperty: "preserve" } }),
 }).annotate({ parseOptions: { onExcessProperty: "preserve" } });
@@ -66,6 +69,7 @@ export function projectWithRemoteSettings(
         teamKey: settings.linear.teamKey ?? undefined,
       },
       githubRepository: settings.githubRepository ?? undefined,
+      githubRepositoryId: settings.githubRepositoryId ?? undefined,
       workflow: settings.workflow,
     },
   };

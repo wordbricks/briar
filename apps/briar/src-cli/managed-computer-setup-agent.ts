@@ -1,9 +1,15 @@
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import {
+  chmod,
   lstat,
   mkdir,
+  mkdtemp,
+  rename,
+  rm,
+  writeFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
+import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -58,8 +64,25 @@ const SetupContextResponse = Schema.Struct({
         Schema.isPattern(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u),
       ),
     ),
+    githubRepositoryId: Schema.optional(Schema.NullOr(
+      Schema.Int.check(Schema.isGreaterThan(0)),
+    )),
     workflow: WorkflowConfig,
   }),
+  repositoryCredential: Schema.optional(Schema.Struct({
+    project: Schema.Struct({
+      id: Schema.String.check(Schema.isUUID()),
+      organizationId: Schema.String.check(Schema.isUUID()),
+    }),
+    repository: Schema.Struct({
+      id: Schema.Int.check(Schema.isGreaterThan(0)),
+      fullName: Schema.String,
+      cloneUrl: Schema.String,
+    }),
+    username: Schema.String,
+    password: Schema.String.check(Schema.isMinLength(1)),
+    expiresAt: Schema.String,
+  })),
 }).annotate({ parseOptions: { onExcessProperty: "preserve" } });
 
 const SetupBindResponse = Schema.Struct({
@@ -248,11 +271,6 @@ function commandStatus(binary: string, args: string[]) {
   return { status: result.status, stdout: result.stdout };
 }
 
-async function githubAuthenticated() {
-  return commandStatus("gh", ["auth", "status", "--hostname", "github.com"])
-    .status === 0;
-}
-
 async function providerAuthenticated(provider: ManagedComputerSetupProvider) {
   if (provider === "codex") {
     return commandStatus("codex", ["login", "status"]).status === 0;
@@ -279,9 +297,11 @@ async function runSimpleCommand(
   binary: string,
   args: string[],
   signal: AbortSignal,
+  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
 ) {
   const child = spawn(binary, args, {
-    env: process.env,
+    cwd: options.cwd,
+    env: options.env ?? process.env,
     stdio: ["ignore", "ignore", "ignore"],
   });
   const exited = new Promise<number>((resolveExit, rejectExit) => {
@@ -318,17 +338,35 @@ function githubRepositoryFromRemote(remote: string) {
 }
 
 async function ensureRepository(
-  repository: string,
-  projectId: string,
+  credential: NonNullable<
+    typeof SetupContextResponse.Type["repositoryCredential"]
+  >,
   signal: AbortSignal,
 ) {
+  const repository = credential.repository.fullName;
+  if (
+    credential.project.id.length === 0 ||
+    credential.repository.id <= 0 ||
+    credential.repository.cloneUrl !== `https://github.com/${repository}.git`
+  ) {
+    throw new Error("Managed repository credential identity is invalid");
+  }
+  if (Date.parse(credential.expiresAt) <= Date.now() + 30_000) {
+    throw new Error("Managed repository credential expired; restart setup to retry");
+  }
   const configuredRoot = process.env.BRIAR_MANAGED_WORKSPACE_ROOT?.trim();
-  const workspaceRoot = configuredRoot || join(homedir(), "workspaces");
+  const workspaceRoot = configuredRoot || join(homedir(), "Briar", "projects");
   if (!isAbsolute(workspaceRoot)) {
     throw new Error("Managed workspace root must be absolute");
   }
-  const repositoryPath = join(workspaceRoot, projectId);
-  await mkdir(workspaceRoot, { recursive: true, mode: 0o700 });
+  const repositoryName = repository.split("/")[1]!;
+  const projectRoot = join(
+    workspaceRoot,
+    credential.project.organizationId,
+    credential.project.id,
+  );
+  const repositoryPath = join(projectRoot, repositoryName);
+  await mkdir(projectRoot, { recursive: true, mode: 0o700 });
   if (await pathExists(repositoryPath)) {
     const root = gitValueAt(repositoryPath, ["rev-parse", "--show-toplevel"]);
     const remote = gitValueAt(repositoryPath, ["remote", "get-url", "origin"]);
@@ -338,12 +376,75 @@ async function ensureRepository(
     ) {
       throw new Error("Managed project directory contains a different repository");
     }
-    return repositoryPath;
+    const marker = gitValueAt(repositoryPath, [
+      "config",
+      "--local",
+      "--get",
+      "briar.githubRepositoryId",
+    ]);
+    if (marker && marker !== String(credential.repository.id)) {
+      throw new Error("Managed clone has a different GitHub repository ID");
+    }
+  }
+  const credentialDirectory = await mkdtemp(join(tmpdir(), "briar-git-"));
+  const askpass = join(credentialDirectory, "askpass.sh");
+  let cloneStagingDirectory: string | null = null;
+  try {
+    await writeFile(
+      askpass,
+      "#!/bin/sh\ncase \"$1\" in\n  *Username*) printf '%s\\n' \"$BRIAR_GIT_USERNAME\" ;;\n  *) printf '%s\\n' \"$BRIAR_GIT_PASSWORD\" ;;\nesac\n",
+      { mode: 0o700 },
+    );
+    await chmod(askpass, 0o700);
+    const env = {
+      ...process.env,
+      GIT_ASKPASS: askpass,
+      GIT_TERMINAL_PROMPT: "0",
+      GCM_INTERACTIVE: "Never",
+      BRIAR_GIT_USERNAME: credential.username,
+      BRIAR_GIT_PASSWORD: credential.password,
+    };
+    if (await pathExists(repositoryPath)) {
+      await runSimpleCommand(
+        "git",
+        ["-c", "credential.helper=", "ls-remote", "--exit-code", credential.repository.cloneUrl, "HEAD"],
+        signal,
+        { cwd: repositoryPath, env },
+      );
+    } else {
+      cloneStagingDirectory = await mkdtemp(join(projectRoot, ".briar-clone-"));
+      const checkout = join(cloneStagingDirectory, "repository");
+      await runSimpleCommand(
+        "git",
+        ["-c", "credential.helper=", "clone", "--origin", "origin", "--", credential.repository.cloneUrl, checkout],
+        signal,
+        { env },
+      );
+      await rename(checkout, repositoryPath);
+    }
+  } finally {
+    await rm(credentialDirectory, { recursive: true, force: true });
+    if (cloneStagingDirectory) {
+      await rm(cloneStagingDirectory, { recursive: true, force: true });
+    }
   }
   await runSimpleCommand(
-    "gh",
-    ["repo", "clone", repository, repositoryPath],
+    "git",
+    ["config", "--local", "briar.githubRepositoryId", String(credential.repository.id)],
     signal,
+    { cwd: repositoryPath },
+  );
+  await runSimpleCommand(
+    "git",
+    ["config", "--local", "credential.useHttpPath", "true"],
+    signal,
+    { cwd: repositoryPath },
+  );
+  await runSimpleCommand(
+    "git",
+    ["config", "--local", "credential.https://github.com.helper", "!\"${BRIAR_CLI:-briar}\" github credential"],
+    signal,
+    { cwd: repositoryPath },
   );
   return repositoryPath;
 }
@@ -458,33 +559,18 @@ export async function runManagedComputerGuidedSetup(
   if (!settings.githubRepository) {
     throw new Error("Connect a GitHub repository to this project before setup");
   }
+  if (!context.repositoryCredential) {
+    throw new Error("GitHub App repository access is not ready for this project");
+  }
 
   dependencies.emit({ type: "state", phase: "github", status: "working" });
-  if (!(await githubAuthenticated())) {
-    await runAuthentication({
-      service: "github",
-      command: {
-        binary: "gh",
-        args: [
-          "auth",
-          "login",
-          "--hostname",
-          "github.com",
-          "--git-protocol",
-          "https",
-          "--web",
-          "--insecure-storage",
-        ],
-        environment: { GH_BROWSER: "/bin/true", GH_PAGER: "cat" },
-      },
-      challengeId: "github-device",
-      signal: input.signal,
-    }, dependencies);
-    if (!(await githubAuthenticated())) {
-      throw new Error("GitHub authentication did not complete");
-    }
+  if (
+    context.repositoryCredential.repository.id !== settings.githubRepositoryId ||
+    context.repositoryCredential.repository.fullName.toLowerCase() !==
+      settings.githubRepository.toLowerCase()
+  ) {
+    throw new Error("Managed repository credential does not match project settings");
   }
-  await runSimpleCommand("gh", ["auth", "setup-git"], input.signal);
   dependencies.emit({ type: "state", phase: "github", status: "complete" });
 
   dependencies.emit({
@@ -514,8 +600,7 @@ export async function runManagedComputerGuidedSetup(
 
   dependencies.emit({ type: "state", phase: "repository", status: "working" });
   const repositoryPath = await ensureRepository(
-    settings.githubRepository,
-    context.project.id,
+    context.repositoryCredential,
     input.signal,
   );
   dependencies.emit({ type: "state", phase: "repository", status: "complete" });

@@ -13,6 +13,7 @@ export type ProjectSettingsRow = {
   linear_enabled: number;
   linear_source: string | null;
   linear_team_key: string | null;
+  github_repository_id: number | null;
   github_repository: string | null;
   workflow_json: string;
   mandatory_checkpoints_json: string | null;
@@ -29,6 +30,7 @@ export type ProjectSettingsInput = {
     source: string | null;
     teamKey: string | null;
   };
+  githubRepositoryId?: number | null;
   githubRepository: string | null;
   workflow: AutoHuntWorkflow;
 };
@@ -37,7 +39,8 @@ export async function getProjectSettings(db: D1Database, projectId: string) {
   return await db
     .prepare(
       `select project_id, velen_org, data_source, linear_enabled,
-              linear_source, linear_team_key, github_repository, workflow_json,
+              linear_source, linear_team_key, github_repository_id,
+              github_repository, workflow_json,
               mandatory_checkpoints_json, checkpoint_policy_revision,
               created_at, updated_at
        from briar_project_settings
@@ -115,15 +118,16 @@ export async function updateProjectSettings(
     .prepare(
       `insert into briar_project_settings (
          project_id, velen_org, data_source, linear_enabled, linear_source,
-         linear_team_key, github_repository, workflow_json,
+         linear_team_key, github_repository_id, github_repository, workflow_json,
          mandatory_checkpoints_json, created_at, updated_at
-       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        on conflict(project_id) do update set
          velen_org = excluded.velen_org,
          data_source = excluded.data_source,
          linear_enabled = excluded.linear_enabled,
          linear_source = excluded.linear_source,
          linear_team_key = excluded.linear_team_key,
+         github_repository_id = excluded.github_repository_id,
          github_repository = excluded.github_repository,
          workflow_json = excluded.workflow_json,
          mandatory_checkpoints_json = case
@@ -145,6 +149,7 @@ export async function updateProjectSettings(
       input.linear.enabled ? 1 : 0,
       input.linear.enabled ? input.linear.source : null,
       input.linear.enabled ? input.linear.teamKey : null,
+      input.githubRepositoryId ?? null,
       input.githubRepository,
       stableJson(workflow),
       stableJson(workflow.execution.checkpoints),
@@ -153,4 +158,28 @@ export async function updateProjectSettings(
     )
     .run();
   return await getProjectSettings(db, projectId);
+}
+
+export async function bindProjectGithubRepositoryIdentity(
+  db: D1Database,
+  projectId: string,
+  input: { repositoryId: number; repository: string },
+) {
+  const updatedAt = new Date().toISOString();
+  const result = await db
+    .prepare(
+      `update briar_project_settings
+       set github_repository_id = ?, github_repository = ?, updated_at = ?
+       where project_id = ? and github_repository is not null
+         and (github_repository_id is null or github_repository_id = ?)`,
+    )
+    .bind(
+      input.repositoryId,
+      input.repository,
+      updatedAt,
+      projectId,
+      input.repositoryId,
+    )
+    .run();
+  return (result.meta.changes ?? 0) > 0;
 }

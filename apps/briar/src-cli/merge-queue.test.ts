@@ -163,7 +163,7 @@ describe("local provider-independent merge-queue worker", () => {
     const commands: string[][] = [];
     const run: MergeQueueCommandRunner = (command) => {
       commands.push([...command]);
-      if (command[0] === "gh") return successful(pullRequestResponse());
+      if (command[1] === "github") return successful(pullRequestResponse());
       if (command[1] === "fetch" || command[1] === "push") return successful();
       if (command[1] === "merge-tree") return successful(treeSha);
       if (command[1] === "commit-tree") return successful(integrationSha);
@@ -252,17 +252,17 @@ describe("local provider-independent merge-queue worker", () => {
     let mainSha = liveBaseSha;
     const run: MergeQueueCommandRunner = (command) => {
       commands.push([...command]);
-      if (command[0] === "gh" && command.includes("graphql")) {
+      if (command[1] === "github" && command.includes("graphql")) {
         return successful(pullRequestResponse());
       }
-      if (command[0] === "gh" && command.at(-1) === "repos/wordbricks/briar") {
+      if (command[1] === "github" && command[2] === "repository") {
         return successful(JSON.stringify({
           allow_merge_commit: true,
           allow_squash_merge: true,
           allow_rebase_merge: true,
         }));
       }
-      if (command[0] === "gh" && command.includes("repos/wordbricks/briar/pulls/42/merge")) {
+      if (command[1] === "github" && command.includes("merge")) {
         mainSha = mergedMainSha;
         return successful(JSON.stringify({
           sha: mergedMainSha,
@@ -270,7 +270,7 @@ describe("local provider-independent merge-queue worker", () => {
           message: "Pull Request successfully merged",
         }));
       }
-      if (command[0] === "gh") return successful();
+      if (command[1] === "github") return successful();
       if (command[1] === "fetch") return successful();
       if (command[1] === "rev-parse") {
         const ref = command.at(-1) ?? "";
@@ -298,16 +298,19 @@ describe("local provider-independent merge-queue worker", () => {
       runCommand: run,
     });
     const statuses = commands.filter((command) =>
-      command[2] === `repos/wordbricks/briar/statuses/${integrationSha}`
+      command[1] === "github" && command[2] === "status"
     );
     expect(statuses).toHaveLength(1);
-    expect(statuses[0]).toContain("context=briar/merge-queue");
+    expect(statuses[0]).toEqual(expect.arrayContaining([
+      "--context",
+      "briar/merge-queue",
+    ]));
     expect(api.calls.filter((call) => call.path.endsWith("/lease"))).toHaveLength(2);
     expect(commands.some((command) =>
-      command[0] === "gh" &&
-      command.includes("repos/wordbricks/briar/pulls/42/merge") &&
-      command.includes(`sha=${headSha}`) &&
-      command.includes("merge_method=squash")
+      command[1] === "github" &&
+      command.includes("merge") &&
+      command.includes(headSha) &&
+      command.includes("squash")
     )).toBe(true);
     expect(commands.some((command) =>
       command[1] === "push" && command.includes("refs/heads/main")
@@ -324,7 +327,7 @@ describe("local provider-independent merge-queue worker", () => {
     const commands: string[][] = [];
     const run: MergeQueueCommandRunner = (command) => {
       commands.push([...command]);
-      if (command[0] === "gh") return successful();
+      if (command[1] === "github") return successful();
       throw new Error(`failed publication must not run git: ${command.join(" ")}`);
     };
     const api = recordingApi();
@@ -336,8 +339,8 @@ describe("local provider-independent merge-queue worker", () => {
       api: api.api,
       runCommand: run,
     });
-    expect(commands.every((command) => command[0] === "gh")).toBe(true);
-    expect(commands.filter((command) => command[0] === "gh")).toHaveLength(1);
+    expect(commands.every((command) => command[1] === "github")).toBe(true);
+    expect(commands.filter((command) => command[1] === "github")).toHaveLength(1);
     expect(api.calls.at(-1)?.path).toBe(`/merge-batch-claims/${batchId}/published`);
   });
 
@@ -354,7 +357,7 @@ describe("local provider-independent merge-queue worker", () => {
     const commands: string[][] = [];
     const run: MergeQueueCommandRunner = (command) => {
       commands.push([...command]);
-      if (command[0] === "gh") return successful();
+      if (command[1] === "github") return successful();
       if (command[1] === "fetch") return successful();
       if (command[1] === "rev-parse") {
         const ref = command.at(-1) ?? "";
@@ -400,13 +403,14 @@ describe("local provider-independent merge-queue worker", () => {
     const run: MergeQueueCommandRunner = (command) => {
       commands.push([...command]);
       if (command[0] === "git") return successful("git@github.com:wordbricks/briar.git\n");
-      if (command[1] === "auth") return successful();
-      const endpoint = command.at(-1) ?? "";
-      if (endpoint === "repos/wordbricks/briar") {
+      if (command[1] === "github" && command[2] === "repository") {
         return successful(JSON.stringify({
           id: 701,
           full_name: "wordbricks/briar",
           default_branch: "main",
+          allow_merge_commit: true,
+          allow_squash_merge: true,
+          allow_rebase_merge: true,
         }));
       }
       throw new Error(`unexpected command: ${command.join(" ")}`);
