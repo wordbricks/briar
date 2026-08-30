@@ -18,6 +18,7 @@ service WorkerQueueService {
   rpc ClaimWork(ClaimWorkRequest) returns (ClaimWorkResponse);
   rpc RenewWorkLease(RenewWorkLeaseRequest) returns (RenewWorkLeaseResponse);
   rpc HandoffWork(HandoffWorkRequest) returns (HandoffWorkResponse);
+  rpc CompleteProjectAgentTask(CompleteProjectAgentTaskRequest) returns (CompleteProjectAgentTaskResponse);
 }
 
 // Execution-credential operations shared by the interactive CLI and the
@@ -197,6 +198,30 @@ message HandoffWorkResponse {
   State state = 3;
   uint32 active_work_count = 4;
   bool ready = 5;
+}
+
+message CompleteProjectAgentTaskRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+
+  oneof result {
+    ProjectAgentTaskSuccess success = 10;
+    ProjectAgentTaskFailure failure = 11;
+  }
+}
+
+message ProjectAgentTaskSuccess {
+  string summary = 1;
+  optional string conversation_id = 2;
+}
+
+message ProjectAgentTaskFailure {
+  string error = 1;
+}
+
+message CompleteProjectAgentTaskResponse {
+  bool replayed = 1;
 }
 
 message ClaimedHandoffContext {

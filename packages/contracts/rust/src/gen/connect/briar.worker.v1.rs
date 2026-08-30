@@ -24,6 +24,18 @@ pub type OwnedHandoffWorkRequestView = ::buffa::view::OwnedView<
 pub type OwnedHandoffWorkResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::HandoffWorkResponseView<'static>,
 >;
+///Shorthand for `OwnedView<CompleteProjectAgentTaskRequestView<'static>>`.
+pub type OwnedCompleteProjectAgentTaskRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::CompleteProjectAgentTaskRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CompleteProjectAgentTaskResponseView<'static>>`.
+pub type OwnedCompleteProjectAgentTaskResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::CompleteProjectAgentTaskResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<ClaimIssueRequestView<'static>>`.
 pub type OwnedClaimIssueRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ClaimIssueRequestView<'static>,
@@ -144,6 +156,48 @@ for crate::proto::briar::worker::v1::__buffa::view::HandoffWorkResponseView<'_> 
 impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::HandoffWorkResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::HandoffWorkResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::CompleteProjectAgentTaskResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::CompleteProjectAgentTaskResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::CompleteProjectAgentTaskResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::CompleteProjectAgentTaskResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -304,6 +358,12 @@ pub const WORKER_QUEUE_SERVICE_HANDOFF_WORK_SPEC: ::connectrpc::Spec = ::connect
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `CompleteProjectAgentTask` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_COMPLETE_PROJECT_AGENT_TASK_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/CompleteProjectAgentTask",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// The machine Worker queue control plane. Large result uploads, transcripts,
 /// evidence, and provider-specific execution endpoints intentionally remain
 /// outside this service because they have different lifecycle and transport
@@ -427,6 +487,29 @@ pub trait WorkerQueueService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Handle the CompleteProjectAgentTask RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn complete_project_agent_task<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::CompleteProjectAgentTaskRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::CompleteProjectAgentTaskResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -546,6 +629,35 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                 },
             )
             .with_spec(WORKER_QUEUE_SERVICE_HANDOFF_WORK_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "CompleteProjectAgentTask",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::CompleteProjectAgentTaskRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::CompleteProjectAgentTaskRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.complete_project_agent_task(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::CompleteProjectAgentTaskResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_COMPLETE_PROJECT_AGENT_TASK_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -618,6 +730,12 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(WORKER_QUEUE_SERVICE_HANDOFF_WORK_SPEC),
+                )
+            }
+            "CompleteProjectAgentTask" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_COMPLETE_PROJECT_AGENT_TASK_SPEC),
                 )
             }
             _ => None,
@@ -698,6 +816,28 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         .await?
                         .encode::<
                             crate::proto::briar::worker::v1::HandoffWorkResponse,
+                        >(format)
+                })
+            }
+            "CompleteProjectAgentTask" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::CompleteProjectAgentTaskRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::CompleteProjectAgentTaskRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::CompleteProjectAgentTaskRequest,
+                    >::from_parts(&req, &body);
+                    svc.complete_project_agent_task(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::CompleteProjectAgentTaskResponse,
                         >(format)
                 })
             }
@@ -960,6 +1100,51 @@ where
                 &self.transport,
                 &self.config,
                 WORKER_QUEUE_SERVICE_HANDOFF_WORK_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CompleteProjectAgentTask RPC. Sends a request to /briar.worker.v1.WorkerQueueService/CompleteProjectAgentTask.
+    pub async fn complete_project_agent_task(
+        &self,
+        request: crate::proto::briar::worker::v1::CompleteProjectAgentTaskRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::CompleteProjectAgentTaskResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.complete_project_agent_task_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CompleteProjectAgentTask RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn complete_project_agent_task_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::CompleteProjectAgentTaskRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::CompleteProjectAgentTaskResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_COMPLETE_PROJECT_AGENT_TASK_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
