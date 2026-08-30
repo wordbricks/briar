@@ -33,7 +33,7 @@ struct CompanionShellView: View {
     let snapshot: DashboardSnapshot?
     let errorMessage: String?
     let token: String
-    let api: any MobileAPIClientProtocol
+    let api: any MobileHTTPClientProtocol
     let user: CurrentUser?
     let refresh: () async -> Void
     let ensureIssueAvailable: (UUID, UUID) async -> Bool
@@ -505,7 +505,7 @@ struct TaskListView: View {
     let snapshot: DashboardSnapshot?
     let errorMessage: String?
     let token: String
-    let api: any MobileAPIClientProtocol
+    let api: any MobileHTTPClientProtocol
     let currentUserID: String?
     let issueConversationView: IssueConversationViewTracker?
     let refresh: () async -> Void
@@ -521,7 +521,7 @@ struct TaskListView: View {
         snapshot: DashboardSnapshot?,
         errorMessage: String?,
         token: String,
-        api: any MobileAPIClientProtocol,
+        api: any MobileHTTPClientProtocol,
         currentUserID: String? = nil,
         issueConversationView: IssueConversationViewTracker? = nil,
         refresh: @escaping () async -> Void,
@@ -1185,7 +1185,7 @@ struct RunDetailView: View {
     private let onSkillSessionMaterialized: SkillSessionMaterializedHandler
     private let onSkillSessionOpen: SkillSessionOpenHandler
     private let token: String
-    private let api: any MobileAPIClientProtocol
+    private let api: any MobileHTTPClientProtocol
 
     private var issueMentionCandidates: [ChannelMentionTarget] {
         MessageMentions.issueCandidates(
@@ -1233,7 +1233,7 @@ struct RunDetailView: View {
         projectID: UUID,
         issueKeyPrefix: String = "AH",
         token: String,
-        api: any MobileAPIClientProtocol,
+        api: any MobileHTTPClientProtocol,
         projects: [Project] = [],
         allRuns: [DashboardRun] = [],
         projectAgents: [ProjectAgent] = [],

@@ -260,7 +260,7 @@ final class ChannelsStoreTests: XCTestCase {
     }
 }
 
-private actor ChannelHTTPRecorder: MobileAPIClientProtocol {
+private actor ChannelHTTPRecorder: MobileHTTPClientProtocol {
     private let channel: ChannelSummary
     private var uploadCount = 0
     private var uploadReferences: [[String]] = []

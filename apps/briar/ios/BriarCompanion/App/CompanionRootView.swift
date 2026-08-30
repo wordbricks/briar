@@ -19,12 +19,12 @@ struct CompanionRootView: View {
     @State private var authError: String?
     @State private var projectSelectionComplete = false
 
-    private let api: any MobileAPIClientProtocol
+    private let api: any MobileHTTPClientProtocol
     private let authorization: DeviceAuthorizationService
     private let presenter: any WebAuthenticationPresenting
 
     @MainActor
-    init(api: any MobileAPIClientProtocol) {
+    init(api: any MobileHTTPClientProtocol) {
         self.init(
             api: api,
             session: SessionStore(),
@@ -34,7 +34,7 @@ struct CompanionRootView: View {
 
     @MainActor
     init(
-        api: any MobileAPIClientProtocol,
+        api: any MobileHTTPClientProtocol,
         session: SessionStore,
         presenter: any WebAuthenticationPresenting
     ) {

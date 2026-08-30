@@ -70,7 +70,7 @@ final class ASWebAuthenticationPresenter: NSObject, WebAuthenticationPresenting,
 }
 
 struct DeviceAuthorizationService: Sendable {
-    let api: any MobileAPIClientProtocol
+    let api: any MobileHTTPClientProtocol
 
     @MainActor
     func authorize(using presenter: any WebAuthenticationPresenting) async throws -> String {

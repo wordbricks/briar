@@ -8,7 +8,7 @@ struct InboxHomeView: View {
     let project: Project
     let snapshot: DashboardSnapshot?
     let token: String
-    let api: any MobileAPIClientProtocol
+    let api: any MobileHTTPClientProtocol
     let refresh: () async -> Void
 
     private var locale: CompanionLocale {

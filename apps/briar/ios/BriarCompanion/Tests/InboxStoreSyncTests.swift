@@ -223,7 +223,7 @@ final class InboxStoreSyncTests: XCTestCase {
     }
 }
 
-private struct InboxHTTPStub: MobileAPIClientProtocol {}
+private struct InboxHTTPStub: MobileHTTPClientProtocol {}
 
 private final class InboxFeedMockScenario: @unchecked Sendable {
     private let lock = NSLock()

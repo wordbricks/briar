@@ -29,7 +29,7 @@ final class InboxStore: ObservableObject {
     private var userID: String?
     private var organizationID: UUID?
     private let defaults: UserDefaults
-    private let api: (any MobileAPIClientProtocol)?
+    private let api: (any MobileHTTPClientProtocol)?
     private let injectedInboxService: (any BriarAPI_InboxServiceClientInterface)?
     private var inboxService: (any BriarAPI_InboxServiceClientInterface)?
     private let pollInterval: Duration
@@ -37,7 +37,7 @@ final class InboxStore: ObservableObject {
 
     init(
         defaults: UserDefaults = .standard,
-        api: (any MobileAPIClientProtocol)? = nil,
+        api: (any MobileHTTPClientProtocol)? = nil,
         inboxService: (any BriarAPI_InboxServiceClientInterface)? = nil,
         pollInterval: Duration = .seconds(15)
     ) {

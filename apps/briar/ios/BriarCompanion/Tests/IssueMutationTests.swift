@@ -175,7 +175,7 @@ final class IssueMutationTests: XCTestCase {
     }
 }
 
-private actor IssueHTTPRecorder: MobileAPIClientProtocol {
+private actor IssueHTTPRecorder: MobileHTTPClientProtocol {
     struct Calls: Sendable {
         var multipartCreates = 0
         var multipartMessages = 0

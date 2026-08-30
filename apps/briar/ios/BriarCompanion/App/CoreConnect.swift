@@ -92,14 +92,14 @@ protocol AuthenticatedMobileServicesFactory: Sendable {
     func authenticatedServices(token: String) -> AuthenticatedMobileServices
 }
 
-extension MobileAPIClient: AuthenticatedMobileServicesFactory {
+extension MobileHTTPClient: AuthenticatedMobileServicesFactory {
     func authenticatedServices(token: String) -> AuthenticatedMobileServices {
         AuthenticatedMobileServices(baseURL: baseURL, session: session, token: token)
     }
 }
 
 func authenticatedMobileServices(
-    for api: any MobileAPIClientProtocol,
+    for api: any MobileHTTPClientProtocol,
     token: String
 ) throws -> AuthenticatedMobileServices {
     guard let factory = api as? any AuthenticatedMobileServicesFactory else {

@@ -6,7 +6,7 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
     @ObservedObject var navigation: CompanionNavigationModel
     let project: Project
     let token: String
-    let api: any MobileAPIClientProtocol
+    let api: any MobileHTTPClientProtocol
     let snapshot: DashboardSnapshot?
     let issueConversationView: IssueConversationViewTracker?
     let refreshDashboard: () async -> Void
@@ -601,7 +601,7 @@ struct SessionDetailView: View {
     let projectAgents: [ProjectAgent]
     let project: Project
     let token: String
-    let api: any MobileAPIClientProtocol
+    let api: any MobileHTTPClientProtocol
     let snapshot: DashboardSnapshot?
     let issueConversationView: IssueConversationViewTracker?
     let refreshDashboard: () async -> Void
@@ -615,7 +615,7 @@ struct SessionDetailView: View {
         projectAgents: [ProjectAgent] = [],
         project: Project,
         token: String,
-        api: any MobileAPIClientProtocol,
+        api: any MobileHTTPClientProtocol,
         snapshot: DashboardSnapshot?,
         issueConversationView: IssueConversationViewTracker? = nil,
         refreshDashboard: @escaping () async -> Void,

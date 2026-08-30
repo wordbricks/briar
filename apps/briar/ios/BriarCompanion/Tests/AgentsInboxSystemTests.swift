@@ -1319,7 +1319,7 @@ final class AgentsInboxSystemTests: XCTestCase {
     }
 }
 
-private struct AgentHTTPStub: MobileAPIClientProtocol {}
+private struct AgentHTTPStub: MobileHTTPClientProtocol {}
 
 private final class AgentTestServices: @unchecked Sendable {
     let scenario: AgentExecutionScenario

@@ -17,7 +17,7 @@ final class OrganizationRealtimeStore: ObservableObject {
     private var isForeground = true
     private var task: Task<Void, Never>?
 
-    init(api: any MobileAPIClientProtocol) {
+    init(api: any MobileHTTPClientProtocol) {
         realtime = api as? any MobileRealtimeClientProtocol
     }
 
@@ -161,7 +161,7 @@ final class ChannelsStore: ObservableObject {
     @Published private(set) var preparingSkillExecutionProposalID: UUID?
     @Published private(set) var errorMessage: String?
 
-    private let api: any MobileAPIClientProtocol
+    private let api: any MobileHTTPClientProtocol
     private let injectedChannelService: (any BriarAPI_ChannelServiceClientInterface)?
     private var channelService: (any BriarAPI_ChannelServiceClientInterface)?
     private let realtime: (any MobileRealtimeClientProtocol)?
@@ -201,7 +201,7 @@ final class ChannelsStore: ObservableObject {
     private var activityExpiryTask: Task<Void, Never>?
 
     init(
-        api: any MobileAPIClientProtocol,
+        api: any MobileHTTPClientProtocol,
         channelService: (any BriarAPI_ChannelServiceClientInterface)? = nil,
         realtime: (any MobileRealtimeClientProtocol)? = nil,
         managesRealtime: Bool = true,
@@ -1197,7 +1197,7 @@ final class ChannelsStore: ObservableObject {
             request.channelID = coreUUIDString(channelID)
             request.proposalID = coreUUIDString(proposalID)
             request.projectID = coreUUIDString(projectID)
-            if let execution { request.execution = try execution.channelConnectMessage() }
+            if let execution { request.execution = try execution.channelApprovalMessage() }
             let wireResponse = await channelService.acceptChannelProposal(
                 request: request,
                 headers: [:]
@@ -1459,7 +1459,7 @@ final class ChannelsStore: ObservableObject {
             approvalRequest.organizationID = coreUUIDString(organizationID)
             approvalRequest.channelID = coreUUIDString(channelID)
             approvalRequest.proposalID = coreUUIDString(proposalID)
-            approvalRequest.approval = try request.channelConnectMessage()
+            approvalRequest.approval = try request.channelApprovalMessage()
             let wireResponse = await channelService.acceptChannelExecutionProposal(
                 request: approvalRequest,
                 headers: [:]

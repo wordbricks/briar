@@ -91,16 +91,7 @@ final class MobileAPIContractTests: XCTestCase {
         XCTAssertThrowsError(try ProjectAgentSessionsSync(connectMessage: overflow))
     }
 
-    func testChannelRealtimeEndpointAndProtobufOneofFrame() throws {
-        let organizationID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
-        XCTAssertEqual(
-            MobileAPIContract.Endpoint.channelEvents(
-                organizationID: organizationID,
-                cursor: 41
-            ),
-            "/organizations/22222222-2222-4222-8222-222222222222/channel-events?cursor=41"
-        )
-
+    func testChannelRealtimeProtobufOneofFrame() throws {
         var frame = BriarRealtime_OrganizationNotification()
         var changed = BriarRealtime_ProjectAgentSessionsChanged()
         changed.projectID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"

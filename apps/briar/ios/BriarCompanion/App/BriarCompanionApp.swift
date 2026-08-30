@@ -22,7 +22,7 @@ struct BriarCompanionApp: App {
                     )
                 )
             } else {
-                CompanionRootView(api: MobileAPIClient(baseURL: Self.apiBaseURL))
+                CompanionRootView(api: MobileHTTPClient(baseURL: Self.apiBaseURL))
             }
         }
         .handlesExternalEvents(matching: Set(arrayLiteral: "*"))
@@ -287,7 +287,7 @@ private struct UITestCompanionFlow: View {
     }
 }
 
-private actor UITestAPIClient: MobileAPIClientProtocol {
+private actor UITestAPIClient: MobileHTTPClientProtocol {
     private var issueStatus: DashboardRun.Status?
     private var dependencyAdded = false
     private let delaysMessageSend: Bool

@@ -217,7 +217,7 @@ final class DashboardSyncTests: XCTestCase {
     }
 }
 
-private struct DashboardHTTPStub: MobileAPIClientProtocol {}
+private struct DashboardHTTPStub: MobileHTTPClientProtocol {}
 
 private final class DashboardMockScenario: @unchecked Sendable {
     private let lock = NSLock()

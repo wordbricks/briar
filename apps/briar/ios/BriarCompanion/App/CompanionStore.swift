@@ -20,7 +20,7 @@ final class CompanionStore: ObservableObject {
     @Published private(set) var loading = false
     @Published private(set) var errorMessage: String?
 
-    private let api: any MobileAPIClientProtocol
+    private let api: any MobileHTTPClientProtocol
     private let accountService: (any BriarAPI_AccountServiceClientInterface)?
     private let projectService: (any BriarAPI_ProjectServiceClientInterface)?
     private let defaults: UserDefaults
@@ -34,7 +34,7 @@ final class CompanionStore: ObservableObject {
     }
 
     init(
-        api: any MobileAPIClientProtocol,
+        api: any MobileHTTPClientProtocol,
         accountService: (any BriarAPI_AccountServiceClientInterface)? = nil,
         projectService: (any BriarAPI_ProjectServiceClientInterface)? = nil,
         defaults: UserDefaults = .standard
@@ -223,7 +223,7 @@ final class DashboardStore: ObservableObject {
     @Published private(set) var isRefreshing = false
     @Published private(set) var errorMessage: String?
 
-    private let api: any MobileAPIClientProtocol
+    private let api: any MobileHTTPClientProtocol
     private let dashboardService: (any BriarAPI_DashboardServiceClientInterface)?
     private let pollInterval: Duration
     private var projectID: UUID?
@@ -235,7 +235,7 @@ final class DashboardStore: ObservableObject {
     private var pollingTask: Task<Void, Never>?
 
     init(
-        api: any MobileAPIClientProtocol,
+        api: any MobileHTTPClientProtocol,
         dashboardService: (any BriarAPI_DashboardServiceClientInterface)? = nil,
         pollInterval: Duration = .seconds(15)
     ) {
@@ -434,7 +434,7 @@ final class RunDetailStore: ObservableObject {
     @Published private(set) var loading = false
     @Published private(set) var errorMessage: String?
 
-    private let api: any MobileAPIClientProtocol
+    private let api: any MobileHTTPClientProtocol
     private let dashboardService: (any BriarAPI_DashboardServiceClientInterface)?
     private let issueService: (any BriarAPI_IssueServiceClientInterface)?
     private let realtime: (any MobileRealtimeClientProtocol)?
@@ -457,7 +457,7 @@ final class RunDetailStore: ObservableObject {
     private static let maxConversationDeltaPagesPerSync = 20
 
     init(
-        api: any MobileAPIClientProtocol,
+        api: any MobileHTTPClientProtocol,
         projectID: UUID,
         runID: UUID,
         token: String,

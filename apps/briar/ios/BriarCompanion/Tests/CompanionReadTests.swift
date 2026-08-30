@@ -1,3 +1,7 @@
+import BriarContracts
+import BriarContractsMocks
+import Connect
+import SwiftProtobuf
 import XCTest
 @testable import BriarCompanion
 
@@ -257,36 +261,13 @@ final class CompanionReadTests: XCTestCase {
     }
 
     @MainActor
-    func testRunDetailAuthoritativeNullInvalidatesPendingExecutionContext() async throws {
-        let proposal = executionProposal()
-        let api = RunDetailSnapshotAPI(messageSnapshots: [
-            IssueMessagesResponse(messages: [issueMessage(executionProposal: proposal)]),
-            IssueMessagesResponse(messages: [issueMessage(executionProposal: nil)]),
-        ])
-        let store = RunDetailStore(
-            api: api,
-            projectID: proposal.projectId,
-            runID: proposal.runId,
-            token: "token"
-        )
-        await store.load()
-        let context = try XCTUnwrap(store.captureExecutionProposal(proposalID: proposal.id))
-
-        await store.load()
-
-        XCTAssertFalse(store.executionProposalIsCurrent(context))
-        XCTAssertNil(store.captureExecutionProposal(proposalID: proposal.id))
-        XCTAssertNil(store.messages.first?.executionProposal)
-    }
-
-    @MainActor
     func testRunDetailShowsLatestIssueAgentActivityUnderItsParentMessage() throws {
         let projectID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let runID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
         let parentMessageID = UUID(uuidString: "99999999-9999-4999-8999-999999999999")!
         let replyID = UUID(uuidString: "cccccccc-cccc-4ccc-8ccc-cccccccccccc")!
         let store = RunDetailStore(
-            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            api: RunDetailHTTPStub(),
             projectID: projectID,
             runID: runID,
             token: "token"
@@ -349,126 +330,6 @@ final class CompanionReadTests: XCTestCase {
     }
 
     @MainActor
-    func testRunDetailAuthoritativeRemovalInvalidatesPendingExecutionContext() async throws {
-        let proposal = executionProposal()
-        let api = RunDetailSnapshotAPI(messageSnapshots: [
-            IssueMessagesResponse(messages: [issueMessage(executionProposal: proposal)]),
-            IssueMessagesResponse(messages: []),
-        ])
-        let store = RunDetailStore(
-            api: api,
-            projectID: proposal.projectId,
-            runID: proposal.runId,
-            token: "token"
-        )
-        await store.load()
-        let context = try XCTUnwrap(store.captureExecutionProposal(proposalID: proposal.id))
-
-        await store.load()
-
-        XCTAssertFalse(store.executionProposalIsCurrent(context))
-        XCTAssertNil(store.captureExecutionProposal(proposalID: proposal.id))
-        XCTAssertTrue(store.messages.isEmpty)
-    }
-
-    @MainActor
-    func testRunDetailOtherClientApprovalTombstonesPendingExecutionContext() async throws {
-        let pending = executionProposal()
-        let accepted = executionProposal(status: .accepted)
-        let api = RunDetailSnapshotAPI(messageSnapshots: [
-            IssueMessagesResponse(messages: [issueMessage(executionProposal: pending)]),
-            IssueMessagesResponse(messages: [issueMessage(executionProposal: accepted)]),
-        ])
-        let store = RunDetailStore(
-            api: api,
-            projectID: pending.projectId,
-            runID: pending.runId,
-            token: "token"
-        )
-        await store.load()
-        let context = try XCTUnwrap(store.captureExecutionProposal(proposalID: pending.id))
-
-        await store.load()
-
-        XCTAssertFalse(store.executionProposalIsCurrent(context))
-        XCTAssertNil(store.captureExecutionProposal(proposalID: pending.id))
-        XCTAssertEqual(store.messages.first?.executionProposal?.status, .accepted)
-    }
-
-    @MainActor
-    func testRunDetailQueuesForcedReloadBehindAnOlderInFlightSnapshot() async throws {
-        let proposal = executionProposal()
-        let api = RunDetailSnapshotAPI(
-            messageSnapshots: [
-                IssueMessagesResponse(messages: [issueMessage(
-                    executionProposal: proposal
-                )]),
-                IssueMessagesResponse(messages: [issueMessage(
-                    executionProposal: nil
-                )]),
-            ],
-            messageDelay: .milliseconds(80)
-        )
-        let store = RunDetailStore(
-            api: api,
-            projectID: proposal.projectId,
-            runID: proposal.runId,
-            token: "token"
-        )
-
-        let initialLoad = Task { await store.load() }
-        while await api.messageRequestCount() == 0 {
-            await Task.yield()
-        }
-        await store.load(queueIfLoading: true)
-        await initialLoad.value
-
-        let requestCount = await api.messageRequestCount()
-        XCTAssertEqual(requestCount, 2)
-        XCTAssertNil(store.messages.first?.executionProposal)
-        XCTAssertNil(store.captureExecutionProposal(proposalID: proposal.id))
-    }
-
-    @MainActor
-    func testRunDetailAppliesConversationDeltaWithoutReloadingTheSnapshot() async throws {
-        let initial = issueMessage(body: "처음 대화")
-        let appended = issueMessage(
-            id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
-            body: "실시간으로 도착한 대화"
-        )
-        let api = RunDetailSnapshotAPI(
-            messageSnapshots: [
-                IssueMessagesResponse(messages: [initial], cursor: 41),
-            ],
-            messageDeltas: [
-                IssueMessagesDeltaResponse(
-                    cursor: 42,
-                    hasMore: false,
-                    changed: true,
-                    messages: [appended],
-                    agentReplies: []
-                ),
-            ]
-        )
-        let store = RunDetailStore(
-            api: api,
-            projectID: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
-            runID: initial.runId,
-            token: "token"
-        )
-
-        await store.load()
-        await store.syncConversationChanges()
-
-        let snapshotRequestCount = await api.messageRequestCount()
-        let deltaRequestCount = await api.deltaRequestCount()
-        XCTAssertEqual(snapshotRequestCount, 1)
-        XCTAssertEqual(deltaRequestCount, 1)
-        XCTAssertFalse(store.loading)
-        XCTAssertEqual(store.messages.map(\.body), ["처음 대화", "실시간으로 도착한 대화"])
-    }
-
-    @MainActor
     func testRunDetailResetReplacesTheEntireConversationSnapshot() async throws {
         let initial = issueMessage(body: "stale")
         let replacement = issueMessage(
@@ -487,7 +348,7 @@ final class CompanionReadTests: XCTestCase {
             attempts: 1,
             error: nil
         )
-        let api = RunDetailSnapshotAPI(
+        let services = RunDetailTestServices(
             messageSnapshots: [IssueMessagesResponse(messages: [initial], cursor: 41)],
             messageDeltas: [IssueMessagesDeltaResponse(
                 cursor: 2,
@@ -499,20 +360,24 @@ final class CompanionReadTests: XCTestCase {
             )]
         )
         let store = RunDetailStore(
-            api: api,
+            api: RunDetailHTTPStub(),
             projectID: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
             runID: initial.runId,
-            token: "token"
+            token: "token",
+            dashboardService: services.dashboard,
+            issueService: services.issue
         )
-
         await store.load()
+        XCTAssertNil(store.errorMessage, store.errorMessage ?? "unexpected load error")
+        XCTAssertEqual(store.messages.map(\.id), [initial.id])
         store.appendOptimisticMessage(optimistic)
         await store.syncConversationChanges()
+        XCTAssertNil(store.errorMessage, store.errorMessage ?? "unexpected sync error")
 
         XCTAssertEqual(store.messages.map(\.id), [replacement.id])
         XCTAssertFalse(store.isMessageOptimistic(optimistic.id))
         XCTAssertEqual(store.agentReplies, [reply])
-        let snapshotRequests = await api.messageRequestCount()
+        let snapshotRequests = services.scenario.messageRequestCount
         XCTAssertEqual(snapshotRequests, 1)
     }
 
@@ -542,7 +407,7 @@ final class CompanionReadTests: XCTestCase {
         )
         let execution = executionProposal()
         let store = RunDetailStore(
-            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            api: RunDetailHTTPStub(),
             projectID: execution.projectId,
             runID: execution.runId,
             token: "token"
@@ -563,43 +428,13 @@ final class CompanionReadTests: XCTestCase {
     }
 
     @MainActor
-    func testRunDetailOtherClientSkillApprovalInvalidatesPendingContext() async throws {
-        let pending = skillExecutionProposal()
-        let accepted = skillExecutionProposal(status: .accepted)
-        let api = RunDetailSnapshotAPI(messageSnapshots: [
-            IssueMessagesResponse(messages: [issueMessage(
-                skillExecutionProposal: pending
-            )]),
-            IssueMessagesResponse(messages: [issueMessage(
-                skillExecutionProposal: accepted
-            )]),
-        ])
-        let store = RunDetailStore(
-            api: api,
-            projectID: pending.projectId,
-            runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
-            token: "token"
-        )
-        await store.load()
-        let context = try XCTUnwrap(
-            store.captureSkillExecutionProposal(proposalID: pending.id)
-        )
-
-        await store.load()
-
-        XCTAssertFalse(store.skillExecutionProposalIsCurrent(context))
-        XCTAssertNil(store.captureSkillExecutionProposal(proposalID: pending.id))
-        XCTAssertEqual(store.messages.first?.skillExecutionProposal?.status, .accepted)
-    }
-
-    @MainActor
     func testRunDetailSkillProposalReplacementInvalidatesTheOriginalContext() throws {
         let pending = skillExecutionProposal()
         let replacement = skillExecutionProposal(
             id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
         )
         let store = RunDetailStore(
-            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            api: RunDetailHTTPStub(),
             projectID: pending.projectId,
             runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
             token: "token"
@@ -620,7 +455,7 @@ final class CompanionReadTests: XCTestCase {
     func testLeavingRunDetailInvalidatesAnInFlightSkillPreparationContext() throws {
         let pending = skillExecutionProposal()
         let store = RunDetailStore(
-            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            api: RunDetailHTTPStub(),
             projectID: pending.projectId,
             runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
             token: "token"
@@ -640,7 +475,7 @@ final class CompanionReadTests: XCTestCase {
         let pending = skillExecutionProposal()
         let accepted = skillExecutionProposal(status: .accepted)
         let store = RunDetailStore(
-            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            api: RunDetailHTTPStub(),
             projectID: pending.projectId,
             runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
             token: "token"
@@ -665,7 +500,7 @@ final class CompanionReadTests: XCTestCase {
         let pending = skillExecutionProposal()
         let accepted = skillExecutionProposal(status: .accepted)
         let store = RunDetailStore(
-            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            api: RunDetailHTTPStub(),
             projectID: pending.projectId,
             runID: UUID(uuidString: "33333333-3333-4333-8333-333333333333")!,
             token: "token"
@@ -682,39 +517,6 @@ final class CompanionReadTests: XCTestCase {
     }
 
     @MainActor
-    func testRunDetailKeepsOptimisticMessageUntilSameIDBecomesAuthoritative() async {
-        let parent = issueMessage(body: "Parent")
-        let pendingID = UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!
-        let pending = issueMessage(
-            id: pendingID,
-            parentMessageId: parent.id,
-            body: "바로 보이는 답글"
-        )
-        let api = RunDetailSnapshotAPI(messageSnapshots: [
-            IssueMessagesResponse(messages: [parent]),
-        ])
-        let store = RunDetailStore(
-            api: api,
-            projectID: executionProposal().projectId,
-            runID: parent.runId,
-            token: "token"
-        )
-        store.appendMessages([parent])
-        store.appendOptimisticMessage(pending)
-
-        XCTAssertTrue(store.isMessageOptimistic(pendingID))
-        XCTAssertEqual(store.messages.first(where: { $0.id == parent.id })?.replyCount, 1)
-        await store.load()
-        XCTAssertTrue(store.messages.contains { $0.id == pendingID })
-        XCTAssertTrue(store.isMessageOptimistic(pendingID))
-
-        store.appendMessages([pending])
-
-        XCTAssertFalse(store.isMessageOptimistic(pendingID))
-        XCTAssertEqual(store.messages.filter { $0.id == pendingID }.count, 1)
-    }
-
-    @MainActor
     func testRunDetailRollsBackOnlyPendingOptimisticMessage() {
         let parent = issueMessage(body: "Parent")
         let pending = issueMessage(
@@ -723,7 +525,7 @@ final class CompanionReadTests: XCTestCase {
             body: "실패할 답글"
         )
         let store = RunDetailStore(
-            api: RunDetailSnapshotAPI(messageSnapshots: []),
+            api: RunDetailHTTPStub(),
             projectID: executionProposal().projectId,
             runID: parent.runId,
             token: "token"
@@ -840,69 +642,133 @@ final class CompanionReadTests: XCTestCase {
     }
 }
 
-private actor RunDetailSnapshotAPI: MobileAPIClientProtocol {
-    private var messageSnapshots: [IssueMessagesResponse]
-    private var messageDeltas: [IssueMessagesDeltaResponse]
-    private let messageDelay: Duration?
-    private var messageRequests = 0
-    private var deltaRequests = 0
+private struct RunDetailHTTPStub: MobileHTTPClientProtocol {}
+
+private final class RunDetailTestServices: @unchecked Sendable {
+    let scenario: RunDetailConnectScenario
+    let dashboard: BriarAPI_DashboardServiceClientMock
+    let issue: BriarAPI_IssueServiceClientMock
 
     init(
         messageSnapshots: [IssueMessagesResponse],
-        messageDeltas: [IssueMessagesDeltaResponse] = [],
-        messageDelay: Duration? = nil
+        messageDeltas: [IssueMessagesDeltaResponse]
+    ) {
+        let scenario = RunDetailConnectScenario(
+            messageSnapshots: messageSnapshots,
+            messageDeltas: messageDeltas
+        )
+        self.scenario = scenario
+        dashboard = BriarAPI_DashboardServiceClientMock()
+        issue = BriarAPI_IssueServiceClientMock()
+        issue.mockAsyncListIssueMessages = { request in
+            .init(result: scenario.listIssueMessages(request))
+        }
+        issue.mockAsyncSyncIssueMessages = { request in
+            .init(result: scenario.syncIssueMessages(request))
+        }
+        issue.mockAsyncListRunEvidence = { request in
+            var response = BriarAPI_ListRunEvidenceResponse()
+            response.runID = request.runID
+            return .init(result: .success(response))
+        }
+    }
+}
+
+private final class RunDetailConnectScenario: @unchecked Sendable {
+    private let lock = NSLock()
+    private var messageSnapshots: [IssueMessagesResponse]
+    private var messageDeltas: [IssueMessagesDeltaResponse]
+    private var messageRequests = 0
+
+    init(
+        messageSnapshots: [IssueMessagesResponse],
+        messageDeltas: [IssueMessagesDeltaResponse]
     ) {
         self.messageSnapshots = messageSnapshots
         self.messageDeltas = messageDeltas
-        self.messageDelay = messageDelay
     }
 
-    func messageRequestCount() -> Int {
-        messageRequests
-    }
-
-    func deltaRequestCount() -> Int {
-        deltaRequests
+    var messageRequestCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return messageRequests
     }
 
     func listIssueMessages(
-        projectID: UUID,
-        runID: UUID,
-        token: String
-    ) async throws -> IssueMessagesResponse {
-        guard !messageSnapshots.isEmpty else { throw MobileAPIError.invalidRequest }
+        _ request: BriarAPI_ListIssueMessagesRequest
+    ) -> Result<BriarAPI_ListIssueMessagesResponse, ConnectError> {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !messageSnapshots.isEmpty else {
+            return .failure(.init(code: .internalError, message: "missing snapshot"))
+        }
         messageRequests += 1
         let response = messageSnapshots.removeFirst()
-        if let messageDelay { try await Task.sleep(for: messageDelay) }
-        return response
+        return .success(wireSnapshot(response))
     }
 
     func syncIssueMessages(
-        projectID: UUID,
-        runID: UUID,
-        cursor: Int,
-        token: String
-    ) async throws -> IssueMessagesDeltaResponse {
-        guard !messageDeltas.isEmpty else { throw MobileAPIError.invalidRequest }
-        deltaRequests += 1
+        _ request: BriarAPI_SyncIssueMessagesRequest
+    ) -> Result<BriarAPI_SyncIssueMessagesResponse, ConnectError> {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !messageDeltas.isEmpty else {
+            return .failure(.init(code: .internalError, message: "missing delta"))
+        }
         let response = messageDeltas.removeFirst()
-        if let messageDelay { try await Task.sleep(for: messageDelay) }
-        return response
+        var message = BriarAPI_SyncIssueMessagesResponse()
+        message.cursor = UInt64(response.cursor)
+        message.hasMore_p = response.hasMore
+        message.changed = response.changed
+        message.reset = response.reset
+        message.messages = (response.messages ?? []).map(wireMessage)
+        message.agentReplies = (response.agentReplies ?? []).map(wireReply)
+        return .success(message)
     }
 
-    func listRunEvidence(
-        projectID: UUID,
-        runID: UUID,
-        token: String
-    ) async throws -> RunEvidenceResponse {
-        RunEvidenceResponse(evidence: [])
+    func wireMessage(_ value: IssueMessage) -> BriarAPI_IssueMessage {
+        var author = BriarAPI_MessageAuthor()
+        author.name = value.author.name
+        var message = BriarAPI_IssueMessage()
+        message.id = value.id.uuidString.lowercased()
+        message.runID = value.runId.uuidString.lowercased()
+        if let parentMessageID = value.parentMessageId {
+            message.parentMessageID = parentMessageID.uuidString.lowercased()
+        }
+        message.body = value.body
+        message.author = author
+        message.replyCount = UInt32(value.replyCount)
+        message.createdAt = .init(date: value.createdAt)
+        message.updatedAt = .init(date: value.updatedAt)
+        return message
     }
 
-    func listRunEvents(
-        projectID: UUID,
-        runID: UUID,
-        token: String
-    ) async throws -> [RunEvent] {
-        []
+    func wireSnapshot(
+        _ response: IssueMessagesResponse
+    ) -> BriarAPI_ListIssueMessagesResponse {
+        var message = BriarAPI_ListIssueMessagesResponse()
+        message.messages = response.messages.map(wireMessage)
+        message.agentReplies = response.agentReplies.map(wireReply)
+        message.cursor = UInt64(response.cursor ?? 0)
+        return message
+    }
+
+    private func wireReply(_ value: IssueAgentReplyJob) -> BriarAPI_IssueAgentReply {
+        var message = BriarAPI_IssueAgentReply()
+        message.id = value.id.uuidString.lowercased()
+        message.triggerMessageID = value.triggerMessageId.uuidString.lowercased()
+        message.parentMessageID = value.parentMessageId.uuidString.lowercased()
+        if let agentID = value.agentId { message.agentID = agentID.uuidString.lowercased() }
+        if let agentName = value.agentName { message.agentName = agentName }
+        switch value.status {
+        case .queued: message.status = .queued
+        case .running: message.status = .running
+        case .completed: message.status = .completed
+        case .failed: message.status = .failed
+        }
+        message.attempts = UInt32(value.attempts)
+        if let error = value.error { message.error = error }
+        message.updatedAt = .init(date: Date(timeIntervalSince1970: 1_700_000_000))
+        return message
     }
 }

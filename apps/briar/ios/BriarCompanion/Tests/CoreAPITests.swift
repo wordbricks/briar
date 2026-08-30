@@ -25,7 +25,7 @@ final class CoreAPITests: XCTestCase {
     func testMultipartUploadUsesBearerAndFileMetadata() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [URLProtocolStub.self]
-        let client = MobileAPIClient(
+        let client = MobileHTTPClient(
             baseURL: URL(string: "https://briar-api.example")!,
             session: URLSession(configuration: configuration)
         )

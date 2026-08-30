@@ -28,7 +28,7 @@ final class AgentsStore: ObservableObject {
         Set(executingAgentCounts.keys)
     }
 
-    private let api: any MobileAPIClientProtocol
+    private let api: any MobileHTTPClientProtocol
     private let injectedAgentService: (any BriarAPI_AgentServiceClientInterface)?
     private let injectedIssueService: (any BriarAPI_IssueServiceClientInterface)?
     private var agentService: (any BriarAPI_AgentServiceClientInterface)?
@@ -45,7 +45,7 @@ final class AgentsStore: ObservableObject {
     private var pollingTask: Task<Void, Never>?
 
     init(
-        api: any MobileAPIClientProtocol,
+        api: any MobileHTTPClientProtocol,
         agentService: (any BriarAPI_AgentServiceClientInterface)? = nil,
         issueService: (any BriarAPI_IssueServiceClientInterface)? = nil,
         pollInterval: Duration = .seconds(15)

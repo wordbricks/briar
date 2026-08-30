@@ -12,7 +12,7 @@ final class IssueMutationStore: ObservableObject {
     @Published private(set) var activeActions: Set<String> = []
     @Published private(set) var errorMessage: String?
 
-    private let api: any MobileAPIClientProtocol
+    private let api: any MobileHTTPClientProtocol
     private let issueService: (any BriarAPI_IssueServiceClientInterface)?
     private let projectID: UUID
     private let token: String
@@ -21,7 +21,7 @@ final class IssueMutationStore: ObservableObject {
     private var pendingRequestIDs: [String: UUID] = [:]
 
     init(
-        api: any MobileAPIClientProtocol,
+        api: any MobileHTTPClientProtocol,
         issueService: (any BriarAPI_IssueServiceClientInterface)? = nil,
         projectID: UUID,
         token: String,
