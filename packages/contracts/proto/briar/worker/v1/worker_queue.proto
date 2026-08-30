@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package briar.worker.v1;
 
+import "briar/app/v1/channel.proto";
 import "briar/app/v1/issue.proto";
 import "briar/app/v1/common.proto";
 import "briar/app/v1/dashboard.proto";
@@ -56,6 +57,7 @@ service WorkerControlService {
 // desktop-hosted Auto Hunt runtime.
 service WorkerExecutionService {
   rpc ClaimIssue(ClaimIssueRequest) returns (ClaimIssueResponse);
+  rpc ListProjectChannelMessages(ListProjectChannelMessagesRequest) returns (ListProjectChannelMessagesResponse);
   // Shared intentionally with IssueService so evidence has one DTO.
   // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
   rpc ListRunEvidence(briar.app.v1.ListRunEvidenceRequest) returns (briar.app.v1.ListRunEvidenceResponse);
@@ -82,6 +84,20 @@ message ClaimIssueRequest {
 
 message ClaimIssueResponse {
   optional ClaimedIssue issue = 1;
+}
+
+message ListProjectChannelMessagesRequest {
+  string project_id = 1;
+  string channel_id = 2;
+  optional string parent_message_id = 3;
+  optional string cursor = 4;
+  optional uint32 limit = 5;
+}
+
+message ListProjectChannelMessagesResponse {
+  briar.app.v1.ChannelSummary channel = 1;
+  repeated briar.app.v1.ChannelMessage messages = 2;
+  optional string next_cursor = 3;
 }
 
 message AppendTranscriptEventsRequest {

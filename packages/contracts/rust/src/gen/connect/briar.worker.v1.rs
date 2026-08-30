@@ -214,6 +214,18 @@ pub type OwnedClaimIssueRequestView = ::buffa::view::OwnedView<
 pub type OwnedClaimIssueResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ClaimIssueResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ListProjectChannelMessagesRequestView<'static>>`.
+pub type OwnedListProjectChannelMessagesRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ListProjectChannelMessagesRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListProjectChannelMessagesResponseView<'static>>`.
+pub type OwnedListProjectChannelMessagesResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ListProjectChannelMessagesResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<ListRunEvidenceRequestView<'static>>`.
 pub type OwnedListRunEvidenceRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::ListRunEvidenceRequestView<'static>,
@@ -1056,6 +1068,48 @@ for crate::proto::briar::worker::v1::__buffa::view::ClaimIssueResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ClaimIssueResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ClaimIssueResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::ListProjectChannelMessagesResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::ListProjectChannelMessagesResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::ListProjectChannelMessagesResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ListProjectChannelMessagesResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -4627,6 +4681,12 @@ pub const WORKER_EXECUTION_SERVICE_CLAIM_ISSUE_SPEC: ::connectrpc::Spec = ::conn
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListProjectChannelMessages` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_EXECUTION_SERVICE_LIST_PROJECT_CHANNEL_MESSAGES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerExecutionService/ListProjectChannelMessages",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `ListRunEvidence` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const WORKER_EXECUTION_SERVICE_LIST_RUN_EVIDENCE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.worker.v1.WorkerExecutionService/ListRunEvidence",
@@ -4753,6 +4813,29 @@ pub trait WorkerExecutionService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::worker::v1::ClaimIssueResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ListProjectChannelMessages RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_project_channel_messages<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::ListProjectChannelMessagesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::ListProjectChannelMessagesResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -5026,6 +5109,35 @@ impl<S: WorkerExecutionService> WorkerExecutionServiceExt for S {
                 },
             )
             .with_spec(WORKER_EXECUTION_SERVICE_CLAIM_ISSUE_SPEC)
+            .route_view(
+                WORKER_EXECUTION_SERVICE_SERVICE_NAME,
+                "ListProjectChannelMessages",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::ListProjectChannelMessagesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::ListProjectChannelMessagesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_project_channel_messages(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::ListProjectChannelMessagesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_EXECUTION_SERVICE_LIST_PROJECT_CHANNEL_MESSAGES_SPEC)
             .route_view(
                 WORKER_EXECUTION_SERVICE_SERVICE_NAME,
                 "ListRunEvidence",
@@ -5350,6 +5462,14 @@ for WorkerExecutionServiceServer<T> {
                         .with_spec(WORKER_EXECUTION_SERVICE_CLAIM_ISSUE_SPEC),
                 )
             }
+            "ListProjectChannelMessages" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_EXECUTION_SERVICE_LIST_PROJECT_CHANNEL_MESSAGES_SPEC,
+                        ),
+                )
+            }
             "ListRunEvidence" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -5445,6 +5565,28 @@ for WorkerExecutionServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::worker::v1::ClaimIssueResponse,
+                        >(format)
+                })
+            }
+            "ListProjectChannelMessages" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::ListProjectChannelMessagesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::ListProjectChannelMessagesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::ListProjectChannelMessagesRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_project_channel_messages(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::ListProjectChannelMessagesResponse,
                         >(format)
                 })
             }
@@ -5816,6 +5958,51 @@ where
                 &self.transport,
                 &self.config,
                 WORKER_EXECUTION_SERVICE_CLAIM_ISSUE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListProjectChannelMessages RPC. Sends a request to /briar.worker.v1.WorkerExecutionService/ListProjectChannelMessages.
+    pub async fn list_project_channel_messages(
+        &self,
+        request: crate::proto::briar::worker::v1::ListProjectChannelMessagesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ListProjectChannelMessagesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_project_channel_messages_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListProjectChannelMessages RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_project_channel_messages_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::ListProjectChannelMessagesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ListProjectChannelMessagesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_EXECUTION_SERVICE_LIST_PROJECT_CHANNEL_MESSAGES_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
