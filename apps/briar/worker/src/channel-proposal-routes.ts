@@ -2,7 +2,6 @@ import type {
   ChannelExecutionProposalAcceptInput,
 } from "../../src/lib/channels-contract";
 import { approveAgentSkillExecutionProposal } from "./agent-skill-execution-approval";
-import type { BriarAuth } from "./auth";
 import {
   approvedIssueCreation,
   assertChannelProposalAuthorScope,
@@ -35,7 +34,7 @@ import {
 } from "./channel-issue-batch-approval";
 import { recordHuntEvent } from "./hunt-event-repository";
 import { getHuntRunForProject } from "./hunt-run-repository";
-import { HttpError, json } from "./http-response";
+import { HttpError } from "./http-response";
 import type { IssueExecutionProposalRow } from "./issue-execution-proposal-repository";
 import {
   decodeAgentSkillExecutionProposalAcceptInput,
@@ -48,8 +47,6 @@ import {
   newChannelBatchProposalIssueSourceKey,
   newChannelProposalIssueSourceKey,
 } from "./proposal-issue-source";
-import { readJson } from "./request-readers";
-import { requireSession } from "./session-auth";
 import {
   assertExecutionSelectionAvailable,
   dispatchHuntRun,
@@ -309,14 +306,6 @@ async function approveChannelExecutionProposalRequest(input: {
     throw error;
   }
 }
-
-export type ChannelProposalRouteInput = {
-  request: Request;
-  url: URL;
-  auth: BriarAuth;
-  db: D1Database;
-  env: Env;
-};
 
 type ChannelProposalApplicationInput = {
   db: D1Database;
@@ -862,76 +851,4 @@ export async function acceptOrganizationChannelProposal(
     resultRunId,
     executionProposal: liveIssueExecutionProposalJson(executionProposal),
   };
-}
-
-export async function handleChannelProposalRoute(
-  routeInput: ChannelProposalRouteInput,
-): Promise<Response | undefined> {
-  const { request, url, auth, db, env } = routeInput;
-  const { pathname } = url;
-
-  const channelProposalDeclineMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/proposals\/([0-9a-f-]+)\/decline$/u,
-  );
-  if (channelProposalDeclineMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await declineOrganizationChannelProposal({
-      db,
-      env,
-      organizationId: channelProposalDeclineMatch[1],
-      channelId: channelProposalDeclineMatch[2],
-      proposalId: channelProposalDeclineMatch[3],
-      userId: session.user.id,
-    }));
-  }
-
-  const channelProposalAcceptMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/proposals\/([0-9a-f-]+)\/accept$/u,
-  );
-  if (channelProposalAcceptMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await acceptOrganizationChannelProposal({
-      db,
-      env,
-      organizationId: channelProposalAcceptMatch[1],
-      channelId: channelProposalAcceptMatch[2],
-      proposalId: channelProposalAcceptMatch[3],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-
-  const channelSkillExecutionProposalAcceptMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/skill-execution-proposals\/([0-9a-f-]+)\/accept$/u,
-  );
-  if (channelSkillExecutionProposalAcceptMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await acceptOrganizationChannelSkillExecutionProposal({
-      db,
-      env,
-      organizationId: channelSkillExecutionProposalAcceptMatch[1],
-      channelId: channelSkillExecutionProposalAcceptMatch[2],
-      proposalId: channelSkillExecutionProposalAcceptMatch[3],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-
-  const channelExecutionProposalAcceptMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/proposals\/([0-9a-f-]+)\/accept-execution$/u,
-  );
-  if (channelExecutionProposalAcceptMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await acceptOrganizationChannelExecutionProposal({
-      db,
-      env,
-      organizationId: channelExecutionProposalAcceptMatch[1],
-      channelId: channelExecutionProposalAcceptMatch[2],
-      proposalId: channelExecutionProposalAcceptMatch[3],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-
-  return undefined;
 }

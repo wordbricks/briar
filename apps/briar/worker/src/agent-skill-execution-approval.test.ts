@@ -30,6 +30,9 @@ import {
 } from "./db";
 import { archiveCompletedLogs, type ArchiveBucket } from "./archive";
 import apiWorker from "./index";
+import {
+  acceptOrganizationChannelSkillExecutionProposal,
+} from "./channel-proposal-routes";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
   bindExecutionWorkerProject,
@@ -899,22 +902,15 @@ describe("conversational Agent Skill execution approval", () => {
       request,
     });
 
-    const response = await apiWorker.fetch(new Request(
-      `https://briar.example/organizations/${organizationId}/channels/${channelId}` +
-        `/skill-execution-proposals/${proposal!.id}/accept`,
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ workerId }),
-      },
-    ), env());
-    expect(response.status).toBe(200);
-    const responseBody = await response.json() as {
-      proposal: { resultSessionId: string };
-    };
+    const responseBody = await acceptOrganizationChannelSkillExecutionProposal({
+      db,
+      env: env(),
+      organizationId,
+      channelId,
+      proposalId: proposal!.id,
+      userId: ownerId,
+      request: { workerId },
+    });
     expect(responseBody).toMatchObject({
       outcome: "accepted",
       proposal: { id: proposal!.id, requestedWorkerId: workerId },
@@ -1071,28 +1067,15 @@ describe("conversational Agent Skill execution approval", () => {
        where id = ?`,
     ).bind(source.session_id).run();
     const taskCountBefore = await tableCount("briar_project_agent_task_jobs");
-    const response = await apiWorker.fetch(new Request(
-      `https://briar.example/organizations/${organizationId}/channels/${channelId}` +
-        `/skill-execution-proposals/${proposal!.id}/accept`,
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerToken}`,
-          "content-type": "application/json",
-        },
-        body: "{}",
-      },
-    ), env());
-    expect(response.status).toBe(200);
-    const accepted = await response.json() as {
-      proposal: {
-        resultSessionId: string;
-        resultMessageId: string;
-        requestedWorkerId: string;
-        executionStatus: string;
-      };
-      session: unknown;
-    };
+    const accepted = await acceptOrganizationChannelSkillExecutionProposal({
+      db,
+      env: env(),
+      organizationId,
+      channelId,
+      proposalId: proposal!.id,
+      userId: ownerId,
+      request: {},
+    });
     expect(accepted).toMatchObject({
       proposal: {
         resultSessionId: source.session_id,
@@ -1194,10 +1177,12 @@ describe("conversational Agent Skill execution approval", () => {
       completedAt: new Date().toISOString(),
       conversationId: "retained-conversation-id",
     })).not.toBeNull();
+    const resultMessageId = accepted.proposal.resultMessageId;
+    if (!resultMessageId) throw new Error("Accepted proposal has no result message");
     expect(await getChannelMessage(
       db,
       channelId,
-      accepted.proposal.resultMessageId,
+      resultMessageId,
     )).toMatchObject({
       body: "Conversation Skill result with an HTML artifact.",
       document: {
@@ -1208,7 +1193,7 @@ describe("conversational Agent Skill execution approval", () => {
     expect(await db.prepare(
       `select title, markdown, project_id
        from briar_channel_message_documents where message_id = ?`,
-    ).bind(accepted.proposal.resultMessageId).first()).toEqual({
+    ).bind(resultMessageId).first()).toEqual({
       title: "ELI5 result",
       markdown: "<div><strong>A tiny visual explanation.</strong></div>",
       project_id: projectId,

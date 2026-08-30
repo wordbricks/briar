@@ -319,14 +319,7 @@ export async function readChannelMessageRequest(request: Request) {
     "Channel images exceed the 25MB total limit",
   );
   if (!form) {
-    const envelope = jsonAttachmentEnvelope(
-      await readJson(request, 32_768),
-    );
-    return {
-      input: decodeChannelMessageInput(envelope.input),
-      attachments: [] as File[],
-      attachmentReferences: envelope.attachmentReferences,
-    };
+    throw new HttpError(415, "Channel message uploads must be multipart");
   }
   const attachments = readMultipartFiles(
     form,

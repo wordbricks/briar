@@ -28,13 +28,19 @@ import {
   reserveIssueExecutionProposalApproval,
   transferIssue,
 } from "./db";
-import worker from "./index";
+import apiWorker from "./index";
+import {
+  acceptOrganizationChannelExecutionProposal,
+  acceptOrganizationChannelProposal,
+} from "./channel-proposal-routes";
+import { HttpError } from "./http-response";
 import { createOrganizationAgent } from "./organization-agents";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
 import {
   dispatchHuntRun,
   registerExecutionWorker,
   unassignHuntRun,
+  WorkerConflictError,
 } from "./workers";
 
 const organizationId = "a1000000-0000-4000-8000-000000000001";
@@ -279,6 +285,65 @@ describe("conversational issue execution approval", () => {
     GOOGLE_CLIENT_ID: "google-client",
     GOOGLE_CLIENT_SECRET: "google-secret",
   }) as unknown as Env;
+
+  type ChannelProposalApplicationCall = {
+    kind: "create" | "execution";
+    channelId: string;
+    proposalId: string;
+    token: string;
+    request: Record<string, unknown>;
+  };
+
+  const invokeChannelProposal = async (
+    call: ChannelProposalApplicationCall,
+    runtimeEnv: Env,
+  ) => {
+    const userId = call.token === ownerToken
+      ? ownerId
+      : call.token === memberToken
+      ? memberId
+      : null;
+    if (!userId) {
+      return Response.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    try {
+      const result = call.kind === "create"
+        ? await acceptOrganizationChannelProposal({
+          db,
+          env: runtimeEnv,
+          organizationId,
+          channelId: call.channelId,
+          proposalId: call.proposalId,
+          userId,
+          request: call.request,
+        })
+        : await acceptOrganizationChannelExecutionProposal({
+          db,
+          env: runtimeEnv,
+          organizationId,
+          channelId: call.channelId,
+          proposalId: call.proposalId,
+          userId,
+          request: call.request,
+        });
+      return Response.json(result);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return Response.json({ message: error.message }, { status: error.status });
+      }
+      if (error instanceof WorkerConflictError) {
+        return Response.json({ message: error.message }, { status: 409 });
+      }
+      return Response.json({ message: "Internal server error" }, { status: 500 });
+    }
+  };
+
+  const worker = {
+    fetch: (input: Request | ChannelProposalApplicationCall, runtimeEnv: Env) =>
+      input instanceof Request
+        ? apiWorker.fetch(input, runtimeEnv)
+        : invokeChannelProposal(input, runtimeEnv),
+  };
 
   const seedIssueProposal = async () => {
     sequence += 1;
@@ -872,18 +937,13 @@ describe("conversational issue execution approval", () => {
       effort: null,
       workerId: null,
     },
-  ) => new Request(
-    `https://briar.example/organizations/${organizationId}/channels/${channelId}` +
-      `/proposals/${proposalId}/accept-execution`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${token}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    },
-  );
+  ): ChannelProposalApplicationCall => ({
+    kind: "execution",
+    channelId,
+    proposalId,
+    token,
+    request: body,
+  });
 
   it("accepts channel execution once and binds retries to the same member and settings", async () => {
     const seeded = await seedChannelProposal({ reserve: false });
@@ -1094,18 +1154,13 @@ describe("conversational issue execution approval", () => {
       initialAt,
       initialAt,
     ).run();
-    const channelCreateAccept = () => new Request(
-      `https://briar.example/organizations/${organizationId}/channels/${channelId}` +
-        `/proposals/${channelActionId}/accept`,
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${ownerToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ projectId: projectAId }),
-      },
-    );
+    const channelCreateAccept = (): ChannelProposalApplicationCall => ({
+      kind: "create",
+      channelId,
+      proposalId: channelActionId,
+      token: ownerToken,
+      request: { projectId: projectAId },
+    });
     const channelCreatedResponse = await worker.fetch(channelCreateAccept(), env());
     expect(channelCreatedResponse.status).toBe(200);
     const channelCreated = await channelCreatedResponse.json<{

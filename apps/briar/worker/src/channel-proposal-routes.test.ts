@@ -9,7 +9,13 @@ import {
   loadChannelDelta,
   reserveChannelActionProposalApproval,
 } from "./channels";
-import worker from "./index";
+import apiWorker from "./index";
+import {
+  acceptOrganizationChannelProposal,
+  declineOrganizationChannelProposal,
+} from "./channel-proposal-routes";
+import { listOrganizationChannelMessages } from "./channel-message-routes";
+import { HttpError } from "./http-response";
 import { createOrganizationAgent } from "./organization-agents";
 import {
   claimNextQueuedHuntRun,
@@ -23,11 +29,13 @@ import {
   transferIssue,
 } from "./db";
 import { createIsolatedTestDatabase } from "./test-helpers/d1";
+import { RequestDecodeError } from "./request-schema";
 import {
   dispatchHuntRun,
   leaseExpiryFrom,
   registerExecutionWorker,
   unassignHuntRun,
+  WorkerConflictError,
 } from "./workers";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
@@ -301,6 +309,89 @@ describe("channel issue proposal approval route", () => {
     observedAt,
   });
 
+  type ChannelProposalApplicationCall =
+    | {
+      kind: "accept";
+      proposalId: string;
+      projectId: string | null;
+      token: string | null;
+      execution: {
+        provider: "codex";
+        model: string | null;
+        effort: "high" | "medium" | null;
+        workerId: string | null;
+      } | null;
+    }
+    | {
+      kind: "decline";
+      proposalId: string;
+      token: string | null;
+    };
+
+  const proposalUserId = (token: string) =>
+    token === ownerToken
+      ? ownerId
+      : token === memberToken
+      ? memberId
+      : token === outsiderToken
+      ? outsiderId
+      : null;
+
+  const invokeChannelProposal = async (
+    call: ChannelProposalApplicationCall,
+    runtimeEnv: Env,
+  ) => {
+    if (!call.token) {
+      return Response.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    const userId = proposalUserId(call.token);
+    if (!userId) {
+      return Response.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    try {
+      const result = call.kind === "decline"
+        ? await declineOrganizationChannelProposal({
+          db,
+          env: runtimeEnv,
+          organizationId,
+          channelId,
+          proposalId: call.proposalId,
+          userId,
+        })
+        : await acceptOrganizationChannelProposal({
+          db,
+          env: runtimeEnv,
+          organizationId,
+          channelId,
+          proposalId: call.proposalId,
+          userId,
+          request: {
+            projectId: call.projectId,
+            execution: call.execution,
+          },
+        });
+      return Response.json(result);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return Response.json({ message: error.message }, { status: error.status });
+      }
+      if (error instanceof WorkerConflictError) {
+        return Response.json({ message: error.message }, { status: 409 });
+      }
+      if (error instanceof RequestDecodeError) {
+        return Response.json({ message: "Invalid request" }, { status: 400 });
+      }
+      return Response.json({ message: "Internal server error" }, { status: 500 });
+    }
+  };
+
+  const worker = {
+    fetch: (input: Request | ChannelProposalApplicationCall, runtimeEnv: Env) =>
+      input instanceof Request
+        ? apiWorker.fetch(input, runtimeEnv)
+        : invokeChannelProposal(input, runtimeEnv),
+  };
+
   const request = (
     proposalId: string,
     projectId: string | null,
@@ -311,29 +402,22 @@ describe("channel issue proposal approval route", () => {
       effort: "high" | "medium" | null;
       workerId: string | null;
     } | null = null,
-  ) =>
-    new Request(
-      `https://briar.example/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/accept`,
-      {
-        method: "POST",
-        headers: {
-          ...(token ? { authorization: `Bearer ${token}` } : undefined),
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ projectId, execution }),
-      },
-    );
+  ): ChannelProposalApplicationCall => ({
+    kind: "accept",
+    proposalId,
+    projectId,
+    token,
+    execution,
+  });
 
   const declineRequest = (
     proposalId: string,
     token: string | null = ownerToken,
-  ) => new Request(
-    `https://briar.example/organizations/${organizationId}/channels/${channelId}/proposals/${proposalId}/decline`,
-    {
-      method: "POST",
-      headers: token ? { authorization: `Bearer ${token}` } : undefined,
-    },
-  );
+  ): ChannelProposalApplicationCall => ({
+    kind: "decline",
+    proposalId,
+    token,
+  });
 
   const seedProposal = async (
     sequence: number,
@@ -722,19 +806,15 @@ describe("channel issue proposal approval route", () => {
        where json_extract(context_json, '$.proposalId') = ?`,
     ).bind(proposalId).first<{ count: number }>()).resolves.toEqual({ count: 3 });
 
-    const channelResponse = await worker.fetch(new Request(
-      `https://briar.example/organizations/${organizationId}/channels/${channelId}/messages?parentMessageId=50000000-0000-4000-8000-00000000001f`,
-      { headers: { authorization: `Bearer ${ownerToken}` } },
-    ), env());
-    expect(channelResponse.status).toBe(200);
-    const channelBody = await channelResponse.json<{
-      messages: Array<{
-        proposal?: {
-          id: string;
-          resultItems?: Array<{ localKey: string; runId: string }>;
-        } | null;
-      }>;
-    }>();
+    const channelBody = await listOrganizationChannelMessages({
+      db,
+      organizationId,
+      channelId,
+      userId: ownerId,
+      parentMessageId: "50000000-0000-4000-8000-00000000001f",
+      cursor: null,
+      limit: null,
+    });
     expect(
       channelBody.messages.find((message) => message.proposal?.id === proposalId)
         ?.proposal?.resultItems,

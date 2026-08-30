@@ -38,7 +38,6 @@ import {
   getProjectOrganizationChannel,
   isChannelReactionEmoji,
   isChannelRootMessage,
-  listChannelAgentReplies,
   listChannelAgents,
   listChannelMessagePage,
   listChannelRootMessages,
@@ -64,7 +63,6 @@ import {
 } from "./query-contract";
 import {
   readChannelMessageRequest,
-  readJson,
 } from "./request-readers";
 import { decodeRequestSync } from "./request-schema";
 import { requireSession } from "./session-auth";
@@ -508,7 +506,7 @@ export async function toggleOrganizationChannelMessageReaction(
 export async function handleChannelMessageRoute(
   routeInput: ChannelMessageRouteInput,
 ): Promise<Response | undefined> {
-  const { request, url, auth, db, attachmentsBucket, env, context } = routeInput;
+  const { request, url, auth, db, attachmentsBucket } = routeInput;
   const { pathname } = url;
 
   const projectChannelMessagesMatch = pathname.match(
@@ -567,9 +565,6 @@ export async function handleChannelMessageRoute(
 
   const channelMessagesMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages$/u,
-  );
-  const channelMessageMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)$/u,
   );
   const channelAttachmentMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
@@ -645,23 +640,18 @@ export async function handleChannelMessageRoute(
     if (!object) throw new HttpError(404, "Attachment not found");
     return channelAttachmentResponse(attachment, object, object.body);
   }
-  if (channelMessagesMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const searchParams = new URL(request.url).searchParams;
-    return json(await listOrganizationChannelMessages({
-      db,
-      organizationId: channelMessagesMatch[1],
-      channelId: channelMessagesMatch[2],
-      userId: session.user.id,
-      parentMessageId: searchParams.get("parentMessageId"),
-      cursor: searchParams.get("cursor"),
-      limit: searchParams.get("limit"),
-    }));
-  }
-  if (channelMessagesMatch && request.method === "POST") {
+  if (
+    channelMessagesMatch && request.method === "POST" &&
+    request.headers.get("content-type")?.toLowerCase().startsWith(
+      "multipart/form-data",
+    )
+  ) {
     const session = await requireSession(auth, request);
     const parsed =
       await readChannelMessageRequest(request);
+    if (parsed.attachments.length === 0) {
+      throw new HttpError(400, "Channel message upload requires an attachment");
+    }
     return json(await createOrganizationChannelMessage({
       db,
       organizationId: channelMessagesMatch[1],
@@ -672,80 +662,6 @@ export async function handleChannelMessageRoute(
       attachments: parsed.attachments,
       attachmentReferences: parsed.attachmentReferences,
     }), 201);
-  }
-
-  if (channelMessageMatch && request.method === "DELETE") {
-    const session = await requireSession(auth, request);
-    return json(await deleteOrganizationChannelMessage({
-      db,
-      organizationId: channelMessageMatch[1],
-      channelId: channelMessageMatch[2],
-      messageId: channelMessageMatch[3],
-      userId: session.user.id,
-      attachmentsBucket,
-      env,
-      context,
-    }));
-  }
-
-  const channelThreadSubscriptionMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/subscription$/u,
-  );
-  if (
-    channelThreadSubscriptionMatch &&
-    (request.method === "PUT" || request.method === "DELETE")
-  ) {
-    const session = await requireSession(auth, request);
-    return json(await setOrganizationChannelThreadSubscription({
-      db,
-      organizationId: channelThreadSubscriptionMatch[1],
-      channelId: channelThreadSubscriptionMatch[2],
-      rootMessageId: channelThreadSubscriptionMatch[3],
-      userId: session.user.id,
-      subscribed: request.method === "PUT",
-    }));
-  }
-
-  const channelMessageReactionMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/reactions$/u,
-  );
-  if (channelMessageReactionMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    return json(await toggleOrganizationChannelMessageReaction({
-      db,
-      organizationId: channelMessageReactionMatch[1],
-      channelId: channelMessageReactionMatch[2],
-      messageId: channelMessageReactionMatch[3],
-      userId: session.user.id,
-      request: await readJson(request, 1_024),
-    }));
-  }
-
-  const channelAgentRepliesMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/agent-replies$/u,
-  );
-  if (channelAgentRepliesMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const channel = await requireChannelAccess(
-      db,
-      channelAgentRepliesMatch[1],
-      channelAgentRepliesMatch[2],
-      session.user.id,
-    );
-    const jobs = await listChannelAgentReplies(
-      db,
-      channel.id,
-      channelAgentRepliesMatch[3],
-    );
-    const replies = await Promise.all(
-      jobs
-        .filter((job) => job.status === "completed")
-        .map((job) => getChannelMessage(db, channel.id, job.reply_message_id)),
-    );
-    return json({
-      agentReplies: jobs.map(channelReplyJson),
-      messages: replies.filter((reply) => reply !== null),
-    });
   }
 
   return undefined;

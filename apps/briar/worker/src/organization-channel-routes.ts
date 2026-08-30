@@ -296,45 +296,9 @@ export async function handleOrganizationChannelRoute(
     routeInput;
   const { pathname } = url;
 
-  const channelChangesMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channel-changes$/u,
-  );
-  if (channelChangesMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    const since = Number(url.searchParams.get("since") ?? "0");
-    return json(await syncOrganizationChannels({
-      db,
-      organizationId: channelChangesMatch[1],
-      userId: session.user.id,
-      since,
-    }));
-  }
-
   const organizationChannelsMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels$/u,
   );
-
-  const organizationDirectMessagesMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/dms$/u,
-  );
-  if (organizationDirectMessagesMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await createOrganizationDirectMessage({
-      db,
-      organizationId: organizationDirectMessagesMatch[1],
-      userId: session.user.id,
-      request: await readJson(request),
-    }), 201);
-  }
-
-  if (organizationChannelsMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    return json(await listOrganizationChannels({
-      db,
-      organizationId: organizationChannelsMatch[1],
-      userId: session.user.id,
-    }));
-  }
   if (organizationChannelsMatch && request.method === "POST") {
     const session = await requireSession(auth, request);
     const organizationId = organizationChannelsMatch[1];
@@ -380,33 +344,9 @@ export async function handleOrganizationChannelRoute(
     return json({ channel: channelJson(channel) }, 201);
   }
 
-  const organizationChannelReadMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/read$/u,
-  );
-  if (organizationChannelReadMatch && request.method === "PUT") {
-    const session = await requireSession(auth, request);
-    return json(await markOrganizationChannelRead({
-      db,
-      organizationId: organizationChannelReadMatch[1],
-      channelId: organizationChannelReadMatch[2],
-      userId: session.user.id,
-      request: await readJson(request),
-    }));
-  }
-
   const organizationChannelMatch = pathname.match(
     /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)$/u,
   );
-  if (organizationChannelMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    return json(await getOrganizationChannelDetail({
-      db,
-      organizationId: organizationChannelMatch[1],
-      channelId: organizationChannelMatch[2],
-      userId: session.user.id,
-      messageLimit: url.searchParams.get("limit"),
-    }));
-  }
   if (organizationChannelMatch && request.method === "PATCH") {
     const session = await requireSession(auth, request);
     const currentChannel = await requireChannelWriteAccess(

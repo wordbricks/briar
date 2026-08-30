@@ -15,7 +15,6 @@ import { handleIssueReplyWorkerRoute } from "./issue-reply-worker-routes";
 import { handleIssueProposalRoute } from "./issue-proposal-routes";
 import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleChannelOrganizationContextRoute } from "./channel-organization-context-routes";
-import { handleChannelProposalRoute } from "./channel-proposal-routes";
 import { handleChannelReplyClaimRoute } from "./channel-reply-claim-routes";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
 import { handleChannelWebhookManagementRoute } from "./channel-webhook-management-routes";
@@ -251,15 +250,6 @@ async function route(
   if (channelWebhookManagementResponse !== undefined) {
     return channelWebhookManagementResponse;
   }
-
-  const channelProposalResponse = await handleChannelProposalRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-  });
-  if (channelProposalResponse !== undefined) return channelProposalResponse;
 
   const organizationWorkerResponse = await handleOrganizationWorkerRoute({
     request,

@@ -109,12 +109,6 @@ describe("shared multipart request envelope", () => {
       body: { body: "JSON issue message" },
     },
     {
-      name: "channel message",
-      read: readChannelMessageRequest,
-      emptyField: "attachments",
-      body: { body: "JSON channel message" },
-    },
-    {
       name: "issue create",
       read: readIssueRequest,
       emptyField: "attachments",
@@ -152,11 +146,6 @@ describe("shared multipart request envelope", () => {
       name: "issue message",
       read: readIssueMessageRequest,
       body: { body: "Issue message" },
-    },
-    {
-      name: "channel message",
-      read: readChannelMessageRequest,
-      body: { body: "Channel message" },
     },
     {
       name: "issue create",
