@@ -24,7 +24,6 @@ import {
   requireAgentProject,
   requireWorkerProjectBinding,
 } from "./worker-route-auth";
-import { handleMergeBatchRoute } from "./merge-batch-routes";
 import { handleRunAgentRoute } from "./run-agent-routes";
 import { handleRunEvidenceRoute } from "./run-evidence-routes";
 import { handleGithubPublicRoute } from "./github-integration-routes";
@@ -231,15 +230,6 @@ async function route(
     attachmentsBucket,
   });
   if (issueCoreResponse !== undefined) return issueCoreResponse;
-
-  const mergeBatchResponse = await handleMergeBatchRoute({
-    request,
-    url,
-    db,
-    requireWorkerProjectBinding: (projectId, workerId) =>
-      requireWorkerProjectBinding(db, request, projectId, workerId),
-  });
-  if (mergeBatchResponse !== undefined) return mergeBatchResponse;
 
   const issueReplyWorkerResponse = await handleIssueReplyWorkerRoute({
     request,

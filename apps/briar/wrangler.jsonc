@@ -52,7 +52,6 @@
       "/projects*",
       "/managed-computers*",
       "/worker-claims",
-      "/merge-batch-claims*",
       "/runs*",
       "/issue-reply-claims*",
       "/agent-schedule-runs/claim",
