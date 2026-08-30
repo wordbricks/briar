@@ -2,6 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   BlockMergeBatchResponseSchema,
+  CheckpointChannelReplySessionResponseSchema,
   CompleteMergeBatchPublicationResponseSchema,
   HandoffWorkResponse_Outcome,
   HandoffWorkResponse_State,
@@ -13,6 +14,7 @@ import {
   RenewWorkLeaseResponseSchema,
   WorkerQueueService,
   type BlockMergeBatchRequest,
+  type CheckpointChannelReplySessionRequest,
   type CompleteMergeBatchPublicationRequest,
   type CompleteProjectAgentTaskRequest,
   type RecordMergeBatchAuthorityRequest,
@@ -23,6 +25,8 @@ import {
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
 import { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
 import {
+  checkpointChannelReplySession,
+  getClaimedChannelReply,
   getChannelReplySession,
   renewChannelReplyLease,
 } from "./channels";
@@ -97,6 +101,8 @@ export type WorkerQueueServices = {
   readonly renewProjectAgentTaskLease: typeof renewProjectAgentTaskLease;
   readonly renewIssueAgentReplyLease: typeof renewIssueAgentReplyLease;
   readonly renewChannelReplyLease: typeof renewChannelReplyLease;
+  readonly getClaimedChannelReply: typeof getClaimedChannelReply;
+  readonly checkpointChannelReplySession: typeof checkpointChannelReplySession;
   readonly renewMergeBatchLease: typeof renewMergeBatchLease;
   readonly getChannelReplySession: typeof getChannelReplySession;
   readonly issueActivityCredential: typeof issueActivityCredential;
@@ -128,6 +134,8 @@ const workerQueueServices: WorkerQueueServices = {
   renewProjectAgentTaskLease,
   renewIssueAgentReplyLease,
   renewChannelReplyLease,
+  getClaimedChannelReply,
+  checkpointChannelReplySession,
   renewMergeBatchLease,
   getChannelReplySession,
   issueActivityCredential,
@@ -572,6 +580,70 @@ async function handoffWork(
   };
 }
 
+const channelReplyConversationId = (value: string | undefined) => {
+  if (value === undefined) return null;
+  const conversationId = value.trim();
+  if (conversationId.length < 1 || conversationId.length > 1_024) {
+    throw new HttpError(
+      400,
+      "Channel reply conversation ID must contain 1-1024 characters",
+    );
+  }
+  return conversationId;
+};
+
+async function checkpointChannelReplySessionRpc(
+  input: WorkerConnectQueueInput,
+  request: CheckpointChannelReplySessionRequest,
+  services: WorkerQueueServices,
+) {
+  const identity = requiredWork(request.work);
+  if (identity.work.case !== "channelReply") {
+    throw new HttpError(400, "Channel reply claim identity is required");
+  }
+  const worker = await authenticatedWorker(
+    input,
+    request.projectId,
+    request.workerId,
+    services,
+  );
+  const organizationId = identity.work.value.organizationId;
+  if (organizationId !== worker.principal.organizationId) {
+    throw new HttpError(403, "Worker is not enabled for this organization");
+  }
+
+  const observedAt = new Date().toISOString();
+  const claimTokenHash = await services.sha256(identity.claimToken);
+  const claimed = await services.getClaimedChannelReply(input.db, {
+    jobId: identity.workId,
+    deviceId: worker.principal.deviceId,
+    workerId: worker.binding.id,
+    claimTokenHash,
+    observedAt,
+  });
+  if (
+    !claimed || claimed.organization_id !== organizationId ||
+    claimed.channel_id !== identity.runId
+  ) {
+    throw new HttpError(409, "Channel reply claim is no longer active");
+  }
+
+  const session = await services.checkpointChannelReplySession(input.db, {
+    jobId: identity.workId,
+    deviceId: worker.principal.deviceId,
+    workerId: worker.binding.id,
+    claimTokenHash,
+    conversationId: channelReplyConversationId(request.conversationId),
+    observedAt,
+  });
+  if (!session) {
+    throw new HttpError(409, "Channel reply session is no longer active");
+  }
+  return create(CheckpointChannelReplySessionResponseSchema, {
+    retainedUntil: timestamp(session.retained_until, "session retention"),
+  });
+}
+
 async function completeProjectAgentTask(
   input: WorkerConnectQueueInput,
   request: CompleteProjectAgentTaskRequest,
@@ -793,6 +865,10 @@ export function createWorkerQueueService(
       withConnectErrors(() => claimWork(input, request, services)),
     renewWorkLease: (request) =>
       withConnectErrors(() => renewWorkLease(input, request, services)),
+    checkpointChannelReplySession: (request) =>
+      withConnectErrors(() =>
+        checkpointChannelReplySessionRpc(input, request, services)
+      ),
     handoffWork: (request) =>
       withConnectErrors(() => handoffWork(input, request, services)),
     completeProjectAgentTask: (request) =>

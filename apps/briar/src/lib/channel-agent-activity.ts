@@ -100,7 +100,9 @@ const decodeUuid = Schema.decodeUnknownSync(
   Schema.String.check(Schema.isUUID()),
 );
 
-const toDomainKind = (kind: ProtoAgentActivityKind): ChannelAgentActivityKind => {
+export const agentActivityKindFromProto = (
+  kind: ProtoAgentActivityKind,
+): ChannelAgentActivityKind => {
   switch (kind) {
     case ProtoAgentActivityKind.MESSAGE:
       return "message";
@@ -159,7 +161,7 @@ const validateProtobufFrame = (
   if (message.activity !== undefined) {
     const descriptor = decodeDomainDescriptor({
       id: message.activity.id,
-      kind: toDomainKind(message.activity.kind),
+      kind: agentActivityKindFromProto(message.activity.kind),
       headline: message.activity.headline,
     });
     if (
@@ -214,7 +216,7 @@ export const agentReplyActivityDomainFrameOption = Option.liftThrowable(
         ? null
         : {
           id: message.activity.id,
-          kind: toDomainKind(message.activity.kind),
+          kind: agentActivityKindFromProto(message.activity.kind),
           headline: message.activity.headline,
         },
       sentAt: new Date(

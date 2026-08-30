@@ -2,7 +2,9 @@ import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError, type HandlerContext } from "@connectrpc/connect";
 import {
   BlockMergeBatchRequestSchema,
+  ChannelReplyClaimIdentitySchema,
   ClaimWorkRequestSchema,
+  CheckpointChannelReplySessionRequestSchema,
   CompleteMergeBatchPublicationRequestSchema,
   CompleteProjectAgentTaskRequestSchema,
   HandoffWorkRequestSchema,
@@ -30,6 +32,7 @@ const projectId = "11111111-1111-4111-8111-111111111111";
 const deviceId = "22222222-2222-4222-8222-222222222222";
 const organizationId = "33333333-3333-4333-8333-333333333333";
 const workId = "44444444-4444-4444-8444-444444444444";
+const channelId = "66666666-6666-4666-8666-666666666666";
 const requestId = "55555555-5555-4555-8555-555555555555";
 const workerId = "worker-1";
 const claimToken = `briar_claim_${"a".repeat(64)}`;
@@ -71,6 +74,16 @@ const issueIdentity = () => create(WorkClaimIdentitySchema, {
   work: {
     case: "issue",
     value: create(IssueClaimIdentitySchema),
+  },
+});
+
+const channelReplyIdentity = () => create(WorkClaimIdentitySchema, {
+  workId,
+  runId: channelId,
+  claimToken,
+  work: {
+    case: "channelReply",
+    value: create(ChannelReplyClaimIdentitySchema, { organizationId }),
   },
 });
 
@@ -134,6 +147,74 @@ describe("WorkerQueueService lifecycle semantics", () => {
       workId,
       expect.objectContaining({ workerId, claimTokenHash: "b".repeat(64) }),
     );
+  });
+
+  it("checkpoints only the exact active channel reply claim", async () => {
+    const claimed = vi.fn<WorkerQueueServices["getClaimedChannelReply"]>();
+    claimed.mockResolvedValue({
+      id: workId,
+      organization_id: organizationId,
+      channel_id: channelId,
+    } as NonNullable<Awaited<ReturnType<
+      WorkerQueueServices["getClaimedChannelReply"]
+    >>>);
+    const checkpoint = vi.fn<
+      WorkerQueueServices["checkpointChannelReplySession"]
+    >();
+    checkpoint.mockResolvedValue({
+      retained_until: "2026-08-31T02:00:00.000Z",
+    } as NonNullable<Awaited<ReturnType<
+      WorkerQueueServices["checkpointChannelReplySession"]
+    >>>);
+    const service = createWorkerQueueService(input, {
+      requireWorkerProjectBinding: authentication(),
+      sha256: async () => "f".repeat(64),
+      getClaimedChannelReply: claimed,
+      checkpointChannelReplySession: checkpoint,
+    });
+    const request = create(CheckpointChannelReplySessionRequestSchema, {
+      projectId,
+      workerId,
+      work: channelReplyIdentity(),
+      conversationId: " conversation-1 ",
+    });
+
+    const response = await service.checkpointChannelReplySession(
+      request,
+      context,
+    );
+    expect(response.retainedUntil).toEqual(expect.objectContaining({
+      seconds: BigInt(Date.parse("2026-08-31T02:00:00.000Z") / 1_000),
+    }));
+    expect(claimed).toHaveBeenCalledWith(input.db, {
+      jobId: workId,
+      deviceId,
+      workerId,
+      claimTokenHash: "f".repeat(64),
+      observedAt: expect.any(String),
+    });
+    expect(checkpoint).toHaveBeenCalledWith(input.db, {
+      jobId: workId,
+      deviceId,
+      workerId,
+      claimTokenHash: "f".repeat(64),
+      conversationId: "conversation-1",
+      observedAt: expect.any(String),
+    });
+
+    const mismatched = create(CheckpointChannelReplySessionRequestSchema, {
+      ...request,
+      work: create(WorkClaimIdentitySchema, {
+        ...channelReplyIdentity(),
+        runId: "77777777-7777-4777-8777-777777777777",
+      }),
+    });
+    const error = await Promise.resolve(
+      service.checkpointChannelReplySession(mismatched, context),
+    ).catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(ConnectError);
+    expect((error as ConnectError).code).toBe(Code.FailedPrecondition);
+    expect(checkpoint).toHaveBeenCalledTimes(1);
   });
 
   it("preserves handoff correlation and reports an idempotent replay", async () => {

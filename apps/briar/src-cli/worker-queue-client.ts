@@ -12,6 +12,7 @@ import type { WorkerExecutionCheckpoint } from "./worker";
 import {
   claimedWorkFromProto,
   type ChannelActivityCredential,
+  type ClaimedChannelReply,
   type ClaimedProjectAgentTask,
   type ClaimedWork,
   type WorkerLeaseRenewal,
@@ -136,6 +137,26 @@ export function createWorkerQueueClient(apiUrl: string, token: string) {
             response.work.case === "issueReply"
           ? activity(response.work.value.activity)
           : null,
+      };
+    },
+
+    checkpointChannelReplySession: async (input: {
+      projectId: string;
+      workerId: string;
+      work: ClaimedChannelReply;
+      conversationId: string | null;
+    }) => {
+      const response = await client.checkpointChannelReplySession({
+        projectId: input.projectId,
+        workerId: input.workerId,
+        work: workClaimIdentityToProto(input.work),
+        conversationId: input.conversationId ?? undefined,
+      }, options);
+      return {
+        retainedUntil: requiredIsoTimestamp(
+          response.retainedUntil,
+          "retainedUntil",
+        ),
       };
     },
 
