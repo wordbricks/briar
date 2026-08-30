@@ -595,7 +595,13 @@ final class BriarCompanionUITests: XCTestCase {
             additionalArguments: ["--ui-testing-delayed-message-send"]
         )
 
-        app.buttons["create-issue-button"].tap()
+        let menu = app.buttons["task-floating-menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: transitionTimeout))
+        menu.tap()
+
+        let createIssue = app.buttons["create-issue-button"]
+        XCTAssertTrue(createIssue.waitForExistence(timeout: 5))
+        createIssue.tap()
         let title = app.textFields["create-issue-title"]
         XCTAssertTrue(title.waitForExistence(timeout: transitionTimeout))
         XCTAssertTrue(
