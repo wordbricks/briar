@@ -29,21 +29,13 @@ import {
   projectWithRemoteSettings,
   remoteWorkflowState,
 } from "./project-settings-sync";
-import { fetchCurrentUser } from "./app-connect-client";
+import {
+  createManagedComputerSetupSession,
+  fetchCurrentUser,
+  fetchManagedComputer,
+  fetchManagedComputerSetupStatus,
+} from "./app-connect-client";
 export { managedComputerWorkerSupervisor } from "./managed-computer-supervisor";
-
-type SetupSessionResponse = {
-  session: {
-    id: string;
-    managedComputerId: string;
-    organizationId: string;
-    projectId: string;
-    status: "pending" | "consumed";
-    expiresAt: string;
-  };
-  setupToken: string;
-  duplicate: boolean;
-};
 
 type SetupBindResponse = {
   managedComputerId: string;
@@ -197,19 +189,18 @@ export async function managedComputerSetupCommand() {
     credential.apiOrigin,
     userToken,
   );
-  const computer = await request<{
-    computer: { requesterUserId: string; state: string; deviceId: string | null };
-  }>(
+  const computer = await fetchManagedComputer(
     credential.apiOrigin,
-    `/organizations/${credential.organizationId}/managed-computers/${credential.managedComputerId}`,
     userToken,
+    credential.organizationId,
+    credential.managedComputerId,
   );
-  if (computer.computer.requesterUserId !== user.id) {
+  if (computer.requesterUserId !== user.id) {
     throw new Error(
       "Briar must be logged in as the user who owns this managed computer",
     );
   }
-  if (computer.computer.deviceId !== credential.deviceId) {
+  if (computer.deviceId !== credential.deviceId) {
     throw new Error("This managed computer enrollment does not match the API");
   }
 
@@ -242,15 +233,13 @@ export async function managedComputerSetupCommand() {
     { refresh: true },
   );
   const requestId = value("--request-id")?.trim() || crypto.randomUUID();
-  const setup = await request<SetupSessionResponse>(
+  const setup = await createManagedComputerSetupSession(
     credential.apiOrigin,
-    `/organizations/${credential.organizationId}/managed-computers/${credential.managedComputerId}/setup-sessions`,
     userToken,
-    {
-      method: "POST",
-      headers: { "Idempotency-Key": requestId },
-      body: JSON.stringify({ projectId, requestId }),
-    },
+    credential.organizationId,
+    credential.managedComputerId,
+    projectId,
+    requestId,
   );
   const binding = await request<SetupBindResponse>(
     credential.apiOrigin,
@@ -328,10 +317,11 @@ export async function managedComputerStatusCommand() {
     credentialPathFromFlag(),
   );
   const { userToken } = await configForManagedComputer(credential.apiOrigin);
-  const status = await request(
+  const status = await fetchManagedComputerSetupStatus(
     credential.apiOrigin,
-    `/organizations/${credential.organizationId}/managed-computers/${credential.managedComputerId}/setup`,
     userToken,
+    credential.organizationId,
+    credential.managedComputerId,
   );
   console.log(JSON.stringify(status));
 }

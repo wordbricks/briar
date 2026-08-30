@@ -12,11 +12,18 @@ import {
   DashboardService,
   type GetDashboardResponse,
 } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+import { FleetService } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
 import {
   ProjectService,
   type ListProjectsResponse,
   type UpdateProjectSettingsRequest,
 } from "@briar/contracts/gen/briar/app/v1/project_pb";
+import {
+  managedComputerFromProto,
+  managedComputerSetupSessionTicketFromProto,
+  managedComputerSetupStatusFromProto,
+} from "../src/lib/app-rpc/fleet-mappers";
+import { requiredMessage } from "../src/lib/app-rpc/mappers";
 
 const transport = (apiUrl: string) =>
   createConnectTransport({ baseUrl: apiUrl.replace(/\/+$/u, "") });
@@ -67,6 +74,55 @@ export async function updateRemoteProjectSettings(
     ProjectService,
     transport(apiUrl),
   ).updateProjectSettings(input, callOptions(token));
+}
+
+export async function fetchManagedComputer(
+  apiUrl: string,
+  token: string,
+  organizationId: string,
+  managedComputerId: string,
+) {
+  const response = await createClient(
+    FleetService,
+    transport(apiUrl),
+  ).getManagedComputer({ organizationId, managedComputerId }, callOptions(token));
+  return managedComputerFromProto(
+    requiredMessage(response.computer, "managedComputer"),
+  );
+}
+
+export async function createManagedComputerSetupSession(
+  apiUrl: string,
+  token: string,
+  organizationId: string,
+  managedComputerId: string,
+  projectId: string,
+  requestId: string,
+) {
+  const response = await createClient(
+    FleetService,
+    transport(apiUrl),
+  ).createManagedComputerSetupSession(
+    { organizationId, managedComputerId, projectId, requestId },
+    callOptions(token),
+  );
+  return managedComputerSetupSessionTicketFromProto(response);
+}
+
+export async function fetchManagedComputerSetupStatus(
+  apiUrl: string,
+  token: string,
+  organizationId: string,
+  managedComputerId: string,
+) {
+  const response = await createClient(
+    FleetService,
+    transport(apiUrl),
+  ).getManagedComputerSetupStatus(
+    { organizationId, managedComputerId },
+    callOptions(token),
+  );
+  return managedComputerSetupStatusFromProto(response);
 }
 
 export const isUnauthenticatedConnectError = (error: unknown) =>
