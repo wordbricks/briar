@@ -1,5 +1,5 @@
 import { createClient } from "@connectrpc/connect";
-import { RealtimeService } from "@briar/contracts/gen/briar/app/v1/realtime_pb";
+import { RealtimeService } from "@briar/contracts/gen/briar/app/v1/realtime_control_pb";
 import { appCallOptions, appRpc, appTransport } from "./core";
 
 const realtimeClient = appTransport

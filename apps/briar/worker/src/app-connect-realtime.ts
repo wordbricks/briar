@@ -8,7 +8,7 @@ import {
 import {
   CreateRealtimeTicketResponseSchema,
   RealtimeService,
-} from "@briar/contracts/gen/briar/app/v1/realtime_pb";
+} from "@briar/contracts/gen/briar/app/v1/realtime_control_pb";
 import type { BriarAuth } from "./auth";
 import { withConnectErrors } from "./app-connect-errors";
 import { HttpError } from "./http-response";
