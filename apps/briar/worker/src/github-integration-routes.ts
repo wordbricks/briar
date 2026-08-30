@@ -1,5 +1,4 @@
 import * as SchemaIssue from "effect/SchemaIssue";
-import type { BriarAuth } from "./auth";
 import { hasOrganizationCapability } from "./organization-access";
 import { getOrganizationRole } from "./organization-repository";
 import {
@@ -30,8 +29,6 @@ import {
   verifyGitHubWebhook,
 } from "./github";
 import {
-  beginGithubInstallationApplication,
-  getGithubIntegrationApplication,
   githubCallbackOrigin,
   githubConfigAvailable,
   githubOAuthRedirectUri,
@@ -49,7 +46,6 @@ import {
 import { reconcileMergeQueuePullRequest } from "./merge-queue-reconcile";
 import { RequestDecodeError } from "./request-schema";
 import { scheduleInboxRealtimeFlush } from "./realtime-scheduling";
-import { requireSession } from "./session-auth";
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 
@@ -523,44 +519,6 @@ async function handleGithubOAuthCallback(request: Request, env: Env) {
       502,
     );
   }
-}
-
-export async function handleOrganizationGithubRoute(input: {
-  request: Request;
-  url: URL;
-  auth: BriarAuth;
-  db: D1Database;
-  env: Env;
-}): Promise<Response | undefined> {
-  const { request, url, auth, db, env } = input;
-
-  const organizationGithubMatch = url.pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/integrations\/github$/u,
-  );
-  if (organizationGithubMatch && request.method === "GET") {
-    const session = await requireSession(auth, request);
-    return json(await getGithubIntegrationApplication({
-      db,
-      env,
-      organizationId: organizationGithubMatch[1],
-      userId: session.user.id,
-    }));
-  }
-  const organizationGithubInstallMatch = url.pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/integrations\/github\/install-url$/u,
-  );
-  if (organizationGithubInstallMatch && request.method === "POST") {
-    const session = await requireSession(auth, request);
-    return json(await beginGithubInstallationApplication({
-      db,
-      env,
-      organizationId: organizationGithubInstallMatch[1],
-      userId: session.user.id,
-    }), 201);
-  }
-
-
-  return undefined;
 }
 
 export async function handleGithubPublicRoute(input: {

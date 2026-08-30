@@ -31,10 +31,7 @@ import { handleRunAgentRoute } from "./run-agent-routes";
 import { handleRunEvidenceRoute } from "./run-evidence-routes";
 import { handleTranscriptRoute } from "./transcript-routes";
 import { handleExecutionWorkerRoute } from "./execution-worker-routes";
-import {
-  handleGithubPublicRoute,
-  handleOrganizationGithubRoute,
-} from "./github-integration-routes";
+import { handleGithubPublicRoute } from "./github-integration-routes";
 import {
   getProject,
 } from "./db";
@@ -191,17 +188,6 @@ async function route(
     context,
   });
   if (channelMessageResponse !== undefined) return channelMessageResponse;
-
-  const organizationGithubResponse = await handleOrganizationGithubRoute({
-    request,
-    url,
-    auth,
-    db,
-    env,
-  });
-  if (organizationGithubResponse !== undefined) {
-    return organizationGithubResponse;
-  }
 
   const projectGithubResponse = await handleProjectGithubRoute({
     request,

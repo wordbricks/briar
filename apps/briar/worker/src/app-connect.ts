@@ -63,6 +63,7 @@ export async function handleAppConnectRequest(
   registerAppGithubServices(router, {
     ...sharedInput,
     env: input.env,
+    context: input.context,
   });
   registerAppDashboardService(router, {
     ...sharedInput,

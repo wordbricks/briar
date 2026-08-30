@@ -42,12 +42,17 @@ import {
 import { decodeRequestSync } from "./request-schema";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
+import {
+  scheduleInboxRealtimeFlush,
+  scheduleProjectRealtimePublish,
+} from "./realtime-scheduling";
 
 export type AppConnectGithubInput = {
   readonly request: Request;
   readonly auth: BriarAuth;
   readonly db: D1Database;
   readonly env: Env;
+  readonly context?: ExecutionContext;
 };
 
 export type AppConnectGithubServices = {
@@ -228,12 +233,14 @@ export const createAppGithubIntegrationService = (
     withConnectErrors(async () => {
       preventAuthenticatedResponseCaching(context.responseHeader);
       const session = await services.requireSession(input.auth, input.request);
-      return appBeginGithubInstallation(await services.beginInstallation({
+      const result = await services.beginInstallation({
         db: input.db,
         env: input.env,
         organizationId: decodeUuid(request.organizationId).toLowerCase(),
         userId: session.user.id,
-      }));
+      });
+      scheduleInboxRealtimeFlush(input.env, input.db, input.context);
+      return appBeginGithubInstallation(result);
     }),
 });
 
@@ -245,13 +252,20 @@ export const createAppProjectGithubService = (
     withConnectErrors(async () => {
       preventAuthenticatedResponseCaching(context.responseHeader);
       const { project } = await projectAccess(input, services, request.projectId);
-      return appProjectGithubCredential(await withGithubProviderErrors(
+      const result = await withGithubProviderErrors(
         services.createCredential({
           db: input.db,
           env: input.env,
           project,
         }),
-      ));
+      );
+      scheduleProjectRealtimePublish(
+        input.env,
+        input.db,
+        project.id,
+        input.context,
+      );
+      return appProjectGithubCredential(result);
     }),
 
   getProjectGitHubRepository: (request, context) =>
@@ -271,7 +285,7 @@ export const createAppProjectGithubService = (
     withConnectErrors(async () => {
       preventAuthenticatedResponseCaching(context.responseHeader);
       const { project } = await projectAccess(input, services, request.projectId);
-      return appCreateGithubPullRequest(await withGithubProviderErrors(
+      const result = await withGithubProviderErrors(
         services.createPullRequest({
           db: input.db,
           env: input.env,
@@ -284,7 +298,14 @@ export const createAppProjectGithubService = (
             draft: request.draft,
           },
         }),
-      ));
+      );
+      scheduleProjectRealtimePublish(
+        input.env,
+        input.db,
+        project.id,
+        input.context,
+      );
+      return appCreateGithubPullRequest(result);
     }),
 
   getGitHubPullRequest: (request, context) =>
@@ -308,7 +329,7 @@ export const createAppProjectGithubService = (
     withConnectErrors(async () => {
       preventAuthenticatedResponseCaching(context.responseHeader);
       const { project } = await projectAccess(input, services, request.projectId);
-      return appUpdateGithubPullRequest(await withGithubProviderErrors(
+      const result = await withGithubProviderErrors(
         services.updatePullRequest({
           db: input.db,
           env: input.env,
@@ -326,14 +347,21 @@ export const createAppProjectGithubService = (
               : { state: updateState(request.state) }),
           },
         }),
-      ));
+      );
+      scheduleProjectRealtimePublish(
+        input.env,
+        input.db,
+        project.id,
+        input.context,
+      );
+      return appUpdateGithubPullRequest(result);
     }),
 
   mergeGitHubPullRequest: (request, context) =>
     withConnectErrors(async () => {
       preventAuthenticatedResponseCaching(context.responseHeader);
       const { project } = await projectAccess(input, services, request.projectId);
-      return appMergeGithubPullRequest(await withGithubProviderErrors(
+      const result = await withGithubProviderErrors(
         services.mergePullRequest({
           db: input.db,
           env: input.env,
@@ -349,7 +377,14 @@ export const createAppProjectGithubService = (
               : { expectedHeadSha: request.expectedHeadSha }),
           },
         }),
-      ));
+      );
+      scheduleProjectRealtimePublish(
+        input.env,
+        input.db,
+        project.id,
+        input.context,
+      );
+      return appMergeGithubPullRequest(result);
     }),
 
   createGitHubCommitStatus: (request, context) =>
@@ -372,6 +407,12 @@ export const createAppProjectGithubService = (
             : { targetUrl: request.targetUrl }),
         },
       }));
+      scheduleProjectRealtimePublish(
+        input.env,
+        input.db,
+        project.id,
+        input.context,
+      );
       return appCreateGithubCommitStatus();
     }),
 });

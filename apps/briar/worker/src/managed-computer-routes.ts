@@ -29,7 +29,7 @@ import { readJson } from "./request-readers";
 import { requireWorkerCredential } from "./worker-auth";
 import { workerJson } from "./worker-json";
 import { createGithubInstallationToken } from "./github-app-api";
-import { projectGithubIdentity } from "./project-github-routes";
+import { projectGithubIdentity } from "./project-github-application";
 
 export type ManagedComputerRouteInput = {
   request: Request;
