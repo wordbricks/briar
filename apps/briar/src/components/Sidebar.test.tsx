@@ -78,6 +78,27 @@ const sidebarChannel = (
 });
 
 describe("Sidebar", () => {
+  it("shows My issues below Inbox and opens it", async () => {
+    const onMyIssuesOpen = vi.fn();
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <Sidebar {...sidebarProps} onMyIssuesOpen={onMyIssuesOpen} />,
+    );
+
+    const inbox = container.querySelector<HTMLAnchorElement>('a[href="#inbox"]')!;
+    const myIssues = container.querySelector<HTMLAnchorElement>(
+      'a[href="#my-issues"]',
+    )!;
+    expect(myIssues.previousElementSibling).toBe(inbox);
+
+    await act(async () => myIssues.click());
+    expect(onMyIssuesOpen).toHaveBeenCalledTimes(1);
+    await cleanup();
+  });
+
   it("shows channels as an accordion and creates one from its context menu", async () => {
     const onChannelOpen = vi.fn();
     const onChannelCreate = vi.fn().mockResolvedValue(undefined);

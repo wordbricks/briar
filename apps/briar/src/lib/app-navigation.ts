@@ -9,6 +9,7 @@ const ActivePage = Schema.Literals([
   "dms",
   "schedule",
   "inbox",
+  "my-issues",
   "organization-create",
   "settings",
 ]);
@@ -60,6 +61,10 @@ export const ProjectSettingsSection = Schema.Literals([
 ]);
 export type ProjectSettingsSection = typeof ProjectSettingsSection.Type;
 
+export const organizationNavigationPages = ["inbox", "my-issues"] as const;
+const OrganizationNavigationPage = Schema.Literals(organizationNavigationPages);
+export type OrganizationNavigationPage = typeof OrganizationNavigationPage.Type;
+
 export type SettingsNavigationTarget =
   | { readonly scope: "application"; readonly section: AppSettingsSection }
   | {
@@ -81,7 +86,7 @@ export type AppNavigationLocation =
   | `${ChannelNavigationPage}/${string}/${string}/${string}`
   | `channel-pages/${ChannelNavigationPage}/${string}`
   | `channel-pages/${ChannelNavigationPage}/${string}/${string}`
-  | `organizations/${string}/inbox`
+  | `organizations/${string}/${OrganizationNavigationPage}`
   | `settings/application/${AppSettingsSection}`
   | `settings/organization/${string}/${OrganizationSettingsSection}`
   | `settings/project/${string}/${ProjectSettingsSection}`;
@@ -122,7 +127,7 @@ const EncodedProjectSegments = Schema.Tuple([
 const EncodedOrganizationSegments = Schema.Tuple([
   Schema.Literal("organizations"),
   NavigationId,
-  Schema.Literal("inbox"),
+  OrganizationNavigationPage,
 ]);
 const EncodedSettingsSegments = Schema.Union([
   Schema.Tuple([
@@ -244,7 +249,7 @@ function projectNavigationSegments(
 
 function organizationNavigationSegments(
   location: AppNavigationLocation,
-): Option.Option<readonly [organizationId: string, page: "inbox"]> {
+): Option.Option<readonly [organizationId: string, page: OrganizationNavigationPage]> {
   return decodeOrganizationSegments(location.split("/")).pipe(
     Option.flatMap(([, organizationId, page]) =>
       decodeUriComponent(organizationId).pipe(
@@ -304,10 +309,11 @@ export function channelPageNavigationLocation(
 
 export function organizationNavigationLocation(
   organizationId: string,
+  page: OrganizationNavigationPage = "inbox",
 ): AppNavigationLocation {
   return `organizations/${encodeURIComponent(
     decodeNavigationId(organizationId),
-  )}/inbox`;
+  )}/${page}`;
 }
 
 export function settingsNavigationLocation(
