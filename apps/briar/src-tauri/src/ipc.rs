@@ -91,7 +91,6 @@ pub(super) fn builder() -> Builder<tauri::Wry> {
             stop_project_agent_session,
             prepare_for_app_update,
             take_planned_update_agent_recoveries,
-            retry_project_auto_hunt_run,
             start_project_auto_hunt,
             load_auto_hunt_app_server_events,
             load_auto_hunt_dispatch,

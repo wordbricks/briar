@@ -64,31 +64,6 @@ fn validates_auto_hunt_session_ids_before_building_log_paths() {
 }
 
 #[test]
-fn retries_the_requested_run_through_the_briar_cli() {
-    let arguments = auto_hunt_retry_arguments(
-        "515b7a2c-8918-5a8f-a292-f0b95090281c",
-        "616b7a2c-8918-5a8f-a292-f0b95090281d",
-        "GitHub authentication was restored.",
-    );
-
-    assert_eq!(
-        arguments,
-        vec![
-            "run",
-            "retry",
-            "--run",
-            "515b7a2c-8918-5a8f-a292-f0b95090281c",
-            "--request-id",
-            "616b7a2c-8918-5a8f-a292-f0b95090281d",
-            "--reason",
-            "GitHub authentication was restored.",
-            "--actor",
-            "briar-agent-host-tool",
-        ],
-    );
-}
-
-#[test]
 fn targets_the_requested_run_when_claiming_auto_hunt_work() {
     let arguments = auto_hunt_claim_arguments("515b7a2c-8918-5a8f-a292-f0b95090281c");
 

@@ -37,7 +37,6 @@ export const commands = {
 	stopProjectAgentSession: (sessionId: string) => __TAURI_INVOKE<boolean>("stop_project_agent_session", { sessionId }),
 	prepareForAppUpdate: () => __TAURI_INVOKE<number>("prepare_for_app_update"),
 	takePlannedUpdateAgentRecoveries: () => __TAURI_INVOKE<PlannedUpdateAgentRecovery[]>("take_planned_update_agent_recoveries"),
-	retryProjectAutoHuntRun: (projectId: string, runId: string, requestId: string, reason: string) => __TAURI_INVOKE<JsonValue>("retry_project_auto_hunt_run", { projectId, runId, requestId, reason }),
 	startProjectAutoHunt: (projectId: string, request: ProjectAutoHuntRequest_Deserialize) => __TAURI_INVOKE<ProjectAutoHuntResponse>("start_project_auto_hunt", { projectId, request }),
 	loadAutoHuntAppServerEvents: (sessionId: string) => __TAURI_INVOKE<AppServerEventRecord_Serialize[]>("load_auto_hunt_app_server_events", { sessionId }),
 	loadAutoHuntDispatch: (dispatchGroupId: string, afterCursor: number | null) => __TAURI_INVOKE<{
