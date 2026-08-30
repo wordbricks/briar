@@ -11,7 +11,7 @@ const runId = "33333333-3333-4333-8333-333333333333";
 const channelId = "44444444-4444-4444-8444-444444444444";
 const userId = "55555555-5555-4555-8555-555555555555";
 
-const services = (): {
+type RealtimeTicketServiceMocks = {
   readonly value: RealtimeTicketApplicationServices;
   readonly createChannelActivityTicket: ReturnType<
     typeof vi.fn<RealtimeTicketApplicationServices["createChannelActivityTicket"]>
@@ -34,7 +34,9 @@ const services = (): {
   readonly getRun: ReturnType<
     typeof vi.fn<RealtimeTicketApplicationServices["getRun"]>
   >;
-} => {
+};
+
+const services = (): RealtimeTicketServiceMocks => {
   const createChannelActivityTicket = vi.fn<
     RealtimeTicketApplicationServices["createChannelActivityTicket"]
   >().mockResolvedValue({ ticket: "channel-ticket", expiresAt: 1 } as never);
