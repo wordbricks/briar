@@ -220,8 +220,6 @@ export function readIssueReplyCompleteRequest(request: Request) {
   });
 }
 
-const maxProjectIconDataUrlLength = 400_000;
-export const maxProjectIconRequestBytes = maxProjectIconDataUrlLength + 20;
 export async function readIssueMessageRequest(request: Request) {
   const form = await readBoundedMultipartForm(
     request,

@@ -1,21 +1,18 @@
-import {
-  createConnectRouter,
-  type ServiceImpl,
-} from "@connectrpc/connect";
+import { createConnectRouter } from "@connectrpc/connect";
 import { createFetchHandler } from "@connectrpc/connect/protocol";
-import { ProjectService } from "@briar/contracts/gen/briar/app/v1/project_pb";
 import type { BriarAuth } from "./auth";
 import { withCorsHeaders } from "./http-response";
 import { registerAppAccountService } from "./app-connect-account";
 import { registerAppAgentService } from "./app-connect-agent";
 import { registerAppChannelService } from "./app-connect-channel";
 import { registerAppDashboardService } from "./app-connect-dashboard";
-import { withConnectErrors } from "./app-connect-errors";
 import { registerAppInboxService } from "./app-connect-inbox";
 import { registerAppIssueService } from "./app-connect-issue";
-import { appProject } from "./app-connect-mappers";
-import { listProjects } from "./project-repository";
-import { requireSession } from "./session-auth";
+import {
+  appConnectProjectServices,
+  type AppConnectProjectServices,
+  registerAppProjectService,
+} from "./app-connect-project";
 import { registerWorkerExecutionService } from "./worker-connect-execution";
 import { registerWorkerQueueService } from "./worker-connect-queue";
 
@@ -27,41 +24,25 @@ export type AppConnectRouteInput = {
   readonly requireRunExecutionProject: (runId: string) => Promise<string>;
 };
 
-export type AppConnectServices = {
-  readonly requireSession: typeof requireSession;
-  readonly listProjects: typeof listProjects;
-};
-
-const appConnectServices: AppConnectServices = {
-  requireSession,
-  listProjects,
-};
-
-const createProjectService = (
-  { request, auth, env }: AppConnectRouteInput,
-  services: AppConnectServices,
-): ServiceImpl<typeof ProjectService> => ({
-  listProjects: async () =>
-    withConnectErrors(async () => {
-      const session = await services.requireSession(auth, request);
-      const rows = await services.listProjects(env.DB, session.user.id);
-      return {
-        projects: rows.map(appProject),
-      };
-    }),
-});
+export type AppConnectServices = AppConnectProjectServices;
 
 /** Serve a generated Connect RPC when the request targets a registered method. */
 export async function handleAppConnectRequest(
   input: AppConnectRouteInput,
-  services: AppConnectServices = appConnectServices,
+  services: AppConnectServices = appConnectProjectServices,
 ): Promise<Response | undefined> {
   const router = createConnectRouter({
     connect: true,
     grpc: false,
     grpcWeb: false,
   });
-  router.service(ProjectService, createProjectService(input, services));
+  registerAppProjectService(router, {
+    request: input.request,
+    auth: input.auth,
+    db: input.env.DB,
+    env: input.env,
+    context: input.context,
+  }, services);
   const sharedInput = {
     request: input.request,
     auth: input.auth,

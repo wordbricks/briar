@@ -1,5 +1,4 @@
 import * as Schema from "effect/Schema";
-import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import { ModelEffort } from "../../src/lib/agent-provider-contract";
 import { agentProviders } from "../../src/lib/agent-provider";
@@ -35,40 +34,8 @@ import {
 } from "./schema-codecs";
 import { decodeRequestSync } from "./request-schema";
 
-const projectImagePattern =
+const agentImagePattern =
   /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/]+={0,2}$/iu;
-const maxProjectIconDataUrlLength = 400_000;
-
-export const ProjectInput = Schema.Struct({
-  name: trimmedText(1, 100),
-  organizationId: Schema.optional(UuidString),
-});
-
-export const ProjectIconInput = strictSchema(Schema.Struct({
-  icon: Schema.NullOr(
-    Schema.String.check(
-      Schema.isMaxLength(maxProjectIconDataUrlLength),
-      Schema.isPattern(projectImagePattern),
-    ),
-  ),
-}));
-
-const UppercaseTrimmed = Schema.Trim.pipe(
-  Schema.decode({
-    decode: SchemaGetter.transform((value) => value.toUpperCase()),
-    encode: SchemaGetter.transform((value) => value.toUpperCase()),
-  }),
-);
-
-export const ProjectIssueKeyPrefixInput = strictSchema(Schema.Struct({
-  issueKeyPrefix: UppercaseTrimmed.check(
-    Schema.isPattern(/^[A-Z0-9]{1,3}$/u),
-  ),
-}));
-
-export const ProjectTabsInput = strictSchema(Schema.Struct({
-  schedule: Schema.Boolean,
-}));
 
 export const ProjectTransferInput = Schema.Struct({
   targetProjectId: UuidString,
@@ -109,7 +76,7 @@ export const ProjectAgentInput = strictSchema(Schema.Struct({
   avatar: Schema.optional(Schema.NullOr(
     Schema.String.check(
       Schema.isMaxLength(400_000),
-      Schema.isPattern(projectImagePattern),
+      Schema.isPattern(agentImagePattern),
     ),
   )),
   codexPet: Schema.optional(Schema.NullOr(CodexPetSelection)),
@@ -354,12 +321,6 @@ export const ProjectAgentScheduleInput = ScheduleSource.pipe(
   ),
 );
 
-export const decodeProjectInput = decodeRequestSync(ProjectInput);
-export const decodeProjectIconInput = decodeRequestSync(ProjectIconInput);
-export const decodeProjectIssueKeyPrefixInput = decodeRequestSync(
-  ProjectIssueKeyPrefixInput,
-);
-export const decodeProjectTabsInput = decodeRequestSync(ProjectTabsInput);
 export const decodeProjectTransferInput = decodeRequestSync(
   ProjectTransferInput,
 );

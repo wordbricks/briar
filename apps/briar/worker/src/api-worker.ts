@@ -22,7 +22,6 @@ import { handleOrganizationWorkerRoute } from "./organization-worker-routes";
 import { handleOrganizationRoute } from "./organization-routes";
 import { handleProjectAgentRoute } from "./project-agent-routes";
 import { handleProjectAgentTaskWorkerRoute } from "./project-agent-task-worker-routes";
-import { handleProjectCoreRoute } from "./project-core-routes";
 import { handleProjectGithubRoute } from "./project-github-routes";
 import { handleProjectLinearRoute } from "./project-linear-routes";
 import { handleProjectSettingsRoute } from "./project-settings-routes";
@@ -276,17 +275,6 @@ async function route(
   if (organizationSlackResponse !== undefined) {
     return organizationSlackResponse;
   }
-
-  const projectCoreResponse = await handleProjectCoreRoute({
-    request,
-    url,
-    auth,
-    db,
-    attachmentsBucket,
-    env,
-    context,
-  });
-  if (projectCoreResponse !== undefined) return projectCoreResponse;
 
   const projectGithubResponse = await handleProjectGithubRoute({
     request,

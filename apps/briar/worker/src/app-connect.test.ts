@@ -5,6 +5,7 @@ import {
   handleAppConnectRequest,
   type AppConnectServices,
 } from "./app-connect";
+import { appConnectProjectServices } from "./app-connect-project";
 import type { ProjectRow } from "./project-repository";
 
 const listProjectsUrl =
@@ -49,7 +50,11 @@ describe("app Connect adapter", () => {
     const listProjects = vi.fn<AppConnectServices["listProjects"]>(
       async () => [projectRow],
     );
-    const services = { requireSession, listProjects };
+    const services = {
+      ...appConnectProjectServices,
+      requireSession,
+      listProjects,
+    } satisfies AppConnectServices;
     const request = connectRequest();
     const requireRunExecutionProject = vi.fn(async () => projectRow.id);
 

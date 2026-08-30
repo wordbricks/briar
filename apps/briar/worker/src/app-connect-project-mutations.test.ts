@@ -1,0 +1,194 @@
+import { Code, createClient, ConnectError } from "@connectrpc/connect";
+import { createConnectTransport } from "@connectrpc/connect-web";
+import { ProjectService } from "@briar/contracts/gen/briar/app/v1/project_pb";
+import { Miniflare } from "miniflare";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import worker from "./index";
+import { createIsolatedTestDatabase } from "./test-helpers/d1";
+
+describe("ProjectService mutations", () => {
+  const organizationId = "11111111-1111-4111-8111-111111111111";
+  const ownerId = "project-connect-owner";
+  const developerId = "project-connect-developer";
+  const viewerId = "project-connect-viewer";
+  const now = "2026-08-31T00:00:00.000Z";
+  const tokens = {
+    owner: "project-connect-owner-token",
+    developer: "project-connect-developer-token",
+    viewer: "project-connect-viewer-token",
+  } as const;
+  let miniflare: Miniflare;
+  let db: D1Database;
+
+  beforeAll(async () => {
+    const database = await createIsolatedTestDatabase({
+      suite: "app-connect-project-mutations",
+    });
+    miniflare = database.miniflare;
+    db = database.db;
+
+    const users = [
+      [ownerId, "Owner", "owner@example.com", "owner", tokens.owner],
+      [
+        developerId,
+        "Developer",
+        "developer@example.com",
+        "developer",
+        tokens.developer,
+      ],
+      [viewerId, "Viewer", "viewer@example.com", "viewer", tokens.viewer],
+    ] as const;
+    for (const [userId, name, email, role, token] of users) {
+      await db.batch([
+        db
+          .prepare(
+            `insert into "user" (
+             id, name, email, emailVerified, createdAt, updatedAt
+           ) values (?, ?, ?, 1, ?, ?)`,
+          )
+          .bind(userId, name, email, now, now),
+        db
+          .prepare(
+            `insert into "session" (
+             id, expiresAt, token, createdAt, updatedAt, userId
+           ) values (?, '2099-01-01T00:00:00.000Z', ?, ?, ?, ?)`,
+          )
+          .bind(`session-${role}`, token, now, now, userId),
+      ]);
+    }
+    await db.batch([
+      db
+        .prepare(
+          `insert into briar_organizations (id, name, handle, created_at, updated_at)
+         values (?, 'Project Connect', 'project-connect', ?, ?)`,
+        )
+        .bind(organizationId, now, now),
+      ...users.map(([userId, _name, _email, role]) =>
+        db
+          .prepare(
+            `insert into briar_organization_members (
+             organization_id, user_id, role, created_at, updated_at
+           ) values (?, ?, ?, ?, ?)`,
+          )
+          .bind(organizationId, userId, role, now, now),
+      ),
+    ]);
+  }, 60_000);
+
+  afterAll(async () => {
+    await miniflare.dispose();
+  });
+
+  const client = (token: string) =>
+    createClient(
+      ProjectService,
+      createConnectTransport({
+        baseUrl: "https://briar.example",
+        fetch: async (input, init) =>
+          worker.fetch(new Request(input, init), {
+            DB: db,
+            ATTACHMENTS: {},
+            ARCHIVES: {},
+            BETTER_AUTH_SECRET:
+              "briar-test-secret-that-is-at-least-32-characters",
+            GOOGLE_CLIENT_ID: "google-client",
+            GOOGLE_CLIENT_SECRET: "google-secret",
+          } as never),
+      }),
+    );
+
+  const options = (token: string) => ({
+    headers: { authorization: `Bearer ${token}` },
+  });
+
+  it("owns the full project control lifecycle and enforces capabilities", async () => {
+    const owner = client(tokens.owner);
+    const created = await owner.createProject(
+      { name: "  Connect Project  ", organizationId },
+      options(tokens.owner),
+    );
+    expect(created.agentToken).toMatch(/^briar_agent_/u);
+    expect(created.project).toMatchObject({
+      name: "Connect Project",
+      issueKeyPrefix: "AH",
+      scheduleTabEnabled: true,
+      organizationId,
+    });
+    const projectId = created.project?.id;
+    expect(projectId).toBeTruthy();
+
+    await db.batch(
+      [developerId, viewerId].map((userId) =>
+        db
+          .prepare(
+            `insert into briar_project_members (
+             project_id, organization_id, user_id, created_at, updated_at
+           ) values (?, ?, ?, ?, ?)`,
+          )
+          .bind(projectId, organizationId, userId, now, now),
+      ),
+    );
+
+    const icon = "data:image/png;base64,aA==";
+    await expect(
+      owner.updateProjectIcon(
+        { projectId: projectId!, iconUpdate: { case: "icon", value: icon } },
+        options(tokens.owner),
+      ),
+    ).resolves.toMatchObject({ project: { icon } });
+    const clearedIcon = await owner.updateProjectIcon(
+      {
+        projectId: projectId!,
+        iconUpdate: { case: "clearIcon", value: {} },
+      },
+      options(tokens.owner),
+    );
+    expect(clearedIcon.project?.icon).toBeUndefined();
+    await expect(
+      owner.updateProjectIssueKeyPrefix(
+        { projectId: projectId!, issueKeyPrefix: " br " },
+        options(tokens.owner),
+      ),
+    ).resolves.toMatchObject({ project: { issueKeyPrefix: "BR" } });
+    await expect(
+      owner.updateProjectTabs(
+        { projectId: projectId!, schedule: false },
+        options(tokens.owner),
+      ),
+    ).resolves.toMatchObject({ project: { scheduleTabEnabled: false } });
+
+    const deniedProjectUpdate = await client(tokens.developer)
+      .updateProjectTabs(
+        { projectId: projectId!, schedule: true },
+        options(tokens.developer),
+      )
+      .catch((error: unknown) => error);
+    expect(deniedProjectUpdate).toBeInstanceOf(ConnectError);
+    expect((deniedProjectUpdate as ConnectError).code).toBe(
+      Code.PermissionDenied,
+    );
+
+    await expect(
+      client(tokens.developer).createProjectAgentToken(
+        { projectId: projectId! },
+        options(tokens.developer),
+      ),
+    ).resolves.toMatchObject({ agentToken: expect.stringMatching(/^briar_agent_/u) });
+    const deniedAgentToken = await client(tokens.viewer)
+      .createProjectAgentToken(
+        { projectId: projectId! },
+        options(tokens.viewer),
+      )
+      .catch((error: unknown) => error);
+    expect(deniedAgentToken).toBeInstanceOf(ConnectError);
+    expect((deniedAgentToken as ConnectError).code).toBe(Code.PermissionDenied);
+
+    await expect(
+      owner.deleteProject({ projectId: projectId! }, options(tokens.owner)),
+    ).resolves.toMatchObject({ deleted: true });
+    const remaining = await owner.listProjects({}, options(tokens.owner));
+    expect(remaining.projects).not.toContainEqual(
+      expect.objectContaining({ id: projectId }),
+    );
+  });
+});

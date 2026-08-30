@@ -12,10 +12,12 @@ import {
   handleAppConnectRequest,
   type AppConnectServices,
 } from "./app-connect";
+import { appConnectProjectServices } from "./app-connect-project";
 
 describe("App Connect errors", () => {
   it("preserves validation details across the HTTP boundary", async () => {
     const services: AppConnectServices = {
+      ...appConnectProjectServices,
       requireSession: vi.fn(),
       listProjects: vi.fn(),
     };
